@@ -25,10 +25,10 @@ void vel_ic(const Vector &coords, double t, Vector &u);
 void vel_icBox(const Vector &coords, double t, Vector &u);
 void vel_wall(const Vector &x, double t, Vector &u);
 void vel_inlet(const Vector &x, double t, Vector &u);
-double temp_ic(const Vector &coords, double t);
-double temp_wall(const Vector &x, double t);
-double temp_wallBox(const Vector &x, double t);
-double temp_inlet(const Vector &x, double t);
+//double temp_ic(const Vector &coords, double t);
+//double temp_wall(const Vector &x, double t);
+//double temp_wallBox(const Vector &x, double t);
+//double temp_inlet(const Vector &x, double t);
 double pres_inlet(const Vector &x, double p);
 void vel_channelTest(const Vector &coords, double t, Vector &u);
 
@@ -82,6 +82,12 @@ LoMachSolver::LoMachSolver(LoMachOptions loMach_opts, TPS::Tps *tps)
   //plasma_conductivity_ = NULL;
   //plasma_conductivity_coef_ = NULL;
   //joule_heating_ = NULL;
+
+  // instantiate phyics models
+  tcClass->thermoChem(tps_,this);
+  //flowClass->flow(tps_,this);
+  //turbClass->turbulence(tps_,this);  
+    
 }
 
 
@@ -121,55 +127,20 @@ void LoMachSolver::initialize() {
      std::cout << "  " << endl;          
    }
 
-   static_rho = config.const_dens;
-   kin_vis = config.const_visc;
-   ambientPressure = config.amb_pres;
-   thermoPressure = config.amb_pres;
-   tPm1 = thermoPressure;
-   tPm2 = thermoPressure;
-   dtP = 0.0;
+   //static_rho = config.const_dens;
+   //kin_vis = config.const_visc;
+   //ambientPressure = config.amb_pres;
+   //thermoPressure = config.amb_pres;
+   //tPm1 = thermoPressure;
+   //tPm2 = thermoPressure;
+   //dtP = 0.0;
 
    // HARD CODE HARDCODE get for dry air
-   Rgas = 287.0;
-   Pr = 0.76;
-   Cp = 1000.5;
-   gamma = 1.4;
+   //Rgas = 287.0;
+   //Pr = 0.76;
+   //Cp = 1000.5;
+   //gamma = 1.4;
 
-   
-   //-----------------------------------------------------
-   // 1) Prepare the mesh
-   //-----------------------------------------------------
-   
-   // temporary hard-coded mesh
-   /*
-   // domain size
-   double Lx = 2.0 * M_PI;
-   double Ly = 1.0;
-   double Lz = M_PI;
-
-   // mesh size
-   int N = order + 1;
-   int NL = static_cast<int>(std::round(64.0 / N)); // Coarse
-   double LC = M_PI / NL;
-   int NX = 2 * NL;
-   int NY = 2 * static_cast<int>(std::round(48.0 / N));
-   int NZ = NL;
-
-   Mesh mesh = Mesh::MakeCartesian3D(NX, NY, NZ, Element::HEXAHEDRON, Lx, Ly, Lz);
-   Mesh *mesh_ptr = &mesh;
-   if (verbose) grvy_printf(ginfo, "Constructed mesh...\n");   
-
-   for (int i = 0; i < mesh.GetNV(); ++i)
-   {
-      double *v = mesh.GetVertex(i);
-      v[1] = mesh_stretching_func(v[1]);
-   }
-
-   // Create translation vectors defining the periodicity
-   Vector x_translation({Lx, 0.0, 0.0});
-   Vector z_translation({0.0, 0.0, Lz});
-   std::vector<Vector> translations = {x_translation, z_translation};   
-   */
 
    /**/
     Vector x_translation({config.GetXTrans(), 0.0, 0.0});
@@ -201,8 +172,6 @@ void LoMachSolver::initialize() {
    Mesh periodic_mesh = Mesh::MakePeriodic(mesh,mesh.CreatePeriodicVertexMapping(translations));
    if (verbose) grvy_printf(ginfo, "Mesh made periodic (if applicable)...\n");         
 
-   // HACK HACK HACK HARD CODE
-   nvel = 3;
    
    // underscore stuff is terrible
    dim_ = mesh_ptr->Dimension();
@@ -210,6 +179,9 @@ void LoMachSolver::initialize() {
    dim = dim_;
    //if (verbose) grvy_printf(ginfo, "Got mesh dim...\n");            
 
+   // HACK HACK HACK HARD CODE
+   nvel = dim;
+   
    // 1b) Refine the serial mesh, if requested
    /*
    if (verbose && (loMach_opts_.ref_levels > 0)) {
@@ -233,12 +205,12 @@ void LoMachSolver::initialize() {
   mixture = NULL;
 
   // HARD CODE HARD CODE HARD CODE
-  config.dryAirInput.specific_heat_ratio = 1.4;
-  config.dryAirInput.gas_constant = 287.058;
-  config.dryAirInput.f = config.workFluid;
-  config.dryAirInput.eq_sys = config.eqSystem;  
-  mixture = new DryAir(config, dim, nvel);  // conditional jump, must be using something in config that wasnt parsed?
-  transportPtr = new DryAirTransport(mixture, config);
+  //config.dryAirInput.specific_heat_ratio = 1.4;
+  //config.dryAirInput.gas_constant = 287.058;
+  //config.dryAirInput.f = config.workFluid;
+  //config.dryAirInput.eq_sys = config.eqSystem;  
+  //mixture = new DryAir(config, dim, nvel);  // conditional jump, must be using something in config that wasnt parsed?
+  //transportPtr = new DryAirTransport(mixture, config);
 
   if (rank0_) {
     if (config.sgsModelType == 1) {
@@ -250,121 +222,6 @@ void LoMachSolver::initialize() {
     //  std::cout << "Dynamic Smagorinsky subgrid model active" << endl;    
     //}    
   }
-
-  
-  /*
-  switch (config.GetWorkingFluid()) {
-    case WorkingFluid::DRY_AIR:
-      mixture = new DryAir(config, dim, nvel);
-
-#if defined(_CUDA_) || defined(_HIP_)
-      tpsGpuMalloc((void **)(&d_mixture), sizeof(DryAir));
-      gpu::instantiateDeviceDryAir<<<1, 1>>>(config.dryAirInput, dim, nvel, d_mixture);
-
-      tpsGpuMalloc((void **)&transportPtr, sizeof(DryAirTransport));
-      gpu::instantiateDeviceDryAirTransport<<<1, 1>>>(d_mixture, config.GetViscMult(), config.GetBulkViscMult(),
-                                                      config.sutherland_.C1, config.sutherland_.S0,
-                                                      config.sutherland_.Pr, transportPtr);
-#else
-      transportPtr = new DryAirTransport(mixture, config);
-#endif
-      break;
-    case WorkingFluid::USER_DEFINED:
-      switch (config.GetGasModel()) {
-        case GasModel::PERFECT_MIXTURE:
-          mixture = new PesfectMixture(config, dim, nvel);
-#if defined(_CUDA_) || defined(_HIP_)
-          tpsGpuMalloc((void **)(&d_mixture), sizeof(PesfectMixture));
-          gpu::instantiateDevicePesfectMixture<<<1, 1>>>(config.pesfectMixtureInput, dim, nvel, d_mixture);
-#endif
-          break;
-        default:
-          mfem_error("GasModel not recognized.");
-          break;
-      }
-      switch (config.GetTranportModel()) {
-        case ARGON_MINIMAL:
-#if defined(_CUDA_) || defined(_HIP_)
-          tpsGpuMalloc((void **)&transportPtr, sizeof(ArgonMinimalTransport));
-          gpu::instantiateDeviceArgonMinimalTransport<<<1, 1>>>(d_mixture, config.argonTransportInput, transportPtr);
-#else
-          transportPtr = new ArgonMinimalTransport(mixture, config);
-#endif
-          break;
-        case ARGON_MIXTURE:
-#if defined(_CUDA_) || defined(_HIP_)
-          tpsGpuMalloc((void **)&transportPtr, sizeof(ArgonMixtureTransport));
-          gpu::instantiateDeviceArgonMixtureTransport<<<1, 1>>>(d_mixture, config.argonTransportInput, transportPtr);
-#else
-          transportPtr = new ArgonMixtureTransport(mixture, config);
-#endif
-          break;
-        case CONSTANT:
-#if defined(_CUDA_) || defined(_HIP_)
-          tpsGpuMalloc((void **)&transportPtr, sizeof(ConstantTransport));
-          gpu::instantiateDeviceConstantTransport<<<1, 1>>>(d_mixture, config.constantTransport, transportPtr);
-#else
-          transportPtr = new ConstantTransport(mixture, config);
-#endif
-          break;
-        default:
-          mfem_error("TransportModel not recognized.");
-          break;
-      }
-      switch (config.GetChemistryModel()) {
-        default:
-#if defined(_CUDA_) || defined(_HIP_)
-          tpsGpuMalloc((void **)&chemistry_, sizeof(Chemistry));
-          gpu::instantiateDeviceChemistry<<<1, 1>>>(d_mixture, config.chemistryInput, chemistry_);
-#else
-          chemistry_ = new Chemistry(mixture, config.chemistryInput);
-#endif
-          break;
-      }
-      break;
-      
-    case WorkingFluid::LTE_FLUID:
-#if defined(_GPU_)
-      mfem_error("LTE_FLUID not supported for GPU.");
-#else
-      mixture = new LteMixture(config, dim, nvel);
-      transportPtr = new LteTransport(mixture, config);
-#endif
-      break;
-    default:
-      mfem_error("WorkingFluid not recognized.");
-      break;
-  }
-  */
-
-
-  /*
-  switch (config.radiationInput.model) {
-    case NET_EMISSION:
-#if defined(_CUDA_) || defined(_HIP_)
-      tpsGpuMalloc((void **)(&radiation_), sizeof(NetEmission));
-      gpu::instantiateDeviceNetEmission<<<1, 1>>>(config.radiationInput, radiation_);
-#else
-      radiation_ = new NetEmission(config.radiationInput);
-#endif
-      break;
-    case NONE_RAD:
-      break;
-    default:
-      mfem_error("RadiationModel not recognized.");
-      break;      
-  }
-  */
-
-  /*
-  assert(mixture != NULL);
-#if defined(_CUDA_) || defined(_HIP_)
-#else
-  d_mixture = mixture;
-#endif
-  */
-  //std::cout << " okay 1..." << endl;
-
 
    
   MaxIters = config.GetNumIters();
@@ -552,11 +409,11 @@ void LoMachSolver::initialize() {
       pres_ess_attr.SetSize(pmesh->bdr_attributes.Max());
       pres_ess_attr = 0;
 
-      temp_ess_attr.SetSize(pmesh->bdr_attributes.Max());
-      temp_ess_attr = 0;
+      //temp_ess_attr.SetSize(pmesh->bdr_attributes.Max());
+      //temp_ess_attr = 0;
 
-      Qt_ess_attr.SetSize(pmesh->bdr_attributes.Max());
-      Qt_ess_attr = 0;
+      //Qt_ess_attr.SetSize(pmesh->bdr_attributes.Max());
+      //Qt_ess_attr = 0;
    }
    if (verbose) grvy_printf(ginfo, "Spaces constructed...\n");   
    
@@ -660,8 +517,8 @@ void LoMachSolver::initialize() {
    boussinesqField = 0.0;   
    divU.SetSize(sfes_truevsize);
    divU = 0.0;
-   Qt.SetSize(sfes_truevsize);
-   Qt = 0.0;   
+   //Qt.SetSize(sfes_truevsize);
+   //Qt = 0.0;   
 
    pn.SetSize(pfes_truevsize);
    pnm1.SetSize(pfes_truevsize);
@@ -699,7 +556,7 @@ void LoMachSolver::initialize() {
    FText_gf.SetSpace(vfes);
    resu_gf.SetSpace(vfes);
 
-   gradT_gf.SetSpace(vfes);   
+   //gradT_gf.SetSpace(vfes);   
 
    pn_gf.SetSpace(pfes);
    pn_gf = 0.0;
@@ -709,6 +566,7 @@ void LoMachSolver::initialize() {
    cur_step = 0;
 
    // adding temperature
+   /*
    Tn.SetSize(sfes_truevsize);
    Tn = 298.0; // fix hardcode, shouldnt matter
    Tn_next.SetSize(sfes_truevsize);
@@ -741,22 +599,24 @@ void LoMachSolver::initialize() {
    Text_bdr.SetSize(sfes_truevsize);   
    Text_gf.SetSpace(sfes);
    t_bdr.SetSize(sfes_truevsize);
+   */
 
    Pext_bdr.SetSize(pfes_truevsize);   
    Pext_gf.SetSpace(pfes);
    p_bdr.SetSize(pfes_truevsize);      
    
-   resT.SetSize(sfes_truevsize);
+   //resT.SetSize(sfes_truevsize);
    tmpR0.SetSize(sfes_truevsize);
    tmpR0a.SetSize(sfes_truevsize);   
    tmpR0b.SetSize(sfes_truevsize);
    tmpR0c.SetSize(sfes_truevsize);
-   resT = 0.0;
+   //resT = 0.0;
    tmpR0 = 0.0;
    tmpR0a = 0.0;   
    tmpR0b = 0.0;
    tmpR0c = 0.0;
-   
+
+   /*
    Tn_next_gf.SetSpace(sfes);
    Tn_gf.SetSpace(sfes);
    Tnm1_gf.SetSpace(sfes);
@@ -764,16 +624,16 @@ void LoMachSolver::initialize() {
    Tn_next_gf = 298.0;
    Tn_gf = 298.0; // fix hardcode   
    Tnm1_gf = 298.0;
-   Tnm2_gf = 298.0;
-   
+   Tnm2_gf = 298.0;   
    resT_gf.SetSpace(sfes);
+   */
 
    viscSml.SetSize(sfes_truevsize);
    viscSml = 1.0e-12;
    viscMultSml.SetSize(sfes_truevsize);
    viscMultSml = 1.0;
-   alphaSml.SetSize(sfes_truevsize);
-   alphaSml = 1.0e-12;   
+   //alphaSml.SetSize(sfes_truevsize);
+   //alphaSml = 1.0e-12;   
 
    //subgridVisc_gf.SetSpace(sfes);   
    subgridViscSml.SetSize(sfes_truevsize);
@@ -826,8 +686,8 @@ void LoMachSolver::initialize() {
    
    viscTotal_gf.SetSpace(sfes);
    viscTotal_gf = 0.0;
-   alphaTotal_gf.SetSpace(sfes);
-   alphaTotal_gf = 0.0;   
+   //alphaTotal_gf.SetSpace(sfes);
+   //alphaTotal_gf = 0.0;   
    resolution_gf.SetSpace(sfes);
    resolution_gf = 0.0;   
    
@@ -849,7 +709,10 @@ void LoMachSolver::initialize() {
    initSolutionAndVisualizationVectors();
    MPI_Barrier(MPI_COMM_WORLD);       
    if (verbose) grvy_printf(ginfo, "init Sol and Vis okay...\n");
-   
+
+   tcClass->initialize();
+   //flowClass->initialize();
+   //turbClass->initialize();     
 
 
   /**/
@@ -1150,7 +1013,7 @@ void LoMachSolver::Setup(double dt)
    ParGridFunction *r_gf = GetCurrentDensity();   
    ParGridFunction *u_gf = GetCurrentVelocity();
    ParGridFunction *p_gf = GetCurrentPressure();
-   ParGridFunction *t_gf = GetCurrentTemperature();
+   //ParGridFunction *t_gf = GetCurrentTemperature();
    //ParGridFunction *mu_gf = GetCurrentTotalViscosity();
    //ParGridFunction *res_gf = GetCurrentResolution();         
    //std::cout << "Check 0..." << std::endl;   
@@ -1177,7 +1040,8 @@ void LoMachSolver::Setup(double dt)
    }
    un_gf.GetTrueDofs(un);
    //std::cout << "Check 1..." << std::endl;
-   
+
+   /*
    if (config.useICFunction == true) {   
      FunctionCoefficient t_ic_coef(temp_ic);
      //if (!config.restart) t_gf->ProjectCoefficient(t_ic_coef);
@@ -1190,14 +1054,13 @@ void LoMachSolver::Setup(double dt)
      if(rank0_) { std::cout << "Using initial condition box function" << endl;}          
    } else {
      ConstantCoefficient t_ic_coef;
-     //t_ic_coef.constant = config.initRhoRhoVp[4] / (Rgas * config.initRhoRhoVp[0]);
      t_ic_coef.constant = config.initRhoRhoVp[4];
-     //if (!config.restart) t_gf->ProjectCoefficient(t_ic_coef);
      if (!config.restart) Tn_gf.ProjectCoefficient(t_ic_coef);          
      if(rank0_) { std::cout << "Initial temperature set from input file: " << config.initRhoRhoVp[4] << endl;}
    }
-   Tn_gf.GetTrueDofs(Tn);
+   //Tn_gf.GetTrueDofs(Tn);
    //std::cout << "Check 2..." << std::endl;
+   */
    
    Array<int> domain_attr(pmesh->attributes);
    domain_attr = 1;
@@ -1221,9 +1084,9 @@ void LoMachSolver::Setup(double dt)
    //ConstantCoefficient t_bc_coef;
    ConstantCoefficient Qt_bc_coef;   
    Array<int> attr(pmesh->bdr_attributes.Max());   
-   Array<int> Tattr(pmesh->bdr_attributes.Max());
+   //Array<int> Tattr(pmesh->bdr_attributes.Max());
    Array<int> Pattr(pmesh->bdr_attributes.Max());
-   Array<int> Qattr(pmesh->bdr_attributes.Max());      
+   //Array<int> Qattr(pmesh->bdr_attributes.Max());      
 
 
    // book-keeping setup => need to build a face normal for bc dof connection
@@ -1261,13 +1124,13 @@ void LoMachSolver::Setup(double dt)
    // inlet bc
    /**/
    attr = 0.0;
-   Tattr = 0.0;
+   //Tattr = 0.0;
    Pattr = 0.0;
    for (int i = 0; i < numInlets; i++) {
      for (int iFace = 1; iFace < pmesh->bdr_attributes.Max()+1; iFace++) {     
        if (iFace == config.inletPatchType[i].first) {
          attr[iFace-1] = 1;
-         Tattr[iFace-1] = 1;
+         //Tattr[iFace-1] = 1;
          //Pattr[iFace-1] = 1;	 	 
        }
      }
@@ -1294,14 +1157,14 @@ void LoMachSolver::Setup(double dt)
        //AddTempDirichletBC(temp_inlet, Tattr);
        */
        buffer_uInletInf = new ParGridFunction(vfes);
-       buffer_tInletInf = new ParGridFunction(sfes);             
+       //buffer_tInletInf = new ParGridFunction(sfes);             
        buffer_uInlet = new ParGridFunction(vfes);
-       buffer_tInlet = new ParGridFunction(sfes);             
+       //buffer_tInlet = new ParGridFunction(sfes);             
        uniformInlet();
        uInletField = new VectorGridFunctionCoefficient(buffer_uInlet);   
        AddVelDirichletBC(uInletField, attr);
-       tInletField = new GridFunctionCoefficient(buffer_tInlet);   
-       AddTempDirichletBC(tInletField, Tattr);       
+       //tInletField = new GridFunctionCoefficient(buffer_tInlet);   
+       //AddTempDirichletBC(tInletField, Tattr);       
 
        
      } else if (config.inletPatchType[i].second == InletType::INTERPOLATE) {
@@ -1309,9 +1172,9 @@ void LoMachSolver::Setup(double dt)
 
        // interpolate from external file
        buffer_uInletInf = new ParGridFunction(vfes);
-       buffer_tInletInf = new ParGridFunction(sfes);             
+       //buffer_tInletInf = new ParGridFunction(sfes);             
        buffer_uInlet = new ParGridFunction(vfes);
-       buffer_tInlet = new ParGridFunction(sfes);      
+       //buffer_tInlet = new ParGridFunction(sfes);      
        interpolateInlet();
        if (rank0_) std::cout << "Interpolation complete... " << endl;
        uInletField = new VectorGridFunctionCoefficient(buffer_uInlet);   
@@ -1336,9 +1199,9 @@ void LoMachSolver::Setup(double dt)
        */
        
        if (rank0_) std::cout << "Interpolated velocity conditions applied " << endl;       
-       tInletField = new GridFunctionCoefficient(buffer_tInlet);   
-       AddTempDirichletBC(tInletField, Tattr);
-       if (rank0_) std::cout << "Interpolated temperature conditions applied " << endl;       
+       //tInletField = new GridFunctionCoefficient(buffer_tInlet);   
+       //AddTempDirichletBC(tInletField, Tattr);
+       //if (rank0_) std::cout << "Interpolated temperature conditions applied " << endl;       
 
      }     
    }
@@ -1349,7 +1212,7 @@ void LoMachSolver::Setup(double dt)
    // outlet bc
    /**/
    attr = 0.0;
-   Tattr = 0.0;
+   //Tattr = 0.0;
    Pattr = 0.0;
    for (int i = 0; i < numOutlets; i++) {
      for (int iFace = 1; iFace < pmesh->bdr_attributes.Max()+1; iFace++) {     
@@ -1401,7 +1264,6 @@ void LoMachSolver::Setup(double dt)
        
      }
      */
-
      
    }
    if (rank0_) std::cout << "Outlet bc's completed: " << numOutlets << endl;   
@@ -1454,11 +1316,12 @@ void LoMachSolver::Setup(double dt)
 
    // this is absolutely terrible
    //ConstantCoefficient t_bc_coef(wallBCs);
-   if (numWalls > 0) { ConstantCoefficient t_bc_coef0(wallBCs[0]); }   
-   if (numWalls > 1) { ConstantCoefficient t_bc_coef1(wallBCs[1]); }
-   if (numWalls > 2) { ConstantCoefficient t_bc_coef2(wallBCs[2]); }
-   if (numWalls > 3) { ConstantCoefficient t_bc_coef2(wallBCs[3]); }   
-   
+   //if (numWalls > 0) { ConstantCoefficient t_bc_coef0(wallBCs[0]); }   
+   //if (numWalls > 1) { ConstantCoefficient t_bc_coef1(wallBCs[1]); }
+   //if (numWalls > 2) { ConstantCoefficient t_bc_coef2(wallBCs[2]); }
+   //if (numWalls > 3) { ConstantCoefficient t_bc_coef2(wallBCs[3]); }   
+
+   /*
    for (int i = 0; i < numWalls; i++) {
 
      Tattr = 0;     
@@ -1495,7 +1358,7 @@ void LoMachSolver::Setup(double dt)
      }
        
    }
-
+   */
      
    // temperature wall bc nuemann
    /*
@@ -1512,10 +1375,11 @@ void LoMachSolver::Setup(double dt)
      }
    }
    */
-   if (rank0_) std::cout << "Temp wall bc completed: " << numWalls << endl;
+   //if (rank0_) std::cout << "Temp wall bc completed: " << numWalls << endl;
 
 
    // Qt wall bc dirichlet (divU = 0)
+   /*
    Qattr = 0;
    for (int i = 0; i < numWalls; i++) {
      Qt_bc_coef.constant = 0.0;     
@@ -1531,9 +1395,7 @@ void LoMachSolver::Setup(double dt)
    }
    buffer_qbc = new ConstantCoefficient(Qt_bc_coef);
    AddQtDirichletBC(buffer_qbc, Qattr);
-
-
-
+   */
    
    
    // returning to regular setup   
@@ -1541,8 +1403,8 @@ void LoMachSolver::Setup(double dt)
 
    vfes->GetEssentialTrueDofs(vel_ess_attr, vel_ess_tdof);
    pfes->GetEssentialTrueDofs(pres_ess_attr, pres_ess_tdof);
-   sfes->GetEssentialTrueDofs(temp_ess_attr, temp_ess_tdof);
-   sfes->GetEssentialTrueDofs(Qt_ess_attr, Qt_ess_tdof);   
+   //sfes->GetEssentialTrueDofs(temp_ess_attr, temp_ess_tdof);
+   //sfes->GetEssentialTrueDofs(Qt_ess_attr, Qt_ess_tdof);   
    if (rank0_) std::cout << "Essential true dof step" << endl;
 
    
@@ -1598,6 +1460,7 @@ void LoMachSolver::Setup(double dt)
    */
 
    // density coefficient
+   /*
    bufferRho = new ParGridFunction(sfes);
    {
      double *data = bufferRho->HostReadWrite();
@@ -1606,7 +1469,39 @@ void LoMachSolver::Setup(double dt)
        data[i] = 1.0; // gets updated anyway... ambientPressure / (Rgas * Tdata[i]);
      }
    }    
-   Rho = new GridFunctionCoefficient(bufferRho);   
+   Rho = new GridFunctionCoefficient(bufferRho);
+   */
+
+   /*
+   bufferRhoDt = new ParGridFunction(sfes);
+   {
+     double *data = bufferRhoDt->HostReadWrite();
+     for (int i = 0; i < Sdof; i++) { data[i] = 0.0; }
+   }   
+   {
+     double *data = bufferRhoDt->HostReadWrite();
+     double *Rdata = rn_gf.HostReadWrite();
+     for (int i = 0; i < Sdof; i++) {
+       data[i] = Rdata[i] / dt;
+     }
+   }
+   rhoDtField = new GridFunctionCoefficient(bufferRhoDt);   
+   
+   bufferSubgridVisc = new ParGridFunction(sfes);
+   {
+     double *data = bufferSubgridVisc->HostReadWrite();
+     for (int i = 0; i < Sdof; i++) {	 
+       data[i] = 0.0;
+     }
+   }
+   */
+
+   // setup pointers to thermoChem data
+   Rho = new GridFunctionCoefficient(tcClass->bufferRho);
+   invRho = new GridFunctionCoefficient(tcClass->bufferInvRho);
+   viscField = new GridFunctionCoefficient(tcClass->bufferVisc);
+   bulkViscField = new GridFunctionCoefficient(tcClass->bufferBulkVisc);
+   rhoDtField = new GridFunctionCoefficient(tcClass->bufferRhoDt);      
    
    // convection section, extrapolation
    ///// nlcoeff.constant = -1.0; // starts with negative to move to rhs
@@ -1631,6 +1526,7 @@ void LoMachSolver::Setup(double dt)
 
 
   // Convection: Atemperature(i,j) = \int_{\Omega} \phi_i \rho u \cdot \nabla \phi_j
+   /*
   un_next_coeff = new VectorGridFunctionCoefficient(&un_next_gf);
   rhon_next_coeff = new GridFunctionCoefficient(&rn_gf);
   rhou_coeff = new ScalarVectorProductCoefficient(*rhon_next_coeff, *un_next_coeff);   
@@ -1645,6 +1541,7 @@ void LoMachSolver::Setup(double dt)
   }
   At_form->Assemble();
   At_form->FormSystemMatrix(empty, At);
+   */
    
    
    // mass matrix
@@ -1671,7 +1568,7 @@ void LoMachSolver::Setup(double dt)
    // DiffusionIntegrator(MatrixCoefficient &q, const IntegrationRule *ir = nullptr)
    // BilinearFormIntegrator *integ = new DiffusionIntegrator(sigma); with sigma some type of Coefficient class
    //ParGridFunction buffer1(pfes);
-   /**/
+   /*
    bufferInvRho = new ParGridFunction(pfes);
    {
      double *data = bufferInvRho->HostReadWrite();
@@ -1679,7 +1576,7 @@ void LoMachSolver::Setup(double dt)
    }
    invRho = new GridFunctionCoefficient(bufferInvRho);
    //std::cout << "Check 9..." << std::endl;
-   /**/
+   */
    
    // looks like this is the Laplacian for press eq
    Sp_form = new ParBilinearForm(pfes);
@@ -1716,7 +1613,8 @@ void LoMachSolver::Setup(double dt)
    */
 
 
-   // temperature laplacian   
+   // temperature laplacian
+   /*
    Lt_form = new ParBilinearForm(sfes);
    //auto *lt_blfi = new DiffusionIntegrator;
    //Lt_coeff.constant = -1.0;   
@@ -1732,6 +1630,7 @@ void LoMachSolver::Setup(double dt)
    }
    Lt_form->Assemble();
    Lt_form->FormSystemMatrix(empty, Lt);
+   */
 
 
    
@@ -1807,7 +1706,8 @@ void LoMachSolver::Setup(double dt)
    Gp_form->Assemble();
    Gp_form->FormRectangularSystemMatrix(empty, empty, Gp);
    if (rank0_) std::cout << "Gradient of pressure operator set" << endl;           
-   
+
+   /*
    // viscosity field 
    //ParGridFunction buffer2(vfes); // or pfes here?
    //bufferVisc = new ParGridFunction(vfes);
@@ -1835,9 +1735,9 @@ void LoMachSolver::Setup(double dt)
      for (int i = 0; i < Sdof; i++) { data[i] = twothird * dataMu[i]; }
    }
    bulkViscField = new GridFunctionCoefficient(bufferBulkVisc);
-   
+   */   
 
-   /**/
+   /*
    bufferRhoDtR1 = new ParGridFunction(vfes);
    {
      double *data = bufferRhoDtR1->HostReadWrite();
@@ -1855,31 +1755,7 @@ void LoMachSolver::Setup(double dt)
      }
    }
    rhoDtFieldR1 = new VectorGridFunctionCoefficient(bufferRhoDtR1);
-   /**/
-
-   bufferRhoDt = new ParGridFunction(sfes);
-   {
-     double *data = bufferRhoDt->HostReadWrite();
-     for (int i = 0; i < Sdof; i++) { data[i] = 0.0; }
-   }   
-   {
-     double *data = bufferRhoDt->HostReadWrite();
-     double *Rdata = rn_gf.HostReadWrite();
-     for (int i = 0; i < Sdof; i++) {
-       data[i] = Rdata[i] / dt;
-     }
-   }
-   rhoDtField = new GridFunctionCoefficient(bufferRhoDt);   
-
-   
-   
-   bufferSubgridVisc = new ParGridFunction(sfes);
-   {
-     double *data = bufferSubgridVisc->HostReadWrite();
-     for (int i = 0; i < Sdof; i++) {	 
-       data[i] = 0.0;
-     }
-   }   
+   */
    
    // helmholtz for velocity
    H_lincoeff.constant = kin_vis;
@@ -2101,7 +1977,7 @@ void LoMachSolver::Setup(double dt)
 
    
    // temperature.....................................
-
+   /*
    Ms_form = new ParBilinearForm(sfes);
    auto *ms_blfi = new MassIntegrator;
    if (numerical_integ) { ms_blfi->SetIntRule(&ir_i); }
@@ -2119,7 +1995,7 @@ void LoMachSolver::Setup(double dt)
    if (partial_assembly) { MsRho_form->SetAssemblyLevel(AssemblyLevel::PARTIAL); }
    MsRho_form->Assemble();
    MsRho_form->FormSystemMatrix(empty, MsRho);
-
+   */
    
    // div(uT) for temperature
    /*
@@ -2141,6 +2017,7 @@ void LoMachSolver::Setup(double dt)
    
    // thermal diffusivity field
    //ParGridFunction buffer3(sfes);
+   /*
    bufferAlpha = new ParGridFunction(sfes);
    {
      double *data = bufferAlpha->HostReadWrite();
@@ -2166,9 +2043,11 @@ void LoMachSolver::Setup(double dt)
    thermal_diff_coeff = new GridFunctionCoefficient(&alphaTotal_gf);   
    gradT_coeff = new GradientGridFunctionCoefficient(&Tn_next_gf);
    kap_gradT_coeff = new ScalarVectorProductCoefficient(*thermal_diff_coeff, *gradT_coeff);
+   */
 
   
    // Qt .....................................
+   /*
    Mq_form = new ParBilinearForm(sfes);
    auto *mq_blfi = new MassIntegrator;
    if (numerical_integ) { mq_blfi->SetIntRule(&ir_i); }
@@ -2215,9 +2094,9 @@ void LoMachSolver::Setup(double dt)
      lq_bdry_lfi->SetIntRule(&ir_di);
    }
    LQ_bdry->AddBoundaryIntegrator(lq_bdry_lfi, temp_ess_attr);
-
+   */
    
-   
+   /*
    Ht_lincoeff.constant = kin_vis / Pr; 
    Ht_bdfcoeff.constant = 1.0 / dt;   
    Ht_form = new ParBilinearForm(sfes);
@@ -2229,6 +2108,8 @@ void LoMachSolver::Setup(double dt)
      hdt_blfi = new DiffusionIntegrator(Ht_lincoeff);     
    } else {
    */
+
+   /*
      //auto *hdt_blfi = new DiffusionIntegrator(*alphaField);
      hdt_blfi = new DiffusionIntegrator(*alphaField);     
      //}
@@ -2264,7 +2145,9 @@ void LoMachSolver::Setup(double dt)
       if (numerical_integ) { tbdr_blfi->SetIntRule(&ir_i); }
       t_bdr_form->AddBoundaryIntegrator(tbdr_blfi, temp_dbc.attr);
    }
+   */
 
+     /*
    if (partial_assembly)
    {
       Vector diag_pa(sfes->GetTrueVSize());
@@ -2283,8 +2166,10 @@ void LoMachSolver::Setup(double dt)
    MsInv->SetPrintLevel(pl_mtsolve);
    MsInv->SetRelTol(config.solver_tol);
    MsInv->SetMaxIter(config.solver_iter);
-   //std::cout << "Check 26..." << std::endl;        
-   
+   //std::cout << "Check 26..." << std::endl;
+   */
+
+   /*
    if (partial_assembly)
    {
       Vector diag_pa(sfes->GetTrueVSize());
@@ -2313,10 +2198,12 @@ void LoMachSolver::Setup(double dt)
        data[i] = config.initRhoRhoVp[4];
      }
      if (rank0_) std::cout << "Reset temperature to IC" << endl;        
-   }     
+   }
+   */
    
    // If the initial condition was set, it has to be aligned with dependent
    // Vectors and GridFunctions
+     /*
    Tn_gf.GetTrueDofs(Tn);
    {
      double *data = Tn_next.HostReadWrite();
@@ -2324,7 +2211,8 @@ void LoMachSolver::Setup(double dt)
      for (int i = 0; i < SdofInt; i++) { data[i] = Tdata[i]; }
    }      
    Tn_next_gf.SetFromTrueDofs(Tn_next);
-   //std::cout << "Check 28..." << std::endl;     
+   //std::cout << "Check 28..." << std::endl;
+   */
    
    // Set initial time step in the history array
    dthist[0] = dt;
@@ -2346,6 +2234,7 @@ void LoMachSolver::Setup(double dt)
       un_filtered_gf = 0.0;
    }
 
+   /*
    if (loMach_opts_.filterTemp == true)     
    {
       sfec_filter = new H1_FECollection(order - filter_cutoff_modes);
@@ -2357,6 +2246,7 @@ void LoMachSolver::Setup(double dt)
       Tn_filtered_gf.SetSpace(sfes);
       Tn_filtered_gf = 0.0;
    }
+   */
 
    //if (config.sgsExcludeMean == true) { bufferMeanUp = new ParGridFunction(fvfes); }
    MPI_Barrier(MPI_COMM_WORLD);        
@@ -2392,13 +2282,15 @@ void LoMachSolver::UpdateTimestepHistory(double dt)
    un_gf.SetFromTrueDofs(un);
 
    // temperature
+   /*
    NTnm2 = NTnm1;
    NTnm1 = NTn;
    Tnm2 = Tnm1;
    Tnm1 = Tn;
    Tn_next_gf.GetTrueDofs(Tn_next);
    Tn = Tn_next;
-   Tn_gf.SetFromTrueDofs(Tn);   
+   Tn_gf.SetFromTrueDofs(Tn);
+   */
    
 }
 
@@ -2752,6 +2644,21 @@ void LoMachSolver::solve()
       //if (verbose) grvy_printf(ginfo, "calling step...\n");
       sw_step.Start();
       if (config.timeIntegratorType == 1) {
+  
+        SetTimeIntegrationCoefficients(current_step-start_step);
+        extrapolateState(current_step);
+        updateBC(current_step);   
+        updateGradientsOP(1.0);	
+        tcClass->extrapolateState(current_step);	  
+        tcClass->updateThermoP();
+        tcClass->updateBC(current_step);
+        tcClass->updateGradientsOP(1.0);   		
+        tcClass->updateDiffusivity();  
+
+	tcClass->thermoChemStep(time, dt, step, iter_start);
+        tcClass->updateDensity(1.0);
+        tcClass->updateDiffusivity();	
+	
         curlcurlStep(time, dt, step, iter_start);
       } else if (config.timeIntegratorType == 2) {
         staggeredTimeStep(time, dt, step, iter_start);	
@@ -2921,7 +2828,8 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    //sw_step.Start();
    //if(rank0_) std::cout << "Time in Step: " << time << endl;
    Array<int> empty;  
-  
+
+   /*
    SetTimeIntegrationCoefficients(current_step-start_step);
    
    // update pressure and dtP
@@ -2942,57 +2850,20 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    
    // update difusivities, including subgrid model contribution and sponge
    updateDiffusivity(false);
+   */
    
    // Set current time for velocity Dirichlet boundary conditions.
    for (auto &vel_dbc : vel_dbcs) {vel_dbc.coeff->SetTime(time + dt);}
    for (auto &pres_dbc : pres_dbcs) {pres_dbc.coeff->SetTime(time + dt);}   
-   for (auto &temp_dbc : temp_dbcs) {temp_dbc.coeff->SetTime(time + dt);}   
+   //for (auto &temp_dbc : temp_dbcs) {temp_dbc.coeff->SetTime(time + dt);}   
 
-   
+
+     /*   
    if (loMach_opts_.solveTemp == true) {
      //if(rank0_) {std::cout<< "in temp solve..." << endl;}     
-   
+
    // begin temperature...................................... <warp>
    resT = 0.0;
-
-   // simple way
-   /*
-   dotVector(Uext,gradT,&tmpR0);
-   multConstScalarIP(Cp,&tmpR0);
-
-   tmpR0a = 0.0;
-   tmpR0b = 0.0;        
-   { 
-     double *data = tmpR0.HostReadWrite();
-     double *d_exp = tmpR0a.HostReadWrite();
-     double *d_imp = tmpR0b.HostReadWrite();
-     for (int i = 0; i < SdofInt; i++) {
-       if (data[i] <= 0.0) { // + on rhs
-	 d_exp[i] = data[i];
-       } else { // - on rhs
-	 d_imp[i] = data[i];
-       }
-     }
-   }
-
-   // exp to rhs
-   MsRho->Mult(tmpR0a,tmpR0c);      
-   resT.Set(-1.0, tmpR0c);
-
-   // imp to diag
-   multScalarScalarIP(rn,&tmpR0b);   
-   multScalarInvScalarIP(Text,&tmpR0b);
-   R0PM0_gf.SetFromTrueDofs(tmpR0b);
-   */
-   
-   /*
-   At_form->Update();
-   At_form->Assemble();
-   At_form->FormSystemMatrix(empty, At);
-   At->Mult(Text,tmpR0);
-   multConstScalarIP(Cp,&tmpR0);
-   resT.Set(-1.0, tmpR0);             
-   */
 
    computeExplicitTempConvectionOP(true); // ->tmpR0
    resT.Set(-1.0, tmpR0);                
@@ -3093,6 +2964,7 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
 
    // end temperature....................................   
    }
+   */   
    //if(rank0_) {std::cout<< "temp solve okay..." << endl;}
 
    // unsteady rho term
@@ -3100,7 +2972,7 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    
    // update rn and diffusivities from with actual T{n+1}
    updateDensity(1.0);
-   updateDiffusivity(false);   
+   //updateDiffusivity();   
    
    
    // begin momentum.....................................
@@ -3479,8 +3351,8 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
      exit(1);
    }
    
-}
 
+}
 
 void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_step, const int start_step, bool provisional)
 {
@@ -3509,7 +3381,7 @@ void LoMachSolver::staggeredTimeStep(double &time, double dt, const int current_
    updateGradientsOP(0.5);   
 
    // update difusivities, including subgrid model contribution and sponge
-   updateDiffusivity(true);   
+   //updateDiffusivity();   
 
    // testing
    //curl_gf.ProjectGridFunction(un_gf);   
@@ -4029,7 +3901,7 @@ void LoMachSolver::deltaPStep(double &time, double dt, const int current_step, c
    updateGradientsOP(0.5);   
 
    // update difusivities, including subgrid model contribution and sponge
-   updateDiffusivity(true);   
+   //updateDiffusivity();   
 
    // testing
    //curl_gf.ProjectGridFunction(un_gf);   
@@ -8396,8 +8268,8 @@ void LoMachSolver::viscSpongePlanar(double *x, double &wgt) {
   
 }
 
-
-void LoMachSolver::updateDiffusivity(bool bulkViscFlag) {
+/*
+void LoMachSolver::updateDiffusivity() {
      
    // subgrid scale model: gradUp is in (eq,dim) form
    if (config.sgsModelType > 0) {
@@ -8473,6 +8345,7 @@ void LoMachSolver::updateDiffusivity(bool bulkViscFlag) {
    bufferVisc->GetTrueDofs(viscSml);   
 
    // for elasticity operator
+   /*
    {
      double *data = bufferBulkVisc->HostReadWrite();
      double *dataMu = bufferVisc->HostReadWrite();
@@ -8483,6 +8356,7 @@ void LoMachSolver::updateDiffusivity(bool bulkViscFlag) {
        for (int i = 0; i < Sdof; i++) { data[i] = 0.0; }       
      }
    }
+   */
 
    
    // thermal diffusivity => TODO: use mult function
@@ -8510,8 +8384,9 @@ void LoMachSolver::updateDiffusivity(bool bulkViscFlag) {
    //}   
    
 }
+*/
 
-
+/*
 void LoMachSolver::computeQt() {  
 
   if (incompressibleSolve == true) {
@@ -8550,8 +8425,9 @@ void LoMachSolver::computeQt() {
     MvInv->Mult(tmpR1, gradDivU);  
     
 }
+*/
 
-
+/*
 void LoMachSolver::computeQtTO() {  
 
     Array<int> empty;    
@@ -8599,7 +8475,7 @@ void LoMachSolver::computeQtTO() {
     MvInv->Mult(tmpR1, gradDivU);  
     
 }
-
+*/
 
 void LoMachSolver::makeDivFree() {  
   
@@ -9244,6 +9120,7 @@ void LoMachSolver::computeExplicitUnsteadyBDF() {
 }
 
 
+/*
 void LoMachSolver::computeExplicitTempConvectionOP(bool extrap) {
 
    Array<int> empty;      
@@ -9274,7 +9151,7 @@ void LoMachSolver::computeExplicitTempConvectionOP(bool extrap) {
     }    
    
 }
-
+*/
 
 void LoMachSolver::computeExplicitConvectionOP(double uStep, bool extrap) {
 
@@ -9834,6 +9711,7 @@ void LoMachSolver::updateThermoP() {
 
 }
 
+/*
 void LoMachSolver::updateDensity(double tStep) {
 
    Array<int> empty;
@@ -9883,7 +9761,7 @@ void LoMachSolver::updateDensity(double tStep) {
    MvInv->Mult(tmpR1, gradRho);   
    
 }
-
+*/
 
 ///* temporary, remove when hooked up *//
 double mesh_stretching_func(const double y)
@@ -10038,6 +9916,7 @@ void vel_inlet(const Vector &coords, double t, Vector &u)
    u(2) = 0.0;   
 }
 
+/*
 double temp_ic(const Vector &coords, double t)
 {
 
@@ -10113,6 +9992,7 @@ double temp_inlet(const Vector &coords, double t)
    temp = Tlo + (y + 0.5) * (Thi - Tlo);
    return temp;   
 }
+*/
 
 double pres_inlet(const Vector &coords, double p)  
 {
