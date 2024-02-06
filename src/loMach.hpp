@@ -30,14 +30,13 @@ class Tps;
 #include "tps_mfem_wrap.hpp"
 #include "run_configuration.hpp"
 #include "mfem.hpp"
-//#include "solvers.hpp"
 #include "mfem/linalg/solvers.hpp"
-
 #include "transport_properties.hpp"
 #include "argon_transport.hpp"
 #include "averaging_and_rms.hpp"
 #include "chemistry.hpp"
 #include "radiation.hpp"
+#include "thermoChem.hpp"
 
 
 using VecFuncT = void(const Vector &x, double t, Vector &u);
@@ -95,6 +94,7 @@ public:
 
   
 /// Container for a Dirichlet boundary condition of the temperature field.
+/*
 class TempDirichletBC_T
 {
 public:
@@ -140,7 +140,7 @@ public:
    Array<int> attr;
    Coefficient *coeff;
 };
-
+*/
   
 /// Container for an acceleration term.
 class AccelTerm_T
@@ -172,8 +172,11 @@ public:
  *
  */
 class LoMachSolver : public TPS::Solver {
+  //friend class ThermoChem;
 protected:
    LoMachOptions loMach_opts_;
+
+   ThermoChem tcClass;
 
    MPI_Groups *groupsMPI;
    int nprocs_;  // total number of MPI procs
@@ -231,8 +234,8 @@ protected:
    double xmax, ymax, zmax;  
 
    // space sizes;
-  int Sdof, Pdof, Vdof, Ndof, NdofR0;
-  int SdofInt, PdofInt, VdofInt, NdofInt, NdofR0Int;
+   int Sdof, Pdof, Vdof, Ndof, NdofR0;
+   int SdofInt, PdofInt, VdofInt, NdofInt, NdofR0Int;
   
    int MaxIters;
    double max_speed;
@@ -303,14 +306,14 @@ protected:
    const int defaultPartMethod = 1;  
   
    // temporary
-   double Re_tau, Pr, Cp, gamma;
+   //double Re_tau, Pr, Cp, gamma;
   
    /// Kinematic viscosity (dimensionless).
-   double kin_vis;
+   //double kin_vis;
 
    // make everything dimensionless after generalizing form channel
-   double ambientPressure, thermoPressure, static_rho, Rgas, systemMass;
-   double tPm1, tPm2, dtP;
+   //double ambientPressure, thermoPressure, static_rho, Rgas, systemMass;
+   //double tPm1, tPm2, dtP;
 
    IntegrationRules gll_rules;
 
@@ -331,10 +334,10 @@ protected:
    ParFiniteElementSpace *pfes = nullptr;
 
    /// Scalar \f$H^1\f$ finite element collection.
-   FiniteElementCollection *sfec = nullptr;
+   //FiniteElementCollection *sfec = nullptr;
 
    /// Scalar \f$H^1\f$ finite element space.
-   ParFiniteElementSpace *sfes = nullptr;  
+   //ParFiniteElementSpace *sfes = nullptr;  
   
    // nonlinear term
    FiniteElementCollection *nfec = nullptr;
@@ -347,14 +350,14 @@ protected:
    VectorMassIntegrator *hmv_blfi = nullptr;  
    VectorDiffusionIntegrator *hdv_blfi = nullptr;
    ElasticityIntegrator *hev_blfi = nullptr;
-   DiffusionIntegrator *hdt_blfi = nullptr;
-   MassIntegrator *hmt_blfi = nullptr;    
+  //DiffusionIntegrator *hdt_blfi = nullptr;
+  //MassIntegrator *hmt_blfi = nullptr;    
   
    ParNonlinearForm *N = nullptr;
    ParBilinearForm *Mv_form = nullptr;
    ParBilinearForm *MvRho_form = nullptr;  
    ParBilinearForm *Sp_form = nullptr;
-   ParBilinearForm *Lt_form = nullptr;  
+   //ParBilinearForm *Lt_form = nullptr;  
    ParMixedBilinearForm *D_form = nullptr;
    ParMixedBilinearForm *DRho_form = nullptr;  
    ParMixedBilinearForm *G_form = nullptr;
@@ -367,6 +370,7 @@ protected:
    ParLinearForm *gravity_form = nullptr;  
 
    // temperature
+   /*
    ParBilinearForm *At_form = nullptr;  
    ParBilinearForm *Ms_form = nullptr;
    ParBilinearForm *MsRho_form = nullptr;  
@@ -379,7 +383,9 @@ protected:
    ParLinearForm *Text_bdr_form = nullptr;
    ParLinearForm *ft_form = nullptr;
    ParLinearForm *t_bdr_form = nullptr;
+   */
 
+  /*
    VectorGridFunctionCoefficient *un_next_coeff = nullptr;
    GridFunctionCoefficient *rhon_next_coeff = nullptr;
    ScalarVectorProductCoefficient *rhou_coeff = nullptr;  
@@ -387,6 +393,7 @@ protected:
    GridFunctionCoefficient *thermal_diff_coeff = nullptr;
    GradientGridFunctionCoefficient *gradT_coeff = nullptr;
    ScalarVectorProductCoefficient *kap_gradT_coeff = nullptr;
+  */
   
    // pressure
    GridFunctionCoefficient *Pext_gfcoeff = nullptr;
@@ -400,23 +407,25 @@ protected:
 
    ConstantCoefficient nlcoeff;
    ConstantCoefficient Sp_coeff;
-   ConstantCoefficient Lt_coeff;  
+  //ConstantCoefficient Lt_coeff;  
    ConstantCoefficient H_lincoeff;
    ConstantCoefficient H_bdfcoeff;
-   ConstantCoefficient Ht_lincoeff;
-   ConstantCoefficient Ht_bdfcoeff;  
+  //ConstantCoefficient Ht_lincoeff;
+  // ConstantCoefficient Ht_bdfcoeff;  
 
    //VectorConstantCoefficient u_bc_coef;
    //ConstantCoefficient t_bc_coef;
+  /*
    ConstantCoefficient t_bc_coef0;
    ConstantCoefficient t_bc_coef1;
    ConstantCoefficient t_bc_coef2;
-   ConstantCoefficient t_bc_coef3;    
+   ConstantCoefficient t_bc_coef3;
+  */
 
    VectorConstantCoefficient *buffer_ubc;
    VectorConstantCoefficient *buffer_accel;  
-   ConstantCoefficient *buffer_tbc;
-   ConstantCoefficient *buffer_qbc;  
+  //ConstantCoefficient *buffer_tbc;
+  //ConstantCoefficient *buffer_qbc;  
    //VectorConstantCoefficient *buffer_tbc;  
    VectorConstantCoefficient *wall_ubc;
    VectorConstantCoefficient *bufferInlet_ubc;  
@@ -424,15 +433,15 @@ protected:
    ConstantCoefficient *bufferInlet_pbc;
    ConstantCoefficient *bufferOutlet_pbc;      
   
-   ParGridFunction *bufferInvRho;  
-   ParGridFunction *bufferVisc;
-   ParGridFunction *bufferBulkVisc;
-   ParGridFunction *bufferRho;  
-   ParGridFunction *bufferRhoDt;
-   ParGridFunction *bufferRhoDtR1;    
+  //ParGridFunction *bufferInvRho;  
+  //ParGridFunction *bufferVisc;
+  //ParGridFunction *bufferBulkVisc;
+  //ParGridFunction *bufferRho;  
+  //ParGridFunction *bufferRhoDt;
+   //ParGridFunction *bufferRhoDtR1;    
    //ParGridFunction *bufferGravity;  
-   ParGridFunction *bufferAlpha;
-   ParGridFunction *bufferTemp;
+   //ParGridFunction *bufferAlpha;
+   //ParGridFunction *bufferTemp;
    ParGridFunction *bufferPM0;      
    ParGridFunction *bufferPM1;
    ParGridFunction *bufferGridScale;
@@ -443,18 +452,18 @@ protected:
    GridFunctionCoefficient *viscField;
    GridFunctionCoefficient *bulkViscField;  
    GridFunctionCoefficient *rhoDtField;
-   VectorGridFunctionCoefficient *rhoDtFieldR1;      
+   //VectorGridFunctionCoefficient *rhoDtFieldR1;      
    GridFunctionCoefficient *invRho;
    GridFunctionCoefficient *Rho;  
    GridFunctionCoefficient *alphaField;
 
    ParGridFunction *buffer_uInlet;
-   ParGridFunction *buffer_tInlet;
+  //ParGridFunction *buffer_tInlet;
    ParGridFunction *buffer_uInletInf;
-   ParGridFunction *buffer_tInletInf;  
+  //ParGridFunction *buffer_tInletInf;  
    ParGridFunction *buffer_pInlet;  
    VectorGridFunctionCoefficient *uInletField;
-   GridFunctionCoefficient *tInletField;
+  //GridFunctionCoefficient *tInletField;
    GridFunctionCoefficient *pInletField;
 
    ParGridFunction *bufferMeanUp;
@@ -465,9 +474,9 @@ protected:
    OperatorHandle Mv;
    OperatorHandle MvRho;  
    OperatorHandle Sp;
-   OperatorHandle Lt;
-   OperatorHandle LQ;  
-   OperatorHandle At;    
+  //OperatorHandle Lt;
+  //OperatorHandle LQ;  
+  // OperatorHandle At;    
    OperatorHandle D;
    OperatorHandle DRho;  
    OperatorHandle G; 
@@ -477,7 +486,7 @@ protected:
    OperatorHandle MsRho;
    OperatorHandle Mq;  
    OperatorHandle Ds;  
-   OperatorHandle Ht;
+  //OperatorHandle Ht;
 
    mfem::Solver *MvInvPC = nullptr;
    mfem::CGSolver *MvInv = nullptr;  
@@ -495,6 +504,7 @@ protected:
    // if not using amg to solve pressure
    mfem::Solver *SpInvPC = nullptr; 
 
+  /*
    mfem::Solver *MsInvPC = nullptr;
    mfem::CGSolver *MsInv = nullptr;
    mfem::Solver *MqInvPC = nullptr;
@@ -502,7 +512,8 @@ protected:
    mfem::Solver *HtInvPC = nullptr;
    mfem::CGSolver *HtInv = nullptr;
    //mfem::GMRESSolver *HtInv = nullptr;  
-   //mfem::BiCGSTABSolver *HtInv = nullptr;  
+   //mfem::BiCGSTABSolver *HtInv = nullptr;
+   */
 
    Vector fn, un, un_next, unm1, unm2;
    Vector u_star, u_half;  
@@ -512,10 +523,12 @@ protected:
    Vector Fext, FText, Lext, Uext, Ldiv, LdivImp;  
    Vector resu, tmpR1, tmpR1a, tmpR1b, tmpR1c;
    Vector gradMu, gradRho, gradDivU;
-   Vector gradU, gradV, gradW, gradT;
-   Vector gradX, gradY, gradZ;  
+   Vector gradU, gradV, gradW;
+   Vector gradX, gradY, gradZ;
+  //Vector gradT;    
    Vector FBext;
-   Vector divU, Qt, dtRho;
+   Vector divU, dtRho;
+  //Vector Qt;  
    Vector gravity;
    Vector boussinesqField;
    Vector uns;
@@ -537,7 +550,7 @@ protected:
    ParGridFunction curl_gf;
   
    ParGridFunction unm1_gf, unm2_gf;
-   ParGridFunction Tnm1_gf, Tnm2_gf;
+  //ParGridFunction Tnm1_gf, Tnm2_gf;
    ParGridFunction u_star_gf;  
   
    //ParGridFunction rn_gf, resr_gf;  
@@ -545,21 +558,23 @@ protected:
    ParGridFunction sml_gf, big_gf;
 
    // temperature additions
+  /*
    Vector fTn, Tn, Tn_next, Tnm1, Tnm2, NTn, NTnm1, NTnm2;
    Vector Text, Text_bdr, t_bdr;
    Vector resT, tmpR0, tmpR0a, tmpR0b, tmpR0c;
    ParGridFunction Tn_gf, Tn_next_gf, Text_gf, resT_gf;
+  */
 
    // pressure mimic
    Vector Pext_bdr, p_bdr;
   
    // density, not actually solved for
-   Vector rn;
-   ParGridFunction rn_gf;
+   //Vector rn;
+   //ParGridFunction rn_gf;
 
    // TrueDof size
    Vector viscSml;
-   Vector alphaSml;  
+  //Vector alphaSml;  
    Vector viscMultSml;
    Vector subgridViscSml;  
    Vector gridScaleSml;
@@ -588,14 +603,14 @@ protected:
    // All essential attributes.
    Array<int> vel_ess_attr;
    Array<int> pres_ess_attr;
-   Array<int> temp_ess_attr;
-   Array<int> Qt_ess_attr;  
+  //Array<int> temp_ess_attr;
+  //Array<int> Qt_ess_attr;  
 
    // All essential true dofs.
    Array<int> vel_ess_tdof;
    Array<int> pres_ess_tdof;
-   Array<int> temp_ess_tdof;
-   Array<int> Qt_ess_tdof;
+  //Array<int> temp_ess_tdof;
+  //Array<int> Qt_ess_tdof;
   
    // Bookkeeping for velocity dirichlet bcs.
    std::vector<VelDirichletBC_T> vel_dbcs;
@@ -604,10 +619,10 @@ protected:
    std::vector<PresDirichletBC_T> pres_dbcs;
 
    // Bookkeeping for temperature dirichlet bcs.
-   std::vector<TempDirichletBC_T> temp_dbcs;
+   //std::vector<TempDirichletBC_T> temp_dbcs;
 
    // Bookkeeping for Qt dirichlet bcs.
-   std::vector<QtDirichletBC_T> Qt_dbcs;
+   //std::vector<QtDirichletBC_T> Qt_dbcs;
   
    // Bookkeeping for acceleration (forcing) terms.
    std::vector<AccelTerm_T> accel_terms;
@@ -648,11 +663,11 @@ protected:
 
    // Iteration counts.
    int iter_mvsolve = 0, iter_spsolve = 0, iter_hsolve = 0;
-   int iter_mtsolve = 0, iter_htsolve = 0;  
+  //int iter_mtsolve = 0, iter_htsolve = 0;  
 
    // Residuals.
    double res_mvsolve = 0.0, res_spsolve = 0.0, res_hsolve = 0.0;
-   double res_mtsolve = 0.0, res_htsolve = 0.0;  
+  //double res_mtsolve = 0.0, res_htsolve = 0.0;  
 
    // LOR related.
    ParLORDiscretization *lor = nullptr;
@@ -667,11 +682,13 @@ protected:
    ParFiniteElementSpace *vfes_filter = nullptr;
    ParGridFunction un_NM1_gf;
    ParGridFunction un_filtered_gf;
-  
+
+  /*
    FiniteElementCollection *sfec_filter = nullptr;
    ParFiniteElementSpace *sfes_filter = nullptr;
    ParGridFunction Tn_NM1_gf;
    ParGridFunction Tn_filtered_gf;
+  */
 
    // stuff that really shouldnt be part of the solver but M2ulPhys is a disaster
    /*
@@ -694,10 +711,10 @@ protected:
    bool loadFromAuxSol;
   
    // Pointers to the different classes
-   GasMixture *mixture;    // valid on host
-   GasMixture *d_mixture;  // valid on device, when available; otherwise = mixture  
+   //GasMixture *mixture;    // valid on host
+   //GasMixture *d_mixture;  // valid on device, when available; otherwise = mixture  
 
-   TransportProperties *transportPtr = NULL;  // valid on both host and device
+   //TransportProperties *transportPtr = NULL;  // valid on both host and device
    // TransportProperties *d_transport = NULL;  // valid on device, when available; otherwise = transportPtr
 
    Chemistry *chemistry_ = NULL;
@@ -733,11 +750,13 @@ protected:
    // I/O organizer
    IODataOrganizer ioData;
 
-   // space varying viscosity multiplier  
+   // space varying viscosity multiplier
+  /*
    ParGridFunction *bufferViscMult;  
    viscositySpongeData vsd_;
    ParGridFunction viscTotal_gf;
-   ParGridFunction alphaTotal_gf;    
+   ParGridFunction alphaTotal_gf;
+  */
 
    // subgrid scale
    ParGridFunction *bufferSubgridVisc;
@@ -830,17 +849,17 @@ public:
    void updateGradientsOP(double uStep);  
    void updateBC(int current_step);  
    void updateDiffusivity(bool bulkViscFlag);
-   void updateThermoP();
+  //void updateThermoP();
    void computeExplicitForcing();
    void computeExplicitUnsteady();
    void computeExplicitUnsteadyBDF();    
    void computeExplicitConvection(double uStep);
    void computeExplicitConvectionOP(double uStep, bool extrap);
-   void computeExplicitTempConvectionOP(bool extrap);    
+  //   void computeExplicitTempConvectionOP(bool extrap);    
    void computeExplicitDiffusion();
    void computeImplicitDiffusion();
-   void computeQt();
-   void computeQtTO();  
+  //void computeQt();
+  //void computeQtTO();  
    void computeDtRho();
    void makeDivFree();
    void makeDivFreeOP();  
@@ -887,16 +906,16 @@ public:
    ParGridFunction *GetCurrentPressure() { return &pn_gf; }
 
    /// Return a pointer to the current temperature ParGridFunction.
-   ParGridFunction *GetCurrentTemperature() { return &Tn_gf; }
+   //ParGridFunction *GetCurrentTemperature() { return &Tn_gf; }
 
    /// Return a pointer to the current density ParGridFunction.  
-   ParGridFunction *GetCurrentDensity() { return &rn_gf; }  
+   //ParGridFunction *GetCurrentDensity() { return &rn_gf; }  
 
    /// Return a pointer to the current total viscosity ParGridFunction.  
    ParGridFunction *GetCurrentTotalViscosity() { return &viscTotal_gf; }  
 
    /// Return a pointer to the current total thermal diffusivity ParGridFunction.    
-   ParGridFunction *GetCurrentTotalThermalDiffusivity() { return &alphaTotal_gf; }  
+   //ParGridFunction *GetCurrentTotalThermalDiffusivity() { return &alphaTotal_gf; }  
   
    /// Return a pointer to the current total resolution ParGridFunction.  
    ParGridFunction *GetCurrentResolution() { return &resolution_gf; }    
@@ -918,6 +937,7 @@ public:
    void AddPresDirichletBC(ScalarFuncT *f, Array<int> &attr);
 
    /// Add a Dirichlet boundary condition to the temperature field.
+  /*
    void AddTempDirichletBC(Coefficient *coeff, Array<int> &attr);
    void AddTempDirichletBC(ScalarFuncT *f, Array<int> &attr);    
    //void AddTempDirichletBC(VectorCoefficient *coeff, Array<int> &attr);
@@ -925,7 +945,8 @@ public:
    //void AddTempDirichletBC(Array<int> &coeff, Array<int> &attr);  
 
    void AddQtDirichletBC(Coefficient *coeff, Array<int> &attr);
-   void AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr);    
+   void AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr);
+  */
   
    /// Add an acceleration term to the RHS of the equation.
    /**
@@ -979,7 +1000,7 @@ public:
    void vectorGrad3D(ParGridFunction &u, ParGridFunction &gu, ParGridFunction &gv, ParGridFunction &gw);
    void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu);
 
-  void vectorGrad3DV(Vector u, Vector* gu, Vector* gv, Vector* gw);    
+   void vectorGrad3DV(Vector u, Vector* gu, Vector* gv, Vector* gw);    
    void scalarGrad3DV(Vector u, Vector* gu);    
 
    /// Remove mean from a Vector.
@@ -1023,7 +1044,7 @@ public:
     * spectral element methods
     */
    void SetFilterAlpha(double a) { filter_alpha = a; }
-  
+
 };  
 
 #endif
