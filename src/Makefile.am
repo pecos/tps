@@ -37,7 +37,7 @@ cxx_sources          = averaging_and_rms.cpp faceGradientIntegration.cpp M2ulPhy
                        reaction.cpp collision_integrals.cpp argon_transport.cpp source_term.cpp gpu_constructor.cpp \
                        independent_coupling.cpp cycle_avg_joule_coupling.cpp table.cpp radiation.cpp lte_mixture.cpp \
                        lte_transport_properties.cpp mixing_length_transport.cpp tps2Boltzmann.cpp  M2ulPhyS2Boltzmann.cpp \
-                       pybindings.cpp gslib_interpolator.cpp loMach.cpp loMachIO.cpp \
+                       pybindings.cpp gslib_interpolator.cpp loMach.cpp loMachIO.cpp thermoChem.cpp \
 	               thermo_chem_base.cpp split_flow_base.cpp tomboulides.cpp dirichlet_bc_helper.cpp
 
 mfem_extra_sources   = ../utils/mfem_extras/pfem_extras.cpp
@@ -51,7 +51,7 @@ headers              = averaging_and_rms.hpp equation_of_state.hpp transport_pro
 	               collision_integrals.hpp argon_transport.hpp source_term.hpp tps_mfem_wrap.hpp gpu_constructor.hpp \
                        independent_coupling.hpp cycle_avg_joule_coupling.hpp table.hpp radiation.hpp lte_mixture.hpp \
                        lte_transport_properties.hpp mixing_length_transport.hpp tps2Boltzmann.hpp gslib_interpolator.hpp \
-                       loMach.hpp \
+                       loMach.hpp thermoChem.hpp \
 		       thermo_chem_base.hpp split_flow_base.hpp tomboulides.hpp dirichlet_bc_helper.hpp
 
 mfem_extra_headers   = ../utils/mfem_extras/pfem_extras.hpp

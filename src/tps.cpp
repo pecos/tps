@@ -58,6 +58,8 @@
 #include "cycle_avg_joule_coupling.hpp"
 #include "independent_coupling.hpp"
 
+#include "thermoChem.hpp"
+
 namespace TPS {
 
 /** \brief Constructs default Tps object.
