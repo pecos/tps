@@ -11,7 +11,7 @@ class Tps;
 #include <hdf5.h>
 #include <tps_config.h>
 
-#include "loMach_options.hpp"
+//#include "loMach_options.hpp"
 #include "io.hpp"
 #include "tps.hpp"
 #include "tps_mfem_wrap.hpp"
@@ -23,11 +23,14 @@ class Tps;
 #include "averaging_and_rms.hpp"
 #include "chemistry.hpp"
 #include "radiation.hpp"
-#include "loMach.hpp"
+//#include "loMach.hpp"
 #include "../utils/mfem_extras/pfem_extras.hpp"
 
 using VecFuncT = void(const Vector &x, double t, Vector &u);
 using ScalarFuncT = double(const Vector &x, double t);
+
+class LoMachSolver;
+class LoMachOptions;
 
 /// Container for a Dirichlet boundary condition of the temperature field.
 class TempDirichletBC_T
@@ -80,17 +83,27 @@ public:
 /// Add some description here...
 class ThermoChem
 {
-  //friend class LoMachSolver;
-  //friend class Flow;  
+  friend class LoMachSolver;
+  //friend class Flow;
+  //friend class TurbModel;  
 private:
 
    TPS::Tps *tpsP_;
    LoMachSolver *loMach_;
+   LoMachOptions *loMach_opts_;
+
+   MPI_Groups *groupsMPI;
+   int nprocs_;  // total number of MPI procs
+   int rank_;    // local MPI rank
+   bool rank0_;  // flag to indicate rank 0
+
+   // Run options
+   RunConfiguration config;
   
    // All essential attributes.
    Array<int> temp_ess_attr;
    Array<int> Qt_ess_attr;  
-
+  
    // All essential true dofs.
    Array<int> temp_ess_tdof;
    Array<int> Qt_ess_tdof;  
@@ -103,16 +116,49 @@ private:
   
    // space sizes
    int Sdof, SdofInt, NdofInt, NdofR0Int;
+
+   /// Enable/disable verbose output.
+   bool verbose = true;
+
+   /// Enable/disable partial assembly of forms.
+   bool partial_assembly = false;
+   bool partial_assembly_pressure = true;  
+
+   /// Enable/disable numerical integration rules of forms.
+   //bool numerical_integ = false;
+   bool numerical_integ = true;
+  
+   //ParMesh *pmesh = nullptr;
+   ParMesh &pmesh;  
   
    // The order of the scalar spaces
-   int sorder;
+   int order;
    IntegrationRules gll_rules;    
 
+   double bd0, bd1, bd2, bd3;
+   double ab1, ab2, ab3;
+   int nvel, dim;
+   int num_equation;    
+   int MaxIters;
+
+   // just keep these saved for ease
+   int numWalls, numInlets, numOutlets;
+  
+   // loMach options to run as incompressible
+   bool constantViscosity = false;
+   bool constantDensity = false;
+   bool incompressibleSolve = false;  
+   bool pFilter = false;
+
+   double dt;
+   double time;
+   int iter;
+  
    // temporary
    double Re_tau, Pr, Cp, gamma;
   
    /// Kinematic viscosity (dimensionless).
-   double kin_vis;
+   double kin_vis, dyn_vis;
 
    // make everything dimensionless after generalizing form channel
    double ambientPressure, thermoPressure, static_rho, Rgas, systemMass;
@@ -124,13 +170,21 @@ private:
    // Scalar \f$H^1\f$ finite element space.
    ParFiniteElementSpace *sfes = nullptr;  
 
+   /// Velocity \f$H^1\f$ finite element collection.
+   FiniteElementCollection *vfec = nullptr;
+
+   /// Velocity \f$(H^1)^d\f$ finite element space.
+   ParFiniteElementSpace *vfes = nullptr;
+  
    // operators
    DiffusionIntegrator *hdt_blfi = nullptr;
    MassIntegrator *hmt_blfi = nullptr;
+   ParBilinearForm *Mv_form = nullptr;  
    ParBilinearForm *Lt_form = nullptr;    
    ParBilinearForm *At_form = nullptr;  
    ParBilinearForm *Ms_form = nullptr;
-   ParBilinearForm *MsRho_form = nullptr;  
+   ParBilinearForm *MsRho_form = nullptr;
+   ParMixedBilinearForm *G_form = nullptr;  
    ParMixedBilinearForm *Ds_form = nullptr;  
    ParBilinearForm *Ht_form = nullptr;
    ParBilinearForm *Mq_form = nullptr;  
@@ -190,6 +244,12 @@ private:
    OperatorHandle LQ;  
    OperatorHandle At;
    OperatorHandle Ht;
+   OperatorHandle Mv;
+   OperatorHandle G;
+   OperatorHandle Ms;
+   OperatorHandle MsRho;
+   OperatorHandle Mq;  
+   OperatorHandle Ds;  
 
    mfem::Solver *MsInvPC = nullptr;
    mfem::CGSolver *MsInv = nullptr;
@@ -197,18 +257,44 @@ private:
    mfem::CGSolver *MqInv = nullptr;    
    mfem::Solver *HtInvPC = nullptr;
    mfem::CGSolver *HtInv = nullptr;
-
+   mfem::Solver *MvInvPC = nullptr;
+   mfem::CGSolver *MvInv = nullptr;  
+  
    ParGridFunction Tnm1_gf, Tnm2_gf;
-   ParGridFunction Tn_gf, Tn_next_gf, Text_gf, resT_gf;  
+   ParGridFunction Tn_gf, Tn_next_gf, Text_gf, resT_gf;
+   ParGridFunction rn_gf, gradT_gf;
+  
    Vector fTn, Tn, Tn_next, Tnm1, Tnm2, NTn, NTnm1, NTnm2;
    Vector Text, Text_bdr, t_bdr;
-   Vector resT, tmpR0, tmpR0a, tmpR0b, tmpR0c;
+   Vector resT, tmpR0a, tmpR0b, tmpR0c;
+  
+   Vector &tmpR0;
+   Vector &tmpR1;
+   ParGridFunction &R0PM0_gf;
+   ParGridFunction &R0PM1_gf;
+   ParGridFunction &un_gf;
+   ParGridFunction &un_next_gf;
 
    Vector gradT;
+   Vector gradMu, gradRho;  
    Vector Qt;      
    Vector rn;
    Vector alphaSml;
-   ParGridFunction rn_gf;    
+   Vector viscSml;
+   Vector viscMultSml;
+   Vector subgridViscSml;  
+
+   // Print levels.
+   int pl_mvsolve = 0;
+   int pl_spsolve = 0;
+   int pl_hsolve = 0;
+   int pl_amg = 0;
+   int pl_mtsolve = 0;  
+
+   // Relative tolerances.
+   double rtol_spsolve = 1e-12;
+   double rtol_hsolve = 1e-12;
+   double rtol_htsolve = 1e-12;    
   
    // Iteration counts.
    int iter_mtsolve = 0, iter_htsolve = 0;
@@ -216,6 +302,10 @@ private:
    // Residuals.
    double res_mtsolve = 0.0, res_htsolve = 0.0;  
 
+   // Filter-based stabilization => move to "input" options
+   int filter_cutoff_modes = 0;
+   double filter_alpha = 0.0;
+  
    FiniteElementCollection *sfec_filter = nullptr;
    ParFiniteElementSpace *sfes_filter = nullptr;
    ParGridFunction Tn_NM1_gf;
@@ -226,6 +316,9 @@ private:
    GasMixture *d_mixture;  // valid on device, when available; otherwise = mixture  
    TransportProperties *transportPtr = NULL;  // valid on both host and device
    // TransportProperties *d_transport = NULL;  // valid on device, when available; otherwise = transportPtr
+
+   // subgrid scale => move to turb model class
+   ParGridFunction *bufferSubgridVisc;
   
   
 public:
@@ -242,12 +335,15 @@ public:
    //void updateGradients(double tStep);
    void updateGradientsOP(double tStep);  
    void updateBC(int current_step);
-   void updateDiffusivity();  
+   void updateDiffusivity();
+   void computeSystemMass();
    
    void computeExplicitTempConvectionOP(bool extrap);      
    void computeQt();
-   void computeQtTO();    
-
+   void computeQtTO();
+   void interpolateInlet();
+   void uniformInlet();  
+  
    /// Initialize forms, solvers and preconditioners.
    void Setup(double dt);  
 
@@ -257,6 +353,9 @@ public:
    /// Return a pointer to the current density ParGridFunction.  
    ParGridFunction *GetCurrentDensity() { return &rn_gf; }  
 
+   /// Return a pointer to the current total viscosity ParGridFunction.  
+   ParGridFunction *GetCurrentTotalViscosity() { return &viscTotal_gf; }    
+  
    /// Return a pointer to the current total thermal diffusivity ParGridFunction.    
    ParGridFunction *GetCurrentTotalThermalDiffusivity() { return &alphaTotal_gf; }
 
@@ -268,6 +367,29 @@ public:
    void AddTempDirichletBC(ScalarFuncT *f, Array<int> &attr);    
    void AddQtDirichletBC(Coefficient *coeff, Array<int> &attr);
    void AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr);      
+
+   /// Eliminate essential BCs in an Operator and apply to RHS.
+   // rename this to something sensible "ApplyEssentialBC" or something
+   void EliminateRHS(Operator &A,
+                     ConstrainedOperator &constrainedA,
+                     const Array<int> &ess_tdof_list,
+                     Vector &x,
+                     Vector &b,
+                     Vector &X,
+                     Vector &B,
+                     int copy_interior = 0);
+
+   /// Remove mean from a Vector.
+   /**
+    * Modify the Vector @a v by subtracting its mean using
+    * \f$v = v - \frac{\sum_i^N v_i}{N} \f$
+    */
+   void Orthogonalize(Vector &v);
+
+   // subgrid scale models => move to turb model class
+   void sgsSmag(const DenseMatrix &gradUp, double delta, double &nu_sgs);
+   void sgsSigma(const DenseMatrix &gradUp, double delta, double &nu_sgs);  
+  
   
 };
 #endif
