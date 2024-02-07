@@ -172,11 +172,14 @@ public:
  *
  */
 class LoMachSolver : public TPS::Solver {
-  //friend class ThermoChem;
+  friend class ThermoChem;
+  //friend class Flow;
+  //friend class TurbModel;    
 protected:
+  
    LoMachOptions loMach_opts_;
 
-   ThermoChem tcClass;
+   ThermoChem *tcClass;
 
    MPI_Groups *groupsMPI;
    int nprocs_;  // total number of MPI procs
@@ -309,7 +312,7 @@ protected:
    //double Re_tau, Pr, Cp, gamma;
   
    /// Kinematic viscosity (dimensionless).
-   //double kin_vis;
+   //double kin_vis, dyn_vis;
 
    // make everything dimensionless after generalizing form channel
    //double ambientPressure, thermoPressure, static_rho, Rgas, systemMass;
@@ -334,10 +337,10 @@ protected:
    ParFiniteElementSpace *pfes = nullptr;
 
    /// Scalar \f$H^1\f$ finite element collection.
-   //FiniteElementCollection *sfec = nullptr;
+   FiniteElementCollection *sfec = nullptr;
 
    /// Scalar \f$H^1\f$ finite element space.
-   //ParFiniteElementSpace *sfes = nullptr;  
+   ParFiniteElementSpace *sfes = nullptr;  
   
    // nonlinear term
    FiniteElementCollection *nfec = nullptr;
@@ -522,7 +525,8 @@ protected:
    Vector Nun, Nunm1, Nunm2;
    Vector Fext, FText, Lext, Uext, Ldiv, LdivImp;  
    Vector resu, tmpR1, tmpR1a, tmpR1b, tmpR1c;
-   Vector gradMu, gradRho, gradDivU;
+   Vector gradDivU;
+  //Vector gradMu, gradRho;
    Vector gradU, gradV, gradW;
    Vector gradX, gradY, gradZ;
   //Vector gradT;    
@@ -561,9 +565,10 @@ protected:
   /*
    Vector fTn, Tn, Tn_next, Tnm1, Tnm2, NTn, NTnm1, NTnm2;
    Vector Text, Text_bdr, t_bdr;
-   Vector resT, tmpR0, tmpR0a, tmpR0b, tmpR0c;
+   Vector resT;   
    ParGridFunction Tn_gf, Tn_next_gf, Text_gf, resT_gf;
   */
+   Vector tmpR0, tmpR0a, tmpR0b, tmpR0c;  
 
    // pressure mimic
    Vector Pext_bdr, p_bdr;
@@ -573,10 +578,10 @@ protected:
    //ParGridFunction rn_gf;
 
    // TrueDof size
-   Vector viscSml;
-  //Vector alphaSml;  
-   Vector viscMultSml;
-   Vector subgridViscSml;  
+   //Vector viscSml;
+   //Vector alphaSml;  
+   //Vector viscMultSml;
+   //Vector subgridViscSml;  
    Vector gridScaleSml;
    Vector gridScaleXSml;
    Vector gridScaleYSml;
@@ -711,8 +716,8 @@ protected:
    bool loadFromAuxSol;
   
    // Pointers to the different classes
-   //GasMixture *mixture;    // valid on host
-   //GasMixture *d_mixture;  // valid on device, when available; otherwise = mixture  
+   GasMixture *mixture;    // valid on host
+   GasMixture *d_mixture;  // valid on device, when available; otherwise = mixture  
 
    //TransportProperties *transportPtr = NULL;  // valid on both host and device
    // TransportProperties *d_transport = NULL;  // valid on device, when available; otherwise = transportPtr
@@ -759,7 +764,7 @@ protected:
   */
 
    // subgrid scale
-   ParGridFunction *bufferSubgridVisc;
+   //ParGridFunction *bufferSubgridVisc;
 
    // for plotting
    ParGridFunction resolution_gf;  
@@ -813,8 +818,8 @@ public:
    void read_restart_files_hdf5(hid_t file, bool serialized_read);
 
    // subgrid scale models
-   void sgsSmag(const DenseMatrix &gradUp, double delta, double &nu_sgs);
-   void sgsSigma(const DenseMatrix &gradUp, double delta, double &nu_sgs);  
+   //void sgsSmag(const DenseMatrix &gradUp, double delta, double &nu_sgs);
+   //void sgsSigma(const DenseMatrix &gradUp, double delta, double &nu_sgs);  
   
    void projectInitialSolution();  
    void writeHDF5(string inputFileName = std::string()) { restart_files_hdf5("write", inputFileName); }
@@ -848,7 +853,7 @@ public:
    void updateGradients(double uStep);
    void updateGradientsOP(double uStep);  
    void updateBC(int current_step);  
-   void updateDiffusivity(bool bulkViscFlag);
+  //void updateDiffusivity(bool bulkViscFlag);
   //void updateThermoP();
    void computeExplicitForcing();
    void computeExplicitUnsteady();
@@ -912,7 +917,7 @@ public:
    //ParGridFunction *GetCurrentDensity() { return &rn_gf; }  
 
    /// Return a pointer to the current total viscosity ParGridFunction.  
-   ParGridFunction *GetCurrentTotalViscosity() { return &viscTotal_gf; }  
+   //ParGridFunction *GetCurrentTotalViscosity() { return &viscTotal_gf; }  
 
    /// Return a pointer to the current total thermal diffusivity ParGridFunction.    
    //ParGridFunction *GetCurrentTotalThermalDiffusivity() { return &alphaTotal_gf; }  
