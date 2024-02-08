@@ -650,7 +650,9 @@ protected:
    double ab1 = 0.0;
    double ab2 = 0.0;
    double ab3 = 0.0;
-
+   std::vector<double> abCoef = {ab1,ab2,ab3};
+   std::vector<double> bdfCoef= {bd0,bd1,bd2,bd3};  
+  
    // Timers.
    StopWatch sw_setup, sw_step, sw_extrap, sw_curlcurl, sw_spsolve, sw_hsolve;
 

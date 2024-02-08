@@ -142,4 +142,22 @@ void GlobalProjectDiscCoefficient(mfem::ParGridFunction &gf, mfem::VectorCoeffic
 void evaluateDistanceSerial(mfem::Mesh &mesh, const mfem::Array<int> &wall_patches, const mfem::GridFunction &coords,
                             mfem::GridFunction &distance);
 
+
+void multConstScalar(double A, Vector B, Vector* C);
+void multConstScalarInv(double A, Vector B, Vector* C);
+void multConstVector(double A, Vector B, Vector* C);
+void multConstScalarIP(double A, Vector* C);
+void multConstScalarInvIP(double A, Vector* C);
+void multConstVectorIP(double A, Vector* C);
+void multScalarScalar(Vector A, Vector B, Vector* C);
+void multScalarVector(Vector A, Vector B, Vector* C, int dim);
+void multScalarInvVector(Vector A, Vector B, Vector* C, int dim);
+void multScalarInvVectorIP(Vector A, Vector* C, int dim);
+void multVectorVector(Vector A, Vector B, Vector* C1, Vector* C2, Vector* C3, int dim);
+void dotVector(Vector A, Vector B, Vector* C, int dim);
+void multScalarScalarIP(Vector A, Vector* C);
+void multScalarInvScalarIP(Vector A, Vector* C);
+void multScalarVectorIP(Vector A, Vector* C, int dim);
+
+
 #endif  // UTILS_HPP_
