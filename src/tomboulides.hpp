@@ -102,6 +102,8 @@ class Tomboulides : public FlowBase {
   mfem::ParFiniteElementSpace *vfes_ = nullptr;
   mfem::ParGridFunction *u_curr_gf_ = nullptr;
   mfem::ParGridFunction *u_next_gf_ = nullptr;
+  mfem::ParGridFunction *curl_gf_ = nullptr;
+  mfem::ParGridFunction *curlcurl_gf_ = nullptr;
 
   /// Presser FEM objects and fields
   mfem::FiniteElementCollection *pfec_ = nullptr;
@@ -141,6 +143,7 @@ class Tomboulides : public FlowBase {
   mfem::Vector Nm1_vec_;
   mfem::Vector Nm2_vec_;
   mfem::Vector ustar_vec_;
+  mfem::Vector uext_vec_;
 
  public:
   /// Constructor
