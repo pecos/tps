@@ -56,6 +56,7 @@ public:
    Coefficient *coeff;
 };
 
+
 class QtDirichletBC_T
 {
 public:
@@ -280,6 +281,7 @@ private:
    ParGridFunction R0PM1_gf;
   //ParGridFunction un_gf;
   //ParGridFunction un_next_gf;
+   ParGridFunction Qt_gf;  
 
    Vector gradT;
    Vector gradMu, gradRho;  
@@ -366,6 +368,9 @@ public:
    /// Return a pointer to the current total thermal diffusivity ParGridFunction.    
    ParGridFunction *GetCurrentTotalThermalDiffusivity() { return &alphaTotal_gf; }
 
+   /// Return a pointer to the current total thermal diffusivity ParGridFunction.    
+   ParGridFunction *GetCurrentThermalDiv() { return &Qt_gf; }
+  
    /// Rotate entries in the time step and solution history arrays.
    void UpdateTimestepHistory(double dt);  
 
@@ -397,6 +402,8 @@ public:
    void sgsSmag(const DenseMatrix &gradUp, double delta, double &nu_sgs);
    void sgsSigma(const DenseMatrix &gradUp, double delta, double &nu_sgs);  
   
+  //MFEM_HOST_DEVICE
+   void viscSpongePlanar(double *x, double &wgt);
   
 };
 #endif

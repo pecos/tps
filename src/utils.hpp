@@ -150,14 +150,27 @@ void multConstScalarIP(double A, Vector* C);
 void multConstScalarInvIP(double A, Vector* C);
 void multConstVectorIP(double A, Vector* C);
 void multScalarScalar(Vector A, Vector B, Vector* C);
-void multScalarVector(Vector A, Vector B, Vector* C, int dim);
-void multScalarInvVector(Vector A, Vector B, Vector* C, int dim);
-void multScalarInvVectorIP(Vector A, Vector* C, int dim);
-void multVectorVector(Vector A, Vector B, Vector* C1, Vector* C2, Vector* C3, int dim);
-void dotVector(Vector A, Vector B, Vector* C, int dim);
+void multScalarVector(Vector A, Vector B, Vector* C, int dim = 3);
+void multScalarInvVector(Vector A, Vector B, Vector* C, int dim = 3);
+void multScalarInvVectorIP(Vector A, Vector* C, int dim = 3);
+void multVectorVector(Vector A, Vector B, Vector* C1, Vector* C2, Vector* C3, int dim = 3);
+void dotVector(Vector A, Vector B, Vector* C, int dim = 3);
 void multScalarScalarIP(Vector A, Vector* C);
 void multScalarInvScalarIP(Vector A, Vector* C);
-void multScalarVectorIP(Vector A, Vector* C, int dim);
+void multScalarVectorIP(Vector A, Vector* C, int dim = 3);
+
+   /// Compute \f$\nabla \times \nabla \times u\f$ for \f$u \in (H^1)^2\f$.
+   void ComputeCurl2D(ParGridFunction &u,
+                      ParGridFunction &cu,
+                      bool assume_scalar = false);
+
+   /// Compute \f$\nabla \times \nabla \times u\f$ for \f$u \in (H^1)^3\f$.
+   void ComputeCurl3D(ParGridFunction &u, ParGridFunction &cu);
+
+   void vectorGrad3D(ParGridFunction &u, ParGridFunction &gu, ParGridFunction &gv, ParGridFunction &gw);
+   void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu);
+   void vectorGrad3DV(FiniteElementSpace *fes, Vector u, Vector* gu, Vector* gv, Vector* gw);    
+   void scalarGrad3DV(FiniteElementSpace *fes, FiniteElementSpace *vfes, Vector u, Vector* gu);    
 
 
 #endif  // UTILS_HPP_

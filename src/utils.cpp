@@ -568,7 +568,7 @@ void multScalarScalar(Vector A, Vector B, Vector* C) {
    
 }
 
-void multScalarVector(Vector A, Vector B, Vector* C, int dim = 3) {
+void multScalarVector(Vector A, Vector B, Vector* C, int dim) {
 
      int Ndof = A.Size();
      double *dataA = A.HostReadWrite();
@@ -582,7 +582,7 @@ void multScalarVector(Vector A, Vector B, Vector* C, int dim = 3) {
    
 }
 
-void multScalarInvVector(Vector A, Vector B, Vector* C, int dim = 3) {
+void multScalarInvVector(Vector A, Vector B, Vector* C, int dim) {
 
      int Ndof = A.Size();
      double *dataA = A.HostReadWrite();
@@ -596,7 +596,7 @@ void multScalarInvVector(Vector A, Vector B, Vector* C, int dim = 3) {
    
 }
 
-void multScalarInvVectorIP(Vector A, Vector* C, int dim = 3) {
+void multScalarInvVectorIP(Vector A, Vector* C, int dim) {
 
      int Ndof = A.Size();
      double *dataA = A.HostReadWrite();
@@ -609,7 +609,7 @@ void multScalarInvVectorIP(Vector A, Vector* C, int dim = 3) {
    
 }
 
-void multVectorVector(Vector A, Vector B, Vector* C1, Vector* C2, Vector* C3, int dim = 3) {
+void multVectorVector(Vector A, Vector B, Vector* C1, Vector* C2, Vector* C3, int dim) {
 
    {
      int Ndof = A.Size() / dim;
@@ -650,7 +650,7 @@ void multVectorVector(Vector A, Vector B, Vector* C1, Vector* C2, Vector* C3, in
 }
 
 
-void dotVector(Vector A, Vector B, Vector* C, int dim = 3) {
+void dotVector(Vector A, Vector B, Vector* C, int dim) {
 
      int Ndof = A.Size() / dim;
      double *dataA = A.HostReadWrite();          
@@ -671,7 +671,7 @@ void multScalarScalarIP(Vector A, Vector* C) {
      double *dataA = A.HostReadWrite();     
      double *dataB = C->HostReadWrite();
      MFEM_FORALL(i, A.Size(), {dataB[i] = dataA[i] * dataB[i];} );
-   
+     
 }
 
 void multScalarInvScalarIP(Vector A, Vector* C) {
@@ -679,10 +679,10 @@ void multScalarInvScalarIP(Vector A, Vector* C) {
      double *dataA = A.HostReadWrite();     
      double *dataB = C->HostReadWrite();
      MFEM_FORALL(i, A.Size(), {dataB[i] = 1.0/dataA[i] * dataB[i];} );
-   
+     
 }
 
-void multScalarVectorIP(Vector A, Vector* C, int dim = 3) {
+void multScalarVectorIP(Vector A, Vector* C, int dim) {
 
      int Ndof = A.Size();
      double *dataA = A.HostReadWrite();
@@ -690,8 +690,370 @@ void multScalarVectorIP(Vector A, Vector* C, int dim = 3) {
      for (int eq = 0; eq < dim; eq++) { 
        for (int i = 0; i < Ndof; i++) {
          dataB[i + eq * Ndof] = dataA[i] * dataB[i +  eq * Ndof];
-         //C[i + eq * Ndof] = dataA[i] * C[i +  eq * Ndof];	 
        }
      }          
    
+}
+
+void ComputeCurl3D(ParGridFunction &u, ParGridFunction &cu)
+{
+  
+   FiniteElementSpace *fes = u.FESpace();
+
+   // AccumulateAndCountZones.
+   Array<int> zones_per_vdof;
+   zones_per_vdof.SetSize(fes->GetVSize());
+   zones_per_vdof = 0;
+
+   cu = 0.0;
+
+   // Local interpolation.
+   int elndofs;
+   Array<int> vdofs;
+   Vector vals;
+   Vector loc_data;
+   int vdim = fes->GetVDim();
+   DenseMatrix grad_hat;
+   DenseMatrix dshape;
+   DenseMatrix grad;
+   Vector curl;
+
+   for (int e = 0; e < fes->GetNE(); ++e)
+   {
+      fes->GetElementVDofs(e, vdofs);
+      u.GetSubVector(vdofs, loc_data);
+      vals.SetSize(vdofs.Size());
+      ElementTransformation *tr = fes->GetElementTransformation(e);
+      const FiniteElement *el = fes->GetFE(e);
+      elndofs = el->GetDof();
+      int dim = el->GetDim();
+      dshape.SetSize(elndofs, dim);
+
+      for (int dof = 0; dof < elndofs; ++dof)
+      {
+         // Project.
+         const IntegrationPoint &ip = el->GetNodes().IntPoint(dof);
+         tr->SetIntPoint(&ip);
+
+         // Eval and GetVectorGradientHat.
+         el->CalcDShape(tr->GetIntPoint(), dshape);
+         grad_hat.SetSize(vdim, dim);
+         DenseMatrix loc_data_mat(loc_data.GetData(), elndofs, vdim);
+         MultAtB(loc_data_mat, dshape, grad_hat);
+
+         const DenseMatrix &Jinv = tr->InverseJacobian();
+         grad.SetSize(grad_hat.Height(), Jinv.Width());
+         Mult(grad_hat, Jinv, grad);
+
+         curl.SetSize(3);
+         curl(0) = grad(2, 1) - grad(1, 2);
+         curl(1) = grad(0, 2) - grad(2, 0);
+         curl(2) = grad(1, 0) - grad(0, 1);
+
+         for (int j = 0; j < curl.Size(); ++j)
+         {
+            vals(elndofs * j + dof) = curl(j);
+         }
+      }
+
+      // Accumulate values in all dofs, count the zones.
+      for (int j = 0; j < vdofs.Size(); j++)
+      {
+         int ldof = vdofs[j];
+         cu(ldof) += vals[j];
+         zones_per_vdof[ldof]++;
+      }
+   }
+
+   // Communication
+
+   // Count the zones globally.
+   GroupCommunicator &gcomm = u.ParFESpace()->GroupComm();
+   gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
+   gcomm.Bcast(zones_per_vdof);
+
+   // Accumulate for all vdofs.
+   gcomm.Reduce<double>(cu.GetData(), GroupCommunicator::Sum);
+   gcomm.Bcast<double>(cu.GetData());
+
+   // Compute means.
+   for (int i = 0; i < cu.Size(); i++)
+   {
+      const int nz = zones_per_vdof[i];
+      if (nz)
+      {
+         cu(i) /= nz;
+      }
+   }
+}
+
+void vectorGrad3D(ParGridFunction &u, ParGridFunction &gu, ParGridFunction &gv, ParGridFunction &gw)
+{
+   
+   ParGridFunction uSub;
+   FiniteElementSpace *sfes = u.FESpace();   
+   uSub.SetSpace(sfes);
+   int nSize = uSub.Size();   
+
+   {
+     double *dataSub = uSub.HostReadWrite();
+     double *data = u.HostReadWrite();   
+     for (int i = 0; i < nSize; i++) {     
+       dataSub[i] = data[i + 0 * nSize];
+     }
+   }      
+   scalarGrad3D(uSub, gu);
+
+   {
+     double *dataSub = uSub.HostReadWrite();
+     double *data = u.HostReadWrite();   
+     for (int i = 0; i < nSize; i++) {     
+       dataSub[i] = data[i + 1 * nSize];
+     }
+   }   
+   scalarGrad3D(uSub, gv);
+
+   {
+     double *dataSub = uSub.HostReadWrite();
+     double *data = u.HostReadWrite();   
+     for (int i = 0; i < nSize; i++) {     
+       dataSub[i] = data[i + 2 * nSize];
+     }
+   }   
+   scalarGrad3D(uSub, gw);
+
+}
+
+void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu)  
+{
+   FiniteElementSpace *fes = u.FESpace();
+
+   // AccumulateAndCountZones.
+   Array<int> zones_per_vdof;
+   zones_per_vdof.SetSize( 3 * (fes->GetVSize()));
+   zones_per_vdof = 0;
+
+   gu = 0.0;
+   int nSize = u.Size();
+
+   // Local interpolation.
+   int elndofs;
+   Array<int> vdofs;
+   Vector vals1, vals2, vals3;   
+   Vector loc_data;
+   int vdim = fes->GetVDim();
+   DenseMatrix grad_hat;
+   DenseMatrix dshape;
+   DenseMatrix grad;
+   int dim_;
+
+   // element loop
+   for (int e = 0; e < fes->GetNE(); ++e)
+   {
+      fes->GetElementVDofs(e, vdofs);
+      u.GetSubVector(vdofs, loc_data);
+      vals1.SetSize(vdofs.Size());
+      vals2.SetSize(vdofs.Size());
+      vals3.SetSize(vdofs.Size());            
+      ElementTransformation *tr = fes->GetElementTransformation(e);
+      const FiniteElement *el = fes->GetFE(e);
+      elndofs = el->GetDof();
+      int dim = el->GetDim();
+      dim_ = dim;
+      dshape.SetSize(elndofs, dim);
+
+      // element dof
+      for (int dof = 0; dof < elndofs; ++dof)
+      {
+         // Project.
+         const IntegrationPoint &ip = el->GetNodes().IntPoint(dof);
+         tr->SetIntPoint(&ip);
+
+         // Eval and GetVectorGradientHat.
+         el->CalcDShape(tr->GetIntPoint(), dshape);
+	 grad_hat.SetSize(vdim,dim);
+         DenseMatrix loc_data_mat(loc_data.GetData(), elndofs, 1);
+         MultAtB(loc_data_mat, dshape, grad_hat);
+
+         const DenseMatrix &Jinv = tr->InverseJacobian();
+         grad.SetSize(grad_hat.Height(), Jinv.Width());
+         Mult(grad_hat, Jinv, grad);
+
+ 	 vals1(dof) = grad(0,0);
+ 	 vals2(dof) = grad(0,1);
+ 	 vals3(dof) = grad(0,2);	 
+	 
+      }
+      
+      // Accumulate values in all dofs, count the zones.
+      for (int j = 0; j < vdofs.Size(); j++) {
+        int ldof = vdofs[j];	
+        gu(ldof + 0 * nSize) += vals1[j];
+      }
+      for (int j = 0; j < vdofs.Size(); j++) {
+        int ldof = vdofs[j];	
+        gu(ldof + 1 * nSize) += vals2[j];
+      }
+      for (int j = 0; j < vdofs.Size(); j++) {
+        int ldof = vdofs[j];	
+        gu(ldof + 2 * nSize) += vals3[j];
+      }      
+      
+      for (int j = 0; j < vdofs.Size(); j++) {
+        int ldof = vdofs[j];	
+        zones_per_vdof[ldof]++;
+      }
+      
+   }
+
+   // Count the zones globally.
+   GroupCommunicator &gcomm = u.ParFESpace()->GroupComm();
+   gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
+   gcomm.Bcast(zones_per_vdof);
+
+   // Accumulate for all vdofs.
+   gcomm.Reduce<double>(gu.GetData(), GroupCommunicator::Sum);
+   gcomm.Bcast<double>(gu.GetData());
+
+   // Compute means.
+   for (int dir = 0; dir < dim_; dir++) {
+     for (int i = 0; i < u.Size(); i++) {
+       const int nz = zones_per_vdof[i];
+       if (nz) { gu(i + dir*nSize) /= nz; }
+     }
+   }
+   
+}
+
+void ComputeCurl2D(ParGridFunction &u,
+                                 ParGridFunction &cu,
+                                 bool assume_scalar)
+{
+   FiniteElementSpace *fes = u.FESpace();
+
+   // AccumulateAndCountZones.
+   Array<int> zones_per_vdof;
+   zones_per_vdof.SetSize(fes->GetVSize());
+   zones_per_vdof = 0;
+
+   cu = 0.0;
+
+   // Local interpolation.
+   int elndofs;
+   Array<int> vdofs;
+   Vector vals;
+   Vector loc_data;
+   int vdim = fes->GetVDim();
+   DenseMatrix grad_hat;
+   DenseMatrix dshape;
+   DenseMatrix grad;
+   Vector curl;
+
+   for (int e = 0; e < fes->GetNE(); ++e)
+   {
+      fes->GetElementVDofs(e, vdofs);
+      u.GetSubVector(vdofs, loc_data);
+      vals.SetSize(vdofs.Size());
+      ElementTransformation *tr = fes->GetElementTransformation(e);
+      const FiniteElement *el = fes->GetFE(e);
+      elndofs = el->GetDof();
+      int dim = el->GetDim();
+      dshape.SetSize(elndofs, dim);
+
+      for (int dof = 0; dof < elndofs; ++dof)
+      {
+         // Project.
+         const IntegrationPoint &ip = el->GetNodes().IntPoint(dof);
+         tr->SetIntPoint(&ip);
+
+         // Eval and GetVectorGradientHat.
+         el->CalcDShape(tr->GetIntPoint(), dshape);
+         grad_hat.SetSize(vdim, dim);
+         DenseMatrix loc_data_mat(loc_data.GetData(), elndofs, vdim);
+         MultAtB(loc_data_mat, dshape, grad_hat);
+
+         const DenseMatrix &Jinv = tr->InverseJacobian();
+         grad.SetSize(grad_hat.Height(), Jinv.Width());
+         Mult(grad_hat, Jinv, grad);
+
+         if (assume_scalar)
+         {
+            curl.SetSize(2);
+            curl(0) = grad(0, 1);
+            curl(1) = -grad(0, 0);
+         }
+         else
+         {
+            curl.SetSize(2);
+            curl(0) = grad(1, 0) - grad(0, 1);
+            curl(1) = 0.0;
+         }
+
+         for (int j = 0; j < curl.Size(); ++j)
+         {
+            vals(elndofs * j + dof) = curl(j);
+         }
+      }
+
+      // Accumulate values in all dofs, count the zones.
+      for (int j = 0; j < vdofs.Size(); j++)
+      {
+         int ldof = vdofs[j];
+         cu(ldof) += vals[j];
+         zones_per_vdof[ldof]++;
+      }
+   }
+
+   // Communication.
+
+   // Count the zones globally.
+   GroupCommunicator &gcomm = u.ParFESpace()->GroupComm();
+   gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
+   gcomm.Bcast(zones_per_vdof);
+
+   // Accumulate for all vdofs.
+   gcomm.Reduce<double>(cu.GetData(), GroupCommunicator::Sum);
+   gcomm.Bcast<double>(cu.GetData());
+
+   // Compute means.
+   for (int i = 0; i < cu.Size(); i++)
+   {
+      const int nz = zones_per_vdof[i];
+      if (nz)
+      {
+         cu(i) /= nz;
+      }
+   }
+}
+
+void scalarGrad3DV(FiniteElementSpace *fes, FiniteElementSpace *vfes, Vector u, Vector* gu)
+{
+
+     ParGridFunction R0_gf;
+     R0_gf.SetSpace(fes);
+
+     ParGridFunction R1_gf;
+     R1_gf.SetSpace(vfes);
+     
+     R0_gf.SetFromTrueDofs(u);  
+     scalarGrad3D(R0_gf,R1_gf);
+     R1_gf.GetTrueDofs(*gu);
+}
+
+void vectorGrad3DV(FiniteElementSpace *fes, Vector u, Vector* gu, Vector* gv, Vector* gw)
+{
+
+     ParGridFunction R1_gf;
+     R1_gf.SetSpace(fes);
+
+     ParGridFunction R1a_gf,R1b_gf,R1c_gf;       
+     R1a_gf.SetSpace(fes);
+     R1b_gf.SetSpace(fes);
+     R1c_gf.SetSpace(fes);     
+     
+     R1_gf.SetFromTrueDofs(u);       
+     vectorGrad3D(R1_gf,R1a_gf,R1b_gf,R1c_gf);
+     R1a_gf.GetTrueDofs(*gu);
+     R1b_gf.GetTrueDofs(*gv);
+     R1c_gf.GetTrueDofs(*gw);     
 }
