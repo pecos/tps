@@ -6,6 +6,193 @@
 
 using namespace mfem;
 
+/**
+ * @brief Helper function to compute the curl of a vector field (2D version)
+ *
+ * Computes an approximation of the curl of a vector field.  Input
+ * should be a vector function where each component is in the same
+ * H1-conforming scalar FE space.  The output is in the same space.
+ */
+void ComputeCurl2D(ParGridFunction &u, ParGridFunction &cu, bool assume_scalar) {
+  FiniteElementSpace *fes = u.FESpace();
+
+  // AccumulateAndCountZones.
+  Array<int> zones_per_vdof;
+  zones_per_vdof.SetSize(fes->GetVSize());
+  zones_per_vdof = 0;
+
+  cu = 0.0;
+
+  // Local interpolation.
+  int elndofs;
+  Array<int> vdofs;
+  Vector vals;
+  Vector loc_data;
+  int vdim = fes->GetVDim();
+  DenseMatrix grad_hat;
+  DenseMatrix dshape;
+  DenseMatrix grad;
+  Vector curl;
+
+  for (int e = 0; e < fes->GetNE(); ++e) {
+    fes->GetElementVDofs(e, vdofs);
+    u.GetSubVector(vdofs, loc_data);
+    vals.SetSize(vdofs.Size());
+    ElementTransformation *tr = fes->GetElementTransformation(e);
+    const FiniteElement *el = fes->GetFE(e);
+    elndofs = el->GetDof();
+    int dim = el->GetDim();
+    dshape.SetSize(elndofs, dim);
+
+    for (int dof = 0; dof < elndofs; ++dof) {
+      // Project.
+      const IntegrationPoint &ip = el->GetNodes().IntPoint(dof);
+      tr->SetIntPoint(&ip);
+
+      // Eval and GetVectorGradientHat.
+      el->CalcDShape(tr->GetIntPoint(), dshape);
+      grad_hat.SetSize(vdim, dim);
+      DenseMatrix loc_data_mat(loc_data.GetData(), elndofs, vdim);
+      MultAtB(loc_data_mat, dshape, grad_hat);
+
+      const DenseMatrix &Jinv = tr->InverseJacobian();
+      grad.SetSize(grad_hat.Height(), Jinv.Width());
+      Mult(grad_hat, Jinv, grad);
+
+      if (assume_scalar) {
+        curl.SetSize(2);
+        curl(0) = grad(0, 1);
+        curl(1) = -grad(0, 0);
+      } else {
+        curl.SetSize(2);
+        curl(0) = grad(1, 0) - grad(0, 1);
+        curl(1) = 0.0;
+      }
+
+      for (int j = 0; j < curl.Size(); ++j) {
+        vals(elndofs * j + dof) = curl(j);
+      }
+    }
+
+    // Accumulate values in all dofs, count the zones.
+    for (int j = 0; j < vdofs.Size(); j++) {
+      int ldof = vdofs[j];
+      cu(ldof) += vals[j];
+      zones_per_vdof[ldof]++;
+    }
+  }
+
+  // Communication.
+
+  // Count the zones globally.
+  GroupCommunicator &gcomm = u.ParFESpace()->GroupComm();
+  gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
+  gcomm.Bcast(zones_per_vdof);
+
+  // Accumulate for all vdofs.
+  gcomm.Reduce<double>(cu.GetData(), GroupCommunicator::Sum);
+  gcomm.Bcast<double>(cu.GetData());
+
+  // Compute means.
+  for (int i = 0; i < cu.Size(); i++) {
+    const int nz = zones_per_vdof[i];
+    if (nz) {
+      cu(i) /= nz;
+    }
+  }
+}
+
+/**
+ * @brief Helper function to compute the curl of a vector field (3D version)
+ *
+ * Computes an approximation of the curl of a vector field.  Input
+ * should be a vector function where each component is in the same
+ * H1-conforming scalar FE space.  The output is in the same space.
+ */
+void ComputeCurl3D(ParGridFunction &u, ParGridFunction &cu) {
+  FiniteElementSpace *fes = u.FESpace();
+
+  // AccumulateAndCountZones.
+  Array<int> zones_per_vdof;
+  zones_per_vdof.SetSize(fes->GetVSize());
+  zones_per_vdof = 0;
+
+  cu = 0.0;
+
+  // Local interpolation.
+  int elndofs;
+  Array<int> vdofs;
+  Vector vals;
+  Vector loc_data;
+  int vdim = fes->GetVDim();
+  DenseMatrix grad_hat;
+  DenseMatrix dshape;
+  DenseMatrix grad;
+  Vector curl;
+
+  for (int e = 0; e < fes->GetNE(); ++e) {
+    fes->GetElementVDofs(e, vdofs);
+    u.GetSubVector(vdofs, loc_data);
+    vals.SetSize(vdofs.Size());
+    ElementTransformation *tr = fes->GetElementTransformation(e);
+    const FiniteElement *el = fes->GetFE(e);
+    elndofs = el->GetDof();
+    int dim = el->GetDim();
+    dshape.SetSize(elndofs, dim);
+
+    for (int dof = 0; dof < elndofs; ++dof) {
+      // Project.
+      const IntegrationPoint &ip = el->GetNodes().IntPoint(dof);
+      tr->SetIntPoint(&ip);
+
+      // Eval and GetVectorGradientHat.
+      el->CalcDShape(tr->GetIntPoint(), dshape);
+      grad_hat.SetSize(vdim, dim);
+      DenseMatrix loc_data_mat(loc_data.GetData(), elndofs, vdim);
+      MultAtB(loc_data_mat, dshape, grad_hat);
+
+      const DenseMatrix &Jinv = tr->InverseJacobian();
+      grad.SetSize(grad_hat.Height(), Jinv.Width());
+      Mult(grad_hat, Jinv, grad);
+
+      curl.SetSize(3);
+      curl(0) = grad(2, 1) - grad(1, 2);
+      curl(1) = grad(0, 2) - grad(2, 0);
+      curl(2) = grad(1, 0) - grad(0, 1);
+
+      for (int j = 0; j < curl.Size(); ++j) {
+        vals(elndofs * j + dof) = curl(j);
+      }
+    }
+
+    // Accumulate values in all dofs, count the zones.
+    for (int j = 0; j < vdofs.Size(); j++) {
+      int ldof = vdofs[j];
+      cu(ldof) += vals[j];
+      zones_per_vdof[ldof]++;
+    }
+  }
+
+  // Communication
+
+  // Count the zones globally.
+  GroupCommunicator &gcomm = u.ParFESpace()->GroupComm();
+  gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
+  gcomm.Bcast(zones_per_vdof);
+
+  // Accumulate for all vdofs.
+  gcomm.Reduce<double>(cu.GetData(), GroupCommunicator::Sum);
+  gcomm.Bcast<double>(cu.GetData());
+
+  // Compute means.
+  for (int i = 0; i < cu.Size(); i++) {
+    const int nz = zones_per_vdof[i];
+    if (nz) {
+      cu(i) /= nz;
+    }
+  }
+}
+
 Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, timeCoefficients &coeff)
     : gll_rules(0, Quadrature1D::GaussLobatto),
       pmesh_(pmesh),
@@ -33,6 +220,8 @@ Tomboulides::~Tomboulides() {
   delete p_gf_;
   delete pfes_;
   delete pfec_;
+  delete curlcurl_gf_;
+  delete curl_gf_;
   delete u_next_gf_;
   delete u_curr_gf_;
   delete vfes_;
@@ -45,6 +234,8 @@ void Tomboulides::initializeSelf() {
   vfes_ = new ParFiniteElementSpace(pmesh_, vfec_, dim_);
   u_curr_gf_ = new ParGridFunction(vfes_);
   u_next_gf_ = new ParGridFunction(vfes_);
+  curl_gf_ = new ParGridFunction(vfes_);
+  curlcurl_gf_ = new ParGridFunction(vfes_);
 
   pfec_ = new H1_FECollection(porder_);
   pfes_ = new ParFiniteElementSpace(pmesh_, pfec_);
@@ -52,6 +243,8 @@ void Tomboulides::initializeSelf() {
 
   *u_curr_gf_ = 0.0;
   *u_next_gf_ = 0.0;
+  *curl_gf_ = 0.0;
+  *curlcurl_gf_ = 0.0;
   *p_gf_ = 0.0;
 
   interface.velocity = u_next_gf_;
@@ -84,6 +277,7 @@ void Tomboulides::initializeSelf() {
   Nm1_vec_.SetSize(vfes_truevsize);
   Nm2_vec_.SetSize(vfes_truevsize);
   ustar_vec_.SetSize(vfes_truevsize);
+  uext_vec_.SetSize(vfes_truevsize);
 
   // zero vectors for now
   forcing_vec_ = 0.0;
@@ -94,6 +288,7 @@ void Tomboulides::initializeSelf() {
   Nm1_vec_ = 0.0;
   Nm2_vec_ = 0.0;
   ustar_vec_ = 0.0;
+  uext_vec_ = 0.0;
 }
 
 void Tomboulides::initializeOperators() {
@@ -312,4 +507,26 @@ void Tomboulides::step() {
   //------------------------------------------------------------------------
   // Step 3: Poisson
   // ------------------------------------------------------------------------
+
+  // Extrapolate the velocity field (and store in u_next_gf_)
+  {
+    const auto d_u = u_vec_.Read();
+    const auto d_um1 = um1_vec_.Read();
+    const auto d_um2 = um2_vec_.Read();
+    auto d_uext = uext_vec_.Write();
+    const auto ab1 = coeff_.ab1;
+    const auto ab2 = coeff_.ab2;
+    const auto ab3 = coeff_.ab3;
+    MFEM_FORALL(i, uext_vec_.Size(), { d_uext[i] = ab1 * d_u[i] + ab2 * d_um1[i] + ab3 * d_um2[i]; });
+  }
+  u_next_gf_->SetFromTrueDofs(uext_vec_);
+
+  // Evaluate the double curl of the extrapolated velocity field
+  if (dim_ == 2) {
+    ComputeCurl2D(*u_next_gf_, *curl_gf_, false);
+    ComputeCurl2D(*curl_gf_, *curlcurl_gf_, true);
+  } else {
+    ComputeCurl3D(*u_next_gf_, *curl_gf_);
+    ComputeCurl3D(*curl_gf_, *curlcurl_gf_);
+  }
 }
