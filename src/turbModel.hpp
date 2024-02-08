@@ -1,6 +1,6 @@
 
-#ifndef THERMOCHEM_HPP
-#define THERMOCHEM_HPP
+#ifndef TURBMODEL_HPP
+#define TURBMODEL_HPP
 
 // forward-declaration for Tps support class
 namespace TPS {
@@ -32,56 +32,9 @@ using ScalarFuncT = double(const Vector &x, double t);
 class LoMachSolver;
 class LoMachOptions;
 
-/// Container for a Dirichlet boundary condition of the temperature field.
-class TempDirichletBC_T
-{
-public:
-   TempDirichletBC_T(Array<int> attr, Coefficient *coeff)
-      : attr(attr), coeff(coeff)
-   {}
-
-   TempDirichletBC_T(TempDirichletBC_T &&obj)
-   {
-      // Deep copy the attribute array
-      this->attr = obj.attr;
-
-      // Move the coefficient pointer
-      this->coeff = obj.coeff;
-      obj.coeff = nullptr;
-   }
-
-   ~TempDirichletBC_T() { delete coeff; }
-
-   Array<int> attr;
-   Coefficient *coeff;
-};
-
-class QtDirichletBC_T
-{
-public:
-   QtDirichletBC_T(Array<int> attr, Coefficient *coeff)
-      : attr(attr), coeff(coeff)
-   {}
-
-   QtDirichletBC_T(QtDirichletBC_T &&obj)
-   {
-      // Deep copy the attribute array
-      this->attr = obj.attr;
-
-      // Move the coefficient pointer
-      this->coeff = obj.coeff;
-      obj.coeff = nullptr;
-   }
-
-   ~QtDirichletBC_T() { delete coeff; }
-
-   Array<int> attr;
-   Coefficient *coeff;
-};
-
 
 /// Add some description here...
-class ThermoChem
+class TurbModel
 {
   friend class LoMachSolver;
   //friend class Flow;
@@ -101,21 +54,21 @@ private:
    RunConfiguration *config;
   
    // All essential attributes.
-   Array<int> temp_ess_attr;
-   Array<int> Qt_ess_attr;  
+   //Array<int> tke_ess_attr;
+   //Array<int> epsi_ess_attr;  
   
    // All essential true dofs.
-   Array<int> temp_ess_tdof;
-   Array<int> Qt_ess_tdof;  
+   //Array<int> tke_ess_tdof;
+   //Array<int> epsi_ess_tdof;  
   
    // Bookkeeping for temperature dirichlet bcs.
-   std::vector<TempDirichletBC_T> temp_dbcs;
+   //std::vector<TKEDirichletBC_T> tke_dbcs;
 
    // Bookkeeping for Qt dirichlet bcs.
-   std::vector<QtDirichletBC_T> Qt_dbcs;  
+   //std::vector<EPSIDirichletBC_T> epsi_dbcs;  
   
    // space sizes
-   int Sdof, SdofInt, NdofInt, NdofR0Int;
+   int Sdof, SdofInt;
 
    /// Enable/disable verbose output.
    bool verbose = true;
@@ -143,26 +96,13 @@ private:
 
    // just keep these saved for ease
    int numWalls, numInlets, numOutlets;
-  
-   // loMach options to run as incompressible
-   bool constantViscosity = false;
-   bool constantDensity = false;
-   bool incompressibleSolve = false;  
-   bool pFilter = false;
 
+   // loMach options to run as incompressible
+   bool pFilter = false;  
+  
    double dt;
    double time;
    int iter;
-  
-   // temporary
-   double Re_tau, Pr, Cp, gamma;
-  
-   /// Kinematic viscosity (dimensionless).
-   double kin_vis, dyn_vis;
-
-   // make everything dimensionless after generalizing form channel
-   double ambientPressure, thermoPressure, static_rho, Rgas, systemMass;
-   double tPm1, tPm2, dtP;
 
    // Scalar \f$H^1\f$ finite element collection.
    FiniteElementCollection *sfec = nullptr;
@@ -175,7 +115,8 @@ private:
 
    /// Velocity \f$(H^1)^d\f$ finite element space.
    ParFiniteElementSpace *vfes = nullptr;
-  
+
+  /*
    // operators
    DiffusionIntegrator *hdt_blfi = nullptr;
    MassIntegrator *hmt_blfi = nullptr;
@@ -267,20 +208,17 @@ private:
    Vector fTn, Tn, Tn_next, Tnm1, Tnm2, NTn, NTnm1, NTnm2;
    Vector Text, Text_bdr, t_bdr;
    Vector resT, tmpR0a, tmpR0b, tmpR0c;
+   */
 
-   //Vector *un;
-   //Vector *un_next;
-   //ParGridFunction *un_gf;
-   ParGridFunction *un_next_gf;
-   ParGridFunction *subgridVisc_gf;      
-  
-   Vector tmpR0;
-   Vector tmpR1;
-   ParGridFunction R0PM0_gf;
-   ParGridFunction R0PM1_gf;
-  //ParGridFunction un_gf;
-  //ParGridFunction un_next_gf;
+   Vector *gradU;
+   Vector *gradV;
+   Vector *gradW;
+   Vector subgridViscSml;
+   ParGridFunction subgridVisc_gf;
+   ParGridFunction *delta_gf;
+   Vector delta;
 
+   /*
    Vector gradT;
    Vector gradMu, gradRho;  
    Vector Qt;      
@@ -288,9 +226,10 @@ private:
    Vector alphaSml;
    Vector viscSml;
    Vector viscMultSml;
-   Vector subgridViscSml;  
-
-   // Print levels.
+   */
+  
+  /*
+   // Print levels.  
    int pl_mvsolve = 0;
    int pl_spsolve = 0;
    int pl_hsolve = 0;
@@ -322,59 +261,39 @@ private:
    GasMixture *d_mixture;  // valid on device, when available; otherwise = mixture  
    TransportProperties *transportPtr = NULL;  // valid on both host and device
    // TransportProperties *d_transport = NULL;  // valid on device, when available; otherwise = transportPtr
+   */
 
    // subgrid scale => move to turb model class
    ParGridFunction *bufferSubgridVisc;
   
   
 public:
-  //ThermoChem(TPS::Tps *tps, LoMachSolver *loMach);
-  ThermoChem(mfem::ParMesh *pmesh_, RunConfiguration *config_, LoMachOptions *loMach_opts_);  
-  virtual ~ThermoChem() {}
+  TurbModel(mfem::ParMesh *pmesh_, RunConfiguration *config_, LoMachOptions *loMach_opts_);  
+  virtual ~TurbModel() {}
 
    void initialize();
-   void initializeExternal(ParGridFunction *un_next_gf_, ParGridFunction *subgridVisc_gf_,int nWalls, int nInlets, int nOutlets);    
-   void thermoChemStep(double &time, double dt, const int cur_step, const int start_step, std::vector<double> ab, std::vector<double> bdf, bool provisional = false);
+   void initializeExternal(Vector *gradU, Vector *gradV, Vector *gradW, ParGridFunction *delta_gf_);  
+  
+   void turbModelStep(double &time, double dt, const int cur_step, const int start_step, std::vector<double> ab, std::vector<double> bdf, bool provisional = false);
 
-   void updateThermoP();
-   void extrapolateState(int current_step);
-   void updateDensity(double tStep);
-   //void updateGradients(double tStep);
-   void updateGradientsOP(double tStep);  
-   void updateBC(int current_step);
-   void updateDiffusivity();
-   void computeSystemMass();
+  //void updateGradientsOP(double tStep);  
+  //void updateBC(int current_step);
    
-   void computeExplicitTempConvectionOP(bool extrap);      
-   void computeQt();
-   void computeQtTO();
-   void interpolateInlet();
-   void uniformInlet();  
+  //void computeExplicitConvectionOP(bool extrap);      
+  //void interpolateInlet();
+  //void uniformInlet();  
   
    /// Initialize forms, solvers and preconditioners.
    void Setup(double dt);  
 
    /// Return a pointer to the current temperature ParGridFunction.
-   ParGridFunction *GetCurrentTemperature() { return &Tn_gf; }
-
-   /// Return a pointer to the current density ParGridFunction.  
-   ParGridFunction *GetCurrentDensity() { return &rn_gf; }  
-
-   /// Return a pointer to the current total viscosity ParGridFunction.  
-   ParGridFunction *GetCurrentTotalViscosity() { return &viscTotal_gf; }    
-  
-   /// Return a pointer to the current total thermal diffusivity ParGridFunction.    
-   ParGridFunction *GetCurrentTotalThermalDiffusivity() { return &alphaTotal_gf; }
-
-   /// Rotate entries in the time step and solution history arrays.
-   void UpdateTimestepHistory(double dt);  
+   ParGridFunction *GetCurrentEddyViscosity() { return &subgridVisc_gf; }
 
    /// Add a Dirichlet boundary condition to the temperature and Qt field.
-   void AddTempDirichletBC(Coefficient *coeff, Array<int> &attr);
-   void AddTempDirichletBC(ScalarFuncT *f, Array<int> &attr);    
-   void AddQtDirichletBC(Coefficient *coeff, Array<int> &attr);
-   void AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr);      
+   //void AddTKEDirichletBC(Coefficient *coeff, Array<int> &attr);
+   //void AddEPSIDirichletBC(ScalarFuncT *f, Array<int> &attr);    
 
+  /*
    /// Eliminate essential BCs in an Operator and apply to RHS.
    // rename this to something sensible "ApplyEssentialBC" or something
    void EliminateRHS(Operator &A,
@@ -385,13 +304,14 @@ public:
                      Vector &X,
                      Vector &B,
                      int copy_interior = 0);
+  */
 
    /// Remove mean from a Vector.
    /**
     * Modify the Vector @a v by subtracting its mean using
     * \f$v = v - \frac{\sum_i^N v_i}{N} \f$
     */
-   void Orthogonalize(Vector &v);
+   //void Orthogonalize(Vector &v);
 
    // subgrid scale models => move to turb model class
    void sgsSmag(const DenseMatrix &gradUp, double delta, double &nu_sgs);

@@ -36,6 +36,7 @@ class Tps;
 #include "averaging_and_rms.hpp"
 #include "chemistry.hpp"
 #include "radiation.hpp"
+#include "turbModel.hpp"
 #include "thermoChem.hpp"
 
 
@@ -172,14 +173,16 @@ public:
  *
  */
 class LoMachSolver : public TPS::Solver {
+  friend class TurbModel;      
   friend class ThermoChem;
   //friend class Flow;
-  //friend class TurbModel;    
 protected:
   
    LoMachOptions loMach_opts_;
 
+   TurbModel  *turbClass;  
    ThermoChem *tcClass;
+   //Flow *flowClass;  
 
    MPI_Groups *groupsMPI;
    int nprocs_;  // total number of MPI procs

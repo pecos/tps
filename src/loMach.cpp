@@ -86,10 +86,7 @@ LoMachSolver::LoMachSolver(LoMachOptions loMach_opts, TPS::Tps *tps)
   //joule_heating_ = NULL;
 
   // instantiate phyics models
-  //turbClass->turbulence(tps_,this);    
-  //tcClass = new ThermoChem(tpsP_,this);
-  //flowClass->flow(tps_,this);
-
+  turbClass = new TurbModel(pmesh,&config,&loMach_opts);  
   tcClass = new ThermoChem(pmesh,&config,&loMach_opts);
     
 }
@@ -717,12 +714,14 @@ void LoMachSolver::initialize() {
    if (verbose) grvy_printf(ginfo, "init Sol and Vis okay...\n");
 
    // initialize sub modues
+   turbClass->initialize();        
    tcClass->initialize();
    //flowClass->initialize();
-   //turbClass->initialize();     
 
-   tcClass->initializeExternal(&un_next_gf);   
+   turbClass->initializeExternal(&gradU, &gradV, &gradW, &resolution_gf);      
+   tcClass->initializeExternal(&un_next_gf,turbClass->GetCurrentEddyViscosity(),numWalls,numOutlets,numInlets);   
 
+   
   /**/
   average = new Averaging(Up, pmesh, sfec, sfes, vfes, fvfes, eqSystem, d_mixture, num_equation, dim, config, groupsMPI);
   //MPI_Barrier(MPI_COMM_WORLD);       
@@ -1507,7 +1506,7 @@ void LoMachSolver::Setup(double dt)
    */
 
    // setup sub models first
-   //turbClass->Setup(dt);   
+   turbClass->Setup(dt);   
    tcClass->Setup(dt);
    //flowClass->Setup(dt);   
    
@@ -2670,7 +2669,10 @@ void LoMachSolver::solve()
         SetTimeIntegrationCoefficients(step - iter_start);
         extrapolateState(step);
         updateBC(step);   
-        updateGradientsOP(1.0);	
+        updateGradientsOP(1.0);
+
+	turbClass->turbModelStep(time, dt, step, iter_start, abCoef, bdfCoef);
+	
         tcClass->extrapolateState(step);  
         tcClass->updateThermoP();
         tcClass->updateBC(step);
@@ -2688,6 +2690,7 @@ void LoMachSolver::solve()
         MvInv->Mult(tmpR1, gradDivU);	
 	
         curlcurlStep(time, dt, step, iter_start);
+	
       } else if (config.timeIntegratorType == 2) {
         //staggeredTimeStep(time, dt, step, iter_start);
 	if(rank0_) std::cout << "Time integration not updated." << endl;
