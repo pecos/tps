@@ -1,5 +1,6 @@
 
 
+#include "turbModel.hpp"
 #include "thermoChem.hpp"
 #include "loMach.hpp"
 #include "loMach_options.hpp"
@@ -239,9 +240,14 @@ void ThermoChem::initialize() {
    
 }
 
-void ThermoChem::initializeExternal(ParGridFunction *un_next_gf_) {
+void ThermoChem::initializeExternal(ParGridFunction *un_next_gf_, ParGridFunction *subgridVisc_gf_, int nWalls, int nInlets, int nOutlets) {
 
   un_next_gf = un_next_gf_;
+  subgridVisc_gf = subgridVisc_gf_;
+  
+  numWalls = nWalls;
+  numInlets = nInlets;
+  numOutlets = nOutlets;    
   
 }
 
@@ -1075,44 +1081,6 @@ void ThermoChem::updateThermoP() {
 }
 
 void ThermoChem::updateDiffusivity() {
-
-   // subgrid scale model: gradUp is in (eq,dim) form
-   // TO BE MOVED TO NEW CLASS
-  /*
-   if (config.sgsModelType > 0) {
-     double *dGradU = loMach_->gradU.HostReadWrite();
-     double *dGradV = loMach_->gradV.HostReadWrite();
-     double *dGradW = loMach_->gradW.HostReadWrite(); 
-     double *rho = rn.HostReadWrite();
-     double *delta = loMach_->gridScaleSml.HostReadWrite();
-     double *data = subgridViscSml.HostReadWrite();             
-     if (config.sgsModelType == 1) {
-       for (int i = 0; i < SdofInt; i++) {     
-         double nu_sgs = 0.;
-	 DenseMatrix gradUp;
-	 gradUp.SetSize(nvel, dim);
-	 for (int dir = 0; dir < dim; dir++) { gradUp(0,dir) = dGradU[i + dir * SdofInt]; }
-	 for (int dir = 0; dir < dim; dir++) { gradUp(1,dir) = dGradV[i + dir * SdofInt]; }
-	 for (int dir = 0; dir < dim; dir++) { gradUp(2,dir) = dGradW[i + dir * SdofInt]; }
-         sgsSmag(gradUp, delta[i], nu_sgs);
-         data[i] = nu_sgs;
-       }
-     } else if (config.sgsModelType == 2) {
-       for (int i = 0; i < SdofInt; i++) {     
-         double nu_sgs = 0.;
-	 DenseMatrix gradUp;
-	 gradUp.SetSize(nvel, dim);
-	 for (int dir = 0; dir < dim; dir++) { gradUp(0,dir) = dGradU[i + dir * SdofInt]; }
-	 for (int dir = 0; dir < dim; dir++) { gradUp(1,dir) = dGradV[i + dir * SdofInt]; }
-	 for (int dir = 0; dir < dim; dir++) { gradUp(2,dir) = dGradW[i + dir * SdofInt]; }
-         sgsSigma(gradUp, delta[i], nu_sgs);
-	 data[i] = nu_sgs;
-       }       
-     }
-     bufferSubgridVisc->SetFromTrueDofs(subgridViscSml);     
-   }
-  */
-
   
    // viscosity
    if (constantViscosity != true) {
@@ -1133,7 +1101,8 @@ void ThermoChem::updateDiffusivity() {
    }
 
    if (config->sgsModelType > 0) {
-     double *dataSubgrid = bufferSubgridVisc->HostReadWrite();
+     //double *dataSubgrid = bufferSubgridVisc->HostReadWrite();
+     double *dataSubgrid = subgridVisc_gf->HostReadWrite();     
      double *dataVisc = bufferVisc->HostReadWrite();
      double *Rdata = rn_gf.HostReadWrite();          
      for (int i = 0; i < Sdof; i++) { dataVisc[i] += Rdata[i] * dataSubgrid[i]; }     
