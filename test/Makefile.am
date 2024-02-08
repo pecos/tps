@@ -150,6 +150,13 @@ tps_interface_test_LDADD    = ../src/libtps.la
 tps_interface_test_LDADD   += $(HDF5_LIBS)
 tps_interface_test_LDADD   += $(GRVY_LIBS)
 
+check_PROGRAMS += split_interface_test
+split_interface_test_SOURCES  = test_split_interface.cpp
+split_interface_test_LDADD    = ../src/libtps.la
+split_interface_test_LDADD   += $(HDF5_LIBS)
+split_interface_test_LDADD   += $(GRVY_LIBS)
+
+
 if !GPU_ENABLED
 
 check_PROGRAMS               += perfect_mixture_test
