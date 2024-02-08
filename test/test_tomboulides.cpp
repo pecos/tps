@@ -27,6 +27,18 @@ int main(int argc, char *argv[]) {
   const int vorder = 3;
   const int porder = 3;
 
+  // time step coefficients (1st order)
+  timeCoefficients time_coeff;
+  time_coeff.time = 0.0;
+  time_coeff.dt = 1.0;
+  time_coeff.ab1 = 1.0;
+  time_coeff.ab2 = 0.0;
+  time_coeff.ab3 = 0.0;
+  time_coeff.bd0 = 1.0;
+  time_coeff.bd1 = -1.0;
+  time_coeff.bd2 = 0.0;
+  time_coeff.bd3 = 0.0;
+
   // Density and viscosity to use
   const double rho = 42.0;
   const double mu = 1.0e-6;
@@ -35,7 +47,7 @@ int main(int argc, char *argv[]) {
   FlowBase *flow;
   ThermoChemModelBase *thermo;
 
-  flow = new Tomboulides(pmesh, vorder, porder);
+  flow = new Tomboulides(pmesh, vorder, porder, time_coeff);
   thermo = new ConstantPropertyThermoChem(pmesh, sorder, rho, mu);
 
   flow->initializeSelf();
@@ -53,6 +65,10 @@ int main(int argc, char *argv[]) {
 
   // Take a time step (actually does nothing for these classes, but still)
   thermo->step();
+  flow->step();
+
+  time_coeff.time += time_coeff.dt;
+
   flow->step();
 
   // Make sure when we get the density via the flow interface it is correct

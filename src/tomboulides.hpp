@@ -41,6 +41,28 @@
 
 #include "split_flow_base.hpp"
 
+/// Container for forcing terms to be added to velocity equation
+class ForcingTerm_T {
+ public:
+  ForcingTerm_T(mfem::Array<int> attr, mfem::VectorCoefficient *coeff) : attr(attr), coeff(coeff) {
+    // nothing here
+  }
+
+  ForcingTerm_T(ForcingTerm_T &&obj) {
+    // Deep copy the attribute array
+    this->attr = obj.attr;
+
+    // Move the coefficient pointer
+    this->coeff = obj.coeff;
+    obj.coeff = nullptr;
+  }
+
+  ~ForcingTerm_T() { delete coeff; }
+
+  mfem::Array<int> attr;
+  mfem::VectorCoefficient *coeff;
+};
+
 class Tomboulides : public FlowBase {
  protected:
   // Options
@@ -53,6 +75,10 @@ class Tomboulides : public FlowBase {
   int pressure_solve_max_iter_ = 100;
   double pressure_solve_rtol_ = 1e-8;
 
+  int mass_inverse_pl_ = 0;
+  int mass_inverse_max_iter_ = 200;
+  double mass_inverse_rtol_ = 1e-12;
+
   // To use "numerical integration", quadrature rule must persist
   mfem::IntegrationRules gll_rules;
 
@@ -61,6 +87,15 @@ class Tomboulides : public FlowBase {
   const int vorder_;
   const int porder_;
   const int dim_;
+
+  // Coefficients necessary to take a time step (including dt).
+  // Assumed to be externally managed and determined, so just get a
+  // reference here.
+  const timeCoefficients &coeff_;
+
+  // Object used to build forcing
+  mfem::VectorConstantCoefficient *gravity_vec_;
+  std::vector<ForcingTerm_T> forcing_terms_;
 
   /// Velocity FEM objects and fields
   mfem::FiniteElementCollection *vfec_ = nullptr;
@@ -76,12 +111,17 @@ class Tomboulides : public FlowBase {
   /// mfem::Coefficients used in forming necessary operators
   mfem::GridFunctionCoefficient *rho_coeff_ = nullptr;
   mfem::RatioCoefficient *iorho_coeff_ = nullptr;
+  mfem::ConstantCoefficient nlcoeff_;
 
   // mfem "form" objects used to create operators
-  mfem::ParBilinearForm *L_iorho_form_ = nullptr;
+  mfem::ParBilinearForm *L_iorho_form_ = nullptr;  // \int (1/\rho) \nabla \phi_i \cdot \nabla \phi_j
+  mfem::ParLinearForm *forcing_form_ = nullptr;    // \int \phi_i f
+  mfem::ParNonlinearForm *Nconv_form_ = nullptr;   // \int \vphi_i \cdot [(u \cdot \nabla) u]
+  mfem::ParBilinearForm *Mv_form_ = nullptr;       // mass matrix = \int \vphi_i \cdot \vphi_j
 
   // mfem operator objects
   mfem::OperatorHandle L_iorho_op_;
+  mfem::OperatorHandle Mv_op_;
 
   // solver objects
   mfem::ParLORDiscretization *L_iorho_lor_ = nullptr;
@@ -89,9 +129,22 @@ class Tomboulides : public FlowBase {
   mfem::OrthoSolver *L_iorho_inv_ortho_pc_ = nullptr;
   mfem::CGSolver *L_iorho_inv_ = nullptr;
 
+  mfem::Solver *Mv_inv_pc_ = nullptr;
+  mfem::CGSolver *Mv_inv_ = nullptr;
+
+  // Vectors
+  mfem::Vector forcing_vec_;
+  mfem::Vector u_vec_;
+  mfem::Vector um1_vec_;
+  mfem::Vector um2_vec_;
+  mfem::Vector N_vec_;
+  mfem::Vector Nm1_vec_;
+  mfem::Vector Nm2_vec_;
+  mfem::Vector ustar_vec_;
+
  public:
   /// Constructor
-  Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder);
+  Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, timeCoefficients &coeff);
 
   /// Destructor
   ~Tomboulides() final;
