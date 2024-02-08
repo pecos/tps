@@ -60,12 +60,6 @@ void TurbModel::initialize() {
    vfec = new H1_FECollection(order, dim);
    vfes = new ParFiniteElementSpace(pmesh, vfec, dim);
    
-   // dealias nonlinear term 
-   //nfec = new H1_FECollection(norder, dim);   
-   //nfes = new ParFiniteElementSpace(pmesh, nfec, dim);   
-   //nfecR0 = new H1_FECollection(norder);   
-   //nfesR0 = new ParFiniteElementSpace(pmesh, nfecR0);         
-   
    // Check if fully periodic mesh
    //if (!(pmesh->bdr_attributes.Size() == 0))
    /* update for tke/epsi
@@ -82,8 +76,6 @@ void TurbModel::initialize() {
 
    int vfes_truevsize = vfes->GetTrueVSize();   
    int sfes_truevsize = sfes->GetTrueVSize();
-   //int nfes_truevsize = nfes->GetTrueVSize();
-   //int nfesR0_truevsize = nfesR0->GetTrueVSize();
 
    subgridViscSml.SetSize(sfes_truevsize);
    subgridVisc_gf.SetSpace(sfes);
