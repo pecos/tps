@@ -60,6 +60,8 @@ class FlowBase {
 
   void initializeFromThermoChem(thermoChemToFlow *thermo) { thermo_interface_ = thermo; }
 
+  virtual void initializeOperators() {}
+
   /// Interface object, provides fields necessary for the thermochemistry model
   flowToThermoChem interface;
 
