@@ -511,3 +511,187 @@ void evaluateDistanceSerial(mfem::Mesh &mesh, const mfem::Array<int> &wall_patch
     h_dist[i] = dist_to_wall;
   }  // end loop over points in GridFunction for distance
 }
+
+
+void multConstScalar(double A, Vector B, Vector* C) {
+   {
+     double *dataB = B.HostReadWrite();
+     double *dataC = C->HostReadWrite();          
+     MFEM_FORALL(i, B.Size(), {dataC[i] = A * dataB[i];} );
+   }   
+}
+
+void multConstScalarInv(double A, Vector B, Vector* C) {
+   {
+     double *dataB = B.HostReadWrite();
+     double *dataC = C->HostReadWrite();
+     MFEM_FORALL(i, B.Size(), {dataC[i] = A / dataB[i];} );
+   }   
+}
+
+void multConstVector(double A, Vector B, Vector* C) {
+   {
+     double *dataB = B.HostReadWrite();
+     double *dataC = C->HostReadWrite();          
+     MFEM_FORALL(i, B.Size(), {dataC[i] = A * dataB[i];} );
+   }     
+}
+
+void multConstScalarIP(double A, Vector* C) {
+   {
+     double *dataC = C->HostReadWrite();          
+     MFEM_FORALL(i, C->Size(), {dataC[i] = A * dataC[i];} );
+   }   
+}
+
+void multConstScalarInvIP(double A, Vector* C) {
+   {
+     double *dataC = C->HostReadWrite();
+     MFEM_FORALL(i, C->Size(), {dataC[i] = A / dataC[i];} );
+   }   
+}
+
+// not necessary
+void multConstVectorIP(double A, Vector* C) {
+   {
+     double *dataC = C->HostReadWrite();          
+     MFEM_FORALL(i, C->Size(), {dataC[i] = A * dataC[i];} );
+   }     
+}
+
+void multScalarScalar(Vector A, Vector B, Vector* C) {
+
+     double *dataA = A.HostReadWrite();     
+     double *dataB = B.HostReadWrite();
+     double *dataC = C->HostReadWrite();     
+     MFEM_FORALL(i, A.Size(), {dataC[i] = dataA[i] * dataB[i];} );
+   
+}
+
+void multScalarVector(Vector A, Vector B, Vector* C, int dim = 3) {
+
+     int Ndof = A.Size();
+     double *dataA = A.HostReadWrite();
+     double *dataB = B.HostReadWrite();          
+     double *dataC = C->HostReadWrite();
+     for (int eq = 0; eq < dim; eq++) { 
+       for (int i = 0; i < Ndof; i++) {
+         dataC[i + eq * Ndof] = dataA[i] * dataB[i +  eq * Ndof];
+       }
+     }          
+   
+}
+
+void multScalarInvVector(Vector A, Vector B, Vector* C, int dim = 3) {
+
+     int Ndof = A.Size();
+     double *dataA = A.HostReadWrite();
+     double *dataB = B.HostReadWrite();          
+     double *dataC = C->HostReadWrite();
+     for (int eq = 0; eq < dim; eq++) { 
+       for (int i = 0; i < Ndof; i++) {
+         dataC[i + eq * Ndof] = (1.0 / dataA[i]) * dataB[i +  eq * Ndof];
+       }
+     }          
+   
+}
+
+void multScalarInvVectorIP(Vector A, Vector* C, int dim = 3) {
+
+     int Ndof = A.Size();
+     double *dataA = A.HostReadWrite();
+     double *dataC = C->HostReadWrite();
+     for (int eq = 0; eq < dim; eq++) { 
+       for (int i = 0; i < Ndof; i++) {
+         dataC[i + eq * Ndof] = (1.0 / dataA[i]) * dataC[i +  eq * Ndof];
+       }
+     }          
+   
+}
+
+void multVectorVector(Vector A, Vector B, Vector* C1, Vector* C2, Vector* C3, int dim = 3) {
+
+   {
+     int Ndof = A.Size() / dim;
+     double *dataA = A.HostReadWrite();          
+     double *dataB = B.HostReadWrite();
+     double *dataC = C1->HostReadWrite();     
+     for (int eq = 0; eq < dim; eq++) { 
+       for (int i = 0; i < Ndof; i++) {
+         dataC[i + eq * Ndof] = dataA[i + 0 * Ndof] * dataB[i + eq * Ndof];
+       }
+     }          
+   }
+
+   {
+     int Ndof = A.Size() / dim;
+     double *dataA = A.HostReadWrite();          
+     double *dataB = B.HostReadWrite();
+     double *dataC = C2->HostReadWrite();     
+     for (int eq = 0; eq < dim; eq++) { 
+       for (int i = 0; i < Ndof; i++) {
+         dataC[i + eq * Ndof] = dataA[i + 1 * Ndof] * dataB[i + eq * Ndof];
+       }
+     }          
+   }
+
+   {
+     int Ndof = A.Size() / dim;
+     double *dataA = A.HostReadWrite();          
+     double *dataB = B.HostReadWrite();
+     double *dataC = C3->HostReadWrite();     
+     for (int eq = 0; eq < dim; eq++) { 
+       for (int i = 0; i < Ndof; i++) {
+         dataC[i + eq * Ndof] = dataA[i + 2 * Ndof] * dataB[i + eq * Ndof];
+       }
+     }          
+   }
+   
+}
+
+
+void dotVector(Vector A, Vector B, Vector* C, int dim = 3) {
+
+     int Ndof = A.Size() / dim;
+     double *dataA = A.HostReadWrite();          
+     double *dataB = B.HostReadWrite();
+     double *data = C->HostReadWrite();
+     for (int i = 0; i < Ndof; i++) { data[i] = 0.0; }
+     for (int eq = 0; eq < dim; eq++) { 
+       for (int i = 0; i < Ndof; i++) {
+         data[i] += dataA[i + eq * Ndof] * dataB[i + eq * Ndof];
+       }
+     }          
+   
+}
+
+
+void multScalarScalarIP(Vector A, Vector* C) {
+
+     double *dataA = A.HostReadWrite();     
+     double *dataB = C->HostReadWrite();
+     MFEM_FORALL(i, A.Size(), {dataB[i] = dataA[i] * dataB[i];} );
+   
+}
+
+void multScalarInvScalarIP(Vector A, Vector* C) {
+  
+     double *dataA = A.HostReadWrite();     
+     double *dataB = C->HostReadWrite();
+     MFEM_FORALL(i, A.Size(), {dataB[i] = 1.0/dataA[i] * dataB[i];} );
+   
+}
+
+void multScalarVectorIP(Vector A, Vector* C, int dim = 3) {
+
+     int Ndof = A.Size();
+     double *dataA = A.HostReadWrite();
+     double *dataB = C->HostReadWrite();          
+     for (int eq = 0; eq < dim; eq++) { 
+       for (int i = 0; i < Ndof; i++) {
+         dataB[i + eq * Ndof] = dataA[i] * dataB[i +  eq * Ndof];
+         //C[i + eq * Ndof] = dataA[i] * C[i +  eq * Ndof];	 
+       }
+     }          
+   
+}
