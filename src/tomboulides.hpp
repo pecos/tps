@@ -43,6 +43,20 @@
 
 class Tomboulides : public FlowBase {
  protected:
+  // Options
+  // TODO(trevilo): hardcoded for testing.  Need to set from config,
+  // so pass config to ctor
+  bool numerical_integ_ = true;
+  bool partial_assembly_ = false;
+
+  int pressure_solve_pl_ = 0;
+  int pressure_solve_max_iter_ = 100;
+  double pressure_solve_rtol_ = 1e-8;
+
+  // To use "numerical integration", quadrature rule must persist
+  mfem::IntegrationRules gll_rules;
+
+  // Basic info needed to create fem spaces
   mfem::ParMesh *pmesh_;
   const int vorder_;
   const int porder_;
@@ -54,13 +68,26 @@ class Tomboulides : public FlowBase {
   mfem::ParGridFunction *u_curr_gf_ = nullptr;
   mfem::ParGridFunction *u_next_gf_ = nullptr;
 
-  /// Pressure \f$H^1\f$ finite element collection.
+  /// Presser FEM objects and fields
   mfem::FiniteElementCollection *pfec_ = nullptr;
   mfem::ParFiniteElementSpace *pfes_ = nullptr;
   mfem::ParGridFunction *p_gf_ = nullptr;
 
-  /// Allocate state ParGridFunction objects and initialize interface
-  void allocateState();
+  /// mfem::Coefficients used in forming necessary operators
+  mfem::GridFunctionCoefficient *rho_coeff_ = nullptr;
+  mfem::RatioCoefficient *iorho_coeff_ = nullptr;
+
+  // mfem "form" objects used to create operators
+  mfem::ParBilinearForm *L_iorho_form_ = nullptr;
+
+  // mfem operator objects
+  mfem::OperatorHandle L_iorho_op_;
+
+  // solver objects
+  mfem::ParLORDiscretization *L_iorho_lor_ = nullptr;
+  mfem::HypreBoomerAMG *L_iorho_inv_pc_ = nullptr;
+  mfem::OrthoSolver *L_iorho_inv_ortho_pc_ = nullptr;
+  mfem::CGSolver *L_iorho_inv_ = nullptr;
 
  public:
   /// Constructor
@@ -69,11 +96,21 @@ class Tomboulides : public FlowBase {
   /// Destructor
   ~Tomboulides() final;
 
-  /// Initialize operators and fields
+  /// Allocate state ParGridFunction objects and initialize interface
   void initializeSelf() final;
 
+  /**
+   * @brief Initialize operators
+   *
+   * Initialize all Coefficient, BilinearForm, etc objects necessary
+   * for step().  Note that this initialization necessarily depends
+   * upon the thermo_interface_ object being initialized, so this
+   * should be call *after* initializeFromThermoChem().
+   */
+  void initializeOperators() final;
+
   /// Advance
-  void step() final {}
+  void step() final;
 };
 
 #endif  // TOMBOULIDES_HPP_
