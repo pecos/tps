@@ -163,16 +163,17 @@ void ThermoChem::initialize() {
    
    gradT.SetSize(vfes_truevsize);
    gradT = 0.0;
+   gradT_gf.SetSpace(vfes);   
 
-   gradMu.SetSize(vfes_truevsize);
-   gradMu = 0.0;   
-   gradRho.SetSize(vfes_truevsize);
-   gradRho = 0.0;   
+   // dont use these in thermoChem, so leave to flow to calc
+   //gradMu.SetSize(vfes_truevsize);
+   //gradMu = 0.0;   
+   //gradRho.SetSize(vfes_truevsize);
+   //gradRho = 0.0;   
    
    Qt.SetSize(sfes_truevsize);
-   Qt = 0.0;   
-
-   gradT_gf.SetSpace(vfes);
+   Qt = 0.0;
+   Qt_gf.SetSpace(sfes);   
    
    Tn.SetSize(sfes_truevsize);
    Tn = 298.0; // fix hardcode, shouldnt matter
@@ -819,6 +820,30 @@ void ThermoChem::Setup(double dt)
       Tn_filtered_gf.SetSpace(sfes);
       Tn_filtered_gf = 0.0;
    }
+
+   
+   bufferViscMult = new ParGridFunction(sfes);
+   {
+     double *data = bufferViscMult->HostReadWrite();
+     for (int i = 0; i < sfes->GetNDofs(); i++) { data[i] = 1.0; }
+   }
+   ParGridFunction coordsDof(vfes);
+   pmesh->GetNodes(coordsDof);  
+   if (config->linViscData.isEnabled) {
+     if (rank0) std::cout << "Viscous sponge active" << endl;
+     double *viscMult = bufferViscMult->HostReadWrite();
+     double *hcoords = coordsDof.HostReadWrite();
+     double wgt = 0.;    
+     for (int n = 0; n < sfes->GetNDofs(); n++) {
+       double coords[3];
+       for (int d = 0; d < dim; d++) {
+	 coords[d] = hcoords[n + d * sfes->GetNDofs()];
+       }
+       viscSpongePlanar(coords, wgt);
+       viscMult[n] = wgt + (config->linViscData.uniformMult - 1.0);
+     }
+  }
+
    
 }
 
@@ -961,6 +986,11 @@ void ThermoChem::thermoChemStep(double &time, double dt, const int current_step,
    }
 
    }
+
+   // prepare for external use
+   updateDensity(1.0);	   
+   //computeQt();
+   computeQtTO();   
    
 }
 
@@ -1080,6 +1110,120 @@ void ThermoChem::updateThermoP() {
 
 }
 
+/**
+Simple planar viscous sponge layer with smooth tanh-transtion using user-specified width and
+total amplification.  Note: duplicate in M2
+*/
+//MFEM_HOST_DEVICE
+void ThermoChem::viscSpongePlanar(double *x, double &wgt) {
+  
+  double normal[3];
+  double point[3];
+  double s[3];
+  double factor, width, dist, wgt0;
+  
+  for (int d = 0; d < dim; d++) normal[d] = config->linViscData.normal[d];
+  for (int d = 0; d < dim; d++) point[d] = config->linViscData.point0[d];
+  width = config->linViscData.width;
+  factor = config->linViscData.viscRatio;
+  
+  // get settings
+  factor = max(factor, 1.0);
+  //width = vsd_.width;  
+
+  // distance from plane
+  dist = 0.;
+  for (int d = 0; d < dim; d++) s[d] = (x[d] - point[d]);
+  for (int d = 0; d < dim; d++) dist += s[d] * normal[d];
+
+  // weight
+  wgt0 = 0.5 * (tanh(0.0 / width - 2.0) + 1.0);  
+  wgt = 0.5 * (tanh(dist / width - 2.0) + 1.0);
+  wgt = (wgt - wgt0) * 1.0/(1.0 - wgt0);
+  wgt = std::max(wgt,0.0);
+  wgt *= (factor - 1.0);
+  wgt += 1.0;
+
+  // add cylindrical area
+  double cylX = config->linViscData.cylXradius;
+  double cylY = config->linViscData.cylYradius;
+  double cylZ = config->linViscData.cylZradius;
+  double wgtCyl;
+  if (config->linViscData.cylXradius > 0.0) {
+    dist = x[1]*x[1] + x[2]*x[2];
+    dist = std::sqrt(dist);
+    dist = dist - cylX;    
+    wgtCyl = 0.5 * (tanh(dist / width - 2.0) + 1.0);
+    wgtCyl = (wgtCyl - wgt0) * 1.0/(1.0 - wgt0);
+    wgtCyl = std::max(wgtCyl,0.0);    
+    wgtCyl *= (factor - 1.0);
+    wgtCyl += 1.0;
+    wgt = std::max(wgt,wgtCyl);
+  } else if (config->linViscData.cylYradius > 0.0) {
+    dist = x[0]*x[0] + x[2]*x[2];
+    dist = std::sqrt(dist);
+    dist = dist - cylY;    
+    wgtCyl = 0.5 * (tanh(dist / width - 2.0) + 1.0);
+    wgtCyl = (wgtCyl - wgt0) * 1.0/(1.0 - wgt0);
+    wgtCyl = std::max(wgtCyl,0.0);    
+    wgtCyl *= (factor - 1.0);
+    wgtCyl += 1.0;
+    wgt = std::max(wgt,wgtCyl);
+  } else if (config->linViscData.cylZradius > 0.0) {  
+    dist = x[0]*x[0] + x[1]*x[1];
+    dist = std::sqrt(dist);
+    dist = dist - cylZ;    
+    wgtCyl = 0.5 * (tanh(dist / width - 2.0) + 1.0);
+    wgtCyl = (wgtCyl - wgt0) * 1.0/(1.0 - wgt0);
+    wgtCyl = std::max(wgtCyl,0.0);    
+    wgtCyl *= (factor - 1.0);
+    wgtCyl += 1.0;
+    wgt = std::max(wgt,wgtCyl);
+  }
+
+  // add annulus sponge => NOT GENERAL, only for annulus aligned with y
+  /**/
+  double centerAnnulus[3];  
+  //for (int d = 0; d < dim; d++) normalAnnulus[d] = config.linViscData.normalA[d];  
+  for (int d = 0; d < dim; d++) centerAnnulus[d] = config->linViscData.pointA[d];
+  double rad1 = config->linViscData.annulusRadius;
+  double rad2 = config->linViscData.annulusThickness;  
+  double factorA = config->linViscData.viscRatioAnnulus;
+  
+  // distance to center
+  double dist1 = x[0]*x[0] + x[2]*x[2];
+  dist1 = std::sqrt(dist1);
+
+  // coordinates of nearest point on annulus center ring
+  for (int d = 0; d < dim; d++) s[d] = (rad1/dist1) * x[d];
+  s[1] = centerAnnulus[1];
+  
+  // distance to ring
+  for (int d = 0; d < dim; d++) s[d] = x[d] - s[d];  
+  double dist2 = s[0]*s[0] + s[1]*s[1] + s[2]*s[2];
+  dist2 = std::sqrt(dist2);
+
+  //if (x[1] <= centerAnnulus[1]+rad2) { 
+  //  std::cout << " rad ratio: " << rad1/dist1 << " ring dist: " << dist2 << endl;
+  //}  
+
+  //if (dist2 <= rad2) { 
+  //  std::cout << " rad ratio: " << rad1/dist1 << " ring dist: " << dist2 << " fA: " << factorA << endl;
+  //}  
+  
+  // sponge weight
+  double wgtAnn;
+  wgtAnn = 0.5 * (tanh( 10.0*(1.0 - dist2/rad2) ) + 1.0);
+  wgtAnn = (wgtAnn - wgt0) * 1.0/(1.0 - wgt0);
+  wgtAnn = std::max(wgtAnn,0.0);
+  //if (dist2 <= rad2) wgtAnn = 1.0; // testing....
+  wgtAnn *= (factorA - 1.0);
+  wgtAnn += 1.0;
+  wgt = std::max(wgt,wgtAnn);
+  
+}
+
+
 void ThermoChem::updateDiffusivity() {
   
    // viscosity
@@ -1144,8 +1288,8 @@ void ThermoChem::updateDiffusivity() {
    alphaTotal_gf.SetFromTrueDofs(alphaSml);
 
    // viscosity gradient
-   G->Mult(viscSml, tmpR1);     
-   MvInv->Mult(tmpR1, gradMu);
+   //G->Mult(viscSml, tmpR1);     
+   //MvInv->Mult(tmpR1, gradMu);
    
 }
 
@@ -1195,8 +1339,8 @@ void ThermoChem::updateDensity(double tStep) {
    }    
    
    // density gradient
-   G->Mult(rn, tmpR1);     
-   MvInv->Mult(tmpR1, gradRho);   
+   //G->Mult(rn, tmpR1);     
+   //MvInv->Mult(tmpR1, gradRho);   
    
 }
 
