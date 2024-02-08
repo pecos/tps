@@ -88,17 +88,17 @@ class ThermoChem
   //friend class TurbModel;  
 private:
 
-   TPS::Tps *tpsP_;
-   LoMachSolver *loMach_;
-   LoMachOptions *loMach_opts_;
+  //TPS::Tps *tpsP_;
+  //LoMachSolver *loMach_;
+   LoMachOptions *loMach_opts;
 
-   MPI_Groups *groupsMPI;
+  //MPI_Groups *groupsMPI;
    int nprocs_;  // total number of MPI procs
-   int rank_;    // local MPI rank
-   bool rank0_;  // flag to indicate rank 0
+   int rank;    // local MPI rank
+   bool rank0;  // flag to indicate rank 0
 
    // Run options
-   RunConfiguration config;
+   RunConfiguration *config;
   
    // All essential attributes.
    Array<int> temp_ess_attr;
@@ -128,8 +128,8 @@ private:
    //bool numerical_integ = false;
    bool numerical_integ = true;
   
-   //ParMesh *pmesh = nullptr;
-   ParMesh &pmesh;  
+   ParMesh *pmesh = nullptr;
+   //ParMesh &pmesh;  
   
    // The order of the scalar spaces
    int order;
@@ -267,13 +267,18 @@ private:
    Vector fTn, Tn, Tn_next, Tnm1, Tnm2, NTn, NTnm1, NTnm2;
    Vector Text, Text_bdr, t_bdr;
    Vector resT, tmpR0a, tmpR0b, tmpR0c;
+
+   //Vector *un;
+   //Vector *un_next;
+   //ParGridFunction *un_gf;
+   ParGridFunction *un_next_gf;    
   
-   Vector &tmpR0;
-   Vector &tmpR1;
-   ParGridFunction &R0PM0_gf;
-   ParGridFunction &R0PM1_gf;
-   ParGridFunction &un_gf;
-   ParGridFunction &un_next_gf;
+   Vector tmpR0;
+   Vector tmpR1;
+   ParGridFunction R0PM0_gf;
+   ParGridFunction R0PM1_gf;
+  //ParGridFunction un_gf;
+  //ParGridFunction un_next_gf;
 
    Vector gradT;
    Vector gradMu, gradRho;  
@@ -322,12 +327,14 @@ private:
   
   
 public:
-  ThermoChem(TPS::Tps *tps, LoMachSolver *loMach);
+  //ThermoChem(TPS::Tps *tps, LoMachSolver *loMach);
+  ThermoChem(mfem::ParMesh *pmesh_, RunConfiguration *config_, LoMachOptions *loMach_opts_);  
   virtual ~ThermoChem() {}
 
    void initialize();
+   void initializeExternal(ParGridFunction *un_next_gf_);  
   
-   void thermoChemStep(double &time, double dt, const int cur_step, const int start_step, bool provisional = false);
+  void thermoChemStep(double &time, double dt, const int cur_step, const int start_step, std::vector<double> ab, std::vector<double> bdf, bool provisional = false);
 
    void updateThermoP();
    void extrapolateState(int current_step);

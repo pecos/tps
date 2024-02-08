@@ -51,11 +51,13 @@ LoMachSolver::LoMachSolver(LoMachOptions loMach_opts, TPS::Tps *tps)
   loadFromAuxSol = config.RestartFromAux();  
 
   // incomp version
+  /*
   if (config.const_visc > 0.0) { constantViscosity = true; }
   if (config.const_dens > 0.0) { constantDensity = true; }
   if ( constantViscosity == true && constantDensity == true ) {
     incompressibleSolve = true;
   }
+  */
   
   // set default solver state
   exit_status_ = NORMAL;
@@ -85,8 +87,10 @@ LoMachSolver::LoMachSolver(LoMachOptions loMach_opts, TPS::Tps *tps)
 
   // instantiate phyics models
   //turbClass->turbulence(tps_,this);    
-  tcClass = new ThermoChem(tpsP_,this);
+  //tcClass = new ThermoChem(tpsP_,this);
   //flowClass->flow(tps_,this);
+
+  tcClass = new ThermoChem(pmesh,&config,&loMach_opts);
     
 }
 
@@ -717,6 +721,7 @@ void LoMachSolver::initialize() {
    //flowClass->initialize();
    //turbClass->initialize();     
 
+   tcClass->initializeExternal(&un_next_gf);   
 
   /**/
   average = new Averaging(Up, pmesh, sfec, sfes, vfes, fvfes, eqSystem, d_mixture, num_equation, dim, config, groupsMPI);
@@ -2672,7 +2677,7 @@ void LoMachSolver::solve()
         tcClass->updateGradientsOP(1.0);   		
         tcClass->updateDiffusivity();  
 
-	tcClass->thermoChemStep(time, dt, step, iter_start);
+	tcClass->thermoChemStep(time, dt, step, iter_start, abCoef, bdfCoef);
         tcClass->updateDensity(1.0);
         tcClass->updateDiffusivity();	
 
@@ -4577,6 +4582,10 @@ void LoMachSolver::SetTimeIntegrationCoefficients(int step)
       ab2 = -rho1 * (1.0 + rho2 * (1.0 + rho1));
       ab3 = (pow(rho2, 2.0) * rho1 * (1.0 + rho1)) / (1.0 + rho2);
    }
+
+   abCoef = {ab1,ab2,ab3};
+   bdfCoef = {bd0,bd1,bd2,bd3};
+   
 }
 
 
