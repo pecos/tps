@@ -217,8 +217,15 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, timeCoeff
       coeff_(coeff) {}
 
 Tomboulides::~Tomboulides() {
-  // objects allocated by initializeOperators
+  // miscellaneous
   delete mass_lform_;
+
+  // objects allocated by initializeOperators
+  delete Hv_inv_;
+  delete Hv_inv_pc_;
+  delete Hv_form_;
+  delete Mv_rho_form_;
+  delete G_form_;
   delete D_form_;
   delete Mv_inv_;
   delete Mv_inv_pc_;
@@ -230,6 +237,8 @@ Tomboulides::~Tomboulides() {
   delete L_iorho_inv_pc_;
   delete L_iorho_lor_;
   delete L_iorho_form_;
+  delete mu_coeff_;
+  delete rho_over_dt_coeff_;
   delete iorho_coeff_;
   delete rho_coeff_;
 
@@ -238,6 +247,7 @@ Tomboulides::~Tomboulides() {
   delete p_gf_;
   delete pfes_;
   delete pfec_;
+  delete resu_gf_;
   delete curlcurl_gf_;
   delete curl_gf_;
   delete u_next_gf_;
@@ -254,6 +264,7 @@ void Tomboulides::initializeSelf() {
   u_next_gf_ = new ParGridFunction(vfes_);
   curl_gf_ = new ParGridFunction(vfes_);
   curlcurl_gf_ = new ParGridFunction(vfes_);
+  resu_gf_ = new ParGridFunction(vfes_);
 
   pfec_ = new H1_FECollection(porder_);
   pfes_ = new ParFiniteElementSpace(pmesh_, pfec_);
@@ -264,6 +275,7 @@ void Tomboulides::initializeSelf() {
   *u_next_gf_ = 0.0;
   *curl_gf_ = 0.0;
   *curlcurl_gf_ = 0.0;
+  *resu_gf_ = 0.0;
   *p_gf_ = 0.0;
   *resp_gf_ = 0.0;
 
@@ -277,7 +289,7 @@ void Tomboulides::initializeSelf() {
   // TODO(trevilo): Get gravity from input file.  For now, hardcoded
   // to usual value acting in -y direction.
   double *g = gravity.HostWrite();
-  g[1] = -9.81;
+  // g[1] = -9.81;
 
   // NB: ForcingTerm_T takes ownership of this vector.  Do not delete it.
   gravity_vec_ = new VectorConstantCoefficient(gravity);
@@ -300,6 +312,7 @@ void Tomboulides::initializeSelf() {
   ustar_vec_.SetSize(vfes_truevsize);
   uext_vec_.SetSize(vfes_truevsize);
   pp_div_vec_.SetSize(vfes_truevsize);
+  resu_vec_.SetSize(vfes_truevsize);
 
   resp_vec_.SetSize(pfes_truevsize);
   p_vec_.SetSize(pfes_truevsize);
@@ -315,6 +328,7 @@ void Tomboulides::initializeSelf() {
   ustar_vec_ = 0.0;
   uext_vec_ = 0.0;
   pp_div_vec_ = 0.0;
+  resu_vec_ = 0.0;
 
   resp_vec_ = 0.0;
   p_vec_ = 0.0;
@@ -326,6 +340,10 @@ void Tomboulides::initializeOperators() {
   // Create all the Coefficient objects we need
   rho_coeff_ = new GridFunctionCoefficient(thermo_interface_->density);
   iorho_coeff_ = new RatioCoefficient(1.0, *rho_coeff_);
+
+  Hv_bdfcoeff_.constant = 1.0 / coeff_.dt;
+  rho_over_dt_coeff_ = new ProductCoefficient(Hv_bdfcoeff_, *rho_coeff_);
+  mu_coeff_ = new GridFunctionCoefficient(thermo_interface_->viscosity);
 
   // Integration rules (only used if numerical_integ_ is true).  When
   // this is the case, the quadrature degree set such that the
@@ -407,6 +425,19 @@ void Tomboulides::initializeOperators() {
   Mv_form_->Assemble();
   Mv_form_->FormSystemMatrix(empty, Mv_op_);
 
+  // Mass matrix (density weighted) for the velocity
+  Mv_rho_form_ = new ParBilinearForm(vfes_);
+  auto *mvr_blfi = new VectorMassIntegrator(*rho_coeff_);
+  if (numerical_integ_) {
+    mvr_blfi->SetIntRule(&ir_ni_v);
+  }
+  Mv_rho_form_->AddDomainIntegrator(mvr_blfi);
+  if (partial_assembly_) {
+    Mv_rho_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+  }
+  Mv_rho_form_->Assemble();
+  Mv_rho_form_->FormSystemMatrix(empty, Mv_rho_op_);
+
   // Inverse (unweighted) mass operator
   if (partial_assembly_) {
     Vector diag_pa(vfes_->GetTrueVSize());
@@ -436,6 +467,58 @@ void Tomboulides::initializeOperators() {
   }
   D_form_->Assemble();
   D_form_->FormRectangularSystemMatrix(empty, empty, D_op_);
+
+  // Gradient
+  G_form_ = new ParMixedBilinearForm(pfes_, vfes_);
+  auto *g_mblfi = new GradientIntegrator();
+  if (numerical_integ_) {
+    g_mblfi->SetIntRule(&ir_ni_v);
+  }
+  G_form_->AddDomainIntegrator(g_mblfi);
+  if (partial_assembly_) {
+    G_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+  }
+  G_form_->Assemble();
+  G_form_->FormRectangularSystemMatrix(empty, empty, G_op_);
+
+  // Helmholtz
+  Hv_form_ = new ParBilinearForm(vfes_);
+  auto *hmv_blfi = new VectorMassIntegrator(*rho_over_dt_coeff_);
+  auto *hdv_blfi = new VectorDiffusionIntegrator(*mu_coeff_);
+  if (numerical_integ_) {
+    hmv_blfi->SetIntRule(&ir_ni_v);
+    hdv_blfi->SetIntRule(&ir_ni_v);
+  }
+  Hv_form_->AddDomainIntegrator(hmv_blfi);
+  Hv_form_->AddDomainIntegrator(hdv_blfi);
+  if (partial_assembly_) {
+    // Partial assembly is not supported for variable coefficient
+    // VectorMassIntegrator (as of mfem 4.5.2 at least)
+    assert(false);
+    Hv_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+  }
+  Hv_form_->Assemble();
+  Hv_form_->FormSystemMatrix(empty, Hv_op_);
+
+  // Helmholtz solver
+  if (partial_assembly_) {
+    Vector diag_pa(vfes_->GetTrueVSize());
+    Hv_form_->AssembleDiagonal(diag_pa);
+    Hv_inv_pc_ = new OperatorJacobiSmoother(diag_pa, empty);
+  } else {
+    Hv_inv_pc_ = new HypreSmoother(*Hv_op_.As<HypreParMatrix>());
+    dynamic_cast<HypreSmoother *>(Hv_inv_pc_)->SetType(HypreSmoother::Jacobi, 1);
+  }
+  Hv_inv_ = new CGSolver(vfes_->GetComm());
+  Hv_inv_->iterative_mode = true;
+  Hv_inv_->SetOperator(*Hv_op_);
+  Hv_inv_->SetPreconditioner(*Hv_inv_pc_);
+  Hv_inv_->SetPrintLevel(hsolve_pl_);
+  Hv_inv_->SetRelTol(hsolve_rtol_);
+  Hv_inv_->SetMaxIter(hsolve_max_iter_);
+
+  // Ensure u_vec_ consistent with u_curr_gf_
+  u_curr_gf_->GetTrueDofs(u_vec_);
 }
 
 void Tomboulides::step() {
@@ -495,6 +578,23 @@ void Tomboulides::step() {
   L_iorho_inv_->SetPrintLevel(pressure_solve_pl_);
   L_iorho_inv_->SetRelTol(pressure_solve_rtol_);
   L_iorho_inv_->SetMaxIter(pressure_solve_max_iter_);
+
+  // Update density weighted mass
+  Mv_rho_form_->Update();
+  Mv_rho_form_->Assemble();
+  Mv_rho_form_->FormSystemMatrix(empty, Mv_rho_op_);
+
+  // Update the Helmholtz operator and inverse
+  Hv_bdfcoeff_.constant = coeff_.bd0 / dt;
+  Hv_form_->Update();
+  Hv_form_->Assemble();
+  Hv_form_->FormSystemMatrix(empty, Hv_op_);
+
+  Hv_inv_->SetOperator(*Hv_op_);
+  if (partial_assembly_) {
+    // TODO(trevilo): Support partial assembly
+    assert(false);
+  }
 
   //------------------------------------------------------------------------
   // Step 2: Compute vstar / dt (as in eqn 2.3 from Tomboulides)
@@ -646,6 +746,57 @@ void Tomboulides::step() {
   //------------------------------------------------------------------------
   // Step 4: Helmholtz solve for the velocity
   //------------------------------------------------------------------------
+  resu_vec_ = 0.0;
+
+  // Variable viscosity term
+  // TODO(trevilo): Add variable viscosity terms
+  // S_mom_form->Assemble();
+  // S_mom_form->ParallelAssemble(resu);
+
+  // -grad(p)
+  G_op_->AddMult(p_vec_, resu_vec_, -1.0);
+
+  // TODO(trevilo): Add grad(mu * Qt) term
+  // Qt *= mun_next; // NB: pointwise multiply
+  // G->AddMult(Qt, resu, 1.0 / 3.0);
+
+  // rho * vstar / dt term
+  Mv_rho_op_->AddMult(ustar_vec_, resu_vec_);
+
+  // TODO(trevilo): Add BCs
+  // for (auto &vel_dbc : vel_dbcs) {
+  //   un_next_gf.ProjectBdrCoefficient(*vel_dbc.coeff, vel_dbc.attr);
+  // }
+
+  vfes_->GetRestrictionMatrix()->MultTranspose(resu_vec_, *resu_gf_);
+
+  Vector X2, B2;
+  if (partial_assembly_) {
+    // TODO(trevilo): Add partial assembly support
+    assert(false);
+    // auto *HC = H.As<ConstrainedOperator>();
+    // EliminateRHS(*Hv_form_, *HC, vel_ess_tdof, un_next_gf, resu_gf, X2, B2, 1);
+  } else {
+    Hv_form_->FormLinearSystem(empty, *u_next_gf_, *resu_gf_, Hv_op_, X2, B2, 1);
+  }
+
+  Hv_inv_->Mult(B2, X2);
+  if (!Hv_inv_->GetConverged()) {
+    exit(1);
+  }
+  // iter_hsolve = HInv->GetNumIterations();
+  // res_hsolve = HInv->GetFinalNorm();
+  Hv_form_->RecoverFEMSolution(X2, *resu_gf_, *u_next_gf_);
+  u_next_gf_->GetTrueDofs(u_next_vec_);
+
+  // Rotate values in solution history
+  um2_vec_ = um1_vec_;
+  um1_vec_ = u_vec_;
+
+  // Update the current solution and corresponding GridFunction
+  u_next_gf_->GetTrueDofs(u_next_vec_);
+  u_vec_ = u_next_vec_;
+  u_curr_gf_->SetFromTrueDofs(u_vec_);
 }
 
 void Tomboulides::meanZero(ParGridFunction &v) {

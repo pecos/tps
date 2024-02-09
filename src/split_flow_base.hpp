@@ -77,6 +77,8 @@ class FlowBase {
 
   virtual void step() = 0;
 
+  virtual mfem::ParGridFunction *getCurrentVelocity() = 0;
+
   void initializeFromThermoChem(thermoChemToFlow *thermo) { thermo_interface_ = thermo; }
 
   virtual void initializeOperators() {}
@@ -109,6 +111,8 @@ class ZeroFlow : public FlowBase {
 
   /// Velocity is always zero, so nothing to do
   void step(){};
+
+  mfem::ParGridFunction *getCurrentVelocity() final { return velocity_; }
 };
 
 #endif  // SPLIT_FLOW_BASE_HPP_
