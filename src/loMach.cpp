@@ -3134,13 +3134,13 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    // explicit part of diff term using elasticity op
    computeExplicitDiffusion(); // ->Ldiv (has rho via mu)
 
-   // sum contributions to rhs of p-p
+   // sum contributions to rhs of p-p, no rho in these terms
    FText.Set(1.0,fn);
    FText.Add(1.0,uns);
    FText.Add(1.0,Fext); // if rho not added to the integrator
-   tmpR1.Set(1.0,FText);
+   //tmpR1.Set(1.0,FText);
 
-   D->Mult(tmpR1,FText); // with 1/rho in p-p op
+   //D->Mult(tmpR1,FText); // with 1/rho in p-p op
    
    //DRho_form->Update();
    //DRho_form->Assemble();
@@ -3154,19 +3154,19 @@ void LoMachSolver::curlcurlStep(double &time, double dt, const int current_step,
    //MvInv->Mult(tmpR1b,tmpR1);
    //D->Mult(tmpR1,FText);   
    
-   tmpR1.Set(1.0,Ldiv);
+   tmpR1.Set(1.0,Ldiv); // have rho from mu
    tmpR1.Add(1.0,LdivImp);
    multScalarInvVectorIP(rn,&tmpR1); // with 1/rho in p-p op
-   //tmpR1.Add(1.0,Fext);   
-   D->Mult(tmpR1,tmpR1b);
-   FText.Add(1.0,tmpR1b);   
+   FText.Add(1.0,tmpR1);   
+   D->Mult(tmpR1,tmpR0);
    
    // add some if for porder != vorder
    // project FText to p-1
    //D->Mult(FText, tmpR0);  // tmp3 c p, tmp2 and resp c (p-1) //
 
    // this neg is necessary because of the negative from IBP on the Sp Laplacian operator
-   tmpR0.Set(-1.0,FText);
+   //tmpR0.Set(-1.0,FText);
+   tmpR0.Neg();
 
    // unsteady div term, (-) on rhs rho * gamma * Qt/dt (after div term)
    //MsRho_form->Update();
@@ -4885,7 +4885,7 @@ void LoMachSolver::Orthogonalize(Vector &v)
    v -= global_sum / static_cast<double>(global_size);
 }
 
-
+// MOVE THESE TO utils
 void LoMachSolver::ComputeCurl3D(ParGridFunction &u, ParGridFunction &cu)
 {
   
