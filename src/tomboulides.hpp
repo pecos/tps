@@ -109,11 +109,13 @@ class Tomboulides : public FlowBase {
   mfem::FiniteElementCollection *pfec_ = nullptr;
   mfem::ParFiniteElementSpace *pfes_ = nullptr;
   mfem::ParGridFunction *p_gf_ = nullptr;
+  mfem::ParGridFunction *resp_gf_ = nullptr;
 
   /// mfem::Coefficients used in forming necessary operators
   mfem::GridFunctionCoefficient *rho_coeff_ = nullptr;
   mfem::RatioCoefficient *iorho_coeff_ = nullptr;
   mfem::ConstantCoefficient nlcoeff_;
+  mfem::ConstantCoefficient one_coeff_;
 
   // mfem "form" objects used to create operators
   mfem::ParBilinearForm *L_iorho_form_ = nullptr;  // \int (1/\rho) \nabla \phi_i \cdot \nabla \phi_j
@@ -148,6 +150,18 @@ class Tomboulides : public FlowBase {
   mfem::Vector uext_vec_;
   mfem::Vector pp_div_vec_;
   mfem::Vector resp_vec_;
+  mfem::Vector p_vec_;
+
+  // miscellaneous
+  double volume_;
+  mfem::ParLinearForm *mass_lform_ = nullptr;
+
+  // helper functions
+
+  /**
+   * @brief Zero the mean of the input function
+   */
+  void meanZero(mfem::ParGridFunction &v);
 
  public:
   /// Constructor
