@@ -7,6 +7,21 @@
 using namespace mfem;
 
 /**
+ * @brief Helper function to remove mean from a vector
+ */
+void Orthogonalize(Vector &v, const ParFiniteElementSpace *pfes) {
+  double loc_sum = v.Sum();
+  double global_sum = 0.0;
+  int loc_size = v.Size();
+  int global_size = 0;
+
+  MPI_Allreduce(&loc_sum, &global_sum, 1, MPI_DOUBLE, MPI_SUM, pfes->GetComm());
+  MPI_Allreduce(&loc_size, &global_size, 1, MPI_INT, MPI_SUM, pfes->GetComm());
+
+  v -= global_sum / static_cast<double>(global_size);
+}
+
+/**
  * @brief Helper function to compute the curl of a vector field (2D version)
  *
  * Computes an approximation of the curl of a vector field.  Input
@@ -203,6 +218,7 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, timeCoeff
 
 Tomboulides::~Tomboulides() {
   // objects allocated by initializeOperators
+  delete mass_lform_;
   delete D_form_;
   delete Mv_inv_;
   delete Mv_inv_pc_;
@@ -218,6 +234,7 @@ Tomboulides::~Tomboulides() {
   delete rho_coeff_;
 
   // objects allocated by initalizeSelf
+  delete resp_gf_;
   delete p_gf_;
   delete pfes_;
   delete pfec_;
@@ -241,12 +258,14 @@ void Tomboulides::initializeSelf() {
   pfec_ = new H1_FECollection(porder_);
   pfes_ = new ParFiniteElementSpace(pmesh_, pfec_);
   p_gf_ = new ParGridFunction(pfes_);
+  resp_gf_ = new ParGridFunction(pfes_);
 
   *u_curr_gf_ = 0.0;
   *u_next_gf_ = 0.0;
   *curl_gf_ = 0.0;
   *curlcurl_gf_ = 0.0;
   *p_gf_ = 0.0;
+  *resp_gf_ = 0.0;
 
   interface.velocity = u_next_gf_;
 
@@ -283,6 +302,7 @@ void Tomboulides::initializeSelf() {
   pp_div_vec_.SetSize(vfes_truevsize);
 
   resp_vec_.SetSize(pfes_truevsize);
+  p_vec_.SetSize(pfes_truevsize);
 
   // zero vectors for now
   forcing_vec_ = 0.0;
@@ -297,6 +317,7 @@ void Tomboulides::initializeSelf() {
   pp_div_vec_ = 0.0;
 
   resp_vec_ = 0.0;
+  p_vec_ = 0.0;
 }
 
 void Tomboulides::initializeOperators() {
@@ -581,5 +602,73 @@ void Tomboulides::step() {
 
   // Negate residual s.t. sign is consistent with
   // -\nabla ( (1/\rho) \cdot \nabla p ) on LHS
-  // resp.Neg();
+  resp_vec_.Neg();
+
+  // TODO(trevilo): Add boundary terms to residual
+
+  // TODO(trevilo): Only do this if no pressure BCs
+  // Since now we don't have BCs at all, have to do it
+  Orthogonalize(resp_vec_, pfes_);
+
+  // for (auto &pres_dbc : pres_dbcs) {
+  //   pn_gf.ProjectBdrCoefficient(*pres_dbc.coeff, pres_dbc.attr);
+  // }
+
+  // Isn't this the same as SetFromTrueDofs????
+  pfes_->GetRestrictionMatrix()->MultTranspose(resp_vec_, *resp_gf_);
+
+  Vector X1, B1;
+  if (partial_assembly_) {
+    // TODO(trevilo): Support partial assembly here
+    assert(false);
+    // auto *SpC = Sp.As<ConstrainedOperator>();
+    // EliminateRHS(*Sp_form, *SpC, pres_ess_tdof, pn_gf, resp_gf, X1, B1, 1);
+  } else {
+    L_iorho_form_->FormLinearSystem(empty, *p_gf_, *resp_gf_, L_iorho_op_, X1, B1, 1);
+  }
+
+  L_iorho_inv_->Mult(B1, X1);
+  if (!L_iorho_inv_->GetConverged()) {
+    exit(1);
+  }
+
+  // iter_spsolve = SpInv->GetNumIterations();
+  // res_spsolve = SpInv->GetFinalNorm();
+  L_iorho_form_->RecoverFEMSolution(X1, *resp_gf_, *p_gf_);
+
+  // If the boundary conditions on the pressure are pure Neumann remove the
+  // nullspace by removing the mean of the pressure solution. This is also
+  // ensured by the OrthoSolver wrapper for the preconditioner which removes
+  // the nullspace after every application.
+  meanZero(*p_gf_);
+  p_gf_->GetTrueDofs(p_vec_);
+
+  //------------------------------------------------------------------------
+  // Step 4: Helmholtz solve for the velocity
+  //------------------------------------------------------------------------
+}
+
+void Tomboulides::meanZero(ParGridFunction &v) {
+  // Make sure not to recompute the inner product linear form every
+  // application.
+  if (mass_lform_ == nullptr) {
+    one_coeff_.constant = 1.0;
+    mass_lform_ = new ParLinearForm(v.ParFESpace());
+    auto *dlfi = new DomainLFIntegrator(one_coeff_);
+    if (numerical_integ_) {
+      const IntegrationRule &ir_ni = gll_rules.Get(vfes_->GetFE(0)->GetGeomType(), 2 * vorder_ - 1);
+      dlfi->SetIntRule(&ir_ni);
+    }
+    mass_lform_->AddDomainIntegrator(dlfi);
+    mass_lform_->Assemble();
+
+    ParGridFunction one_gf(v.ParFESpace());
+    one_gf.ProjectCoefficient(one_coeff_);
+
+    volume_ = mass_lform_->operator()(one_gf);
+  }
+
+  double integ = mass_lform_->operator()(v);
+
+  v -= integ / volume_;
 }
