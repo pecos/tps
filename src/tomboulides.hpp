@@ -120,10 +120,12 @@ class Tomboulides : public FlowBase {
   mfem::ParLinearForm *forcing_form_ = nullptr;    // \int \phi_i f
   mfem::ParNonlinearForm *Nconv_form_ = nullptr;   // \int \vphi_i \cdot [(u \cdot \nabla) u]
   mfem::ParBilinearForm *Mv_form_ = nullptr;       // mass matrix = \int \vphi_i \cdot \vphi_j
+  mfem::ParMixedBilinearForm *D_form_ = nullptr;   // divergence = \int \phi_i \nabla \cdot \vphi_j
 
   // mfem operator objects
   mfem::OperatorHandle L_iorho_op_;
   mfem::OperatorHandle Mv_op_;
+  mfem::OperatorHandle D_op_;
 
   // solver objects
   mfem::ParLORDiscretization *L_iorho_lor_ = nullptr;
@@ -144,6 +146,8 @@ class Tomboulides : public FlowBase {
   mfem::Vector Nm2_vec_;
   mfem::Vector ustar_vec_;
   mfem::Vector uext_vec_;
+  mfem::Vector pp_div_vec_;
+  mfem::Vector resp_vec_;
 
  public:
   /// Constructor

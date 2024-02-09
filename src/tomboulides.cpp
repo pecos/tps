@@ -203,6 +203,7 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, timeCoeff
 
 Tomboulides::~Tomboulides() {
   // objects allocated by initializeOperators
+  delete D_form_;
   delete Mv_inv_;
   delete Mv_inv_pc_;
   delete Mv_form_;
@@ -268,7 +269,8 @@ void Tomboulides::initializeSelf() {
 
   // Allocate Vector storage
   const int vfes_truevsize = vfes_->GetTrueVSize();
-  // const int pfes_truevsize = pfes->GetTrueVSize();
+  const int pfes_truevsize = pfes_->GetTrueVSize();
+
   forcing_vec_.SetSize(vfes_truevsize);
   u_vec_.SetSize(vfes_truevsize);
   um1_vec_.SetSize(vfes_truevsize);
@@ -278,6 +280,9 @@ void Tomboulides::initializeSelf() {
   Nm2_vec_.SetSize(vfes_truevsize);
   ustar_vec_.SetSize(vfes_truevsize);
   uext_vec_.SetSize(vfes_truevsize);
+  pp_div_vec_.SetSize(vfes_truevsize);
+
+  resp_vec_.SetSize(pfes_truevsize);
 
   // zero vectors for now
   forcing_vec_ = 0.0;
@@ -289,6 +294,9 @@ void Tomboulides::initializeSelf() {
   Nm2_vec_ = 0.0;
   ustar_vec_ = 0.0;
   uext_vec_ = 0.0;
+  pp_div_vec_ = 0.0;
+
+  resp_vec_ = 0.0;
 }
 
 void Tomboulides::initializeOperators() {
@@ -394,6 +402,19 @@ void Tomboulides::initializeOperators() {
   Mv_inv_->SetPrintLevel(mass_inverse_pl_);
   Mv_inv_->SetRelTol(mass_inverse_rtol_);
   Mv_inv_->SetMaxIter(mass_inverse_max_iter_);
+
+  // Divergence operator
+  D_form_ = new ParMixedBilinearForm(vfes_, pfes_);
+  auto *vd_mblfi = new VectorDivergenceIntegrator();
+  if (numerical_integ_) {
+    vd_mblfi->SetIntRule(&ir_ni_v);
+  }
+  D_form_->AddDomainIntegrator(vd_mblfi);
+  if (partial_assembly_) {
+    D_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+  }
+  D_form_->Assemble();
+  D_form_->FormRectangularSystemMatrix(empty, empty, D_op_);
 }
 
 void Tomboulides::step() {
@@ -529,4 +550,36 @@ void Tomboulides::step() {
     ComputeCurl3D(*u_next_gf_, *curl_gf_);
     ComputeCurl3D(*curl_gf_, *curlcurl_gf_);
   }
+
+  curlcurl_gf_->GetTrueDofs(pp_div_vec_);
+
+  // Negate b/c term that appears in residual is -curl curl u
+  pp_div_vec_.Neg();
+
+  // TODO(trevilo): Generalize the calculation below of the viscous
+  // contribution to the rhs of the pressure Poisson equation.  The
+  // current calculation is incomplete in two ways.  First, it
+  // neglects the contribution of gradient of the thermal divergence
+  // (\nabla Q).  Second, it is restricted to constant properties.
+
+  // Restriction 1: This doesn't handle variable nu
+  auto rho = thermo_interface_->density->HostRead();
+  auto mu = thermo_interface_->viscosity->HostRead();
+  const double nu = mu[0] / rho[0];
+  pp_div_vec_ *= nu;
+
+  // Restriction 2: grad(Qt) term isn't here
+  // pp_div_vec_ += (4/3) grad(Qt) contribution
+
+  // Add ustar/dt contribution
+  pp_div_vec_ += ustar_vec_;
+
+  D_op_->Mult(pp_div_vec_, resp_vec_);
+
+  // TODO(trevilo): Add Qt term
+  // Ms->AddMult(Qt, resp, -bd0 / dt);
+
+  // Negate residual s.t. sign is consistent with
+  // -\nabla ( (1/\rho) \cdot \nabla p ) on LHS
+  // resp.Neg();
 }
