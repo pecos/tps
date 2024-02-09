@@ -79,6 +79,10 @@ class Tomboulides : public FlowBase {
   int mass_inverse_max_iter_ = 200;
   double mass_inverse_rtol_ = 1e-12;
 
+  int hsolve_pl_ = 0;
+  int hsolve_max_iter_ = 200;
+  double hsolve_rtol_ = 1e-12;
+
   // To use "numerical integration", quadrature rule must persist
   mfem::IntegrationRules gll_rules;
 
@@ -110,12 +114,16 @@ class Tomboulides : public FlowBase {
   mfem::ParFiniteElementSpace *pfes_ = nullptr;
   mfem::ParGridFunction *p_gf_ = nullptr;
   mfem::ParGridFunction *resp_gf_ = nullptr;
+  mfem::ParGridFunction *resu_gf_ = nullptr;
 
   /// mfem::Coefficients used in forming necessary operators
   mfem::GridFunctionCoefficient *rho_coeff_ = nullptr;
   mfem::RatioCoefficient *iorho_coeff_ = nullptr;
   mfem::ConstantCoefficient nlcoeff_;
   mfem::ConstantCoefficient one_coeff_;
+  mfem::ConstantCoefficient Hv_bdfcoeff_;
+  mfem::ProductCoefficient *rho_over_dt_coeff_ = nullptr;
+  mfem::GridFunctionCoefficient *mu_coeff_ = nullptr;
 
   // mfem "form" objects used to create operators
   mfem::ParBilinearForm *L_iorho_form_ = nullptr;  // \int (1/\rho) \nabla \phi_i \cdot \nabla \phi_j
@@ -123,11 +131,17 @@ class Tomboulides : public FlowBase {
   mfem::ParNonlinearForm *Nconv_form_ = nullptr;   // \int \vphi_i \cdot [(u \cdot \nabla) u]
   mfem::ParBilinearForm *Mv_form_ = nullptr;       // mass matrix = \int \vphi_i \cdot \vphi_j
   mfem::ParMixedBilinearForm *D_form_ = nullptr;   // divergence = \int \phi_i \nabla \cdot \vphi_j
+  mfem::ParMixedBilinearForm *G_form_ = nullptr;   // gradient = \int \vphi_i \cdot \nabla \phi_j
+  mfem::ParBilinearForm *Mv_rho_form_ = nullptr;   // mass matrix (density weighted) = \int \rho \vphi_i \cdot \vphi_j
+  mfem::ParBilinearForm *Hv_form_ = nullptr;
 
   // mfem operator objects
   mfem::OperatorHandle L_iorho_op_;
   mfem::OperatorHandle Mv_op_;
+  mfem::OperatorHandle Mv_rho_op_;
   mfem::OperatorHandle D_op_;
+  mfem::OperatorHandle G_op_;
+  mfem::OperatorHandle Hv_op_;
 
   // solver objects
   mfem::ParLORDiscretization *L_iorho_lor_ = nullptr;
@@ -138,11 +152,15 @@ class Tomboulides : public FlowBase {
   mfem::Solver *Mv_inv_pc_ = nullptr;
   mfem::CGSolver *Mv_inv_ = nullptr;
 
+  mfem::Solver *Hv_inv_pc_ = nullptr;
+  mfem::CGSolver *Hv_inv_ = nullptr;
+
   // Vectors
   mfem::Vector forcing_vec_;
   mfem::Vector u_vec_;
   mfem::Vector um1_vec_;
   mfem::Vector um2_vec_;
+  mfem::Vector u_next_vec_;
   mfem::Vector N_vec_;
   mfem::Vector Nm1_vec_;
   mfem::Vector Nm2_vec_;
@@ -151,6 +169,7 @@ class Tomboulides : public FlowBase {
   mfem::Vector pp_div_vec_;
   mfem::Vector resp_vec_;
   mfem::Vector p_vec_;
+  mfem::Vector resu_vec_;
 
   // miscellaneous
   double volume_;
@@ -185,6 +204,8 @@ class Tomboulides : public FlowBase {
 
   /// Advance
   void step() final;
+
+  mfem::ParGridFunction *getCurrentVelocity() final { return u_curr_gf_; }
 };
 
 #endif  // TOMBOULIDES_HPP_
