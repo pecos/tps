@@ -380,10 +380,8 @@ void LoMachSolver::initialize() {
    flowClass->initialize();
 
    // setup pointers to external data
-   turbClass->initializeExternal(flowClass->GetCurrentVelGradU(), flowClass->GetCurrentVelGradV(), flowClass->GetCurrentVelGradW(), &resolution_gf);
-   
-   tcClass->initializeExternal(flowClass->GetCurrentVelocity(),turbClass->GetCurrentEddyViscosity(), numWalls, numOutlets, numInlets);
-   
+   turbClass->initializeExternal(flowClass->GetCurrentVelGradU(), flowClass->GetCurrentVelGradV(), flowClass->GetCurrentVelGradW(), &resolution_gf);   
+   tcClass->initializeExternal(flowClass->GetCurrentVelocity(),turbClass->GetCurrentEddyViscosity(), numWalls, numOutlets, numInlets);   
    flowClass->initializeExternal(tcClass->GetCurrentTotalViscosity(), tcClass->GetCurrentDensity(), tcClass->GetCurrentThermalDiv(), numWalls, numOutlets, numInlets);         
 
    
