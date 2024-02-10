@@ -39,6 +39,7 @@
  *
  */
 
+#include "dirichlet_bc_helper.hpp"
 #include "split_flow_base.hpp"
 
 /// Container for forcing terms to be added to velocity equation
@@ -101,6 +102,18 @@ class Tomboulides : public FlowBase {
   mfem::VectorConstantCoefficient *gravity_vec_;
   std::vector<ForcingTerm_T> forcing_terms_;
 
+  // BCs holders
+  std::vector<DirichletBC_T<mfem::VectorCoefficient>> vel_dbcs_;
+  std::vector<DirichletBC_T<mfem::Coefficient>> pres_dbcs_;
+
+  // List of essential boundaries
+  mfem::Array<int> vel_ess_attr_;
+  mfem::Array<int> pres_ess_attr_;
+
+  // All essential true dofs.
+  mfem::Array<int> vel_ess_tdof_;
+  mfem::Array<int> pres_ess_tdof_;
+
   /// Velocity FEM objects and fields
   mfem::FiniteElementCollection *vfec_ = nullptr;
   mfem::ParFiniteElementSpace *vfes_ = nullptr;
@@ -108,13 +121,14 @@ class Tomboulides : public FlowBase {
   mfem::ParGridFunction *u_next_gf_ = nullptr;
   mfem::ParGridFunction *curl_gf_ = nullptr;
   mfem::ParGridFunction *curlcurl_gf_ = nullptr;
+  mfem::ParGridFunction *resu_gf_ = nullptr;
+  mfem::ParGridFunction *pp_div_gf_ = nullptr;
 
   /// Presser FEM objects and fields
   mfem::FiniteElementCollection *pfec_ = nullptr;
   mfem::ParFiniteElementSpace *pfes_ = nullptr;
   mfem::ParGridFunction *p_gf_ = nullptr;
   mfem::ParGridFunction *resp_gf_ = nullptr;
-  mfem::ParGridFunction *resu_gf_ = nullptr;
 
   /// mfem::Coefficients used in forming necessary operators
   mfem::GridFunctionCoefficient *rho_coeff_ = nullptr;
@@ -124,6 +138,7 @@ class Tomboulides : public FlowBase {
   mfem::ConstantCoefficient Hv_bdfcoeff_;
   mfem::ProductCoefficient *rho_over_dt_coeff_ = nullptr;
   mfem::GridFunctionCoefficient *mu_coeff_ = nullptr;
+  mfem::VectorGridFunctionCoefficient *pp_div_coeff_ = nullptr;
 
   // mfem "form" objects used to create operators
   mfem::ParBilinearForm *L_iorho_form_ = nullptr;  // \int (1/\rho) \nabla \phi_i \cdot \nabla \phi_j
@@ -134,6 +149,7 @@ class Tomboulides : public FlowBase {
   mfem::ParMixedBilinearForm *G_form_ = nullptr;   // gradient = \int \vphi_i \cdot \nabla \phi_j
   mfem::ParBilinearForm *Mv_rho_form_ = nullptr;   // mass matrix (density weighted) = \int \rho \vphi_i \cdot \vphi_j
   mfem::ParBilinearForm *Hv_form_ = nullptr;
+  mfem::ParLinearForm *pp_div_bdr_form_ = nullptr;
 
   // mfem operator objects
   mfem::OperatorHandle L_iorho_op_;
@@ -167,6 +183,7 @@ class Tomboulides : public FlowBase {
   mfem::Vector ustar_vec_;
   mfem::Vector uext_vec_;
   mfem::Vector pp_div_vec_;
+  mfem::Vector pp_div_bdr_vec_;
   mfem::Vector resp_vec_;
   mfem::Vector p_vec_;
   mfem::Vector resu_vec_;
@@ -206,6 +223,12 @@ class Tomboulides : public FlowBase {
   void step() final;
 
   mfem::ParGridFunction *getCurrentVelocity() final { return u_curr_gf_; }
+
+  /// Add a Dirichlet boundary condition to the velocity field
+  void addVelDirichletBC(const mfem::Vector &u, mfem::Array<int> &attr);
+
+  /// Add a Dirichlet boundary condition to the pressure field.
+  void addPresDirichletBC(double p, mfem::Array<int> &attr);
 };
 
 #endif  // TOMBOULIDES_HPP_
