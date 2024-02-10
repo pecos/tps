@@ -91,7 +91,7 @@ private:
 
   //TPS::Tps *tpsP_;
   //LoMachSolver *loMach_;
-   LoMachOptions *loMach_opts;
+   LoMachOptions *loMach_opts = nullptr;
 
   //MPI_Groups *groupsMPI;
    int nprocs_;  // total number of MPI procs
@@ -99,7 +99,7 @@ private:
    bool rank0;  // flag to indicate rank 0
 
    // Run options
-   RunConfiguration *config;
+   RunConfiguration *config = nullptr;
   
    // All essential attributes.
    Array<int> temp_ess_attr;
@@ -116,7 +116,7 @@ private:
    std::vector<QtDirichletBC_T> Qt_dbcs;  
   
    // space sizes
-   int Sdof, SdofInt, NdofInt, NdofR0Int;
+   int Sdof, SdofInt, Pdof, PdofInt, NdofInt, NdofR0Int;
 
    /// Enable/disable verbose output.
    bool verbose = true;
@@ -133,7 +133,7 @@ private:
    //ParMesh &pmesh;  
   
    // The order of the scalar spaces
-   int order;
+   int order, porder, norder;
    IntegrationRules gll_rules;    
 
    double bd0, bd1, bd2, bd3;
@@ -176,6 +176,12 @@ private:
 
    /// Velocity \f$(H^1)^d\f$ finite element space.
    ParFiniteElementSpace *vfes = nullptr;
+
+   /// Pressure \f$H^1\f$ finite element collection.
+   FiniteElementCollection *pfec = nullptr;
+
+   /// Pressure \f$H^1\f$ finite element space.
+   ParFiniteElementSpace *pfes = nullptr;  
   
    // operators
    DiffusionIntegrator *hdt_blfi = nullptr;
@@ -213,30 +219,30 @@ private:
    ConstantCoefficient t_bc_coef2;
    ConstantCoefficient t_bc_coef3;    
   
-   ConstantCoefficient *buffer_tbc;
-   ConstantCoefficient *buffer_qbc;    
+   ConstantCoefficient *buffer_tbc = nullptr;
+   ConstantCoefficient *buffer_qbc = nullptr;
 
-   ParGridFunction *bufferInvRho;  
-   ParGridFunction *bufferVisc;
-   ParGridFunction *bufferBulkVisc;
-   ParGridFunction *bufferRho;
-   ParGridFunction *bufferRhoDt;  
-   ParGridFunction *bufferAlpha;
-   ParGridFunction *bufferTemp;
+   ParGridFunction *bufferInvRho = nullptr;
+   ParGridFunction *bufferVisc = nullptr;
+   ParGridFunction *bufferBulkVisc = nullptr;
+   ParGridFunction *bufferRho = nullptr;
+   ParGridFunction *bufferRhoDt = nullptr;
+   ParGridFunction *bufferAlpha = nullptr;
+   ParGridFunction *bufferTemp = nullptr;
 
-   GridFunctionCoefficient *viscField;
-   GridFunctionCoefficient *bulkViscField;  
-   GridFunctionCoefficient *rhoDtField;
-   GridFunctionCoefficient *invRho;
-   GridFunctionCoefficient *Rho;  
-   GridFunctionCoefficient *alphaField;  
+   GridFunctionCoefficient *viscField = nullptr;
+   GridFunctionCoefficient *bulkViscField = nullptr;
+   GridFunctionCoefficient *rhoDtField = nullptr;
+   GridFunctionCoefficient *invRho = nullptr;
+   GridFunctionCoefficient *Rho = nullptr;
+   GridFunctionCoefficient *alphaField = nullptr;
 
-   ParGridFunction *buffer_tInlet;
-   ParGridFunction *buffer_tInletInf;
-   GridFunctionCoefficient *tInletField;
+   ParGridFunction *buffer_tInlet = nullptr;
+   ParGridFunction *buffer_tInletInf = nullptr;
+   GridFunctionCoefficient *tInletField = nullptr;
 
    // space varying viscosity multiplier  
-   ParGridFunction *bufferViscMult;  
+   ParGridFunction *bufferViscMult = nullptr;
    viscositySpongeData vsd_;
    ParGridFunction viscTotal_gf;
    ParGridFunction alphaTotal_gf;      
@@ -272,15 +278,15 @@ private:
    //Vector *un;
    //Vector *un_next;
    //ParGridFunction *un_gf;
-   ParGridFunction *un_next_gf;
-   ParGridFunction *subgridVisc_gf;      
+   ParGridFunction *un_next_gf = nullptr;
+   ParGridFunction *subgridVisc_gf = nullptr;
   
    Vector tmpR0;
    Vector tmpR1;
    ParGridFunction R0PM0_gf;
    ParGridFunction R0PM1_gf;
-  //ParGridFunction un_gf;
-  //ParGridFunction un_next_gf;
+   //ParGridFunction un_gf;
+   //ParGridFunction un_next_gf;
    ParGridFunction Qt_gf;  
 
    Vector gradT;
@@ -320,26 +326,25 @@ private:
    ParGridFunction Tn_filtered_gf;
 
    // Pointers to the different classes
-   GasMixture *mixture;    // valid on host
-   GasMixture *d_mixture;  // valid on device, when available; otherwise = mixture  
+   GasMixture *mixture = nullptr;;    // valid on host
+   GasMixture *d_mixture = nullptr;;  // valid on device, when available; otherwise = mixture  
    TransportProperties *transportPtr = NULL;  // valid on both host and device
    // TransportProperties *d_transport = NULL;  // valid on device, when available; otherwise = transportPtr
 
    // subgrid scale => move to turb model class
-   ParGridFunction *bufferSubgridVisc;
+   //ParGridFunction *bufferSubgridVisc;
   
   
 public:
-  //ThermoChem(TPS::Tps *tps, LoMachSolver *loMach);
   ThermoChem(mfem::ParMesh *pmesh_, RunConfiguration *config_, LoMachOptions *loMach_opts_);  
   virtual ~ThermoChem() {}
 
    void initialize();
    void initializeExternal(ParGridFunction *un_next_gf_, ParGridFunction *subgridVisc_gf_,int nWalls, int nInlets, int nOutlets);    
-   void thermoChemStep(double &time, double dt, const int cur_step, const int start_step, std::vector<double> ab, std::vector<double> bdf, bool provisional = false);
+   void thermoChemStep(double &time, double dt, const int cur_step, const int start_step, std::vector<double> bdf, bool provisional = false);
 
    void updateThermoP();
-   void extrapolateState(int current_step);
+   void extrapolateState(int current_step, std::vector<double> ab);
    void updateDensity(double tStep);
    //void updateGradients(double tStep);
    void updateGradientsOP(double tStep);  

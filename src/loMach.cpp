@@ -75,9 +75,11 @@ LoMachSolver::LoMachSolver(LoMachOptions loMach_opts, TPS::Tps *tps)
   //joule_heating_ = NULL;
 
   // instantiate phyics models
+  /*
   turbClass = new TurbModel(pmesh,&config,&loMach_opts);  
   tcClass = new ThermoChem(pmesh,&config,&loMach_opts);
-  flowClass = new Flow(pmesh,&config,&loMach_opts);  
+  flowClass = new Flow(pmesh,&config,&loMach_opts);
+  */
     
 }
 
@@ -315,6 +317,18 @@ void LoMachSolver::initialize() {
    if (verbose) grvy_printf(ginfo, "Mesh partitioned...\n");      
 
 
+   // instantiate phyics models
+   turbClass = new TurbModel(pmesh, &config, &loMach_opts_);
+   //MPI_Barrier(MPI_COMM_WORLD);          
+   //if (rank0_) {std::cout << "turbClass instantiated" << endl;}
+   tcClass = new ThermoChem(pmesh, &config, &loMach_opts_);
+   //MPI_Barrier(MPI_COMM_WORLD);          
+   //if (rank0_) {std::cout << "tcClass instantiated" << endl;}   
+   flowClass = new Flow(pmesh, &config, &loMach_opts_);
+   //MPI_Barrier(MPI_COMM_WORLD);          
+   //if (rank0_) {std::cout << "flowClass instantiated" << endl;}   
+
+   
    //-----------------------------------------------------
    // 2) Prepare the required finite elements
    //-----------------------------------------------------
@@ -362,7 +376,15 @@ void LoMachSolver::initialize() {
    gridScaleYSml.SetSize(sfes_truevsize);
    gridScaleYSml = 0.0;
    gridScaleZSml.SetSize(sfes_truevsize);
-   gridScaleZSml = 0.0;            
+   gridScaleZSml = 0.0;
+
+   // for paraview
+   //Qt_gf.SetSpace(sfes);
+   //Qt_gf = 0.0;   
+   //viscTotal_gf.SetSpace(sfes);
+   //viscTotal_gf = 0.0;
+   //alphaTotal_gf.SetSpace(sfes);
+   //alphaTotal_gf = 0.0;      
    resolution_gf.SetSpace(sfes);
    resolution_gf = 0.0;   
    
@@ -375,14 +397,20 @@ void LoMachSolver::initialize() {
    if (verbose) grvy_printf(ginfo, "init Sol and Vis okay...\n");
 
    // initialize sub modues
-   turbClass->initialize();        
+   turbClass->initialize();
+   if (verbose) grvy_printf(ginfo, "init turbClass okay...\n");   
    tcClass->initialize();
+   if (verbose) grvy_printf(ginfo, "init tcClass okay...\n");      
    flowClass->initialize();
+   if (verbose) grvy_printf(ginfo, "init flowClass okay...\n");      
 
    // setup pointers to external data
-   turbClass->initializeExternal(flowClass->GetCurrentVelGradU(), flowClass->GetCurrentVelGradV(), flowClass->GetCurrentVelGradW(), &resolution_gf);   
-   tcClass->initializeExternal(flowClass->GetCurrentVelocity(),turbClass->GetCurrentEddyViscosity(), numWalls, numOutlets, numInlets);   
-   flowClass->initializeExternal(tcClass->GetCurrentTotalViscosity(), tcClass->GetCurrentDensity(), tcClass->GetCurrentThermalDiv(), numWalls, numOutlets, numInlets);         
+   turbClass->initializeExternal(flowClass->GetCurrentVelGradU(), flowClass->GetCurrentVelGradV(), flowClass->GetCurrentVelGradW(), &resolution_gf);
+   if (verbose) grvy_printf(ginfo, "init ext turbClass okay...\n");      
+   tcClass->initializeExternal(flowClass->GetCurrentVelocity(),turbClass->GetCurrentEddyViscosity(), numWalls, numOutlets, numInlets);
+   if (verbose) grvy_printf(ginfo, "init ext tcClass okay...\n");         
+   flowClass->initializeExternal(tcClass->GetCurrentTotalViscosity(), tcClass->GetCurrentDensity(), tcClass->GetCurrentThermalDiv(), numWalls, numOutlets, numInlets);
+   if (verbose) grvy_printf(ginfo, "init ext flowClass okay...\n");         
 
    
    // Averaging handled through loMach
@@ -828,23 +856,37 @@ void LoMachSolver::solve()
 
    updateU();
    //copyU(); // testing
-   if (rank0_) std::cout << "Initial updateU complete" << endl;      
+   if (rank0_) std::cout << "Initial updateU complete" << endl;
+
+   // for initial plot
+   flowClass->updateGradientsOP(0.0);
+   tcClass->updateGradientsOP(0.0);
+   tcClass->updateDensity(0.0);
+   tcClass->updateDiffusivity();
+
    
    // better ways to do this? just for plotting
+   /*
    {
      double *visc = tcClass->bufferVisc->HostReadWrite();
+     if (rank0_) std::cout << "okay 1" << endl;        
      double *data = tcClass->viscTotal_gf.HostReadWrite();
+     if (rank0_) std::cout << "okay 2" << endl;             
      for (int i = 0; i < Sdof; i++) {
        data[i] = visc[i];
      }
    }
+   //tcClass->GetCurrentTotalViscosity();
+   if (rank0_) std::cout << "paraview visc pointer set" << endl;   
    {
      double *alpha = tcClass->bufferAlpha->HostReadWrite();
      double *data = tcClass->alphaTotal_gf.HostReadWrite();
      for (int i = 0; i < Sdof; i++) {
        data[i] = alpha[i];
      }
-   }   
+   }
+   if (rank0_) std::cout << "paraview alpha pointer set" << endl;
+   */
    {
      double *res = bufferGridScale->HostReadWrite();     
      double *data = resolution_gf.HostReadWrite();
@@ -852,51 +894,53 @@ void LoMachSolver::solve()
        data[i] = res[i];
      }
    }
-   
-   ParGridFunction *r_gf = tcClass->GetCurrentDensity();   
-   ParGridFunction *u_gf = flowClass->GetCurrentVelocity();
-   ParGridFunction *p_gf = flowClass->GetCurrentPressure();
+
+
+   ParGridFunction *r_gf = tcClass->GetCurrentDensity(); 
    ParGridFunction *t_gf = tcClass->GetCurrentTemperature();
-   ParGridFunction *res_gf = GetCurrentResolution();
    ParGridFunction *mu_gf = tcClass->GetCurrentTotalViscosity();
-   ParGridFunction *alpha_gf = tcClass->GetCurrentTotalThermalDiffusivity();      
+   //ParGridFunction *alpha_gf = tcClass->GetCurrentTotalThermalDiffusivity();   
+   ParGridFunction *u_gf = flowClass->GetCurrentVelocity();
+   ParGridFunction *qt_gf = tcClass->GetCurrentThermalDiv();      
+   ParGridFunction *p_gf = flowClass->GetCurrentPressure();
+   ParGridFunction *res_gf = GetCurrentResolution();   
    
-   /**/
    ParaViewDataCollection pvdc("output", pmesh);
    pvdc.SetDataFormat(VTKFormat::BINARY32);
    pvdc.SetHighOrderOutput(true);
    pvdc.SetLevelsOfDetail(order);
    pvdc.SetCycle(iter);
    pvdc.SetTime(time);
-   pvdc.RegisterField("resolution", res_gf);
-   pvdc.RegisterField("viscosity", mu_gf);
-   pvdc.RegisterField("alpha", alpha_gf);         
+   pvdc.RegisterField("resolution", res_gf);   
    pvdc.RegisterField("density", r_gf);   
+   pvdc.RegisterField("temperature", t_gf);   
+   pvdc.RegisterField("viscosity", mu_gf);
    pvdc.RegisterField("velocity", u_gf);
-   pvdc.RegisterField("pressure", p_gf);
-   pvdc.RegisterField("temperature", t_gf);
+   pvdc.RegisterField("pressure", p_gf); 
+   pvdc.RegisterField("Qt", qt_gf);     
+   //pvdc.RegisterField("alpha", alpha_gf);   
    pvdc.Save();
    if( rank0_ == true ) std::cout << "Saving first step to paraview: " << iter << endl;
-   /**/
-
+   
    if (config.isOpen != true) {     
      tcClass->computeSystemMass();
    }
-      
-   int iter_start = iter;
+
+   
+   int iter_start = iter + 1;
    if( rank0_ == true ) std::cout << " Starting main loop, from " << iter_start << " to " << MaxIters << endl;
 
-      if (rank0_ == true) {   
-        if (dt_fixed < 0) {
-          std::cout << " "<< endl;		
-          std::cout << " N     Time        dt      time/step    minT    maxT    max|U|"<< endl;
-          std::cout << "=================================================================="<< endl;	
-        } else {
-          std::cout << " "<< endl;		
-          std::cout << " N     Time        cfl      time/step    minT    maxT    max|U|"<< endl;
-          std::cout << "=================================================================="<< endl;
-	}
-      }
+   if (rank0_ == true) {   
+     if (dt_fixed < 0) {
+       std::cout << " "<< endl;		
+       std::cout << " N     Time        dt      time/step    minT    maxT    max|U|"<< endl;
+       std::cout << "=================================================================="<< endl;	
+     } else {
+       std::cout << " "<< endl;		
+       std::cout << " N     Time        cfl      time/step    minT    maxT    max|U|"<< endl;
+       std::cout << "=================================================================="<< endl;
+     }
+   }
 
 
    double time_previous = 0.0;      
@@ -914,8 +958,8 @@ void LoMachSolver::solve()
   
         SetTimeIntegrationCoefficients(step - iter_start);
 	
-        flowClass->extrapolateState(step);
-        tcClass->extrapolateState(step);
+        flowClass->extrapolateState(step, abCoef);
+        tcClass->extrapolateState(step, abCoef);
 	
         flowClass->updateBC(step);
         tcClass->updateBC(step);
@@ -926,11 +970,13 @@ void LoMachSolver::solve()
         tcClass->updateThermoP();
         tcClass->updateDensity(1.0);	
 	
-	turbClass->turbModelStep(time, dt, step, iter_start, abCoef, bdfCoef);
-        tcClass->updateDiffusivity(); 	
-	tcClass->thermoChemStep(time, dt, step, iter_start, abCoef, bdfCoef);
-        tcClass->updateDiffusivity(); 	
-	flowClass->flowStep(time, dt, step, iter_start, abCoef, bdfCoef);	
+	turbClass->turbModelStep(time, dt, step, iter_start, bdfCoef);
+        tcClass->updateDiffusivity();
+	
+	tcClass->thermoChemStep(time, dt, step, iter_start, bdfCoef);
+        tcClass->updateDiffusivity();
+	
+	flowClass->flowStep(time, dt, step, iter_start, bdfCoef);	
 	
         //curlcurlStep(time, dt, step, iter_start);
 	
@@ -1016,7 +1062,15 @@ void LoMachSolver::solve()
         MPI_Bcast(&earlyExit, 1, MPI_INT, 0, MPI_COMM_WORLD);	 
         if(earlyExit == 1) exit(-1);
       }
-	
+
+      //if (!provisional)
+      //{
+       UpdateTimestepHistory(dt);
+       time += dt;
+       //if(rank0_) std::cout << "Time in Step after update: " << time << endl;       
+       //}
+
+      
    }
    MPI_Barrier(MPI_COMM_WORLD);      
 
@@ -1197,6 +1251,7 @@ void LoMachSolver::setTimestep()
        MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, pmesh->GetComm());
        double dtInst = CFL * hmin / (max_speed * (double)order);
        dt = dtInst;
+       std::cout << "dt from setTimestep: " << dt << " max_speed: " << max_speed << endl;
        
 } 
 
@@ -3552,7 +3607,7 @@ void LoMachSolver::initSolutionAndVisualizationVectors() {
   }
   */
 
-  ioData.registerIOFamily("Solution state variables", "/solution", Up);
+  ioData.registerIOFamily("Solution state variables", "/solution", Up, false);
   ioData.registerIOVar("/solution", "density", 0);
   ioData.registerIOVar("/solution", "u", 1);
   ioData.registerIOVar("/solution", "v", 2);
@@ -3562,7 +3617,6 @@ void LoMachSolver::initSolutionAndVisualizationVectors() {
   } else {
     ioData.registerIOVar("/solution", "temperature", 3);
   }
-
   
   /*
   // TODO(kevin): for now, keep the number of primitive variables same as conserved variables.
