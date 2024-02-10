@@ -221,6 +221,7 @@ Tomboulides::~Tomboulides() {
   delete mass_lform_;
 
   // objects allocated by initializeOperators
+  delete pp_div_bdr_form_;
   delete Hv_inv_;
   delete Hv_inv_pc_;
   delete Hv_form_;
@@ -237,6 +238,7 @@ Tomboulides::~Tomboulides() {
   delete L_iorho_inv_pc_;
   delete L_iorho_lor_;
   delete L_iorho_form_;
+  delete pp_div_coeff_;
   delete mu_coeff_;
   delete rho_over_dt_coeff_;
   delete iorho_coeff_;
@@ -248,6 +250,7 @@ Tomboulides::~Tomboulides() {
   delete pfes_;
   delete pfec_;
   delete resu_gf_;
+  delete pp_div_gf_;
   delete curlcurl_gf_;
   delete curl_gf_;
   delete u_next_gf_;
@@ -265,6 +268,7 @@ void Tomboulides::initializeSelf() {
   curl_gf_ = new ParGridFunction(vfes_);
   curlcurl_gf_ = new ParGridFunction(vfes_);
   resu_gf_ = new ParGridFunction(vfes_);
+  pp_div_gf_ = new ParGridFunction(vfes_);
 
   pfec_ = new H1_FECollection(porder_);
   pfes_ = new ParFiniteElementSpace(pmesh_, pfec_);
@@ -316,6 +320,7 @@ void Tomboulides::initializeSelf() {
 
   resp_vec_.SetSize(pfes_truevsize);
   p_vec_.SetSize(pfes_truevsize);
+  pp_div_bdr_vec_.SetSize(pfes_truevsize);
 
   // zero vectors for now
   forcing_vec_ = 0.0;
@@ -332,6 +337,16 @@ void Tomboulides::initializeSelf() {
 
   resp_vec_ = 0.0;
   p_vec_ = 0.0;
+  pp_div_bdr_vec_ = 0.0;
+
+  // make sure there is room for BC attributes
+  if (!(pmesh_->bdr_attributes.Size() == 0)) {
+    vel_ess_attr_.SetSize(pmesh_->bdr_attributes.Max());
+    vel_ess_attr_ = 0;
+
+    pres_ess_attr_.SetSize(pmesh_->bdr_attributes.Max());
+    pres_ess_attr_ = 0;
+  }
 }
 
 void Tomboulides::initializeOperators() {
@@ -344,6 +359,7 @@ void Tomboulides::initializeOperators() {
   Hv_bdfcoeff_.constant = 1.0 / coeff_.dt;
   rho_over_dt_coeff_ = new ProductCoefficient(Hv_bdfcoeff_, *rho_coeff_);
   mu_coeff_ = new GridFunctionCoefficient(thermo_interface_->viscosity);
+  pp_div_coeff_ = new VectorGridFunctionCoefficient(pp_div_gf_);
 
   // Integration rules (only used if numerical_integ_ is true).  When
   // this is the case, the quadrature degree set such that the
@@ -355,6 +371,9 @@ void Tomboulides::initializeOperators() {
 
   // Empty array, use where we want operators without BCs
   Array<int> empty;
+
+  // Get Dirichlet dofs
+  vfes_->GetEssentialTrueDofs(vel_ess_attr_, vel_ess_tdof_);
 
   // Create the operators
 
@@ -498,13 +517,13 @@ void Tomboulides::initializeOperators() {
     Hv_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   }
   Hv_form_->Assemble();
-  Hv_form_->FormSystemMatrix(empty, Hv_op_);
+  Hv_form_->FormSystemMatrix(vel_ess_tdof_, Hv_op_);
 
   // Helmholtz solver
   if (partial_assembly_) {
     Vector diag_pa(vfes_->GetTrueVSize());
     Hv_form_->AssembleDiagonal(diag_pa);
-    Hv_inv_pc_ = new OperatorJacobiSmoother(diag_pa, empty);
+    Hv_inv_pc_ = new OperatorJacobiSmoother(diag_pa, vel_ess_tdof_);
   } else {
     Hv_inv_pc_ = new HypreSmoother(*Hv_op_.As<HypreParMatrix>());
     dynamic_cast<HypreSmoother *>(Hv_inv_pc_)->SetType(HypreSmoother::Jacobi, 1);
@@ -516,6 +535,14 @@ void Tomboulides::initializeOperators() {
   Hv_inv_->SetPrintLevel(hsolve_pl_);
   Hv_inv_->SetRelTol(hsolve_rtol_);
   Hv_inv_->SetMaxIter(hsolve_max_iter_);
+
+  //
+  pp_div_bdr_form_ = new ParLinearForm(pfes_);
+  auto *ppd_bnlfi = new BoundaryNormalLFIntegrator(*pp_div_coeff_);
+  if (numerical_integ_) {
+    ppd_bnlfi->SetIntRule(&ir_ni_p);
+  }
+  pp_div_bdr_form_->AddBoundaryIntegrator(ppd_bnlfi, vel_ess_attr_);
 
   // Ensure u_vec_ consistent with u_curr_gf_
   u_curr_gf_->GetTrueDofs(u_vec_);
@@ -588,7 +615,7 @@ void Tomboulides::step() {
   Hv_bdfcoeff_.constant = coeff_.bd0 / dt;
   Hv_form_->Update();
   Hv_form_->Assemble();
-  Hv_form_->FormSystemMatrix(empty, Hv_op_);
+  Hv_form_->FormSystemMatrix(vel_ess_tdof_, Hv_op_);
 
   Hv_inv_->SetOperator(*Hv_op_);
   if (partial_assembly_) {
@@ -705,6 +732,10 @@ void Tomboulides::step() {
   resp_vec_.Neg();
 
   // TODO(trevilo): Add boundary terms to residual
+  pp_div_gf_->SetFromTrueDofs(pp_div_vec_);
+  pp_div_bdr_form_->Assemble();
+  pp_div_bdr_form_->ParallelAssemble(pp_div_bdr_vec_);
+  resp_vec_.Add(1.0, pp_div_bdr_vec_);
 
   // TODO(trevilo): Only do this if no pressure BCs
   // Since now we don't have BCs at all, have to do it
@@ -763,10 +794,9 @@ void Tomboulides::step() {
   // rho * vstar / dt term
   Mv_rho_op_->AddMult(ustar_vec_, resu_vec_);
 
-  // TODO(trevilo): Add BCs
-  // for (auto &vel_dbc : vel_dbcs) {
-  //   un_next_gf.ProjectBdrCoefficient(*vel_dbc.coeff, vel_dbc.attr);
-  // }
+  for (auto &vel_dbc : vel_dbcs_) {
+    u_next_gf_->ProjectBdrCoefficient(*vel_dbc.coeff, vel_dbc.attr);
+  }
 
   vfes_->GetRestrictionMatrix()->MultTranspose(resu_vec_, *resu_gf_);
 
@@ -777,7 +807,7 @@ void Tomboulides::step() {
     // auto *HC = H.As<ConstrainedOperator>();
     // EliminateRHS(*Hv_form_, *HC, vel_ess_tdof, un_next_gf, resu_gf, X2, B2, 1);
   } else {
-    Hv_form_->FormLinearSystem(empty, *u_next_gf_, *resu_gf_, Hv_op_, X2, B2, 1);
+    Hv_form_->FormLinearSystem(vel_ess_tdof_, *u_next_gf_, *resu_gf_, Hv_op_, X2, B2, 1);
   }
 
   Hv_inv_->Mult(B2, X2);
@@ -823,3 +853,18 @@ void Tomboulides::meanZero(ParGridFunction &v) {
 
   v -= integ / volume_;
 }
+
+/// Add a Dirichlet boundary condition to the velocity field
+void Tomboulides::addVelDirichletBC(const Vector &u, Array<int> &attr) {
+  assert(u.Size() == dim_);
+  vel_dbcs_.emplace_back(attr, new VectorConstantCoefficient(u));
+  for (int i = 0; i < attr.Size(); ++i) {
+    if (attr[i] == 1) {
+      assert(!vel_ess_attr_[i]);  // if vel_ess_attr[i] already set, fail b/c duplicate
+      vel_ess_attr_[i] = 1;
+    }
+  }
+}
+
+/// Add a Dirichlet boundary condition to the pressure field.
+void Tomboulides::addPresDirichletBC(double p, Array<int> &attr) {}
