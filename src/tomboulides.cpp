@@ -332,6 +332,15 @@ void Tomboulides::initializeSelf() {
 
   resp_vec_ = 0.0;
   p_vec_ = 0.0;
+
+  // make sure there is room for BC attributes
+  if (!(pmesh_->bdr_attributes.Size() == 0)) {
+    vel_ess_attr_.SetSize(pmesh_->bdr_attributes.Max());
+    vel_ess_attr_ = 0;
+
+    pres_ess_attr_.SetSize(pmesh_->bdr_attributes.Max());
+    pres_ess_attr_ = 0;
+  }
 }
 
 void Tomboulides::initializeOperators() {
@@ -823,3 +832,18 @@ void Tomboulides::meanZero(ParGridFunction &v) {
 
   v -= integ / volume_;
 }
+
+/// Add a Dirichlet boundary condition to the velocity field
+void Tomboulides::addVelDirichletBC(const Vector &u, Array<int> &attr) {
+  assert(u.Size() == dim_);
+  vel_dbcs_.emplace_back(attr, new VectorConstantCoefficient(u));
+  for (int i = 0; i < attr.Size(); ++i) {
+    if (attr[i] == 1) {
+      assert(!vel_ess_attr_[i]);  // if vel_ess_attr[i] already set, fail b/c duplicate
+      vel_ess_attr_[i] = 1;
+    }
+  }
+}
+
+/// Add a Dirichlet boundary condition to the pressure field.
+void Tomboulides::addPresDirichletBC(double p, Array<int> &attr) {}

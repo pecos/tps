@@ -39,6 +39,7 @@
  *
  */
 
+#include "dirichlet_bc_helper.hpp"
 #include "split_flow_base.hpp"
 
 /// Container for forcing terms to be added to velocity equation
@@ -100,6 +101,18 @@ class Tomboulides : public FlowBase {
   // Object used to build forcing
   mfem::VectorConstantCoefficient *gravity_vec_;
   std::vector<ForcingTerm_T> forcing_terms_;
+
+  // BCs holders
+  std::vector<DirichletBC_T<mfem::VectorCoefficient>> vel_dbcs_;
+  std::vector<DirichletBC_T<mfem::Coefficient>> pres_dbcs_;
+
+  // List of essential boundaries
+  mfem::Array<int> vel_ess_attr_;
+  mfem::Array<int> pres_ess_attr_;
+
+  // All essential true dofs.
+  mfem::Array<int> vel_ess_tdof_;
+  mfem::Array<int> pres_ess_tdof_;
 
   /// Velocity FEM objects and fields
   mfem::FiniteElementCollection *vfec_ = nullptr;
@@ -206,6 +219,12 @@ class Tomboulides : public FlowBase {
   void step() final;
 
   mfem::ParGridFunction *getCurrentVelocity() final { return u_curr_gf_; }
+
+  /// Add a Dirichlet boundary condition to the velocity field
+  void addVelDirichletBC(const mfem::Vector &u, mfem::Array<int> &attr);
+
+  /// Add a Dirichlet boundary condition to the pressure field.
+  void addPresDirichletBC(double p, mfem::Array<int> &attr);
 };
 
 #endif  // TOMBOULIDES_HPP_

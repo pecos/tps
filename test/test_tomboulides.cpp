@@ -91,8 +91,10 @@ int main(int argc, char *argv[]) {
 
   int ref_levels = 2;
   int order = 3;
+  int problem = 0; // 0 = TG, 1 = lid-driven cavity
   double dt = -1.0;
   double t_final = 1.0;
+
 
   //---------------------------------------------------------------------
   // Parse command line options
@@ -100,6 +102,7 @@ int main(int argc, char *argv[]) {
   args.AddOption(&ref_levels, "-r", "--refine",
                  "Number of times to refine the mesh uniformly.");
   args.AddOption(&order, "-o", "--order", "Order (degree) of the finite elements.");
+  args.AddOption(&problem, "-p", "--problem", "0 = Taylor-Green, 1 = lid-driven cavity.");
   args.AddOption(&dt, "-dt", "--time-step", "Time step.");
   args.AddOption(&t_final, "-tf", "--final-time", "Final time.");
 
@@ -118,24 +121,39 @@ int main(int argc, char *argv[]) {
   Mesh *mesh = new Mesh("./meshes/inline-quad.mesh");
 
   // Make it periodic
-  Vector x_translation({1.0, 0.0});
-  Vector y_translation({0.0, 1.0});
-  std::vector<Vector> translations = {x_translation, y_translation};
+  Mesh periodic_mesh;
+  ParMesh *pmesh;
+  if (problem == 0) {
+    // problem 0 is Taylor-Green on (0,2\pi)x(0,2\pi)
+    Vector x_translation({1.0, 0.0});
+    Vector y_translation({0.0, 1.0});
+    std::vector<Vector> translations = {x_translation, y_translation};
 
-  Mesh periodic_mesh = Mesh::MakePeriodic(*mesh,mesh->CreatePeriodicVertexMapping(translations));
+    Mesh periodic_mesh = Mesh::MakePeriodic(*mesh,mesh->CreatePeriodicVertexMapping(translations));
 
-  // Scale domain to (0,L)x(0,L)
-  periodic_mesh.EnsureNodes();
-  GridFunction *nodes = periodic_mesh.GetNodes();
-  *nodes *= (2 * M_PI);
+    // Scale domain to (0,L)x(0,L)
+    periodic_mesh.EnsureNodes();
+    GridFunction *nodes = periodic_mesh.GetNodes();
+    *nodes *= (2 * M_PI);
 
-  // Refine the periodic mesh
-  for (int i = 0; i < ref_levels; ++i) {
-    periodic_mesh.UniformRefinement();
+    // Refine the periodic mesh
+    for (int i = 0; i < ref_levels; ++i) {
+      periodic_mesh.UniformRefinement();
+    }
+
+    // And finally, decompose it
+    pmesh = new ParMesh(MPI_COMM_WORLD, periodic_mesh);
+
+  } else if (problem == 1) {
+    // problem 1 is a lid-driven cavity on (0,1)x(0,1)
+    for (int i = 0; i < ref_levels; ++i) {
+      mesh->UniformRefinement();
+    }
+    pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);
+  } else {
+    std::cout << "Unknown problem requested.  Exiting." << std::endl;
+    return 1;
   }
-
-  // And finally, decompose it
-  ParMesh *pmesh = new ParMesh(MPI_COMM_WORLD, periodic_mesh);
   delete mesh;
 
   // Get minimum element size
@@ -164,7 +182,6 @@ int main(int argc, char *argv[]) {
   dthist[0] = dthist[1] = dthist[2] = time_coeff.dt;
   updateTimeIntegrationCoefficients(0, dthist, time_coeff);
 
-
   // Density and viscosity to use
   const double rho = 1.0;
   const double mu = 1.0;
@@ -185,7 +202,34 @@ int main(int argc, char *argv[]) {
   ParGridFunction *u_gf = flow->getCurrentVelocity();
   VectorFunctionCoefficient u_excoeff(2, vel_exact_tg);
   u_excoeff.SetTime(0.0);
-  u_gf->ProjectCoefficient(u_excoeff);
+
+  // If TG problem set the IC
+  if (problem == 0) {
+    u_gf->ProjectCoefficient(u_excoeff);
+  }
+
+  if (problem == 1) {
+    Vector zero(2);
+    zero = 0.0;
+
+    Vector onex(2);
+    onex[0] = 1.0;
+
+    Array<int> top_attr(pmesh->bdr_attributes.Max());
+    top_attr = 0;
+    top_attr[2] = 1;
+
+    Tomboulides *tflow = dynamic_cast<Tomboulides*>(flow);
+
+    tflow->addVelDirichletBC(onex, top_attr);
+
+    Array<int> rest_attr(pmesh->bdr_attributes.Max());
+    rest_attr = 1;
+    rest_attr[2] = 0;
+    tflow->addVelDirichletBC(zero, rest_attr);
+
+    return 1;
+  }
 
 #if 0
   // Set above to 1 to ensure that assert catches uninitialized interface
