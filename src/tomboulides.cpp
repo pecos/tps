@@ -221,6 +221,7 @@ Tomboulides::~Tomboulides() {
   delete mass_lform_;
 
   // objects allocated by initializeOperators
+  delete pp_div_bdr_form_;
   delete Hv_inv_;
   delete Hv_inv_pc_;
   delete Hv_form_;
@@ -237,6 +238,7 @@ Tomboulides::~Tomboulides() {
   delete L_iorho_inv_pc_;
   delete L_iorho_lor_;
   delete L_iorho_form_;
+  delete pp_div_coeff_;
   delete mu_coeff_;
   delete rho_over_dt_coeff_;
   delete iorho_coeff_;
@@ -248,6 +250,7 @@ Tomboulides::~Tomboulides() {
   delete pfes_;
   delete pfec_;
   delete resu_gf_;
+  delete pp_div_gf_;
   delete curlcurl_gf_;
   delete curl_gf_;
   delete u_next_gf_;
@@ -265,6 +268,7 @@ void Tomboulides::initializeSelf() {
   curl_gf_ = new ParGridFunction(vfes_);
   curlcurl_gf_ = new ParGridFunction(vfes_);
   resu_gf_ = new ParGridFunction(vfes_);
+  pp_div_gf_ = new ParGridFunction(vfes_);
 
   pfec_ = new H1_FECollection(porder_);
   pfes_ = new ParFiniteElementSpace(pmesh_, pfec_);
@@ -316,6 +320,7 @@ void Tomboulides::initializeSelf() {
 
   resp_vec_.SetSize(pfes_truevsize);
   p_vec_.SetSize(pfes_truevsize);
+  pp_div_bdr_vec_.SetSize(pfes_truevsize);
 
   // zero vectors for now
   forcing_vec_ = 0.0;
@@ -332,6 +337,7 @@ void Tomboulides::initializeSelf() {
 
   resp_vec_ = 0.0;
   p_vec_ = 0.0;
+  pp_div_bdr_vec_ = 0.0;
 
   // make sure there is room for BC attributes
   if (!(pmesh_->bdr_attributes.Size() == 0)) {
@@ -353,6 +359,7 @@ void Tomboulides::initializeOperators() {
   Hv_bdfcoeff_.constant = 1.0 / coeff_.dt;
   rho_over_dt_coeff_ = new ProductCoefficient(Hv_bdfcoeff_, *rho_coeff_);
   mu_coeff_ = new GridFunctionCoefficient(thermo_interface_->viscosity);
+  pp_div_coeff_ = new VectorGridFunctionCoefficient(pp_div_gf_);
 
   // Integration rules (only used if numerical_integ_ is true).  When
   // this is the case, the quadrature degree set such that the
@@ -528,6 +535,14 @@ void Tomboulides::initializeOperators() {
   Hv_inv_->SetPrintLevel(hsolve_pl_);
   Hv_inv_->SetRelTol(hsolve_rtol_);
   Hv_inv_->SetMaxIter(hsolve_max_iter_);
+
+  //
+  pp_div_bdr_form_ = new ParLinearForm(pfes_);
+  auto *ppd_bnlfi = new BoundaryNormalLFIntegrator(*pp_div_coeff_);
+  if (numerical_integ_) {
+    ppd_bnlfi->SetIntRule(&ir_ni_p);
+  }
+  pp_div_bdr_form_->AddBoundaryIntegrator(ppd_bnlfi, vel_ess_attr_);
 
   // Ensure u_vec_ consistent with u_curr_gf_
   u_curr_gf_->GetTrueDofs(u_vec_);
@@ -717,6 +732,10 @@ void Tomboulides::step() {
   resp_vec_.Neg();
 
   // TODO(trevilo): Add boundary terms to residual
+  pp_div_gf_->SetFromTrueDofs(pp_div_vec_);
+  pp_div_bdr_form_->Assemble();
+  pp_div_bdr_form_->ParallelAssemble(pp_div_bdr_vec_);
+  resp_vec_.Add(1.0, pp_div_bdr_vec_);
 
   // TODO(trevilo): Only do this if no pressure BCs
   // Since now we don't have BCs at all, have to do it
@@ -775,10 +794,9 @@ void Tomboulides::step() {
   // rho * vstar / dt term
   Mv_rho_op_->AddMult(ustar_vec_, resu_vec_);
 
-  // TODO(trevilo): Add BCs
-  // for (auto &vel_dbc : vel_dbcs) {
-  //   un_next_gf.ProjectBdrCoefficient(*vel_dbc.coeff, vel_dbc.attr);
-  // }
+  for (auto &vel_dbc : vel_dbcs_) {
+    u_next_gf_->ProjectBdrCoefficient(*vel_dbc.coeff, vel_dbc.attr);
+  }
 
   vfes_->GetRestrictionMatrix()->MultTranspose(resu_vec_, *resu_gf_);
 
