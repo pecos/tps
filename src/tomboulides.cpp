@@ -365,6 +365,9 @@ void Tomboulides::initializeOperators() {
   // Empty array, use where we want operators without BCs
   Array<int> empty;
 
+  // Get Dirichlet dofs
+  vfes_->GetEssentialTrueDofs(vel_ess_attr_, vel_ess_tdof_);
+
   // Create the operators
 
   // Variable coefficient Laplacian: \nabla \cdot ( (1/\rho) \nabla )
@@ -507,13 +510,13 @@ void Tomboulides::initializeOperators() {
     Hv_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   }
   Hv_form_->Assemble();
-  Hv_form_->FormSystemMatrix(empty, Hv_op_);
+  Hv_form_->FormSystemMatrix(vel_ess_tdof_, Hv_op_);
 
   // Helmholtz solver
   if (partial_assembly_) {
     Vector diag_pa(vfes_->GetTrueVSize());
     Hv_form_->AssembleDiagonal(diag_pa);
-    Hv_inv_pc_ = new OperatorJacobiSmoother(diag_pa, empty);
+    Hv_inv_pc_ = new OperatorJacobiSmoother(diag_pa, vel_ess_tdof_);
   } else {
     Hv_inv_pc_ = new HypreSmoother(*Hv_op_.As<HypreParMatrix>());
     dynamic_cast<HypreSmoother *>(Hv_inv_pc_)->SetType(HypreSmoother::Jacobi, 1);
@@ -597,7 +600,7 @@ void Tomboulides::step() {
   Hv_bdfcoeff_.constant = coeff_.bd0 / dt;
   Hv_form_->Update();
   Hv_form_->Assemble();
-  Hv_form_->FormSystemMatrix(empty, Hv_op_);
+  Hv_form_->FormSystemMatrix(vel_ess_tdof_, Hv_op_);
 
   Hv_inv_->SetOperator(*Hv_op_);
   if (partial_assembly_) {
@@ -786,7 +789,7 @@ void Tomboulides::step() {
     // auto *HC = H.As<ConstrainedOperator>();
     // EliminateRHS(*Hv_form_, *HC, vel_ess_tdof, un_next_gf, resu_gf, X2, B2, 1);
   } else {
-    Hv_form_->FormLinearSystem(empty, *u_next_gf_, *resu_gf_, Hv_op_, X2, B2, 1);
+    Hv_form_->FormLinearSystem(vel_ess_tdof_, *u_next_gf_, *resu_gf_, Hv_op_, X2, B2, 1);
   }
 
   Hv_inv_->Mult(B2, X2);
