@@ -184,7 +184,11 @@ int main(int argc, char *argv[]) {
 
   // Density and viscosity to use
   const double rho = 1.0;
-  const double mu = 1.0;
+  double mu = 1.0;
+
+  if (problem == 1) {
+    mu = 0.001;
+  }
 
   // Set up the flow and thermo classes
   FlowBase *flow;
@@ -213,22 +217,20 @@ int main(int argc, char *argv[]) {
     zero = 0.0;
 
     Vector onex(2);
+    onex = 0.0;
     onex[0] = 1.0;
+
+    Array<int> rest_attr(pmesh->bdr_attributes.Max());
+    rest_attr = 1;
+    rest_attr[2] = 0;
 
     Array<int> top_attr(pmesh->bdr_attributes.Max());
     top_attr = 0;
     top_attr[2] = 1;
 
     Tomboulides *tflow = dynamic_cast<Tomboulides*>(flow);
-
-    tflow->addVelDirichletBC(onex, top_attr);
-
-    Array<int> rest_attr(pmesh->bdr_attributes.Max());
-    rest_attr = 1;
-    rest_attr[2] = 0;
     tflow->addVelDirichletBC(zero, rest_attr);
-
-    return 1;
+    tflow->addVelDirichletBC(onex, top_attr);
   }
 
 #if 0
@@ -268,6 +270,13 @@ int main(int argc, char *argv[]) {
     time_coeff.time += time_coeff.dt;
     iter++;
 
+    // Write some visualization files
+    if (iter % 100 == 0) {
+      pd->SetCycle(iter);
+      pd->SetTime(time_coeff.time);
+      pd->Save();
+    }
+
     // update dt history
     dthist[2] = dthist[1];
     dthist[1] = dthist[0];
@@ -280,15 +289,16 @@ int main(int argc, char *argv[]) {
     std::cout << "Final step " << iter << ": time = " << time_coeff.time << std::endl;
   }
 
-  u_excoeff.SetTime(time_coeff.time);
-  const double err_u = u_gf->ComputeL2Error(u_excoeff);
-  if (Mpi::Root()) {
-    std::cout << "Velocity error at final time = " << err_u << std::endl;
+  if (problem == 0) {
+    u_excoeff.SetTime(time_coeff.time);
+    const double err_u = u_gf->ComputeL2Error(u_excoeff);
+    if (Mpi::Root()) {
+      std::cout << "Velocity error at final time = " << err_u << std::endl;
+    }
   }
 
-
   // Write some visualization files
-  pd->SetCycle(1);
+  pd->SetCycle(iter);
   pd->SetTime(time_coeff.time);
   pd->Save();
 
