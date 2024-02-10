@@ -1,9 +1,9 @@
 
 
-#include "turbModel.hpp"
-#include "thermoChem.hpp"
+//#include "turbModel.hpp"
+//#include "thermoChem.hpp"
 #include "flow.hpp"
-#include "loMach.hpp"
+//#include "loMach.hpp"
 #include "loMach_options.hpp"
 #include "mfem/general/forall.hpp"
 #include "mfem/linalg/solvers.hpp"
@@ -39,6 +39,7 @@ void Flow::initialize() {
     //groupsMPI = pmesh->GetComm(); 
     rank = pmesh->GetMyRank();
     //rank0 = pmesh->isWorldRoot();
+    rank0 = false;
     if(rank == 0) {rank0 = true;}
     dim = pmesh->Dimension();
     nvel = dim;
@@ -49,13 +50,13 @@ void Flow::initialize() {
    if (loMach_opts->uOrder == -1) {
      order = std::max(config->solOrder,1);
      porder = order;
-     //double no;
-     //no = ceil( ((double)order * 1.5) );   
-     //norder = int(no);
+     double no;
+     no = ceil( ((double)order * 1.5) );   
+     norder = int(no);
    } else {
      order = loMach_opts->uOrder;
      porder = loMach_opts->pOrder;     
-     //norder = loMach_->loMach_opts_.nOrder;
+     norder = loMach_opts->nOrder;
    }
       
    MaxIters = config->GetNumIters();
@@ -67,7 +68,7 @@ void Flow::initialize() {
 
    // scalar
    sfec = new H1_FECollection(order);
-   sfes = new ParFiniteElementSpace(pmesh, sfec);   
+   sfes = new ParFiniteElementSpace(pmesh, sfec);
 
    // vector
    vfec = new H1_FECollection(order, dim);
@@ -76,13 +77,13 @@ void Flow::initialize() {
    // pressure
    pfec = new H1_FECollection(porder);
    //pfec = new L2_FECollection(porder,dim);   
-   pfes = new ParFiniteElementSpace(pmesh, pfec);   
+   pfes = new ParFiniteElementSpace(pmesh, pfec);
 
    // dealias nonlinear term 
    nfec = new H1_FECollection(norder, dim);   
    nfes = new ParFiniteElementSpace(pmesh, nfec, dim);   
    nfecR0 = new H1_FECollection(norder);   
-   nfesR0 = new ParFiniteElementSpace(pmesh, nfecR0);   
+   nfesR0 = new ParFiniteElementSpace(pmesh, nfecR0);
 
    
    // Check if fully periodic mesh
@@ -142,6 +143,7 @@ void Flow::initialize() {
    LdivImp.SetSize(vfes_truevsize);      
    resu.SetSize(vfes_truevsize);
    resu = 0.0;
+   FText = 0.0;
 
    gradMu.SetSize(vfes_truevsize);
    gradRho.SetSize(vfes_truevsize);   
@@ -176,10 +178,12 @@ void Flow::initialize() {
    resp.SetSize(pfes_truevsize);
    resp = 0.0;
    FText_bdr.SetSize(sfes_truevsize);
+   FText_bdr = 0.0;
    g_bdr.SetSize(sfes_truevsize);
+   g_bdr = 0.0;
 
-   pnBig.SetSize(sfes_truevsize);
-   pnBig = 0.0;   
+   //pnBig.SetSize(sfes_truevsize);
+   //pnBig = 0.0;   
   
    u_star_gf.SetSpace(vfes);
    u_star_gf = 0.0;
@@ -197,12 +201,15 @@ void Flow::initialize() {
    curlu_gf.SetSpace(vfes);
    curlcurlu_gf.SetSpace(vfes);
    FText_gf.SetSpace(vfes);
+   FText_gf = 0.0;
    resu_gf.SetSpace(vfes);
+   resu_gf = 0.0;
 
    pn_gf.SetSpace(pfes);
    pn_gf = 0.0;
    resp_gf.SetSpace(pfes);
-   tmpR0PM1.SetSize(pfes_truevsize);   
+   resp_gf = 0.0;
+   //tmpR0PM1.SetSize(pfes_truevsize);   
 
    Pext_bdr.SetSize(pfes_truevsize);   
    Pext_gf.SetSpace(pfes);
@@ -234,8 +241,14 @@ void Flow::initialize() {
    R1PX2_gf.SetSpace(nfes);
    R1PX2_gf = 0.0;      
    
-   tmpR0.SetSize(sfes_truevsize);
    tmpR1.SetSize(vfes_truevsize);
+   tmpR1a.SetSize(vfes_truevsize);
+   tmpR1b.SetSize(vfes_truevsize);
+   tmpR1c.SetSize(vfes_truevsize);
+   tmpR1 = 0.0;
+   tmpR1a = 0.0;
+   tmpR1b = 0.0;
+   tmpR1c = 0.0;
 
    r0pm0.SetSize(sfes_truevsize);
    r1pm0.SetSize(vfes_truevsize);   
@@ -245,11 +258,8 @@ void Flow::initialize() {
    r1px2a.SetSize(nfes_truevsize);
    r1px2b.SetSize(nfes_truevsize);
    r1px2c.SetSize(nfes_truevsize);            
-
    
    if (verbose) grvy_printf(ginfo, "Flow vectors and gf initialized...\n");     
-
-   // setup pointers to loMach owned temp data blocks
    
 }
 
@@ -271,7 +281,8 @@ void Flow::Setup(double dt)
 
    // HARD CODE
    partial_assembly = false;
-   partial_assembly_pressure = false;      
+   partial_assembly_pressure = false;
+   numerical_integ = true;
    //if (verbose) grvy_printf(ginfo, "in Setup...\n");
 
    Vdof = vfes->GetNDofs();
@@ -397,11 +408,13 @@ void Flow::Setup(double dt)
    for (int i = 0; i < numWalls; i++) {
      for (int iFace = 1; iFace < pmesh->bdr_attributes.Max()+1; iFace++) {
        //if (config.wallPatchType[i].second != WallType::INV) { 
-       if (config->wallPatchType[i].second == WallType::VISC_ISOTH) {	   
+       if (config->wallPatchType[i].second == WallType::VISC_ISOTH) {
+	 //std::cout << " wall check " << i << " " << iFace << " " << config->wallPatchType[i].first << endl;	 
          if (iFace == config->wallPatchType[i].first) {
             attr[iFace-1] = 1;	 
          }
-       } else if (config->wallPatchType[i].second == WallType::VISC_ADIAB) {   
+       } else if (config->wallPatchType[i].second == WallType::VISC_ADIAB) {
+	 //std::cout << " wall check " << i << " " << iFace << " " << config->wallPatchType[i].first << endl;	 
          if (iFace == config->wallPatchType[i].first) {
  	    attr[iFace-1] = 1;
          }	 
@@ -409,7 +422,7 @@ void Flow::Setup(double dt)
      }
    }
    AddVelDirichletBC(vel_wall, attr);   
-   if (rank0) std::cout << "Velocity wall bc completed: " << endl;   
+   if (rank0) std::cout << "Velocity wall bc completed: " << numWalls << endl;   
    
 
    vfes->GetEssentialTrueDofs(vel_ess_attr, vel_ess_tdof);
@@ -425,7 +438,7 @@ void Flow::Setup(double dt)
    // GLL integration rule (Numerical Integration)
    const IntegrationRule &ir_i  = gll_rules.Get(sfes->GetFE(0)->GetGeomType(), 2*order + 1);  //3 5
    const IntegrationRule &ir_pi = gll_rules.Get(pfes->GetFE(0)->GetGeomType(), 3*porder - 1); //2 5   
-   const IntegrationRule &ir_nli = gll_rules.Get(sfes->GetFE(0)->GetGeomType(), 4*order);    //4 8
+   const IntegrationRule &ir_nli = gll_rules.Get(sfes->GetFE(0)->GetGeomType(), 4*norder);    //4 8
    const IntegrationRule &ir_di  = gll_rules.Get(sfes->GetFE(0)->GetGeomType(), 3*order - 1); //2 5  
    if (rank0) std::cout << "Integration rules set" << endl;   
 
@@ -443,9 +456,25 @@ void Flow::Setup(double dt)
    
    // setup coefficients, all updated before uses so dont have to set values here
    bufferRho = new ParGridFunction(sfes);
+   {
+     double *data = bufferRho->HostReadWrite();
+     for (int i = 0; i < Sdof; i++) { data[i] = 1.0; }
+   }       
    bufferInvRho = new ParGridFunction(pfes);
+   {
+     double *data = bufferInvRho->HostReadWrite();
+     for (int i = 0; i < Pdof; i++) { data[i] = 1.0; }
+   }          
    bufferVisc = new ParGridFunction(sfes);
-   bufferRhoDt = new ParGridFunction(sfes);   
+   {
+     double *data = bufferVisc->HostReadWrite();
+     for (int i = 0; i < Sdof; i++) { data[i] = 1.0; }
+   }          
+   bufferRhoDt = new ParGridFunction(sfes);
+   {
+     double *data = bufferRhoDt->HostReadWrite();
+     for (int i = 0; i < Sdof; i++) { data[i] = 1.0; }
+   }          
    Rho = new GridFunctionCoefficient(bufferRho);
    invRho = new GridFunctionCoefficient(bufferInvRho);
    viscField = new GridFunctionCoefficient(bufferVisc);
@@ -490,22 +519,37 @@ void Flow::Setup(double dt)
    if (partial_assembly) { MvRho_form->SetAssemblyLevel(AssemblyLevel::PARTIAL); }
    MvRho_form->Assemble();
    MvRho_form->FormSystemMatrix(empty, MvRho);
-      
+
+   // mass matrix
+   Ms_form = new ParBilinearForm(sfes);
+   auto *ms_blfi = new MassIntegrator;
+   if (numerical_integ) { ms_blfi->SetIntRule(&ir_i); }
+   Ms_form->AddDomainIntegrator(ms_blfi);
+   if (partial_assembly) { Ms_form->SetAssemblyLevel(AssemblyLevel::PARTIAL); }
+   Ms_form->Assemble();
+   Ms_form->FormSystemMatrix(empty, Ms);
+   //std::cout << "Check 20..." << std::endl;        
+
+   // mass matrix with rho
+   MsRho_form = new ParBilinearForm(sfes);
+   //auto *ms_blfi = new MassIntegrator;
+   auto *msrho_blfi = new MassIntegrator(*Rho);   
+   if (numerical_integ) { msrho_blfi->SetIntRule(&ir_i); }
+   MsRho_form->AddDomainIntegrator(msrho_blfi);
+   if (partial_assembly) { MsRho_form->SetAssemblyLevel(AssemblyLevel::PARTIAL); }
+   MsRho_form->Assemble();
+   MsRho_form->FormSystemMatrix(empty, MsRho);
+   
    // looks like this is the Laplacian for press eq
    Sp_form = new ParBilinearForm(pfes);
    //auto *sp_blfi = new DiffusionIntegrator;
    auto *sp_blfi = new DiffusionIntegrator(*invRho); // HERE breaks with amg
-   if (numerical_integ)
-   {
-      sp_blfi->SetIntRule(&ir_pi);
-   }
+   if (numerical_integ) { sp_blfi->SetIntRule(&ir_pi); }
    Sp_form->AddDomainIntegrator(sp_blfi);
-   if (partial_assembly_pressure)
-   {
-      Sp_form->SetAssemblyLevel(AssemblyLevel::PARTIAL);
-   }
+   if (partial_assembly_pressure) { Sp_form->SetAssemblyLevel(AssemblyLevel::PARTIAL); }
    Sp_form->Assemble();
-   Sp_form->FormSystemMatrix(pres_ess_tdof, Sp);
+   //? Sp_form->FormSystemMatrix(pres_ess_tdof, Sp);
+   Sp_form->FormSystemMatrix(empty, Sp);
    if (rank0) std::cout << "Pressure-poisson operator set" << endl;        
 
    // pressure boundary terms => patterning off existing stuff
@@ -621,7 +665,15 @@ void Flow::Setup(double dt)
    H_form->FormSystemMatrix(vel_ess_tdof, H);
    if (rank0) std::cout << "Velocity Helmholtz operator set" << endl;              
    
-   // boundary terms   
+   // boundary terms
+   /*
+   bufferFText = new ParGridFunction(vfes);
+   {
+     double *data = bufferFText->HostReadWrite();
+     for (int i = 0; i < Vdof; i++) { data[i] = 0.0; }
+   }
+   FText_gfcoeff = new VectorGridFunctionCoefficient(bufferFText);
+   */   
    FText_gfcoeff = new VectorGridFunctionCoefficient(&FText_gf);
    FText_bdr_form = new ParLinearForm(sfes);
    auto *ftext_bnlfi = new BoundaryNormalLFIntegrator(*FText_gfcoeff);
@@ -671,6 +723,27 @@ void Flow::Setup(double dt)
    MvInv->SetPrintLevel(pl_mvsolve);
    MvInv->SetRelTol(config->solver_tol);
    MvInv->SetMaxIter(config->solver_iter);
+
+   if (partial_assembly)
+   {
+      Vector diag_pa(sfes->GetTrueVSize());
+      Ms_form->AssembleDiagonal(diag_pa);
+      MsInvPC = new OperatorJacobiSmoother(diag_pa, empty);
+   }
+   else
+   {
+      MsInvPC = new HypreSmoother(*Ms.As<HypreParMatrix>());
+      dynamic_cast<HypreSmoother *>(MsInvPC)->SetType(HypreSmoother::Jacobi, 1);
+   }
+   MsInv = new CGSolver(sfes->GetComm());
+   MsInv->iterative_mode = false;
+   MsInv->SetOperator(*Ms);
+   MsInv->SetPreconditioner(*MsInvPC);
+   MsInv->SetPrintLevel(pl_mtsolve);
+   MsInv->SetRelTol(config->solver_tol);
+   MsInv->SetMaxIter(config->solver_iter);
+   //std::cout << "Check 26..." << std::endl;        
+
    
    /*
    if (partial_assembly_pressure) {
@@ -729,7 +802,7 @@ void Flow::Setup(double dt)
     SpInvPC = new HypreBoomerAMG(lor->GetAssembledMatrix());
     //SpInvPC->SetPrintLevel(pl_amg);
     SpInvPC->Mult(resp, pn);
-    SpInvOrthoPC = new OrthoSolver(vfes->GetComm());
+    SpInvOrthoPC = new OrthoSolver(pfes->GetComm());
     SpInvOrthoPC->SetSolver(*SpInvPC);
   } else {
     //SpInvPC = new HypreBoomerAMG(*Sp.As<HypreParMatrix>());
@@ -737,11 +810,11 @@ void Flow::Setup(double dt)
     SpInvPC = new HypreSmoother(*Sp.As<HypreParMatrix>());
     //dynamic_cast<HypreSmoother *>(SpInvPC)->SetType(HypreSmoother::Jacobi, 1);
     dynamic_cast<HypreSmoother *>(SpInvPC)->SetType(HypreSmoother::GS, 1);
-    SpInvOrthoPC = new OrthoSolver(vfes->GetComm());
+    SpInvOrthoPC = new OrthoSolver(pfes->GetComm());
     SpInvOrthoPC->SetSolver(*SpInvPC);
     //Jacobi, l1Jacobi, l1GS, l1GStr, lumpedJacobi, GS, OPFS, Chebyshev, Taubin, FIR    
   }
-  SpInv = new CGSolver(vfes->GetComm());
+  SpInv = new CGSolver(pfes->GetComm());
   //SpInv = new GMRESSolver(vfes->GetComm());
   //SpInv = new BiCGSTABSolver(vfes->GetComm());
   SpInv->iterative_mode = true;
@@ -753,9 +826,7 @@ void Flow::Setup(double dt)
   }
   SpInv->SetPrintLevel(pl_spsolve);
   SpInv->SetRelTol(config->solver_tol);
-  SpInv->SetMaxIter(2000);
-   
-   if (rank0) std::cout << "Inverse operators set" << endl;
+  SpInv->SetMaxIter(2000);  
    
    if (partial_assembly)
    {
@@ -778,6 +849,8 @@ void Flow::Setup(double dt)
    HInv->SetRelTol(config->solver_tol);
    HInv->SetMaxIter(config->solver_iter);
 
+   if (rank0) std::cout << "Inverse operators set" << endl;   
+   
    // If the initial condition was set, it has to be aligned with dependent
    // Vectors and GridFunctions
    
@@ -830,20 +903,24 @@ void Flow::UpdateTimestepHistory(double dt)
 }
 
 
-void Flow::flowStep(double &time, double dt, const int current_step, const int start_step, std::vector<double> ab, std::vector<double> bdf, bool provisional)
+void Flow::flowStep(double &time, double dt, const int current_step, const int start_step, std::vector<double> bdf) //, bool provisional)
 {
-
+  
+  //if(rank0) {std::cout << "wtf?" << endl;}
    Array<int> empty;
 
-   // update ab & bdf coeffs
-   ab1 = ab[0];
-   ab2 = ab[1];
-   ab3 = ab[2];  
+   // update bdf coeffs
    bd0 = bdf[0];
    bd1 = bdf[1];
    bd2 = bdf[2];
-   bd3 = bdf[3];  
+   bd3 = bdf[3];
+   //if(rank0) {std::cout << "time: " << time << " dt: " << dt << endl;}   
+   //if(rank0) {std::cout << "bdfs: " << bd0 << " " << bd1 << " " << bd2 << " " << bd3 << endl;}
 
+   // testing...
+   //Qt = 0.0;
+   //Qt_gf->SetFromTrueDofs(Qt);   
+   
    // update vectors from external data and gradients
    rn_gf->GetTrueDofs(rn);
    Qt_gf->GetTrueDofs(Qt);
@@ -854,14 +931,16 @@ void Flow::flowStep(double &time, double dt, const int current_step, const int s
    MvInv->Mult(tmpR1, gradMu);
    divU.Set(1.0, Qt);
    G->Mult(divU, tmpR1);     
-   MvInv->Mult(tmpR1, gradDivU);	   
+   MvInv->Mult(tmpR1, gradDivU);
+   //if(rank0) {std::cout << "update block okay" << endl;}   
    
    // update coefficients of operators
    {
      double *data = bufferRho->HostReadWrite();
      double *dataR = rn_gf->HostReadWrite();
      for (int i = 0; i < Sdof; i++) {     
-       data[i] = dataR[i]; 
+       data[i] = dataR[i];
+       //if(dataR[i]!=config->const_dens) {std::cout << "rho in flow: " << dataR[i] << " at dof: " << i << endl;}
      }
    }
    {
@@ -869,7 +948,7 @@ void Flow::flowStep(double &time, double dt, const int current_step, const int s
      R0PM1_gf.ProjectGridFunction(R0PM0_gf);
      double *data = bufferInvRho->HostReadWrite();
      double *dataR = R0PM1_gf.HostReadWrite();
-     for (int i = 0; i < Sdof; i++) {     
+     for (int i = 0; i < Pdof; i++) {     
        data[i] = 1.0 / dataR[i]; 
      }
    }
@@ -877,7 +956,8 @@ void Flow::flowStep(double &time, double dt, const int current_step, const int s
      double *data = bufferVisc->HostReadWrite();
      double *dataMu = visc_gf->HostReadWrite();
      for (int i = 0; i < Sdof; i++) {     
-       data[i] = dataMu[i]; 
+       data[i] = dataMu[i];
+       //if(dataMu[i]!=config->const_visc) {std::cout << "mu in flow: " << dataMu[i] << " at dof: " << i << endl; }
      }
    }   
    {
@@ -887,7 +967,7 @@ void Flow::flowStep(double &time, double dt, const int current_step, const int s
        data[i] = dataR[i] / dt; 
      }
    }
-
+   //if(rank0) {std::cout << "update coeff okay" << endl;}   
    
    // Set current time for velocity Dirichlet boundary conditions.
    for (auto &vel_dbc : vel_dbcs) {vel_dbc.coeff->SetTime(time + dt);}
@@ -896,6 +976,7 @@ void Flow::flowStep(double &time, double dt, const int current_step, const int s
    // zero rhs vectors
    fn = 0.0;   
    Fext = 0.0;
+   FText = 0.0;
    uns = 0.0;
    LdivImp = 0.0;
    Ldiv = 0.0;
@@ -909,7 +990,7 @@ void Flow::flowStep(double &time, double dt, const int current_step, const int s
    computeExplicitConvectionOP(0.0,true); // uses extrap nl div product
 
    // total unsteady contribution
-   computeExplicitUnsteadyBDF(); // ->uns   
+   computeExplicitUnsteadyBDF(dt); // ->uns   
 
    // implicit part of diff term (calculated explicitly) using elasticity op
    computeImplicitDiffusion(); // ->LdivImp (has rho via mu)
@@ -917,50 +998,76 @@ void Flow::flowStep(double &time, double dt, const int current_step, const int s
    // explicit part of diff term using elasticity op
    computeExplicitDiffusion(); // ->Ldiv (has rho via mu)
 
-   // sum contributions to rhs of p-p
+   //if(rank0) {std::cout << "rhs parts okay?" << endl;}   
+
+   // sum contributions to rhs of p-p, these do not have density
    FText.Set(1.0,fn);
    FText.Add(1.0,uns);
    FText.Add(1.0,Fext); // if rho not added to the integrator
-   tmpR1.Set(1.0,FText);
 
-   D->Mult(tmpR1,FText); // with 1/rho in p-p op
-   
+   //tmpR1.Set(1.0,FText);
+   //D->Mult(tmpR1,tmpR0); // with 1/rho in p-p op
+   //if(rank0) {std::cout << "div 1 okay" << endl;}
+
+   //tmpR1 = 0.0;
    tmpR1.Set(1.0,Ldiv);
    tmpR1.Add(1.0,LdivImp);
-   multScalarInvVectorIP(rn,&tmpR1); // with 1/rho in p-p op
-   D->Mult(tmpR1,tmpR1b);
-   FText.Add(1.0,tmpR1b);   
+   multScalarInvVectorIP(rn,&tmpR1); // with 1/rho in p-p op because viscous terms use mu
+   FText.Add(1.0,tmpR1);
+   D->Mult(FText,tmpR0);
+   //if(rank0) {std::cout << "div 2 okay" << endl;}   
 
    // neg necessary because of the negative from IBP on the Sp Laplacian operator
-   tmpR0.Set(-1.0,FText);
+   //tmpR1.Set(-1.0,FText);
+   tmpR0.Neg();
+   //if(rank0) {std::cout << "okay 2" << endl;}   
 
    // unsteady div term, (-) on rhs rho * gamma * Qt/dt (after div term)
    multConstScalar((bd0/dt),Qt,&tmpR0b);     
    Ms->Mult(tmpR0b, tmpR0c); // with 1/rho in p-p op
    tmpR0.Add(+1.0,tmpR0c); // because of the tmpR0.Neg()...
-
+   //if(rank0) {std::cout << "okay 3" << endl;}
+   
    // store old p
-   pnm1.Set(1.0,pn);   
+   pnm1.Set(1.0,pn);
+   //MPI_Barrier(MPI_COMM_WORLD);             
+   //if(rank0) {std::cout << "okay 4" << endl;}   
    
    // Add boundary terms.
+   /*
    FText_gf.SetFromTrueDofs(FText);
+   {
+     double *dFT = FText_gf.HostReadWrite();     
+     double *data = bufferFText->HostReadWrite();
+     for (int i = 0; i < Vdof; i++) { data[i] = dFT[i]; }
+   }
+   FText_bdr_form->Update();
+   */
+
    FText_bdr_form->Assemble();
    FText_bdr_form->ParallelAssemble(FText_bdr);
    tmpR0.Add(1.0, FText_bdr);
-   
+
    g_bdr_form->Assemble();
    g_bdr_form->ParallelAssemble(g_bdr);
    tmpR0.Add((-bd0/dt), g_bdr);
-      
+
+   // testing!!!
+   //tmpR0 = 0.0;   
+   
    // project rhs to p-space
    R0PM0_gf.SetFromTrueDofs(tmpR0);   
    R0PM1_gf.ProjectGridFunction(R0PM0_gf);
    R0PM1_gf.GetTrueDofs(resp);
+   //if(rank0) {std::cout << "okay 6" << endl;}
+
+   // testing!!!
+   //resp = 0.0;   
 
    Sp_form->Update();
    Sp_form->Assemble();
    Sp_form->FormSystemMatrix(pres_ess_tdof, Sp);
-   SpInv->SetOperator(*Sp);   
+   SpInv->SetOperator(*Sp);
 
    if (pres_dbcs.empty()) { Orthogonalize(resp); }   
    for (auto &pres_dbc : pres_dbcs) { pn_gf.ProjectBdrCoefficient(*pres_dbc.coeff, pres_dbc.attr); }
@@ -979,7 +1086,7 @@ void Flow::flowStep(double &time, double dt, const int current_step, const int s
 
    // actual implicit solve for p(n+1)
    sw_spsolve.Start(); 
-   SpInv->Mult(B1, X1);
+   SpInv->Mult(B1, X1); // uninitialised? how?
    sw_spsolve.Stop();
    iter_spsolve = SpInv->GetNumIterations();
    res_spsolve = SpInv->GetFinalNorm();
@@ -990,7 +1097,8 @@ void Flow::flowStep(double &time, double dt, const int current_step, const int s
    // ensured by the OrthoSolver wrapper for the preconditioner which removes
    // the nullspace after every application.
    if (pres_dbcs.empty()) { MeanZero(pn_gf); }
-   //if(rank0) {std::cout << "Pressure solve complete.." << endl;}
+   MPI_Barrier(vfes->GetComm());  
+   //if(rank0) {std::cout << "Pressure solve complete in " << iter_spsolve << " iters" << endl;}
    
    pn_gf.GetTrueDofs(pn);
    
@@ -1009,6 +1117,7 @@ void Flow::flowStep(double &time, double dt, const int current_step, const int s
    resu.Add(1.0,tmpR1b);
    Mv->Mult(Ldiv,tmpR1);
    resu.Add(1.0,tmpR1);
+   //if(rank0) {std::cout << "okay 7" << endl;}   
 
    // for c-n
    //Mv->Mult(LdivImp,tmpR1);
@@ -1048,6 +1157,9 @@ void Flow::flowStep(double &time, double dt, const int current_step, const int s
    res_hsolve = HInv->GetFinalNorm();
    H_form->RecoverFEMSolution(X2, resu_gf, un_next_gf);
    un_next_gf.GetTrueDofs(un_next);
+
+   MPI_Barrier(vfes->GetComm());  
+   //if(rank0) {std::cout << "Helmholtz solve complete in " << iter_hsolve << " iters" << endl;}
    
    // explicit filter
    if (loMach_opts->filterVel == true)
@@ -1067,11 +1179,11 @@ void Flow::flowStep(double &time, double dt, const int current_step, const int s
       
    // If the current time step is not provisional, accept the computed solution
    // and update the time step history by default.
-   if (!provisional)
-   {
+   //if (!provisional)
+   //{
       UpdateTimestepHistory(dt);
-      time += dt;
-   }   
+      //time += dt; leave this for the loMach UTH
+   //}   
   
    int iflag = 0;
    if (iter_spsolve == config->solver_iter ||
@@ -1365,9 +1477,9 @@ void Flow::computeImplicitDiffusion() {
     ComputeCurl2D(curlu_gf, curlcurlu_gf, true);
   } else {
     
-    //ComputeCurl3D(Lext_gf, curlu_gf);
+    ComputeCurl3D(Lext_gf, curlu_gf);
 
-    /**/
+    /*
     {
       double *dU = gradU.HostReadWrite();
       double *dV = gradV.HostReadWrite();
@@ -1392,7 +1504,7 @@ void Flow::computeImplicitDiffusion() {
       }        
     }
     curlu_gf.SetFromTrueDofs(tmpR1);
-    /**/
+    */
     
     ComputeCurl3D(curlu_gf, curlcurlu_gf);
     
@@ -1494,7 +1606,7 @@ void Flow::computeExplicitForcing() {
   
 }
 
-void Flow::computeExplicitUnsteady() {
+void Flow::computeExplicitUnsteady(double dt) {
 
    {
      const auto d_un = un.Read();
@@ -1506,7 +1618,7 @@ void Flow::computeExplicitUnsteady() {
    
 }
 
-void Flow::computeExplicitUnsteadyBDF() {
+void Flow::computeExplicitUnsteadyBDF(double dt) {
 
    // negative on bd's to move to rhs
    {
@@ -1522,6 +1634,11 @@ void Flow::computeExplicitUnsteadyBDF() {
          data[i] = bd1idt * d_un[i] 
                  + bd2idt * d_unm1[i]
                  + bd3idt * d_unm2[i];
+	 if(data[i]!=data[i]) {
+  	   std::cout << "dt: " << dt << endl;	   
+  	   std::cout << "bds: " << bd1idt << " " << bd2idt << " " << bd3idt << endl;
+  	   std::cout << "uns: " << d_un[i] << " " << d_unm1[i] << " " << d_unm2[i] << endl;
+	 }
       });
    }
    
@@ -1672,16 +1789,17 @@ void Flow::updateGradientsOP(double uStep) {
 
    // gradient of velocity
    {
+     
      double *dataU;
-     if (uStep == 0) {
+     if (uStep == 0.0) {
        dataU = un.HostReadWrite();
       } else if (uStep == 0.5) {
        dataU = u_half.HostReadWrite();
      } else {
        dataU = un_next.HostReadWrite();
      }
-     double *dBuffer = tmpR0.HostReadWrite();
      
+     double *dBuffer = tmpR0.HostReadWrite();     
      for (int i = 0; i < SdofInt; i++) { dBuffer[i] = dataU[i + 0*SdofInt]; }
      G->Mult(tmpR0, tmpR1);
      MvInv->Mult(tmpR1, gradU);     
@@ -1773,8 +1891,13 @@ void Flow::updateBC(int current_step) {
 
 }
 
-void Flow::extrapolateState(int current_step) {
-       
+void Flow::extrapolateState(int current_step, std::vector<double> ab) {
+
+   // update ab coeffs
+   ab1 = ab[0];
+   ab2 = ab[1];
+   ab3 = ab[2];  
+  
    // extrapolated velocity at {n+1}   
    {
       const auto d_un = un.Read();

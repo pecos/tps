@@ -1,8 +1,9 @@
 
 
+
 #include "turbModel.hpp"
-#include "thermoChem.hpp"
-#include "loMach.hpp"
+//#include "thermoChem.hpp"
+//#include "loMach.hpp"
 #include "loMach_options.hpp"
 #include "mfem/general/forall.hpp"
 #include "mfem/linalg/solvers.hpp"
@@ -24,26 +25,27 @@ TurbModel::TurbModel(mfem::ParMesh *pmesh_, RunConfiguration *config_, LoMachOpt
 
 
 void TurbModel::initialize() {
-
+  
     //groupsMPI = pmesh->GetComm(); 
     rank = pmesh->GetMyRank();
     //rank0 = pmesh->isWorldRoot();
+    rank0 = false;
     if(rank == 0) {rank0 = true;}
     dim = pmesh->Dimension();
     nvel = dim;
-  
-   bool verbose = rank0;
-   if (verbose) grvy_printf(ginfo, "Initializing TurbModel solver.\n");
 
-   if (loMach_opts->uOrder == -1) {
-     order = std::max(config->solOrder,1);
-     double no;
-     no = ceil( ((double)order * 1.5) );   
-     //norder = int(no);
-   } else {
-     order = loMach_opts->uOrder;
-     //norder = loMach_->loMach_opts_.nOrder;
-   }
+    bool verbose = rank0;
+    if (verbose) grvy_printf(ginfo, "Initializing TurbModel solver.\n");
+    
+    if (loMach_opts->uOrder == -1) {
+      order = std::max(config->solOrder,1);
+      double no;
+      no = ceil( ((double)order * 1.5) );   
+      //norder = int(no);
+    } else {
+      order = loMach_opts->uOrder;
+      //norder = loMach_->loMach_opts_.nOrder;
+    }
    
    MaxIters = config->GetNumIters();
    num_equation = 1; // hard code for now, fix with species
@@ -79,17 +81,21 @@ void TurbModel::initialize() {
 
    subgridViscSml.SetSize(sfes_truevsize);
    subgridVisc_gf.SetSpace(sfes);
-   delta.SetSize(sfes_truevsize);   
+   delta.SetSize(sfes_truevsize);
+
+   gradU.SetSize(vfes_truevsize);
+   gradV.SetSize(vfes_truevsize);
+   gradW.SetSize(vfes_truevsize);   
    
    if (verbose) grvy_printf(ginfo, "TurbModel vectors and gf initialized...\n");     
    
 }
 
-void TurbModel::initializeExternal(Vector *gradU_, Vector *gradV_, Vector *gradW_, ParGridFunction *delta_gf_) {
+void TurbModel::initializeExternal(ParGridFunction *gradU_gf_, ParGridFunction *gradV_gf_, ParGridFunction *gradW_gf_, ParGridFunction *delta_gf_) {
 
-  gradU = gradU_;
-  gradV = gradV_;
-  gradW = gradW_;
+  gradU_gf = gradU_gf_;
+  gradV_gf = gradV_gf_;
+  gradW_gf = gradW_gf_;
   delta_gf = delta_gf_;
   
 }
@@ -134,28 +140,35 @@ void TurbModel::Setup(double dt)
    
 }
 
-void TurbModel::turbModelStep(double &time, double dt, const int current_step, const int start_step, std::vector<double> ab, std::vector<double> bdf, bool provisional)
+void TurbModel::turbModelStep(double &time, double dt, const int current_step, const int start_step, std::vector<double> bdf, bool provisional)
 {
 
-   ab1 = ab[0];
-   ab2 = ab[1];
-   ab3 = ab[2];  
-
+  //ab1 = ab[0];
+  //ab2 = ab[1];
+  //ab3 = ab[2];  
    bd0 = bdf[0];
    bd1 = bdf[1];
    bd2 = bdf[2];
    bd3 = bdf[3];  
-  
+
+   // update vectors from external data and gradients
+   gradU_gf->GetTrueDofs(gradU);
+   gradV_gf->GetTrueDofs(gradV);
+   gradW_gf->GetTrueDofs(gradW);   
+   
+   // add selection for turbmodel here
+   
    // Set current time for scalar Dirichlet boundary conditions.
    //for (auto &temp_dbc : temp_dbcs) {temp_dbc.coeff->SetTime(time + dt);}   
 
    subgridViscSml = 0.0;
-   delta_gf->GetTrueDofs(delta);  
+   delta_gf->GetTrueDofs(delta);
+   
    if (config->sgsModelType > 0) {
      
-     double *dGradU = gradU->HostReadWrite();
-     double *dGradV = gradV->HostReadWrite();
-     double *dGradW = gradW->HostReadWrite(); 
+     double *dGradU = gradU.HostReadWrite();
+     double *dGradV = gradV.HostReadWrite();
+     double *dGradW = gradW.HostReadWrite(); 
      double *del = delta.HostReadWrite();
      double *data = subgridViscSml.HostReadWrite();
      
@@ -193,7 +206,7 @@ void TurbModel::turbModelStep(double &time, double dt, const int current_step, c
    }
    
    subgridVisc_gf.SetFromTrueDofs(subgridViscSml);          
-   bufferSubgridVisc->SetFromTrueDofs(subgridViscSml);     
+   //bufferSubgridVisc->SetFromTrueDofs(subgridViscSml);     
      
 }
 

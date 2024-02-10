@@ -43,7 +43,7 @@ private:
 
   //TPS::Tps *tpsP_;
   //LoMachSolver *loMach_;
-   LoMachOptions *loMach_opts;
+   LoMachOptions *loMach_opts = nullptr;
 
   //MPI_Groups *groupsMPI;
    int nprocs_;  // total number of MPI procs
@@ -51,7 +51,7 @@ private:
    bool rank0;  // flag to indicate rank 0
 
    // Run options
-   RunConfiguration *config;
+   RunConfiguration *config = nullptr;
   
    // All essential attributes.
    //Array<int> tke_ess_attr;
@@ -210,13 +210,18 @@ private:
    Vector resT, tmpR0a, tmpR0b, tmpR0c;
    */
 
-   Vector *gradU;
-   Vector *gradV;
-   Vector *gradW;
+   ParGridFunction *gradU_gf = nullptr;
+   ParGridFunction *gradV_gf = nullptr;
+   ParGridFunction *gradW_gf = nullptr;      
+   Vector gradU; 
+   Vector gradV;
+   Vector gradW;
+
+   ParGridFunction *delta_gf = nullptr;
+   Vector delta;
+  
    Vector subgridViscSml;
    ParGridFunction subgridVisc_gf;
-   ParGridFunction *delta_gf;
-   Vector delta;
 
    /*
    Vector gradT;
@@ -264,7 +269,7 @@ private:
    */
 
    // subgrid scale => move to turb model class
-   ParGridFunction *bufferSubgridVisc;
+   //ParGridFunction *bufferSubgridVisc;
   
   
 public:
@@ -272,16 +277,17 @@ public:
   virtual ~TurbModel() {}
 
    void initialize();
-   void initializeExternal(Vector *gradU, Vector *gradV, Vector *gradW, ParGridFunction *delta_gf_);  
+   void initializeExternal(ParGridFunction *gradU_gf_, ParGridFunction *gradV_gf_, ParGridFunction *gradW_gf_, ParGridFunction *delta_gf_);  
   
-   void turbModelStep(double &time, double dt, const int cur_step, const int start_step, std::vector<double> ab, std::vector<double> bdf, bool provisional = false);
+   void turbModelStep(double &time, double dt, const int cur_step, const int start_step, std::vector<double> bdf, bool provisional = false);
 
   //void updateGradientsOP(double tStep);  
   //void updateBC(int current_step);
    
   //void computeExplicitConvectionOP(bool extrap);      
   //void interpolateInlet();
-  //void uniformInlet();  
+  //void uniformInlet();
+  //std::vector<double> ab, 
   
    /// Initialize forms, solvers and preconditioners.
    void Setup(double dt);  

@@ -49,18 +49,18 @@ using ScalarFuncT = double(const Vector &x, double t);
  *
  */
 class LoMachSolver : public TPS::Solver {
-  friend class TurbModel;      
-  friend class ThermoChem;
-  friend class Flow;
+  //friend class TurbModel;      
+  //friend class ThermoChem;
+  //friend class Flow;
 protected:
   
    LoMachOptions loMach_opts_;
 
-   TurbModel  *turbClass;  
-   ThermoChem *tcClass;
-   Flow *flowClass;  
+   TurbModel  *turbClass = nullptr;  
+   ThermoChem *tcClass = nullptr;
+   Flow       *flowClass = nullptr; 
 
-   MPI_Groups *groupsMPI;
+   MPI_Groups *groupsMPI = nullptr;
    int nprocs_;  // total number of MPI procs
    int rank_;    // local MPI rank
    bool rank0_;  // flag to indicate rank 0
@@ -101,13 +101,13 @@ protected:
    int iter;
   
    // pointer to parent Tps class
-   TPS::Tps *tpsP_;
+   TPS::Tps *tpsP_ = nullptr;
 
-   mfem::ParMesh *pmesh_;
+   mfem::ParMesh *pmesh_ = nullptr;
    int dim_;
    int true_size_;
    Array<int> offsets_;
-
+  
    // min/max element size
    double hmin, hmax;
 
@@ -128,7 +128,7 @@ protected:
    int exit_status_;
 
    // mapping from local to global element index
-   int *locToGlobElem;
+   int *locToGlobElem = nullptr;
   
    // just keep these saved for ease
    int numWalls, numInlets, numOutlets;
@@ -148,6 +148,7 @@ protected:
 
    /// Eliminate essential BCs in an Operator and apply to RHS.
    // rename this to something sensible "ApplyEssentialBC" or something
+  /*
    void EliminateRHS(Operator &A,
                      ConstrainedOperator &constrainedA,
                      const Array<int> &ess_tdof_list,
@@ -156,6 +157,7 @@ protected:
                      Vector &X,
                      Vector &B,
                      int copy_interior = 0);
+  */
 
    /// Enable/disable debug output.
    bool debug = false;
@@ -282,31 +284,35 @@ protected:
    Radiation *radiation_ = NULL;
 
    /// Distance to nearest no-slip wall
-   ParGridFunction *distance_;
+   ParGridFunction *distance_ = nullptr;
   
    // to interface with existing code
-   ParGridFunction *U;
-   ParGridFunction *Up;  
+   ParGridFunction *U = nullptr;
+   ParGridFunction *Up = nullptr;
 
    // The solution u has components {density, x-momentum, y-momentum, energy}.
    // These are stored contiguously in the BlockVector u_block.
-   Array<int> *offsets;
-   BlockVector *u_block;
-   BlockVector *up_block;
+   Array<int> *offsets = nullptr;
+   BlockVector *u_block = nullptr;
+   BlockVector *up_block = nullptr;
 
    // paraview collection pointer
    ParaViewDataCollection *paraviewColl = NULL;
    // DataCollection *visitColl = NULL;
 
    // Visualization functions (these are pointers to Up)
-   ParGridFunction *temperature, *dens, *vel, *vtheta, *passiveScalar;
-   ParGridFunction *electron_temp_field;
-   ParGridFunction *press;
+   ParGridFunction *temperature = nullptr;
+   ParGridFunction *dens = nullptr;
+   ParGridFunction *vel = nullptr;
+   ParGridFunction *vtheta = nullptr;
+   ParGridFunction *passiveScalar = nullptr;
+   ParGridFunction *electron_temp_field = nullptr;
+   ParGridFunction *press = nullptr;
    std::vector<ParGridFunction *> visualizationVariables_;
    std::vector<std::string> visualizationNames_;
    AuxiliaryVisualizationIndexes visualizationIndexes_;
-   ParGridFunction *plasma_conductivity_;
-   ParGridFunction *joule_heating_;
+   ParGridFunction *plasma_conductivity_ = nullptr;
+   ParGridFunction *joule_heating_ = nullptr;
 
    // I/O organizer
    IODataOrganizer ioData;
@@ -323,15 +329,17 @@ protected:
    //ParGridFunction *bufferSubgridVisc;
 
    // for plotting
+   //ParGridFunction viscTotal_gf;
+   //ParGridFunction alphaTotal_gf;      
    ParGridFunction resolution_gf;
 
-  // grid information
-   ParGridFunction *bufferGridScale;
-   ParGridFunction *bufferGridScaleX;
-   ParGridFunction *bufferGridScaleY;
-   ParGridFunction *bufferGridScaleZ;    
+   // grid information
+   ParGridFunction *bufferGridScale = nullptr;
+   ParGridFunction *bufferGridScaleX = nullptr;
+   ParGridFunction *bufferGridScaleY = nullptr;
+   ParGridFunction *bufferGridScaleZ = nullptr;
 
-   ParGridFunction *bufferMeanUp;
+   ParGridFunction *bufferMeanUp = nullptr;
   
    bool channelTest;
   

@@ -117,7 +117,7 @@ private:
 
   //TPS::Tps *tpsP_;
   //LoMachSolver *loMach_;
-   LoMachOptions *loMach_opts;
+   LoMachOptions *loMach_opts = nullptr;
 
   //MPI_Groups *groupsMPI;
    int nprocs_;  // total number of MPI procs
@@ -125,7 +125,7 @@ private:
    bool rank0;  // flag to indicate rank 0
 
    // Run options
-   RunConfiguration *config;
+   RunConfiguration *config = nullptr;
   
    // All essential attributes.
    Array<int> vel_ess_attr;
@@ -156,7 +156,7 @@ private:
 
    /// Enable/disable partial assembly of forms.
    bool partial_assembly = false;
-   bool partial_assembly_pressure = true;  
+   bool partial_assembly_pressure = false;  
 
    /// Enable/disable numerical integration rules of forms.
    //bool numerical_integ = false;
@@ -224,7 +224,9 @@ private:
    // operators  
    ParNonlinearForm *N = nullptr;
    ParBilinearForm *Mv_form = nullptr;
-   ParBilinearForm *MvRho_form = nullptr;  
+   ParBilinearForm *MvRho_form = nullptr;
+   ParBilinearForm *Ms_form = nullptr;
+   ParBilinearForm *MsRho_form = nullptr;  
    ParBilinearForm *Sp_form = nullptr;
    ParMixedBilinearForm *D_form = nullptr;
    ParMixedBilinearForm *DRho_form = nullptr;  
@@ -252,27 +254,28 @@ private:
    ConstantCoefficient H_lincoeff;
    ConstantCoefficient H_bdfcoeff;
 
-   VectorConstantCoefficient *buffer_ubc;
-   VectorConstantCoefficient *buffer_accel;  
-   VectorConstantCoefficient *wall_ubc;
-   VectorConstantCoefficient *bufferInlet_ubc;  
-   ConstantCoefficient *bufferInlet_tbc;
-   ConstantCoefficient *bufferInlet_pbc;
-   ConstantCoefficient *bufferOutlet_pbc;      
+   VectorConstantCoefficient *buffer_ubc = nullptr;
+   VectorConstantCoefficient *buffer_accel = nullptr;
+   VectorConstantCoefficient *wall_ubc = nullptr;
+   VectorConstantCoefficient *bufferInlet_ubc = nullptr;
+   ConstantCoefficient *bufferInlet_tbc = nullptr;
+   ConstantCoefficient *bufferInlet_pbc = nullptr;
+   ConstantCoefficient *bufferOutlet_pbc = nullptr;      
 
-   ParGridFunction *bufferPM0;      
-   ParGridFunction *bufferPM1;
-   GridFunctionCoefficient *viscField;
-   GridFunctionCoefficient *bulkViscField;  
-   GridFunctionCoefficient *rhoDtField;
-   GridFunctionCoefficient *invRho;
-   GridFunctionCoefficient *Rho;  
+   ParGridFunction *bufferPM0 = nullptr;
+   ParGridFunction *bufferPM1 = nullptr;
+   GridFunctionCoefficient *viscField = nullptr;
+   GridFunctionCoefficient *bulkViscField = nullptr;
+   GridFunctionCoefficient *rhoDtField = nullptr;
+   GridFunctionCoefficient *invRho = nullptr;
+   GridFunctionCoefficient *Rho = nullptr;
+   //VectorGridFunctionCoefficient *FText_gfcoeff;    
 
-   ParGridFunction *buffer_uInlet;
-   ParGridFunction *buffer_uInletInf;
-   ParGridFunction *buffer_pInlet;  
-   VectorGridFunctionCoefficient *uInletField;
-   GridFunctionCoefficient *pInletField;
+   ParGridFunction *buffer_uInlet = nullptr;
+   ParGridFunction *buffer_uInletInf = nullptr;
+   ParGridFunction *buffer_pInlet = nullptr;
+   VectorGridFunctionCoefficient *uInletField = nullptr;
+   GridFunctionCoefficient *pInletField = nullptr;
 
    OperatorHandle Mv;
    OperatorHandle MvRho;  
@@ -287,6 +290,8 @@ private:
    OperatorHandle Mq;  
    OperatorHandle Ds;  
 
+   mfem::Solver *MsInvPC = nullptr;
+   mfem::CGSolver *MsInv = nullptr;  
    mfem::Solver *MvInvPC = nullptr;
    mfem::CGSolver *MvInv = nullptr;  
    mfem::Solver *HInvPC = nullptr;
@@ -321,7 +326,7 @@ private:
    Vector bufferR0sml, bufferR1sml;
    Vector pn, pnm1, deltaP, resp, FText_bdr, g_bdr;
    Vector tmpR0PM1;
-   Vector pnBig;
+   //Vector pnBig;
    Vector gridScale;
    Vector tmpR0, tmpR0a, tmpR0b, tmpR0c;
    Vector Pext_bdr, p_bdr;
@@ -337,23 +342,24 @@ private:
 
    ParGridFunction gradU_gf, gradV_gf, gradW_gf;  
     
-   ParGridFunction *bufferInvRho;  
-   ParGridFunction *bufferVisc;
-   ParGridFunction *bufferBulkVisc;
-   ParGridFunction *bufferRho;
-   ParGridFunction *bufferRhoDt;  
+   ParGridFunction *bufferInvRho = nullptr;
+   ParGridFunction *bufferVisc = nullptr;
+   ParGridFunction *bufferBulkVisc = nullptr;
+   ParGridFunction *bufferRho = nullptr;
+   ParGridFunction *bufferRhoDt = nullptr;
+   ParGridFunction *bufferFText = nullptr;
 
-   ParGridFunction *buffer_vInlet;
-   ParGridFunction *buffer_vInletInf;
-   GridFunctionCoefficient *vInletField;
+   ParGridFunction *buffer_vInlet = nullptr;
+   ParGridFunction *buffer_vInletInf = nullptr;
+   GridFunctionCoefficient *vInletField = nullptr;
   
    // space varying viscosity multiplier  
-   ParGridFunction *bufferViscMult;  
+   //ParGridFunction *bufferViscMult;  
 
    // pointers to externals
-   ParGridFunction *visc_gf;
-   ParGridFunction *rn_gf;
-   ParGridFunction *Qt_gf;
+   ParGridFunction *visc_gf = nullptr;
+   ParGridFunction *rn_gf = nullptr;
+   ParGridFunction *Qt_gf = nullptr;
 
    // internals of external gf
    Vector rn, visc, Qt;  
@@ -363,6 +369,7 @@ private:
    int pl_spsolve = 0;
    int pl_hsolve = 0;
    int pl_amg = 0;
+   int pl_mtsolve = 0;    
 
    // Relative tolerances.
    double rtol_spsolve = 1e-12;
@@ -407,17 +414,17 @@ public:
 
    void initialize();
 
-  void initializeExternal(ParGridFunction *visc_gf_, ParGridFunction *rn_gf_, ParGridFunction *Qt_gf_, int nWalls, int nInlets, int nOutlets);
+   void initializeExternal(ParGridFunction *visc_gf_, ParGridFunction *rn_gf_, ParGridFunction *Qt_gf_, int nWalls, int nInlets, int nOutlets);
   
-   void flowStep(double &time, double dt, const int cur_step, const int start_step, std::vector<double> ab, std::vector<double> bdf, bool provisional = false);
+   void flowStep(double &time, double dt, const int cur_step, const int start_step, std::vector<double> bdf); //, bool provisional = false);
 
-   void extrapolateState(int current_step);
+   void extrapolateState(int current_step, std::vector<double> ab);
    void updateGradients(double tStep);
    void updateGradientsOP(double tStep);  
    void updateBC(int current_step);   
    void computeExplicitForcing();
-   void computeExplicitUnsteady();
-   void computeExplicitUnsteadyBDF();    
+   void computeExplicitUnsteady(double dt);
+   void computeExplicitUnsteadyBDF(double dt);    
    void computeExplicitConvection(double uStep);
    void computeExplicitConvectionOP(double uStep, bool extrap);
    void computeExplicitDiffusion();

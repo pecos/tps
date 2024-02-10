@@ -1,8 +1,7 @@
 
-
-#include "turbModel.hpp"
+//#include "turbModel.hpp"
 #include "thermoChem.hpp"
-#include "loMach.hpp"
+//#include "loMach.hpp"
 #include "loMach_options.hpp"
 #include "mfem/general/forall.hpp"
 #include "mfem/linalg/solvers.hpp"
@@ -68,6 +67,7 @@ void ThermoChem::initialize() {
     //groupsMPI = pmesh->GetComm(); 
     rank = pmesh->GetMyRank();
     //rank0 = pmesh->isWorldRoot();
+    rank0 = false;
     if(rank == 0) {rank0 = true;}
     dim = pmesh->Dimension();
     nvel = dim;
@@ -84,16 +84,18 @@ void ThermoChem::initialize() {
 
    if (loMach_opts->uOrder == -1) {
      order = std::max(config->solOrder,1);
+     porder = order;     
      double no;
      no = ceil( ((double)order * 1.5) );   
-     //norder = int(no);
+     norder = int(no);
    } else {
      order = loMach_opts->uOrder;
-     //norder = loMach_->loMach_opts_.nOrder;
+     porder = loMach_opts->pOrder;
+     norder = loMach_opts->nOrder;
    }
    
    static_rho = config->const_dens;
-   kin_vis = config->const_visc;
+   dyn_vis = config->const_visc;
    ambientPressure = config->amb_pres;
    thermoPressure = config->amb_pres;
    tPm1 = thermoPressure;
@@ -137,6 +139,12 @@ void ThermoChem::initialize() {
    // vector
    vfec = new H1_FECollection(order, dim);
    vfes = new ParFiniteElementSpace(pmesh, vfec, dim);
+
+   // pressure
+   pfec = new H1_FECollection(porder);
+   //pfec = new L2_FECollection(porder,dim);   
+   pfes = new ParFiniteElementSpace(pmesh, pfec);
+
    
    // dealias nonlinear term 
    //nfec = new H1_FECollection(norder, dim);   
@@ -173,7 +181,7 @@ void ThermoChem::initialize() {
    
    Qt.SetSize(sfes_truevsize);
    Qt = 0.0;
-   Qt_gf.SetSpace(sfes);   
+   Qt_gf.SetSpace(sfes);   // why is this an unitialized???
    
    Tn.SetSize(sfes_truevsize);
    Tn = 298.0; // fix hardcode, shouldnt matter
@@ -222,6 +230,11 @@ void ThermoChem::initialize() {
    rn_gf.SetSpace(sfes);
    rn_gf = 1.0;
 
+   viscSml.SetSize(sfes_truevsize);
+   viscSml = 1.0e-12;
+   viscMultSml.SetSize(sfes_truevsize);
+   viscMultSml = 1.0;
+   
    alphaSml.SetSize(sfes_truevsize);
    alphaSml = 1.0e-12;      
    alphaTotal_gf.SetSpace(sfes);
@@ -230,14 +243,18 @@ void ThermoChem::initialize() {
    subgridViscSml.SetSize(sfes_truevsize);
    subgridViscSml = 1.0e-15;
 
+   viscTotal_gf.SetSpace(sfes);
+   viscTotal_gf = 0.0;
+   
    tmpR0.SetSize(sfes_truevsize);
+   tmpR0a.SetSize(sfes_truevsize);
+   tmpR0b.SetSize(sfes_truevsize);
+   tmpR0c.SetSize(sfes_truevsize);   
    tmpR1.SetSize(vfes_truevsize);
    R0PM0_gf.SetSpace(sfes);
-   //R0PM1_gf.SetSpace(pfes);   
+   R0PM1_gf.SetSpace(pfes);   
    
    if (verbose) grvy_printf(ginfo, "ThermpChem vectors and gf initialized...\n");     
-
-   // setup pointers to loMach owned temp data blocks
    
 }
 
@@ -262,10 +279,12 @@ void ThermoChem::Setup(double dt)
    //if (verbose) grvy_printf(ginfo, "in Setup...\n");
 
    Sdof = sfes->GetNDofs();
+   Pdof = pfes->GetNDofs();   
    //Ndof = nfes->GetNDofs();
    //NdofR0 = nfesR0->GetNDofs();         
    
    SdofInt = sfes->GetTrueVSize();
+   PdofInt = pfes->GetTrueVSize();   
    //NdofInt = nfes->GetTrueVSize();
    //NdofR0Int = nfesR0->GetTrueVSize();
 
@@ -291,6 +310,10 @@ void ThermoChem::Setup(double dt)
      if(rank0) { std::cout << "Initial temperature set from input file: " << config->initRhoRhoVp[4] << endl;}
    }
    Tn_gf.GetTrueDofs(Tn);
+   Tnm1_gf.SetFromTrueDofs(Tn);
+   Tnm2_gf.SetFromTrueDofs(Tn);
+   Tnm1_gf.GetTrueDofs(Tnm1);
+   Tnm2_gf.GetTrueDofs(Tnm2);         
    //std::cout << "Check 2..." << std::endl;
    
 
@@ -489,6 +512,20 @@ void ThermoChem::Setup(double dt)
    }
    invRho = new GridFunctionCoefficient(bufferInvRho);
 
+   bufferRhoDt = new ParGridFunction(sfes);
+   {
+     double *data = bufferRhoDt->HostReadWrite();
+     for (int i = 0; i < Sdof; i++) { data[i] = 0.0; }
+   }   
+   {
+     double *data = bufferRhoDt->HostReadWrite();
+     double *Rdata = rn_gf.HostReadWrite();
+     for (int i = 0; i < Sdof; i++) {
+       data[i] = Rdata[i] / dt;
+     }
+   }
+   rhoDtField = new GridFunctionCoefficient(bufferRhoDt);   
+   
    // viscosity field 
    bufferVisc = new ParGridFunction(sfes);
    {
@@ -530,7 +567,9 @@ void ThermoChem::Setup(double dt)
      }
    }   
    alphaField = new GridFunctionCoefficient(bufferAlpha);
-   //std::cout << "Check 22..." << std::endl;        
+   //std::cout << "Check 22..." << std::endl;
+
+   
 
    //thermal_diff_coeff.constant = thermal_diff;
    thermal_diff_coeff = new GridFunctionCoefficient(&alphaTotal_gf);   
@@ -552,7 +591,7 @@ void ThermoChem::Setup(double dt)
    }
    G_form->Assemble();
    G_form->FormRectangularSystemMatrix(empty, empty, G);
-   if (rank0) std::cout << "Gradient operator set" << endl;           
+   if (rank0) std::cout << "ThermoChem gradient operator set" << endl;           
 
    // mass matrix for vector
    Mv_form = new ParBilinearForm(vfes);
@@ -561,7 +600,7 @@ void ThermoChem::Setup(double dt)
    Mv_form->AddDomainIntegrator(mv_blfi);
    if (partial_assembly) { Mv_form->SetAssemblyLevel(AssemblyLevel::PARTIAL); }
    Mv_form->Assemble();
-   Mv_form->FormSystemMatrix(empty, Mv);   
+   Mv_form->FormSystemMatrix(empty, Mv);
    
    // Convection: Atemperature(i,j) = \int_{\Omega} \phi_i \rho u \cdot \nabla \phi_j
    //un_next_coeff = new VectorGridFunctionCoefficient(&un_next_gf);
@@ -580,6 +619,7 @@ void ThermoChem::Setup(double dt)
    }
    At_form->Assemble();
    At_form->FormSystemMatrix(empty, At);
+   if (rank0) std::cout << "ThermoChem At operator set" << endl;      
       
    // mass matrix
    Ms_form = new ParBilinearForm(sfes);
@@ -600,11 +640,12 @@ void ThermoChem::Setup(double dt)
    if (partial_assembly) { MsRho_form->SetAssemblyLevel(AssemblyLevel::PARTIAL); }
    MsRho_form->Assemble();
    MsRho_form->FormSystemMatrix(empty, MsRho);
+   if (rank0) std::cout << "ThermoChem MsRho operator set" << endl;
    
    // temperature laplacian   
    Lt_form = new ParBilinearForm(sfes);
    //auto *lt_blfi = new DiffusionIntegrator;
-   //Lt_coeff.constant = -1.0;   
+   Lt_coeff.constant = -1.0;   
    auto *lt_blfi = new DiffusionIntegrator(Lt_coeff);
    if (numerical_integ)
    {
@@ -617,6 +658,7 @@ void ThermoChem::Setup(double dt)
    }
    Lt_form->Assemble();
    Lt_form->FormSystemMatrix(empty, Lt);
+   if (rank0) std::cout << "ThermoChem Lt operator set" << endl;     
    
    // boundary terms
    /*
@@ -656,7 +698,8 @@ void ThermoChem::Setup(double dt)
    }
    Ht_form->Assemble();
    Ht_form->FormSystemMatrix(temp_ess_tdof, Ht);
-   //std::cout << "Check 24..." << std::endl;        
+   //std::cout << "Check 24..." << std::endl;
+   if (rank0) std::cout << "ThermoChem Ht operator set" << endl;    
    
    // temp boundary terms   
    Text_gfcoeff = new GridFunctionCoefficient(&Text_gf);
@@ -693,6 +736,7 @@ void ThermoChem::Setup(double dt)
    MvInv->SetPrintLevel(pl_mvsolve);
    MvInv->SetRelTol(config->solver_tol);
    MvInv->SetMaxIter(config->solver_iter);
+   if (rank0) std::cout << "ThermoChem MvInv operator set" << endl;   
    
    if (partial_assembly)
    {
@@ -745,6 +789,8 @@ void ThermoChem::Setup(double dt)
    if (partial_assembly) { Mq_form->SetAssemblyLevel(AssemblyLevel::PARTIAL); }
    Mq_form->Assemble();
    Mq_form->FormSystemMatrix(Qt_ess_tdof, Mq);
+   //Mq_form->FormSystemMatrix(empty, Mq);
+   if (rank0) std::cout << "ThermoChem Mq operator set" << endl;   
 
    if (partial_assembly)
    {
@@ -783,7 +829,7 @@ void ThermoChem::Setup(double dt)
      lq_bdry_lfi->SetIntRule(&ir_di);
    }
    LQ_bdry->AddBoundaryIntegrator(lq_bdry_lfi, temp_ess_attr);
-
+   if (rank0) std::cout << "ThermoChem LQ operator set" << endl;
    
    // remaining initialization
    if (config->resetTemp == true) {
@@ -863,13 +909,10 @@ void ThermoChem::UpdateTimestepHistory(double dt)
 }
 
 
-void ThermoChem::thermoChemStep(double &time, double dt, const int current_step, const int start_step, std::vector<double> ab, std::vector<double> bdf, bool provisional)
+void ThermoChem::thermoChemStep(double &time, double dt, const int current_step, const int start_step, std::vector<double> bdf, bool provisional)
 {
 
-  ab1 = ab[0];
-  ab2 = ab[1];
-  ab3 = ab[2];  
-
+  // update bdf coefficients
   bd0 = bdf[0];
   bd1 = bdf[1];
   bd2 = bdf[2];
@@ -991,6 +1034,8 @@ void ThermoChem::thermoChemStep(double &time, double dt, const int current_step,
    updateDensity(1.0);	   
    //computeQt();
    computeQtTO();   
+
+   UpdateTimestepHistory(dt);
    
 }
 
@@ -1051,10 +1096,14 @@ void ThermoChem::updateBC(int current_step) {
 
 }
 
-void ThermoChem::extrapolateState(int current_step) {
-   
+void ThermoChem::extrapolateState(int current_step, std::vector<double> ab) {
+
+   // update ab coefficients
+   ab1 = ab[0];
+   ab2 = ab[1];
+   ab3 = ab[2];  
+  
    // extrapolated temp at {n+1}
-  /*
    {
       const auto d_Tn = Tn.Read();
       const auto d_Tnm1 = Tnm1.Read();
@@ -1065,13 +1114,14 @@ void ThermoChem::extrapolateState(int current_step) {
       const auto ab3_ = ab3;      
       MFEM_FORALL(i, Text.Size(),	
       {
-	d_Text[i] = ab1_*d_Tn[i] + ab2_*d_Tnm1[i] + ab3_*d_Tnm2[i];
+	d_Text[i] = ab1_*d_Tn[i]
+	          + ab2_*d_Tnm1[i]
+	          + ab3_*d_Tnm2[i];
       });
    }
-  */
-   Text.Set(ab1,Tn);
-   Text.Add(ab2,Tnm1);
-   Text.Add(ab3,Tnm2);   
+  //Text.Set(ab1,Tn);
+  //Text.Add(ab2,Tnm1);
+  //Text.Add(ab3,Tnm2);   
    
    // store ext in _next containers, remove Text, Uext completely later
    Tn_next_gf.SetFromTrueDofs(Text);
@@ -1251,6 +1301,7 @@ void ThermoChem::updateDiffusivity() {
      double *Rdata = rn_gf.HostReadWrite();          
      for (int i = 0; i < Sdof; i++) { dataVisc[i] += Rdata[i] * dataSubgrid[i]; }     
    }
+   
    if (config->linViscData.isEnabled) {
      double *viscMult = bufferViscMult->HostReadWrite();
      double *dataVisc = bufferVisc->HostReadWrite();
@@ -1300,7 +1351,7 @@ void ThermoChem::updateDensity(double tStep) {
   
    // set rn
    if (constantDensity != true) {
-     if(tStep == 1) {
+     if(tStep == 1.0) {
        multConstScalarInv((thermoPressure/Rgas), Tn_next, &rn);
      } else if(tStep == 0.5) {
        multConstScalarInv((thermoPressure/Rgas), Tn_next, &tmpR0a);
@@ -1314,12 +1365,13 @@ void ThermoChem::updateDensity(double tStep) {
      } else {
        multConstScalarInv((thermoPressure/Rgas), Tn, &rn);       
      }
-   }
-   else {
+   
+   } else {
      double *data = rn.HostWrite();        
      for (int i = 0; i < SdofInt; i++) { data[i] = static_rho; }
    }
    rn_gf.SetFromTrueDofs(rn);
+   //if(rank0) {std::cout << "okay 1..." << endl;}
 
    {
      double *data = bufferRho->HostReadWrite();
@@ -1328,15 +1380,17 @@ void ThermoChem::updateDensity(double tStep) {
    }    
    MsRho_form->Update();
    MsRho_form->Assemble();
-   MsRho_form->FormSystemMatrix(empty, MsRho);   
+   MsRho_form->FormSystemMatrix(empty, MsRho);
+   //if(rank0) {std::cout << "okay 2..." << endl;}   
 
    R0PM0_gf.SetFromTrueDofs(rn);   
    R0PM1_gf.ProjectGridFunction(R0PM0_gf);
    {
      double *data = bufferInvRho->HostReadWrite();
      double *rho = R0PM1_gf.HostReadWrite();     
-     for (int i = 0; i < Sdof; i++) { data[i] = 1.0/rho[i]; }
-   }    
+     for (int i = 0; i < Pdof; i++) { data[i] = 1.0/rho[i]; }
+   }
+   //if(rank0) {std::cout << "okay 3..." << endl;}   
    
    // density gradient
    //G->Mult(rn, tmpR1);     
@@ -1933,6 +1987,41 @@ void ThermoChem::AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr)
 }
 
 
+/*
+void ThermoChem::computeQt() {  
+
+  if (incompressibleSolve == true) {
+    Qt = 0.0;
+    
+  } else {
+     
+     // laplace(T)
+     double TdivFactor = 0.0;
+     if (loMach_opts_.thermalDiv == true) {
+       Lt->Mult(Tn_next,tmpR0);
+       MsInv->Mult(tmpR0, Qt);       
+     }
+
+     //multScalarScalar(rn,viscSml,&tmpR0);
+     multScalarScalarIP(viscSml,&Qt);
+     double tmp = Rgas / (Pr * thermoPressure);
+     multConstScalarIP(tmp,&Qt);
+     
+     // add closed-domain pressure term
+     if (config.isOpen != true) {
+       double *data = Qt.HostReadWrite();     
+       for (int i = 0; i < SdofInt; i++) {
+         data[i] += ((gamma - 1.0)/gamma - Cp) * 1.0 / (Cp*thermoPressure) * dtP;
+       }       
+     }     
+      
+   }
+
+   Qt_gf.SetFromTrueDofs(Qt);  
+    
+}
+*/
+
 void ThermoChem::computeQtTO() {  
 
     Array<int> empty;    
@@ -1951,7 +2040,7 @@ void ThermoChem::computeQtTO() {
       LQ_form->Update();
       LQ_form->Assemble();
       LQ_form->FormSystemMatrix(empty, LQ);      
-      LQ->AddMult(Tn_next, tmpR0);
+      LQ->AddMult(Tn_next, tmpR0); // tmpR0 += LQ{Tn_next}
       MqInv->Mult(tmpR0, Qt);
 
       Qt *= -Rgas / thermoPressure;
@@ -1980,6 +2069,8 @@ void ThermoChem::computeQtTO() {
     G->Mult(divU, tmpR1);     
     MvInv->Mult(tmpR1, gradDivU);
     */
+
+    Qt_gf.SetFromTrueDofs(Qt);
     
 }
 
