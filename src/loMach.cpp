@@ -56,12 +56,12 @@ using namespace mfem::common;
 void CopyDBFIntegrators(ParBilinearForm *src, ParBilinearForm *dst);
 
 LoMachSolver::LoMachSolver(LoMachOptions loMach_opts, TPS::Tps *tps)
-    : groupsMPI(new MPI_Groups(tps->getTPSCommWorld())),
+    : tpsP_(tps),
+      loMach_opts_(loMach_opts),
+      groupsMPI(new MPI_Groups(tps->getTPSCommWorld())),
       nprocs_(groupsMPI->getTPSWorldSize()),
       rank_(groupsMPI->getTPSWorldRank()),
-      rank0_(groupsMPI->isWorldRoot()),
-      tpsP_(tps),
-      loMach_opts_(loMach_opts) {
+      rank0_(groupsMPI->isWorldRoot()) {
   pmesh = NULL;
 
   // is this needed?
@@ -230,30 +230,12 @@ void LoMachSolver::initialize() {
   sfec = new H1_FECollection(order);
   sfes = new ParFiniteElementSpace(pmesh, sfec);
 
-  // pressure
-  pfec = new H1_FECollection(porder);
-  // pfec = new L2_FECollection(porder,dim);
-  pfes = new ParFiniteElementSpace(pmesh, pfec);
-
-  // dealias nonlinear term
-  nfec = new H1_FECollection(norder, dim);
-  nfes = new ParFiniteElementSpace(pmesh, nfec, dim);
-  nfecR0 = new H1_FECollection(norder);
-  nfesR0 = new ParFiniteElementSpace(pmesh, nfecR0);
-
   // full vector for compatability
   fvfes = new ParFiniteElementSpace(pmesh, vfec, num_equation);  //, Ordering::byNODES);
   fvfes2 = new ParFiniteElementSpace(pmesh, sfec, num_equation);
-
-  // testing...
-  // HCurlFESpace = new ND_ParFESpace(pmesh,order,pmesh->Dimension());
   if (verbose) grvy_printf(ginfo, "Spaces constructed...\n");
 
-  int vfes_truevsize = vfes->GetTrueVSize();
-  int pfes_truevsize = pfes->GetTrueVSize();
   int sfes_truevsize = sfes->GetTrueVSize();
-  int nfes_truevsize = nfes->GetTrueVSize();
-  int nfesR0_truevsize = nfesR0->GetTrueVSize();
   if (verbose) grvy_printf(ginfo, "Got sizes...\n");
 
   cur_step = 0;
@@ -367,7 +349,6 @@ void LoMachSolver::initialize() {
     Array<int> vdofs;
     Vector vals;
     Vector loc_data;
-    int vdim = sfes->GetVDim();
     int nSize = bufferGridScale->Size();
     Array<int> zones_per_vdof;
     zones_per_vdof.SetSize(sfes->GetVSize());
@@ -377,7 +358,6 @@ void LoMachSolver::initialize() {
     zones_per_vdofALL = 0;
 
     double *data = bufferGridScale->HostReadWrite();
-    double *dataTMP = bufferGridScaleX->HostReadWrite();
     double *count = dofCount.HostReadWrite();
 
     for (int i = 0; i < sfes->GetNDofs(); i++) {
@@ -392,7 +372,7 @@ void LoMachSolver::initialize() {
       ElementTransformation *tr = sfes->GetElementTransformation(e);
       const FiniteElement *el = sfes->GetFE(e);
       elndofs = el->GetDof();
-      double delta, d1;
+      double delta;
 
       // element dof
       for (int dof = 0; dof < elndofs; ++dof) {
@@ -419,13 +399,10 @@ void LoMachSolver::initialize() {
     GroupCommunicator &gcomm = bufferGridScale->ParFESpace()->GroupComm();
     gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
     gcomm.Bcast(zones_per_vdof);
-    // MPI_Allreduce(&zones_per_vdof, &zones_per_vdofALL, sfes->GetVSize(), MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 
     // Accumulate for all vdofs.
     gcomm.Reduce<double>(bufferGridScale->GetData(), GroupCommunicator::Sum);
     gcomm.Bcast<double>(bufferGridScale->GetData());
-    // for (int i = 0; i < nSize; i++) { dataTMP[i] = data[i]; }
-    // MPI_Allreduce(&bufferGridScaleX, &bufferGridScale, sfes->GetVSize(), MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
     // Compute means.
     for (int i = 0; i < nSize; i++) {
@@ -550,15 +527,8 @@ void LoMachSolver::solve() {
     dt = std::min(config.dt_initial, dt);
   }
 
-  double Umax_lcl = 1.0e-12;
-  max_speed = Umax_lcl;
-  double Umag;
-  int dof = vfes->GetNDofs();
-
   // temporary hardcodes
   double CFL_actual;
-  double t_final = 1.0;
-  double dtFactor = config.dt_factor;
   CFL = config.GetCFLNumber();
 
   int SdofInt = sfes->GetTrueVSize();
@@ -765,20 +735,15 @@ void LoMachSolver::updateTimestep() {
   double Umax_lcl = 1.0e-12;
   max_speed = Umax_lcl;
   double Umag;
-  int dof = vfes->GetNDofs();
   int Sdof = sfes->GetNDofs();
   double dtFactor = config.dt_factor;
   auto dataU = flowClass->un_gf.HostRead();
 
   // come in divided by order
   double *dataD = bufferGridScale->HostReadWrite();
-  double *dataX = bufferGridScaleX->HostReadWrite();
-  double *dataY = bufferGridScaleY->HostReadWrite();
-  double *dataZ = bufferGridScaleZ->HostReadWrite();
 
   for (int n = 0; n < Sdof; n++) {
     Umag = 0.0;
-    // Vector delta({dataX[n], dataY[n], dataZ[n]});
     Vector delta({dataD[n], dataD[n], dataD[n]});  // use smallest delta for all
     for (int eq = 0; eq < dim; eq++) {
       Umag += (dataU[n + eq * Sdof] / delta[eq]) * (dataU[n + eq * Sdof] / delta[eq]);
@@ -840,21 +805,13 @@ void LoMachSolver::updateTimestep() {
 }
 
 double LoMachSolver::computeCFL(double dt) {
-  // minimum timestep to not waste comp time
-  double dtMin = 1.0e-9;
-
   double Umax_lcl = 1.0e-12;
   max_speed = Umax_lcl;
   double Umag;
-  int dof = vfes->GetNDofs();
   int Sdof = sfes->GetNDofs();
-  double dtFactor = config.dt_factor;
 
   // come in divided by order
   double *dataD = bufferGridScale->HostReadWrite();
-  double *dataX = bufferGridScaleX->HostReadWrite();
-  double *dataY = bufferGridScaleY->HostReadWrite();
-  double *dataZ = bufferGridScaleZ->HostReadWrite();
   auto dataU = flowClass->un_gf.HostRead();
 
   for (int n = 0; n < Sdof; n++) {
@@ -911,9 +868,7 @@ void LoMachSolver::setTimestep() {
   double Umax_lcl = 1.0e-12;
   max_speed = Umax_lcl;
   double Umag;
-  int dof = vfes->GetNDofs();
   int Sdof = sfes->GetNDofs();
-  double dtFactor = config.dt_factor;
 
   auto dataU = flowClass->un_gf.HostRead();
   for (int n = 0; n < Sdof; n++) {
@@ -1041,19 +996,6 @@ void LoMachSolver::PrintTimingData() {
               << std::setw(10) << my_rt[5] / my_rt[1] << "\n";
 
     mfem::out << std::setprecision(8);
-  }
-}
-
-void LoMachSolver::PrintInfo() {
-  int fes_size0 = vfes->GlobalVSize();
-  int fes_size1 = pfes->GlobalVSize();
-
-  if (pmesh->GetMyRank() == 0) {
-    //      mfem::out << "NAVIER version: " << NAVIER_VERSION << std::endl
-    mfem::out << "MFEM version: " << MFEM_VERSION << std::endl
-              << "MFEM GIT: " << MFEM_GIT_STRING << std::endl
-              << "Velocity #DOFs: " << fes_size0 << std::endl
-              << "Pressure #DOFs: " << fes_size1 << std::endl;
   }
 }
 

@@ -60,14 +60,13 @@ class Tps;
 #include "transport_properties.hpp"
 #include "turbModel.hpp"
 
-using VecFuncT = void(const Vector &x, double t, Vector &u);
-using ScalarFuncT = double(const Vector &x, double t);
-
 /**
  * @brief Driver class for models based on low Mach, variable density formulation
  */
 class LoMachSolver : public TPS::Solver {
  protected:
+  // pointer to parent Tps class
+  TPS::Tps *tpsP_ = nullptr;
   LoMachOptions loMach_opts_;
 
   TurbModel *turbClass = nullptr;
@@ -114,9 +113,6 @@ class LoMachSolver : public TPS::Solver {
   double time;
   int iter;
 
-  // pointer to parent Tps class
-  TPS::Tps *tpsP_ = nullptr;
-
   mfem::ParMesh *pmesh_ = nullptr;
   int dim_;
   int true_size_;
@@ -146,9 +142,6 @@ class LoMachSolver : public TPS::Solver {
 
   // just keep these saved for ease
   int numWalls, numInlets, numOutlets;
-
-  /// Print information about the Navier version.
-  void PrintInfo();
 
   /// Update the EXTk/BDF time integration coefficient.
   void SetTimeIntegrationCoefficients(int step);
@@ -182,8 +175,6 @@ class LoMachSolver : public TPS::Solver {
   Array<int> partitioning_;
   const int defaultPartMethod = 1;
 
-  IntegrationRules gll_rules;
-
   /// Velocity \f$H^1\f$ finite element collection.
   FiniteElementCollection *vfec = nullptr;
 
@@ -194,30 +185,11 @@ class LoMachSolver : public TPS::Solver {
   ParFiniteElementSpace *fvfes = nullptr;
   ParFiniteElementSpace *fvfes2 = nullptr;
 
-  /// Pressure \f$H^1\f$ finite element collection.
-  FiniteElementCollection *pfec = nullptr;
-
-  /// Pressure \f$H^1\f$ finite element space.
-  ParFiniteElementSpace *pfes = nullptr;
-
   /// Scalar \f$H^1\f$ finite element collection.
   FiniteElementCollection *sfec = nullptr;
 
   /// Scalar \f$H^1\f$ finite element space.
   ParFiniteElementSpace *sfes = nullptr;
-
-  // nonlinear term
-  FiniteElementCollection *nfec = nullptr;
-  ParFiniteElementSpace *nfes = nullptr;
-  FiniteElementCollection *nfecR0 = nullptr;
-  ParFiniteElementSpace *nfesR0 = nullptr;
-
-  ParFiniteElementSpace *HCurlFESpace = nullptr;
-
-  /// Linear form to compute the mass matrix in various subroutines.
-  ParLinearForm *mass_lf = nullptr;
-  ConstantCoefficient onecoeff;
-  double volume = 0.0;
 
   Vector gridScaleSml;
   Vector gridScaleXSml;
