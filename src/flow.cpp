@@ -474,11 +474,20 @@ void Flow::Setup(double dt)
    {
      double *data = bufferRhoDt->HostReadWrite();
      for (int i = 0; i < Sdof; i++) { data[i] = 1.0; }
-   }          
+   }
+   bufferRhoDtR1 = new ParGridFunction(vfes);
+   {
+     double *data = bufferRhoDtR1->HostReadWrite();
+     for (int eq = 0; eq < dim; eq++) {
+       for (int i = 0; i < Sdof; i++) { data[i+eq*Sdof] = 1.0; }
+     }
+   }   
+   
    Rho = new GridFunctionCoefficient(bufferRho);
    invRho = new GridFunctionCoefficient(bufferInvRho);
    viscField = new GridFunctionCoefficient(bufferVisc);
-   rhoDtField = new GridFunctionCoefficient(bufferRhoDt);      
+   rhoDtField = new GridFunctionCoefficient(bufferRhoDt);
+   rhoDtFieldR1 = new VectorGridFunctionCoefficient(bufferRhoDtR1);   
    
    // convection section, extrapolation
    ///// nlcoeff.constant = -1.0; // starts with negative to move to rhs
@@ -635,7 +644,8 @@ void Flow::Setup(double dt)
    //H_lincoeff.constant = dyn_vis;
    H_bdfcoeff.constant = 1.0 / dt;
    H_form = new ParBilinearForm(vfes);
-   hmv_blfi = new VectorMassIntegrator(*rhoDtField);   
+   //hmv_blfi = new VectorMassIntegrator(*rhoDtField);
+   hmv_blfi = new VectorMassIntegrator(*rhoDtFieldR1);   
    if (config->timeIntegratorType == 1) {   
      hdv_blfi = new VectorDiffusionIntegrator(*viscField);
    } else {
@@ -967,13 +977,20 @@ void Flow::flowStep(double &time, double dt, const int current_step, const int s
        data[i] = dataR[i] / dt; 
      }
    }
+   {
+     double *data = bufferRhoDtR1->HostReadWrite();
+     double *dataR = rn_gf->HostReadWrite();     
+     for (int eq = 0; eq < dim; eq++) {
+       for (int i = 0; i < Sdof; i++) { data[i+eq*Sdof] = dataR[i] / dt; }
+     }
+   }      
    //if(rank0) {std::cout << "update coeff okay" << endl;}   
    
    // Set current time for velocity Dirichlet boundary conditions.
    for (auto &vel_dbc : vel_dbcs) {vel_dbc.coeff->SetTime(time + dt);}
    for (auto &pres_dbc : pres_dbcs) {pres_dbc.coeff->SetTime(time + dt);}   
 
-   // zero rhs vectors
+   // zero rhs vectors <warp>
    fn = 0.0;   
    Fext = 0.0;
    FText = 0.0;
@@ -1123,6 +1140,7 @@ void Flow::flowStep(double &time, double dt, const int current_step, const int s
    //Mv->Mult(LdivImp,tmpR1);
    //resu.Add(0.5,tmpR1);   
 
+   H_bdfcoeff.constant = 1.0 / dt;   
    H_form->Update();
    H_form->Assemble();
    H_form->FormSystemMatrix(vel_ess_tdof, H);

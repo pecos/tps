@@ -343,7 +343,7 @@ public:
    void initializeExternal(ParGridFunction *un_next_gf_, ParGridFunction *subgridVisc_gf_,int nWalls, int nInlets, int nOutlets);    
    void thermoChemStep(double &time, double dt, const int cur_step, const int start_step, std::vector<double> bdf, bool provisional = false);
 
-   void updateThermoP();
+   void updateThermoP(double dt);
    void extrapolateState(int current_step, std::vector<double> ab);
    void updateDensity(double tStep);
    //void updateGradients(double tStep);

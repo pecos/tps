@@ -967,7 +967,7 @@ void LoMachSolver::solve()
         flowClass->updateGradientsOP(1.0);
         tcClass->updateGradientsOP(1.0);	
 
-        tcClass->updateThermoP();
+        tcClass->updateThermoP(dt);
         tcClass->updateDensity(1.0);	
 	
 	turbClass->turbModelStep(time, dt, step, iter_start, bdfCoef);
