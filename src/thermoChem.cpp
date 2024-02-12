@@ -669,7 +669,7 @@ void ThermoChem::Setup(double dt)
    T_bdr_form->AddBoundaryIntegrator(t_bnlfi);   
    */
 
-   Ht_lincoeff.constant = kin_vis / Pr; 
+   //Ht_lincoeff.constant = kin_vis / Pr; 
    Ht_bdfcoeff.constant = 1.0 / dt;   
    Ht_form = new ParBilinearForm(sfes);
    //auto *hmt_blfi = new MassIntegrator(Ht_bdfcoeff); // unsteady bit
@@ -976,7 +976,8 @@ void ThermoChem::thermoChemStep(double &time, double dt, const int current_step,
      double *d_imp = R0PM0_gf.HostReadWrite();
      for (int i = 0; i < Sdof; i++) { data[i] = coeff * Rdata[i]; }
      //for (int i = 0; i < Sdof; i++) {data[i] = coeff*Rdata[i] + d_imp[i]; }     
-   }         
+   }
+   Ht_bdfcoeff.constant = 1.0 / dt;      
    Ht_form->Update();
    Ht_form->Assemble();
    Ht_form->FormSystemMatrix(temp_ess_tdof, Ht);
@@ -1131,7 +1132,7 @@ void ThermoChem::extrapolateState(int current_step, std::vector<double> ab) {
 
 
 // update thermodynamic pressure
-void ThermoChem::updateThermoP() {
+void ThermoChem::updateThermoP(double dt) {
   
   if (config->isOpen != true) {
 

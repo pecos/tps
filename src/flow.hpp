@@ -267,6 +267,7 @@ private:
    GridFunctionCoefficient *viscField = nullptr;
    GridFunctionCoefficient *bulkViscField = nullptr;
    GridFunctionCoefficient *rhoDtField = nullptr;
+   VectorGridFunctionCoefficient *rhoDtFieldR1 = nullptr;        
    GridFunctionCoefficient *invRho = nullptr;
    GridFunctionCoefficient *Rho = nullptr;
    //VectorGridFunctionCoefficient *FText_gfcoeff;    
@@ -347,6 +348,7 @@ private:
    ParGridFunction *bufferBulkVisc = nullptr;
    ParGridFunction *bufferRho = nullptr;
    ParGridFunction *bufferRhoDt = nullptr;
+   ParGridFunction *bufferRhoDtR1 = nullptr;  
    ParGridFunction *bufferFText = nullptr;
 
    ParGridFunction *buffer_vInlet = nullptr;
