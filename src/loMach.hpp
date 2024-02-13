@@ -30,6 +30,14 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
 
+// TODO(trevilo): List of capabilities removed during refactoring
+//
+// * Statstics calculations.  The Averaging class is somewhat brittle
+//   and only plays nice with state stored as done in the compressible
+//   flow code path, which is not convenient here.  This should be
+//   refactored into a more general capability so it can be used here.
+//   For the moment however, averaging is disabled.
+
 #ifndef LOMACH_HPP_
 #define LOMACH_HPP_
 
@@ -55,8 +63,8 @@ class Tps;
 #include "radiation.hpp"
 #include "run_configuration.hpp"
 #include "split_flow_base.hpp"
-#include "thermo_chem_base.hpp"
 #include "thermoChem.hpp"
+#include "thermo_chem_base.hpp"
 #include "tps.hpp"
 #include "tps_mfem_wrap.hpp"
 #include "transport_properties.hpp"
@@ -107,9 +115,6 @@ class LoMachSolver : public TPS::Solver {
   bool constantDensity = false;
   bool incompressibleSolve = false;
   bool pFilter = false;
-
-  // Average handler
-  Averaging *average;
 
   double dt;
   double time;
@@ -288,7 +293,6 @@ class LoMachSolver : public TPS::Solver {
   void parsePostProcessVisualizationInputs();
   void parseFluidPreset();
   void parseViscosityOptions();
-  void initSolutionAndVisualizationVectors();
   void initialTimeStep();
   void solve();
   void updateTimestep();
