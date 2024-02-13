@@ -2,6 +2,7 @@
 
 #include <mfem/general/forall.hpp>
 
+#include "io.hpp"
 #include "thermo_chem_base.hpp"
 #include "utils.hpp"
 
@@ -365,6 +366,13 @@ void Tomboulides::initializeOperators() {
 
   // Ensure u_vec_ consistent with u_curr_gf_
   u_curr_gf_->GetTrueDofs(u_vec_);
+}
+
+void Tomboulides::initializeIO(IODataOrganizer &io) const {
+  io.registerIOFamily("Velocity", "/velocity", u_curr_gf_, false);
+  io.registerIOVar("/velocity", "x-comp", 0);
+  if (dim_ >= 2) io.registerIOVar("/velocity", "y-comp", 1);
+  if (dim_ == 3) io.registerIOVar("/velocity", "z-comp", 2);
 }
 
 void Tomboulides::step() {

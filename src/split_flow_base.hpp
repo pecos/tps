@@ -37,6 +37,7 @@
 
 #include "tps_mfem_wrap.hpp"
 
+class IODataOrganizer;
 struct thermoChemToFlow;
 
 struct turbModelToFlow;
@@ -95,6 +96,8 @@ class FlowBase {
   void initializeFromTurbModel(turbModelToFlow *turbModel) { turbModel_interface_ = turbModel; }  
 
   virtual void initializeOperators() {}
+
+  virtual void initializeIO(IODataOrganizer &io) const {}
 
   /// Interface object, provides fields necessary for the thermochemistry model
   flowToThermoChem toThermoChem_interface;

@@ -1,8 +1,13 @@
+#include <hdf5.h>
 #include <limits>
+#include <fstream>
+#include <iostream>
 #include <math.h>
+#include <string>
 
 #include <mfem/general/forall.hpp>
 
+#include "../src/io.hpp"
 #include "../src/thermo_chem_base.hpp"
 #include "../src/split_flow_base.hpp"
 #include "../src/tomboulides.hpp"
@@ -66,6 +71,7 @@ void updateTimeIntegrationCoefficients(int step, double *dthist, timeCoefficient
 }
 
 
+using namespace std;
 
 /**
  * @brief Test that the interface design for the low Mach split time
@@ -94,7 +100,7 @@ int main(int argc, char *argv[]) {
   int problem = 0; // 0 = TG, 1 = lid-driven cavity
   double dt = -1.0;
   double t_final = 1.0;
-
+  const char* restart_file_char = "";
 
   //---------------------------------------------------------------------
   // Parse command line options
@@ -105,6 +111,7 @@ int main(int argc, char *argv[]) {
   args.AddOption(&problem, "-p", "--problem", "0 = Taylor-Green, 1 = lid-driven cavity.");
   args.AddOption(&dt, "-dt", "--time-step", "Time step.");
   args.AddOption(&t_final, "-tf", "--final-time", "Final time.");
+  args.AddOption(&restart_file_char, "-rf", "--restart-file", "HDF5 restart file.");
 
   args.Parse();
   if (!args.Good()) {
@@ -116,6 +123,8 @@ int main(int argc, char *argv[]) {
   if (Mpi::Root()) {
     args.PrintOptions(mfem::out);
   }
+
+  std::string restart_file(restart_file_char);
 
   // Create the mesh
   Mesh *mesh = new Mesh("./meshes/inline-quad.mesh");
@@ -190,6 +199,9 @@ int main(int argc, char *argv[]) {
     mu = 0.001;
   }
 
+  // So we can read/write restart info
+  IODataOrganizer io;
+
   // Set up the flow and thermo classes
   FlowBase *flow;
   ThermoChemModelBase *thermo;
@@ -201,6 +213,16 @@ int main(int argc, char *argv[]) {
   // Initialize -- after this, solution fields have been allocated
   flow->initializeSelf();
   thermo->initializeSelf();
+
+  flow->initializeIO(io);
+
+  hid_t file = -1;
+  if (!restart_file.empty()) {
+    file = H5Fopen(restart_file.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+    assert(file >= 0);
+    io.read(file, false);
+    H5Fclose(file);
+  }
 
   // Get the velocity field and set the IC
   ParGridFunction *u_gf = flow->getCurrentVelocity();
@@ -296,6 +318,11 @@ int main(int argc, char *argv[]) {
       std::cout << "Velocity error at final time = " << err_u << std::endl;
     }
   }
+
+  file = H5Fcreate("tomboulides_restart.h5", H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+  assert(file >= 0);
+  io.write(file, false);
+  H5Fclose(file);
 
   // Write some visualization files
   pd->SetCycle(iter);
