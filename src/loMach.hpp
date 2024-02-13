@@ -243,14 +243,6 @@ class LoMachSolver : public TPS::Solver {
   // paraview collection pointer
   ParaViewDataCollection *paraviewColl = NULL;
 
-  // Visualization functions (these are pointers to Up)
-  ParGridFunction *temperature = nullptr;
-  ParGridFunction *dens = nullptr;
-  ParGridFunction *vel = nullptr;
-  ParGridFunction *vtheta = nullptr;
-  ParGridFunction *passiveScalar = nullptr;
-  ParGridFunction *electron_temp_field = nullptr;
-  ParGridFunction *press = nullptr;
   std::vector<ParGridFunction *> visualizationVariables_;
   std::vector<std::string> visualizationNames_;
   AuxiliaryVisualizationIndexes visualizationIndexes_;
