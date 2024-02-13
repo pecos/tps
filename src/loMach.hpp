@@ -110,6 +110,7 @@ class LoMachSolver : public TPS::Solver {
 
   // Mesh and geometry related
   ParMesh *pmesh_ = nullptr;
+  Mesh *serial_mesh_ = nullptr;
 
   int dim_;
   int nvel_;
@@ -195,7 +196,6 @@ class LoMachSolver : public TPS::Solver {
   void parseTimeIntegrationOptions();
   void parseIOSettings();
   void parseBCInputs();
-  void parseICOptions();
   void initialTimeStep();
   void solve();
   void updateTimestep();
