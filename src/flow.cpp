@@ -455,39 +455,54 @@ void Flow::Setup(double dt)
 
    
    // setup coefficients, all updated before uses so dont have to set values here
+   /*
    bufferRho = new ParGridFunction(sfes);
    {
      double *data = bufferRho->HostReadWrite();
      for (int i = 0; i < Sdof; i++) { data[i] = 1.0; }
-   }       
-   bufferInvRho = new ParGridFunction(pfes);
+   }
+   */
+   
+   //bufferInvRho = new ParGridFunction(pfes);
+   bufferInvRho.SetSpace(pfes);
    {
-     double *data = bufferInvRho->HostReadWrite();
+     double *data = bufferInvRho.HostReadWrite();     
      for (int i = 0; i < Pdof; i++) { data[i] = 1.0; }
-   }          
+   }
+   
+   /*
    bufferVisc = new ParGridFunction(sfes);
    {
      double *data = bufferVisc->HostReadWrite();
-     for (int i = 0; i < Sdof; i++) { data[i] = 1.0; }
-   }          
-   bufferRhoDt = new ParGridFunction(sfes);
+     double *dataTmp = tmpR0.HostReadWrite();     
+     for (int i = 0; i < Sdof; i++) { data[i] = dataTmp[i]; }
+   }
+   */
+   
+   //bufferRhoDt = new ParGridFunction(sfes);
+   bufferRhoDt.SetSpace(sfes);
    {
-     double *data = bufferRhoDt->HostReadWrite();
+     double *data = bufferRhoDt.HostReadWrite();
      for (int i = 0; i < Sdof; i++) { data[i] = 1.0; }
    }
+   
+   /*
    bufferRhoDtR1 = new ParGridFunction(vfes);
    {
      double *data = bufferRhoDtR1->HostReadWrite();
      for (int eq = 0; eq < dim; eq++) {
        for (int i = 0; i < Sdof; i++) { data[i+eq*Sdof] = 1.0; }
      }
-   }   
+   }
+   */
    
-   Rho = new GridFunctionCoefficient(bufferRho);
-   invRho = new GridFunctionCoefficient(bufferInvRho);
-   viscField = new GridFunctionCoefficient(bufferVisc);
-   rhoDtField = new GridFunctionCoefficient(bufferRhoDt);
-   rhoDtFieldR1 = new VectorGridFunctionCoefficient(bufferRhoDtR1);   
+   //Rho = new GridFunctionCoefficient(bufferRho);
+   Rho = new GridFunctionCoefficient(rn_gf);
+   invRho = new GridFunctionCoefficient(&bufferInvRho);
+   //viscField = new GridFunctionCoefficient(bufferVisc);
+   viscField = new GridFunctionCoefficient(visc_gf);
+   rhoDtField = new GridFunctionCoefficient(&bufferRhoDt);
+   //rhoDtFieldR1 = new VectorGridFunctionCoefficient(bufferRhoDtR1);   
    
    // convection section, extrapolation
    ///// nlcoeff.constant = -1.0; // starts with negative to move to rhs
@@ -641,13 +656,14 @@ void Flow::Setup(double dt)
    if (rank0) std::cout << "Gradient of pressure operator set" << endl;           
    
    // helmholtz for velocity
-   //H_lincoeff.constant = dyn_vis;
+   //H_lincoeff.constant = config->const_visc;;
    H_bdfcoeff.constant = 1.0 / dt;
    H_form = new ParBilinearForm(vfes);
-   //hmv_blfi = new VectorMassIntegrator(*rhoDtField);
-   hmv_blfi = new VectorMassIntegrator(*rhoDtFieldR1);   
+   hmv_blfi = new VectorMassIntegrator(*rhoDtField);
+   //hmv_blfi = new VectorMassIntegrator(*rhoDtFieldR1);   
    if (config->timeIntegratorType == 1) {   
      hdv_blfi = new VectorDiffusionIntegrator(*viscField);
+     //hdv_blfi = new VectorDiffusionIntegrator(H_lincoeff);
    } else {
      hev_blfi = new ElasticityIntegrator(*bulkViscField, *viscField);      
    }
@@ -934,9 +950,11 @@ void Flow::flowStep(double &time, double dt, const int current_step, const int s
    // update vectors from external data and gradients
    rn_gf->GetTrueDofs(rn);
    Qt_gf->GetTrueDofs(Qt);
-   visc_gf->GetTrueDofs(visc);      
-   G->Mult(rn, tmpR1);
-   MvInv->Mult(tmpR1, gradRho);   
+   visc_gf->GetTrueDofs(visc);
+
+   // gradients of external
+   //G->Mult(rn, tmpR1);
+   //MvInv->Mult(tmpR1, gradRho);   
    G->Mult(visc, tmpR1);
    MvInv->Mult(tmpR1, gradMu);
    divU.Set(1.0, Qt);
@@ -945,6 +963,7 @@ void Flow::flowStep(double &time, double dt, const int current_step, const int s
    //if(rank0) {std::cout << "update block okay" << endl;}   
    
    // update coefficients of operators
+   /*
    {
      double *data = bufferRho->HostReadWrite();
      double *dataR = rn_gf->HostReadWrite();
@@ -953,37 +972,45 @@ void Flow::flowStep(double &time, double dt, const int current_step, const int s
        //if(dataR[i]!=config->const_dens) {std::cout << "rho in flow: " << dataR[i] << " at dof: " << i << endl;}
      }
    }
+   */
    {
      R0PM0_gf.SetFromTrueDofs(rn);   
      R0PM1_gf.ProjectGridFunction(R0PM0_gf);
-     double *data = bufferInvRho->HostReadWrite();
+     //double *data = bufferInvRho->HostReadWrite();
+     double *data = bufferInvRho.HostReadWrite();     
      double *dataR = R0PM1_gf.HostReadWrite();
      for (int i = 0; i < Pdof; i++) {     
        data[i] = 1.0 / dataR[i]; 
      }
    }
+   /*
    {
      double *data = bufferVisc->HostReadWrite();
      double *dataMu = visc_gf->HostReadWrite();
      for (int i = 0; i < Sdof; i++) {     
        data[i] = dataMu[i];
        //if(dataMu[i]!=config->const_visc) {std::cout << "mu in flow: " << dataMu[i] << " at dof: " << i << endl; }
+       //std::cout << "mu in flow: " << dataMu[i] << " at dof: " << i << endl;
      }
-   }   
+   }
+   */
    {
-     double *data = bufferRhoDt->HostReadWrite();
+     //double *data = bufferRhoDt->HostReadWrite();
+     double *data = bufferRhoDt.HostReadWrite();
      double *dataR = rn_gf->HostReadWrite();
      for (int i = 0; i < Sdof; i++) {     
        data[i] = dataR[i] / dt; 
      }
    }
+   /*
    {
      double *data = bufferRhoDtR1->HostReadWrite();
      double *dataR = rn_gf->HostReadWrite();     
      for (int eq = 0; eq < dim; eq++) {
        for (int i = 0; i < Sdof; i++) { data[i+eq*Sdof] = dataR[i] / dt; }
      }
-   }      
+   }
+   */
    //if(rank0) {std::cout << "update coeff okay" << endl;}   
    
    // Set current time for velocity Dirichlet boundary conditions.

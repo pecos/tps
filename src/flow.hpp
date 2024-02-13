@@ -343,11 +343,14 @@ private:
 
    ParGridFunction gradU_gf, gradV_gf, gradW_gf;  
     
-   ParGridFunction *bufferInvRho = nullptr;
+  //ParGridFunction *bufferInvRho = nullptr;
+   ParGridFunction bufferInvRho;
    ParGridFunction *bufferVisc = nullptr;
+  //ParGridFunction bufferVisc;
    ParGridFunction *bufferBulkVisc = nullptr;
    ParGridFunction *bufferRho = nullptr;
-   ParGridFunction *bufferRhoDt = nullptr;
+  //ParGridFunction *bufferRhoDt = nullptr;
+   ParGridFunction bufferRhoDt;
    ParGridFunction *bufferRhoDtR1 = nullptr;  
    ParGridFunction *bufferFText = nullptr;
 
