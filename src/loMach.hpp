@@ -230,24 +230,8 @@ class LoMachSolver : public TPS::Solver {
   /// Distance to nearest no-slip wall
   ParGridFunction *distance_ = nullptr;
 
-  // to interface with existing code
-  ParGridFunction *U = nullptr;
-  ParGridFunction *Up = nullptr;
-
-  // The solution u has components {density, x-momentum, y-momentum, energy}.
-  // These are stored contiguously in the BlockVector u_block.
-  Array<int> *offsets = nullptr;
-  BlockVector *u_block = nullptr;
-  BlockVector *up_block = nullptr;
-
   // paraview collection pointer
   ParaViewDataCollection *paraviewColl = NULL;
-
-  std::vector<ParGridFunction *> visualizationVariables_;
-  std::vector<std::string> visualizationNames_;
-  AuxiliaryVisualizationIndexes visualizationIndexes_;
-  ParGridFunction *plasma_conductivity_ = nullptr;
-  ParGridFunction *joule_heating_ = nullptr;
 
   // I/O organizer
   IODataOrganizer ioData;
