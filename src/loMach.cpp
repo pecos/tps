@@ -169,7 +169,6 @@ void LoMachSolver::initialize() {
 
   MaxIters = config.GetNumIters();
   max_speed = 0.;
-  num_equation = 5;  // HARD CODE
 
   // check if a simulation is being restarted
   if (config.GetRestartCycle() > 0) {

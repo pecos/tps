@@ -77,22 +77,21 @@ class LoMachSolver : public TPS::Solver {
  protected:
   // pointer to parent Tps class
   TPS::Tps *tpsP_ = nullptr;
+
+  // Run options
   LoMachOptions loMach_opts_;
+  RunConfiguration config;
 
-  // TurbModel *turbClass = nullptr;
-  ThermoChemModelBase *thermo_ = nullptr;
-  FlowBase *flow_ = nullptr;
-
+  // MPI helpers
   MPI_Groups *groupsMPI = nullptr;
   int nprocs_;  // total number of MPI procs
   int rank_;    // local MPI rank
   bool rank0_;  // flag to indicate rank 0
 
-  // Run options
-  RunConfiguration config;
-
-  // History file
-  std::ofstream histFile;
+  // Model classes
+  // TurbModel *turbClass = nullptr;
+  ThermoChemModelBase *thermo_ = nullptr;
+  FlowBase *flow_ = nullptr;
 
   // Early terminatation flag
   int earlyExit = 0;
@@ -101,20 +100,6 @@ class LoMachSolver : public TPS::Solver {
   int dim;
   int nvel;
 
-  // Number of equations
-  int num_equation;
-
-  // Is it ambipolar?
-  bool ambipolar = false;
-
-  // Is it two-temperature?
-  bool twoTemperature_ = false;
-
-  // loMach options to run as incompressible
-  bool constantViscosity = false;
-  bool constantDensity = false;
-  bool incompressibleSolve = false;
-  bool pFilter = false;
 
   double dt;
   double time;
@@ -131,10 +116,6 @@ class LoMachSolver : public TPS::Solver {
   // domain extent
   double xmin, ymin, zmin;
   double xmax, ymax, zmax;
-
-  // space sizes;
-  int Sdof, Pdof, Vdof, Ndof, NdofR0;
-  int SdofInt, PdofInt, VdofInt, NdofInt, NdofR0Int;
 
   int MaxIters;
   double max_speed;
