@@ -46,29 +46,15 @@ namespace TPS {
 class Tps;
 }
 
-#include <hdf5.h>
 #include <tps_config.h>
 
-#include <iostream>
-
-#include "../utils/mfem_extras/pfem_extras.hpp"
-#include "argon_transport.hpp"
-#include "averaging_and_rms.hpp"
-#include "chemistry.hpp"
-#include "flow.hpp"
 #include "io.hpp"
 #include "loMach_options.hpp"
-#include "mfem.hpp"
-#include "mfem/linalg/solvers.hpp"
-#include "radiation.hpp"
 #include "run_configuration.hpp"
+#include "solver.hpp"
 #include "split_flow_base.hpp"
-#include "thermoChem.hpp"
 #include "thermo_chem_base.hpp"
-#include "tps.hpp"
 #include "tps_mfem_wrap.hpp"
-#include "transport_properties.hpp"
-#include "turbModel.hpp"
 
 /**
  * @brief Driver class for models based on low Mach, variable density formulation
@@ -99,7 +85,6 @@ class LoMachSolver : public TPS::Solver {
   // Number of dimensions
   int dim;
   int nvel;
-
 
   double dt;
   double time;
