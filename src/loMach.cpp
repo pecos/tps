@@ -57,8 +57,6 @@ LoMachSolver::LoMachSolver(LoMachOptions loMach_opts, TPS::Tps *tps)
       nprocs_(groupsMPI->getTPSWorldSize()),
       rank_(groupsMPI->getTPSWorldRank()),
       rank0_(groupsMPI->isWorldRoot()) {
-  pmesh_ = NULL;
-
   // is this needed?
   groupsMPI->init();
 
@@ -90,6 +88,7 @@ LoMachSolver::~LoMachSolver() {
   delete flow_;
   delete thermo_;
   delete pmesh_;
+  delete serial_mesh_;
 
   // allocated in constructor
   delete groupsMPI;
@@ -99,51 +98,49 @@ void LoMachSolver::initialize() {
   bool verbose = rank0_;
   if (verbose) grvy_printf(ginfo, "Initializing loMach solver.\n");
 
-  if (loMach_opts_.uOrder == -1) {
-    order = std::max(config.solOrder, 1);
-    porder = order;
-    double no;
-    no = ceil(((double)order * 1.5));
-    norder = int(no);
-  } else {
-    order = loMach_opts_.uOrder;
-    porder = loMach_opts_.pOrder;
-    norder = loMach_opts_.nOrder;
-  }
+  order = loMach_opts_.order;
 
   if (rank0_) {
     std::cout << "  " << endl;
     std::cout << " Order of solution-spaces " << endl;
     std::cout << " +velocity : " << order << endl;
-    std::cout << " +pressure : " << porder << endl;
-    std::cout << " +non-linear : " << norder << endl;
+    std::cout << " +pressure : " << order << endl;
+    std::cout << " +non-linear : " << order << endl;
     std::cout << "  " << endl;
   }
 
-  // grid periodicity
-  Vector x_translation({config.GetXTrans(), 0.0, 0.0});
-  Vector y_translation({0.0, config.GetYTrans(), 0.0});
-  Vector z_translation({0.0, 0.0, config.GetZTrans()});
-  std::vector<Vector> translations = {x_translation, y_translation, z_translation};
+  // Generate serial mesh, making it periodic if requested
+  if (config.GetPeriodic()) {
+    Mesh temp_mesh = Mesh(loMach_opts_.mesh_file.c_str());
+    Vector x_translation({config.GetXTrans(), 0.0, 0.0});
+    Vector y_translation({0.0, config.GetYTrans(), 0.0});
+    Vector z_translation({0.0, 0.0, config.GetZTrans()});
+    std::vector<Vector> translations = {x_translation, y_translation, z_translation};
 
-  if (rank0_) {
-    std::cout << " Making the mesh periodic using the following offsets:" << std::endl;
-    std::cout << "   xTrans: " << config.GetXTrans() << std::endl;
-    std::cout << "   yTrans: " << config.GetYTrans() << std::endl;
-    std::cout << "   zTrans: " << config.GetZTrans() << std::endl;
+    if (rank0_) {
+      std::cout << " Making the mesh periodic using the following offsets:" << std::endl;
+      std::cout << "   xTrans: " << config.GetXTrans() << std::endl;
+      std::cout << "   yTrans: " << config.GetYTrans() << std::endl;
+      std::cout << "   zTrans: " << config.GetZTrans() << std::endl;
+    }
+
+    serial_mesh_ =
+        new Mesh(std::move(Mesh::MakePeriodic(temp_mesh, temp_mesh.CreatePeriodicVertexMapping(translations))));
+  } else {
+    serial_mesh_ = new Mesh(config.GetMeshFileName().c_str());
   }
-
-  // Read the serial mesh (on each mpi rank)
-  Mesh mesh = Mesh(loMach_opts_.mesh_file.c_str());
-  Mesh *serial_mesh = &mesh;
   if (verbose) grvy_printf(ginfo, "Mesh read...\n");
 
-  // Create the periodic mesh using the vertex mapping defined by the translation vectors
-  Mesh periodic_mesh = Mesh::MakePeriodic(mesh, mesh.CreatePeriodicVertexMapping(translations));
-  if (verbose) grvy_printf(ginfo, "Mesh made periodic (if applicable)...\n");
+  // Scale domain (NB: after periodicity applied)
+  if (loMach_opts_.scale_mesh != 1) {
+    if (verbose) grvy_printf(ginfo, "Scaling mesh factor of scale_mesh = %.6e\n", loMach_opts_.scale_mesh);
+    serial_mesh_->EnsureNodes();
+    GridFunction *nodes = serial_mesh_->GetNodes();
+    *nodes *= loMach_opts_.scale_mesh;
+  }
 
-  // underscore stuff is terrible
-  dim_ = mesh.Dimension();
+  // Stash mesh dimension (convenience)
+  dim_ = serial_mesh_->Dimension();
 
   // HACK HACK HACK HARD CODE
   nvel_ = dim_;
@@ -160,7 +157,7 @@ void LoMachSolver::initialize() {
 
   // check if a simulation is being restarted
   if (config.GetRestartCycle() > 0) {
-    if (config.GetUniformRefLevels() > 0) {
+    if (loMach_opts_.ref_levels > 0) {
       if (rank0_) {
         std::cerr << "ERROR: Uniform mesh refinement not supported upon restart." << std::endl;
       }
@@ -168,7 +165,7 @@ void LoMachSolver::initialize() {
     }
 
     // read partitioning info from original decomposition (unless restarting from serial soln)
-    nelemGlobal_ = serial_mesh->GetNE();
+    nelemGlobal_ = serial_mesh_->GetNE();
     // nelemGlobal_ = mesh->GetNE();
     if (rank0_) grvy_printf(ginfo, "Total # of mesh elements = %i\n", nelemGlobal_);
 
@@ -190,19 +187,18 @@ void LoMachSolver::initialize() {
     }
 
     // uniform refinement, user-specified number of times
-    for (int l = 0; l < config.GetUniformRefLevels(); l++) {
+    for (int l = 0; l < loMach_opts_.ref_levels; l++) {
       if (rank0_) {
         std::cout << "Uniform refinement number " << l << std::endl;
       }
-      serial_mesh->UniformRefinement();
-      // mesh->UniformRefinement();
+      serial_mesh_->UniformRefinement();
     }
 
     // generate partitioning file (we assume conforming meshes)
-    nelemGlobal_ = serial_mesh->GetNE();
+    nelemGlobal_ = serial_mesh_->GetNE();
     if (nprocs_ > 1) {
-      assert(serial_mesh->Conforming());
-      partitioning_ = Array<int>(serial_mesh->GeneratePartitioning(nprocs_, defaultPartMethod), nelemGlobal_);
+      assert(serial_mesh_->Conforming());
+      partitioning_ = Array<int>(serial_mesh_->GeneratePartitioning(nprocs_, defaultPartMethod), nelemGlobal_);
       if (rank0_) partitioning_file_hdf5("write", config, groupsMPI, nelemGlobal_, partitioning_);
     }
 
@@ -213,7 +209,7 @@ void LoMachSolver::initialize() {
 
   // 1c) Partition the mesh (see partitioning_ in M2ulPhyS)
   // pmesh__ = new ParMesh(MPI_COMM_WORLD, *mesh);
-  pmesh_ = new ParMesh(MPI_COMM_WORLD, periodic_mesh);
+  pmesh_ = new ParMesh(MPI_COMM_WORLD, *serial_mesh_, partitioning_);
   if (verbose) grvy_printf(ginfo, "Mesh partitioned...\n");
 
   // instantiate physics models
@@ -227,7 +223,7 @@ void LoMachSolver::initialize() {
     flow_ = new ZeroFlow(pmesh_, 1);
   } else if (loMach_opts_.flow_solver == "tomboulides") {
     // Tomboulides flow solver
-    flow_ = new Tomboulides(pmesh_, loMach_opts_.order, loMach_opts_.order, temporal_coeff_);
+    flow_ = new Tomboulides(pmesh_, loMach_opts_.order, loMach_opts_.order, temporal_coeff_, tpsP_);
   } else {
     // Unknown choice... die
     if (rank0_) {
@@ -289,7 +285,7 @@ void LoMachSolver::initialize() {
 
   // TODO(trevilo): Enable averaging.  See note in loMach.hpp
 
-  ioData.initializeSerial(rank0_, (config.RestartSerial() != "no"), serial_mesh, locToGlobElem, &partitioning_);
+  ioData.initializeSerial(rank0_, (config.RestartSerial() != "no"), serial_mesh_, locToGlobElem, &partitioning_);
   MPI_Barrier(MPI_COMM_WORLD);
   if (verbose) grvy_printf(ginfo, "ioData.init thingy...\n");
 
@@ -891,13 +887,15 @@ void LoMachSolver::PrintTimingData() {
 void LoMachSolver::parseSolverOptions() {
   // if (verbose) grvy_printf(ginfo, "parsing solver options...\n");
   tpsP_->getRequiredInput("loMach/mesh", loMach_opts_.mesh_file);
+  tpsP_->getInput("loMach/scale-mesh", loMach_opts_.scale_mesh, 1.0);
+  assert(loMach_opts_.scale_mesh > 0);
+
   tpsP_->getRequiredInput("loMach/flow-solver", loMach_opts_.flow_solver);
   assert(loMach_opts_.flow_solver == "zero-flow" || loMach_opts_.flow_solver == "tomboulides");
 
   tpsP_->getInput("loMach/order", loMach_opts_.order, 1);
-  tpsP_->getInput("loMach/uOrder", loMach_opts_.uOrder, -1);
-  tpsP_->getInput("loMach/pOrder", loMach_opts_.pOrder, -1);
-  tpsP_->getInput("loMach/nOrder", loMach_opts_.nOrder, -1);
+  assert(loMach_opts_.order >= 1);
+
   tpsP_->getInput("loMach/ref_levels", loMach_opts_.ref_levels, 0);
   tpsP_->getInput("loMach/max_iter", loMach_opts_.max_iter, 100);
   tpsP_->getInput("loMach/rtol", loMach_opts_.rtol, 1.0e-8);
@@ -925,9 +923,6 @@ void LoMachSolver::parseSolverOptions2() {
 
   // I/O settings
   parseIOSettings();
-
-  // initial conditions
-  parseICOptions();
 
   // changed the order of parsing in order to use species list.
   // boundary conditions. The number of boundaries of each supported type if
@@ -974,7 +969,6 @@ void LoMachSolver::parseFlowOptions() {
     for (int d = 0; d < 3; d++) tpsP_->getRequiredVecElem("loMach/gravity", config.gravity[d], d);
   }
 
-  tpsP_->getInput("loMach/refinement_levels", config.ref_levels, 0);
   tpsP_->getInput("loMach/computeDistance", config.compute_distance, false);
 
   std::string type;
@@ -1044,17 +1038,6 @@ void LoMachSolver::parseIOSettings() {
     grvy_printf(GRVY_ERROR, "\nUnknown restart mode -> %s\n", restartMode.c_str());
     exit(ERROR);
   }
-}
-
-void LoMachSolver::parseICOptions() {
-  tpsP_->getRequiredInput("initialConditions/rho", config.initRhoRhoVp[0]);
-  tpsP_->getRequiredInput("initialConditions/rhoU", config.initRhoRhoVp[1]);
-  tpsP_->getRequiredInput("initialConditions/rhoV", config.initRhoRhoVp[2]);
-  tpsP_->getRequiredInput("initialConditions/rhoW", config.initRhoRhoVp[3]);
-  tpsP_->getRequiredInput("initialConditions/temperature", config.initRhoRhoVp[4]);
-  tpsP_->getInput("initialConditions/useFunction", config.useICFunction, false);
-  tpsP_->getInput("initialConditions/useBoxFunction", config.useICBoxFunction, false);
-  tpsP_->getInput("initialConditions/resetTemp", config.resetTemp, false);
 }
 
 void LoMachSolver::parseBCInputs() {

@@ -39,6 +39,12 @@
  *
  */
 
+// forward-declaration for Tps support class (tps.hpp)
+namespace TPS {
+class Tps;
+}
+
+// forward-declaration of struct hold temporal coefficients (loMach.hpp)
 struct temporalSchemeCoefficients;
 
 #include "dirichlet_bc_helper.hpp"
@@ -99,6 +105,8 @@ class Tomboulides : public FlowBase {
   // Assumed to be externally managed and determined, so just get a
   // reference here.
   const temporalSchemeCoefficients &coeff_;
+
+  std::string ic_string_;
 
   // Object used to build forcing
   mfem::VectorConstantCoefficient *gravity_vec_;
@@ -203,7 +211,7 @@ class Tomboulides : public FlowBase {
 
  public:
   /// Constructor
-  Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalSchemeCoefficients &coeff);
+  Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalSchemeCoefficients &coeff, TPS::Tps *tps = nullptr);
 
   /// Destructor
   ~Tomboulides() final;

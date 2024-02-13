@@ -43,6 +43,7 @@
 class LoMachOptions {
  public:
   std::string mesh_file; /**< Mesh filename */
+  double scale_mesh;
 
   std::string flow_solver; /**< Flow solver name */
 
@@ -106,6 +107,7 @@ class LoMachOptions {
     out << std::endl;
     out << "LoMach options:" << std::endl;
     out << "  mesh_file   = " << mesh_file << std::endl;
+    out << "  scale_mesh  = " << scale_mesh << std::endl;
     out << "  flow_solver = " << flow_solver << std::endl;
     out << "  order       = " << order << std::endl;
     out << "  ref_levels  = " << ref_levels << std::endl;

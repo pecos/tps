@@ -5,9 +5,13 @@
 #include "io.hpp"
 #include "loMach.hpp"
 #include "thermo_chem_base.hpp"
+#include "tps.hpp"
 #include "utils.hpp"
 
 using namespace mfem;
+
+/// forward declarations
+void vel_exact_tgv2d(const Vector &x, double t, Vector &u);
 
 /**
  * @brief Helper function to remove mean from a vector
@@ -24,13 +28,18 @@ void Orthogonalize(Vector &v, const ParFiniteElementSpace *pfes) {
   v -= global_sum / static_cast<double>(global_size);
 }
 
-Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalSchemeCoefficients &coeff)
+Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalSchemeCoefficients &coeff, TPS::Tps *tps)
     : gll_rules(0, Quadrature1D::GaussLobatto),
       pmesh_(pmesh),
       vorder_(vorder),
       porder_(porder),
       dim_(pmesh->Dimension()),
-      coeff_(coeff) {}
+      coeff_(coeff) {
+  if (tps != nullptr) {
+    // if we have Tps object, use it to set other options
+    tps->getInput("loMach/tomboulides/ic", ic_string_, std::string(""));
+  }
+}
 
 Tomboulides::~Tomboulides() {
   // miscellaneous
@@ -159,6 +168,16 @@ void Tomboulides::initializeSelf() {
   resp_vec_ = 0.0;
   p_vec_ = 0.0;
   pp_div_bdr_vec_ = 0.0;
+
+  // set IC if we have one at this point
+  if (!ic_string_.empty()) {
+    if (ic_string_ == "tgv2d") {
+      std::cout << "Setting tgv2d IC..." << std::endl;
+      VectorFunctionCoefficient u_excoeff(2, vel_exact_tgv2d);
+      u_excoeff.SetTime(0.0);
+      u_curr_gf_->ProjectCoefficient(u_excoeff);
+    }
+  }
 
   // make sure there is room for BC attributes
   if (!(pmesh_->bdr_attributes.Size() == 0)) {
@@ -696,3 +715,14 @@ void Tomboulides::addVelDirichletBC(const Vector &u, Array<int> &attr) {
 
 /// Add a Dirichlet boundary condition to the pressure field.
 void Tomboulides::addPresDirichletBC(double p, Array<int> &attr) {}
+
+// Non-class functions that are only used in this file below here
+
+/// Used to set the velocity IC (and to check error)
+void vel_exact_tgv2d(const Vector &x, double t, Vector &u) {
+  const double nu = 1.0;
+  const double F = std::exp(-2 * nu * t);
+
+  u(0) = F * std::sin(x[0]) * std::cos(x[1]);
+  u(1) = -F * std::cos(x[0]) * std::sin(x[1]);
+}
