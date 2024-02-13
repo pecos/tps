@@ -128,25 +128,6 @@ void LoMachSolver::read_restart_files_hdf5(hid_t file, bool serialized_read) {
   // Data - actual data read handled by IODataOrganizer class
   // -------------------------------------------------------------------
   ioData.read(file, serialized_read, read_order);
-
-  if (loadFromAuxSol) {
-    // Update primitive variables.  This will be done automatically
-    // before taking a time step, but we may write paraview output
-    // prior to that, in which case the primitives are incorrect.
-    // We would like to just call rhsOperator::updatePrimitives, but
-    // rhsOperator has not been constructed yet.  As a workaround,
-    // that code is duplicated here.
-    // TODO(kevin): use mixture comptue primitive.
-    double *dataUp = Up->HostReadWrite();
-    const double *x = U->HostRead();
-    for (int i = 0; i < vfes->GetNDofs(); i++) {
-      Vector conserved(num_equation);
-      Vector primitive(num_equation);
-      for (int eq = 0; eq < num_equation; eq++) conserved[eq] = x[i + eq * vfes->GetNDofs()];
-      mixture->GetPrimitivesFromConservatives(conserved, primitive);
-      for (int eq = 0; eq < num_equation; eq++) dataUp[i + eq * vfes->GetNDofs()] = primitive[eq];
-    }
-  }
 }
 
 void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {

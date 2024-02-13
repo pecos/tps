@@ -227,13 +227,6 @@ class LoMachSolver : public TPS::Solver {
   // order of polynomials for auxiliary solution
   bool loadFromAuxSol;
 
-  // Pointers to the different classes
-  GasMixture *mixture;    // valid on host
-  GasMixture *d_mixture;  // valid on device, when available; otherwise = mixture
-
-  Chemistry *chemistry_ = NULL;
-  Radiation *radiation_ = NULL;
-
   /// Distance to nearest no-slip wall
   ParGridFunction *distance_ = nullptr;
 
