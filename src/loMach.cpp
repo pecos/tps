@@ -472,17 +472,8 @@ void LoMachSolver::projectInitialSolution() {
 }
 
 void LoMachSolver::initialTimeStep() {
-  auto dataU = U->HostReadWrite();
-  int dof = vfes->GetNDofs();
-
-  for (int n = 0; n < dof; n++) {
-    Vector state(num_equation);
-    for (int eq = 0; eq < num_equation; eq++) state[eq] = dataU[n + eq * dof];
-  }
-
-  double partition_C = max_speed;
-  MPI_Allreduce(&partition_C, &max_speed, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
-  dt = CFL * hmin / max_speed / static_cast<double>(dim);
+  // TODO(trevilo): Compute initial dt from CFL
+  // This calc was broken here, so it was removed temporarily.
 
   // dt_fixed is initialized to -1, so if it is positive, then the
   // user requested a fixed dt run
