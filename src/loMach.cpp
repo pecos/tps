@@ -151,8 +151,6 @@ void LoMachSolver::initialize() {
   // HACK HACK HACK HARD CODE
   nvel_ = dim_;
 
-  eqSystem = config.GetEquationSystem();
-
   if (rank0_) {
     if (config.sgsModelType == 1) {
       std::cout << "Smagorinsky subgrid model active" << endl;
@@ -162,7 +160,6 @@ void LoMachSolver::initialize() {
   }
 
   MaxIters = config.GetNumIters();
-  max_speed = 0.;
 
   // check if a simulation is being restarted
   if (config.GetRestartCycle() > 0) {
@@ -240,8 +237,6 @@ void LoMachSolver::initialize() {
 
   int sfes_truevsize = sfes->GetTrueVSize();
   if (verbose) grvy_printf(ginfo, "Got sizes...\n");
-
-  cur_step = 0;
 
   gridScaleSml.SetSize(sfes_truevsize);
   gridScaleSml = 0.0;
@@ -636,7 +631,7 @@ void LoMachSolver::updateTimestep() {
   double dtMin = 1.0e-9;
 
   double Umax_lcl = 1.0e-12;
-  max_speed = Umax_lcl;
+  double max_speed = Umax_lcl;
   double Umag;
   int Sdof = sfes->GetNDofs();
   double dtFactor = config.dt_factor;
@@ -711,7 +706,7 @@ void LoMachSolver::updateTimestep() {
 
 double LoMachSolver::computeCFL(double dt) {
   double Umax_lcl = 1.0e-12;
-  max_speed = Umax_lcl;
+  double max_speed = Umax_lcl;
   double Umag;
   int Sdof = sfes->GetNDofs();
 
@@ -772,7 +767,7 @@ double LoMachSolver::computeCFL(double dt) {
 
 void LoMachSolver::setTimestep() {
   double Umax_lcl = 1.0e-12;
-  max_speed = Umax_lcl;
+  double max_speed = Umax_lcl;
   double Umag;
   int Sdof = sfes->GetNDofs();
 
