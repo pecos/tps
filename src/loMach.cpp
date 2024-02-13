@@ -90,12 +90,8 @@ LoMachSolver::~LoMachSolver() {
   delete bufferGridScaleY;
   delete bufferGridScaleX;
   delete bufferGridScale;
-  delete fvfes2;
-  delete fvfes;
   delete sfes;
   delete sfec;
-  delete vfes;
-  delete vfec;
   delete flow_;
   delete thermo_;
   delete pmesh;
@@ -243,17 +239,10 @@ void LoMachSolver::initialize() {
   // 2) Prepare the required finite elements
   //-----------------------------------------------------
 
-  // velocity (DG_FECollection?)
-  vfec = new H1_FECollection(order, dim);
-  vfes = new ParFiniteElementSpace(pmesh, vfec, dim);
-
   // scalar
   sfec = new H1_FECollection(order);
   sfes = new ParFiniteElementSpace(pmesh, sfec);
 
-  // full vector for compatability
-  fvfes = new ParFiniteElementSpace(pmesh, vfec, num_equation);  //, Ordering::byNODES);
-  fvfes2 = new ParFiniteElementSpace(pmesh, sfec, num_equation);
   if (verbose) grvy_printf(ginfo, "Spaces constructed...\n");
 
   int sfes_truevsize = sfes->GetTrueVSize();

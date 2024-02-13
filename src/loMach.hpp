@@ -182,16 +182,6 @@ class LoMachSolver : public TPS::Solver {
   Array<int> partitioning_;
   const int defaultPartMethod = 1;
 
-  /// Velocity \f$H^1\f$ finite element collection.
-  FiniteElementCollection *vfec = nullptr;
-
-  /// Velocity \f$(H^1)^d\f$ finite element space.
-  ParFiniteElementSpace *vfes = nullptr;
-
-  //// total space for compatibility
-  ParFiniteElementSpace *fvfes = nullptr;
-  ParFiniteElementSpace *fvfes2 = nullptr;
-
   /// Scalar \f$H^1\f$ finite element collection.
   FiniteElementCollection *sfec = nullptr;
 
