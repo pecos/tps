@@ -44,6 +44,8 @@ class LoMachOptions {
  public:
   std::string mesh_file; /**< Mesh filename */
 
+  std::string flow_solver; /**< Flow solver name */
+
   int order;      /**< Element order */
   int uOrder;
   int pOrder;
@@ -104,6 +106,7 @@ class LoMachOptions {
     out << std::endl;
     out << "LoMach options:" << std::endl;
     out << "  mesh_file   = " << mesh_file << std::endl;
+    out << "  flow_solver = " << flow_solver << std::endl;
     out << "  order       = " << order << std::endl;
     out << "  ref_levels  = " << ref_levels << std::endl;
     out << "  ref_levels  = " << ref_levels << std::endl;

@@ -43,15 +43,12 @@
 #include <iomanip>
 
 #include "logger.hpp"
+#include "tomboulides.hpp"
 #include "tps.hpp"
 #include "utils.hpp"
 
 using namespace mfem;
 using namespace mfem::common;
-
-// temporary
-// double mesh_stretching_func(const double y);
-void CopyDBFIntegrators(ParBilinearForm *src, ParBilinearForm *dst);
 
 LoMachSolver::LoMachSolver(LoMachOptions loMach_opts, TPS::Tps *tps)
     : tpsP_(tps),
@@ -222,8 +219,22 @@ void LoMachSolver::initialize() {
   // instantiate physics models
   // turbClass = new TurbModel(pmesh_, &config, &loMach_opts_);
 
+  // TODO(trevilo): Instantiate based in input options
   thermo_ = new ConstantPropertyThermoChem(pmesh_, 1, 1.0, 1.0);
-  flow_ = new ZeroFlow(pmesh_, 1);
+
+  if (loMach_opts_.flow_solver == "zero-flow") {
+    // No flow---set u = 0.  Primarily useful for testing thermochem models in isolation
+    flow_ = new ZeroFlow(pmesh_, 1);
+  } else if (loMach_opts_.flow_solver == "tomboulides") {
+    // Tomboulides flow solver
+    flow_ = new Tomboulides(pmesh_, loMach_opts_.order, loMach_opts_.order, temporal_coeff_);
+  } else {
+    // Unknown choice... die
+    if (rank0_) {
+      grvy_printf(GRVY_ERROR, "Unknown loMach/flow-solver option > %s\n", loMach_opts_.flow_solver.c_str());
+    }
+    exit(ERROR);
+  }
 
   //-----------------------------------------------------
   // 2) Prepare the required finite elements
@@ -252,6 +263,14 @@ void LoMachSolver::initialize() {
   resolution_gf = 0.0;
 
   if (verbose) grvy_printf(ginfo, "vectors and gf initialized...\n");
+
+  // Initialize time marching coefficients.  NB: dt will be reset
+  // prior to time step, but must be initialized here in order to
+  // avoid possible uninitialized usage when constructing operators in
+  // model classes.
+  temporal_coeff_.dt = 1.0;
+  temporal_coeff_.dt3 = temporal_coeff_.dt2 = temporal_coeff_.dt1 = temporal_coeff_.dt;
+  SetTimeIntegrationCoefficients(0);
 
   // Initialize model-owned data
   flow_->initializeSelf();
@@ -488,6 +507,8 @@ void LoMachSolver::solve() {
   if (dt_fixed > 0) {
     temporal_coeff_.dt = dt_fixed;
   }
+
+  if (rank0_) std::cout << "Initial dt = " << temporal_coeff_.dt << std::endl;
 
   // trevilo: What is this doing?
   {
@@ -870,6 +891,9 @@ void LoMachSolver::PrintTimingData() {
 void LoMachSolver::parseSolverOptions() {
   // if (verbose) grvy_printf(ginfo, "parsing solver options...\n");
   tpsP_->getRequiredInput("loMach/mesh", loMach_opts_.mesh_file);
+  tpsP_->getRequiredInput("loMach/flow-solver", loMach_opts_.flow_solver);
+  assert(loMach_opts_.flow_solver == "zero-flow" || loMach_opts_.flow_solver == "tomboulides");
+
   tpsP_->getInput("loMach/order", loMach_opts_.order, 1);
   tpsP_->getInput("loMach/uOrder", loMach_opts_.uOrder, -1);
   tpsP_->getInput("loMach/pOrder", loMach_opts_.pOrder, -1);
@@ -893,28 +917,17 @@ void LoMachSolver::parseSolverOptions() {
 
 ///* move these to separate support class *//
 void LoMachSolver::parseSolverOptions2() {
-  // tpsP->getRequiredInput("flow/mesh", config.meshFile);
-
   // flow/numerics
   parseFlowOptions();
 
   // time integration controls
   parseTimeIntegrationOptions();
 
-  // statistics
-  parseStatOptions();
-
   // I/O settings
   parseIOSettings();
 
-  // viscosity multiplier function
-  parseViscosityOptions();
-
   // initial conditions
   parseICOptions();
-
-  // fluid presets
-  parseFluidPreset();
 
   // changed the order of parsing in order to use species list.
   // boundary conditions. The number of boundaries of each supported type if
@@ -923,11 +936,6 @@ void LoMachSolver::parseSolverOptions2() {
 
   // periodicity
   parsePeriodicInputs();
-
-  // post-process visualization inputs
-  parsePostProcessVisualizationInputs();
-
-  return;
 }
 
 void LoMachSolver::parseFlowOptions() {
@@ -1017,14 +1025,6 @@ void LoMachSolver::parseTimeIntegrationOptions() {
   max_bdf_order = config.bdfOrder;
 }
 
-void LoMachSolver::parseStatOptions() {
-  tpsP_->getInput("averaging/saveMeanHist", config.meanHistEnable, false);
-  tpsP_->getInput("averaging/startIter", config.startIter, 0);
-  tpsP_->getInput("averaging/sampleFreq", config.sampleInterval, 0);
-  tpsP_->getInput("averaging/enableContinuation", config.restartMean, false);
-  tpsP_->getInput("averaging/restartRMS", config.restartRMS, false);
-}
-
 void LoMachSolver::parseIOSettings() {
   tpsP_->getInput("io/outdirBase", config.outputFile, std::string("output-default"));
   tpsP_->getInput("io/enableRestart", config.restart, false);
@@ -1046,50 +1046,6 @@ void LoMachSolver::parseIOSettings() {
   }
 }
 
-void LoMachSolver::parseRMSJobOptions() {
-  tpsP_->getInput("jobManagement/enableAutoRestart", config.rm_enableMonitor_, false);
-  tpsP_->getInput("jobManagement/timeThreshold", config.rm_threshold_, 15 * 60);  // 15 minutes
-  tpsP_->getInput("jobManagement/checkFreq", config.rm_checkFrequency_, 500);     // 500 iterations
-}
-
-void LoMachSolver::parseViscosityOptions() {
-  tpsP_->getInput("viscosityMultiplierFunction/isEnabled", config.linViscData.isEnabled, false);
-
-  if (config.linViscData.isEnabled) {
-    auto normal = config.linViscData.normal.HostWrite();
-    tpsP_->getRequiredVecElem("viscosityMultiplierFunction/normal", normal[0], 0);
-    tpsP_->getRequiredVecElem("viscosityMultiplierFunction/normal", normal[1], 1);
-    tpsP_->getRequiredVecElem("viscosityMultiplierFunction/normal", normal[2], 2);
-
-    auto point0 = config.linViscData.point0.HostWrite();
-    tpsP_->getRequiredVecElem("viscosityMultiplierFunction/point", point0[0], 0);
-    tpsP_->getRequiredVecElem("viscosityMultiplierFunction/point", point0[1], 1);
-    tpsP_->getRequiredVecElem("viscosityMultiplierFunction/point", point0[2], 2);
-
-    tpsP_->getRequiredInput("viscosityMultiplierFunction/width", config.linViscData.width);
-    tpsP_->getRequiredInput("viscosityMultiplierFunction/viscosityRatio", config.linViscData.viscRatio);
-
-    tpsP_->getInput("viscosityMultiplierFunction/uniformMult", config.linViscData.uniformMult, 1.0);
-    tpsP_->getInput("viscosityMultiplierFunction/cylinderX", config.linViscData.cylXradius, -1.0);
-    tpsP_->getInput("viscosityMultiplierFunction/cylinderY", config.linViscData.cylYradius, -1.0);
-    tpsP_->getInput("viscosityMultiplierFunction/cylinderZ", config.linViscData.cylZradius, -1.0);
-
-    /**/
-    auto pointA = config.linViscData.pointA.HostWrite();
-    double pointA0, pointA1, pointA2;
-    tpsP_->getInput("viscosityMultiplierFunction/pointA0", pointA0, 0.0);
-    tpsP_->getInput("viscosityMultiplierFunction/pointA1", pointA1, 0.0);
-    tpsP_->getInput("viscosityMultiplierFunction/pointA2", pointA2, 0.0);
-    pointA[0] = pointA0;
-    pointA[1] = pointA1;
-    pointA[2] = pointA2;
-    tpsP_->getInput("viscosityMultiplierFunction/viscosityRatioAnnulus", config.linViscData.viscRatioAnnulus, 1.0);
-    tpsP_->getInput("viscosityMultiplierFunction/annulusRadius", config.linViscData.annulusRadius, 1.0e8);
-    tpsP_->getInput("viscosityMultiplierFunction/annulusThickness", config.linViscData.annulusThickness, 1.0e-8);
-    /**/
-  }
-}
-
 void LoMachSolver::parseICOptions() {
   tpsP_->getRequiredInput("initialConditions/rho", config.initRhoRhoVp[0]);
   tpsP_->getRequiredInput("initialConditions/rhoU", config.initRhoRhoVp[1]);
@@ -1099,36 +1055,6 @@ void LoMachSolver::parseICOptions() {
   tpsP_->getInput("initialConditions/useFunction", config.useICFunction, false);
   tpsP_->getInput("initialConditions/useBoxFunction", config.useICBoxFunction, false);
   tpsP_->getInput("initialConditions/resetTemp", config.resetTemp, false);
-}
-
-void LoMachSolver::parseFluidPreset() {
-  std::string fluidTypeStr;
-  tpsP_->getInput("loMach/fluid", fluidTypeStr, std::string("dry_air"));
-  if (fluidTypeStr == "dry_air") {
-    config.workFluid = DRY_AIR;
-    tpsP_->getInput("loMach/specific_heat_ratio", config.dryAirInput.specific_heat_ratio, 1.4);
-    tpsP_->getInput("loMach/gas_constant", config.dryAirInput.gas_constant, 287.058);
-  } else if (fluidTypeStr == "user_defined") {
-    config.workFluid = USER_DEFINED;
-  } else if (fluidTypeStr == "lte_table") {
-    config.workFluid = LTE_FLUID;
-    std::string thermo_file;
-    tpsP_->getRequiredInput("loMach/lte/thermo_table", thermo_file);
-    config.lteMixtureInput.thermo_file_name = thermo_file;
-    std::string trans_file;
-    tpsP_->getRequiredInput("loMach/lte/transport_table", trans_file);
-    config.lteMixtureInput.trans_file_name = trans_file;
-    std::string e_rev_file;
-    tpsP_->getRequiredInput("loMach/lte/e_rev_table", e_rev_file);
-    config.lteMixtureInput.e_rev_file_name = e_rev_file;
-  } else {
-    grvy_printf(GRVY_ERROR, "\nUnknown fluid preset supplied at runtime -> %s", fluidTypeStr.c_str());
-    exit(ERROR);
-  }
-
-  if ((rank0_ == true) && (config.workFluid != USER_DEFINED))
-    cout << "Fluid is set to the preset '" << fluidTypeStr << "'. Input options in [plasma_models] will not be used."
-         << endl;
 }
 
 void LoMachSolver::parseBCInputs() {
@@ -1334,25 +1260,9 @@ void LoMachSolver::parseBCInputs() {
   }
 }
 
-void LoMachSolver::parsePostProcessVisualizationInputs() {
-  if (tpsP_->isVisualizationMode()) {
-    tpsP_->getRequiredInput("post-process/visualization/prefix", config.postprocessInput.prefix);
-    tpsP_->getRequiredInput("post-process/visualization/start-iter", config.postprocessInput.startIter);
-    tpsP_->getRequiredInput("post-process/visualization/end-iter", config.postprocessInput.endIter);
-    tpsP_->getRequiredInput("post-process/visualization/frequency", config.postprocessInput.freq);
-  }
-}
-
 void LoMachSolver::parsePeriodicInputs() {
   tpsP_->getInput("periodicity/enablePeriodic", config.periodic, false);
   tpsP_->getInput("periodicity/xTrans", config.xTrans, 1.0e12);
   tpsP_->getInput("periodicity/yTrans", config.yTrans, 1.0e12);
   tpsP_->getInput("periodicity/zTrans", config.zTrans, 1.0e12);
-}
-
-void CopyDBFIntegrators(ParBilinearForm *src, ParBilinearForm *dst) {
-  Array<BilinearFormIntegrator *> *bffis = src->GetDBFI();
-  for (int i = 0; i < bffis->Size(); ++i) {
-    dst->AddDomainIntegrator((*bffis)[i]);
-  }
 }
