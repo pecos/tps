@@ -32,11 +32,12 @@
 /** @file
  * @copydoc io.hpp
  */
+#include <grvy.h>
 #include <hdf5.h>
 
 #include "io.hpp"
 #include "loMach.hpp"
-#include "utils.hpp"
+#include "logger.hpp"
 
 void LoMachSolver::write_restart_files_hdf5(hid_t file, bool serialized_write) {
   MPI_Comm TPSCommWorld = this->groupsMPI->getTPSCommWorld();
