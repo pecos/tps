@@ -54,6 +54,8 @@ class Tps;
 #include "mfem/linalg/solvers.hpp"
 #include "radiation.hpp"
 #include "run_configuration.hpp"
+#include "split_flow_base.hpp"
+#include "thermo_chem_base.hpp"
 #include "thermoChem.hpp"
 #include "tps.hpp"
 #include "tps_mfem_wrap.hpp"
@@ -69,9 +71,9 @@ class LoMachSolver : public TPS::Solver {
   TPS::Tps *tpsP_ = nullptr;
   LoMachOptions loMach_opts_;
 
-  TurbModel *turbClass = nullptr;
-  ThermoChem *tcClass = nullptr;
-  Flow *flowClass = nullptr;
+  // TurbModel *turbClass = nullptr;
+  ThermoChemModelBase *thermo_ = nullptr;
+  FlowBase *flow_ = nullptr;
 
   MPI_Groups *groupsMPI = nullptr;
   int nprocs_;  // total number of MPI procs
@@ -289,8 +291,6 @@ class LoMachSolver : public TPS::Solver {
   void initSolutionAndVisualizationVectors();
   void initialTimeStep();
   void solve();
-  void updateU();
-  void copyU();
   void updateTimestep();
   void setTimestep();
 
@@ -307,9 +307,6 @@ class LoMachSolver : public TPS::Solver {
     paraviewColl->SetTime(time);
     paraviewColl->Save();
   }
-
-  /// Initialize forms, solvers and preconditioners.
-  void Setup(double dt);
 
   /// Return a pointer to the current total resolution ParGridFunction.
   ParGridFunction *GetCurrentResolution() { return &resolution_gf; }
