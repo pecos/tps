@@ -84,6 +84,28 @@ LoMachSolver::LoMachSolver(LoMachOptions loMach_opts, TPS::Tps *tps)
   }
 }
 
+LoMachSolver::~LoMachSolver() {
+
+  // allocated in initialize()
+  delete bufferGridScaleZ;
+  delete bufferGridScaleY;
+  delete bufferGridScaleX;
+  delete bufferGridScale;
+  delete average;
+  delete fvfes2;
+  delete fvfes;
+  delete sfes;
+  delete sfec;
+  delete vfes;
+  delete vfec;
+  delete flow_;
+  delete thermo_;
+  delete pmesh;
+
+  // allocated in constructor
+  delete groupsMPI;
+}
+
 void LoMachSolver::initialize() {
   bool verbose = rank0_;
   if (verbose) grvy_printf(ginfo, "Initializing loMach solver.\n");
