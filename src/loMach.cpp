@@ -85,13 +85,11 @@ LoMachSolver::LoMachSolver(LoMachOptions loMach_opts, TPS::Tps *tps)
 }
 
 LoMachSolver::~LoMachSolver() {
-
   // allocated in initialize()
   delete bufferGridScaleZ;
   delete bufferGridScaleY;
   delete bufferGridScaleX;
   delete bufferGridScale;
-  delete average;
   delete fvfes2;
   delete fvfes;
   delete sfes;
@@ -278,14 +276,12 @@ void LoMachSolver::initialize() {
 
   if (verbose) grvy_printf(ginfo, "vectors and gf initialized...\n");
 
-
   // Initialize model-owned data
   flow_->initializeSelf();
   thermo_->initializeSelf();
 
   // Initialize restart read/write capability
   flow_->initializeIO(ioData);
-
 
   // Exchange interface information
   flow_->initializeFromThermoChem(&thermo_->interface);
@@ -295,39 +291,7 @@ void LoMachSolver::initialize() {
   flow_->initializeOperators();
   // thermo_->initializeOperators();
 
-
-  // Averaging handled through loMach
-  average =
-      new Averaging(Up, pmesh, sfec, sfes, vfes, fvfes, eqSystem, d_mixture, num_equation, dim, config, groupsMPI);
-
-  // register rms and mean sol into ioData
-  if (average->ComputeMean()) {
-    // meanUp
-    ioData.registerIOFamily("Time-averaged primitive vars", "/meanSolution", average->GetMeanUp(), false,
-                            config.GetRestartMean());
-    ioData.registerIOVar("/meanSolution", "meanDens", 0);
-    ioData.registerIOVar("/meanSolution", "mean-u", 1);
-    ioData.registerIOVar("/meanSolution", "mean-v", 2);
-    if (nvel == 3) {
-      ioData.registerIOVar("/meanSolution", "mean-w", 3);
-      ioData.registerIOVar("/meanSolution", "mean-E", 4);
-    } else {
-      ioData.registerIOVar("/meanSolution", "mean-p", dim + 1);
-    }
-
-    // rms
-    ioData.registerIOFamily("RMS velocity fluctuation", "/rmsData", average->GetRMS(), false, config.GetRestartMean());
-
-    ioData.registerIOVar("/rmsData", "uu", 0);
-    ioData.registerIOVar("/rmsData", "vv", 1);
-    ioData.registerIOVar("/rmsData", "ww", 2);
-    ioData.registerIOVar("/rmsData", "uv", 3);
-    ioData.registerIOVar("/rmsData", "uw", 4);
-    ioData.registerIOVar("/rmsData", "vw", 5);
-  }
-  MPI_Barrier(MPI_COMM_WORLD);
-  if (verbose) grvy_printf(ginfo, "mean setup good...\n");
-  /**/
+  // TODO(trevilo): Enable averaging.  See note in loMach.hpp
 
   ioData.initializeSerial(rank0_, (config.RestartSerial() != "no"), serial_mesh, locToGlobElem, &partitioning_);
   MPI_Barrier(MPI_COMM_WORLD);
@@ -563,7 +527,7 @@ void LoMachSolver::solve() {
   }
 
   ParGridFunction *u_gf = flow_->getCurrentVelocity();
-  //const ParGridFunction *p_gf = flow_->GetCurrentPressure();
+  // const ParGridFunction *p_gf = flow_->GetCurrentPressure();
 
   ParaViewDataCollection pvdc("output", pmesh);
   pvdc.SetDataFormat(VTKFormat::BINARY32);
@@ -665,10 +629,7 @@ void LoMachSolver::solve() {
     // restart files
     if (iter % config.itersOut == 0 && iter != 0) {
       restart_files_hdf5("write");
-      average->write_meanANDrms_restart_files(iter, time);
     }
-
-    average->addSampleMean(iter);
 
     // check for DIE
     if (iter % 100 == 0) {
@@ -842,7 +803,7 @@ void LoMachSolver::setTimestep() {
   double Umag;
   int Sdof = sfes->GetNDofs();
 
-  //auto dataU = flowClass->un_gf.HostRead();
+  // auto dataU = flowClass->un_gf.HostRead();
   auto dataU = flow_->getCurrentVelocity()->HostRead();
   for (int n = 0; n < Sdof; n++) {
     Umag = 0.0;
@@ -1416,34 +1377,6 @@ void LoMachSolver::parsePeriodicInputs() {
   tpsP_->getInput("periodicity/xTrans", config.xTrans, 1.0e12);
   tpsP_->getInput("periodicity/yTrans", config.yTrans, 1.0e12);
   tpsP_->getInput("periodicity/zTrans", config.zTrans, 1.0e12);
-}
-
-void LoMachSolver::initSolutionAndVisualizationVectors() {
-  // std::cout << " In initSol&Viz..." << endl;
-  visualizationVariables_.clear();
-  visualizationNames_.clear();
-
-  offsets = new Array<int>(num_equation + 1);
-  for (int k = 0; k <= num_equation; k++) {
-    (*offsets)[k] = k * fvfes->GetNDofs();
-  }
-
-  u_block = new BlockVector(*offsets);
-  up_block = new BlockVector(*offsets);
-
-  U = new ParGridFunction(fvfes, u_block->HostReadWrite());
-  Up = new ParGridFunction(fvfes, up_block->HostReadWrite());
-
-  ioData.registerIOFamily("Solution state variables", "/solution", Up, false);
-  ioData.registerIOVar("/solution", "density", 0);
-  ioData.registerIOVar("/solution", "u", 1);
-  ioData.registerIOVar("/solution", "v", 2);
-  if (nvel == 3) {
-    ioData.registerIOVar("/solution", "w", 3);
-    ioData.registerIOVar("/solution", "temperature", 4);
-  } else {
-    ioData.registerIOVar("/solution", "temperature", 3);
-  }
 }
 
 void CopyDBFIntegrators(ParBilinearForm *src, ParBilinearForm *dst) {
