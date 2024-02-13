@@ -3,6 +3,10 @@
 
 TEST="valgrind"
 RUNFILE="inputs/input.dtconst.2iters.cyl.ini"
+LOMACH_RUNFILE="inputs/lomach.tgv2d.ini"
+EXE="../src/tps"
+LIBTOOL_RUN="../libtool --mode=execute"
+VALGRIND="valgrind --suppressions=valgrind.suppressions --tool=memcheck --leak-check=full --error-exitcode=1"
 
 setup() {
     OPTS=""
@@ -27,7 +31,11 @@ setup() {
     # use following option to generate suppression list if needed
     # for things not in TPS (I'm talking about you MPICH).
     #valgrind--gen-suppressions=all
-    valgrind --suppressions=valgrind.suppressions --error-exitcode=1 ../src/tps $OPTS --runFile $RUNFILE
-
+    #valgrind --suppressions=valgrind.suppressions --error-exitcode=1 ../src/tps $OPTS --runFile $RUNFILE
+    $LIBTOOL_RUN $VALGRIND $EXE --runFile $RUNFILE
 }
 
+@test "[$TEST] run tps with input -> $LOMACH_RUNFILE under valgrind" {
+    test -s $LOMACH_RUNFILE
+    $LIBTOOL_RUN $VALGRIND $EXE -run $LOMACH_RUNFILE
+}
