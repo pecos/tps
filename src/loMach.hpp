@@ -74,64 +74,24 @@ class LoMachSolver : public TPS::Solver {
   int rank_;    // local MPI rank
   bool rank0_;  // flag to indicate rank 0
 
+  // Various codes and flags
+  int exit_status_;     // exit status code;
+  int earlyExit = 0;    // Early terminatation flag
+  bool loadFromAuxSol;  // load restart of different polynomial order
+
   // Model classes
   // TurbModel *turbClass = nullptr;
   ThermoChemModelBase *thermo_ = nullptr;
   FlowBase *flow_ = nullptr;
 
-  // Early terminatation flag
-  int earlyExit = 0;
-
-  double dt;
-  double time;
-  int iter;
-
+  // Mesh and geometry related
   ParMesh *pmesh_ = nullptr;
+
   int dim_;
   int nvel_;
 
-  // min/max element size
-  double hmin, hmax;
-
-  // domain extent
-  double xmin, ymin, zmin;
-  double xmax, ymax, zmax;
-
-  int MaxIters;
-  double max_speed;
-  double CFL;
-  int numActiveSpecies, numSpecies;
-
-  // exit status code;
-  int exit_status_;
-
   // mapping from local to global element index
   int *locToGlobElem = nullptr;
-
-  // just keep these saved for ease
-  int numWalls, numInlets, numOutlets;
-
-  /// Update the EXTk/BDF time integration coefficient.
-  void SetTimeIntegrationCoefficients(int step);
-
-  /// Enable/disable debug output.
-  bool debug = false;
-
-  /// Enable/disable verbose output.
-  bool verbose = true;
-
-  /// Enable/disable partial assembly of forms.
-  bool partial_assembly = false;
-  bool partial_assembly_pressure = true;
-
-  /// Enable/disable numerical integration rules of forms.
-  // bool numerical_integ = false;
-  bool numerical_integ = true;
-
-  /// The order of the velocity and pressure space.
-  int order;
-  int porder;
-  int norder;
 
   // total number of mesh elements (serial)
   int nelemGlobal_;
@@ -140,19 +100,48 @@ class LoMachSolver : public TPS::Solver {
   Array<int> partitioning_;
   const int defaultPartMethod = 1;
 
+  // min/max element size
+  double hmin, hmax;
+
+  // domain extent
+  double xmin, ymin, zmin;
+  double xmax, ymax, zmax;
+
   /// Scalar \f$H^1\f$ finite element collection.
   FiniteElementCollection *sfec = nullptr;
 
   /// Scalar \f$H^1\f$ finite element space.
   ParFiniteElementSpace *sfes = nullptr;
 
+  /// Distance to nearest no-slip wall
+  ParGridFunction *distance_ = nullptr;
+
   Vector gridScaleSml;
   Vector gridScaleXSml;
   Vector gridScaleYSml;
   Vector gridScaleZSml;
 
+  // for plotting
+  ParGridFunction resolution_gf;
+
+  // grid information
+  ParGridFunction *bufferGridScale = nullptr;
+  ParGridFunction *bufferGridScaleX = nullptr;
+  ParGridFunction *bufferGridScaleY = nullptr;
+  ParGridFunction *bufferGridScaleZ = nullptr;
+
+  // just keep these saved for ease
+  int numWalls, numInlets, numOutlets;
+
+  // Time marching related parameters
+  double dt;
+  double time;
+  int iter;
+
+  int MaxIters;
+  double CFL;
+
   int max_bdf_order;  // input option now
-  int cur_step = 0;
   std::vector<double> dthist = {0.0, 0.0, 0.0};
 
   // BDFk/EXTk coefficients.
@@ -166,36 +155,20 @@ class LoMachSolver : public TPS::Solver {
   std::vector<double> abCoef = {ab1, ab2, ab3};
   std::vector<double> bdfCoef = {bd0, bd1, bd2, bd3};
 
+  /// The order of the velocity and pressure space.
+  int order;
+  int porder;
+  int norder;
+
   // Timers.
   StopWatch sw_setup, sw_step, sw_extrap, sw_curlcurl, sw_spsolve, sw_hsolve;
 
-  // Equations solved
-  Equations eqSystem;
+  // I/O helpers
+  ParaViewDataCollection *paraviewColl = nullptr;  // visualization
+  IODataOrganizer ioData;                          // restart
 
-  // order of polynomials for auxiliary solution
-  bool loadFromAuxSol;
-
-  /// Distance to nearest no-slip wall
-  ParGridFunction *distance_ = nullptr;
-
-  // paraview collection pointer
-  ParaViewDataCollection *paraviewColl = NULL;
-
-  // I/O organizer
-  IODataOrganizer ioData;
-
-  // for plotting
-  ParGridFunction resolution_gf;
-
-  // grid information
-  ParGridFunction *bufferGridScale = nullptr;
-  ParGridFunction *bufferGridScaleX = nullptr;
-  ParGridFunction *bufferGridScaleY = nullptr;
-  ParGridFunction *bufferGridScaleZ = nullptr;
-
-  ParGridFunction *bufferMeanUp = nullptr;
-
-  bool channelTest;
+  /// Update the EXTk/BDF time integration coefficient.
+  void SetTimeIntegrationCoefficients(int step);
 
  public:
   /// Ctor
@@ -241,13 +214,6 @@ class LoMachSolver : public TPS::Solver {
   ParGridFunction *GetCurrentResolution() { return &resolution_gf; }
 
   LoMachOptions GetOptions() { return loMach_opts_; }
-
-  /// Enable partial assembly for every operator.
-  void EnablePA(bool pa) { partial_assembly = pa; }
-
-  /// Enable numerical integration rules. This means collocated quadrature at
-  /// the nodal points.
-  void EnableNI(bool ni) { numerical_integ = ni; }
 
   /// Print timing summary of the solving routine.
   void PrintTimingData();
