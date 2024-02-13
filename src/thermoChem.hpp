@@ -82,7 +82,8 @@ public:
 
 
 /// Add some description here...
-class ThermoChem
+//class ThermoChem
+class ThermoChem : public ThermoChemModelBase
 {
   friend class LoMachSolver;
   //friend class Flow;
@@ -339,9 +340,14 @@ public:
   ThermoChem(mfem::ParMesh *pmesh_, RunConfiguration *config_, LoMachOptions *loMach_opts_);  
   virtual ~ThermoChem() {}
 
-   void initialize();
-   void initializeExternal(ParGridFunction *un_next_gf_, ParGridFunction *subgridVisc_gf_,int nWalls, int nInlets, int nOutlets);    
-   void thermoChemStep(double &time, double dt, const int cur_step, const int start_step, std::vector<double> bdf, bool provisional = false);
+   void initializeSelf();
+  
+   //   void initializeExternal(ParGridFunction *un_next_gf_, ParGridFunction *subgridVisc_gf_,int nWalls, int nInlets, int nOutlets);
+   void initializeFromFlow(flowToThermoChem *flow);
+   void initializeFromTurbModel(turbModelToThermoChem *turbModel);  
+  
+   //   void step(double &time, double dt, const int cur_step, const int start_step, std::vector<double> bdf, bool provisional = false);
+   void step();
 
    void updateThermoP(double dt);
    void extrapolateState(int current_step, std::vector<double> ab);
@@ -350,8 +356,7 @@ public:
    void updateGradientsOP(double tStep);  
    void updateBC(int current_step);
    void updateDiffusivity();
-   void computeSystemMass();
-   
+   void computeSystemMass();   
    void computeExplicitTempConvectionOP(bool extrap);      
    void computeQt();
    void computeQtTO();
@@ -385,6 +390,10 @@ public:
    void AddQtDirichletBC(Coefficient *coeff, Array<int> &attr);
    void AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr);      
 
+   //MFEM_HOST_DEVICE
+   void viscSpongePlanar(double *x, double &wgt);
+
+   // move to utils...
    /// Eliminate essential BCs in an Operator and apply to RHS.
    // rename this to something sensible "ApplyEssentialBC" or something
    void EliminateRHS(Operator &A,
@@ -402,13 +411,6 @@ public:
     * \f$v = v - \frac{\sum_i^N v_i}{N} \f$
     */
    void Orthogonalize(Vector &v);
-
-   // subgrid scale models => move to turb model class
-   void sgsSmag(const DenseMatrix &gradUp, double delta, double &nu_sgs);
-   void sgsSigma(const DenseMatrix &gradUp, double delta, double &nu_sgs);  
-  
-  //MFEM_HOST_DEVICE
-   void viscSpongePlanar(double *x, double &wgt);
-  
+    
 };
 #endif

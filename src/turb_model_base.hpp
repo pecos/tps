@@ -29,57 +29,55 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
-#ifndef THERMO_CHEM_BASE_HPP_
-#define THERMO_CHEM_BASE_HPP_
+#ifndef TURB_MODEL_BASE_HPP_
+#define TURB_MODEL_BASE_HPP_
 /** @file
  * @brief Contains base class and simplest possible variant of thermochemistry model.
  */
 
 #include "tps_mfem_wrap.hpp"
 
-struct flowToThermoChem;
+struct flowToTurbModel;
 
 /**
  * Provides wrapper for fields that need to be provided by the
- * thermochemistry model to the flow.
+ * turbulence model to the flow.
  */
-struct thermoChemToFlow {
-  const mfem::ParGridFunction *density = nullptr;
-  const mfem::ParGridFunction *viscosity = nullptr;
-  const mfem::ParGridFunction *thermal_divergence = nullptr;
+struct turbModelToFlow {
+  const mfem::ParGridFunction *eddy_viscosity = nullptr;
 };
 
 
-struct turbModelToThermoChem;
+struct thermoChemToTurbModel;
 
 /**
  * Provides wrapper for fields that need to be provided by the
- * thermochemistry model to the flow.
+ * turbulence model to the thermo chem model.
  */
-struct thermoChemToTurbModel {
-  const mfem::ParGridFunction *density = nullptr;
+struct turbModelToThermoChem {
+  const mfem::ParGridFunction *eddy_viscosity = nullptr;  
 };
 
 
 /**
- * Provides interface for thermochemical model implementation
+ * Provides interface for turbulence model implementation
  * to be used for time split schemes, such as those available through
  * LoMachSolver
  */
-class ThermoChemModelBase {
+class TurbModelBase {
  protected:
-  const flowToThermoChem *flow_interface_;
-  const turbModelToThermoChem *turbModel_interface_;  
+  const flowToTurbModel *flow_interface_;
+  const thermoChemToTurbModel *thermoChem_interface_;  
 
  public:
   /// Destructor
-  virtual ~ThermoChemModelBase() {}
+  virtual ~TurbModelBase() {}
 
   /**
    * @brief Initialize the model-owned data
    *
    * Initialize any fields that this model owns.  This *must* include
-   * the interface fields in thermoChemToFlow, but it may include
+   * the interface fields in turbModelToFlow, but it may include
    * other fields as well (i.e.., internal state variables such as
    * temperature and/or species densities).  No parameters are passed
    * b/c it is assumed that any necessary information is stored as
@@ -95,50 +93,47 @@ class ThermoChemModelBase {
   /**
    * @brief Initialize data from the flow class
    *
-   * Initialize fields that the thermochemistry model needs from the
+   * Initialize fields that the turbulence model needs from the
    * flow.
    */
-  void initializeFromFlow(flowToThermoChem *flow) { flow_interface_ = flow; }
+  void initializeFromFlow(flowToTurbModel *flow) { flow_interface_ = flow; }
 
   /// Get interface provided by flow model
-  const flowToThermoChem *getFlowInterface() const { return flow_interface_; }
+  const flowToTurbModel *getFlowInterface() const { return flow_interface_; }
 
   /// Interface object, provides fields necessary for the flow
-  thermoChemToFlow toFlow_interface;
+  turbModelToFlow toFlow_interface;
   
   /**
-   * @brief Initialize data from the turbulence model class
+   * @brief Initialize data from the thermoChem class
    *
-   * Initialize fields that the thermochemistry model needs from the
+   * Initialize fields that the turbulence model needs from the
    * turbulence model.
    */
-  void initializeFromTurbModel(turbModelToThermoChem *turbModel) { turbModel_interface_ = turbModel; }
+  void initializeFromThermoChem(turbModelToThermoChem *thermoChem) { thermoChem_interface_ = thermoChem; }
 
-  /// Get interface provided by flow model
-  const turbModelToThermoChem *getTurbModelInterface() const { return turbModel_interface_; }
+  /// Get interface provided by thermoChem model
+  const thermoChemToTurbModel *getThermoChemInterface() const { return thermoChem_interface_; }
   
   /// Interface object, provides fields necessary for the turbModel
-  thermoChemToTurbModel toTurbModel_interface;
+  turbModelToThermoChem toThermoChem_interface;
   
 };
 
 /**
- * Provides simplest possible thermochemistry model---i.e., constant
- * density, constant viscosity, zero thermal divergence.
+ * Provides simplest possible turbulence model---i.e.,
+ * zero eddy viscosity.
  */
-class ConstantPropertyThermoChem : public ThermoChemModelBase {
+class ZeroTurbModel : public TurbModelBase {
  protected:
   mfem::ParMesh *pmesh_;
   const int sorder_;
-  const double rho_;
-  const double mu_;
+  const double nuT_;
 
   mfem::FiniteElementCollection *fec_ = nullptr;
   mfem::ParFiniteElementSpace *fes_ = nullptr;
 
-  mfem::ParGridFunction *density_ = nullptr;
-  mfem::ParGridFunction *viscosity_ = nullptr;
-  mfem::ParGridFunction *thermal_divergence_ = nullptr;
+  mfem::ParGridFunction *eddy_viscosity_ = nullptr;
 
  public:
   /**
@@ -148,13 +143,12 @@ class ConstantPropertyThermoChem : public ThermoChemModelBase {
    *
    * @param pmesh A pointer to the mesh
    * @param sorder The polynomial order for scalar fields
-   * @param rho The (constant) value to use for the density
-   * @param mu The (constant) value to use for the viscosity
+   * @param nuT The (zero) value to use for the eddy viscosity
    */
-  ConstantPropertyThermoChem(mfem::ParMesh *pmesh, int sorder, double rho, double mu);
+  ZeroTurbModel(mfem::ParMesh *pmesh, int sorder, double nuT);
 
   /// Free the interface fields and support objects
-  ~ConstantPropertyThermoChem() final;
+  ~ZeroTurbModel() final;
 
   /// Allocate and initialize the interface fields to constant values
   void initializeSelf() final;
@@ -163,4 +157,4 @@ class ConstantPropertyThermoChem : public ThermoChemModelBase {
   void step() final {}
 };
 
-#endif  // THERMO_CHEM_BASE_HPP_
+#endif  // TURB_MODEL_BASE_HPP_

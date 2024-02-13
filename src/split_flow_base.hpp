@@ -39,6 +39,8 @@
 
 struct thermoChemToFlow;
 
+struct turbModelToFlow;
+
 struct timeCoefficients {
   // Current time
   double time;
@@ -65,9 +67,16 @@ struct flowToThermoChem {
   const mfem::ParGridFunction *swirl = nullptr;
 };
 
+struct flowToTurbModel {
+  const mfem::ParGridFunction *gradU = nullptr;
+  const mfem::ParGridFunction *gradV = nullptr;
+  const mfem::ParGridFunction *gradW = nullptr;    
+};
+
 class FlowBase {
  protected:
   const thermoChemToFlow *thermo_interface_;
+  const turbModelToFlow *turbModel_interface_;  
 
  public:
   /// Destructor
@@ -78,8 +87,12 @@ class FlowBase {
   virtual void step() = 0;
 
   virtual mfem::ParGridFunction *getCurrentVelocity() = 0;
+  virtual mfem::ParGridFunction *getCurrentVelocityGradientU() = 0;
+  virtual mfem::ParGridFunction *getCurrentVelocityGradientV() = 0;
+  virtual mfem::ParGridFunction *getCurrentVelocityGradientW() = 0;    
 
   void initializeFromThermoChem(thermoChemToFlow *thermo) { thermo_interface_ = thermo; }
+  void initializeFromTurbModel(turbModelToFlow *turbModel) { turbModel_interface_ = turbModel; }  
 
   virtual void initializeOperators() {}
 
@@ -88,6 +101,12 @@ class FlowBase {
 
   /// Get interface provided by thermo model
   const thermoChemToFlow *getThermoInterface() const { return thermo_interface_; }
+
+  /// Interface object, provides fields necessary for the turbulence model
+  flowToTurbModel interface;
+
+  /// Get interface provided by thermo model
+  const turbModelToFlow *getTurbModelInterface() const { return turbModel_interface_; }  
 };
 
 class ZeroFlow : public FlowBase {
