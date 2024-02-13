@@ -219,6 +219,14 @@ class Tomboulides : public FlowBase {
    */
   void initializeOperators() final;
 
+  /**
+   * @brief Initialize IO
+   *
+   * Register the state with the IODataOrganizer object so that it can
+   * be read/written.  Must be called after initializeSelf().
+   */
+  void initializeIO(IODataOrganizer &io) const final;
+
   /// Advance
   void step() final;
 

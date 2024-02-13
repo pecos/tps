@@ -37,6 +37,7 @@
 
 #include "tps_mfem_wrap.hpp"
 
+class IODataOrganizer;
 struct thermoChemToFlow;
 
 struct timeCoefficients {
@@ -82,6 +83,8 @@ class FlowBase {
   void initializeFromThermoChem(thermoChemToFlow *thermo) { thermo_interface_ = thermo; }
 
   virtual void initializeOperators() {}
+
+  virtual void initializeIO(IODataOrganizer &io) const {}
 
   /// Interface object, provides fields necessary for the thermochemistry model
   flowToThermoChem interface;
