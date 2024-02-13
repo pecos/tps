@@ -51,9 +51,9 @@ void LoMachSolver::write_restart_files_hdf5(hid_t file, bool serialized_write) {
     // current iteration count
     h5_save_attribute(file, "iteration", iter);
     // total time
-    h5_save_attribute(file, "time", time);
+    h5_save_attribute(file, "time", temporal_coeff_.time);
     // timestep
-    h5_save_attribute(file, "dt", dt);
+    h5_save_attribute(file, "dt", temporal_coeff_.dt);
     // solution order
     h5_save_attribute(file, "order", order);
     // spatial dimension
@@ -107,22 +107,22 @@ void LoMachSolver::read_restart_files_hdf5(hid_t file, bool serialized_read) {
 
   if (rank0_ || !serialized_read) {
     h5_read_attribute(file, "iteration", iter);
-    h5_read_attribute(file, "time", time);
-    h5_read_attribute(file, "dt", dt);
+    h5_read_attribute(file, "time", temporal_coeff_.time);
+    h5_read_attribute(file, "dt", temporal_coeff_.dt);
     h5_read_attribute(file, "order", read_order);
   }
 
   if (serialized_read) {
     MPI_Bcast(&iter, 1, MPI_INT, 0, TPSCommWorld);
-    MPI_Bcast(&time, 1, MPI_DOUBLE, 0, TPSCommWorld);
-    MPI_Bcast(&dt, 1, MPI_DOUBLE, 0, TPSCommWorld);
+    MPI_Bcast(&(temporal_coeff_.time), 1, MPI_DOUBLE, 0, TPSCommWorld);
+    MPI_Bcast(&(temporal_coeff_.dt), 1, MPI_DOUBLE, 0, TPSCommWorld);
     MPI_Bcast(&read_order, 1, MPI_INT, 0, TPSCommWorld);
   }
 
   if (rank0_) {
     grvy_printf(ginfo, "Restarting from iteration = %i\n", iter);
-    grvy_printf(ginfo, "--> time = %e\n", time);
-    grvy_printf(ginfo, "--> dt   = %e\n", dt);
+    grvy_printf(ginfo, "--> time = %e\n", temporal_coeff_.time);
+    grvy_printf(ginfo, "--> dt   = %e\n", temporal_coeff_.dt);
   }
 
   // -------------------------------------------------------------------

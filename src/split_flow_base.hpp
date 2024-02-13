@@ -40,25 +40,6 @@
 class IODataOrganizer;
 struct thermoChemToFlow;
 
-struct timeCoefficients {
-  // Current time
-  double time;
-
-  // Time step
-  double dt;
-
-  // "Adams-Bashforth" coefficients (explicit)
-  double ab1;
-  double ab2;
-  double ab3;
-
-  // "Backward difference" coefficients (implicit)
-  double bd0;
-  double bd1;
-  double bd2;
-  double bd3;
-};
-
 struct flowToThermoChem {
   const mfem::ParGridFunction *velocity = nullptr;
 

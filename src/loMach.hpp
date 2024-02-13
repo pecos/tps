@@ -56,6 +56,30 @@ class Tps;
 #include "thermo_chem_base.hpp"
 #include "tps_mfem_wrap.hpp"
 
+struct temporalSchemeCoefficients {
+  // Current time
+  double time;
+
+  // Time step
+  double dt;
+
+  // Previous time steps
+  double dt1;
+  double dt2;
+  double dt3;
+
+  // "Adams-Bashforth" coefficients (explicit)
+  double ab1;
+  double ab2;
+  double ab3;
+
+  // "Backward difference" coefficients (implicit)
+  double bd0;
+  double bd1;
+  double bd2;
+  double bd3;
+};
+
 /**
  * @brief Driver class for models based on low Mach, variable density formulation
  */
@@ -134,26 +158,12 @@ class LoMachSolver : public TPS::Solver {
   int numWalls, numInlets, numOutlets;
 
   // Time marching related parameters
-  double dt;
-  double time;
   int iter;
-
   int MaxIters;
   double CFL;
 
   int max_bdf_order;  // input option now
-  std::vector<double> dthist = {0.0, 0.0, 0.0};
-
-  // BDFk/EXTk coefficients.
-  double bd0 = 0.0;
-  double bd1 = 0.0;
-  double bd2 = 0.0;
-  double bd3 = 0.0;
-  double ab1 = 0.0;
-  double ab2 = 0.0;
-  double ab3 = 0.0;
-  std::vector<double> abCoef = {ab1, ab2, ab3};
-  std::vector<double> bdfCoef = {bd0, bd1, bd2, bd3};
+  temporalSchemeCoefficients temporal_coeff_;
 
   /// The order of the velocity and pressure space.
   int order;
