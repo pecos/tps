@@ -272,7 +272,7 @@ class LoMachSolver : public TPS::Solver {
   LoMachSolver(LoMachOptions loMach_opts, TPS::Tps *tps);
 
   /// Dtor TODO(trevilo): this needs to free memory
-  virtual ~LoMachSolver() {}
+  virtual ~LoMachSolver();
 
   void initialize();
   void parseSolverOptions() override;
