@@ -60,7 +60,7 @@ LoMachSolver::LoMachSolver(LoMachOptions loMach_opts, TPS::Tps *tps)
       nprocs_(groupsMPI->getTPSWorldSize()),
       rank_(groupsMPI->getTPSWorldRank()),
       rank0_(groupsMPI->isWorldRoot()) {
-  pmesh = NULL;
+  pmesh_ = NULL;
 
   // is this needed?
   groupsMPI->init();
@@ -92,7 +92,7 @@ LoMachSolver::~LoMachSolver() {
   delete sfec;
   delete flow_;
   delete thermo_;
-  delete pmesh;
+  delete pmesh_;
 
   // allocated in constructor
   delete groupsMPI;
@@ -138,7 +138,6 @@ void LoMachSolver::initialize() {
 
   // Read the serial mesh (on each mpi rank)
   Mesh mesh = Mesh(loMach_opts_.mesh_file.c_str());
-  Mesh *mesh_ptr = &mesh;
   Mesh *serial_mesh = &mesh;
   if (verbose) grvy_printf(ginfo, "Mesh read...\n");
 
@@ -147,13 +146,10 @@ void LoMachSolver::initialize() {
   if (verbose) grvy_printf(ginfo, "Mesh made periodic (if applicable)...\n");
 
   // underscore stuff is terrible
-  dim_ = mesh_ptr->Dimension();
-  // int dim = pmesh->Dimension();
-  dim = dim_;
-  // if (verbose) grvy_printf(ginfo, "Got mesh dim...\n");
+  dim_ = mesh.Dimension();
 
   // HACK HACK HACK HARD CODE
-  nvel = dim;
+  nvel_ = dim_;
 
   eqSystem = config.GetEquationSystem();
 
@@ -222,15 +218,15 @@ void LoMachSolver::initialize() {
   }
 
   // 1c) Partition the mesh (see partitioning_ in M2ulPhyS)
-  // pmesh_ = new ParMesh(MPI_COMM_WORLD, *mesh);
-  pmesh = new ParMesh(MPI_COMM_WORLD, periodic_mesh);
+  // pmesh__ = new ParMesh(MPI_COMM_WORLD, *mesh);
+  pmesh_ = new ParMesh(MPI_COMM_WORLD, periodic_mesh);
   if (verbose) grvy_printf(ginfo, "Mesh partitioned...\n");
 
   // instantiate physics models
-  // turbClass = new TurbModel(pmesh, &config, &loMach_opts_);
+  // turbClass = new TurbModel(pmesh_, &config, &loMach_opts_);
 
-  thermo_ = new ConstantPropertyThermoChem(pmesh, 1, 1.0, 1.0);
-  flow_ = new ZeroFlow(pmesh, 1);
+  thermo_ = new ConstantPropertyThermoChem(pmesh_, 1, 1.0, 1.0);
+  flow_ = new ZeroFlow(pmesh_, 1);
 
   //-----------------------------------------------------
   // 2) Prepare the required finite elements
@@ -238,7 +234,7 @@ void LoMachSolver::initialize() {
 
   // scalar
   sfec = new H1_FECollection(order);
-  sfes = new ParFiniteElementSpace(pmesh, sfec);
+  sfes = new ParFiniteElementSpace(pmesh_, sfec);
 
   if (verbose) grvy_printf(ginfo, "Spaces constructed...\n");
 
@@ -289,20 +285,20 @@ void LoMachSolver::initialize() {
   // Determine the minimum element size.
   {
     double local_hmin = 1.0e18;
-    for (int i = 0; i < pmesh->GetNE(); i++) {
-      local_hmin = min(pmesh->GetElementSize(i, 1), local_hmin);
+    for (int i = 0; i < pmesh_->GetNE(); i++) {
+      local_hmin = min(pmesh_->GetElementSize(i, 1), local_hmin);
     }
-    MPI_Allreduce(&local_hmin, &hmin, 1, MPI_DOUBLE, MPI_MIN, pmesh->GetComm());
+    MPI_Allreduce(&local_hmin, &hmin, 1, MPI_DOUBLE, MPI_MIN, pmesh_->GetComm());
   }
   if (verbose) grvy_printf(ginfo, "Min element size found...\n");
 
   // maximum size
   {
     double local_hmax = 1.0e-15;
-    for (int i = 0; i < pmesh->GetNE(); i++) {
-      local_hmax = max(pmesh->GetElementSize(i, 1), local_hmax);
+    for (int i = 0; i < pmesh_->GetNE(); i++) {
+      local_hmax = max(pmesh_->GetElementSize(i, 1), local_hmax);
     }
-    MPI_Allreduce(&local_hmax, &hmax, 1, MPI_DOUBLE, MPI_MAX, pmesh->GetComm());
+    MPI_Allreduce(&local_hmax, &hmax, 1, MPI_DOUBLE, MPI_MAX, pmesh_->GetComm());
   }
   if (verbose) grvy_printf(ginfo, "Max element size found...\n");
 
@@ -346,7 +342,7 @@ void LoMachSolver::initialize() {
       for (int dof = 0; dof < elndofs; ++dof) {
         const IntegrationPoint &ip = el->GetNodes().IntPoint(dof);
         tr->SetIntPoint(&ip);
-        delta = pmesh->GetElementSize(tr->ElementNo, 1);
+        delta = pmesh_->GetElementSize(tr->ElementNo, 1);
         delta = delta / ((double)order);
         vals(dof) = delta;
       }
@@ -388,8 +384,8 @@ void LoMachSolver::initialize() {
 
   // Determine domain bounding box size
   ParGridFunction coordsVert(sfes);
-  pmesh->GetVertices(coordsVert);
-  int nVert = coordsVert.Size() / dim;
+  pmesh_->GetVertices(coordsVert);
+  int nVert = coordsVert.Size() / dim_;
   {
     double local_xmin = 1.0e18;
     double local_ymin = 1.0e18;
@@ -400,26 +396,26 @@ void LoMachSolver::initialize() {
     for (int n = 0; n < nVert; n++) {
       auto hcoords = coordsVert.HostRead();
       double coords[3];
-      for (int d = 0; d < dim; d++) {
+      for (int d = 0; d < dim_; d++) {
         coords[d] = hcoords[n + d * nVert];
       }
       local_xmin = min(coords[0], local_xmin);
       local_ymin = min(coords[1], local_ymin);
-      if (dim == 3) {
+      if (dim_ == 3) {
         local_zmin = min(coords[2], local_zmin);
       }
       local_xmax = max(coords[0], local_xmax);
       local_ymax = max(coords[1], local_ymax);
-      if (dim == 3) {
+      if (dim_ == 3) {
         local_zmax = max(coords[2], local_zmax);
       }
     }
-    MPI_Allreduce(&local_xmin, &xmin, 1, MPI_DOUBLE, MPI_MIN, pmesh->GetComm());
-    MPI_Allreduce(&local_ymin, &ymin, 1, MPI_DOUBLE, MPI_MIN, pmesh->GetComm());
-    MPI_Allreduce(&local_zmin, &zmin, 1, MPI_DOUBLE, MPI_MIN, pmesh->GetComm());
-    MPI_Allreduce(&local_xmax, &xmax, 1, MPI_DOUBLE, MPI_MAX, pmesh->GetComm());
-    MPI_Allreduce(&local_ymax, &ymax, 1, MPI_DOUBLE, MPI_MAX, pmesh->GetComm());
-    MPI_Allreduce(&local_zmax, &zmax, 1, MPI_DOUBLE, MPI_MAX, pmesh->GetComm());
+    MPI_Allreduce(&local_xmin, &xmin, 1, MPI_DOUBLE, MPI_MIN, pmesh_->GetComm());
+    MPI_Allreduce(&local_ymin, &ymin, 1, MPI_DOUBLE, MPI_MIN, pmesh_->GetComm());
+    MPI_Allreduce(&local_zmin, &zmin, 1, MPI_DOUBLE, MPI_MIN, pmesh_->GetComm());
+    MPI_Allreduce(&local_xmax, &xmax, 1, MPI_DOUBLE, MPI_MAX, pmesh_->GetComm());
+    MPI_Allreduce(&local_ymax, &ymax, 1, MPI_DOUBLE, MPI_MAX, pmesh_->GetComm());
+    MPI_Allreduce(&local_zmax, &zmax, 1, MPI_DOUBLE, MPI_MAX, pmesh_->GetComm());
   }
 
   //
@@ -506,7 +502,7 @@ void LoMachSolver::solve() {
   ParGridFunction *u_gf = flow_->getCurrentVelocity();
   // const ParGridFunction *p_gf = flow_->GetCurrentPressure();
 
-  ParaViewDataCollection pvdc("output", pmesh);
+  ParaViewDataCollection pvdc("output", pmesh_);
   pvdc.SetDataFormat(VTKFormat::BINARY32);
   pvdc.SetHighOrderOutput(true);
   pvdc.SetLevelsOfDetail(order);
@@ -652,14 +648,14 @@ void LoMachSolver::updateTimestep() {
   for (int n = 0; n < Sdof; n++) {
     Umag = 0.0;
     Vector delta({dataD[n], dataD[n], dataD[n]});  // use smallest delta for all
-    for (int eq = 0; eq < dim; eq++) {
+    for (int eq = 0; eq < dim_; eq++) {
       Umag += (dataU[n + eq * Sdof] / delta[eq]) * (dataU[n + eq * Sdof] / delta[eq]);
     }
     Umag = std::sqrt(Umag);
     Umax_lcl = std::max(Umag, Umax_lcl);
   }
 
-  MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, pmesh->GetComm());
+  MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, pmesh_->GetComm());
   double dtInst_conv = 0.5 * CFL / max_speed;
 
   // double *dGradU = flowClass->gradU.HostReadWrite();
@@ -670,19 +666,19 @@ void LoMachSolver::updateTimestep() {
   // Umax_lcl = 1.0e-12;
   // for (int n = 0; n < SdofInt; n++) {
   //   DenseMatrix gU;
-  //   gU.SetSize(nvel, dim);
-  //   for (int dir = 0; dir < dim; dir++) {
+  //   gU.SetSize(nvel_, dim_);
+  //   for (int dir = 0; dir < dim_; dir++) {
   //     gU(0, dir) = dGradU[n + dir * SdofInt];
   //   }
-  //   for (int dir = 0; dir < dim; dir++) {
+  //   for (int dir = 0; dir < dim_; dir++) {
   //     gU(1, dir) = dGradV[n + dir * SdofInt];
   //   }
-  //   for (int dir = 0; dir < dim; dir++) {
+  //   for (int dir = 0; dir < dim_; dir++) {
   //     gU(2, dir) = dGradW[n + dir * SdofInt];
   //   }
   //   double duMag = 0.0;
-  //   for (int dir = 0; dir < dim; dir++) {
-  //     for (int eq = 0; eq < nvel; eq++) {
+  //   for (int dir = 0; dir < dim_; dir++) {
+  //     for (int eq = 0; eq < nvel_; eq++) {
   //       duMag += gU(eq, dir) * gU(eq, dir);
   //     }
   //   }
@@ -691,7 +687,7 @@ void LoMachSolver::updateTimestep() {
   //   viscVel /= dataD[n];
   //   Umax_lcl = std::max(viscVel, Umax_lcl);
   // }
-  // MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, pmesh->GetComm());
+  // MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, pmesh_->GetComm());
   // double dtInst_visc = 0.5 * CFL / max_speed;
 
   // double dtInst = max(dtInst_conv, dtInst_visc);
@@ -727,13 +723,13 @@ double LoMachSolver::computeCFL(double dt) {
     Umag = 0.0;
     // Vector delta({dataX[n], dataY[n], dataZ[n]});
     Vector delta({dataD[n], dataD[n], dataD[n]});  // use smallest delta for all
-    for (int eq = 0; eq < dim; eq++) {
+    for (int eq = 0; eq < dim_; eq++) {
       Umag += (dataU[n + eq * Sdof] / delta[eq]) * (dataU[n + eq * Sdof] / delta[eq]);
     }
     Umag = std::sqrt(Umag);
     Umax_lcl = std::max(Umag, Umax_lcl);
   }
-  MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, pmesh->GetComm());
+  MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, pmesh_->GetComm());
   double CFL_conv = 2.0 * dt * max_speed;
 
   // double *dGradU = flowClass->gradU.HostReadWrite();
@@ -744,19 +740,19 @@ double LoMachSolver::computeCFL(double dt) {
   // Umax_lcl = 1.0e-12;
   // for (int n = 0; n < SdofInt; n++) {
   //   DenseMatrix gU;
-  //   gU.SetSize(nvel, dim);
-  //   for (int dir = 0; dir < dim; dir++) {
+  //   gU.SetSize(nvel_, dim_);
+  //   for (int dir = 0; dir < dim_; dir++) {
   //     gU(0, dir) = dGradU[n + dir * SdofInt];
   //   }
-  //   for (int dir = 0; dir < dim; dir++) {
+  //   for (int dir = 0; dir < dim_; dir++) {
   //     gU(1, dir) = dGradV[n + dir * SdofInt];
   //   }
-  //   for (int dir = 0; dir < dim; dir++) {
+  //   for (int dir = 0; dir < dim_; dir++) {
   //     gU(2, dir) = dGradW[n + dir * SdofInt];
   //   }
   //   double duMag = 0.0;
-  //   for (int dir = 0; dir < dim; dir++) {
-  //     for (int eq = 0; eq < nvel; eq++) {
+  //   for (int dir = 0; dir < dim_; dir++) {
+  //     for (int eq = 0; eq < nvel_; eq++) {
   //       duMag += gU(eq, dir) * gU(eq, dir);
   //     }
   //   }
@@ -765,7 +761,7 @@ double LoMachSolver::computeCFL(double dt) {
   //   viscVel /= dataD[n];
   //   Umax_lcl = std::max(viscVel, Umax_lcl);
   // }
-  // MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, pmesh->GetComm());
+  // MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, pmesh_->GetComm());
   // double CFL_visc = 2.0 * dt * max_speed;
 
   // double CFL_here = max(CFL_conv, CFL_visc);
@@ -784,13 +780,13 @@ void LoMachSolver::setTimestep() {
   auto dataU = flow_->getCurrentVelocity()->HostRead();
   for (int n = 0; n < Sdof; n++) {
     Umag = 0.0;
-    for (int eq = 0; eq < dim; eq++) {
+    for (int eq = 0; eq < dim_; eq++) {
       Umag += dataU[n + eq * Sdof] * dataU[n + eq * Sdof];
     }
     Umag = std::sqrt(Umag);
     Umax_lcl = std::max(Umag, Umax_lcl);
   }
-  MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, pmesh->GetComm());
+  MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, pmesh_->GetComm());
   double dtInst = CFL * hmin / (max_speed * (double)order);
   dt = dtInst;
   std::cout << "dt from setTimestep: " << dt << " max_speed: " << max_speed << endl;
@@ -853,9 +849,9 @@ void LoMachSolver::PrintTimingData() {
   my_rt[4] = sw_spsolve.RealTime();
   my_rt[5] = sw_hsolve.RealTime();
 
-  MPI_Reduce(my_rt, rt_max, 6, MPI_DOUBLE, MPI_MAX, 0, pmesh->GetComm());
+  MPI_Reduce(my_rt, rt_max, 6, MPI_DOUBLE, MPI_MAX, 0, pmesh_->GetComm());
 
-  if (pmesh->GetMyRank() == 0) {
+  if (pmesh_->GetMyRank() == 0) {
     mfem::out << std::setw(10) << "SETUP" << std::setw(10) << "STEP" << std::setw(10) << "EXTRAP" << std::setw(10)
               << "CURLCURL" << std::setw(10) << "PSOLVE" << std::setw(10) << "HSOLVE"
               << "\n";

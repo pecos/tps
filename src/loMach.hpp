@@ -82,18 +82,13 @@ class LoMachSolver : public TPS::Solver {
   // Early terminatation flag
   int earlyExit = 0;
 
-  // Number of dimensions
-  int dim;
-  int nvel;
-
   double dt;
   double time;
   int iter;
 
-  mfem::ParMesh *pmesh_ = nullptr;
+  ParMesh *pmesh_ = nullptr;
   int dim_;
-  int true_size_;
-  Array<int> offsets_;
+  int nvel_;
 
   // min/max element size
   double hmin, hmax;
@@ -132,9 +127,6 @@ class LoMachSolver : public TPS::Solver {
   /// Enable/disable numerical integration rules of forms.
   // bool numerical_integ = false;
   bool numerical_integ = true;
-
-  /// The parallel mesh.
-  ParMesh *pmesh = nullptr;
 
   /// The order of the velocity and pressure space.
   int order;
