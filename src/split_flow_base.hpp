@@ -39,27 +39,7 @@
 
 class IODataOrganizer;
 struct thermoChemToFlow;
-
 struct turbModelToFlow;
-
-struct timeCoefficients {
-  // Current time
-  double time;
-
-  // Time step
-  double dt;
-
-  // "Adams-Bashforth" coefficients (explicit)
-  double ab1;
-  double ab2;
-  double ab3;
-
-  // "Backward difference" coefficients (implicit)
-  double bd0;
-  double bd1;
-  double bd2;
-  double bd3;
-};
 
 struct flowToThermoChem {
   const mfem::ParGridFunction *velocity = nullptr;
@@ -71,13 +51,13 @@ struct flowToThermoChem {
 struct flowToTurbModel {
   const mfem::ParGridFunction *gradU = nullptr;
   const mfem::ParGridFunction *gradV = nullptr;
-  const mfem::ParGridFunction *gradW = nullptr;    
+  const mfem::ParGridFunction *gradW = nullptr;
 };
 
 class FlowBase {
  protected:
   const thermoChemToFlow *thermo_interface_;
-  const turbModelToFlow *turbModel_interface_;  
+  const turbModelToFlow *turbModel_interface_;
 
  public:
   /// Destructor
@@ -88,12 +68,12 @@ class FlowBase {
   virtual void step() = 0;
 
   virtual mfem::ParGridFunction *getCurrentVelocity() = 0;
-  virtual mfem::ParGridFunction *getCurrentVelocityGradientU() = 0;
-  virtual mfem::ParGridFunction *getCurrentVelocityGradientV() = 0;
-  virtual mfem::ParGridFunction *getCurrentVelocityGradientW() = 0;    
+  virtual mfem::ParGridFunction *getCurrentVelocityGradientU() { return nullptr; }
+  virtual mfem::ParGridFunction *getCurrentVelocityGradientV() { return nullptr; }
+  virtual mfem::ParGridFunction *getCurrentVelocityGradientW() { return nullptr; }
 
   void initializeFromThermoChem(thermoChemToFlow *thermo) { thermo_interface_ = thermo; }
-  void initializeFromTurbModel(turbModelToFlow *turbModel) { turbModel_interface_ = turbModel; }  
+  void initializeFromTurbModel(turbModelToFlow *turbModel) { turbModel_interface_ = turbModel; }
 
   virtual void initializeOperators() {}
 
@@ -109,7 +89,7 @@ class FlowBase {
   flowToTurbModel toTurbModel_interface;
 
   /// Get interface provided by thermo model
-  const turbModelToFlow *getTurbModelInterface() const { return turbModel_interface_; }  
+  const turbModelToFlow *getTurbModelInterface() const { return turbModel_interface_; }
 };
 
 class ZeroFlow : public FlowBase {

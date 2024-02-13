@@ -34,6 +34,7 @@ using ScalarFuncT = double(const Vector &x, double t);
 
 class LoMachSolver;
 class LoMachOptions;
+struct temporalSchemeCoefficients;
 
 /// Container for a Dirichlet boundary condition of the temperature field.
 class TempDirichletBC_T
@@ -159,7 +160,7 @@ private:
    // Coefficients necessary to take a time step (including dt).
    // Assumed to be externally managed and determined, so just get a
    // reference here.
-   const timeCoefficients &timeCoeff_;
+   const temporalSchemeCoefficients &timeCoeff_;
   
    // temporary
    double Re_tau, Pr, Cp, gamma;
@@ -347,7 +348,7 @@ private:
   
   
 public:
-  ThermoChem(mfem::ParMesh *pmesh, RunConfiguration *config, LoMachOptions *loMach_opts, timeCoefficients &timeCoeff);  
+  ThermoChem(mfem::ParMesh *pmesh, RunConfiguration *config, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff);  
   virtual ~ThermoChem() {}
 
    void initializeSelf();

@@ -37,10 +37,7 @@ using namespace mfem;
 ZeroFlow::ZeroFlow(mfem::ParMesh *pmesh, int vorder) : pmesh_(pmesh), vorder_(vorder), dim_(pmesh->Dimension()) {}
 
 ZeroFlow::~ZeroFlow() {
-  delete toThermoChem_interface.velocity;
-  delete toTurbModel_interface.gradU;
-  delete toTurbModel_interface.gradV;
-  delete toTurbModel_interface.gradW;    
+  delete velocity_;
   delete fes_;
   delete fec_;
 }
@@ -54,8 +51,7 @@ void ZeroFlow::initializeSelf() {
   toThermoChem_interface.velocity = velocity_;
   toThermoChem_interface.swirl_supported = false;
 
-  toTurbModel_interface.gradU = velocity_;
-  toTurbModel_interface.gradV = velocity_;
-  toTurbModel_interface.gradW = velocity_;  
-  
+  toTurbModel_interface.gradU = nullptr;
+  toTurbModel_interface.gradV = nullptr;
+  toTurbModel_interface.gradW = nullptr;
 }

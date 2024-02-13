@@ -3,7 +3,7 @@
 
 #include "turbModel.hpp"
 //#include "thermoChem.hpp"
-//#include "loMach.hpp"
+#include "loMach.hpp"
 #include "loMach_options.hpp"
 #include "mfem/general/forall.hpp"
 #include "mfem/linalg/solvers.hpp"
@@ -18,7 +18,7 @@ using namespace mfem;
 using namespace mfem::common;
 
 
-TurbModel::TurbModel(mfem::ParMesh *pmesh, RunConfiguration *config, LoMachOptions *loMach_opts, timeCoefficients &timeCoeff)
+TurbModel::TurbModel(mfem::ParMesh *pmesh, RunConfiguration *config, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff)
   : pmesh_(pmesh),
     loMach_opts_(loMach_opts),
     config_(config),

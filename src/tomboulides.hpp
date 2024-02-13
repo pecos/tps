@@ -39,6 +39,8 @@
  *
  */
 
+struct temporalSchemeCoefficients;
+
 #include "dirichlet_bc_helper.hpp"
 #include "split_flow_base.hpp"
 
@@ -96,7 +98,7 @@ class Tomboulides : public FlowBase {
   // Coefficients necessary to take a time step (including dt).
   // Assumed to be externally managed and determined, so just get a
   // reference here.
-  const timeCoefficients &coeff_;
+  const temporalSchemeCoefficients &coeff_;
 
   // Object used to build forcing
   mfem::VectorConstantCoefficient *gravity_vec_;
@@ -201,7 +203,7 @@ class Tomboulides : public FlowBase {
 
  public:
   /// Constructor
-  Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, timeCoefficients &coeff);
+  Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalSchemeCoefficients &coeff);
 
   /// Destructor
   ~Tomboulides() final;

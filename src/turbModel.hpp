@@ -34,7 +34,7 @@ using ScalarFuncT = double(const Vector &x, double t);
 
 class LoMachSolver;
 class LoMachOptions;
-
+struct temporalSchemeCoefficients;
 
 /// Add some description here...
 class TurbModel : public TurbModelBase {
@@ -107,7 +107,7 @@ private:
    // Coefficients necessary to take a time step (including dt).
    // Assumed to be externally managed and determined, so just get a
    // reference here.
-   const timeCoefficients &timeCoeff_;
+   const temporalSchemeCoefficients &timeCoeff_;
   
    // Scalar \f$H^1\f$ finite element collection.
    FiniteElementCollection *sfec = nullptr;
@@ -280,7 +280,7 @@ private:
    //ParGridFunction *bufferSubgridVisc;
   
 public:
-  TurbModel(mfem::ParMesh *pmesh, RunConfiguration *config, LoMachOptions *loMach_opts, timeCoefficients &timeCoeff);  
+  TurbModel(mfem::ParMesh *pmesh, RunConfiguration *config, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff);  
   virtual ~TurbModel() {}
 
    void initializeSelf();

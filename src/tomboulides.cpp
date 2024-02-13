@@ -3,6 +3,7 @@
 #include <mfem/general/forall.hpp>
 
 #include "io.hpp"
+#include "loMach.hpp"
 #include "thermo_chem_base.hpp"
 #include "utils.hpp"
 
@@ -23,7 +24,7 @@ void Orthogonalize(Vector &v, const ParFiniteElementSpace *pfes) {
   v -= global_sum / static_cast<double>(global_size);
 }
 
-Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, timeCoefficients &coeff)
+Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalSchemeCoefficients &coeff)
     : gll_rules(0, Quadrature1D::GaussLobatto),
       pmesh_(pmesh),
       vorder_(vorder),
@@ -101,9 +102,9 @@ void Tomboulides::initializeSelf() {
   toThermoChem_interface.velocity = u_next_gf_;
 
   // NEEDS TO BE ADDED
-  //toTurbModel_interface.gradU = gradU_gf_;
-  //toTurbModel_interface.gradV = gradV_gf_;
-  //toTurbModel_interface.gradW = gradW_gf_;    
+  // toTurbModel_interface.gradU = gradU_gf_;
+  // toTurbModel_interface.gradV = gradV_gf_;
+  // toTurbModel_interface.gradW = gradW_gf_;
 
   // Add gravity forcing
   assert(dim_ >= 2);

@@ -1,7 +1,7 @@
 
 //#include "turbModel.hpp"
 #include "thermoChem.hpp"
-//#include "loMach.hpp"
+#include "loMach.hpp"
 #include "loMach_options.hpp"
 #include "mfem/general/forall.hpp"
 #include "mfem/linalg/solvers.hpp"
@@ -23,7 +23,7 @@ double temp_wallBox(const Vector &x, double t);
 double temp_inlet(const Vector &x, double t);
 
 
-ThermoChem::ThermoChem(mfem::ParMesh *pmesh, RunConfiguration *config, LoMachOptions *loMach_opts, timeCoefficients &timeCoeff)
+ThermoChem::ThermoChem(mfem::ParMesh *pmesh, RunConfiguration *config, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff)
   : pmesh_(pmesh),
     loMach_opts_(loMach_opts),
     config_(config),

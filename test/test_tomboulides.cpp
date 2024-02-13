@@ -8,6 +8,7 @@
 #include <mfem/general/forall.hpp>
 
 #include "../src/io.hpp"
+#include "../src/loMach.hpp"
 #include "../src/thermo_chem_base.hpp"
 #include "../src/split_flow_base.hpp"
 #include "../src/tomboulides.hpp"
@@ -24,7 +25,7 @@ void vel_exact_tg(const Vector &x, double t, Vector &u) {
   u(1) = -F * std::cos(x[0]) * std::sin(x[1]);
 }
 
-void updateTimeIntegrationCoefficients(int step, double *dthist, timeCoefficients &time_coeff) {
+void updateTimeIntegrationCoefficients(int step, temporalSchemeCoefficients &time_coeff) {
   using std::pow;
 
   // Maximum BDF order to use at current time step
@@ -37,10 +38,10 @@ void updateTimeIntegrationCoefficients(int step, double *dthist, timeCoefficient
   // Ratio of time step history at dt(t_{n-1}) - dt(t_{n-2})
   double rho2 = 0.0;
 
-  rho1 = dthist[0] / dthist[1];
+  rho1 = time_coeff.dt1 / time_coeff.dt2;
 
   if (bdf_order == 3) {
-    rho2 = dthist[1] / dthist[2];
+    rho2 = time_coeff.dt2 / time_coeff.dt3;
   }
 
   if (step == 0 && bdf_order == 1) {
@@ -179,7 +180,7 @@ int main(int argc, char *argv[]) {
   const int porder = order;
 
   // time step coefficients (1st order)
-  timeCoefficients time_coeff;
+  temporalSchemeCoefficients time_coeff;
   time_coeff.time = 0.0;
   if (dt > 0.0) {
     time_coeff.dt = dt;
@@ -187,9 +188,8 @@ int main(int argc, char *argv[]) {
     time_coeff.dt = 0.5 * hmin / vorder; // max velocity magn is 1
   }
 
-  double dthist[3];
-  dthist[0] = dthist[1] = dthist[2] = time_coeff.dt;
-  updateTimeIntegrationCoefficients(0, dthist, time_coeff);
+  time_coeff.dt3 = time_coeff.dt2 = time_coeff.dt1 = time_coeff.dt;
+  updateTimeIntegrationCoefficients(0, time_coeff);
 
   // Density and viscosity to use
   const double rho = 1.0;
@@ -261,8 +261,8 @@ int main(int argc, char *argv[]) {
 #endif
 
   // Exchange interface information
-  flow->initializeFromThermoChem(&thermo->interface);
-  thermo->initializeFromFlow(&flow->interface);
+  flow->initializeFromThermoChem(&thermo->toFlow_interface_);
+  thermo->initializeFromFlow(&flow->toThermoChem_interface);
 
   // And now we can finish initializing the flow
   flow->initializeOperators();
@@ -300,12 +300,12 @@ int main(int argc, char *argv[]) {
     }
 
     // update dt history
-    dthist[2] = dthist[1];
-    dthist[1] = dthist[0];
-    dthist[0] = time_coeff.dt;
+    time_coeff.dt3 = time_coeff.dt2;
+    time_coeff.dt2 = time_coeff.dt1;
+    time_coeff.dt1 = time_coeff.dt;
 
     // update coefficients (dt is constant here)
-    updateTimeIntegrationCoefficients(iter, dthist, time_coeff);
+    updateTimeIntegrationCoefficients(iter, time_coeff);
   }
   if (Mpi::Root()) {
     std::cout << "Final step " << iter << ": time = " << time_coeff.time << std::endl;

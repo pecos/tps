@@ -210,7 +210,7 @@ void LoMachSolver::initialize() {
     }
 
     // make sure these are actually hooked up!
-    time = 0.;
+    temporal_coeff_.time = 0.;
     iter = 0;
   }
 
@@ -261,8 +261,8 @@ void LoMachSolver::initialize() {
   flow_->initializeIO(ioData);
 
   // Exchange interface information
-  flow_->initializeFromThermoChem(&thermo_->interface);
-  thermo_->initializeFromFlow(&flow_->interface);
+  flow_->initializeFromThermoChem(&thermo_->toFlow_interface_);
+  // thermo_->initializeFromFlow(&flow_->interface);
 
   // Finish initializing operators
   flow_->initializeOperators();
@@ -438,9 +438,13 @@ void LoMachSolver::initialize() {
 
 void LoMachSolver::UpdateTimestepHistory(double dt) {
   // Rotate values in time step history
-  dthist[2] = dthist[1];
-  dthist[1] = dthist[0];
-  dthist[0] = dt;
+  // dthist[2] = dthist[1];
+  // dthist[1] = dthist[0];
+  // dthist[0] = dt;
+
+  temporal_coeff_.dt3 = temporal_coeff_.dt2;
+  temporal_coeff_.dt2 = temporal_coeff_.dt1;
+  temporal_coeff_.dt1 = dt;
 }
 
 void LoMachSolver::projectInitialSolution() {
@@ -456,7 +460,7 @@ void LoMachSolver::initialTimeStep() {
   // user requested a fixed dt run
   const double dt_fixed = config.GetFixedDT();
   if (dt_fixed > 0) {
-    dt = dt_fixed;
+    temporal_coeff_.dt = dt_fixed;
   }
 }
 
@@ -468,7 +472,7 @@ void LoMachSolver::solve() {
 
   setTimestep();
   if (iter == 0) {
-    dt = std::min(config.dt_initial, dt);
+    temporal_coeff_.dt = std::min(config.dt_initial, temporal_coeff_.dt);
   }
 
   // temporary hardcodes
@@ -482,7 +486,7 @@ void LoMachSolver::solve() {
   // then the user requested a fixed dt run
   const double dt_fixed = config.GetFixedDT();
   if (dt_fixed > 0) {
-    dt = dt_fixed;
+    temporal_coeff_.dt = dt_fixed;
   }
 
   // trevilo: What is this doing?
@@ -502,7 +506,7 @@ void LoMachSolver::solve() {
   pvdc.SetHighOrderOutput(true);
   pvdc.SetLevelsOfDetail(order);
   pvdc.SetCycle(iter);
-  pvdc.SetTime(time);
+  pvdc.SetTime(temporal_coeff_.time);
   pvdc.RegisterField("velocity", u_gf);
   // pvdc.RegisterField("pressure", p_gf);
   pvdc.Save();
@@ -612,14 +616,14 @@ void LoMachSolver::solve() {
       if (earlyExit == 1) exit(-1);
     }
 
-    UpdateTimestepHistory(dt);
-    time += dt;
+    UpdateTimestepHistory(temporal_coeff_.dt);
+    temporal_coeff_.time += temporal_coeff_.dt;
   }
   MPI_Barrier(MPI_COMM_WORLD);
 
   // paraview
   pvdc.SetCycle(iter);
-  pvdc.SetTime(time);
+  pvdc.SetTime(temporal_coeff_.time);
   if (rank0_ == true) std::cout << " Saving final step to paraview: " << iter << "... " << endl;
   pvdc.Save();
   MPI_Barrier(MPI_COMM_WORLD);
@@ -689,6 +693,7 @@ void LoMachSolver::updateTimestep() {
 
   double dtInst = dtInst_conv;
 
+  double &dt = temporal_coeff_.dt;
   if (dtInst > dt) {
     dt = dt * (1.0 + dtFactor);
     dt = std::min(dt, dtInst);
@@ -783,8 +788,8 @@ void LoMachSolver::setTimestep() {
   }
   MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, pmesh_->GetComm());
   double dtInst = CFL * hmin / (max_speed * (double)order);
-  dt = dtInst;
-  std::cout << "dt from setTimestep: " << dt << " max_speed: " << max_speed << endl;
+  temporal_coeff_.dt = dtInst;
+  std::cout << "dt from setTimestep: " << temporal_coeff_.dt << " max_speed: " << max_speed << endl;
 }
 
 void LoMachSolver::SetTimeIntegrationCoefficients(int step) {
@@ -794,44 +799,42 @@ void LoMachSolver::SetTimeIntegrationCoefficients(int step) {
 
   // Ratio of time step history at dt(t_{n}) - dt(t_{n-1})
   double rho1 = 0.0;
+  if (bdf_order >= 2) {
+    rho1 = temporal_coeff_.dt1 / temporal_coeff_.dt2;
+  }
 
   // Ratio of time step history at dt(t_{n-1}) - dt(t_{n-2})
   double rho2 = 0.0;
-
-  rho1 = dthist[0] / dthist[1];
-
   if (bdf_order == 3) {
-    rho2 = dthist[1] / dthist[2];
+    rho2 = temporal_coeff_.dt2 / temporal_coeff_.dt3;
   }
 
   if (step == 0 && bdf_order == 1) {
-    bd0 = 1.0;
-    bd1 = -1.0;
-    bd2 = 0.0;
-    bd3 = 0.0;
-    ab1 = 1.0;
-    ab2 = 0.0;
-    ab3 = 0.0;
+    temporal_coeff_.bd0 = 1.0;
+    temporal_coeff_.bd1 = -1.0;
+    temporal_coeff_.bd2 = 0.0;
+    temporal_coeff_.bd3 = 0.0;
+    temporal_coeff_.ab1 = 1.0;
+    temporal_coeff_.ab2 = 0.0;
+    temporal_coeff_.ab3 = 0.0;
   } else if (step >= 1 && bdf_order == 2) {
-    bd0 = (1.0 + 2.0 * rho1) / (1.0 + rho1);
-    bd1 = -(1.0 + rho1);
-    bd2 = pow(rho1, 2.0) / (1.0 + rho1);
-    bd3 = 0.0;
-    ab1 = 1.0 + rho1;
-    ab2 = -rho1;
-    ab3 = 0.0;
+    temporal_coeff_.bd0 = (1.0 + 2.0 * rho1) / (1.0 + rho1);
+    temporal_coeff_.bd1 = -(1.0 + rho1);
+    temporal_coeff_.bd2 = pow(rho1, 2.0) / (1.0 + rho1);
+    temporal_coeff_.bd3 = 0.0;
+    temporal_coeff_.ab1 = 1.0 + rho1;
+    temporal_coeff_.ab2 = -rho1;
+    temporal_coeff_.ab3 = 0.0;
   } else if (step >= 2 && bdf_order == 3) {
-    bd0 = 1.0 + rho1 / (1.0 + rho1) + (rho2 * rho1) / (1.0 + rho2 * (1 + rho1));
-    bd1 = -1.0 - rho1 - (rho2 * rho1 * (1.0 + rho1)) / (1.0 + rho2);
-    bd2 = pow(rho1, 2.0) * (rho2 + 1.0 / (1.0 + rho1));
-    bd3 = -(pow(rho2, 3.0) * pow(rho1, 2.0) * (1.0 + rho1)) / ((1.0 + rho2) * (1.0 + rho2 + rho2 * rho1));
-    ab1 = ((1.0 + rho1) * (1.0 + rho2 * (1.0 + rho1))) / (1.0 + rho2);
-    ab2 = -rho1 * (1.0 + rho2 * (1.0 + rho1));
-    ab3 = (pow(rho2, 2.0) * rho1 * (1.0 + rho1)) / (1.0 + rho2);
+    temporal_coeff_.bd0 = 1.0 + rho1 / (1.0 + rho1) + (rho2 * rho1) / (1.0 + rho2 * (1 + rho1));
+    temporal_coeff_.bd1 = -1.0 - rho1 - (rho2 * rho1 * (1.0 + rho1)) / (1.0 + rho2);
+    temporal_coeff_.bd2 = pow(rho1, 2.0) * (rho2 + 1.0 / (1.0 + rho1));
+    temporal_coeff_.bd3 =
+        -(pow(rho2, 3.0) * pow(rho1, 2.0) * (1.0 + rho1)) / ((1.0 + rho2) * (1.0 + rho2 + rho2 * rho1));
+    temporal_coeff_.ab1 = ((1.0 + rho1) * (1.0 + rho2 * (1.0 + rho1))) / (1.0 + rho2);
+    temporal_coeff_.ab2 = -rho1 * (1.0 + rho2 * (1.0 + rho1));
+    temporal_coeff_.ab3 = (pow(rho2, 2.0) * rho1 * (1.0 + rho1)) / (1.0 + rho2);
   }
-
-  abCoef = {ab1, ab2, ab3};
-  bdfCoef = {bd0, bd1, bd2, bd3};
 }
 
 void LoMachSolver::PrintTimingData() {

@@ -39,8 +39,8 @@ int main(int argc, char *argv[]) {
   flow->initializeSelf();
   thermo->initializeSelf();
 
-  flow->initializeFromThermoChem(&thermo->interface);
-  thermo->initializeFromFlow(&flow->interface);
+  flow->initializeFromThermoChem(&thermo->toFlow_interface_);
+  thermo->initializeFromFlow(&flow->toThermoChem_interface);
 
   // Take a time step (actually does nothing for these classes, but still)
   thermo->step();
