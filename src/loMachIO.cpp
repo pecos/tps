@@ -57,7 +57,7 @@ void LoMachSolver::write_restart_files_hdf5(hid_t file, bool serialized_write) {
     // solution order
     h5_save_attribute(file, "order", order);
     // spatial dimension
-    h5_save_attribute(file, "dimension", dim);
+    h5_save_attribute(file, "dimension", dim_);
 
     // code revision
 #ifdef BUILD_VERSION
