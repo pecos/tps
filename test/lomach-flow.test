@@ -10,6 +10,8 @@ setup() {
     RUNFILE_p2="inputs/lomach.tgv2d.p2.ini"
     RUNFILE_MOD="inputs/lomach.tgv2d.mod.ini"
     rm -f $RUNFILE_MOD $RUNFILE_p2
+
+    RUNFILE_LID="inputs/lomach.lid.ini"
 }
 
 @test "[$TEST] check convergence for 2D Taylor-Green case using p = 1" {
@@ -66,4 +68,9 @@ setup() {
     echo ${output} >> flow_p2_err.out
 
     rm -f $RUNFILE_MOD $RUNFILE_p2
+}
+
+@test "[$TEST] check that lid-driven cavity runs" {
+    run $EXE --runFile $RUNFILE_LID
+    [[ ${status} -eq 0 ]]
 }
