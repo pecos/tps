@@ -128,7 +128,7 @@ void LoMachSolver::initialize() {
     serial_mesh_ =
         new Mesh(std::move(Mesh::MakePeriodic(temp_mesh, temp_mesh.CreatePeriodicVertexMapping(translations))));
   } else {
-    serial_mesh_ = new Mesh(config.GetMeshFileName().c_str());
+    serial_mesh_ = new Mesh(loMach_opts_.mesh_file.c_str());
   }
   if (verbose) grvy_printf(ginfo, "Mesh read...\n");
 
@@ -641,7 +641,9 @@ void LoMachSolver::solve() {
 
   // evaluate error (if possible)
   const double flow_err = flow_->computeL2Error();
-  if (rank0_) std::cout << "At time = " << temporal_coeff_.time << ", flow L2 error = " << flow_err << std::endl;
+  if (flow_err >= 0.0) {
+    if (rank0_) std::cout << "At time = " << temporal_coeff_.time << ", flow L2 error = " << flow_err << std::endl;
+  }
 
   // paraview
   pvdc.SetCycle(iter);
