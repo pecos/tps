@@ -90,6 +90,14 @@ class FlowBase {
 
   /// Get interface provided by thermo model
   const turbModelToFlow *getTurbModelInterface() const { return turbModel_interface_; }
+
+  /**
+   * @brief A hook to evaluate L2 norm of error
+   *
+   * Usually this will be a no-op, but it is useful for testing on
+   * cases where we have an exact solution.
+   */
+  virtual double computeL2Error() const { return -1.0; }
 };
 
 class ZeroFlow : public FlowBase {

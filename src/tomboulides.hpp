@@ -242,6 +242,9 @@ class Tomboulides : public FlowBase {
 
   mfem::ParGridFunction *getCurrentVelocity() final { return u_curr_gf_; }
 
+  /// Evaluate error (only when exact solution is known)
+  double computeL2Error() const final;
+
   /// Add a Dirichlet boundary condition to the velocity field
   void addVelDirichletBC(const mfem::Vector &u, mfem::Array<int> &attr);
 

@@ -676,6 +676,17 @@ void Tomboulides::step() {
   u_curr_gf_->SetFromTrueDofs(u_vec_);
 }
 
+double Tomboulides::computeL2Error() const {
+  double err = -1.0;
+  if (ic_string_ == "tgv2d") {
+    std::cout << "Evaluating TGV2D error..." << std::endl;
+    VectorFunctionCoefficient u_excoeff(2, vel_exact_tgv2d);
+    u_excoeff.SetTime(coeff_.time);
+    err = u_curr_gf_->ComputeL2Error(u_excoeff);
+  }
+  return err;
+}
+
 void Tomboulides::meanZero(ParGridFunction &v) {
   // Make sure not to recompute the inner product linear form every
   // application.
