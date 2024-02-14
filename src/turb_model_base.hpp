@@ -102,7 +102,7 @@ class TurbModelBase {
   const flowToTurbModel *getFlowInterface() const { return flow_interface_; }
 
   /// Interface object, provides fields necessary for the flow
-  turbModelToFlow toFlow_interface;
+  turbModelToFlow toFlow_interface_;
   
   /**
    * @brief Initialize data from the thermoChem class
@@ -110,13 +110,13 @@ class TurbModelBase {
    * Initialize fields that the turbulence model needs from the
    * turbulence model.
    */
-  void initializeFromThermoChem(turbModelToThermoChem *thermoChem) { thermoChem_interface_ = thermoChem; }
+  void initializeFromThermoChem(thermoChemToTurbModel *thermoChem) { thermoChem_interface_ = thermoChem; }
 
   /// Get interface provided by thermoChem model
   const thermoChemToTurbModel *getThermoChemInterface() const { return thermoChem_interface_; }
   
   /// Interface object, provides fields necessary for the turbModel
-  turbModelToThermoChem toThermoChem_interface;
+  turbModelToThermoChem toThermoChem_interface_;
   
 };
 
@@ -145,7 +145,7 @@ class ZeroTurbModel : public TurbModelBase {
    * @param sorder The polynomial order for scalar fields
    * @param nuT The (zero) value to use for the eddy viscosity
    */
-  ZeroTurbModel(mfem::ParMesh *pmesh, int sorder, double nuT);
+  ZeroTurbModel(mfem::ParMesh *pmesh, int sorder);
 
   /// Free the interface fields and support objects
   ~ZeroTurbModel() final;

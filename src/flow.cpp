@@ -276,7 +276,7 @@ void Flow::initializeExternal(ParGridFunction *visc_gf_, ParGridFunction *rn_gf_
 }
 
 
-void Flow::Setup(double dt)
+void Flow::setup(double dt)
 {
 
    // HARD CODE

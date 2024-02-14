@@ -25,6 +25,8 @@ class Tps;
 #include "radiation.hpp"
 //#include "loMach.hpp"
 #include "../utils/mfem_extras/pfem_extras.hpp"
+#include "thermo_chem_base.hpp"
+#include "split_flow_base.hpp"
 
 using VecFuncT = void(const Vector &x, double t, Vector &u);
 using ScalarFuncT = double(const Vector &x, double t);
@@ -83,11 +85,8 @@ public:
 
 /// Add some description here...
 //class ThermoChem
-class ThermoChem : public ThermoChemModelBase
-{
+class ThermoChem : public ThermoChemModelBase {
   friend class LoMachSolver;
-  //friend class Flow;
-  //friend class TurbModel;  
 private:
 
   //TPS::Tps *tpsP_;
@@ -137,8 +136,8 @@ private:
    int order, porder, norder;
    IntegrationRules gll_rules;    
 
-  //double bd0, bd1, bd2, bd3;
-  //double ab1, ab2, ab3;
+   double bd0, bd1, bd2, bd3;
+   double ab1, ab2, ab3;
    int nvel, dim;
    int num_equation;    
    int MaxIters;
@@ -154,7 +153,7 @@ private:
 
    double dt;
    double time;
-  //int iter;
+   int iter;
 
    // Coefficients necessary to take a time step (including dt).
    // Assumed to be externally managed and determined, so just get a
@@ -251,7 +250,7 @@ private:
 
    // space varying viscosity multiplier  
    //ParGridFunction *bufferViscMult = nullptr;
-   ParGridFunction *viscMult = nullptr;
+   ParGridFunction viscMult_gf;
    viscositySpongeData vsd_;
    ParGridFunction viscTotal_gf;
    ParGridFunction visc_gf;
@@ -304,10 +303,10 @@ private:
    Vector gradMu, gradRho;  
    Vector Qt;      
    Vector rn;
-   Vector alphaSml;
-   Vector viscSml;
-   Vector viscMultSml;
-   Vector subgridViscSml;  
+   Vector kappa;
+   Vector visc;
+   Vector viscMult;
+   Vector subgridVisc;  
 
    // Print levels.
    int pl_mvsolve = 0;
@@ -386,7 +385,7 @@ public:
    ParGridFunction *GetCurrentTotalViscosity() { return &viscTotal_gf; }    
   
    /// Return a pointer to the current total thermal diffusivity ParGridFunction.    
-   ParGridFunction *GetCurrentTotalThermalDiffusivity() { return &alphaTotal_gf; }
+   ParGridFunction *GetCurrentTotalThermalDiffusivity() { return &kappa_gf; }
 
    /// Return a pointer to the current total thermal diffusivity ParGridFunction.    
    ParGridFunction *GetCurrentThermalDiv() { return &Qt_gf; }

@@ -25,6 +25,8 @@ class Tps;
 #include "radiation.hpp"
 //#include "loMach.hpp"
 #include "../utils/mfem_extras/pfem_extras.hpp"
+#include "split_flow_base.hpp"
+#include "turb_model_base.hpp"
 
 using VecFuncT = void(const Vector &x, double t, Vector &u);
 using ScalarFuncT = double(const Vector &x, double t);
@@ -34,16 +36,13 @@ class LoMachOptions;
 
 
 /// Add some description here...
-class TurbModel
-{
+class TurbModel : public TurbModelBase {
   friend class LoMachSolver;
-  //friend class Flow;
-  //friend class TurbModel;  
 private:
 
   //TPS::Tps *tpsP_;
   //LoMachSolver *loMach_;
-   LoMachOptions *loMach_opts = nullptr;
+   LoMachOptions *loMach_opts_ = nullptr;
 
   //MPI_Groups *groupsMPI;
    int nprocs_;  // total number of MPI procs
@@ -51,7 +50,7 @@ private:
    bool rank0;  // flag to indicate rank 0
 
    // Run options
-   RunConfiguration *config = nullptr;
+   RunConfiguration *config_ = nullptr;
   
    // All essential attributes.
    //Array<int> tke_ess_attr;
@@ -81,15 +80,15 @@ private:
    //bool numerical_integ = false;
    bool numerical_integ = true;
   
-   ParMesh *pmesh = nullptr;
+   ParMesh *pmesh_ = nullptr;
    //ParMesh &pmesh;  
   
    // The order of the scalar spaces
    int order;
    IntegrationRules gll_rules;    
 
-  //double bd0, bd1, bd2, bd3;
-  //double ab1, ab2, ab3;
+   double bd0, bd1, bd2, bd3;
+   double ab1, ab2, ab3;
    int nvel, dim;
    int num_equation;    
    int MaxIters;
@@ -100,9 +99,9 @@ private:
    // loMach options to run as incompressible
    bool pFilter = false;  
   
-  //double dt;
-  //double time;
-  //int iter;
+   double dt;
+   double time;
+   int iter;
 
    // Coefficients necessary to take a time step (including dt).
    // Assumed to be externally managed and determined, so just get a
@@ -222,6 +221,9 @@ private:
    Vector gradV;
    Vector gradW;
 
+   ParGridFunction *rn_gf = nullptr;        
+   Vector rn;
+  
    ParGridFunction *delta_gf = nullptr;
    Vector delta;
   
@@ -276,15 +278,15 @@ private:
    // subgrid scale => move to turb model class
    //ParGridFunction *bufferSubgridVisc;
   
-  
 public:
-  TurbModel(mfem::ParMesh *pmesh_, RunConfiguration *config_, LoMachOptions *loMach_opts_);  
+  TurbModel(mfem::ParMesh *pmesh, RunConfiguration *config, LoMachOptions *loMach_opts, timeCoefficients &timeCoeff);  
   virtual ~TurbModel() {}
 
-   void initialize();
+   void initializeSelf();
    void initializeExternal(ParGridFunction *gradU_gf_, ParGridFunction *gradV_gf_, ParGridFunction *gradW_gf_, ParGridFunction *delta_gf_);  
   
-   void turbModelStep(double &time, double dt, const int cur_step, const int start_step, std::vector<double> bdf, bool provisional = false);
+  //   void turbModelStep(double &time, double dt, const int cur_step, const int start_step, std::vector<double> bdf, bool provisional = false);
+  void step();
 
   //void updateGradientsOP(double tStep);  
   //void updateBC(int current_step);
@@ -295,7 +297,7 @@ public:
   //std::vector<double> ab, 
   
    /// Initialize forms, solvers and preconditioners.
-   void Setup(double dt);  
+   void setup(double dt);  
 
    /// Return a pointer to the current temperature ParGridFunction.
    ParGridFunction *GetCurrentEddyViscosity() { return &subgridVisc_gf; }

@@ -25,7 +25,10 @@ void ConstantPropertyThermoChem::initializeSelf() {
   *viscosity_ = mu_;
   *thermal_divergence_ = 0.0;
 
-  interface.density = density_;
-  interface.viscosity = viscosity_;
-  interface.thermal_divergence = thermal_divergence_;
+  toFlow_interface_.density = density_;
+  toFlow_interface_.viscosity = viscosity_;
+  toFlow_interface_.thermal_divergence = thermal_divergence_;
+
+  toTurbModel_interface_.density = density_;
+  
 }

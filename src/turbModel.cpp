@@ -28,27 +28,27 @@ TurbModel::TurbModel(mfem::ParMesh *pmesh, RunConfiguration *config, LoMachOptio
 void TurbModel::initializeSelf() {
   
     //groupsMPI = pmesh->GetComm(); 
-    rank = pmesh->GetMyRank();
+    rank = pmesh_->GetMyRank();
     //rank0 = pmesh->isWorldRoot();
     rank0 = false;
     if(rank == 0) {rank0 = true;}
-    dim = pmesh->Dimension();
+    dim = pmesh_->Dimension();
     nvel = dim;
 
     bool verbose = rank0;
     if (verbose) grvy_printf(ginfo, "Initializing TurbModel solver.\n");
     
-    if (loMach_opts->uOrder == -1) {
-      order = std::max(config->solOrder,1);
+    if (loMach_opts_->uOrder == -1) {
+      order = std::max(config_->solOrder,1);
       double no;
       no = ceil( ((double)order * 1.5) );   
       //norder = int(no);
     } else {
-      order = loMach_opts->uOrder;
+      order = loMach_opts_->uOrder;
       //norder = loMach_->loMach_opts_.nOrder;
     }
    
-   MaxIters = config->GetNumIters();
+   MaxIters = config_->GetNumIters();
    num_equation = 1; // hard code for now, fix with species
 
    //-----------------------------------------------------
@@ -57,11 +57,11 @@ void TurbModel::initializeSelf() {
 
    // scalar
    sfec = new H1_FECollection(order);
-   sfes = new ParFiniteElementSpace(pmesh, sfec);   
+   sfes = new ParFiniteElementSpace(pmesh_, sfec);   
 
    // vector
    vfec = new H1_FECollection(order, dim);
-   vfes = new ParFiniteElementSpace(pmesh, vfec, dim);
+   vfes = new ParFiniteElementSpace(pmesh_, vfec, dim);
    
    // Check if fully periodic mesh
    //if (!(pmesh->bdr_attributes.Size() == 0))
@@ -86,13 +86,14 @@ void TurbModel::initializeSelf() {
 
    gradU.SetSize(vfes_truevsize);
    gradV.SetSize(vfes_truevsize);
-   gradW.SetSize(vfes_truevsize);   
+   gradW.SetSize(vfes_truevsize);
+   rn.SetSize(sfes_truevsize);      
    
    if (verbose) grvy_printf(ginfo, "TurbModel vectors and gf initialized...\n");     
 
    // exports
-   toFlow_interface.eddy_viscosity = subgridVisc_gf;
-   toThermoChem_interface.eddy_viscosity = subgridVisc_gf;  
+   toFlow_interface_.eddy_viscosity = &subgridVisc_gf;
+   toThermoChem_interface_.eddy_viscosity = &subgridVisc_gf;  
    
 }
 
@@ -151,13 +152,13 @@ void TurbModel::setup(double dt)
 void TurbModel::step()
 {
 
-  // update bdf coefficients
-  bd0 = timeCoeff_->bd0;
-  bd1 = timeCoeff_->bd1;
-  bd2 = timeCoeff_->bd2;
-  bd3 = timeCoeff_->bd3;
-  dt = timeCoeff_->dt;
-  time = timeCoeff_->time;  
+   // update bdf coefficients
+   bd0 = timeCoeff_.bd0;
+   bd1 = timeCoeff_.bd1;
+   bd2 = timeCoeff_.bd2;
+   bd3 = timeCoeff_.bd3;
+   dt = timeCoeff_.dt;
+   time = timeCoeff_.time;  
 
    // update vectors from external data and gradients
    //gradU_gf->GetTrueDofs(gradU);
@@ -172,22 +173,23 @@ void TurbModel::step()
    subgridViscSml = 0.0;
 
    // is this legal?
-   (flow_interface_->gradU).GetTrueDofs(gradU);
-   (flow_interface_->gradV).GetTrueDofs(gradV);
-   (flow_interface_->gradW).GetTrueDofs(gradW);   
-   (thermoChem_interface_->density).GetTrueDofs(rn);
-   (grid_interface_->delta).GetTrueDofs(delta); // doesnt exist yet   
+   (flow_interface_->gradU)->GetTrueDofs(gradU);
+   (flow_interface_->gradV)->GetTrueDofs(gradV);
+   (flow_interface_->gradW)->GetTrueDofs(gradW);   
+   // generates an error, for now just keep as nu (thermoChem_interface_->density)->GetTrueDofs(rn);
+   //(grid_interface_->delta).GetTrueDofs(delta); // doesnt exist yet
+   delta = 0.0; // temporary
    
-   if (config->sgsModelType > 0) {
+   if (config_->sgsModelType > 0) {
      
      double *dGradU = gradU.HostReadWrite();
      double *dGradV = gradV.HostReadWrite();
      double *dGradW = gradW.HostReadWrite(); 
      double *del = delta.HostReadWrite();
-     double *rho = rn.HostReadWrite();     
+     //double *rho = rn.HostReadWrite();     
      double *data = subgridViscSml.HostReadWrite();
      
-     if (config->sgsModelType == 1) {
+     if (config_->sgsModelType == 1) {
        for (int i = 0; i < SdofInt; i++) {     
          double nu_sgs = 0.;
 	 DenseMatrix gradUp;
@@ -196,10 +198,11 @@ void TurbModel::step()
 	 for (int dir = 0; dir < dim; dir++) { gradUp(1,dir) = dGradV[i + dir * SdofInt]; }
 	 for (int dir = 0; dir < dim; dir++) { gradUp(2,dir) = dGradW[i + dir * SdofInt]; }
          sgsSmag(gradUp, del[i], nu_sgs);
-         data[i] = rho[i] * nu_sgs;
+         //data[i] = rho[i] * nu_sgs;
+         data[i] = nu_sgs;	 
        }
        
-     } else if (config->sgsModelType == 2) {       
+     } else if (config_->sgsModelType == 2) {       
        for (int i = 0; i < SdofInt; i++) {     
          double nu_sgs = 0.;
 	 DenseMatrix gradUp;
@@ -208,7 +211,8 @@ void TurbModel::step()
 	 for (int dir = 0; dir < dim; dir++) { gradUp(1,dir) = dGradV[i + dir * SdofInt]; }
 	 for (int dir = 0; dir < dim; dir++) { gradUp(2,dir) = dGradW[i + dir * SdofInt]; }
          sgsSigma(gradUp, del[i], nu_sgs);
-	 data[i] = rho[i] *nu_sgs;
+	 //data[i] = rho[i] *nu_sgs;
+	 data[i] = nu_sgs;	 
        }
        
      } else {
@@ -284,7 +288,7 @@ void TurbModel::sgsSmag(const DenseMatrix &gradUp, double delta, double &nu) {
   double Cd;
   double l_floor;
   double d_model;
-  Cd = config->sgs_model_const;
+  Cd = config_->sgs_model_const;
   
 
   // gradUp is in (eq,dim) form
@@ -325,7 +329,7 @@ void TurbModel::sgsSigma(const DenseMatrix &gradUp, double delta, double &nu) {
   double onethird = 1./3.;  
   double l_floor, d_model, d4;
   double p1, p2, p, q, detB, r, phi;
-  Cd = config->sgs_model_const;
+  Cd = config_->sgs_model_const;
   
   // Qij = u_{k,i}*u_{k,j}
   for (int j = 0; j < dim; j++) {  

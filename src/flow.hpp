@@ -438,7 +438,7 @@ public:
    void uniformInlet();  
   
    /// Initialize forms, solvers and preconditioners.
-   void Setup(double dt);  
+   void setup(double dt);  
 
    /// Return a pointer to the provisional velocity ParGridFunction.
    ParGridFunction *GetProvisionalVelocity() { return &un_next_gf; }

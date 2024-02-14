@@ -104,7 +104,7 @@ class ThermoChemModelBase {
   const flowToThermoChem *getFlowInterface() const { return flow_interface_; }
 
   /// Interface object, provides fields necessary for the flow
-  thermoChemToFlow toFlow_interface;
+  thermoChemToFlow toFlow_interface_;
   
   /**
    * @brief Initialize data from the turbulence model class
@@ -118,7 +118,7 @@ class ThermoChemModelBase {
   const turbModelToThermoChem *getTurbModelInterface() const { return turbModel_interface_; }
   
   /// Interface object, provides fields necessary for the turbModel
-  thermoChemToTurbModel toTurbModel_interface;
+  thermoChemToTurbModel toTurbModel_interface_;
   
 };
 
