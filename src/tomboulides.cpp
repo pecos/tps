@@ -35,9 +35,69 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
       porder_(porder),
       dim_(pmesh->Dimension()),
       coeff_(coeff) {
+  // make sure there is room for BC attributes
+  if (!(pmesh_->bdr_attributes.Size() == 0)) {
+    vel_ess_attr_.SetSize(pmesh_->bdr_attributes.Max());
+    vel_ess_attr_ = 0;
+
+    pres_ess_attr_.SetSize(pmesh_->bdr_attributes.Max());
+    pres_ess_attr_ = 0;
+  }
+
   if (tps != nullptr) {
-    // if we have Tps object, use it to set other options
+    // if we have Tps object, use it to set other options...
+
+    // Initial condition function... options are
+    // 1) "" (Empty string), velocity initialized to zero
+    // 2) "tgv2d", velocity initialized using vel_exact_tgv2d function
+    // 3) "constant", TODO(trevilo) implement options to read constant
     tps->getInput("loMach/tomboulides/ic", ic_string_, std::string(""));
+
+    // Boundary conditions
+    // number of BC regions defined
+    int numWalls, numInlets, numOutlets;
+    tps->getInput("boundaryConditions/numWalls", numWalls, 0);
+    tps->getInput("boundaryConditions/numInlets", numInlets, 0);
+    tps->getInput("boundaryConditions/numOutlets", numOutlets, 0);
+
+    // Inlet and outlet not supported yet!
+    // TODO(trevilo): Add support
+    assert(numInlets == 0);
+    assert(numOutlets == 0);
+
+    // Wall Bcs
+    for (int i = 1; i <= numWalls; i++) {
+      int patch;
+      std::string type;
+      std::string basepath("boundaryConditions/wall" + std::to_string(i));
+
+      tps->getRequiredInput((basepath + "/patch").c_str(), patch);
+      tps->getRequiredInput((basepath + "/type").c_str(), type);
+
+      if (type == "viscous_isothermal" || type == "viscous_adiabatic" || type == "viscous" || type == "no-slip") {
+        Array<int> wall_attr(pmesh_->bdr_attributes.Max());
+        wall_attr = 0;
+        wall_attr[patch] = 1;
+
+        Vector zero(dim_);
+        zero = 0.0;
+
+        Vector velocity_value(dim_);
+        tps->getVec((basepath + "/velocity").c_str(), velocity_value, dim_, zero);
+
+        if (pmesh_->GetMyRank() == 0) {
+          std::cout << "Tomboulides: Setting Dirichlet velocity on patch = " << patch << std::endl;
+        }
+        addVelDirichletBC(velocity_value, wall_attr);
+      } else {
+        if (pmesh_->GetMyRank() == 0) {
+          std::cout << "Tomboulides: When reading " << basepath << ", encountered wall type = " << type << std::endl;
+          std::cout << "Tomboulides: Tomboulides flow solver does not support this type." << std::endl;
+        }
+        assert(false);
+        exit(1);
+      }
+    }
   }
 }
 
@@ -177,15 +237,6 @@ void Tomboulides::initializeSelf() {
       u_excoeff.SetTime(0.0);
       u_curr_gf_->ProjectCoefficient(u_excoeff);
     }
-  }
-
-  // make sure there is room for BC attributes
-  if (!(pmesh_->bdr_attributes.Size() == 0)) {
-    vel_ess_attr_.SetSize(pmesh_->bdr_attributes.Max());
-    vel_ess_attr_ = 0;
-
-    pres_ess_attr_.SetSize(pmesh_->bdr_attributes.Max());
-    pres_ess_attr_ = 0;
   }
 }
 
