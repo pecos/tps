@@ -19,7 +19,7 @@ void ZeroTurbModel::initializeSelf() {
 
   *eddy_viscosity_ = 0.0;
 
-  toFlow_interface_.eddy_viscosity = viscosity_;
-  toThermChem_interface_.eddy_viscosity = density_;
+  toFlow_interface_.eddy_viscosity = eddy_viscosity_;
+  toThermoChem_interface_.eddy_viscosity = eddy_viscosity_;
   
 }

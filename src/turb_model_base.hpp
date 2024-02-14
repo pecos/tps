@@ -128,7 +128,7 @@ class ZeroTurbModel : public TurbModelBase {
  protected:
   mfem::ParMesh *pmesh_;
   const int sorder_;
-  const double nuT_;
+  //const double nuT_;
 
   mfem::FiniteElementCollection *fec_ = nullptr;
   mfem::ParFiniteElementSpace *fes_ = nullptr;
