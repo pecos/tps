@@ -92,7 +92,7 @@ private:
 
   //TPS::Tps *tpsP_;
   //LoMachSolver *loMach_;
-   LoMachOptions *loMach_opts = nullptr;
+   LoMachOptions *loMach_opts_ = nullptr;
 
   //MPI_Groups *groupsMPI;
    int nprocs_;  // total number of MPI procs
@@ -100,7 +100,7 @@ private:
    bool rank0;  // flag to indicate rank 0
 
    // Run options
-   RunConfiguration *config = nullptr;
+   RunConfiguration *config_ = nullptr;
   
    // All essential attributes.
    Array<int> temp_ess_attr;
@@ -130,15 +130,15 @@ private:
    //bool numerical_integ = false;
    bool numerical_integ = true;
   
-   ParMesh *pmesh = nullptr;
+   ParMesh *pmesh_ = nullptr;
    //ParMesh &pmesh;  
   
    // The order of the scalar spaces
    int order, porder, norder;
    IntegrationRules gll_rules;    
 
-   double bd0, bd1, bd2, bd3;
-   double ab1, ab2, ab3;
+  //double bd0, bd1, bd2, bd3;
+  //double ab1, ab2, ab3;
    int nvel, dim;
    int num_equation;    
    int MaxIters;
@@ -154,7 +154,12 @@ private:
 
    double dt;
    double time;
-   int iter;
+  //int iter;
+
+   // Coefficients necessary to take a time step (including dt).
+   // Assumed to be externally managed and determined, so just get a
+   // reference here.
+   const timeCoefficients &timeCoeff_;
   
    // temporary
    double Re_tau, Pr, Cp, gamma;
@@ -227,7 +232,9 @@ private:
    ParGridFunction *bufferVisc = nullptr;
    ParGridFunction *bufferBulkVisc = nullptr;
    ParGridFunction *bufferRho = nullptr;
-   ParGridFunction *bufferRhoDt = nullptr;
+  //ParGridFunction *bufferRhoDt = nullptr;
+  //ParGridFunction bufferRhoDt;
+   ParGridFunction rhoDt;
    ParGridFunction *bufferAlpha = nullptr;
    ParGridFunction *bufferTemp = nullptr;
 
@@ -236,17 +243,20 @@ private:
    GridFunctionCoefficient *rhoDtField = nullptr;
    GridFunctionCoefficient *invRho = nullptr;
    GridFunctionCoefficient *Rho = nullptr;
-   GridFunctionCoefficient *alphaField = nullptr;
+   GridFunctionCoefficient *kappaField = nullptr;
 
    ParGridFunction *buffer_tInlet = nullptr;
    ParGridFunction *buffer_tInletInf = nullptr;
    GridFunctionCoefficient *tInletField = nullptr;
 
    // space varying viscosity multiplier  
-   ParGridFunction *bufferViscMult = nullptr;
+   //ParGridFunction *bufferViscMult = nullptr;
+   ParGridFunction *viscMult = nullptr;
    viscositySpongeData vsd_;
    ParGridFunction viscTotal_gf;
-   ParGridFunction alphaTotal_gf;      
+   ParGridFunction visc_gf;
+   ParGridFunction eddyVisc_gf;    
+   ParGridFunction kappa_gf;      
 
    OperatorHandle Lt;
    OperatorHandle LQ;  
@@ -337,7 +347,7 @@ private:
   
   
 public:
-  ThermoChem(mfem::ParMesh *pmesh_, RunConfiguration *config_, LoMachOptions *loMach_opts_);  
+  ThermoChem(mfem::ParMesh *pmesh, RunConfiguration *config, LoMachOptions *loMach_opts, timeCoefficients &timeCoeff);  
   virtual ~ThermoChem() {}
 
    void initializeSelf();
@@ -364,7 +374,7 @@ public:
    void uniformInlet();  
   
    /// Initialize forms, solvers and preconditioners.
-   void Setup(double dt);  
+   void setup(double dt);  
 
    /// Return a pointer to the current temperature ParGridFunction.
    ParGridFunction *GetCurrentTemperature() { return &Tn_gf; }

@@ -18,13 +18,14 @@ using namespace mfem;
 using namespace mfem::common;
 
 
-TurbModel::TurbModel(mfem::ParMesh *pmesh_, RunConfiguration *config_, LoMachOptions *loMach_opts_)
-  : pmesh(pmesh_),
-    loMach_opts(loMach_opts_),
-    config(config_) {}
+TurbModel::TurbModel(mfem::ParMesh *pmesh, RunConfiguration *config, LoMachOptions *loMach_opts, timeCoefficients &timeCoeff)
+  : pmesh_(pmesh),
+    loMach_opts_(loMach_opts),
+    config_(config),
+    timeCoeff_(timeCoeff){}
 
 
-void TurbModel::initialize() {
+void TurbModel::initializeSelf() {
   
     //groupsMPI = pmesh->GetComm(); 
     rank = pmesh->GetMyRank();
@@ -88,9 +89,14 @@ void TurbModel::initialize() {
    gradW.SetSize(vfes_truevsize);   
    
    if (verbose) grvy_printf(ginfo, "TurbModel vectors and gf initialized...\n");     
+
+   // exports
+   toFlow_interface.eddy_viscosity = subgridVisc_gf;
+   toThermoChem_interface.eddy_viscosity = subgridVisc_gf;  
    
 }
 
+/*
 void TurbModel::initializeExternal(ParGridFunction *gradU_gf_, ParGridFunction *gradV_gf_, ParGridFunction *gradW_gf_, ParGridFunction *delta_gf_) {
 
   gradU_gf = gradU_gf_;
@@ -99,9 +105,10 @@ void TurbModel::initializeExternal(ParGridFunction *gradU_gf_, ParGridFunction *
   delta_gf = delta_gf_;
   
 }
+*/
 
 
-void TurbModel::Setup(double dt)
+void TurbModel::setup(double dt)
 {
 
    // HARD CODE
@@ -140,21 +147,22 @@ void TurbModel::Setup(double dt)
    
 }
 
-void TurbModel::turbModelStep(double &time, double dt, const int current_step, const int start_step, std::vector<double> bdf, bool provisional)
+//void TurbModel::turbModelStep(double &time, double dt, const int current_step, const int start_step, std::vector<double> bdf, bool provisional)
+void TurbModel::step()
 {
 
-  //ab1 = ab[0];
-  //ab2 = ab[1];
-  //ab3 = ab[2];  
-   bd0 = bdf[0];
-   bd1 = bdf[1];
-   bd2 = bdf[2];
-   bd3 = bdf[3];  
+  // update bdf coefficients
+  bd0 = timeCoeff_->bd0;
+  bd1 = timeCoeff_->bd1;
+  bd2 = timeCoeff_->bd2;
+  bd3 = timeCoeff_->bd3;
+  dt = timeCoeff_->dt;
+  time = timeCoeff_->time;  
 
    // update vectors from external data and gradients
-   gradU_gf->GetTrueDofs(gradU);
-   gradV_gf->GetTrueDofs(gradV);
-   gradW_gf->GetTrueDofs(gradW);   
+   //gradU_gf->GetTrueDofs(gradU);
+   //gradV_gf->GetTrueDofs(gradV);
+   //gradW_gf->GetTrueDofs(gradW);   
    
    // add selection for turbmodel here
    
@@ -162,7 +170,13 @@ void TurbModel::turbModelStep(double &time, double dt, const int current_step, c
    //for (auto &temp_dbc : temp_dbcs) {temp_dbc.coeff->SetTime(time + dt);}   
 
    subgridViscSml = 0.0;
-   delta_gf->GetTrueDofs(delta);
+
+   // is this legal?
+   (flow_interface_->gradU).GetTrueDofs(gradU);
+   (flow_interface_->gradV).GetTrueDofs(gradV);
+   (flow_interface_->gradW).GetTrueDofs(gradW);   
+   (thermoChem_interface_->density).GetTrueDofs(rn);
+   (grid_interface_->delta).GetTrueDofs(delta); // doesnt exist yet   
    
    if (config->sgsModelType > 0) {
      
@@ -170,6 +184,7 @@ void TurbModel::turbModelStep(double &time, double dt, const int current_step, c
      double *dGradV = gradV.HostReadWrite();
      double *dGradW = gradW.HostReadWrite(); 
      double *del = delta.HostReadWrite();
+     double *rho = rn.HostReadWrite();     
      double *data = subgridViscSml.HostReadWrite();
      
      if (config->sgsModelType == 1) {
@@ -181,7 +196,7 @@ void TurbModel::turbModelStep(double &time, double dt, const int current_step, c
 	 for (int dir = 0; dir < dim; dir++) { gradUp(1,dir) = dGradV[i + dir * SdofInt]; }
 	 for (int dir = 0; dir < dim; dir++) { gradUp(2,dir) = dGradW[i + dir * SdofInt]; }
          sgsSmag(gradUp, del[i], nu_sgs);
-         data[i] = nu_sgs;
+         data[i] = rho[i] * nu_sgs;
        }
        
      } else if (config->sgsModelType == 2) {       
@@ -193,7 +208,7 @@ void TurbModel::turbModelStep(double &time, double dt, const int current_step, c
 	 for (int dir = 0; dir < dim; dir++) { gradUp(1,dir) = dGradV[i + dir * SdofInt]; }
 	 for (int dir = 0; dir < dim; dir++) { gradUp(2,dir) = dGradW[i + dir * SdofInt]; }
          sgsSigma(gradUp, del[i], nu_sgs);
-	 data[i] = nu_sgs;
+	 data[i] = rho[i] *nu_sgs;
        }
        
      } else {

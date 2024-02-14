@@ -97,13 +97,13 @@ class FlowBase {
   virtual void initializeOperators() {}
 
   /// Interface object, provides fields necessary for the thermochemistry model
-  flowToThermoChem interface;
+  flowToThermoChem toThermoChem_interface;
 
   /// Get interface provided by thermo model
   const thermoChemToFlow *getThermoInterface() const { return thermo_interface_; }
 
   /// Interface object, provides fields necessary for the turbulence model
-  flowToTurbModel interface;
+  flowToTurbModel toTurbModel_interface;
 
   /// Get interface provided by thermo model
   const turbModelToFlow *getTurbModelInterface() const { return turbModel_interface_; }  

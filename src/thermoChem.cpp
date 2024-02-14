@@ -23,10 +23,11 @@ double temp_wallBox(const Vector &x, double t);
 double temp_inlet(const Vector &x, double t);
 
 
-ThermoChem::ThermoChem(mfem::ParMesh *pmesh_, RunConfiguration *config_, LoMachOptions *loMach_opts_) //, TPS::Tps *tps, LoMachSolver *loMach)
-  : pmesh(pmesh_),
-    loMach_opts(loMach_opts_),
-    config(config_) {}
+ThermoChem::ThermoChem(mfem::ParMesh *pmesh, RunConfiguration *config, LoMachOptions *loMach_opts, timeCoefficients &timeCoeff)
+  : pmesh_(pmesh),
+    loMach_opts_(loMach_opts),
+    config_(config),
+    timeCoeff_(timeCoeff){}
 
 /*
     groupsMPI(new MPI_Groups(tps->getTPSCommWorld())),
@@ -62,7 +63,7 @@ ThermoChem::ThermoChem(mfem::ParMesh *pmesh_, RunConfiguration *config_, LoMachO
 }    
 */
 
-void ThermoChem::initialize() {
+void ThermoChem::initializeSelf() {
 
     //groupsMPI = pmesh->GetComm(); 
     rank = pmesh->GetMyRank();
@@ -240,11 +241,20 @@ void ThermoChem::initialize() {
    alphaTotal_gf.SetSpace(sfes);
    alphaTotal_gf = 0.0;   
 
+   kappaTotal_gf.SetSpace(sfes);
+   kappaTotal_gf = 0.0;   
+   
    subgridViscSml.SetSize(sfes_truevsize);
    subgridViscSml = 1.0e-15;
 
+   eddyVisc_gf.SetSize(sfes_truevsize);
+   eddyVisc_gf = 1.0e-15;
+   
    viscTotal_gf.SetSpace(sfes);
    viscTotal_gf = 0.0;
+
+   visc_gf.SetSpace(sfes);
+   visc_gf = 0.0;
    
    tmpR0.SetSize(sfes_truevsize);
    tmpR0a.SetSize(sfes_truevsize);
@@ -253,11 +263,21 @@ void ThermoChem::initialize() {
    tmpR1.SetSize(vfes_truevsize);
    R0PM0_gf.SetSpace(sfes);
    R0PM1_gf.SetSpace(pfes);   
+
+   rhoDt.SetSpace(sfes);
+   viscMult.SetSpace(sfes);   
    
-   if (verbose) grvy_printf(ginfo, "ThermpChem vectors and gf initialized...\n");     
+   if (verbose) grvy_printf(ginfo, "ThermoChem vectors and gf initialized...\n");     
+
+   // exports
+   toFlow_interface.density = rn_gf;
+   toFlow_interface.viscosity = visc_gf;
+   toFlow_interface.thermal_divergence = Qt_gf;   
+   toTurbModel_interface.density = rn_gf;
    
 }
 
+/*
 void ThermoChem::initializeExternal(ParGridFunction *un_next_gf_, ParGridFunction *subgridVisc_gf_, int nWalls, int nInlets, int nOutlets) {
 
   un_next_gf = un_next_gf_;
@@ -268,9 +288,10 @@ void ThermoChem::initializeExternal(ParGridFunction *un_next_gf_, ParGridFunctio
   numOutlets = nOutlets;    
   
 }
+*/
 
 
-void ThermoChem::Setup(double dt)
+void ThermoChem::setup(double dt)
 {
 
    // HARD CODE
@@ -480,6 +501,11 @@ void ThermoChem::Setup(double dt)
    sfes->GetEssentialTrueDofs(Qt_ess_attr, Qt_ess_tdof);   
    if (rank0) std::cout << "ThermoChem Essential true dof step" << endl;
 
+
+   
+   //void ThermoChem::initializeOperators() {
+   //  assert(flow_interface_ != NULL);
+   //  assert(turbModel_interface_ != NULL);   
    
    Array<int> empty;
 
@@ -493,8 +519,9 @@ void ThermoChem::Setup(double dt)
    const IntegrationRule &ir_di  = gll_rules.Get(sfes->GetFE(0)->GetGeomType(), 3*order - 1); //2 5  
    if (rank0) std::cout << "Integration rules set" << endl;   
 
-
+  
    // density coefficient
+   /*
    bufferRho = new ParGridFunction(sfes);
    {
      double *data = bufferRho->HostReadWrite();
@@ -502,31 +529,21 @@ void ThermoChem::Setup(double dt)
      for (int i = 0; i < Sdof; i++) {     
        data[i] = 1.0; // gets updated anyway... ambientPressure / (Rgas * Tdata[i]);
      }
-   }    
-   Rho = new GridFunctionCoefficient(bufferRho);
-
-   bufferInvRho = new ParGridFunction(sfes);
-   {
-     double *data = bufferInvRho->HostReadWrite();
-     for (int i = 0; i < Sdof; i++) { data[i] = 1.0; }
    }
-   invRho = new GridFunctionCoefficient(bufferInvRho);
+   */
+   Rho = new GridFunctionCoefficient(&rn_gf);
 
-   bufferRhoDt = new ParGridFunction(sfes);
    {
-     double *data = bufferRhoDt->HostReadWrite();
-     for (int i = 0; i < Sdof; i++) { data[i] = 0.0; }
-   }   
-   {
-     double *data = bufferRhoDt->HostReadWrite();
+     double *data = rhoDt.HostReadWrite();
      double *Rdata = rn_gf.HostReadWrite();
      for (int i = 0; i < Sdof; i++) {
        data[i] = Rdata[i] / dt;
      }
    }
-   rhoDtField = new GridFunctionCoefficient(bufferRhoDt);   
+   rhoDtField = new GridFunctionCoefficient(&rhoDt);   
    
-   // viscosity field 
+   // viscosity field
+   /*
    bufferVisc = new ParGridFunction(sfes);
    {
      double *data = bufferVisc->HostReadWrite();
@@ -540,8 +557,10 @@ void ThermoChem::Setup(double dt)
        data[i] = visc[0];       
      }
    }
-   viscField = new GridFunctionCoefficient(bufferVisc);
+   */
+   viscField = new GridFunctionCoefficient(&visc_gf);
 
+   /*
    bufferBulkVisc = new ParGridFunction(sfes);
    {
      double *data = bufferBulkVisc->HostReadWrite();
@@ -550,8 +569,10 @@ void ThermoChem::Setup(double dt)
      for (int i = 0; i < Sdof; i++) { data[i] = twothird * dataMu[i]; }
    }
    bulkViscField = new GridFunctionCoefficient(bufferBulkVisc);
+   */
    
    // thermal diffusivity field
+   /*
    bufferAlpha = new ParGridFunction(sfes);
    {
      double *data = bufferAlpha->HostReadWrite();
@@ -565,14 +586,14 @@ void ThermoChem::Setup(double dt)
          data[i] = visc[0] / Pr;
 	 //data[i] = kin_vis / Pr;
      }
-   }   
-   alphaField = new GridFunctionCoefficient(bufferAlpha);
+   }
+   */
+   kappaField = new GridFunctionCoefficient(&kappa_gf);
    //std::cout << "Check 22..." << std::endl;
 
    
-
    //thermal_diff_coeff.constant = thermal_diff;
-   thermal_diff_coeff = new GridFunctionCoefficient(&alphaTotal_gf);   
+   thermal_diff_coeff = new GridFunctionCoefficient(&kappa_gf);   
    gradT_coeff = new GradientGridFunctionCoefficient(&Tn_next_gf);
    kap_gradT_coeff = new ScalarVectorProductCoefficient(*thermal_diff_coeff, *gradT_coeff);
 
@@ -604,7 +625,7 @@ void ThermoChem::Setup(double dt)
    
    // Convection: Atemperature(i,j) = \int_{\Omega} \phi_i \rho u \cdot \nabla \phi_j
    //un_next_coeff = new VectorGridFunctionCoefficient(&un_next_gf);
-   un_next_coeff = new VectorGridFunctionCoefficient(un_next_gf);
+   un_next_coeff = new VectorGridFunctionCoefficient(flow_interface_->velocity);
    rhon_next_coeff = new GridFunctionCoefficient(&rn_gf);
    rhou_coeff = new ScalarVectorProductCoefficient(*rhon_next_coeff, *un_next_coeff);
    
@@ -681,7 +702,7 @@ void ThermoChem::Setup(double dt)
    } else {
    */
      //auto *hdt_blfi = new DiffusionIntegrator(*alphaField);
-     hdt_blfi = new DiffusionIntegrator(*alphaField);     
+     hdt_blfi = new DiffusionIntegrator(*kappaField);     
      //}
    //std::cout << "Check 23..." << std::endl;        
    
@@ -868,16 +889,16 @@ void ThermoChem::Setup(double dt)
    }
 
    
-   bufferViscMult = new ParGridFunction(sfes);
-   {
-     double *data = bufferViscMult->HostReadWrite();
-     for (int i = 0; i < sfes->GetNDofs(); i++) { data[i] = 1.0; }
-   }
+   //bufferViscMult = new ParGridFunction(sfes);
+   //{
+   //  double *data = bufferViscMult->HostReadWrite();
+   //  for (int i = 0; i < sfes->GetNDofs(); i++) { data[i] = 1.0; }
+   //}
    ParGridFunction coordsDof(vfes);
    pmesh->GetNodes(coordsDof);  
    if (config->linViscData.isEnabled) {
      if (rank0) std::cout << "Viscous sponge active" << endl;
-     double *viscMult = bufferViscMult->HostReadWrite();
+     double *vMult = viscMult.HostReadWrite();
      double *hcoords = coordsDof.HostReadWrite();
      double wgt = 0.;    
      for (int n = 0; n < sfes->GetNDofs(); n++) {
@@ -886,7 +907,7 @@ void ThermoChem::Setup(double dt)
 	 coords[d] = hcoords[n + d * sfes->GetNDofs()];
        }
        viscSpongePlanar(coords, wgt);
-       viscMult[n] = wgt + (config->linViscData.uniformMult - 1.0);
+       vMult[n] = wgt + (config->linViscData.uniformMult - 1.0);
      }
   }
 
@@ -909,14 +930,17 @@ void ThermoChem::UpdateTimestepHistory(double dt)
 }
 
 
-void ThermoChem::thermoChemStep(double &time, double dt, const int current_step, const int start_step, std::vector<double> bdf, bool provisional)
+//void ThermoChem::thermoChemStep(double &time, double dt, const int current_step, const int start_step, std::vector<double> bdf, bool provisional)
+void ThermoChem::step();
 {
 
   // update bdf coefficients
-  bd0 = bdf[0];
-  bd1 = bdf[1];
-  bd2 = bdf[2];
-  bd3 = bdf[3];  
+  bd0 = timeCoeff_->bd0;
+  bd1 = timeCoeff_->bd1;
+  bd2 = timeCoeff_->bd2;
+  bd3 = timeCoeff_->bd3;
+  dt = timeCoeff_->dt;
+  time = timeCoeff_->time;  
   
    // Set current time for velocity Dirichlet boundary conditions.
    for (auto &temp_dbc : temp_dbcs) {temp_dbc.coeff->SetTime(time + dt);}   
@@ -969,15 +993,13 @@ void ThermoChem::thermoChemStep(double &time, double dt, const int current_step,
 
    //Ht_bdfcoeff.constant = bd0 / dt;
    { 
-     double *data = bufferRhoDt->HostReadWrite();
+     double *data = rhoDt.HostReadWrite();
      double *Rdata = rn_gf.HostReadWrite();
      //double coeff = Cp*bd0/dt;
-     double coeff = (bd0) / dt;     
-     double *d_imp = R0PM0_gf.HostReadWrite();
+     double coeff = bd0 / dt;     
      for (int i = 0; i < Sdof; i++) { data[i] = coeff * Rdata[i]; }
-     //for (int i = 0; i < Sdof; i++) {data[i] = coeff*Rdata[i] + d_imp[i]; }     
    }
-   Ht_bdfcoeff.constant = 1.0 / dt;      
+   //Ht_bdfcoeff.constant = 1.0 / dt;      
    Ht_form->Update();
    Ht_form->Assemble();
    Ht_form->FormSystemMatrix(temp_ess_tdof, Ht);
@@ -991,7 +1013,7 @@ void ThermoChem::thermoChemStep(double &time, double dt, const int current_step,
       HtInvPC = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof);
       HtInv->SetPreconditioner(*HtInvPC);
    }
-  
+   
    for (auto &temp_dbc : temp_dbcs) { Tn_next_gf.ProjectBdrCoefficient(*temp_dbc.coeff, temp_dbc.attr); }
    sfes->GetRestrictionMatrix()->MultTranspose(resT, resT_gf);
 
@@ -1100,9 +1122,9 @@ void ThermoChem::updateBC(int current_step) {
 void ThermoChem::extrapolateState(int current_step, std::vector<double> ab) {
 
    // update ab coefficients
-   ab1 = ab[0];
-   ab2 = ab[1];
-   ab3 = ab[2];  
+   ab1 = timeCoeff_->ab1;
+   ab2 = timeCoeff_->ab2;
+   ab3 = timeCoeff_->ab3;  
   
    // extrapolated temp at {n+1}
    {
@@ -1279,7 +1301,7 @@ void ThermoChem::updateDiffusivity() {
   
    // viscosity
    if (constantViscosity != true) {
-     double *dataVisc = bufferVisc->HostReadWrite();        
+     double *dataVisc = visc_gf.HostReadWrite();        
      double *Tdata = Tn_gf.HostReadWrite();
      double *Rdata = rn_gf.HostReadWrite();     
      double visc[2];
@@ -1291,26 +1313,30 @@ void ThermoChem::updateDiffusivity() {
        dataVisc[i] = visc[0];       
      }     
    } else {
-     double *dataVisc = bufferVisc->HostReadWrite();        
+     double *dataVisc = visc_gf.HostReadWrite();        
      for (int i = 0; i < Sdof; i++) { dataVisc[i] = dyn_vis; }
    }
 
    if (config->sgsModelType > 0) {
      //double *dataSubgrid = bufferSubgridVisc->HostReadWrite();
-     double *dataSubgrid = subgridVisc_gf->HostReadWrite();     
-     double *dataVisc = bufferVisc->HostReadWrite();
-     double *Rdata = rn_gf.HostReadWrite();          
-     for (int i = 0; i < Sdof; i++) { dataVisc[i] += Rdata[i] * dataSubgrid[i]; }     
+     //double *dataSubgrid = subgridVisc_gf->HostReadWrite();
+     double *dataSubgrid = (turbModel_interface_->eddy_viscosity)->HostRead();
+     double *dataVisc = visc_gf.HostReadWrite();
+     double *data = viscTotal_gf.HostReadWrite();     
+     //double *Rdata = rn_gf.HostReadWrite();          
+     for (int i = 0; i < Sdof; i++) {
+       data[i] = dataVisc[i] + dataSubgrid[i];
+     }     
    }
    
    if (config->linViscData.isEnabled) {
-     double *viscMult = bufferViscMult->HostReadWrite();
-     double *dataVisc = bufferVisc->HostReadWrite();
+     double *vMult = viscMult.HostReadWrite();
+     double *dataVisc = viscTotal_gf.HostReadWrite();
      for (int i = 0; i < Sdof; i++) { dataVisc[i] *= viscMult[i]; }
    }      
 
    // interior-sized visc needed for p-p rhs
-   bufferVisc->GetTrueDofs(viscSml);   
+   //bufferVisc->GetTrueDofs(viscSml);   
 
    // for elasticity operator
    /*
@@ -1328,16 +1354,18 @@ void ThermoChem::updateDiffusivity() {
   
    // thermal diffusivity, this is really k
    {
-     double *data = bufferAlpha->HostReadWrite();
-     double *dataVisc = bufferVisc->HostReadWrite();
+     double *data = kappa_gf.HostReadWrite();
+     double *dataVisc = viscTotal_gf.HostReadWrite();
      //double Ctmp = Cp / Pr;
      double Ctmp = 1.0 / Pr;
-     for (int i = 0; i < Sdof; i++) { data[i] = Ctmp * dataVisc[i]; }
+     for (int i = 0; i < Sdof; i++) {
+       data[i] = Ctmp * dataVisc[i];
+     }
    }
-   bufferAlpha->GetTrueDofs(alphaSml);
 
+   // are these still used? CHECK
    viscTotal_gf.SetFromTrueDofs(viscSml);      
-   alphaTotal_gf.SetFromTrueDofs(alphaSml);
+   kappa_gf.SetFromTrueDofs(kappaSml);
 
    // viscosity gradient
    //G->Mult(viscSml, tmpR1);     
@@ -1432,6 +1460,7 @@ void ThermoChem::computeSystemMass() {
 }
 
 
+// move to utils
 void ThermoChem::EliminateRHS(Operator &A,
                                 ConstrainedOperator &constrainedA,
                                 const Array<int> &ess_tdof_list,

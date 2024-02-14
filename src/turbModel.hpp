@@ -88,8 +88,8 @@ private:
    int order;
    IntegrationRules gll_rules;    
 
-   double bd0, bd1, bd2, bd3;
-   double ab1, ab2, ab3;
+  //double bd0, bd1, bd2, bd3;
+  //double ab1, ab2, ab3;
    int nvel, dim;
    int num_equation;    
    int MaxIters;
@@ -100,10 +100,15 @@ private:
    // loMach options to run as incompressible
    bool pFilter = false;  
   
-   double dt;
-   double time;
-   int iter;
+  //double dt;
+  //double time;
+  //int iter;
 
+   // Coefficients necessary to take a time step (including dt).
+   // Assumed to be externally managed and determined, so just get a
+   // reference here.
+   const timeCoefficients &timeCoeff_;
+  
    // Scalar \f$H^1\f$ finite element collection.
    FiniteElementCollection *sfec = nullptr;
 

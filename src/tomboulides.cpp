@@ -97,7 +97,12 @@ void Tomboulides::initializeSelf() {
   *p_gf_ = 0.0;
   *resp_gf_ = 0.0;
 
-  interface.velocity = u_next_gf_;
+  toThermoChem_interface.velocity = u_next_gf_;
+
+  // NEEDS TO BE ADDED
+  //toTurbModel_interface.gradU = gradU_gf_;
+  //toTurbModel_interface.gradV = gradV_gf_;
+  //toTurbModel_interface.gradW = gradW_gf_;    
 
   // Add gravity forcing
   assert(dim_ >= 2);
