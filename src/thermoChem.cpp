@@ -1320,13 +1320,12 @@ void ThermoChem::updateDiffusivity() {
    if (config_->sgsModelType > 0) {
      //double *dataSubgrid = bufferSubgridVisc->HostReadWrite();
      //double *dataSubgrid = subgridVisc_gf->HostReadWrite();
-     // generates an error double *dataSubgrid = (turbModel_interface_->eddy_viscosity)->HostRead();
+     const double *dataSubgrid = turbModel_interface_->eddy_viscosity->HostRead();
      double *dataVisc = visc_gf.HostReadWrite();
      double *data = viscTotal_gf.HostReadWrite();     
      double *Rdata = rn_gf.HostReadWrite();          
      for (int i = 0; i < Sdof; i++) {
-       //       data[i] = dataVisc[i] + Rdata[i] * dataSubgrid[i];
-       data[i] = dataVisc[i];  //FIX
+       data[i] = dataVisc[i] + Rdata[i] * dataSubgrid[i];
      }     
    }
    

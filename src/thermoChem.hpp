@@ -25,6 +25,7 @@ class Tps;
 #include "radiation.hpp"
 //#include "loMach.hpp"
 #include "../utils/mfem_extras/pfem_extras.hpp"
+#include "turb_model_base.hpp"
 #include "thermo_chem_base.hpp"
 #include "split_flow_base.hpp"
 

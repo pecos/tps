@@ -176,7 +176,8 @@ void TurbModel::step()
    (flow_interface_->gradU)->GetTrueDofs(gradU);
    (flow_interface_->gradV)->GetTrueDofs(gradV);
    (flow_interface_->gradW)->GetTrueDofs(gradW);   
-   // generates an error, for now just keep as nu (thermoChem_interface_->density)->GetTrueDofs(rn);
+   // generates an error, for now just keep as nu (
+   (thermoChem_interface_->density)->GetTrueDofs(rn);
    //(grid_interface_->delta).GetTrueDofs(delta); // doesnt exist yet
    delta = 0.0; // temporary
    
@@ -186,7 +187,7 @@ void TurbModel::step()
      double *dGradV = gradV.HostReadWrite();
      double *dGradW = gradW.HostReadWrite(); 
      double *del = delta.HostReadWrite();
-     //double *rho = rn.HostReadWrite();     
+     double *rho = rn.HostReadWrite();     
      double *data = subgridViscSml.HostReadWrite();
      
      if (config_->sgsModelType == 1) {
@@ -198,8 +199,8 @@ void TurbModel::step()
 	 for (int dir = 0; dir < dim; dir++) { gradUp(1,dir) = dGradV[i + dir * SdofInt]; }
 	 for (int dir = 0; dir < dim; dir++) { gradUp(2,dir) = dGradW[i + dir * SdofInt]; }
          sgsSmag(gradUp, del[i], nu_sgs);
-         //data[i] = rho[i] * nu_sgs;
-         data[i] = nu_sgs;	 
+         data[i] = rho[i] * nu_sgs;
+         //data[i] = nu_sgs;	 
        }
        
      } else if (config_->sgsModelType == 2) {       
@@ -211,8 +212,8 @@ void TurbModel::step()
 	 for (int dir = 0; dir < dim; dir++) { gradUp(1,dir) = dGradV[i + dir * SdofInt]; }
 	 for (int dir = 0; dir < dim; dir++) { gradUp(2,dir) = dGradW[i + dir * SdofInt]; }
          sgsSigma(gradUp, del[i], nu_sgs);
-	 //data[i] = rho[i] *nu_sgs;
-	 data[i] = nu_sgs;	 
+	 data[i] = rho[i] *nu_sgs;
+	 //data[i] = nu_sgs;	 
        }
        
      } else {

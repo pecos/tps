@@ -26,6 +26,7 @@ class Tps;
 //#include "loMach.hpp"
 #include "../utils/mfem_extras/pfem_extras.hpp"
 #include "split_flow_base.hpp"
+#include "thermo_chem_base.hpp"
 #include "turb_model_base.hpp"
 
 using VecFuncT = void(const Vector &x, double t, Vector &u);
