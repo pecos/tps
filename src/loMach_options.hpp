@@ -74,18 +74,6 @@ class LoMachOptions {
     max_iter = 100;
     rtol = 1.0e-8;
     atol = 1.0e-12;
-    /*
-    preconditioner_background_sigma = -1;
-    evaluate_magnetic_field = true;
-    nBy = 0;
-    yinterp_min = 0.0;
-    yinterp_max = 1.0;
-    top_only = false;
-    bot_only = false;
-    current_amplitude = 1.0;
-    current_frequency = 1.0;
-    mu0 = 1.0;
-    */
   }
 
   void print(std::ostream &out) {
