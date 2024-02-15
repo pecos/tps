@@ -34,8 +34,7 @@
 #define LOMACH_OPTIONS_HPP_
 
 #include <iostream>
-
-#include "tps_mfem_wrap.hpp"
+#include <string>
 
 /** LoMach options
  *  A class for storing/passing options to Low Mach solvers.
