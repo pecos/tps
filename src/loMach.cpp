@@ -112,18 +112,18 @@ void LoMachSolver::initialize() {
   }
 
   // Generate serial mesh, making it periodic if requested
-  if (config.GetPeriodic()) {
+  if (loMach_opts_.periodic) {
     Mesh temp_mesh = Mesh(loMach_opts_.mesh_file.c_str());
-    Vector x_translation({config.GetXTrans(), 0.0, 0.0});
-    Vector y_translation({0.0, config.GetYTrans(), 0.0});
-    Vector z_translation({0.0, 0.0, config.GetZTrans()});
+    Vector x_translation({loMach_opts_.x_trans, 0.0, 0.0});
+    Vector y_translation({0.0, loMach_opts_.y_trans, 0.0});
+    Vector z_translation({0.0, 0.0, loMach_opts_.z_trans});
     std::vector<Vector> translations = {x_translation, y_translation, z_translation};
 
     if (rank0_) {
       std::cout << " Making the mesh periodic using the following offsets:" << std::endl;
-      std::cout << "   xTrans: " << config.GetXTrans() << std::endl;
-      std::cout << "   yTrans: " << config.GetYTrans() << std::endl;
-      std::cout << "   zTrans: " << config.GetZTrans() << std::endl;
+      std::cout << "   xTrans: " << loMach_opts_.x_trans << std::endl;
+      std::cout << "   yTrans: " << loMach_opts_.y_trans << std::endl;
+      std::cout << "   zTrans: " << loMach_opts_.z_trans << std::endl;
     }
 
     serial_mesh_ =
@@ -1283,8 +1283,8 @@ void LoMachSolver::parseBCInputs() {
 }
 
 void LoMachSolver::parsePeriodicInputs() {
-  tpsP_->getInput("periodicity/enablePeriodic", config.periodic, false);
-  tpsP_->getInput("periodicity/xTrans", config.xTrans, 1.0e12);
-  tpsP_->getInput("periodicity/yTrans", config.yTrans, 1.0e12);
-  tpsP_->getInput("periodicity/zTrans", config.zTrans, 1.0e12);
+  tpsP_->getInput("periodicity/enablePeriodic", loMach_opts_.periodic, false);
+  tpsP_->getInput("periodicity/xTrans", loMach_opts_.x_trans, 1.0e12);
+  tpsP_->getInput("periodicity/yTrans", loMach_opts_.y_trans, 1.0e12);
+  tpsP_->getInput("periodicity/zTrans", loMach_opts_.z_trans, 1.0e12);
 }

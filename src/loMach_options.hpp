@@ -42,21 +42,32 @@
  */
 class LoMachOptions {
  public:
+  // Mesh-related options
   std::string mesh_file; /**< Mesh filename */
   double scale_mesh;
+  int ref_levels; /**< Number of uniform mesh refinements */
 
-  std::string flow_solver;   /**< Flow solver name */
-  std::string thermo_solver; /**< Themo-chemical solver name */
+  bool periodic;
+  double x_trans;
+  double y_trans;
+  double z_trans;
 
-  int order; /**< Element order */
+  // FEM
+  int order;      /**< Element order */
   int uOrder;
   int pOrder;
   int nOrder;
-  int ref_levels; /**< Number of uniform mesh refinements */
 
-  int max_iter; /**< Maximum number of linear solver iterations */
-  double rtol;  /**< Linear solver relative tolerance */
-  double atol;  /**< Linear solver absolute tolerance */
+  // Model choices
+  std::string flow_solver; /**< Flow solver name */
+  std::string thermo_solver; /**< Themo-chemical solver name */
+
+
+  // TODO(trevilo): Do we want/need to keep any of these here?
+  // They aren't currently being used.
+  int max_iter;                           /**< Maximum number of linear solver iterations */
+  double rtol;                            /**< Linear solver relative tolerance */
+  double atol;                            /**< Linear solver absolute tolerance */
 
   bool thermalDiv; // turn on/off Qt
   bool realDiv;    // use actual divergence
@@ -80,6 +91,7 @@ class LoMachOptions {
     out << "  mesh_file   = " << mesh_file << std::endl;
     out << "  scale_mesh  = " << scale_mesh << std::endl;
     out << "  flow_solver = " << flow_solver << std::endl;
+    out << "  thermo_solver = " << thermo_solver << std::endl;
     out << "  order       = " << order << std::endl;
     out << "  ref_levels  = " << ref_levels << std::endl;
     out << "  ref_levels  = " << ref_levels << std::endl;
