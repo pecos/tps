@@ -66,8 +66,6 @@ class LoMachOptions {
   bool filterTemp, filterVel;
   bool solveTemp;
 
-  bool channelTest;
-
   LoMachOptions() {
     order = 1;
     ref_levels = 0;
