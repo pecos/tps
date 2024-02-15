@@ -41,6 +41,7 @@
 #include <vector>
 
 #include "dataStructures.hpp"
+#include "io.hpp"
 #include "tps_mfem_wrap.hpp"
 
 using namespace mfem;
@@ -51,15 +52,15 @@ using namespace std;
 // Lines begining with # are ignored
 class RunConfiguration {
  public:
+  // IO options
+  IOOptions io_opts_;
+
   // mesh file file
   string meshFile;
   int ref_levels;
 
   // partition file
   string partFile;
-
-  // output file name
-  string outputFile;
 
   // time integrator. Possible values
   //  1: ForwardEulerSolver
@@ -107,15 +108,11 @@ class RunConfiguration {
   bool useRoe;
 
   // restart controls
-  bool restart;
-  bool restartFromLTE;
   bool restart_hdf5_conversion;  // read in older ascii format
-  std::string restart_serial;    // mode for serial restarts
   int restart_cycle;
 
   // Restart from different order solution on same mesh.  New order
   // set by POL_ORDER, old order determined from restart file.
-  bool restartFromAux;
   bool singleRestartFile;
 
   // mean and RMS
@@ -297,7 +294,7 @@ class RunConfiguration {
   double GetWallTemp() { return wallTemperature; }
 
   string GetMeshFileName() { return meshFile; }
-  string GetOutputName() { return outputFile; }
+  string GetOutputName() { return io_opts_.output_dir_; }
   string GetPartitionBaseName() const { return partFile; }
   int GetUniformRefLevels() { return ref_levels; }
 
@@ -338,19 +335,18 @@ class RunConfiguration {
   int rm_threshold() { return rm_threshold_; }
   int rm_checkFreq() { return rm_checkFrequency_; }
 
-  int exit_checkFreq() { return exit_checkFrequency_; }
+  int exit_checkFreq() { return io_opts_.exit_check_frequency_; }
 
   bool thereIsForcing() { return isForcing; }
   double* GetImposedPressureGradient() { return &gradPress[0]; }
 
-  int GetRestartCycle() { return restart; }
+  int GetRestartCycle() { return io_opts_.enable_restart_; }
   void SetRestartCycle(int iter) {
     restart_cycle = iter;
     return;
   }
-  bool RestartFromAux() { return restartFromAux; }
+  bool RestartFromAux() { return io_opts_.restart_variable_order_; }
   bool RestartHDFConversion() { return restart_hdf5_conversion; }
-  std::string RestartSerial() { return restart_serial; }
   bool isRestartSerialized(string mode);
   bool isRestartPartitioned(string mode);
 

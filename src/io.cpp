@@ -385,6 +385,52 @@ void read_variable_data_hdf5(hid_t file, string varName, size_t index, double *d
   H5Dclose(data_soln);
 }
 
+IOOptions::IOOptions() : output_dir_("output"), restart_mode_("standard") {}
+
+void IOOptions::read(TPS::Tps *tps, std::string prefix) {
+  std::string basename;
+  if (!prefix.empty()) {
+    basename = prefix + "/io";
+  } else {
+    basename = "io";
+  }
+  tps->getInput((basename + "/outdirBase").c_str(), output_dir_, std::string("output-default"));
+  tps->getInput((basename + "/enableRestart").c_str(), enable_restart_, false);
+  tps->getInput((basename + "/restartFromLTE").c_str(), enable_restart_from_lte_, false);
+  tps->getInput((basename + "/exitCheckFreq").c_str(), exit_check_frequency_, 500);
+  assert(exit_check_frequency_ > 0);
+
+  tps->getInput((basename + "/restartMode").c_str(), restart_mode_, std::string("standard"));
+  setRestartFlags();
+}
+
+void IOOptions::setRestartFlags() {
+  if (restart_mode_ == "variableP") {
+    restart_variable_order_ = true;
+    restart_serial_write_ = false;
+    restart_serial_read_ = false;
+  } else if (restart_mode_ == "singleFileWrite") {
+    restart_variable_order_ = false;
+    restart_serial_write_ = true;
+    restart_serial_read_ = false;
+  } else if (restart_mode_ == "singleFileRead") {
+    restart_variable_order_ = false;
+    restart_serial_write_ = false;
+    restart_serial_read_ = true;
+  } else if (restart_mode_ == "singleFileReadWrite") {
+    restart_variable_order_ = false;
+    restart_serial_write_ = true;
+    restart_serial_read_ = true;
+  } else if (restart_mode_ == "standard") {
+    restart_variable_order_ = false;
+    restart_serial_write_ = false;
+    restart_serial_read_ = false;
+  } else {
+    grvy_printf(GRVY_ERROR, "\nUnknown restart mode -> %s\n", restart_mode_.c_str());
+    exit(1);
+  }
+}
+
 // convenience function to read and distribute solution data for serialized restarts
 void IOFamily::readDistributeSerializedVariable(hid_t file, const IOVar &var, int numDof, double *data) {
   std::string varName = group_ + "/" + var.varName_;

@@ -42,11 +42,39 @@
 #include <string>
 #include <vector>
 
+#include "logger.hpp"
 #include "mpi_groups.hpp"
-#include "run_configuration.hpp"
 #include "tps_mfem_wrap.hpp"
 
+class RunConfiguration;
 class IODataOrganizer;
+
+namespace TPS {
+class Tps;
+}
+
+/**
+ * @brief A place to hold options from the "io" section of a tps input deck
+ */
+class IOOptions {
+ public:
+  IOOptions();
+
+  std::string output_dir_;
+  bool enable_restart_ = false;
+  bool enable_restart_from_lte_ = false;
+
+  int exit_check_frequency_ = 500;
+
+  std::string restart_mode_;
+
+  bool restart_variable_order_ = false;
+  bool restart_serial_read_ = false;
+  bool restart_serial_write_ = false;
+
+  void read(TPS::Tps *tps, std::string prefix = std::string(""));
+  void setRestartFlags();
+};
 
 /**
  * @brief Stores info about variables to read/write.

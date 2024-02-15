@@ -429,7 +429,7 @@ void M2ulPhyS::initVariables() {
   }
 
   // only need serial mesh if on rank 0 and using single restart file option
-  if (!rank0_ || (config.RestartSerial() == "no")) delete serial_mesh;
+  if (!rank0_ || (!config.isRestartSerialized("either"))) delete serial_mesh;
 
   // Paraview setup
   paraviewColl = new ParaViewDataCollection(config.GetOutputName(), mesh);
@@ -655,7 +655,7 @@ void M2ulPhyS::initVariables() {
     ioData.registerIOVar("/rmsData", "vw", 5);
   }
 
-  ioData.initializeSerial(rank0_, (config.RestartSerial() != "no"), serial_mesh, locToGlobElem, &partitioning_);
+  ioData.initializeSerial(rank0_, config.isRestartSerialized("either"), serial_mesh, locToGlobElem, &partitioning_);
   projectInitialSolution();
 
   // Boundary attributes in present partition
@@ -1812,14 +1812,14 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     if ((eqSystem == NS_PASSIVE) && (sp == 1)) break;
 
     std::string speciesName = config.speciesNames[sp];
-    if (config.restartFromLTE) {
+    if (config.io_opts_.enable_restart_from_lte_) {
       ioData.registerIOVar("/solution", "rho-Y_" + speciesName, sp + nvel + 2, false);
     } else {
       ioData.registerIOVar("/solution", "rho-Y_" + speciesName, sp + nvel + 2);
     }
   }
   if (config.twoTemperature) {
-    if (config.restartFromLTE) {
+    if (config.io_opts_.enable_restart_from_lte_) {
       ioData.registerIOVar("/solution", "rhoE_e", num_equation - 1, false);
     } else {
       ioData.registerIOVar("/solution", "rhoE_e", num_equation - 1);
@@ -1918,7 +1918,7 @@ void M2ulPhyS::projectInitialSolution() {
 
     restart_files_hdf5("read");
 
-    if (config.restartFromLTE) {
+    if (config.io_opts_.enable_restart_from_lte_) {
       initilizeSpeciesFromLTE();
       Check_Undershoot();
     }
@@ -1951,7 +1951,7 @@ void M2ulPhyS::projectInitialSolution() {
   }
 
   // if restarting from LTE, write paraview and restart h5 immediately
-  if (config.restartFromLTE && !tpsP->isVisualizationMode()) {
+  if (config.io_opts_.enable_restart_from_lte_ && !tpsP->isVisualizationMode()) {
     if (rank0_) std::cout << "Writing non-equilibrium restart files!" << std::endl;
     paraviewColl->Save();
     restart_files_hdf5("write");
@@ -2711,28 +2711,7 @@ void M2ulPhyS::parseStatOptions() {
   tpsP->getInput("averaging/enableContinuation", config.restartMean, false);
 }
 
-void M2ulPhyS::parseIOSettings() {
-  tpsP->getInput("io/outdirBase", config.outputFile, std::string("output-default"));
-  tpsP->getInput("io/enableRestart", config.restart, false);
-  tpsP->getInput("io/restartFromLTE", config.restartFromLTE, false);
-  tpsP->getInput("io/exitCheckFreq", config.exit_checkFrequency_, 500);
-  assert(config.exit_checkFrequency_ > 0);
-
-  std::string restartMode;
-  tpsP->getInput("io/restartMode", restartMode, std::string("standard"));
-  if (restartMode == "variableP") {
-    config.restartFromAux = true;
-  } else if (restartMode == "singleFileWrite") {
-    config.restart_serial = "write";
-  } else if (restartMode == "singleFileRead") {
-    config.restart_serial = "read";
-  } else if (restartMode == "singleFileReadWrite") {
-    config.restart_serial = "readwrite";
-  } else if (restartMode != "standard") {
-    grvy_printf(GRVY_ERROR, "\nUnknown restart mode -> %s\n", restartMode.c_str());
-    exit(ERROR);
-  }
-}
+void M2ulPhyS::parseIOSettings() { config.io_opts_.read(tpsP); }
 
 void M2ulPhyS::parseRMSJobOptions() {
   tpsP->getInput("jobManagement/enableAutoRestart", config.rm_enableMonitor_, false);
