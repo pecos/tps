@@ -2,7 +2,6 @@
 
 
 #include "turbModel.hpp"
-//#include "thermoChem.hpp"
 #include "loMach.hpp"
 #include "loMach_options.hpp"
 #include "mfem/general/forall.hpp"
@@ -42,15 +41,10 @@ void TurbModel::initializeSelf() {
       order = std::max(config_->solOrder,1);
       double no;
       no = ceil( ((double)order * 1.5) );   
-      //norder = int(no);
     } else {
       order = loMach_opts_->uOrder;
-      //norder = loMach_->loMach_opts_.nOrder;
     }
    
-   MaxIters = config_->GetNumIters();
-   num_equation = 1; // hard code for now, fix with species
-
    //-----------------------------------------------------
    // 2) Prepare the required finite elements
    //-----------------------------------------------------
@@ -63,24 +57,10 @@ void TurbModel::initializeSelf() {
    vfec = new H1_FECollection(order, dim);
    vfes = new ParFiniteElementSpace(pmesh_, vfec, dim);
    
-   // Check if fully periodic mesh
-   //if (!(pmesh->bdr_attributes.Size() == 0))
-   /* update for tke/epsi
-   if (!(pmesh->bdr_attributes.Size() == 0))     
-   {
-      temp_ess_attr.SetSize(pmesh->bdr_attributes.Max());
-      temp_ess_attr = 0;
-
-      Qt_ess_attr.SetSize(pmesh->bdr_attributes.Max());
-      Qt_ess_attr = 0;
-   }
-   if (verbose) grvy_printf(ginfo, "ThermoChem paces constructed...\n");
-   */
-
    int vfes_truevsize = vfes->GetTrueVSize();   
    int sfes_truevsize = sfes->GetTrueVSize();
 
-   subgridViscSml.SetSize(sfes_truevsize);
+   subgridVisc.SetSize(sfes_truevsize);
    subgridVisc_gf.SetSpace(sfes);
    delta.SetSize(sfes_truevsize);
 
@@ -97,90 +77,25 @@ void TurbModel::initializeSelf() {
    
 }
 
-/*
-void TurbModel::initializeExternal(ParGridFunction *gradU_gf_, ParGridFunction *gradV_gf_, ParGridFunction *gradW_gf_, ParGridFunction *delta_gf_) {
-
-  gradU_gf = gradU_gf_;
-  gradV_gf = gradV_gf_;
-  gradW_gf = gradW_gf_;
-  delta_gf = delta_gf_;
-  
-}
-*/
-
-
 void TurbModel::setup(double dt)
 {
 
-   // HARD CODE
-   //partial_assembly = true;
-   partial_assembly = false;
-   //if (verbose) grvy_printf(ginfo, "in Setup...\n");
-
-   Sdof = sfes->GetNDofs();   
-   SdofInt = sfes->GetTrueVSize();
-
-   // Initial conditions
-   
-   // Boundary conditions
-      
-   // inlet bc
-   // outlet bc   
-   // wall bc
-
-   
-   Array<int> empty;
-
-   // unsteady: p+p [+p] = 2p [3p]
-   // convection: p+p+(p-1) [+p] = 3p-1 [4p-1]
-   // diffusion: (p-1)+(p-1) [+p] = 2p-2 [3p-2]
-   
-   // GLL integration rule (Numerical Integration)
-   /*
-   const IntegrationRule &ir_i  = gll_rules.Get(sfes->GetFE(0)->GetGeomType(), 2*order + 1);  //3 5
-   const IntegrationRule &ir_nli = gll_rules.Get(sfes->GetFE(0)->GetGeomType(), 4*order);    //4 8
-   const IntegrationRule &ir_di  = gll_rules.Get(sfes->GetFE(0)->GetGeomType(), 3*order - 1); //2 5  
-   if (rank0) std::cout << "Integration rules set" << endl;
-   */
-
-   // coeffs for solvers
-   // density coefficient
+  // empty for now, will be used for transport models
    
 }
 
-//void TurbModel::turbModelStep(double &time, double dt, const int current_step, const int start_step, std::vector<double> bdf, bool provisional)
 void TurbModel::step()
 {
 
-   // update bdf coefficients
-   bd0 = timeCoeff_.bd0;
-   bd1 = timeCoeff_.bd1;
-   bd2 = timeCoeff_.bd2;
-   bd3 = timeCoeff_.bd3;
-   dt = timeCoeff_.dt;
-   time = timeCoeff_.time;  
-
-   // update vectors from external data and gradients
-   //gradU_gf->GetTrueDofs(gradU);
-   //gradV_gf->GetTrueDofs(gradV);
-   //gradW_gf->GetTrueDofs(gradW);   
-   
-   // add selection for turbmodel here
-   
-   // Set current time for scalar Dirichlet boundary conditions.
-   //for (auto &temp_dbc : temp_dbcs) {temp_dbc.coeff->SetTime(time + dt);}   
-
-   subgridViscSml = 0.0;
-
-   // is this legal?
+   // gather necessary information from other classes
    (flow_interface_->gradU)->GetTrueDofs(gradU);
    (flow_interface_->gradV)->GetTrueDofs(gradV);
    (flow_interface_->gradW)->GetTrueDofs(gradW);   
-   // generates an error, for now just keep as nu (
    (thermoChem_interface_->density)->GetTrueDofs(rn);
    //(grid_interface_->delta).GetTrueDofs(delta); // doesnt exist yet
    delta = 0.0; // temporary
-   
+
+   subgridVisc = 0.0;   
    if (config_->sgsModelType > 0) {
      
      double *dGradU = gradU.HostReadWrite();
@@ -188,7 +103,7 @@ void TurbModel::step()
      double *dGradW = gradW.HostReadWrite(); 
      double *del = delta.HostReadWrite();
      double *rho = rn.HostReadWrite();     
-     double *data = subgridViscSml.HostReadWrite();
+     double *data = subgridVisc.HostReadWrite();
      
      if (config_->sgsModelType == 1) {
        for (int i = 0; i < SdofInt; i++) {     
@@ -200,7 +115,6 @@ void TurbModel::step()
 	 for (int dir = 0; dir < dim; dir++) { gradUp(2,dir) = dGradW[i + dir * SdofInt]; }
          sgsSmag(gradUp, del[i], nu_sgs);
          data[i] = rho[i] * nu_sgs;
-         //data[i] = nu_sgs;	 
        }
        
      } else if (config_->sgsModelType == 2) {       
@@ -213,7 +127,6 @@ void TurbModel::step()
 	 for (int dir = 0; dir < dim; dir++) { gradUp(2,dir) = dGradW[i + dir * SdofInt]; }
          sgsSigma(gradUp, del[i], nu_sgs);
 	 data[i] = rho[i] *nu_sgs;
-	 //data[i] = nu_sgs;	 
        }
        
      } else {
@@ -225,62 +138,12 @@ void TurbModel::step()
 
    }
    
-   subgridVisc_gf.SetFromTrueDofs(subgridViscSml);          
-   //bufferSubgridVisc->SetFromTrueDofs(subgridViscSml);     
+   subgridVisc_gf.SetFromTrueDofs(subgridVisc);
      
 }
 
-
-   //void TurbModel::computeExplicitConvectionOP(bool extrap) {}
-
-   //void TurbModel::updateBC(int current_step) {}
-
-/*
-void ThermoChem::EliminateRHS(Operator &A,
-                                ConstrainedOperator &constrainedA,
-                                const Array<int> &ess_tdof_list,
-                                Vector &x,
-                                Vector &b,
-                                Vector &X,
-                                Vector &B,
-                                int copy_interior)
-{
-   const Operator *Po = A.GetOutputProlongation();
-   const Operator *Pi = A.GetProlongation();
-   const Operator *Ri = A.GetRestriction();
-   A.InitTVectors(Po, Ri, Pi, x, b, X, B);
-   if (!copy_interior) { X.SetSubVectorComplement(ess_tdof_list, 0.0); }
-   constrainedA.EliminateRHS(X, B);
-}
-*/
-
-/*
-void ThermoChem::Orthogonalize(Vector &v)
-{
-   double loc_sum = v.Sum();
-   double global_sum = 0.0;
-   int loc_size = v.Size();
-   int global_size = 0;
-
-   MPI_Allreduce(&loc_sum, &global_sum, 1, MPI_DOUBLE, MPI_SUM, sfes->GetComm());
-   MPI_Allreduce(&loc_size, &global_size, 1, MPI_INT, MPI_SUM, sfes->GetComm());
-
-   v -= global_sum / static_cast<double>(global_size);
-}
-*/
-
-/* 
-void TurbModel::interpolateInlet() {
-}
-*/
-
-/*
-void ThermoChem::uniformInlet() {  
-}
-*/
-
 /**
-Basic Smagorinksy subgrid model with user-specified cutoff grid length
+Basic Smagorinksy subgrid model with user-specified coefficient
 */
 void TurbModel::sgsSmag(const DenseMatrix &gradUp, double delta, double &nu) {
 
@@ -417,62 +280,4 @@ void TurbModel::sgsSigma(const DenseMatrix &gradUp, double delta, double &nu) {
   if (nu != nu) nu = 0.0;
   
 }
-
-/* 
-void TurbModel::AddTKEDirichletBC(Coefficient *coeff, Array<int> &attr)
-{
-
-   temp_dbcs.emplace_back(attr, coeff);
-
-   if (verbose && pmesh->GetMyRank() == 0)
-   {
-      mfem::out << "Adding Temperature Dirichlet BC to attributes ";
-      for (int i = 0; i < attr.Size(); ++i) {
-         if (attr[i] == 1) {
-	   mfem::out << i << " ";
-	 }
-      }
-      mfem::out << std::endl;
-   }
-
-   for (int i = 0; i < attr.Size(); ++i)
-   {
-      MFEM_ASSERT((temp_ess_attr[i] && attr[i]) == 0,"Duplicate boundary definition deteceted.");
-      if (attr[i] == 1) { temp_ess_attr[i] = 1; }
-   }
-}
-
-void ThermoChem::AddTempDirichletBC(ScalarFuncT *f, Array<int> &attr)
-{
-   AddTempDirichletBC(new FunctionCoefficient(f), attr);
-}
-
-void ThermoChem::AddQtDirichletBC(Coefficient *coeff, Array<int> &attr)
-{
-
-   Qt_dbcs.emplace_back(attr, coeff);
-
-   if (verbose && pmesh->GetMyRank() == 0)
-   {
-      mfem::out << "Adding Qt Dirichlet BC to attributes ";
-      for (int i = 0; i < attr.Size(); ++i) {
-         if (attr[i] == 1) {
-	   mfem::out << i << " ";
-	 }
-      }
-      mfem::out << std::endl;
-   }
-
-   for (int i = 0; i < attr.Size(); ++i)
-   {
-      MFEM_ASSERT((Qt_ess_attr[i] && attr[i]) == 0,"Duplicate boundary definition deteceted.");
-      if (attr[i] == 1) { Qt_ess_attr[i] = 1; }
-   }
-}
-
-void ThermoChem::AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr)
-{
-   AddQtDirichletBC(new FunctionCoefficient(f), attr);
-}
-*/
 
