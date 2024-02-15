@@ -57,25 +57,9 @@ class LoMachOptions {
   int max_iter; /**< Maximum number of linear solver iterations */
   double rtol;  /**< Linear solver relative tolerance */
   double atol;  /**< Linear solver absolute tolerance */
-  // double preconditioner_background_sigma; /**< Uniform conductivity to use to preconditioner (ignored if <= 0) */
 
-  bool thermalDiv;  // turn on/off Qt
-  bool realDiv;     // use actual divergence
-
-  // bool top_only; /**< Flag to specify current in top rings only */
-  // bool bot_only; /**< Flag to specify current in bottom rings only */
-
-  // bool evaluate_magnetic_field;
-  // std::string By_file; /**< Filename for vertical component of magnetic field on y-axis */
-  // int nBy;             /**< Number of uniformly spaced points for By output */
-  // double yinterp_min;  /**< Begin value for uniformly spaced points */
-  // double yinterp_max;  /**< End value for uniformly spaced points */
-
-  // double current_amplitude; /**< Amplitude of source current */
-  // double current_frequency; /**< Frequency of source current */
-  // double mu0;               /**< Permeability of free space */
-
-  // mfem::Vector current_axis;
+  bool thermalDiv; // turn on/off Qt
+  bool realDiv;    // use actual divergence
 
   int nFilter;
   double filterWeight;
@@ -116,17 +100,6 @@ class LoMachOptions {
     out << "  max_iter    = " << max_iter << std::endl;
     out << "  rtol        = " << rtol << std::endl;
     out << "  atol        = " << atol << std::endl;
-    /*
-    out << "  top_only    = " << top_only << std::endl;
-    out << "  bot_only    = " << bot_only << std::endl;
-    out << "  By_file     = " << By_file << std::endl;
-    out << "  nBy         = " << nBy << std::endl;
-    out << "  yinterp_min = " << yinterp_min << std::endl;
-    out << "  yinterp_max = " << yinterp_max << std::endl;
-    out << "  current_amplitude = " << current_amplitude << std::endl;
-    out << "  current_frequency = " << current_frequency << std::endl;
-    out << "  mu0 = " << mu0 << std::endl;
-    */
     out << std::endl;
   }
 };
