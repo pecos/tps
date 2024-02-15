@@ -36,11 +36,16 @@
 #include <iostream>
 #include <string>
 
+class IOOptions;
+
 /** LoMach options
  *  A class for storing/passing options to Low Mach solvers.
  */
 class LoMachOptions {
  public:
+  // IO-related options
+  IOOptions io_opts_;
+
   // Mesh-related options
   std::string mesh_file; /**< Mesh filename */
   double scale_mesh;

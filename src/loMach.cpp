@@ -43,6 +43,7 @@
 #include <iomanip>
 #include <limits>
 
+#include "io.hpp"
 #include "logger.hpp"
 #include "thermoChem.hpp"
 #include "tomboulides.hpp"
@@ -65,7 +66,7 @@ LoMachSolver::LoMachSolver(LoMachOptions loMach_opts, TPS::Tps *tps)
   // ini file options
   parseSolverOptions();
   parseSolverOptions2();
-  loadFromAuxSol = config.RestartFromAux();
+  loadFromAuxSol = loMach_opts_.io_opts_.restart_variable_order_;
 
   // set default solver state
   exit_status_ = NORMAL;
@@ -307,7 +308,9 @@ void LoMachSolver::initialize() {
 
   // TODO(trevilo): Enable averaging.  See note in loMach.hpp
 
-  ioData.initializeSerial(rank0_, (config.RestartSerial() != "no"), serial_mesh_, locToGlobElem, &partitioning_);
+  const bool restart_serial =
+      (loMach_opts_.io_opts_.restart_serial_read_ || loMach_opts_.io_opts_.restart_serial_write_);
+  ioData.initializeSerial(rank0_, restart_serial, serial_mesh_, locToGlobElem, &partitioning_);
   MPI_Barrier(MPI_COMM_WORLD);
   if (verbose) grvy_printf(ginfo, "ioData.init thingy...\n");
 
@@ -503,7 +506,7 @@ void LoMachSolver::initialTimeStep() {
 
 void LoMachSolver::solve() {
   // just restart here
-  if (config.restart) {
+  if (loMach_opts_.io_opts_.enable_restart_) {
     restart_files_hdf5("read");
   }
 
@@ -961,7 +964,7 @@ void LoMachSolver::parseSolverOptions2() {
   parseTimeIntegrationOptions();
 
   // I/O settings
-  parseIOSettings();
+  loMach_opts_.io_opts_.read(tpsP_);
 
   // periodicity
   parsePeriodicInputs();
@@ -1051,27 +1054,6 @@ void LoMachSolver::parseTimeIntegrationOptions() {
     config.bdfOrder = 1;
   }
   max_bdf_order = config.bdfOrder;
-}
-
-void LoMachSolver::parseIOSettings() {
-  tpsP_->getInput("io/outdirBase", config.outputFile, std::string("output-default"));
-  tpsP_->getInput("io/enableRestart", config.restart, false);
-  tpsP_->getInput("io/exitCheckFreq", config.exit_checkFrequency_, 500);
-
-  std::string restartMode;
-  tpsP_->getInput("io/restartMode", restartMode, std::string("standard"));
-  if (restartMode == "variableP") {
-    config.restartFromAux = true;
-  } else if (restartMode == "singleFileWrite") {
-    config.restart_serial = "write";
-  } else if (restartMode == "singleFileRead") {
-    config.restart_serial = "read";
-  } else if (restartMode == "singleFileReadWrite") {
-    config.restart_serial = "readwrite";
-  } else if (restartMode != "standard") {
-    grvy_printf(GRVY_ERROR, "\nUnknown restart mode -> %s\n", restartMode.c_str());
-    exit(ERROR);
-  }
 }
 
 void LoMachSolver::parsePeriodicInputs() {
