@@ -12,6 +12,7 @@ setup() {
     rm -f $RUNFILE_MOD $RUNFILE_p2
 
     RUNFILE_LID="inputs/lomach.lid.ini"
+    RUNFILE_LID_MOD="inputs/lomach.lid.mod.ini"
 }
 
 @test "[$TEST] check convergence for 2D Taylor-Green case using p = 1" {
@@ -73,4 +74,33 @@ setup() {
 @test "[$TEST] check that lid-driven cavity runs" {
     run $EXE --runFile $RUNFILE_LID
     [[ ${status} -eq 0 ]]
+}
+
+@test "[$TEST] verify consistent restart for Tomboulides with lid-driven cavity" {
+    # Runs 2 iter
+    cat $RUNFILE_LID | sed 's/maxIters = 1000/maxIters = 2/' | \
+        sed 's/outputFreq = 10000/outputFreq = 1/' > $RUNFILE_LID_MOD
+    run $EXE --runFile $RUNFILE_LID_MOD
+    [[ ${status} -eq 0 ]]
+    mv restart_output-lid.sol.h5 restart_output-lid.sol.2.h5
+
+    # Run 1 iter (from 0 IC)
+    cat $RUNFILE_LID | sed 's/maxIters = 1000/maxIters = 1/' | \
+        sed 's/outputFreq = 10000/outputFreq = 1/' > $RUNFILE_LID_MOD
+    run $EXE --runFile $RUNFILE_LID_MOD
+    [[ ${status} -eq 0 ]]
+
+    # Run 1 more (from restart)
+    cat $RUNFILE_LID | sed 's/maxIters = 1000/maxIters = 2/' | \
+        sed 's/outputFreq = 10000/outputFreq = 1/' | \
+        sed 's/#enableRestart = True/enableRestart = True/' > $RUNFILE_LID_MOD
+    run $EXE --runFile $RUNFILE_LID_MOD
+    [[ ${status} -eq 0 ]]
+
+    # check solutions are the same!
+    h5diff -r restart_output-lid.sol.h5 restart_output-lid.sol.2.h5
+
+    # delete intermediate files
+    rm -f restart_output-lid*.h5
+    rm $RUNFILE_LID_MOD
 }
