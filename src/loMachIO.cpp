@@ -149,13 +149,16 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
     serialName = inputFileName;
   } else {
     serialName = "restart_";
-    serialName.append(config.GetOutputName());
+    serialName.append(loMach_opts_.io_opts_.output_dir_);
     serialName.append(".sol.h5");
   }
 
   // determine restart file name (either serial or partitioned)
   string fileName;
-  if (config.isRestartSerialized(mode)) {
+  bool restart_serial;
+  if (mode == "read") restart_serial = loMach_opts_.io_opts_.restart_serial_read_;
+  if (mode == "write") restart_serial = loMach_opts_.io_opts_.restart_serial_write_;
+  if (restart_serial) {
     fileName = serialName;
   } else {
     fileName = groupsMPI->getParallelName(serialName);
@@ -166,12 +169,12 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
   // open restart files
   hid_t file = -1;
   if (mode == "write") {
-    if (rank0_ || config.isRestartPartitioned(mode)) {
+    if (rank0_ || !loMach_opts_.io_opts_.restart_serial_write_) {
       file = H5Fcreate(fileName.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
       assert(file >= 0);
     }
   } else if (mode == "read") {
-    if (config.isRestartSerialized(mode)) {
+    if (loMach_opts_.io_opts_.restart_serial_read_) {
       if (rank0_) {
         file = H5Fopen(fileName.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
         assert(file >= 0);
@@ -197,9 +200,9 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
   // -------------------------------------------------------------------
 
   if (mode == "write") {
-    write_restart_files_hdf5(file, config.isRestartSerialized(mode));
+    write_restart_files_hdf5(file, loMach_opts_.io_opts_.restart_serial_write_);
   } else {  // read
-    read_restart_files_hdf5(file, config.isRestartSerialized(mode));
+    read_restart_files_hdf5(file, loMach_opts_.io_opts_.restart_serial_read_);
   }
 
   if (file >= 0) H5Fclose(file);

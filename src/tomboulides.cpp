@@ -500,6 +500,10 @@ void Tomboulides::step() {
   const double time = coeff_.time;
   const double dt = coeff_.dt;
 
+  // Ensure u_vec_ consistent with u_curr_gf_
+  u_curr_gf_->GetTrueDofs(u_vec_);
+
+
   // TODO(trevilo): Have to implement some BC infrastructure
   Array<int> empty;
 

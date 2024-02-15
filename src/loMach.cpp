@@ -159,13 +159,15 @@ void LoMachSolver::initialize() {
   MaxIters = config.GetNumIters();
 
   // check if a simulation is being restarted
-  if (config.GetRestartCycle() > 0) {
-    if (loMach_opts_.ref_levels > 0) {
+  if (loMach_opts_.io_opts_.enable_restart_) {
+    // uniform refinement, user-specified number of times
+    for (int l = 0; l < loMach_opts_.ref_levels; l++) {
       if (rank0_) {
-        std::cerr << "ERROR: Uniform mesh refinement not supported upon restart." << std::endl;
+        std::cout << "Uniform refinement number " << l << std::endl;
       }
-      MPI_Abort(MPI_COMM_WORLD, 1);
+      serial_mesh_->UniformRefinement();
     }
+
 
     // read partitioning info from original decomposition (unless restarting from serial soln)
     nelemGlobal_ = serial_mesh_->GetNE();
@@ -173,7 +175,7 @@ void LoMachSolver::initialize() {
     if (rank0_) grvy_printf(ginfo, "Total # of mesh elements = %i\n", nelemGlobal_);
 
     if (nprocs_ > 1) {
-      assert(!config.isRestartSerialized("read"));
+      assert(!loMach_opts_.io_opts_.restart_serial_read_);
       // TODO(trevilo): Add support for serial read/write
       partitioning_file_hdf5("read", config, groupsMPI, nelemGlobal_, partitioning_);
     }
@@ -182,10 +184,10 @@ void LoMachSolver::initialize() {
     // remove previous solution
     if (rank0_) {
       string command = "rm -r ";
-      command.append(config.GetOutputName());
+      command.append(loMach_opts_.io_opts_.output_dir_);
       int err = system(command.c_str());
       if (err != 0) {
-        cout << "Error deleting previous data in " << config.GetOutputName() << endl;
+        cout << "Error deleting previous data in " << loMach_opts_.io_opts_.output_dir_ << endl;
       }
     }
 
@@ -635,13 +637,12 @@ void LoMachSolver::solve() {
     // }
     time_previous = sw_step.RealTime();
 
-    // update dt
-    if (dt_fixed < 0.0) {
-      updateTimestep();
-    }
+    UpdateTimestepHistory(temporal_coeff_.dt);
+    temporal_coeff_.time += temporal_coeff_.dt;
 
     // restart files
     if (iter % config.itersOut == 0 && iter != 0) {
+      // Write restart file!
       restart_files_hdf5("write");
     }
 
@@ -658,8 +659,10 @@ void LoMachSolver::solve() {
       if (earlyExit == 1) exit(-1);
     }
 
-    UpdateTimestepHistory(temporal_coeff_.dt);
-    temporal_coeff_.time += temporal_coeff_.dt;
+    // update dt
+    if (dt_fixed < 0.0) {
+      updateTimestep();
+    }
   }
   MPI_Barrier(MPI_COMM_WORLD);
 
