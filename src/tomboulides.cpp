@@ -67,6 +67,10 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
       porder_(porder),
       dim_(pmesh->Dimension()),
       coeff_(coeff) {
+  assert(pmesh_ != NULL);
+
+  rank0_ = (pmesh_->GetMyRank() == 0);
+
   // make sure there is room for BC attributes
   if (!(pmesh_->bdr_attributes.Size() == 0)) {
     vel_ess_attr_.SetSize(pmesh_->bdr_attributes.Max());
@@ -138,6 +142,7 @@ Tomboulides::~Tomboulides() {
   delete mass_lform_;
 
   // objects allocated by initializeOperators
+  delete u_bdr_form_;
   delete pp_div_bdr_form_;
   delete Hv_inv_;
   delete Hv_inv_pc_;
@@ -243,6 +248,7 @@ void Tomboulides::initializeSelf() {
   resp_vec_.SetSize(pfes_truevsize);
   p_vec_.SetSize(pfes_truevsize);
   pp_div_bdr_vec_.SetSize(pfes_truevsize);
+  u_bdr_vec_.SetSize(pfes_truevsize);
 
   // zero vectors for now
   forcing_vec_ = 0.0;
@@ -260,6 +266,7 @@ void Tomboulides::initializeSelf() {
   resp_vec_ = 0.0;
   p_vec_ = 0.0;
   pp_div_bdr_vec_ = 0.0;
+  u_bdr_vec_ = 0.0;
 
   // set IC if we have one at this point
   if (!ic_string_.empty()) {
@@ -328,6 +335,7 @@ void Tomboulides::initializeOperators() {
   L_iorho_inv_->SetPreconditioner(*L_iorho_inv_ortho_pc_);
   L_iorho_inv_->SetPrintLevel(pressure_solve_pl_);
   L_iorho_inv_->SetRelTol(pressure_solve_rtol_);
+  L_iorho_inv_->SetAbsTol(pressure_solve_atol_);
   L_iorho_inv_->SetMaxIter(pressure_solve_max_iter_);
 
   // Forcing term in the velocity equation: du/dt + ... = ... + f
@@ -467,6 +475,15 @@ void Tomboulides::initializeOperators() {
   }
   pp_div_bdr_form_->AddBoundaryIntegrator(ppd_bnlfi, vel_ess_attr_);
 
+  u_bdr_form_ = new ParLinearForm(pfes_);
+  for (auto &vel_dbc : vel_dbcs_) {
+    auto *ubdr_bnlfi = new BoundaryNormalLFIntegrator(*vel_dbc.coeff);
+    if (numerical_integ_) {
+      ubdr_bnlfi->SetIntRule(&ir_ni_p);
+    }
+    u_bdr_form_->AddBoundaryIntegrator(ubdr_bnlfi, vel_dbc.attr);
+  }
+
   // Ensure u_vec_ consistent with u_curr_gf_
   u_curr_gf_->GetTrueDofs(u_vec_);
 }
@@ -503,7 +520,6 @@ void Tomboulides::step() {
   // Ensure u_vec_ consistent with u_curr_gf_
   u_curr_gf_->GetTrueDofs(u_vec_);
 
-
   // TODO(trevilo): Have to implement some BC infrastructure
   Array<int> empty;
 
@@ -538,6 +554,7 @@ void Tomboulides::step() {
   L_iorho_inv_->SetPreconditioner(*L_iorho_inv_ortho_pc_);
   L_iorho_inv_->SetPrintLevel(pressure_solve_pl_);
   L_iorho_inv_->SetRelTol(pressure_solve_rtol_);
+  L_iorho_inv_->SetAbsTol(pressure_solve_atol_);
   L_iorho_inv_->SetMaxIter(pressure_solve_max_iter_);
 
   // Update density weighted mass
@@ -587,6 +604,7 @@ void Tomboulides::step() {
   // vstar / dt = M^{-1} (extrapolated nonlinear + forcing) --- eqn.
   Mv_inv_->Mult(forcing_vec_, ustar_vec_);
   if (!Mv_inv_->GetConverged()) {
+    if (rank0_) std::cout << "ERROR: Mv inverse did not converge." << std::endl;
     exit(1);
   }
   // TODO(trevilo): track linear solve
@@ -671,6 +689,10 @@ void Tomboulides::step() {
   pp_div_bdr_form_->ParallelAssemble(pp_div_bdr_vec_);
   resp_vec_.Add(1.0, pp_div_bdr_vec_);
 
+  u_bdr_form_->Assemble();
+  u_bdr_form_->ParallelAssemble(u_bdr_vec_);
+  resp_vec_.Add(-coeff_.bd0 / dt, u_bdr_vec_);
+
   // TODO(trevilo): Only do this if no pressure BCs
   // Since now we don't have BCs at all, have to do it
   Orthogonalize(resp_vec_, pfes_);
@@ -694,6 +716,7 @@ void Tomboulides::step() {
 
   L_iorho_inv_->Mult(B1, X1);
   if (!L_iorho_inv_->GetConverged()) {
+    if (rank0_) std::cout << "ERROR: Poisson solve did not converge." << std::endl;
     exit(1);
   }
 
@@ -746,6 +769,7 @@ void Tomboulides::step() {
 
   Hv_inv_->Mult(B2, X2);
   if (!Hv_inv_->GetConverged()) {
+    if (rank0_) std::cout << "ERROR: Helmholtz solve did not converge." << std::endl;
     exit(1);
   }
   // iter_hsolve = HInv->GetNumIterations();

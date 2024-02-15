@@ -74,15 +74,18 @@ class ForcingTerm_T {
 
 class Tomboulides : public FlowBase {
  protected:
+  // true if this is root rank
+  bool rank0_;
+
   // Options
-  // TODO(trevilo): hardcoded for testing.  Need to set from config,
-  // so pass config to ctor
+  // TODO(trevilo): hardcoded for testing.  Need to set based on input file.
   bool numerical_integ_ = true;
   bool partial_assembly_ = false;
 
   int pressure_solve_pl_ = 0;
   int pressure_solve_max_iter_ = 100;
   double pressure_solve_rtol_ = 1e-8;
+  double pressure_solve_atol_ = 1e-18;
 
   int mass_inverse_pl_ = 0;
   int mass_inverse_max_iter_ = 200;
@@ -160,6 +163,7 @@ class Tomboulides : public FlowBase {
   mfem::ParBilinearForm *Mv_rho_form_ = nullptr;   // mass matrix (density weighted) = \int \rho \vphi_i \cdot \vphi_j
   mfem::ParBilinearForm *Hv_form_ = nullptr;
   mfem::ParLinearForm *pp_div_bdr_form_ = nullptr;
+  mfem::ParLinearForm *u_bdr_form_;
 
   // mfem operator objects
   mfem::OperatorHandle L_iorho_op_;
@@ -194,6 +198,7 @@ class Tomboulides : public FlowBase {
   mfem::Vector uext_vec_;
   mfem::Vector pp_div_vec_;
   mfem::Vector pp_div_bdr_vec_;
+  mfem::Vector u_bdr_vec_;
   mfem::Vector resp_vec_;
   mfem::Vector p_vec_;
   mfem::Vector resu_vec_;
