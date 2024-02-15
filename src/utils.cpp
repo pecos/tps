@@ -1057,3 +1057,34 @@ void vectorGrad3DV(FiniteElementSpace *fes, Vector u, Vector* gu, Vector* gv, Ve
      R1b_gf.GetTrueDofs(*gv);
      R1c_gf.GetTrueDofs(*gw);     
 }
+
+void EliminateRHS(Operator &A,
+                                ConstrainedOperator &constrainedA,
+                                const Array<int> &ess_tdof_list,
+                                Vector &x,
+                                Vector &b,
+                                Vector &X,
+                                Vector &B,
+                                int copy_interior)
+{
+   const Operator *Po = A.GetOutputProlongation();
+   const Operator *Pi = A.GetProlongation();
+   const Operator *Ri = A.GetRestriction();
+   A.InitTVectors(Po, Ri, Pi, x, b, X, B);
+   if (!copy_interior) { X.SetSubVectorComplement(ess_tdof_list, 0.0); }
+   constrainedA.EliminateRHS(X, B);
+}
+
+
+void Orthogonalize(Vector &v, MPI_Comm comm) 
+{
+   double loc_sum = v.Sum();
+   double global_sum = 0.0;
+   int loc_size = v.Size();
+   int global_size = 0;
+
+   MPI_Allreduce(&loc_sum, &global_sum, 1, MPI_DOUBLE, MPI_SUM, comm);
+   MPI_Allreduce(&loc_size, &global_size, 1, MPI_INT, MPI_SUM, comm);
+
+   v -= global_sum / static_cast<double>(global_size);
+}

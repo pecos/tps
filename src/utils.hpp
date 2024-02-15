@@ -172,5 +172,23 @@ void multScalarVectorIP(Vector A, Vector* C, int dim = 3);
    void vectorGrad3DV(FiniteElementSpace *fes, Vector u, Vector* gu, Vector* gv, Vector* gw);    
    void scalarGrad3DV(FiniteElementSpace *fes, FiniteElementSpace *vfes, Vector u, Vector* gu);    
 
+   /// Eliminate essential BCs in an Operator and apply to RHS.
+   /// rename this to something sensible "ApplyEssentialBC" or something
+   void EliminateRHS(Operator &A,
+                     ConstrainedOperator &constrainedA,
+                     const Array<int> &ess_tdof_list,
+                     Vector &x,
+                     Vector &b,
+                     Vector &X,
+                     Vector &B,
+                     int copy_interior = 0);
+
+   /// Remove mean from a Vector.
+   /**
+    * Modify the Vector @a v by subtracting its mean using
+    * \f$v = v - \frac{\sum_i^N v_i}{N} \f$
+    */
+   void Orthogonalize(Vector &v, MPI_Comm comm);
+
 
 #endif  // UTILS_HPP_

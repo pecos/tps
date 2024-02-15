@@ -11,7 +11,6 @@ class Tps;
 #include <hdf5.h>
 #include <tps_config.h>
 
-//#include "loMach_options.hpp"
 #include "io.hpp"
 #include "tps.hpp"
 #include "tps_mfem_wrap.hpp"
@@ -23,7 +22,6 @@ class Tps;
 #include "averaging_and_rms.hpp"
 #include "chemistry.hpp"
 #include "radiation.hpp"
-//#include "loMach.hpp"
 #include "../utils/mfem_extras/pfem_extras.hpp"
 #include "turb_model_base.hpp"
 #include "thermo_chem_base.hpp"
@@ -85,17 +83,17 @@ public:
 };
 
 
-/// Add some description here...
-//class ThermoChem
+/**
+   Energy/species class specific for temperature solves with loMach flows
+ */
 class ThermoChem : public ThermoChemModelBase {
   friend class LoMachSolver;
 private:
 
-  //TPS::Tps *tpsP_;
-  //LoMachSolver *loMach_;
+   //TPS::Tps *tpsP_;
    LoMachOptions *loMach_opts_ = nullptr;
 
-  //MPI_Groups *groupsMPI;
+   //MPI_Groups *groupsMPI;
    int nprocs_;  // total number of MPI procs
    int rank;    // local MPI rank
    bool rank0;  // flag to indicate rank 0
@@ -125,19 +123,17 @@ private:
 
    /// Enable/disable partial assembly of forms.
    bool partial_assembly = false;
-   bool partial_assembly_pressure = true;  
 
    /// Enable/disable numerical integration rules of forms.
-   //bool numerical_integ = false;
    bool numerical_integ = true;
   
    ParMesh *pmesh_ = nullptr;
-   //ParMesh &pmesh;  
   
    // The order of the scalar spaces
    int order, porder, norder;
    IntegrationRules gll_rules;    
 
+   // local copies of time integration information
    double bd0, bd1, bd2, bd3;
    double ab1, ab2, ab3;
    int nvel, dim;
@@ -162,14 +158,13 @@ private:
    // reference here.
    const temporalSchemeCoefficients &timeCoeff_;
   
-   // temporary
-   double Re_tau, Pr, Cp, gamma;
-  
-   /// Kinematic viscosity (dimensionless).
+   /// constant prop solves  
+   double Pr, Cp, gamma;  
    double kin_vis, dyn_vis;
+   double static_rho, Rgas;
 
-   // make everything dimensionless after generalizing form channel
-   double ambientPressure, thermoPressure, static_rho, Rgas, systemMass;
+   /// pressure-related, closed-system thermo pressure changes
+   double ambientPressure, thermoPressure, systemMass;  
    double tPm1, tPm2, dtP;
 
    // Scalar \f$H^1\f$ finite element collection.
@@ -212,7 +207,6 @@ private:
    VectorGridFunctionCoefficient *un_next_coeff = nullptr;
    GridFunctionCoefficient *rhon_next_coeff = nullptr;
    ScalarVectorProductCoefficient *rhou_coeff = nullptr;  
-
    GridFunctionCoefficient *thermal_diff_coeff = nullptr;
    GradientGridFunctionCoefficient *gradT_coeff = nullptr;
    ScalarVectorProductCoefficient *kap_gradT_coeff = nullptr;
@@ -220,7 +214,7 @@ private:
    ConstantCoefficient Lt_coeff;  
    ConstantCoefficient Ht_lincoeff;
    ConstantCoefficient Ht_bdfcoeff;
-  
+
    ConstantCoefficient t_bc_coef0;
    ConstantCoefficient t_bc_coef1;
    ConstantCoefficient t_bc_coef2;
@@ -233,10 +227,7 @@ private:
    ParGridFunction *bufferVisc = nullptr;
    ParGridFunction *bufferBulkVisc = nullptr;
    ParGridFunction *bufferRho = nullptr;
-  //ParGridFunction *bufferRhoDt = nullptr;
-  //ParGridFunction bufferRhoDt;
    ParGridFunction rhoDt;
-   ParGridFunction *bufferAlpha = nullptr;
    ParGridFunction *bufferTemp = nullptr;
 
    GridFunctionCoefficient *viscField = nullptr;
@@ -251,7 +242,6 @@ private:
    GridFunctionCoefficient *tInletField = nullptr;
 
    // space varying viscosity multiplier  
-   //ParGridFunction *bufferViscMult = nullptr;
    ParGridFunction viscMult_gf;
    viscositySpongeData vsd_;
    ParGridFunction viscTotal_gf;
@@ -287,9 +277,6 @@ private:
    Vector Text, Text_bdr, t_bdr;
    Vector resT, tmpR0a, tmpR0b, tmpR0c;
 
-   //Vector *un;
-   //Vector *un_next;
-   //ParGridFunction *un_gf;
    ParGridFunction *un_next_gf = nullptr;
    ParGridFunction *subgridVisc_gf = nullptr;
   
@@ -297,8 +284,7 @@ private:
    Vector tmpR1;
    ParGridFunction R0PM0_gf;
    ParGridFunction R0PM1_gf;
-   //ParGridFunction un_gf;
-   //ParGridFunction un_next_gf;
+
    ParGridFunction Qt_gf;  
 
    Vector gradT;
@@ -312,13 +298,10 @@ private:
 
    // Print levels.
    int pl_mvsolve = 0;
-   int pl_spsolve = 0;
-   int pl_hsolve = 0;
-   int pl_amg = 0;
+   int pl_htsolve = 0;
    int pl_mtsolve = 0;  
 
    // Relative tolerances.
-   double rtol_spsolve = 1e-12;
    double rtol_hsolve = 1e-12;
    double rtol_htsolve = 1e-12;    
   
@@ -342,22 +325,15 @@ private:
    GasMixture *d_mixture = nullptr;;  // valid on device, when available; otherwise = mixture  
    TransportProperties *transportPtr = NULL;  // valid on both host and device
    // TransportProperties *d_transport = NULL;  // valid on device, when available; otherwise = transportPtr
-
-   // subgrid scale => move to turb model class
-   //ParGridFunction *bufferSubgridVisc;
   
   
 public:
   ThermoChem(mfem::ParMesh *pmesh, RunConfiguration *config, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff);  
   virtual ~ThermoChem() {}
 
-   void initializeSelf();
-  
-   //   void initializeExternal(ParGridFunction *un_next_gf_, ParGridFunction *subgridVisc_gf_,int nWalls, int nInlets, int nOutlets);
+   void initializeSelf();  
    void initializeFromFlow(flowToThermoChem *flow);
-   void initializeFromTurbModel(turbModelToThermoChem *turbModel);  
-  
-   //   void step(double &time, double dt, const int cur_step, const int start_step, std::vector<double> bdf, bool provisional = false);
+   void initializeFromTurbModel(turbModelToThermoChem *turbModel);    
    void step();
 
    void updateThermoP(double dt);
@@ -403,25 +379,6 @@ public:
 
    //MFEM_HOST_DEVICE
    void viscSpongePlanar(double *x, double &wgt);
-
-   // move to utils...
-   /// Eliminate essential BCs in an Operator and apply to RHS.
-   // rename this to something sensible "ApplyEssentialBC" or something
-   void EliminateRHS(Operator &A,
-                     ConstrainedOperator &constrainedA,
-                     const Array<int> &ess_tdof_list,
-                     Vector &x,
-                     Vector &b,
-                     Vector &X,
-                     Vector &B,
-                     int copy_interior = 0);
-
-   /// Remove mean from a Vector.
-   /**
-    * Modify the Vector @a v by subtracting its mean using
-    * \f$v = v - \frac{\sum_i^N v_i}{N} \f$
-    */
-   void Orthogonalize(Vector &v);
     
 };
 #endif

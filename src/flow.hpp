@@ -487,6 +487,7 @@ public:
   
    /// Eliminate essential BCs in an Operator and apply to RHS.
    // rename this to something sensible "ApplyEssentialBC" or something
+  /*
    void EliminateRHS(Operator &A,
                      ConstrainedOperator &constrainedA,
                      const Array<int> &ess_tdof_list,
@@ -495,14 +496,16 @@ public:
                      Vector &X,
                      Vector &B,
                      int copy_interior = 0);
-
+  */
    /// Remove mean from a Vector.
    /**
     * Modify the Vector @a v by subtracting its mean using
     * \f$v = v - \frac{\sum_i^N v_i}{N} \f$
     */
+  /*
    void Orthogonalize(Vector &v);
-
+  */
+  
    /// Remove the mean from a ParGridFunction.
    /**
     * Modify the ParGridFunction @a v by subtracting its mean using

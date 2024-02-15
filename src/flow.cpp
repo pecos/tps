@@ -1113,7 +1113,7 @@ void Flow::flowStep(double &time, double dt, const int current_step, const int s
    Sp_form->FormSystemMatrix(pres_ess_tdof, Sp);
    SpInv->SetOperator(*Sp);
 
-   if (pres_dbcs.empty()) { Orthogonalize(resp); }   
+   if (pres_dbcs.empty()) { Orthogonalize(resp,sfes->GetComm()); }   
    for (auto &pres_dbc : pres_dbcs) { pn_gf.ProjectBdrCoefficient(*pres_dbc.coeff, pres_dbc.attr); }
    pfes->GetRestrictionMatrix()->MultTranspose(resp, resp_gf);
    
@@ -1300,7 +1300,7 @@ void Flow::MeanZero(ParGridFunction &v)
    v -= integ / volume;
 }
 
-
+/*
 void Flow::EliminateRHS(Operator &A,
                                 ConstrainedOperator &constrainedA,
                                 const Array<int> &ess_tdof_list,
@@ -1331,7 +1331,7 @@ void Flow::Orthogonalize(Vector &v)
 
    v -= global_sum / static_cast<double>(global_size);
 }
-
+*/
 
 /*
 void Flow::ComputeCurl3D(ParGridFunction &u, ParGridFunction &cu)
