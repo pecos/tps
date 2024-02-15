@@ -181,7 +181,7 @@ struct linearlyVaryingVisc {
   double viscRatio;
   double width;
   double uniformMult;
-  double cylXradius, cylYradius, cylZradius;  
+  double cylXradius, cylYradius, cylZradius;
   bool isEnabled;
   Vector pointA;
   double viscRatioAnnulus;

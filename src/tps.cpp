@@ -53,11 +53,10 @@
 
 #endif
 
-#include "loMach_options.hpp"
-#include "loMach.hpp"
 #include "cycle_avg_joule_coupling.hpp"
 #include "independent_coupling.hpp"
-
+#include "loMach.hpp"
+#include "loMach_options.hpp"
 #include "thermoChem.hpp"
 
 namespace TPS {

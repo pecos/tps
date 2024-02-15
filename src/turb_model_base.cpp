@@ -2,8 +2,7 @@
 
 using namespace mfem;
 
-ZeroTurbModel::ZeroTurbModel(ParMesh *pmesh, int sorder)
-    : pmesh_(pmesh), sorder_(sorder) {}
+ZeroTurbModel::ZeroTurbModel(ParMesh *pmesh, int sorder) : pmesh_(pmesh), sorder_(sorder) {}
 
 ZeroTurbModel::~ZeroTurbModel() {
   delete eddy_viscosity_;
@@ -21,5 +20,4 @@ void ZeroTurbModel::initializeSelf() {
 
   toFlow_interface_.eddy_viscosity = eddy_viscosity_;
   toThermoChem_interface_.eddy_viscosity = eddy_viscosity_;
-  
 }

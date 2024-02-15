@@ -49,7 +49,6 @@ struct thermoChemToFlow {
   const mfem::ParGridFunction *thermal_divergence = nullptr;
 };
 
-
 struct turbModelToThermoChem;
 
 /**
@@ -60,7 +59,6 @@ struct thermoChemToTurbModel {
   const mfem::ParGridFunction *density = nullptr;
 };
 
-
 /**
  * Provides interface for thermochemical model implementation
  * to be used for time split schemes, such as those available through
@@ -69,7 +67,7 @@ struct thermoChemToTurbModel {
 class ThermoChemModelBase {
  protected:
   const flowToThermoChem *flow_interface_;
-  const turbModelToThermoChem *turbModel_interface_;  
+  const turbModelToThermoChem *turbModel_interface_;
 
  public:
   /// Destructor
@@ -105,7 +103,7 @@ class ThermoChemModelBase {
 
   /// Interface object, provides fields necessary for the flow
   thermoChemToFlow toFlow_interface_;
-  
+
   /**
    * @brief Initialize data from the turbulence model class
    *
@@ -116,10 +114,9 @@ class ThermoChemModelBase {
 
   /// Get interface provided by flow model
   const turbModelToThermoChem *getTurbModelInterface() const { return turbModel_interface_; }
-  
+
   /// Interface object, provides fields necessary for the turbModel
   thermoChemToTurbModel toTurbModel_interface_;
-  
 };
 
 /**

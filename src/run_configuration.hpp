@@ -102,7 +102,7 @@ class RunConfiguration {
   int solver_iter;
   double solver_tol;
   int bdfOrder;
-  int abOrder;    
+  int abOrder;
 
   // num iterations. Defaults to 0
   int numIters;
@@ -128,7 +128,7 @@ class RunConfiguration {
   int sampleInterval;
   int startIter;
   bool restartMean;
-  bool restartRMS;    
+  bool restartRMS;
   bool meanHistEnable;
 
   // working fluid. Options thus far
@@ -181,27 +181,27 @@ class RunConfiguration {
 
   // ic flag to use internal ic function definition
   bool useICFunction;
-  bool useICBoxFunction;  
+  bool useICBoxFunction;
 
   // reset Temp field to IC
-  bool resetTemp;  
-  
+  bool resetTemp;
+
   // wall bc flag to use internal function definition
   bool useWallFunction;
-  bool useWallBox; // NEED A BETTER WAY TO DO THIS!
-  
-  // Imposed pressure gradient  
+  bool useWallBox;  // NEED A BETTER WAY TO DO THIS!
+
+  // Imposed pressure gradient
   bool isForcing;
   double gradPress[3];
 
   // Boussinesq term
-  bool isGravity; 
+  bool isGravity;
   double gravity[3];
 
   // closed or open system
-  bool isOpen;  
+  bool isOpen;
 
-  // loMach specific additions  
+  // loMach specific additions
   double amb_pres, const_visc, const_dens;
 
   // Inlet BC data
@@ -215,7 +215,7 @@ class RunConfiguration {
   // Outlet BC data
   Array<double> outletBC;
   std::vector<pair<int, OutletType>> outletPatchType;
-  double outletPressure;      
+  double outletPressure;
 
   // Wall BC data
   // Array<double> wallBC;

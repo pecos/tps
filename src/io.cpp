@@ -123,8 +123,8 @@ void M2ulPhyS::read_restart_files_hdf5(hid_t file, bool serialized_read) {
       average->SetSamplesMean(samplesMean);
       average->SetSamplesInterval(intervals);
 
-      int istatus = H5Aexists(file,"samplesRMS");
-      if(istatus > 0) {
+      int istatus = H5Aexists(file, "samplesRMS");
+      if (istatus > 0) {
         h5_read_attribute(file, "samplesRMS", samplesRMS);
       } else {
         samplesRMS = samplesMean;

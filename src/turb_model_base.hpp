@@ -47,7 +47,6 @@ struct turbModelToFlow {
   const mfem::ParGridFunction *eddy_viscosity = nullptr;
 };
 
-
 struct thermoChemToTurbModel;
 
 /**
@@ -55,9 +54,8 @@ struct thermoChemToTurbModel;
  * turbulence model to the thermo chem model.
  */
 struct turbModelToThermoChem {
-  const mfem::ParGridFunction *eddy_viscosity = nullptr;  
+  const mfem::ParGridFunction *eddy_viscosity = nullptr;
 };
-
 
 /**
  * Provides interface for turbulence model implementation
@@ -67,7 +65,7 @@ struct turbModelToThermoChem {
 class TurbModelBase {
  protected:
   const flowToTurbModel *flow_interface_;
-  const thermoChemToTurbModel *thermoChem_interface_;  
+  const thermoChemToTurbModel *thermoChem_interface_;
 
  public:
   /// Destructor
@@ -103,7 +101,7 @@ class TurbModelBase {
 
   /// Interface object, provides fields necessary for the flow
   turbModelToFlow toFlow_interface_;
-  
+
   /**
    * @brief Initialize data from the thermoChem class
    *
@@ -114,10 +112,9 @@ class TurbModelBase {
 
   /// Get interface provided by thermoChem model
   const thermoChemToTurbModel *getThermoChemInterface() const { return thermoChem_interface_; }
-  
+
   /// Interface object, provides fields necessary for the turbModel
   turbModelToThermoChem toThermoChem_interface_;
-  
 };
 
 /**
@@ -128,7 +125,7 @@ class ZeroTurbModel : public TurbModelBase {
  protected:
   mfem::ParMesh *pmesh_;
   const int sorder_;
-  //const double nuT_;
+  // const double nuT_;
 
   mfem::FiniteElementCollection *fec_ = nullptr;
   mfem::ParFiniteElementSpace *fes_ = nullptr;

@@ -30,5 +30,4 @@ void ConstantPropertyThermoChem::initializeSelf() {
   toFlow_interface_.thermal_divergence = thermal_divergence_;
 
   toTurbModel_interface_.density = density_;
-  
 }

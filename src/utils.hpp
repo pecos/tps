@@ -142,53 +142,43 @@ void GlobalProjectDiscCoefficient(mfem::ParGridFunction &gf, mfem::VectorCoeffic
 void evaluateDistanceSerial(mfem::Mesh &mesh, const mfem::Array<int> &wall_patches, const mfem::GridFunction &coords,
                             mfem::GridFunction &distance);
 
+void multConstScalar(double A, Vector B, Vector *C);
+void multConstScalarInv(double A, Vector B, Vector *C);
+void multConstVector(double A, Vector B, Vector *C);
+void multConstScalarIP(double A, Vector *C);
+void multConstScalarInvIP(double A, Vector *C);
+void multConstVectorIP(double A, Vector *C);
+void multScalarScalar(Vector A, Vector B, Vector *C);
+void multScalarVector(Vector A, Vector B, Vector *C, int dim = 3);
+void multScalarInvVector(Vector A, Vector B, Vector *C, int dim = 3);
+void multScalarInvVectorIP(Vector A, Vector *C, int dim = 3);
+void multVectorVector(Vector A, Vector B, Vector *C1, Vector *C2, Vector *C3, int dim = 3);
+void dotVector(Vector A, Vector B, Vector *C, int dim = 3);
+void multScalarScalarIP(Vector A, Vector *C);
+void multScalarInvScalarIP(Vector A, Vector *C);
+void multScalarVectorIP(Vector A, Vector *C, int dim = 3);
 
-void multConstScalar(double A, Vector B, Vector* C);
-void multConstScalarInv(double A, Vector B, Vector* C);
-void multConstVector(double A, Vector B, Vector* C);
-void multConstScalarIP(double A, Vector* C);
-void multConstScalarInvIP(double A, Vector* C);
-void multConstVectorIP(double A, Vector* C);
-void multScalarScalar(Vector A, Vector B, Vector* C);
-void multScalarVector(Vector A, Vector B, Vector* C, int dim = 3);
-void multScalarInvVector(Vector A, Vector B, Vector* C, int dim = 3);
-void multScalarInvVectorIP(Vector A, Vector* C, int dim = 3);
-void multVectorVector(Vector A, Vector B, Vector* C1, Vector* C2, Vector* C3, int dim = 3);
-void dotVector(Vector A, Vector B, Vector* C, int dim = 3);
-void multScalarScalarIP(Vector A, Vector* C);
-void multScalarInvScalarIP(Vector A, Vector* C);
-void multScalarVectorIP(Vector A, Vector* C, int dim = 3);
+/// Compute \f$\nabla \times \nabla \times u\f$ for \f$u \in (H^1)^2\f$.
+void ComputeCurl2D(ParGridFunction &u, ParGridFunction &cu, bool assume_scalar = false);
 
-   /// Compute \f$\nabla \times \nabla \times u\f$ for \f$u \in (H^1)^2\f$.
-   void ComputeCurl2D(ParGridFunction &u,
-                      ParGridFunction &cu,
-                      bool assume_scalar = false);
+/// Compute \f$\nabla \times \nabla \times u\f$ for \f$u \in (H^1)^3\f$.
+void ComputeCurl3D(ParGridFunction &u, ParGridFunction &cu);
 
-   /// Compute \f$\nabla \times \nabla \times u\f$ for \f$u \in (H^1)^3\f$.
-   void ComputeCurl3D(ParGridFunction &u, ParGridFunction &cu);
+void vectorGrad3D(ParGridFunction &u, ParGridFunction &gu, ParGridFunction &gv, ParGridFunction &gw);
+void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu);
+void vectorGrad3DV(FiniteElementSpace *fes, Vector u, Vector *gu, Vector *gv, Vector *gw);
+void scalarGrad3DV(FiniteElementSpace *fes, FiniteElementSpace *vfes, Vector u, Vector *gu);
 
-   void vectorGrad3D(ParGridFunction &u, ParGridFunction &gu, ParGridFunction &gv, ParGridFunction &gw);
-   void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu);
-   void vectorGrad3DV(FiniteElementSpace *fes, Vector u, Vector* gu, Vector* gv, Vector* gw);    
-   void scalarGrad3DV(FiniteElementSpace *fes, FiniteElementSpace *vfes, Vector u, Vector* gu);    
+/// Eliminate essential BCs in an Operator and apply to RHS.
+/// rename this to something sensible "ApplyEssentialBC" or something
+void EliminateRHS(Operator &A, ConstrainedOperator &constrainedA, const Array<int> &ess_tdof_list, Vector &x, Vector &b,
+                  Vector &X, Vector &B, int copy_interior = 0);
 
-   /// Eliminate essential BCs in an Operator and apply to RHS.
-   /// rename this to something sensible "ApplyEssentialBC" or something
-   void EliminateRHS(Operator &A,
-                     ConstrainedOperator &constrainedA,
-                     const Array<int> &ess_tdof_list,
-                     Vector &x,
-                     Vector &b,
-                     Vector &X,
-                     Vector &B,
-                     int copy_interior = 0);
-
-   /// Remove mean from a Vector.
-   /**
-    * Modify the Vector @a v by subtracting its mean using
-    * \f$v = v - \frac{\sum_i^N v_i}{N} \f$
-    */
-   void Orthogonalize(Vector &v, MPI_Comm comm);
-
+/// Remove mean from a Vector.
+/**
+ * Modify the Vector @a v by subtracting its mean using
+ * \f$v = v - \frac{\sum_i^N v_i}{N} \f$
+ */
+void Orthogonalize(Vector &v, MPI_Comm comm);
 
 #endif  // UTILS_HPP_
