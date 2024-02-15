@@ -46,6 +46,7 @@ class LoMachOptions {
   double scale_mesh;
 
   std::string flow_solver; /**< Flow solver name */
+  std::string thermo_solver; /**< Themo-chemical solver name */
 
   int order;      /**< Element order */
   int uOrder;

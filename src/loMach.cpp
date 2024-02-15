@@ -44,6 +44,7 @@
 #include <limits>
 
 #include "logger.hpp"
+#include "thermoChem.hpp"
 #include "tomboulides.hpp"
 #include "tps.hpp"
 #include "utils.hpp"
@@ -214,11 +215,24 @@ void LoMachSolver::initialize() {
   if (verbose) grvy_printf(ginfo, "Mesh partitioned...\n");
 
   // instantiate physics models
+
+  // TODO(trevilo): Add support for turbulence modeling
   // turbClass = new TurbModel(pmesh_, &config, &loMach_opts_);
 
-  // TODO(trevilo): Instantiate based in input options
-  thermo_ = new ConstantPropertyThermoChem(pmesh_, 1, 1.0, 1.0);
+  // Instantiate thermochemical model
+  if (loMach_opts_.thermo_solver == "constant-property") {
+    thermo_ = new ConstantPropertyThermoChem(pmesh_, loMach_opts_.order, 1.0, 1.0);
+  } else if (loMach_opts_.thermo_solver == "calorically-perfect") {
+    thermo_ = new ThermoChem(pmesh_, &config, &loMach_opts_, temporal_coeff_);
+  } else {
+    // Unknown choice... die
+    if (rank0_) {
+      grvy_printf(GRVY_ERROR, "Unknown loMach/thermo-solver option > %s\n", loMach_opts_.thermo_solver.c_str());
+    }
+    exit(ERROR);
+  }
 
+  // Instantiate flow solver
   if (loMach_opts_.flow_solver == "zero-flow") {
     // No flow---set u = 0.  Primarily useful for testing thermochem models in isolation
     flow_ = new ZeroFlow(pmesh_, 1);
@@ -907,6 +921,9 @@ void LoMachSolver::parseSolverOptions() {
 
   tpsP_->getRequiredInput("loMach/flow-solver", loMach_opts_.flow_solver);
   assert(loMach_opts_.flow_solver == "zero-flow" || loMach_opts_.flow_solver == "tomboulides");
+
+  tpsP_->getInput("loMach/thermo-solver", loMach_opts_.thermo_solver, string("constant-property"));
+  assert(loMach_opts_.thermo_solver == "constant-property" || loMach_opts_.flow_solver == "calorically-perfect");
 
   tpsP_->getInput("loMach/order", loMach_opts_.order, 1);
   assert(loMach_opts_.order >= 1);
