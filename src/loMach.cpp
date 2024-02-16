@@ -315,7 +315,6 @@ void LoMachSolver::initialize() {
   MPI_Barrier(MPI_COMM_WORLD);
   if (verbose) grvy_printf(ginfo, "ioData.init thingy...\n");
 
-  // CFL = config.GetCFLNumber();
   CFL = loMach_opts_.ts_opts_.cfl_;
   if (verbose) grvy_printf(ginfo, "got CFL...\n");
 
@@ -456,7 +455,6 @@ void LoMachSolver::initialize() {
   }
 
   //
-  // if (config.GetRestartCycle() == 0) initialTimeStep();
   if (rank0_) cout << "Maximum element size: " << hmax << "m" << endl;
   if (rank0_) cout << "Minimum element size: " << hmin << "m" << endl;
 }
@@ -500,7 +498,6 @@ void LoMachSolver::initialTimeStep() {
 
   // dt_fixed is initialized to -1, so if it is positive, then the
   // user requested a fixed dt run
-  // const double dt_fixed = config.GetFixedDT();
   const double dt_fixed = loMach_opts_.ts_opts_.constant_dt_;
   if (dt_fixed > 0) {
     temporal_coeff_.dt = dt_fixed;
@@ -515,13 +512,12 @@ void LoMachSolver::solve() {
 
   setTimestep();
   if (iter == 0) {
-    // temporal_coeff_.dt = std::min(config.dt_initial, temporal_coeff_.dt);
+    // TODO(trevilo): Let user set initial dt
     temporal_coeff_.dt = temporal_coeff_.dt;
   }
 
   // temporary hardcodes
   double CFL_actual;
-  // CFL = config.GetCFLNumber();
   CFL = loMach_opts_.ts_opts_.cfl_;
 
   // int SdofInt = sfes->GetTrueVSize();
@@ -529,7 +525,6 @@ void LoMachSolver::solve() {
 
   // dt_fixed is initialized to -1, so if it is positive,
   // then the user requested a fixed dt run
-  // const double dt_fixed = config.GetFixedDT();
   const double dt_fixed = loMach_opts_.ts_opts_.constant_dt_;
   if (dt_fixed > 0) {
     temporal_coeff_.dt = dt_fixed;
@@ -585,7 +580,6 @@ void LoMachSolver::solve() {
     }
 
     sw_step.Start();
-    // if (config.timeIntegratorType == 1) {
     if (loMach_opts_.ts_opts_.integrator_type_ == LoMachTemporalOptions::CURL_CURL) {
       SetTimeIntegrationCoefficients(step - iter_start);
       thermo_->step();
@@ -689,7 +683,7 @@ void LoMachSolver::updateTimestep() {
   double max_speed = Umax_lcl;
   double Umag;
   int Sdof = sfes->GetNDofs();
-  // double dtFactor = config.dt_factor;
+  // TODO(trevilo): Let user set dtFactor
   double dtFactor = 1.0;
   auto dataU = flow_->getCurrentVelocity()->HostRead();
 
