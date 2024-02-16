@@ -63,7 +63,6 @@ class Tps;
 
 #include "io.hpp"
 #include "loMach_options.hpp"
-#include "run_configuration.hpp"
 #include "solver.hpp"
 #include "split_flow_base.hpp"
 #include "thermo_chem_base.hpp"
@@ -103,7 +102,6 @@ class LoMachSolver : public TPS::Solver {
 
   // Run options
   LoMachOptions loMach_opts_;
-  RunConfiguration config;
 
   // MPI helpers
   MPI_Groups *groupsMPI = nullptr;
