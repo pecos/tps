@@ -47,3 +47,5 @@ ref_solns/restart_non-lte-restart-test.noneq.h5 filter=lfs diff=lfs merge=lfs -t
 ref_solns/plasma.lte1d.final.h5 filter=lfs diff=lfs merge=lfs -text
 lte-data/argon_thermo_1atm.h5 filter=lfs diff=lfs merge=lfs -text
 lte-data/argon_transport_1atm.h5 filter=lfs diff=lfs merge=lfs -text
+ref_solns/heatedBox filter=lfs diff=lfs merge=lfs -text
+ref_solns/heatedBox/restart_output.sol.h5 filter=lfs diff=lfs merge=lfs -text
