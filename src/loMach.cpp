@@ -102,7 +102,6 @@ void LoMachSolver::initialize() {
     std::cout << " Order of solution-spaces " << endl;
     std::cout << " +velocity : " << order << endl;
     std::cout << " +pressure : " << order << endl;
-    std::cout << " +non-linear : " << order << endl;
     std::cout << "  " << endl;
   }
 
@@ -149,8 +148,6 @@ void LoMachSolver::initialize() {
       std::cout << "Sigma subgrid model active" << endl;
     }
   }
-
-  MaxIters = loMach_opts_.max_steps_;
 
   // check if a simulation is being restarted
   if (loMach_opts_.io_opts_.enable_restart_) {
@@ -481,11 +478,6 @@ void LoMachSolver::UpdateTimestepHistory(double dt) {
   temporal_coeff_.dt1 = dt;
 }
 
-void LoMachSolver::projectInitialSolution() {
-  // This whole function was commented out.
-  // Keep as no-op for now, but do we need it?
-}
-
 void LoMachSolver::initialTimeStep() {
   // TODO(trevilo): Compute initial dt from CFL
   // This calc was broken here, so it was removed temporarily.
@@ -548,6 +540,8 @@ void LoMachSolver::solve() {
   // pvdc.RegisterField("pressure", p_gf);
   pvdc.Save();
   if (rank0_ == true) std::cout << "Saving first step to paraview: " << iter << endl;
+
+  const int MaxIters = loMach_opts_.max_steps_;
 
   int iter_start = iter + 1;
   if (rank0_ == true) std::cout << " Starting main loop, from " << iter_start << " to " << MaxIters << endl;
@@ -749,7 +743,9 @@ void LoMachSolver::updateTimestep() {
   }
 }
 
-double LoMachSolver::computeCFL(double dt) {
+double LoMachSolver::computeCFL() {
+  const double dt = temporal_coeff_.dt;
+
   double Umax_lcl = 1.0e-12;
   double max_speed = Umax_lcl;
   double Umag;

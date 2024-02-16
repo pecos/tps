@@ -149,9 +149,6 @@ class LoMachSolver : public TPS::Solver {
   /// Scalar \f$H^1\f$ finite element space.
   ParFiniteElementSpace *sfes = nullptr;
 
-  /// Distance to nearest no-slip wall
-  ParGridFunction *distance_ = nullptr;
-
   Vector gridScaleSml;
   Vector gridScaleXSml;
   Vector gridScaleYSml;
@@ -166,12 +163,8 @@ class LoMachSolver : public TPS::Solver {
   ParGridFunction *bufferGridScaleY = nullptr;
   ParGridFunction *bufferGridScaleZ = nullptr;
 
-  // just keep these saved for ease
-  int numWalls, numInlets, numOutlets;
-
   // Time marching related parameters
   int iter;
-  int MaxIters;
   double CFL;
 
   int max_bdf_order;  // input option now
@@ -179,8 +172,6 @@ class LoMachSolver : public TPS::Solver {
 
   /// The order of the velocity and pressure space.
   int order;
-  int porder;
-  int norder;
 
   // Timers.
   StopWatch sw_setup, sw_step, sw_extrap, sw_curlcurl, sw_spsolve, sw_hsolve;
@@ -196,48 +187,30 @@ class LoMachSolver : public TPS::Solver {
   /// Ctor
   LoMachSolver(TPS::Tps *tps);
 
-  /// Dtor TODO(trevilo): this needs to free memory
+  /// Dtor
   virtual ~LoMachSolver();
 
-  void initialize();
+  // overrides of Solver functions
+  void initialize() override;
   void parseSolverOptions() override;
+  void solve() override;
 
+  // time-step related functions
   void initialTimeStep();
-  void solve();
   void updateTimestep();
   void setTimestep();
+  double computeCFL();
 
   // i/o routines
   void restart_files_hdf5(string mode, string inputFileName = std::string());
   void write_restart_files_hdf5(hid_t file, bool serialized_write);
   void read_restart_files_hdf5(hid_t file, bool serialized_read);
 
-  void projectInitialSolution();
-  void writeHDF5(string inputFileName = std::string()) { restart_files_hdf5("write", inputFileName); }
-  void readHDF5(string inputFileName = std::string()) { restart_files_hdf5("read", inputFileName); }
-  void writeParaview(int iter, double time) {
-    paraviewColl->SetCycle(iter);
-    paraviewColl->SetTime(time);
-    paraviewColl->Save();
-  }
-
-  /// Return a pointer to the current total resolution ParGridFunction.
-  ParGridFunction *GetCurrentResolution() { return &resolution_gf; }
-
-  LoMachOptions GetOptions() { return loMach_opts_; }
-
   /// Print timing summary of the solving routine.
   void PrintTimingData();
 
   /// Rotate entries in the time step and solution history arrays.
   void UpdateTimestepHistory(double dt);
-
-  /// Set the maximum order to use for the BDF method.
-  void SetMaxBDFOrder(int maxbdforder) { max_bdf_order = maxbdforder; }
-
-  /// Compute CFL
-  // double ComputeCFL(ParGridFunction &u, double dt);
-  double computeCFL(double dt);
 };
 
 #endif  // LOMACH_HPP_
