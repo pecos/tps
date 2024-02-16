@@ -397,36 +397,56 @@ void ThermoChem::Setup(double dt)
 
    // this is absolutely terrible
    //ConstantCoefficient t_bc_coef(wallBCs);
-   if (numWalls > 0) { ConstantCoefficient t_bc_coef0(wallBCs[0]); }   
-   if (numWalls > 1) { ConstantCoefficient t_bc_coef1(wallBCs[1]); }
-   if (numWalls > 2) { ConstantCoefficient t_bc_coef2(wallBCs[2]); }
-   if (numWalls > 3) { ConstantCoefficient t_bc_coef2(wallBCs[3]); }   
+   if (numWalls > 0) { t_bc_coef0.constant = wallBCs[0]; }   
+   if (numWalls > 1) { t_bc_coef1.constant = wallBCs[1]; }
+   if (numWalls > 2) { t_bc_coef2.constant = wallBCs[2]; }
+   if (numWalls > 3) { t_bc_coef3.constant = wallBCs[3]; }   
    
    for (int i = 0; i < numWalls; i++) {
 
      Tattr = 0;     
      //t_bc_coef.constant = config.wallBC[i].Th;
      
-     for (int iFace = 1; iFace < pmesh->bdr_attributes.Max()+1; iFace++) {     
-       if (config->wallPatchType[i].second == WallType::VISC_ISOTH) {	   	 
+     for (int iFace = 1; iFace < pmesh->bdr_attributes.Max()+1; iFace++) {
+       
+       if (config->wallPatchType[i].second == WallType::VISC_ISOTH) {
+	 
          if (iFace == config->wallPatchType[i].first) {
+	   
             Tattr[iFace-1] = 1;
             if (rank0) std::cout << "Dirichlet wall temperature BC: " << iFace << endl;
 
-     if (config->useWallFunction == true) {
-       AddTempDirichletBC(temp_wall, Tattr);
-       if (rank0) std::cout << "Using wall temp function bc for wall number: " << i+1 << endl;	               
-     } else if (config->useWallBox == true) {
-       AddTempDirichletBC(temp_wallBox, Tattr);
-       if (rank0) std::cout << "Using box temp bc for wall number: " << i+1 << endl;	        
-     } else {
-       if(i==0) {buffer_tbc = new ConstantCoefficient(t_bc_coef0); }
-       if(i==1) {buffer_tbc = new ConstantCoefficient(t_bc_coef1); }
-       if(i==2) {buffer_tbc = new ConstantCoefficient(t_bc_coef2); }
-       if(i==3) {buffer_tbc = new ConstantCoefficient(t_bc_coef3); }       
-       AddTempDirichletBC(buffer_tbc, Tattr);
-       if (rank0) std::cout << i+1 << ") wall temperature BC: " << config->wallBC[i].Th << endl;       
-     }      
+            if (config->useWallFunction == true) {
+              AddTempDirichletBC(temp_wall, Tattr);
+              if (rank0) std::cout << "Using wall temp function bc for wall number: " << i+1 << endl;
+	      
+	    } else if (config->useWallBox == true) {
+              AddTempDirichletBC(temp_wallBox, Tattr);
+              if (rank0) std::cout << "Using box temp bc for wall number: " << i+1 << endl;
+		
+            } else {
+       
+              if(i==0) {buffer_tbc = new ConstantCoefficient(t_bc_coef0); }
+              if(i==1) {buffer_tbc = new ConstantCoefficient(t_bc_coef1); }
+              if(i==2) {buffer_tbc = new ConstantCoefficient(t_bc_coef2); }
+              if(i==3) {buffer_tbc = new ConstantCoefficient(t_bc_coef3); }
+
+       /*
+       ParGridFunction buffer_tWall;
+       buffer_tWall.SetSpace(sfes);
+       buffer_tWall = config->wallBC[i].Th;
+       tInletField = new GridFunctionCoefficient(buffer_tInlet);   
+       AddTempDirichletBC(tInletField, Tattr);
+       */
+       
+              //AddTempDirichletBC(buffer_tbc, Tattr);
+              if(i==0) { AddTempDirichletBC(&t_bc_coef0, Tattr); }
+              if(i==1) { AddTempDirichletBC(&t_bc_coef1, Tattr); }
+              if(i==2) { AddTempDirichletBC(&t_bc_coef2, Tattr); }
+              if(i==3) { AddTempDirichletBC(&t_bc_coef3, Tattr); }
+       
+              if (rank0) std::cout << i+1 << ") wall temperature BC: " << config->wallBC[i].Th << endl;
+           }      
 	    
 	 }
        } else if (config->wallPatchType[i].second == WallType::VISC_ADIAB) {
