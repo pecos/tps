@@ -53,9 +53,8 @@
 using namespace mfem;
 using namespace mfem::common;
 
-LoMachSolver::LoMachSolver(LoMachOptions loMach_opts, TPS::Tps *tps)
+LoMachSolver::LoMachSolver(TPS::Tps *tps)
     : tpsP_(tps),
-      loMach_opts_(loMach_opts),
       groupsMPI(new MPI_Groups(tps->getTPSCommWorld())),
       nprocs_(groupsMPI->getTPSWorldSize()),
       rank_(groupsMPI->getTPSWorldRank()),

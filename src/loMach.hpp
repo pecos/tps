@@ -194,7 +194,7 @@ class LoMachSolver : public TPS::Solver {
 
  public:
   /// Ctor
-  LoMachSolver(LoMachOptions loMach_opts, TPS::Tps *tps);
+  LoMachSolver(TPS::Tps *tps);
 
   /// Dtor TODO(trevilo): this needs to free memory
   virtual ~LoMachSolver();
