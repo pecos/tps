@@ -38,7 +38,7 @@ EXTRA_DIST  = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes lte-
 		      independent_coupling.test interp_em.test mms.euler_2d.test mms.cns_2d.test \
 		      gradient.test coupled-3d.test coupled-3d.splitcomm.test coupled-3d.py-loop.test \
 		      tabulated.test lte_mixture.test distance_fcn.test \
-              sgsSmag.test sgsSigma.test plate.test pipe.mix.test lte2noneq-restart.test \
+              sgsSmag.test sgsSigma.test heatEq.test plate.test pipe.mix.test lte2noneq-restart.test \
               coupled-3d.interface.test plasma.axisym.test plasma.axisym.lte1d.test \
 	      lomach-flow.test
 
@@ -57,6 +57,7 @@ TESTS += cyl3d.gpu.test \
 	 pipe.test \
 	 sgsSmag.test \
 	 sgsSigma.test \
+	 heatEq.test \
          plate.test \
 	 pipe.mix.test \
 	 plasma.axisym.lte1d.test
@@ -92,6 +93,7 @@ TESTS += cyl3d.test \
 	 lte_mixture.test \
          sgsSmag.test \
          sgsSigma.test \
+         heatEq.text \
          plate.test \
          pipe.mix.test \
 	 lte2noneq-restart.test \
