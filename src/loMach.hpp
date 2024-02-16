@@ -30,13 +30,26 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
 
-// TODO(trevilo): List of capabilities removed during refactoring
+// TODO(trevilo): List of capabilities removed during refactoring (to be added back asap)
 //
 // * Statstics calculations.  The Averaging class is somewhat brittle
 //   and only plays nice with state stored as done in the compressible
 //   flow code path, which is not convenient here.  This should be
 //   refactored into a more general capability so it can be used here.
 //   For the moment however, averaging is disabled.
+//
+// * Variable time stepping.  Need to get dt info from models.  Not
+//   provided yet.  Put variable dt back once that part of the
+//   interface is written. This will include adding the control logic
+//   to LoMachSolver and likely some new parameters in
+//   LoMachTemporalScheme.
+//
+// * Some options parsing.  Some options previously parsed by
+//   LoMachSolver have been eliminated.  Generally speaking these were
+//   either options that were not being used (as far as I could tell)
+//   or that seemed model-specific, and thus could be better handled
+//   by the model classes.  So, some will be brought back, but clearly
+//   until that is done, the options don't exist.
 
 #ifndef LOMACH_HPP_
 #define LOMACH_HPP_
@@ -190,9 +203,6 @@ class LoMachSolver : public TPS::Solver {
 
   void initialize();
   void parseSolverOptions() override;
-  void parseSolverOptions2();
-  void parseFlowOptions();
-  void parseTimeIntegrationOptions();
 
   void initialTimeStep();
   void solve();

@@ -64,9 +64,8 @@ LoMachSolver::LoMachSolver(LoMachOptions loMach_opts, TPS::Tps *tps)
   groupsMPI->init();
 
   // ini file options
-  parseSolverOptions();
-  parseSolverOptions2();
-  loadFromAuxSol = loMach_opts_.io_opts_.restart_variable_order_;
+  // parseSolverOptions();
+  // parseSolverOptions2();
 
   // set default solver state
   exit_status_ = NORMAL;
@@ -149,14 +148,14 @@ void LoMachSolver::initialize() {
   nvel_ = dim_;
 
   if (rank0_) {
-    if (config.sgsModelType == 1) {
+    if (loMach_opts_.sgs_opts_.sgs_model_type_ == SubGridModelOptions::SMAGORINSKY) {
       std::cout << "Smagorinsky subgrid model active" << endl;
-    } else if (config.sgsModelType == 2) {
+    } else if (loMach_opts_.sgs_opts_.sgs_model_type_ == SubGridModelOptions::SIGMA) {
       std::cout << "Sigma subgrid model active" << endl;
     }
   }
 
-  MaxIters = config.GetNumIters();
+  MaxIters = loMach_opts_.max_steps_;
 
   // check if a simulation is being restarted
   if (loMach_opts_.io_opts_.enable_restart_) {
@@ -951,15 +950,24 @@ void LoMachSolver::parseSolverOptions() {
   if (rank0_) {
     loMach_opts_.print(std::cout);
   }
-}
 
-///* move these to separate support class *//
-void LoMachSolver::parseSolverOptions2() {
-  // flow/numerics
-  parseFlowOptions();
+  // TODO(trevilo): maintain in loMach for now (via LoMachOptions)
+  tpsP_->getInput("loMach/order", config.solOrder, 2);
+  tpsP_->getInput("loMach/maxIters", loMach_opts_.max_steps_, 10);
+  tpsP_->getInput("loMach/outputFreq", config.itersOut, 50);
+  tpsP_->getInput("loMach/timingFreq", config.timingFreq, 100);
+
+  assert(config.solOrder > 0);
+  assert(config.numIters >= 0);
+  assert(config.itersOut > 0);
+
+  // SGS model options
+  loMach_opts_.sgs_opts_.read(tpsP_, std::string("loMach"));
+
 
   // time integration controls
-  parseTimeIntegrationOptions();
+  loMach_opts_.ts_opts_.read(tpsP_);
+  max_bdf_order = loMach_opts_.ts_opts_.bdf_order_;
 
   // I/O settings
   loMach_opts_.io_opts_.read(tpsP_);
@@ -969,74 +977,6 @@ void LoMachSolver::parseSolverOptions2() {
   tpsP_->getInput("periodicity/xTrans", loMach_opts_.x_trans, 1.0e12);
   tpsP_->getInput("periodicity/yTrans", loMach_opts_.y_trans, 1.0e12);
   tpsP_->getInput("periodicity/zTrans", loMach_opts_.z_trans, 1.0e12);
-}
 
-void LoMachSolver::parseFlowOptions() {
-  std::map<std::string, int> sgsModel;
-  sgsModel["none"] = 0;
-  sgsModel["smagorinsky"] = 1;
-  sgsModel["sigma"] = 2;
-
-  tpsP_->getInput("loMach/order", config.solOrder, 2);
-  tpsP_->getInput("loMach/integrationRule", config.integrationRule, 1);
-  tpsP_->getInput("loMach/basisType", config.basisType, 1);
-  tpsP_->getInput("loMach/maxIters", config.numIters, 10);
-  tpsP_->getInput("loMach/outputFreq", config.itersOut, 50);
-  tpsP_->getInput("loMach/timingFreq", config.timingFreq, 100);
-  tpsP_->getInput("loMach/viscosityMultiplier", config.visc_mult, 1.0);
-  tpsP_->getInput("loMach/bulkViscosityMultiplier", config.bulk_visc, 0.0);
-  tpsP_->getInput("flow/axisymmetric", config.axisymmetric_, false);
-  // axisymmetric not supported yet, so make sure we aren't trying to run it
-  assert(!config.axisymmetric_);
-  tpsP_->getInput("loMach/SutherlandC1", config.sutherland_.C1, 1.458e-6);
-  tpsP_->getInput("loMach/SutherlandS0", config.sutherland_.S0, 110.4);
-  tpsP_->getInput("loMach/SutherlandPr", config.sutherland_.Pr, 0.71);
-
-  tpsP_->getInput("loMach/constantViscosity", config.const_visc, -1.0);
-  tpsP_->getInput("loMach/constantDensity", config.const_dens, -1.0);
-  tpsP_->getInput("loMach/ambientPressure", config.amb_pres, 101325.0);
-  tpsP_->getInput("loMach/openSystem", config.isOpen, true);
-
-  tpsP_->getInput("loMach/enablePressureForcing", config.isForcing, false);
-  if (config.isForcing) {
-    for (int d = 0; d < 3; d++) tpsP_->getRequiredVecElem("loMach/pressureGrad", config.gradPress[d], d);
-  }
-
-  tpsP_->getInput("loMach/enableGravity", config.isGravity, false);
-  if (config.isGravity) {
-    for (int d = 0; d < 3; d++) tpsP_->getRequiredVecElem("loMach/gravity", config.gravity[d], d);
-  }
-
-  tpsP_->getInput("loMach/computeDistance", config.compute_distance, false);
-
-  std::string type;
-  tpsP_->getInput("loMach/sgsModel", type, std::string("none"));
-  config.sgsModelType = sgsModel[type];
-  tpsP_->getInput("loMach/sgsExcludeMean", config.sgsExcludeMean, false);
-
-  double sgs_const = 0.;
-  if (config.sgsModelType == 1) {
-    sgs_const = 0.12;
-  } else if (config.sgsModelType == 2) {
-    sgs_const = 0.135;
-  }
-  tpsP_->getInput("loMach/sgsModelConstant", config.sgs_model_const, sgs_const);
-
-  assert(config.solOrder > 0);
-  assert(config.numIters >= 0);
-  assert(config.itersOut > 0);
-  assert(config.refLength > 0);
-}
-
-void LoMachSolver::parseTimeIntegrationOptions() {
-  loMach_opts_.ts_opts_.read(tpsP_);
-  max_bdf_order = loMach_opts_.ts_opts_.bdf_order_;
-
-  // TODO(trevilo): Add rest of time options, specifically the ones
-  // below:
-  // tpsP_->getInput("time/initialTimestep", config.dt_initial, 1.0e-8);
-  // tpsP_->getInput("time/dt_fixed", config.dt_fixed, -1.);
-
-  // TODO(trevilo): Add ability to pass tolerances to solvers.  Where
-  // should this go?  Here, or each physics parses its own?
+  loadFromAuxSol = loMach_opts_.io_opts_.restart_variable_order_;
 }

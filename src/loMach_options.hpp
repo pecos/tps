@@ -43,6 +43,21 @@ namespace TPS {
 class Tps;
 }
 
+class SubGridModelOptions {
+ public:
+  SubGridModelOptions();
+  void read(TPS::Tps *tps, std::string prefix = std::string(""));
+
+  enum SubGridModelType { NONE, SMAGORINSKY, SIGMA };
+
+  std::string sgs_model_string_;
+  std::map<std::string, SubGridModelType> sgs_model_map_;
+  SubGridModelType sgs_model_type_;
+
+  double sgs_model_constant_;
+  bool exclude_mean_;
+};
+
 class LoMachTemporalOptions {
  public:
   LoMachTemporalOptions();
@@ -71,7 +86,11 @@ class LoMachOptions {
   IOOptions io_opts_;
 
   // Temporal scheme related options
+  int max_steps_; /**< Maximum number of time steps */
   LoMachTemporalOptions ts_opts_;
+
+  // SGS-related options
+  SubGridModelOptions sgs_opts_;
 
   // Mesh-related options
   std::string mesh_file; /**< Mesh filename */
