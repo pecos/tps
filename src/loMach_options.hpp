@@ -83,6 +83,8 @@ class LoMachTemporalOptions {
 class LoMachOptions {
  public:
   // IO-related options
+  int output_frequency_;
+  int timing_frequency_;
   IOOptions io_opts_;
 
   // Temporal scheme related options

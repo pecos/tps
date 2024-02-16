@@ -63,10 +63,6 @@ LoMachSolver::LoMachSolver(LoMachOptions loMach_opts, TPS::Tps *tps)
   // is this needed?
   groupsMPI->init();
 
-  // ini file options
-  // parseSolverOptions();
-  // parseSolverOptions2();
-
   // set default solver state
   exit_status_ = NORMAL;
 
@@ -634,7 +630,7 @@ void LoMachSolver::solve() {
     temporal_coeff_.time += temporal_coeff_.dt;
 
     // restart files
-    if (iter % config.itersOut == 0 && iter != 0) {
+    if (iter % loMach_opts_.output_frequency_ == 0 && iter != 0) {
       // Write restart file!
       restart_files_hdf5("write");
     }
@@ -952,18 +948,12 @@ void LoMachSolver::parseSolverOptions() {
   }
 
   // TODO(trevilo): maintain in loMach for now (via LoMachOptions)
-  tpsP_->getInput("loMach/order", config.solOrder, 2);
   tpsP_->getInput("loMach/maxIters", loMach_opts_.max_steps_, 10);
-  tpsP_->getInput("loMach/outputFreq", config.itersOut, 50);
-  tpsP_->getInput("loMach/timingFreq", config.timingFreq, 100);
-
-  assert(config.solOrder > 0);
-  assert(config.numIters >= 0);
-  assert(config.itersOut > 0);
+  tpsP_->getInput("loMach/outputFreq", loMach_opts_.output_frequency_, 50);
+  tpsP_->getInput("loMach/timingFreq", loMach_opts_.timing_frequency_, 100);
 
   // SGS model options
   loMach_opts_.sgs_opts_.read(tpsP_, std::string("loMach"));
-
 
   // time integration controls
   loMach_opts_.ts_opts_.read(tpsP_);
@@ -971,12 +961,11 @@ void LoMachSolver::parseSolverOptions() {
 
   // I/O settings
   loMach_opts_.io_opts_.read(tpsP_);
+  loadFromAuxSol = loMach_opts_.io_opts_.restart_variable_order_;
 
   // periodicity
   tpsP_->getInput("periodicity/enablePeriodic", loMach_opts_.periodic, false);
   tpsP_->getInput("periodicity/xTrans", loMach_opts_.x_trans, 1.0e12);
   tpsP_->getInput("periodicity/yTrans", loMach_opts_.y_trans, 1.0e12);
   tpsP_->getInput("periodicity/zTrans", loMach_opts_.z_trans, 1.0e12);
-
-  loadFromAuxSol = loMach_opts_.io_opts_.restart_variable_order_;
 }
