@@ -18,8 +18,7 @@
 using namespace mfem;
 using namespace mfem::common;
 
-TurbModel::TurbModel(mfem::ParMesh *pmesh, RunConfiguration *config, LoMachOptions *loMach_opts,
-                     temporalSchemeCoefficients &timeCoeff)
+TurbModel::TurbModel(mfem::ParMesh *pmesh, RunConfiguration *config, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff)
     : pmesh_(pmesh), loMach_opts_(loMach_opts), config_(config), timeCoeff_(timeCoeff) {}
 
 void TurbModel::initializeSelf() {
