@@ -34,9 +34,33 @@
 #define LOMACH_OPTIONS_HPP_
 
 #include <iostream>
+#include <map>
 #include <string>
 
-class IOOptions;
+#include "io.hpp"
+
+namespace TPS {
+class Tps;
+}
+
+class LoMachTemporalOptions {
+ public:
+  LoMachTemporalOptions();
+  void read(TPS::Tps *tps, std::string prefix = std::string(""));
+
+  enum IntegratorType { CURL_CURL, STAGGERED_TIME, DELTA_P };
+
+  std::string integrator_string_;
+  std::map<std::string, IntegratorType> integrator_map_;
+  IntegratorType integrator_type_;
+
+  bool enable_constant_dt_;
+
+  double cfl_;
+  double constant_dt_;
+
+  int bdf_order_;
+};
 
 /** LoMach options
  *  A class for storing/passing options to Low Mach solvers.
@@ -45,6 +69,9 @@ class LoMachOptions {
  public:
   // IO-related options
   IOOptions io_opts_;
+
+  // Temporal scheme related options
+  LoMachTemporalOptions ts_opts_;
 
   // Mesh-related options
   std::string mesh_file; /**< Mesh filename */
@@ -57,24 +84,23 @@ class LoMachOptions {
   double z_trans;
 
   // FEM
-  int order;      /**< Element order */
+  int order; /**< Element order */
   int uOrder;
   int pOrder;
   int nOrder;
 
   // Model choices
-  std::string flow_solver; /**< Flow solver name */
+  std::string flow_solver;   /**< Flow solver name */
   std::string thermo_solver; /**< Themo-chemical solver name */
-
 
   // TODO(trevilo): Do we want/need to keep any of these here?
   // They aren't currently being used.
-  int max_iter;                           /**< Maximum number of linear solver iterations */
-  double rtol;                            /**< Linear solver relative tolerance */
-  double atol;                            /**< Linear solver absolute tolerance */
+  int max_iter; /**< Maximum number of linear solver iterations */
+  double rtol;  /**< Linear solver relative tolerance */
+  double atol;  /**< Linear solver absolute tolerance */
 
-  bool thermalDiv; // turn on/off Qt
-  bool realDiv;    // use actual divergence
+  bool thermalDiv;  // turn on/off Qt
+  bool realDiv;     // use actual divergence
 
   int nFilter;
   double filterWeight;

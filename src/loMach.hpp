@@ -191,7 +191,6 @@ class LoMachSolver : public TPS::Solver {
   void initialize();
   void parseSolverOptions() override;
   void parseSolverOptions2();
-  void parsePeriodicInputs();
   void parseFlowOptions();
   void parseTimeIntegrationOptions();
 

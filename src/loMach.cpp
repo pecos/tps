@@ -168,7 +168,6 @@ void LoMachSolver::initialize() {
       serial_mesh_->UniformRefinement();
     }
 
-
     // read partitioning info from original decomposition (unless restarting from serial soln)
     nelemGlobal_ = serial_mesh_->GetNE();
     // nelemGlobal_ = mesh->GetNE();
@@ -316,7 +315,8 @@ void LoMachSolver::initialize() {
   MPI_Barrier(MPI_COMM_WORLD);
   if (verbose) grvy_printf(ginfo, "ioData.init thingy...\n");
 
-  CFL = config.GetCFLNumber();
+  // CFL = config.GetCFLNumber();
+  CFL = loMach_opts_.ts_opts_.cfl_;
   if (verbose) grvy_printf(ginfo, "got CFL...\n");
 
   // Determine the minimum element size.
@@ -500,7 +500,8 @@ void LoMachSolver::initialTimeStep() {
 
   // dt_fixed is initialized to -1, so if it is positive, then the
   // user requested a fixed dt run
-  const double dt_fixed = config.GetFixedDT();
+  // const double dt_fixed = config.GetFixedDT();
+  const double dt_fixed = loMach_opts_.ts_opts_.constant_dt_;
   if (dt_fixed > 0) {
     temporal_coeff_.dt = dt_fixed;
   }
@@ -514,19 +515,22 @@ void LoMachSolver::solve() {
 
   setTimestep();
   if (iter == 0) {
-    temporal_coeff_.dt = std::min(config.dt_initial, temporal_coeff_.dt);
+    // temporal_coeff_.dt = std::min(config.dt_initial, temporal_coeff_.dt);
+    temporal_coeff_.dt = temporal_coeff_.dt;
   }
 
   // temporary hardcodes
-  // double CFL_actual;
-  CFL = config.GetCFLNumber();
+  double CFL_actual;
+  // CFL = config.GetCFLNumber();
+  CFL = loMach_opts_.ts_opts_.cfl_;
 
   // int SdofInt = sfes->GetTrueVSize();
   int Sdof = sfes->GetNDofs();
 
   // dt_fixed is initialized to -1, so if it is positive,
   // then the user requested a fixed dt run
-  const double dt_fixed = config.GetFixedDT();
+  // const double dt_fixed = config.GetFixedDT();
+  const double dt_fixed = loMach_opts_.ts_opts_.constant_dt_;
   if (dt_fixed > 0) {
     temporal_coeff_.dt = dt_fixed;
   }
@@ -581,16 +585,12 @@ void LoMachSolver::solve() {
     }
 
     sw_step.Start();
-    if (config.timeIntegratorType == 1) {
+    // if (config.timeIntegratorType == 1) {
+    if (loMach_opts_.ts_opts_.integrator_type_ == LoMachTemporalOptions::CURL_CURL) {
       SetTimeIntegrationCoefficients(step - iter_start);
       thermo_->step();
       flow_->step();
-    } else if (config.timeIntegratorType == 2) {
-      // staggeredTimeStep(time, dt, step, iter_start);
-      if (rank0_) std::cout << "Time integration not updated." << endl;
-      exit(1);
-    } else if (config.timeIntegratorType == 3) {
-      // deltaPStep(time, dt, step, iter_start);
+    } else {
       if (rank0_) std::cout << "Time integration not updated." << endl;
       exit(1);
     }
@@ -689,7 +689,8 @@ void LoMachSolver::updateTimestep() {
   double max_speed = Umax_lcl;
   double Umag;
   int Sdof = sfes->GetNDofs();
-  double dtFactor = config.dt_factor;
+  // double dtFactor = config.dt_factor;
+  double dtFactor = 1.0;
   auto dataU = flow_->getCurrentVelocity()->HostRead();
 
   // come in divided by order
@@ -970,7 +971,10 @@ void LoMachSolver::parseSolverOptions2() {
   loMach_opts_.io_opts_.read(tpsP_);
 
   // periodicity
-  parsePeriodicInputs();
+  tpsP_->getInput("periodicity/enablePeriodic", loMach_opts_.periodic, false);
+  tpsP_->getInput("periodicity/xTrans", loMach_opts_.x_trans, 1.0e12);
+  tpsP_->getInput("periodicity/yTrans", loMach_opts_.y_trans, 1.0e12);
+  tpsP_->getInput("periodicity/zTrans", loMach_opts_.z_trans, 1.0e12);
 }
 
 void LoMachSolver::parseFlowOptions() {
@@ -1031,37 +1035,14 @@ void LoMachSolver::parseFlowOptions() {
 }
 
 void LoMachSolver::parseTimeIntegrationOptions() {
-  std::map<std::string, int> integrators;
-  integrators["curlcurl"] = 1;
-  integrators["staggeredTime"] = 2;
-  integrators["deltaP"] = 3;
+  loMach_opts_.ts_opts_.read(tpsP_);
+  max_bdf_order = loMach_opts_.ts_opts_.bdf_order_;
 
-  std::string type;
-  tpsP_->getInput("time/cfl", config.cflNum, 0.2);
-  tpsP_->getInput("time/integrator", type, std::string("curlcurl"));
-  tpsP_->getInput("time/enableConstantTimestep", config.constantTimeStep, false);
-  tpsP_->getInput("time/initialTimestep", config.dt_initial, 1.0e-8);
-  tpsP_->getInput("time/changeFactor", config.dt_factor, 0.05);
-  tpsP_->getInput("time/dt_fixed", config.dt_fixed, -1.);
-  tpsP_->getInput("time/maxSolverIteration", config.solver_iter, 100);
-  tpsP_->getInput("time/solverRelTolerance", config.solver_tol, 1.0e-8);
-  tpsP_->getInput("time/bdfOrder", config.bdfOrder, 2);
-  tpsP_->getInput("time/abOrder", config.abOrder, 2);
-  if (integrators.count(type) == 1) {
-    config.timeIntegratorType = integrators[type];
-  } else {
-    grvy_printf(GRVY_ERROR, "Unknown time integrator > %s\n", type.c_str());
-    exit(ERROR);
-  }
-  if (config.timeIntegratorType != 1) {
-    config.bdfOrder = 1;
-  }
-  max_bdf_order = config.bdfOrder;
-}
+  // TODO(trevilo): Add rest of time options, specifically the ones
+  // below:
+  // tpsP_->getInput("time/initialTimestep", config.dt_initial, 1.0e-8);
+  // tpsP_->getInput("time/dt_fixed", config.dt_fixed, -1.);
 
-void LoMachSolver::parsePeriodicInputs() {
-  tpsP_->getInput("periodicity/enablePeriodic", loMach_opts_.periodic, false);
-  tpsP_->getInput("periodicity/xTrans", loMach_opts_.x_trans, 1.0e12);
-  tpsP_->getInput("periodicity/yTrans", loMach_opts_.y_trans, 1.0e12);
-  tpsP_->getInput("periodicity/zTrans", loMach_opts_.z_trans, 1.0e12);
+  // TODO(trevilo): Add ability to pass tolerances to solvers.  Where
+  // should this go?  Here, or each physics parses its own?
 }
