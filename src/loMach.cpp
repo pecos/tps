@@ -95,15 +95,12 @@ void LoMachSolver::initialize() {
   bool verbose = rank0_;
   if (verbose) grvy_printf(ginfo, "Initializing loMach solver.\n");
 
+  // Stash the order, just for convenience
   order = loMach_opts_.order;
 
-  if (rank0_) {
-    std::cout << "  " << endl;
-    std::cout << " Order of solution-spaces " << endl;
-    std::cout << " +velocity : " << order << endl;
-    std::cout << " +pressure : " << order << endl;
-    std::cout << "  " << endl;
-  }
+  //-----------------------------------------------------
+  // 1) Prepare the mesh
+  //-----------------------------------------------------
 
   // Generate serial mesh, making it periodic if requested
   if (loMach_opts_.periodic) {
@@ -138,16 +135,8 @@ void LoMachSolver::initialize() {
   // Stash mesh dimension (convenience)
   dim_ = serial_mesh_->Dimension();
 
-  // HACK HACK HACK HARD CODE
+  // Only support number of velocity components = spatial dimension for now
   nvel_ = dim_;
-
-  if (rank0_) {
-    if (loMach_opts_.sgs_opts_.sgs_model_type_ == SubGridModelOptions::SMAGORINSKY) {
-      std::cout << "Smagorinsky subgrid model active" << endl;
-    } else if (loMach_opts_.sgs_opts_.sgs_model_type_ == SubGridModelOptions::SIGMA) {
-      std::cout << "Sigma subgrid model active" << endl;
-    }
-  }
 
   // check if a simulation is being restarted
   if (loMach_opts_.io_opts_.enable_restart_) {
@@ -197,54 +186,23 @@ void LoMachSolver::initialize() {
       if (rank0_) partitioning_file_hdf5("write", groupsMPI, nelemGlobal_, partitioning_);
     }
 
-    // make sure these are actually hooked up!
+    // When starting from scratch time = 0 and iter = 0
     temporal_coeff_.time = 0.;
     iter = 0;
   }
 
-  // 1c) Partition the mesh (see partitioning_ in M2ulPhyS)
-  // pmesh__ = new ParMesh(MPI_COMM_WORLD, *mesh);
+  // Partition the mesh
   pmesh_ = new ParMesh(MPI_COMM_WORLD, *serial_mesh_, partitioning_);
   if (verbose) grvy_printf(ginfo, "Mesh partitioned...\n");
 
-  // instantiate physics models
-
-  // TODO(trevilo): Add support for turbulence modeling
-  // turbClass = new TurbModel(pmesh_, &config, &loMach_opts_);
-
-  // Instantiate thermochemical model
-  if (loMach_opts_.thermo_solver == "constant-property") {
-    thermo_ = new ConstantPropertyThermoChem(pmesh_, loMach_opts_.order, 1.0, 1.0);
-  } else if (loMach_opts_.thermo_solver == "calorically-perfect") {
-    thermo_ = new ThermoChem(pmesh_, &loMach_opts_, nullptr, temporal_coeff_, tpsP_);
-  } else {
-    // Unknown choice... die
-    if (rank0_) {
-      grvy_printf(GRVY_ERROR, "Unknown loMach/thermo-solver option > %s\n", loMach_opts_.thermo_solver.c_str());
-    }
-    exit(ERROR);
-  }
-
-  // Instantiate flow solver
-  if (loMach_opts_.flow_solver == "zero-flow") {
-    // No flow---set u = 0.  Primarily useful for testing thermochem models in isolation
-    flow_ = new ZeroFlow(pmesh_, 1);
-  } else if (loMach_opts_.flow_solver == "tomboulides") {
-    // Tomboulides flow solver
-    flow_ = new Tomboulides(pmesh_, loMach_opts_.order, loMach_opts_.order, temporal_coeff_, tpsP_);
-  } else {
-    // Unknown choice... die
-    if (rank0_) {
-      grvy_printf(GRVY_ERROR, "Unknown loMach/flow-solver option > %s\n", loMach_opts_.flow_solver.c_str());
-    }
-    exit(ERROR);
-  }
-
   //-----------------------------------------------------
-  // 2) Prepare the required finite elements
+  // 2) Prepare the required finite elements (for resolution info)
+  //    and other mesh related data
   //-----------------------------------------------------
 
-  // scalar
+  // TODO(trevilo): This code is necessary here b/c LoMachSolver owns
+  // the grid resolution objects.  We should refactor them into a
+  // "MeshHelper" class or some such thing.
   sfec = new H1_FECollection(order);
   sfes = new ParFiniteElementSpace(pmesh_, sfec);
 
@@ -267,47 +225,6 @@ void LoMachSolver::initialize() {
   resolution_gf = 0.0;
 
   if (verbose) grvy_printf(ginfo, "vectors and gf initialized...\n");
-
-  // Initialize time marching coefficients.  NB: dt will be reset
-  // prior to time step, but must be initialized here in order to
-  // avoid possible uninitialized usage when constructing operators in
-  // model classes.
-  temporal_coeff_.dt = 1.0;
-  temporal_coeff_.dt3 = temporal_coeff_.dt2 = temporal_coeff_.dt1 = temporal_coeff_.dt;
-  SetTimeIntegrationCoefficients(0);
-
-  // Initialize model-owned data
-  flow_->initializeSelf();
-
-  // NOTE: Order here necessary currently b/c
-  // ThermoChem::initializeSelf assumes that the internal flow
-  // interface has already been initialized.
-  thermo_->initializeFromFlow(&flow_->toThermoChem_interface);
-
-  thermo_->initializeSelf();
-
-  // Initialize restart read/write capability
-  flow_->initializeIO(ioData);
-  thermo_->initializeIO(ioData);
-
-  // Exchange interface information
-  flow_->initializeFromThermoChem(&thermo_->toFlow_interface_);
-
-
-  // Finish initializing operators
-  flow_->initializeOperators();
-  // thermo_->initializeOperators();
-
-  // TODO(trevilo): Enable averaging.  See note in loMach.hpp
-
-  const bool restart_serial =
-      (loMach_opts_.io_opts_.restart_serial_read_ || loMach_opts_.io_opts_.restart_serial_write_);
-  ioData.initializeSerial(rank0_, restart_serial, serial_mesh_, locToGlobElem, &partitioning_);
-  MPI_Barrier(MPI_COMM_WORLD);
-  if (verbose) grvy_printf(ginfo, "ioData.init thingy...\n");
-
-  CFL = loMach_opts_.ts_opts_.cfl_;
-  if (verbose) grvy_printf(ginfo, "got CFL...\n");
 
   // Determine the minimum element size.
   {
@@ -445,27 +362,86 @@ void LoMachSolver::initialize() {
     MPI_Allreduce(&local_zmax, &zmax, 1, MPI_DOUBLE, MPI_MAX, pmesh_->GetComm());
   }
 
-  //
   if (rank0_) cout << "Maximum element size: " << hmax << "m" << endl;
   if (rank0_) cout << "Minimum element size: " << hmin << "m" << endl;
+
+  //-----------------------------------------------------
+  // 3) Prepare the sub-physics models/solvers
+  //-----------------------------------------------------
+
+  // TODO(trevilo): Add support for turbulence modeling
+  if (rank0_) {
+    if (loMach_opts_.sgs_opts_.sgs_model_type_ == SubGridModelOptions::SMAGORINSKY) {
+      std::cout << "Smagorinsky subgrid model active" << endl;
+    } else if (loMach_opts_.sgs_opts_.sgs_model_type_ == SubGridModelOptions::SIGMA) {
+      std::cout << "Sigma subgrid model active" << endl;
+    }
+  }
+  // Turbulence modeling not supported yet
+  assert(loMach_opts_.sgs_opts_.sgs_model_type_ == SubGridModelOptions::NONE);
+
+  // Instantiate thermochemical model
+  if (loMach_opts_.thermo_solver == "constant-property") {
+    thermo_ = new ConstantPropertyThermoChem(pmesh_, loMach_opts_.order, 1.0, 1.0);
+  } else if (loMach_opts_.thermo_solver == "calorically-perfect") {
+    thermo_ = new ThermoChem(pmesh_, nullptr, &loMach_opts_, temporal_coeff_);
+  } else {
+    // Unknown choice... die
+    if (rank0_) {
+      grvy_printf(GRVY_ERROR, "Unknown loMach/thermo-solver option > %s\n", loMach_opts_.thermo_solver.c_str());
+    }
+    exit(ERROR);
+  }
+
+  // Instantiate flow solver
+  if (loMach_opts_.flow_solver == "zero-flow") {
+    // No flow---set u = 0.  Primarily useful for testing thermochem models in isolation
+    flow_ = new ZeroFlow(pmesh_, 1);
+  } else if (loMach_opts_.flow_solver == "tomboulides") {
+    // Tomboulides flow solver
+    flow_ = new Tomboulides(pmesh_, loMach_opts_.order, loMach_opts_.order, temporal_coeff_, tpsP_);
+  } else {
+    // Unknown choice... die
+    if (rank0_) {
+      grvy_printf(GRVY_ERROR, "Unknown loMach/flow-solver option > %s\n", loMach_opts_.flow_solver.c_str());
+    }
+    exit(ERROR);
+  }
+
+  // Initialize time marching coefficients.  NB: dt will be reset
+  // prior to time step, but must be initialized here in order to
+  // avoid possible uninitialized usage when constructing operators in
+  // model classes.
+  temporal_coeff_.dt = 1.0;
+  temporal_coeff_.dt3 = temporal_coeff_.dt2 = temporal_coeff_.dt1 = temporal_coeff_.dt;
+  SetTimeIntegrationCoefficients(0);
+
+  CFL = loMach_opts_.ts_opts_.cfl_;
+  if (verbose) grvy_printf(ginfo, "got CFL...\n");
+
+  // Initialize model-owned data
+  flow_->initializeSelf();
+  thermo_->initializeSelf();
+
+  // Initialize restart read/write capability
+  flow_->initializeIO(ioData);
+
+  // Exchange interface information
+  flow_->initializeFromThermoChem(&thermo_->toFlow_interface_);
+  // thermo_->initializeFromFlow(&flow_->interface);
+
+  // Finish initializing operators
+  flow_->initializeOperators();
+  // thermo_->initializeOperators();
+
+  // TODO(trevilo): Enable averaging.  See note in loMach.hpp
+
+  const bool restart_serial =
+      (loMach_opts_.io_opts_.restart_serial_read_ || loMach_opts_.io_opts_.restart_serial_write_);
+  ioData.initializeSerial(rank0_, restart_serial, serial_mesh_, locToGlobElem, &partitioning_);
+  MPI_Barrier(MPI_COMM_WORLD);
+  if (verbose) grvy_printf(ginfo, "ioData.init thingy...\n");
 }
-
-// void LoMachSolver::Setup(double dt) {
-//   sw_setup.Start();
-
-//   // Set initial time step in the history array
-//   dthist[0] = dt;
-
-//   // if (config.sgsExcludeMean == true) { bufferMeanUp = new ParGridFunction(fvfes); }
-//   MPI_Barrier(MPI_COMM_WORLD);
-//   if (rank0_) std::cout << "Attempting to setup bufferMeanUp..." << endl;
-//   bufferMeanUp = new ParGridFunction(fvfes2);
-//   MPI_Barrier(MPI_COMM_WORLD);
-//   if (rank0_) std::cout << "...complete" << endl;
-
-//   sw_setup.Stop();
-//   // std::cout << "Check 29..." << std::endl;
-// }
 
 void LoMachSolver::UpdateTimestepHistory(double dt) {
   // Rotate values in time step history
