@@ -362,6 +362,5 @@ void write_variable_data_hdf5(hid_t group, std::string varName, hid_t dataspace,
  * @todo Refactor this function to make it more generic and fit better
  * into the IODataOrganizer paradigm.
  */
-void partitioning_file_hdf5(std::string mode, const RunConfiguration &config, MPI_Groups *groupsMPI, int nelemGlobal,
-                            mfem::Array<int> &partitioning);
+void partitioning_file_hdf5(std::string mode, MPI_Groups *groupsMPI, int nelemGlobal, mfem::Array<int> &partitioning);
 #endif  // IO_HPP_

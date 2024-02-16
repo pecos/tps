@@ -171,7 +171,7 @@ void LoMachSolver::initialize() {
     if (nprocs_ > 1) {
       assert(!loMach_opts_.io_opts_.restart_serial_read_);
       // TODO(trevilo): Add support for serial read/write
-      partitioning_file_hdf5("read", config, groupsMPI, nelemGlobal_, partitioning_);
+      partitioning_file_hdf5("read", groupsMPI, nelemGlobal_, partitioning_);
     }
 
   } else {
@@ -198,7 +198,7 @@ void LoMachSolver::initialize() {
     if (nprocs_ > 1) {
       assert(serial_mesh_->Conforming());
       partitioning_ = Array<int>(serial_mesh_->GeneratePartitioning(nprocs_, defaultPartMethod), nelemGlobal_);
-      if (rank0_) partitioning_file_hdf5("write", config, groupsMPI, nelemGlobal_, partitioning_);
+      if (rank0_) partitioning_file_hdf5("write", groupsMPI, nelemGlobal_, partitioning_);
     }
 
     // make sure these are actually hooked up!

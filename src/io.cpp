@@ -268,8 +268,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
   return;
 }
 
-void partitioning_file_hdf5(std::string mode, const RunConfiguration &config, MPI_Groups *groupsMPI, int nelemGlobal,
-                            Array<int> &partitioning) {
+void partitioning_file_hdf5(std::string mode, MPI_Groups *groupsMPI, int nelemGlobal, Array<int> &partitioning) {
   MPI_Comm TPSCommWorld = groupsMPI->getTPSCommWorld();
   const bool rank0 = groupsMPI->isWorldRoot();
   const int nprocs = groupsMPI->getTPSWorldSize();
@@ -282,7 +281,7 @@ void partitioning_file_hdf5(std::string mode, const RunConfiguration &config, MP
   // hid_t file, dataspace, data_soln;
   hid_t file = -1, dataspace;
   herr_t status;
-  std::string fileName = config.GetPartitionBaseName();
+  std::string fileName("partition");
   fileName += "." + std::to_string(nprocs) + "p.h5";
 
   assert((mode == "read") || (mode == "write"));
