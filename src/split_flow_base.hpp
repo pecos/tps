@@ -78,6 +78,7 @@ class FlowBase {
   virtual void initializeOperators() {}
 
   virtual void initializeIO(IODataOrganizer &io) const {}
+  virtual void initializeViz(mfem::ParaViewDataCollection &pvdc) const {}
 
   /// Interface object, provides fields necessary for the thermochemistry model
   flowToThermoChem toThermoChem_interface;

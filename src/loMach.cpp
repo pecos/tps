@@ -76,6 +76,7 @@ LoMachSolver::LoMachSolver(TPS::Tps *tps)
 
 LoMachSolver::~LoMachSolver() {
   // allocated in initialize()
+  delete pvdc_;
   delete bufferGridScaleZ;
   delete bufferGridScaleY;
   delete bufferGridScaleX;
@@ -192,7 +193,7 @@ void LoMachSolver::initialize() {
   }
 
   // Partition the mesh
-  pmesh_ = new ParMesh(MPI_COMM_WORLD, *serial_mesh_, partitioning_);
+  pmesh_ = new ParMesh(groupsMPI->getTPSCommWorld(), *serial_mesh_, partitioning_);
   if (verbose) grvy_printf(ginfo, "Mesh partitioned...\n");
 
   //-----------------------------------------------------
@@ -439,8 +440,18 @@ void LoMachSolver::initialize() {
   const bool restart_serial =
       (loMach_opts_.io_opts_.restart_serial_read_ || loMach_opts_.io_opts_.restart_serial_write_);
   ioData.initializeSerial(rank0_, restart_serial, serial_mesh_, locToGlobElem, &partitioning_);
-  MPI_Barrier(MPI_COMM_WORLD);
+  MPI_Barrier(groupsMPI->getTPSCommWorld());
   if (verbose) grvy_printf(ginfo, "ioData.init thingy...\n");
+
+
+  // Initialize visualization
+  pvdc_ = new ParaViewDataCollection(loMach_opts_.io_opts_.output_dir_, pmesh_);
+  pvdc_->SetDataFormat(VTKFormat::BINARY32);
+  pvdc_->SetHighOrderOutput(true);
+  pvdc_->SetLevelsOfDetail(order);
+
+  flow_->initializeViz(*pvdc_);
+  // thermo_->initializeViz(*pvdc_);
 }
 
 void LoMachSolver::UpdateTimestepHistory(double dt) {
@@ -479,7 +490,7 @@ void LoMachSolver::solve() {
   }
 
   // temporary hardcodes
-  double CFL_actual;
+  // double CFL_actual;
   CFL = loMach_opts_.ts_opts_.cfl_;
 
   // int SdofInt = sfes->GetTrueVSize();
@@ -503,18 +514,9 @@ void LoMachSolver::solve() {
     }
   }
 
-  ParGridFunction *u_gf = flow_->getCurrentVelocity();
-  // const ParGridFunction *p_gf = flow_->GetCurrentPressure();
-
-  ParaViewDataCollection pvdc("output", pmesh_);
-  pvdc.SetDataFormat(VTKFormat::BINARY32);
-  pvdc.SetHighOrderOutput(true);
-  pvdc.SetLevelsOfDetail(order);
-  pvdc.SetCycle(iter);
-  pvdc.SetTime(temporal_coeff_.time);
-  pvdc.RegisterField("velocity", u_gf);
-  // pvdc.RegisterField("pressure", p_gf);
-  pvdc.Save();
+  pvdc_->SetCycle(iter);
+  pvdc_->SetTime(temporal_coeff_.time);
+  pvdc_->Save();
   if (rank0_ == true) std::cout << "Saving first step to paraview: " << iter << endl;
 
   const int MaxIters = loMach_opts_.max_steps_;
@@ -534,7 +536,7 @@ void LoMachSolver::solve() {
     }
   }
 
-  double time_previous = 0.0;
+  // double time_previous = 0.0;
   for (int step = iter_start; step <= MaxIters; step++) {
     iter = step;
 
@@ -574,9 +576,9 @@ void LoMachSolver::solve() {
     //       maxU = max(Umag, maxU);
     //     }
     //   }
-    //   MPI_Allreduce(&minT, &minTall, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
-    //   MPI_Allreduce(&maxT, &maxTall, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
-    //   MPI_Allreduce(&maxU, &maxUall, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+    //   MPI_Allreduce(&minT, &minTall, 1, MPI_DOUBLE, MPI_MIN, groupsMPI->getTPSCommWorld());
+    //   MPI_Allreduce(&maxT, &maxTall, 1, MPI_DOUBLE, MPI_MAX, groupsMPI->getTPSCommWorld());
+    //   MPI_Allreduce(&maxU, &maxUall, 1, MPI_DOUBLE, MPI_MAX, groupsMPI->getTPSCommWorld());
 
     //   if (dt_fixed < 0) {
     //     if (rank0_ == true) {
@@ -593,7 +595,7 @@ void LoMachSolver::solve() {
     //     }
     //   }
     // }
-    time_previous = sw_step.RealTime();
+    // time_previous = sw_step.RealTime();
 
     UpdateTimestepHistory(temporal_coeff_.dt);
     temporal_coeff_.time += temporal_coeff_.dt;
@@ -602,19 +604,25 @@ void LoMachSolver::solve() {
     if (iter % loMach_opts_.output_frequency_ == 0 && iter != 0) {
       // Write restart file!
       restart_files_hdf5("write");
+
+      // Write visualization files
+      pvdc_->SetCycle(iter);
+      pvdc_->SetTime(temporal_coeff_.time);
+      pvdc_->Save();
     }
 
     // check for DIE
-    if (iter % 100 == 0) {
+    if (iter % loMach_opts_.io_opts_.exit_check_frequency_ == 0) {
+      int early_exit = 0;
       if (rank0_) {
         if (file_exists("DIE")) {
           grvy_printf(gdebug, "Caught DIE file. Exiting...\n");
           remove("DIE");
-          earlyExit = 1;
+          early_exit = 1;
         }
       }
-      MPI_Bcast(&earlyExit, 1, MPI_INT, 0, MPI_COMM_WORLD);
-      if (earlyExit == 1) exit(-1);
+      MPI_Bcast(&early_exit, 1, MPI_INT, 0, groupsMPI->getTPSCommWorld());
+      if (early_exit == 1) exit(-1);
     }
 
     // update dt
@@ -622,7 +630,7 @@ void LoMachSolver::solve() {
       updateTimestep();
     }
   }
-  MPI_Barrier(MPI_COMM_WORLD);
+  MPI_Barrier(groupsMPI->getTPSCommWorld());
 
   // evaluate error (if possible)
   const double flow_err = flow_->computeL2Error();
@@ -631,11 +639,11 @@ void LoMachSolver::solve() {
   }
 
   // paraview
-  pvdc.SetCycle(iter);
-  pvdc.SetTime(temporal_coeff_.time);
+  pvdc_->SetCycle(iter);
+  pvdc_->SetTime(temporal_coeff_.time);
   if (rank0_ == true) std::cout << " Saving final step to paraview: " << iter << "... " << endl;
-  pvdc.Save();
-  MPI_Barrier(MPI_COMM_WORLD);
+  pvdc_->Save();
+  MPI_Barrier(groupsMPI->getTPSCommWorld());
   if (rank0_ == true) std::cout << " ...complete!" << endl;
 }
 
@@ -858,29 +866,19 @@ void LoMachSolver::SetTimeIntegrationCoefficients(int step) {
 }
 
 void LoMachSolver::PrintTimingData() {
-  double my_rt[6], rt_max[6];
+  double my_rt[2], rt_max[2];
 
   my_rt[0] = sw_setup.RealTime();
   my_rt[1] = sw_step.RealTime();
-  my_rt[2] = sw_extrap.RealTime();
-  my_rt[3] = sw_curlcurl.RealTime();
-  my_rt[4] = sw_spsolve.RealTime();
-  my_rt[5] = sw_hsolve.RealTime();
 
-  MPI_Reduce(my_rt, rt_max, 6, MPI_DOUBLE, MPI_MAX, 0, pmesh_->GetComm());
+  MPI_Reduce(my_rt, rt_max, 2, MPI_DOUBLE, MPI_MAX, 0, pmesh_->GetComm());
 
   if (pmesh_->GetMyRank() == 0) {
-    mfem::out << std::setw(10) << "SETUP" << std::setw(10) << "STEP" << std::setw(10) << "EXTRAP" << std::setw(10)
-              << "CURLCURL" << std::setw(10) << "PSOLVE" << std::setw(10) << "HSOLVE"
+    mfem::out << std::setw(10) << "SETUP" << std::setw(10) << "STEP"
               << "\n";
 
-    mfem::out << std::setprecision(3) << std::setw(10) << my_rt[0] << std::setw(10) << my_rt[1] << std::setw(10)
-              << my_rt[2] << std::setw(10) << my_rt[3] << std::setw(10) << my_rt[4] << std::setw(10) << my_rt[5]
+    mfem::out << std::setprecision(3) << std::setw(10) << my_rt[0] << std::setw(10) << my_rt[1]
               << "\n";
-
-    mfem::out << std::setprecision(3) << std::setw(10) << " " << std::setw(10) << my_rt[1] / my_rt[1] << std::setw(10)
-              << my_rt[2] / my_rt[1] << std::setw(10) << my_rt[3] / my_rt[1] << std::setw(10) << my_rt[4] / my_rt[1]
-              << std::setw(10) << my_rt[5] / my_rt[1] << "\n";
 
     mfem::out << std::setprecision(8);
   }

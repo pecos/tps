@@ -111,7 +111,6 @@ class LoMachSolver : public TPS::Solver {
 
   // Various codes and flags
   int exit_status_;     // exit status code;
-  int earlyExit = 0;    // Early terminatation flag
   bool loadFromAuxSol;  // load restart of different polynomial order
 
   // Model classes
@@ -174,11 +173,11 @@ class LoMachSolver : public TPS::Solver {
   int order;
 
   // Timers.
-  StopWatch sw_setup, sw_step, sw_extrap, sw_curlcurl, sw_spsolve, sw_hsolve;
+  StopWatch sw_setup, sw_step;
 
   // I/O helpers
-  ParaViewDataCollection *paraviewColl = nullptr;  // visualization
-  IODataOrganizer ioData;                          // restart
+  ParaViewDataCollection *pvdc_;  // visualization
+  IODataOrganizer ioData;         // restart
 
   /// Update the EXTk/BDF time integration coefficient.
   void SetTimeIntegrationCoefficients(int step);

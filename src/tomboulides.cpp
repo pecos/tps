@@ -495,6 +495,11 @@ void Tomboulides::initializeIO(IODataOrganizer &io) const {
   if (dim_ == 3) io.registerIOVar("/velocity", "z-comp", 2);
 }
 
+void Tomboulides::initializeViz(mfem::ParaViewDataCollection &pvdc) const {
+  pvdc.RegisterField("velocity", u_curr_gf_);
+  pvdc.RegisterField("pressure", p_gf_);
+}
+
 void Tomboulides::step() {
   //------------------------------------------------------------------------
   // The time step is split into 4 large chunks:

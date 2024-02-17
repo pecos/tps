@@ -242,6 +242,13 @@ class Tomboulides : public FlowBase {
    */
   void initializeIO(IODataOrganizer &io) const final;
 
+  /**
+   * @brief Initialize Paraview outputs
+   *
+   * Register fields to be written to paraview visualization files.
+   */
+  void initializeViz(mfem::ParaViewDataCollection &pvdc) const final;
+
   /// Advance
   void step() final;
 
