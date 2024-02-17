@@ -93,7 +93,7 @@ TESTS += cyl3d.test \
 	 lte_mixture.test \
          sgsSmag.test \
          sgsSigma.test \
-         heatEq.text \
+         heatEq.test \
          plate.test \
          pipe.mix.test \
 	 lte2noneq-restart.test \
