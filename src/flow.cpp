@@ -2119,8 +2119,8 @@ void Flow::interpolateInlet() {
   // fname = "./inputs/inletPlane.txt";
   const int fname_length = fname.length();
   char *char_array = new char[fname_length + 1];
-  // strcpy(char_array, fname.c_str());
-  snprintf(char_array, fname.c_str());
+  strcpy(char_array, fname.c_str());
+  // snprintf(char_array, fname.c_str());
   int nCount = 0;
 
   // open, find size
