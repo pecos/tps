@@ -814,7 +814,7 @@ void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu) {
   DenseMatrix grad_hat;
   DenseMatrix dshape;
   DenseMatrix grad;
-  int dim_;
+  int dim_ = 3;
 
   // element loop
   for (int e = 0; e < fes->GetNE(); ++e) {
