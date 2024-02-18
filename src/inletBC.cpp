@@ -453,10 +453,9 @@ void InletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradS
       break;
     case INTERPOLATE:
       printf("INLET BC INTERPOLATE NOT FULLY IMPLEMENTED IN inletBC.cpp");
-      exit(1);      
+      exit(1);
       break;
   }
-  
 }
 
 void InletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {

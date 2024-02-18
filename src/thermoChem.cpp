@@ -301,10 +301,18 @@ void ThermoChem::setup(double dt) {
 
   // for multiple walls at different temps => this is absolutely terrible
   // ConstantCoefficient t_bc_coef(wallBCs);
-  if (numWalls > 0) { t_bc_coef0.constant = wallBCs[0]; }   
-  if (numWalls > 1) { t_bc_coef1.constant = wallBCs[1]; }
-  if (numWalls > 2) { t_bc_coef2.constant = wallBCs[2]; }
-  if (numWalls > 3) { t_bc_coef3.constant = wallBCs[3]; }     
+  if (numWalls > 0) {
+    t_bc_coef0.constant = wallBCs[0];
+  }
+  if (numWalls > 1) {
+    t_bc_coef1.constant = wallBCs[1];
+  }
+  if (numWalls > 2) {
+    t_bc_coef2.constant = wallBCs[2];
+  }
+  if (numWalls > 3) {
+    t_bc_coef3.constant = wallBCs[3];
+  }
 
   for (int i = 0; i < numWalls; i++) {
     Tattr = 0;
@@ -322,12 +330,19 @@ void ThermoChem::setup(double dt) {
             AddTempDirichletBC(temp_wallBox, Tattr);
             if (rank0) std::cout << "Using box temp bc for wall number: " << i + 1 << endl;
           } else {
+            if (i == 0) {
+              AddTempDirichletBC(&t_bc_coef0, Tattr);
+            }
+            if (i == 1) {
+              AddTempDirichletBC(&t_bc_coef1, Tattr);
+            }
+            if (i == 2) {
+              AddTempDirichletBC(&t_bc_coef2, Tattr);
+            }
+            if (i == 3) {
+              AddTempDirichletBC(&t_bc_coef3, Tattr);
+            }
 
-            if(i==0) { AddTempDirichletBC(&t_bc_coef0, Tattr); }
-            if(i==1) { AddTempDirichletBC(&t_bc_coef1, Tattr); }
-            if(i==2) { AddTempDirichletBC(&t_bc_coef2, Tattr); }
-            if(i==3) { AddTempDirichletBC(&t_bc_coef3, Tattr); }
-	    
             if (rank0) std::cout << i + 1 << ") wall temperature BC: " << config_->wallBC[i].Th << endl;
           }
         }
