@@ -447,7 +447,16 @@ void InletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradS
     case SUB_VEL_CONST_ENT:
       subsonicNonReflectingDensityVelocity(normal, stateIn, gradState, bdrFlux);
       break;
+    case UNI_DENS_VEL:
+      printf("INLET BC UNI_DENS_VEL NOT FULLY IMPLEMENTED IN inletBC.cpp");
+      exit(1);
+      break;
+    case INTERPOLATE:
+      printf("INLET BC INTERPOLATE NOT FULLY IMPLEMENTED IN inletBC.cpp");
+      exit(1);      
+      break;
   }
+  
 }
 
 void InletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {

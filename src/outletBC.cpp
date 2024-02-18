@@ -313,6 +313,10 @@ void OutletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &grad
     case SUB_MF_NR_PW:
       subsonicNonRefPWMassFlow(normal, stateIn, gradState, bdrFlux);
       break;
+    case RESIST_IN:
+      std::cout << " OUTLET BC RESIST_IN NOT FULLY IMPLEMENTED IN computeBdrFlux" << endl;
+      exit(1);
+      break;
   }
 }
 
