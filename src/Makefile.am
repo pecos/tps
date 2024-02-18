@@ -51,7 +51,7 @@ headers              = averaging_and_rms.hpp equation_of_state.hpp transport_pro
 	               collision_integrals.hpp argon_transport.hpp source_term.hpp tps_mfem_wrap.hpp gpu_constructor.hpp \
                        independent_coupling.hpp cycle_avg_joule_coupling.hpp table.hpp radiation.hpp lte_mixture.hpp \
                        lte_transport_properties.hpp mixing_length_transport.hpp tps2Boltzmann.hpp gslib_interpolator.hpp \
-                       loMach.hpp turbModel.hpp thermoChem.hpp flow.hpp turb_model_base.hpp \
+                       loMach.hpp loMach_options.hpp turbModel.hpp thermoChem.hpp flow.hpp turb_model_base.hpp \
 		       thermo_chem_base.hpp split_flow_base.hpp tomboulides.hpp dirichlet_bc_helper.hpp
 
 mfem_extra_headers   = ../utils/mfem_extras/pfem_extras.hpp
