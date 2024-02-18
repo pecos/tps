@@ -343,12 +343,18 @@ class ThermoChem : public ThermoChemModelBase {
   ParGridFunction Tn_filtered_gf;
 
   // Pointers to the different classes
+
+  // valid on host
   GasMixture *mixture = nullptr;
-  ;  // valid on host
+
+  // valid on device, when available; otherwise = mixture
   GasMixture *d_mixture = nullptr;
-  ;                                          // valid on device, when available; otherwise = mixture
-  TransportProperties *transportPtr = NULL;  // valid on both host and device
-  // TransportProperties *d_transport = NULL;  // valid on device, when available; otherwise = transportPtr
+
+  // valid on both host and device
+  TransportProperties *transportPtr = NULL;
+
+  // valid on device, when available; otherwise = transportPtr
+  // TransportProperties *d_transport = NULL;
 
  public:
   ThermoChem(mfem::ParMesh *pmesh, RunConfiguration *config, LoMachOptions *loMach_opts,

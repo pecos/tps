@@ -1029,7 +1029,8 @@ void ThermoChem::updateDiffusivity() {
     double *Tdata = Tn_gf.HostReadWrite();
     double *Rdata = rn_gf.HostReadWrite();
     double visc[2];
-    double prim[nvel + 2];
+    // double prim[nvel + 2];
+    double prim[5];
     for (int i = 0; i < nvel + 2; i++) {
       prim[i] = 0.0;
     }
@@ -1166,7 +1167,8 @@ void ThermoChem::interpolateInlet() {
   fname = "./inputs/inletPlane.csv";
   const int fname_length = fname.length();
   char *char_array = new char[fname_length + 1];
-  strcpy(char_array, fname.c_str());
+  // strcpy(char_array, fname.c_str());
+  snprintf(char_array, fname.c_str());
   int nCount = 0;
 
   // open, find size

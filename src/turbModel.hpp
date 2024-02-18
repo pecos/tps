@@ -30,8 +30,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
 
-#ifndef TURBMODEL_HPP
-#define TURBMODEL_HPP
+#ifndef TURBMODEL_HPP_
+#define TURBMODEL_HPP_
 
 // forward-declaration for Tps support class
 namespace TPS {

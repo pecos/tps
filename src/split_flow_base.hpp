@@ -120,7 +120,7 @@ class ZeroFlow : public FlowBase {
   void initializeSelf() final;
 
   /// Velocity is always zero, so nothing to do
-  void step(){};
+  void step() {}
 
   mfem::ParGridFunction *getCurrentVelocity() final { return velocity_; }
 };

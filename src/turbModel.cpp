@@ -115,7 +115,7 @@ void TurbModel::step() {
   (flow_interface_->gradV)->GetTrueDofs(gradV);
   (flow_interface_->gradW)->GetTrueDofs(gradW);
   (thermoChem_interface_->density)->GetTrueDofs(rn);
-  //(grid_interface_->delta).GetTrueDofs(delta); // doesnt exist yet
+  // (grid_interface_->delta).GetTrueDofs(delta); // doesnt exist yet
   delta = 0.0;  // temporary
 
   subgridVisc = 0.0;
