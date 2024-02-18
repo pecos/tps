@@ -45,37 +45,37 @@ class LoMachOptions {
   std::string mesh_file; /**< Mesh filename */
   double scale_mesh;
 
-  std::string flow_solver; /**< Flow solver name */
+  std::string flow_solver;   /**< Flow solver name */
   std::string thermo_solver; /**< Themo-chemical solver name */
 
-  int order;      /**< Element order */
+  int order; /**< Element order */
   int uOrder;
   int pOrder;
   int nOrder;
   int ref_levels; /**< Number of uniform mesh refinements */
 
-  int max_iter;                           /**< Maximum number of linear solver iterations */
-  double rtol;                            /**< Linear solver relative tolerance */
-  double atol;                            /**< Linear solver absolute tolerance */
-  //double preconditioner_background_sigma; /**< Uniform conductivity to use to preconditioner (ignored if <= 0) */
+  int max_iter; /**< Maximum number of linear solver iterations */
+  double rtol;  /**< Linear solver relative tolerance */
+  double atol;  /**< Linear solver absolute tolerance */
+  // double preconditioner_background_sigma; /**< Uniform conductivity to use to preconditioner (ignored if <= 0) */
 
-  bool thermalDiv; // turn on/off Qt
-  bool realDiv;    // use actual divergence  
-  
-  //bool top_only; /**< Flag to specify current in top rings only */
-  //bool bot_only; /**< Flag to specify current in bottom rings only */
+  bool thermalDiv;  // turn on/off Qt
+  bool realDiv;     // use actual divergence
 
-  //bool evaluate_magnetic_field;
-  //std::string By_file; /**< Filename for vertical component of magnetic field on y-axis */
-  //int nBy;             /**< Number of uniformly spaced points for By output */
-  //double yinterp_min;  /**< Begin value for uniformly spaced points */
-  //double yinterp_max;  /**< End value for uniformly spaced points */
+  // bool top_only; /**< Flag to specify current in top rings only */
+  // bool bot_only; /**< Flag to specify current in bottom rings only */
 
-  //double current_amplitude; /**< Amplitude of source current */
-  //double current_frequency; /**< Frequency of source current */
-  //double mu0;               /**< Permeability of free space */
+  // bool evaluate_magnetic_field;
+  // std::string By_file; /**< Filename for vertical component of magnetic field on y-axis */
+  // int nBy;             /**< Number of uniformly spaced points for By output */
+  // double yinterp_min;  /**< Begin value for uniformly spaced points */
+  // double yinterp_max;  /**< End value for uniformly spaced points */
 
-  //mfem::Vector current_axis;
+  // double current_amplitude; /**< Amplitude of source current */
+  // double current_frequency; /**< Frequency of source current */
+  // double mu0;               /**< Permeability of free space */
+
+  // mfem::Vector current_axis;
 
   int nFilter;
   double filterWeight;
@@ -83,7 +83,7 @@ class LoMachOptions {
   bool solveTemp;
 
   bool channelTest;
-  
+
   LoMachOptions() {
     order = 1;
     ref_levels = 0;

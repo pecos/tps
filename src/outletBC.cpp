@@ -1223,12 +1223,12 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const elementIndexingData
           break;
         case OutletType::SUB_MF_NR_PW:
           printf("OUTLET SUB_MF_NR_PW BC NOT IMPLEMENTED");
-	  //exit(1);
+          // exit(1);
           break;
         case OutletType::RESIST_IN:
           printf("OUTLET RESIST_IN BC NOT IMPLEMENTED");
-	  //exit(1);	  
-          break;	  
+          // exit(1);
+          break;
       }
 
       // compute flux

@@ -30,8 +30,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
 
-#ifndef THERMOCHEM_HPP
-#define THERMOCHEM_HPP
+#ifndef THERMOCHEM_HPP_
+#define THERMOCHEM_HPP_
 
 // forward-declaration for Tps support class
 namespace TPS {
@@ -404,4 +404,4 @@ class ThermoChem : public ThermoChemModelBase {
   // MFEM_HOST_DEVICE
   void viscSpongePlanar(double *x, double &wgt);
 };
-#endif
+#endif  // THERMOCHEM_HPP_

@@ -155,4 +155,4 @@ class TurbModel : public TurbModelBase {
   void sgsSmag(const DenseMatrix &gradUp, double delta, double &nu_sgs);
   void sgsSigma(const DenseMatrix &gradUp, double delta, double &nu_sgs);
 };
-#endif // TURBMODEL_HPP_  
+#endif  // TURBMODEL_HPP_

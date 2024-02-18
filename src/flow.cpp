@@ -952,9 +952,7 @@ void Flow::UpdateTimestepHistory(double dt) {
   un_gf.SetFromTrueDofs(un);
 }
 
-void Flow::flowStep(double &time, double dt, const int current_step, const int start_step,
-                    std::vector<double> bdf)  //, bool provisional)
-{
+void Flow::flowStep(double &time, double dt, const int current_step, const int start_step, std::vector<double> bdf) {
   // if(rank0) {std::cout << "wtf?" << endl;}
   Array<int> empty;
 

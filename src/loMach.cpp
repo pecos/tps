@@ -506,10 +506,10 @@ void LoMachSolver::solve() {
   }
 
   // temporary hardcodes
-  double CFL_actual;
+  // double CFL_actual;
   CFL = config.GetCFLNumber();
 
-  int SdofInt = sfes->GetTrueVSize();
+  // int SdofInt = sfes->GetTrueVSize();
   int Sdof = sfes->GetNDofs();
 
   // dt_fixed is initialized to -1, so if it is positive,

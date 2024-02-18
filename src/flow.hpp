@@ -30,9 +30,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
 
-
-#ifndef FLOW_HPP
-#define FLOW_HPP
+#ifndef FLOW_HPP_
+#define FLOW_HPP_
 
 // forward-declaration for Tps support class
 namespace TPS {
@@ -530,4 +529,4 @@ class Flow {
    */
   void MeanZero(ParGridFunction &v);
 };
-#endif
+#endif  // FLOW_HPP_
