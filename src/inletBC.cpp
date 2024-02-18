@@ -889,19 +889,19 @@ void InletBC::interpInlet_gpu(const mfem::Vector &x, const elementIndexingData &
           break;
         case InletType::SUB_DENS_VEL_NR:
           printf("INLET BC NOT IMPLEMENTED");
-          exit(1);
+          //exit(1);
           break;
         case InletType::SUB_VEL_CONST_ENT:
           printf("INLET BC NOT IMPLEMENTED");
-          exit(1);
+          //exit(1);
           break;
         case InletType::UNI_DENS_VEL:
           printf("INLET BC NOT IMPLEMENTED");
-          exit(1);
+          //exit(1);
           break;
         case InletType::INTERPOLATE:
           printf("INLET BC NOT IMPLEMENTED");
-          exit(1);
+          //exit(1);
           break;
       }
 
