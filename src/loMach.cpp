@@ -223,7 +223,7 @@ void LoMachSolver::initialize() {
   if (loMach_opts_.thermo_solver == "constant-property") {
     thermo_ = new ConstantPropertyThermoChem(pmesh_, loMach_opts_.order, 1.0, 1.0);
   } else if (loMach_opts_.thermo_solver == "calorically-perfect") {
-    thermo_ = new ThermoChem(pmesh_, &config, &loMach_opts_, temporal_coeff_);
+    thermo_ = new ThermoChem(pmesh_, &loMach_opts_, &config, temporal_coeff_, tpsP_);
   } else {
     // Unknown choice... die
     if (rank0_) {
@@ -285,14 +285,21 @@ void LoMachSolver::initialize() {
 
   // Initialize model-owned data
   flow_->initializeSelf();
+
+  // NOTE: Order here necessary currently b/c
+  // ThermoChem::initializeSelf assumes that the internal flow
+  // interface has already been initialized.
+  thermo_->initializeFromFlow(&flow_->toThermoChem_interface);
+
   thermo_->initializeSelf();
 
   // Initialize restart read/write capability
   flow_->initializeIO(ioData);
+  thermo_->initializeIO(ioData);
 
   // Exchange interface information
   flow_->initializeFromThermoChem(&thermo_->toFlow_interface_);
-  // thermo_->initializeFromFlow(&flow_->interface);
+
 
   // Finish initializing operators
   flow_->initializeOperators();
@@ -923,7 +930,7 @@ void LoMachSolver::parseSolverOptions() {
   assert(loMach_opts_.flow_solver == "zero-flow" || loMach_opts_.flow_solver == "tomboulides");
 
   tpsP_->getInput("loMach/thermo-solver", loMach_opts_.thermo_solver, string("constant-property"));
-  assert(loMach_opts_.thermo_solver == "constant-property" || loMach_opts_.flow_solver == "calorically-perfect");
+  assert(loMach_opts_.thermo_solver == "constant-property" || loMach_opts_.thermo_solver == "calorically-perfect");
 
   tpsP_->getInput("loMach/order", loMach_opts_.order, 1);
   assert(loMach_opts_.order >= 1);

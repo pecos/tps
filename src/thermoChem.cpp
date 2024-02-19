@@ -55,9 +55,9 @@ double temp_wall(const Vector &x, double t);
 double temp_wallBox(const Vector &x, double t);
 double temp_inlet(const Vector &x, double t);
 
-ThermoChem::ThermoChem(mfem::ParMesh *pmesh, RunConfiguration *config, LoMachOptions *loMach_opts,
-                       temporalSchemeCoefficients &timeCoeff)
-    : pmesh_(pmesh), loMach_opts_(loMach_opts), config_(config), timeCoeff_(timeCoeff) {}
+ThermoChem::ThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, RunConfiguration *config,
+                       temporalSchemeCoefficients &timeCoeff, TPS::Tps *tps)
+    : tpsP_(tps), pmesh_(pmesh), loMach_opts_(loMach_opts), config_(config), timeCoeff_(timeCoeff) {}
 
 void ThermoChem::initializeSelf() {
   // groupsMPI = pmesh->GetComm();
@@ -69,36 +69,43 @@ void ThermoChem::initializeSelf() {
   dim = pmesh_->Dimension();
   nvel = dim;
 
-  // config settings for thermoChem
-  if (config_->const_visc > 0.0) {
-    constantViscosity = true;
-  }
-  if (config_->const_dens > 0.0) {
-    constantDensity = true;
-  }
-  if (constantViscosity == true && constantDensity == true) {
-    incompressibleSolve = true;
-  }
+  // // config settings for thermoChem
+  // if (config_->const_visc > 0.0) {
+  //   constantViscosity = true;
+  // }
+  // if (config_->const_dens > 0.0) {
+  //   constantDensity = true;
+  // }
+  // if (constantViscosity == true && constantDensity == true) {
+  //   incompressibleSolve = true;
+  // }
+
+  constantViscosity = true;
 
   bool verbose = rank0;
   if (verbose) grvy_printf(ginfo, "Initializing ThermoChem solver.\n");
 
-  if (loMach_opts_->uOrder == -1) {
-    order = std::max(config_->solOrder, 1);
-    porder = order;
-    double no;
-    no = ceil(((double)order * 1.5));
-    norder = int(no);
-  } else {
-    order = loMach_opts_->uOrder;
-    porder = loMach_opts_->pOrder;
-    norder = loMach_opts_->nOrder;
-  }
+  // if (loMach_opts_->uOrder == -1) {
+  //   order = std::max(config_->solOrder, 1);
+  //   porder = order;
+  //   double no;
+  //   no = ceil(((double)order * 1.5));
+  //   norder = int(no);
+  // } else {
+  //   order = loMach_opts_->uOrder;
+  //   porder = loMach_opts_->pOrder;
+  //   norder = loMach_opts_->nOrder;
+  // }
+  order = loMach_opts_->order;
 
-  static_rho = config_->const_dens;
-  dyn_vis = config_->const_visc;
-  ambientPressure = config_->amb_pres;
-  thermoPressure = config_->amb_pres;
+  static_rho = 1.0; // config_->const_dens;
+  dyn_vis = 1.0e-5; //config_->const_visc;
+
+  tpsP_->getInput("loMach/ambientPressure", ambientPressure, 101325.0);
+  thermoPressure = ambientPressure;
+
+  tpsP_->getInput("initialConditions/temperature", T_ic_, 300.0);
+
   tPm1 = thermoPressure;
   tPm2 = thermoPressure;
   dtP = 0.0;
@@ -111,6 +118,9 @@ void ThermoChem::initializeSelf() {
 
   mixture = NULL;
 
+  // TODO: Fix transport
+  transportPtr = NULL;
+
   // HARD CODE HARD CODE HARD CODE
   config_->dryAirInput.specific_heat_ratio = 1.4;
   config_->dryAirInput.gas_constant = 287.058;
@@ -119,8 +129,8 @@ void ThermoChem::initializeSelf() {
   mixture = new DryAir(*config_, dim, nvel);
   transportPtr = new DryAirTransport(mixture, *config_);
 
-  MaxIters = config_->GetNumIters();
-  num_equation = 1;  // hard code for now, fix with species
+  // MaxIters = config_->GetNumIters();
+  // num_equation = 1;  // hard code for now, fix with species
   /*
   numSpecies = mixture->GetNumSpecies();
   numActiveSpecies = mixture->GetNumActiveSpecies();
@@ -141,8 +151,8 @@ void ThermoChem::initializeSelf() {
   vfec = new H1_FECollection(order, dim);
   vfes = new ParFiniteElementSpace(pmesh_, vfec, dim);
 
-  // pressure
-  pfec = new H1_FECollection(porder);
+  // pressure (trevilo: do we need this space?)
+  pfec = new H1_FECollection(order);
   pfes = new ParFiniteElementSpace(pmesh_, pfec);
 
   // Check if fully periodic mesh
@@ -158,9 +168,9 @@ void ThermoChem::initializeSelf() {
   int vfes_truevsize = vfes->GetTrueVSize();
   int sfes_truevsize = sfes->GetTrueVSize();
 
-  gradT.SetSize(vfes_truevsize);
-  gradT = 0.0;
-  gradT_gf.SetSpace(vfes);
+  // gradT.SetSize(vfes_truevsize);
+  // gradT = 0.0;
+  // gradT_gf.SetSpace(vfes);
 
   Qt.SetSize(sfes_truevsize);
   Qt = 0.0;
@@ -243,6 +253,10 @@ void ThermoChem::initializeSelf() {
   toFlow_interface_.viscosity = &visc_gf;
   toFlow_interface_.thermal_divergence = &Qt_gf;
   toTurbModel_interface_.density = &rn_gf;
+
+
+  // call setup
+  setup(timeCoeff_.dt);
 }
 
 void ThermoChem::setup(double dt) {
@@ -254,28 +268,38 @@ void ThermoChem::setup(double dt) {
   SdofInt = sfes->GetTrueVSize();
   PdofInt = pfes->GetTrueVSize();
 
-  // Initial conditions
-  if (config_->useICFunction == true) {
-    FunctionCoefficient t_ic_coef(temp_ic);
-    if (!config_->restart) Tn_gf.ProjectCoefficient(t_ic_coef);
-    if (rank0) {
-      std::cout << "Using initial condition function" << endl;
-    }
-  } else if (config_->useICBoxFunction == true) {
-    FunctionCoefficient t_ic_coef(temp_wallBox);
-    if (!config_->restart) Tn_gf.ProjectCoefficient(t_ic_coef);
-    if (rank0) {
-      std::cout << "Using initial condition box function" << endl;
-    }
-  } else {
-    ConstantCoefficient t_ic_coef;
-    // t_ic_coef.constant = config.initRhoRhoVp[4] / (Rgas * config.initRhoRhoVp[0]);
-    t_ic_coef.constant = config_->initRhoRhoVp[4];
-    if (!config_->restart) Tn_gf.ProjectCoefficient(t_ic_coef);
-    if (rank0) {
-      std::cout << "Initial temperature set from input file: " << config_->initRhoRhoVp[4] << endl;
-    }
+  // // Initial conditions
+  // if (config_->useICFunction == true) {
+  //   FunctionCoefficient t_ic_coef(temp_ic);
+  //   if (!config_->restart) Tn_gf.ProjectCoefficient(t_ic_coef);
+  //   if (rank0) {
+  //     std::cout << "Using initial condition function" << endl;
+  //   }
+  // } else if (config_->useICBoxFunction == true) {
+  //   FunctionCoefficient t_ic_coef(temp_wallBox);
+  //   if (!config_->restart) Tn_gf.ProjectCoefficient(t_ic_coef);
+  //   if (rank0) {
+  //     std::cout << "Using initial condition box function" << endl;
+  //   }
+  // } else {
+  //   ConstantCoefficient t_ic_coef;
+  //   // t_ic_coef.constant = config.initRhoRhoVp[4] / (Rgas * config.initRhoRhoVp[0]);
+  //   t_ic_coef.constant = config_->initRhoRhoVp[4];
+  //   if (!config_->restart) Tn_gf.ProjectCoefficient(t_ic_coef);
+  //   if (rank0) {
+  //     std::cout << "Initial temperature set from input file: " << config_->initRhoRhoVp[4] << endl;
+  //   }
+  // }
+
+  ConstantCoefficient t_ic_coef;
+  // t_ic_coef.constant = config.initRhoRhoVp[4] / (Rgas * config.initRhoRhoVp[0]);
+  t_ic_coef.constant = T_ic_;
+  //if (!config_->restart) Tn_gf.ProjectCoefficient(t_ic_coef);
+  Tn_gf.ProjectCoefficient(t_ic_coef);
+  if (rank0) {
+    // std::cout << "Initial temperature set from input file: " << config_->initRhoRhoVp[4] << endl;
   }
+
   Tn_gf.GetTrueDofs(Tn);
   Tnm1_gf.SetFromTrueDofs(Tn);
   Tnm2_gf.SetFromTrueDofs(Tn);
@@ -283,6 +307,10 @@ void ThermoChem::setup(double dt) {
   Tnm2_gf.GetTrueDofs(Tnm2);
 
   // Boundary conditions
+  tpsP_->getInput("boundaryConditions/numWalls", numWalls, 0);
+  tpsP_->getInput("boundaryConditions/numInlets", numInlets, 0);
+  tpsP_->getInput("boundaryConditions/numOutlets", numOutlets, 0);
+
   ConstantCoefficient Qt_bc_coef;
   Array<int> Tattr(pmesh_->bdr_attributes.Max());
   Array<int> Qattr(pmesh_->bdr_attributes.Max());
@@ -333,16 +361,20 @@ void ThermoChem::setup(double dt) {
   // for multiple walls at different temps => this is absolutely terrible
   // ConstantCoefficient t_bc_coef(wallBCs);
   if (numWalls > 0) {
-    t_bc_coef0.constant = wallBCs[0];
+    t_bc_coef0 = new ConstantCoefficient();
+    t_bc_coef0->constant = wallBCs[0];
   }
   if (numWalls > 1) {
-    t_bc_coef1.constant = wallBCs[1];
+    t_bc_coef1 = new ConstantCoefficient();
+    t_bc_coef1->constant = wallBCs[1];
   }
   if (numWalls > 2) {
-    t_bc_coef2.constant = wallBCs[2];
+    t_bc_coef2 = new ConstantCoefficient();
+    t_bc_coef2->constant = wallBCs[2];
   }
   if (numWalls > 3) {
-    t_bc_coef3.constant = wallBCs[3];
+    t_bc_coef3 = new ConstantCoefficient();
+    t_bc_coef3->constant = wallBCs[3];
   }
 
   for (int i = 0; i < numWalls; i++) {
@@ -362,16 +394,16 @@ void ThermoChem::setup(double dt) {
             if (rank0) std::cout << "Using box temp bc for wall number: " << i + 1 << endl;
           } else {
             if (i == 0) {
-              AddTempDirichletBC(&t_bc_coef0, Tattr);
+              AddTempDirichletBC(t_bc_coef0, Tattr);
             }
             if (i == 1) {
-              AddTempDirichletBC(&t_bc_coef1, Tattr);
+              AddTempDirichletBC(t_bc_coef1, Tattr);
             }
             if (i == 2) {
-              AddTempDirichletBC(&t_bc_coef2, Tattr);
+              AddTempDirichletBC(t_bc_coef2, Tattr);
             }
             if (i == 3) {
-              AddTempDirichletBC(&t_bc_coef3, Tattr);
+              AddTempDirichletBC(t_bc_coef3, Tattr);
             }
 
             if (rank0) std::cout << i + 1 << ") wall temperature BC: " << config_->wallBC[i].Th << endl;
@@ -667,14 +699,14 @@ void ThermoChem::setup(double dt) {
   LQ_bdry->AddBoundaryIntegrator(lq_bdry_lfi, temp_ess_attr);
   if (rank0) std::cout << "ThermoChem LQ operator set" << endl;
 
-  // remaining initialization
-  if (config_->resetTemp == true) {
-    double *data = Tn_gf.HostReadWrite();
-    for (int i = 0; i < Sdof; i++) {
-      data[i] = config_->initRhoRhoVp[4];
-    }
-    if (rank0) std::cout << "Reset temperature to IC" << endl;
-  }
+  // // remaining initialization
+  // if (config_->resetTemp == true) {
+  //   double *data = Tn_gf.HostReadWrite();
+  //   for (int i = 0; i < Sdof; i++) {
+  //     data[i] = config_->initRhoRhoVp[4];
+  //   }
+  //   if (rank0) std::cout << "Reset temperature to IC" << endl;
+  // }
 
   // copy IC to other temp containers
   Tn_gf.GetTrueDofs(Tn);
@@ -696,23 +728,23 @@ void ThermoChem::setup(double dt) {
     Tn_filtered_gf = 0.0;
   }
 
-  // viscous sponge
-  ParGridFunction coordsDof(vfes);
-  pmesh_->GetNodes(coordsDof);
-  if (config_->linViscData.isEnabled) {
-    if (rank0) std::cout << "Viscous sponge active" << endl;
-    double *vMult = viscMult.HostReadWrite();
-    double *hcoords = coordsDof.HostReadWrite();
-    double wgt = 0.;
-    for (int n = 0; n < sfes->GetNDofs(); n++) {
-      double coords[3];
-      for (int d = 0; d < dim; d++) {
-        coords[d] = hcoords[n + d * sfes->GetNDofs()];
-      }
-      viscSpongePlanar(coords, wgt);
-      vMult[n] = wgt + (config_->linViscData.uniformMult - 1.0);
-    }
-  }
+  // // viscous sponge
+  // ParGridFunction coordsDof(vfes);
+  // pmesh_->GetNodes(coordsDof);
+  // if (config_->linViscData.isEnabled) {
+  //   if (rank0) std::cout << "Viscous sponge active" << endl;
+  //   double *vMult = viscMult.HostReadWrite();
+  //   double *hcoords = coordsDof.HostReadWrite();
+  //   double wgt = 0.;
+  //   for (int n = 0; n < sfes->GetNDofs(); n++) {
+  //     double coords[3];
+  //     for (int d = 0; d < dim; d++) {
+  //       coords[d] = hcoords[n + d * sfes->GetNDofs()];
+  //     }
+  //     viscSpongePlanar(coords, wgt);
+  //     vMult[n] = wgt + (config_->linViscData.uniformMult - 1.0);
+  //   }
+  // }
 }
 
 /**
@@ -737,6 +769,12 @@ void ThermoChem::step() {
   bd3 = timeCoeff_.bd3;
   dt = timeCoeff_.dt;
   time = timeCoeff_.time;
+
+  // Prepare for residual calc
+  extrapolateState();
+  updateBC(0); // NB: can't ramp right now
+  // updateGradientsOP(1.0);
+  updateDensity(1.0);
 
   // Set current time for velocity Dirichlet boundary conditions.
   for (auto &temp_dbc : temp_dbcs) {
@@ -842,6 +880,11 @@ void ThermoChem::computeExplicitTempConvectionOP(bool extrap) {
     At->Mult(Text, NTn);
   }
 
+  // update ab coefficients
+  ab1 = timeCoeff_.ab1;
+  ab2 = timeCoeff_.ab2;
+  ab3 = timeCoeff_.ab3;
+
   // ab predictor
   if (extrap == true) {
     tmpR0.Set(ab1, NTn);
@@ -851,6 +894,12 @@ void ThermoChem::computeExplicitTempConvectionOP(bool extrap) {
     tmpR0.Set(1.0, NTn);
   }
 }
+
+void ThermoChem::initializeIO(IODataOrganizer &io) {
+  io.registerIOFamily("Temperature", "/temperature", &Tn_gf, false);
+  io.registerIOVar("/temperature", "temperature", 0);
+}
+
 
 /**
    Update boundary conditions for Temperature, useful for
@@ -868,7 +917,7 @@ void ThermoChem::updateBC(int current_step) {
   }
 }
 
-void ThermoChem::extrapolateState(int current_step, std::vector<double> ab) {
+void ThermoChem::extrapolateState() {
   // update ab coefficients
   ab1 = timeCoeff_.ab1;
   ab2 = timeCoeff_.ab2;
@@ -1087,7 +1136,10 @@ void ThermoChem::updateDensity(double tStep) {
   // set rn
   if (constantDensity != true) {
     if (tStep == 1.0) {
-      multConstScalarInv((thermoPressure / Rgas), Tn_next, &rn);
+      printf("Using variable density!\n");
+      //multConstScalarInv((thermoPressure / Rgas), Tn_next, &rn);
+      rn = (thermoPressure / Rgas);
+      rn /= Tn_next;
     } else if (tStep == 0.5) {
       multConstScalarInv((thermoPressure / Rgas), Tn_next, &tmpR0a);
       multConstScalarInv((thermoPressure / Rgas), Tn, &tmpR0b);
@@ -1104,10 +1156,13 @@ void ThermoChem::updateDensity(double tStep) {
     }
 
   } else {
-    double *data = rn.HostWrite();
-    for (int i = 0; i < SdofInt; i++) {
-      data[i] = static_rho;
-    }
+    // 
+    // double *data = rn.HostWrite();
+    // for (int i = 0; i < SdofInt; i++) {
+    //   data[i] = static_rho;
+    // }
+    printf("Using constant density!\n");
+    rn = static_rho;
   }
   rn_gf.SetFromTrueDofs(rn);
 
@@ -1118,13 +1173,15 @@ void ThermoChem::updateDensity(double tStep) {
   // project to p-space in case not same as vel-temp
   R0PM0_gf.SetFromTrueDofs(rn);
   R0PM1_gf.ProjectGridFunction(R0PM0_gf);
-  {
-    double *data = bufferInvRho->HostReadWrite();
-    double *rho = R0PM1_gf.HostReadWrite();
-    for (int i = 0; i < Pdof; i++) {
-      data[i] = 1.0 / rho[i];
-    }
-  }
+
+  // Is bufferInvRho used anywhere????
+  // {
+  //   double *data = bufferInvRho->HostReadWrite();
+  //   double *rho = R0PM1_gf.HostReadWrite();
+  //   for (int i = 0; i < Pdof; i++) {
+  //     data[i] = 1.0 / rho[i];
+  //   }
+  // }
 }
 
 void ThermoChem::updateGradientsOP(double tStep) {

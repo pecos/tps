@@ -112,7 +112,7 @@ class ThermoChem : public ThermoChemModelBase {
   friend class LoMachSolver;
 
  private:
-  // TPS::Tps *tpsP_;
+  TPS::Tps *tpsP_;
   LoMachOptions *loMach_opts_ = nullptr;
 
   // MPI_Groups *groupsMPI;
@@ -237,10 +237,10 @@ class ThermoChem : public ThermoChemModelBase {
   ConstantCoefficient Ht_lincoeff;
   ConstantCoefficient Ht_bdfcoeff;
 
-  ConstantCoefficient t_bc_coef0;
-  ConstantCoefficient t_bc_coef1;
-  ConstantCoefficient t_bc_coef2;
-  ConstantCoefficient t_bc_coef3;
+  ConstantCoefficient *t_bc_coef0;
+  ConstantCoefficient *t_bc_coef1;
+  ConstantCoefficient *t_bc_coef2;
+  ConstantCoefficient *t_bc_coef3;
 
   ConstantCoefficient *buffer_tbc = nullptr;
   ConstantCoefficient *buffer_qbc = nullptr;
@@ -337,6 +337,9 @@ class ThermoChem : public ThermoChemModelBase {
   int filter_cutoff_modes = 0;
   double filter_alpha = 0.0;
 
+  // Initial temperature value (if constant IC)
+  double T_ic_;
+
   FiniteElementCollection *sfec_filter = nullptr;
   ParFiniteElementSpace *sfes_filter = nullptr;
   ParGridFunction Tn_NM1_gf;
@@ -357,8 +360,8 @@ class ThermoChem : public ThermoChemModelBase {
   // TransportProperties *d_transport = NULL;
 
  public:
-  ThermoChem(mfem::ParMesh *pmesh, RunConfiguration *config, LoMachOptions *loMach_opts,
-             temporalSchemeCoefficients &timeCoeff);
+  ThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, RunConfiguration *config, temporalSchemeCoefficients &timeCoeff, TPS::Tps *tps);
+
   virtual ~ThermoChem() {}
 
   void initializeSelf();
@@ -366,8 +369,14 @@ class ThermoChem : public ThermoChemModelBase {
   void initializeFromTurbModel(turbModelToThermoChem *turbModel);
   void step();
 
+  /**
+   * @brief Hook to let derived classes register restart fields with the IODataOrganizer.
+   */
+  void initializeIO(IODataOrganizer &io);
+
+
   void updateThermoP(double dt);
-  void extrapolateState(int current_step, std::vector<double> ab);
+  void extrapolateState();
   void updateDensity(double tStep);
   // void updateGradients(double tStep);
   void updateGradientsOP(double tStep);

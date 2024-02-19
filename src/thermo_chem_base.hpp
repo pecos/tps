@@ -37,6 +37,7 @@
 
 #include "tps_mfem_wrap.hpp"
 
+class IODataOrganizer;
 struct flowToThermoChem;
 
 /**
@@ -89,6 +90,11 @@ class ThermoChemModelBase {
    * @brief Take a single time step
    */
   virtual void step() = 0;
+
+  /**
+   * @brief Hook to let derived classes register restart fields with the IODataOrganizer.
+   */
+  virtual void initializeIO(IODataOrganizer &io) {}
 
   /**
    * @brief Initialize data from the flow class
