@@ -89,6 +89,7 @@ void ThermoChem::initializeSelf() {
   // }
 
   constantViscosity = true;
+  // constantDensity = true;
 
   bool verbose = rank0;
   if (verbose) grvy_printf(ginfo, "Initializing ThermoChem solver.\n");
@@ -612,14 +613,18 @@ void ThermoChem::setup(double dt) {
   MsInv->SetRelTol(1e-12); //config_->solver_tol);
   MsInv->SetMaxIter(2000); // config_->solver_iter);
 
-  if (partial_assembly) {
-    Vector diag_pa(sfes->GetTrueVSize());
-    Ht_form->AssembleDiagonal(diag_pa);
-    HtInvPC = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof);
-  } else {
-    HtInvPC = new HypreSmoother(*Ht.As<HypreParMatrix>());
-    dynamic_cast<HypreSmoother *>(HtInvPC)->SetType(HypreSmoother::Jacobi, 1);
-  }
+  // if (partial_assembly) {
+  //   Vector diag_pa(sfes->GetTrueVSize());
+  //   Ht_form->AssembleDiagonal(diag_pa);
+  //   HtInvPC = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof);
+  // } else {
+  //   HtInvPC = new HypreSmoother(*Ht.As<HypreParMatrix>());
+  //   dynamic_cast<HypreSmoother *>(HtInvPC)->SetType(HypreSmoother::Jacobi, 1);
+  // }
+  Vector diag_pa(sfes->GetTrueVSize());
+  Ht_form->AssembleDiagonal(diag_pa);
+  HtInvPC = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof);
+
   HtInv = new CGSolver(sfes->GetComm());
 
   // make these options instead?
@@ -756,6 +761,9 @@ void ThermoChem::step() {
   dt = timeCoeff_.dt;
   time = timeCoeff_.time;
 
+  std::cout << "bd0 = " << bd0 << ", bd1 = " << bd1 << ", dt = " << dt << std::endl;
+  std::cout << "bd2 = " << bd2 << ", bd3 = " << bd3 << std::endl;
+
   // Prepare for residual calc
   extrapolateState();
   updateBC(0); // NB: can't ramp right now
@@ -778,43 +786,51 @@ void ThermoChem::step() {
 
     // for unsteady term, compute and add known part of BDF unsteady term
     tmpR0.Set(bd1 / dt, Tn);
-    tmpR0.Add(bd2 / dt, Tnm1);
-    tmpR0.Add(bd3 / dt, Tnm2);
+    // tmpR0.Add(bd2 / dt, Tnm1);
+    // tmpR0.Add(bd3 / dt, Tnm2);
 
-    // multScalarScalarIP(rn,&tmpR0);
+    // // multScalarScalarIP(rn,&tmpR0);
     MsRho->Mult(tmpR0, tmpR0b);
     resT.Add(-1.0, tmpR0b);
-    // multConstScalarIP(Cp,&resT);
+    // // multConstScalarIP(Cp,&resT);
 
     // dPo/dt
-    tmpR0 = (dtP / Cp);
-    Ms->Mult(tmpR0, tmpR0b);
-    resT.Add(1.0, tmpR0b);
+    // tmpR0 = (dtP / Cp);
+    // Ms->Mult(tmpR0, tmpR0b);
+    // resT.Add(1.0, tmpR0b);
 
     // Add natural boundary terms here later
 
     // update Helmholtz operator, unsteady here, kappa in updateDiffusivity
     {
-      double *data = rhoDt.HostReadWrite();
-      double *Rdata = rn_gf.HostReadWrite();
-      // double coeff = Cp*bd0/dt;
-      double coeff = bd0 / dt;
-      for (int i = 0; i < Sdof; i++) {
-        data[i] = coeff * Rdata[i];
-      }
+      // double *data = rhoDt.HostReadWrite();
+      // double *Rdata = rn_gf.HostReadWrite();
+      // // double coeff = Cp*bd0/dt;
+      // double coeff = bd0 / dt;
+      // for (int i = 0; i < Sdof; i++) {
+      //   data[i] = coeff * Rdata[i];
+      // }
+      rhoDt = rn_gf;
+      rhoDt *= (bd0 / dt);
     }
     Ht_form->Update();
     Ht_form->Assemble();
     Ht_form->FormSystemMatrix(temp_ess_tdof, Ht);
 
     HtInv->SetOperator(*Ht);
-    if (partial_assembly) {
-      delete HtInvPC;
-      Vector diag_pa(sfes->GetTrueVSize());
-      Ht_form->AssembleDiagonal(diag_pa);
-      HtInvPC = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof);
-      HtInv->SetPreconditioner(*HtInvPC);
-    }
+    // if (partial_assembly) {
+    //   delete HtInvPC;
+    //   Vector diag_pa(sfes->GetTrueVSize());
+    //   Ht_form->AssembleDiagonal(diag_pa);
+    //   HtInvPC = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof);
+    //   HtInv->SetPreconditioner(*HtInvPC);
+    // }
+
+    delete HtInvPC;
+    Vector diag_pa(sfes->GetTrueVSize());
+    Ht_form->AssembleDiagonal(diag_pa);
+    HtInvPC = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof);
+    HtInv->SetPreconditioner(*HtInvPC);
 
     for (auto &temp_dbc : temp_dbcs) {
       Tn_next_gf.ProjectBdrCoefficient(*temp_dbc.coeff, temp_dbc.attr);
@@ -831,6 +847,15 @@ void ThermoChem::step() {
 
     // solve helmholtz eq for temp
     HtInv->Mult(Bt2, Xt2);
+
+    if (!HtInv->GetConverged()) {
+      printf("Solver did not converge!!\n");
+    } else {
+      iter_htsolve = HtInv->GetNumIterations();
+      res_htsolve = HtInv->GetFinalNorm();
+      printf("Solver took %d iterations to get to residual = %.6e\n", iter_htsolve, res_htsolve);
+    }
+
     iter_htsolve = HtInv->GetNumIterations();
     res_htsolve = HtInv->GetFinalNorm();
     Ht_form->RecoverFEMSolution(Xt2, resT_gf, Tn_next_gf);
@@ -1169,7 +1194,7 @@ void ThermoChem::updateDensity(double tStep) {
     //   data[i] = static_rho;
     // }
     printf("Using constant density!\n");
-    rn = static_rho;
+    rn = 1.0;
   }
   rn_gf.SetFromTrueDofs(rn);
 
