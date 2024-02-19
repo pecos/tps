@@ -265,6 +265,9 @@ void ThermoChem::initializeSelf() {
 
   // call setup
   setup(timeCoeff_.dt);
+
+  // and initialize system mass
+  computeSystemMass();
 }
 
 void ThermoChem::setup(double dt) {
@@ -514,6 +517,7 @@ void ThermoChem::setup(double dt) {
   auto *msrho_blfi = new MassIntegrator(*Rho);
   if (numerical_integ) {
     msrho_blfi->SetIntRule(&ir_i);
+    // msrho_blfi->SetIntRule(&ir_di);
   }
   MsRho_form->AddDomainIntegrator(msrho_blfi);
   if (partial_assembly) {
@@ -756,7 +760,9 @@ void ThermoChem::step() {
   extrapolateState();
   updateBC(0); // NB: can't ramp right now
   // updateGradientsOP(1.0);
+  updateThermoP();
   updateDensity(1.0);
+  updateDiffusivity();
 
   // Set current time for velocity Dirichlet boundary conditions.
   for (auto &temp_dbc : temp_dbcs) {
@@ -767,8 +773,8 @@ void ThermoChem::step() {
     resT = 0.0;
 
     // convection
-    computeExplicitTempConvectionOP(true);  // ->tmpR0
-    resT.Set(-1.0, tmpR0);
+    // computeExplicitTempConvectionOP(true);  // ->tmpR0
+    // resT.Set(-1.0, tmpR0);
 
     // for unsteady term, compute and add known part of BDF unsteady term
     tmpR0.Set(bd1 / dt, Tn);
@@ -884,6 +890,8 @@ void ThermoChem::initializeIO(IODataOrganizer &io) {
 
 void ThermoChem::initializeViz(ParaViewDataCollection &pvdc) {
   pvdc.RegisterField("temperature", &Tn_gf);
+  pvdc.RegisterField("density", &rn_gf);
+  pvdc.RegisterField("kappa", &kappa_gf);
 }
 
 /**
@@ -920,16 +928,19 @@ void ThermoChem::extrapolateState() {
 }
 
 // update thermodynamic pressure
-void ThermoChem::updateThermoP(double dt) {
+void ThermoChem::updateThermoP() {
   //if (config_->isOpen != true) {
+  // if (false) {
   if (false) {
     double allMass, PNM1;
     double myMass = 0.0;
-    double *Tdata = Tn.HostReadWrite();
-    double *data = tmpR0.HostReadWrite();
-    for (int i = 0; i < SdofInt; i++) {
-      data[i] = 1.0 / Tdata[i];
-    }
+    // double *Tdata = Tn.HostReadWrite();
+    // double *data = tmpR0.HostReadWrite();
+    // for (int i = 0; i < SdofInt; i++) {
+    //   data[i] = 1.0 / Tdata[i];
+    // }
+    tmpR0 = 1.0;
+    tmpR0 /= Tn;
     // multConstScalarIP((thermoPressure/Rgas),&tmpR0);
     tmpR0 *= (thermoPressure / Rgas);
     Ms->Mult(tmpR0, tmpR0b);
@@ -1060,61 +1071,69 @@ void ThermoChem::viscSpongePlanar(double *x, double &wgt) {
 void ThermoChem::updateDiffusivity() {
   // viscosity
   if (constantViscosity != true) {
-    double *dataVisc = visc_gf.HostReadWrite();
-    // double *dataBVisc = bulkVisc_gf->HostReadWrite();
-    double *Tdata = Tn_gf.HostReadWrite();
-    double *Rdata = rn_gf.HostReadWrite();
-    double visc[2];
-    // double prim[nvel + 2];
-    double prim[5];
-    for (int i = 0; i < nvel + 2; i++) {
-      prim[i] = 0.0;
-    }
-    for (int i = 0; i < Sdof; i++) {
-      prim[1 + nvel] = Tdata[i];
-      // transportPtr->GetViscosities(prim, prim, visc);  // returns dynamic
-      // TODO(trevilo): Replace with Sutherland!
-      dataVisc[i] = 1.0e-5; // visc[0];
-      // dataBVisc[i] = visc[1];
-    }
+    // double *dataVisc = visc_gf.HostReadWrite();
+    // // double *dataBVisc = bulkVisc_gf->HostReadWrite();
+    // double *Tdata = Tn_gf.HostReadWrite();
+    // double *Rdata = rn_gf.HostReadWrite();
+    // double visc[2];
+    // // double prim[nvel + 2];
+    // double prim[5];
+    // for (int i = 0; i < nvel + 2; i++) {
+    //   prim[i] = 0.0;
+    // }
+    // for (int i = 0; i < Sdof; i++) {
+    //   prim[1 + nvel] = Tdata[i];
+    //   // transportPtr->GetViscosities(prim, prim, visc);  // returns dynamic
+    //   // TODO(trevilo): Replace with Sutherland!
+    //   dataVisc[i] = 1.8e-5; // visc[0];
+    //   // dataBVisc[i] = visc[1];
+    // }
+    visc = 1.8e-5;
   } else {
-    double *dataVisc = visc_gf.HostReadWrite();
-    for (int i = 0; i < Sdof; i++) {
-      dataVisc[i] = dyn_vis;
-    }
+    // double *dataVisc = visc_gf.HostReadWrite();
+    // for (int i = 0; i < Sdof; i++) {
+    //   dataVisc[i] = 1.8e-5; // dyn_vis;
+    // }
+    visc = 1.8e-5;
   }
 
-  if (config_->sgsModelType > 0) {
-    const double *dataSubgrid = turbModel_interface_->eddy_viscosity->HostRead();
-    double *dataVisc = visc_gf.HostReadWrite();
-    double *data = viscTotal_gf.HostReadWrite();
-    double *Rdata = rn_gf.HostReadWrite();
-    for (int i = 0; i < Sdof; i++) {
-      data[i] = dataVisc[i] + Rdata[i] * dataSubgrid[i];
-    }
-  }
+  // if (config_->sgsModelType > 0) {
+  //   const double *dataSubgrid = turbModel_interface_->eddy_viscosity->HostRead();
+  //   double *dataVisc = visc_gf.HostReadWrite();
+  //   double *data = viscTotal_gf.HostReadWrite();
+  //   double *Rdata = rn_gf.HostReadWrite();
+  //   for (int i = 0; i < Sdof; i++) {
+  //     data[i] = dataVisc[i] + Rdata[i] * dataSubgrid[i];
+  //   }
+  // }
 
-  if (config_->linViscData.isEnabled) {
-    double *vMult = viscMult.HostReadWrite();
-    double *dataVisc = viscTotal_gf.HostReadWrite();
-    for (int i = 0; i < Sdof; i++) {
-      dataVisc[i] *= viscMult[i];
-    }
-  }
+  // if (config_->linViscData.isEnabled) {
+  //   double *vMult = viscMult.HostReadWrite();
+  //   double *dataVisc = viscTotal_gf.HostReadWrite();
+  //   for (int i = 0; i < Sdof; i++) {
+  //     dataVisc[i] *= viscMult[i];
+  //   }
+  // }
 
   // thermal diffusivity: storing as kappa eventhough does NOT
   // include Cp for now
-  {
-    double *data = kappa_gf.HostReadWrite();
-    double *dataVisc = viscTotal_gf.HostReadWrite();
-    // double Ctmp = Cp / Pr;
-    double Ctmp = 1.0 / Pr;
-    for (int i = 0; i < Sdof; i++) {
-      data[i] = Ctmp * dataVisc[i];
-    }
-  }
+  // {
+  //   double *data = kappa_gf.HostReadWrite();
+  //   double *dataVisc = viscTotal_gf.HostReadWrite();
+  //   // double Ctmp = Cp / Pr;
+  //   double Ctmp = 1.0 / Pr;
+  //   for (int i = 0; i < Sdof; i++) {
+  //     data[i] = Ctmp * dataVisc[i];
+  //   }
+  // }
 
+  // viscTotal_gf.SetFromTrueDofs(visc);
+
+  // viscTotal_gf.GetTrueDofs(visc);
   viscTotal_gf.SetFromTrueDofs(visc);
+  kappa = visc;
+  kappa /= Pr;
+  // kappa = 1.0;
   kappa_gf.SetFromTrueDofs(kappa);
 }
 

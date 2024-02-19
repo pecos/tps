@@ -375,7 +375,7 @@ class ThermoChem : public ThermoChemModelBase {
   void initializeIO(IODataOrganizer &io) final;
   void initializeViz(ParaViewDataCollection &pvdc) final;
 
-  void updateThermoP(double dt);
+  void updateThermoP();
   void extrapolateState();
   void updateDensity(double tStep);
   // void updateGradients(double tStep);
