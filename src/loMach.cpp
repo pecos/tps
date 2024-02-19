@@ -422,14 +422,19 @@ void LoMachSolver::initialize() {
 
   // Initialize model-owned data
   flow_->initializeSelf();
-  thermo_->initializeSelf();
 
   // Initialize restart read/write capability
   flow_->initializeIO(ioData);
 
+
+
+  // Weird ordering here, b/c thermo initializeSelf assumes flow interface already ready to go
+  thermo_->initializeFromFlow(&flow_->toThermoChem_interface);
+  thermo_->initializeSelf();
+  thermo_->initializeIO(ioData);
+
   // Exchange interface information
   flow_->initializeFromThermoChem(&thermo_->toFlow_interface_);
-  // thermo_->initializeFromFlow(&flow_->interface);
 
   // Finish initializing operators
   flow_->initializeOperators();
@@ -451,7 +456,7 @@ void LoMachSolver::initialize() {
   pvdc_->SetLevelsOfDetail(order);
 
   flow_->initializeViz(*pvdc_);
-  // thermo_->initializeViz(*pvdc_);
+  thermo_->initializeViz(*pvdc_);
 }
 
 void LoMachSolver::UpdateTimestepHistory(double dt) {

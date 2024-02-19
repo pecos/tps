@@ -97,6 +97,11 @@ class ThermoChemModelBase {
   virtual void initializeIO(IODataOrganizer &io) {}
 
   /**
+   * @brief Hook to let derived classes register visualization fields with ParaViewDataCollection
+   */
+  virtual void initializeViz(mfem::ParaViewDataCollection &pvdc) {}
+
+  /**
    * @brief Initialize data from the flow class
    *
    * Initialize fields that the thermochemistry model needs from the

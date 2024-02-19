@@ -55,6 +55,14 @@ double temp_wall(const Vector &x, double t);
 double temp_wallBox(const Vector &x, double t);
 double temp_inlet(const Vector &x, double t);
 
+double Sutherland(const double T, const double mu_star, const double T_star, const double S_star) {
+  const double T_rat = T / T_star;
+  const double T_rat_32 = T_rat * sqrt(T_rat);
+  const double S_rat = (T_star + S_star) / (T + S_star);
+  return mu_star * T_rat_32 * S_rat;
+}
+
+
 ThermoChem::ThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, RunConfiguration *config,
                        temporalSchemeCoefficients &timeCoeff, TPS::Tps *tps)
     : tpsP_(tps), pmesh_(pmesh), loMach_opts_(loMach_opts), config_(config), timeCoeff_(timeCoeff) {}
@@ -121,13 +129,13 @@ void ThermoChem::initializeSelf() {
   // TODO: Fix transport
   transportPtr = NULL;
 
-  // HARD CODE HARD CODE HARD CODE
-  config_->dryAirInput.specific_heat_ratio = 1.4;
-  config_->dryAirInput.gas_constant = 287.058;
-  config_->dryAirInput.f = config_->workFluid;
-  config_->dryAirInput.eq_sys = config_->eqSystem;
-  mixture = new DryAir(*config_, dim, nvel);
-  transportPtr = new DryAirTransport(mixture, *config_);
+  // // HARD CODE HARD CODE HARD CODE
+  // config_->dryAirInput.specific_heat_ratio = 1.4;
+  // config_->dryAirInput.gas_constant = 287.058;
+  // config_->dryAirInput.f = config_->workFluid;
+  // config_->dryAirInput.eq_sys = config_->eqSystem;
+  // mixture = new DryAir(*config_, dim, nvel);
+  // transportPtr = new DryAirTransport(mixture, *config_);
 
   // MaxIters = config_->GetNumIters();
   // num_equation = 1;  // hard code for now, fix with species
@@ -312,129 +320,103 @@ void ThermoChem::setup(double dt) {
   tpsP_->getInput("boundaryConditions/numOutlets", numOutlets, 0);
 
   ConstantCoefficient Qt_bc_coef;
-  Array<int> Tattr(pmesh_->bdr_attributes.Max());
   Array<int> Qattr(pmesh_->bdr_attributes.Max());
 
   // inlet bc
-  Tattr = 0.0;
-  for (int i = 0; i < numInlets; i++) {
-    for (int iFace = 1; iFace < pmesh_->bdr_attributes.Max() + 1; iFace++) {
-      if (iFace == config_->inletPatchType[i].first) {
-        Tattr[iFace - 1] = 1;
+  {
+    Array<int> attr_inlet(pmesh_->bdr_attributes.Max());
+    attr_inlet = 0;
+    for (int i = 1; i <= numInlets; i++) {
+      int patch;
+      std::string type;
+      std::string basepath("boundaryConditions/inlet" + std::to_string(i));
+
+      tpsP_->getRequiredInput((basepath + "/patch").c_str(), patch);
+      tpsP_->getRequiredInput((basepath + "/type").c_str(), type);
+
+      // TODO(trevilo): inlet types uniform and interpolate should be supported
+      if (type == "uniform") {
+        if (rank0) {
+          std::cout << "ERROR: Inlet type = " << type << " not supported." << std::endl;;
+        }
+        assert(false);
+        exit(1);
+      } else if (type == "interpolate") {
+        if (rank0) {
+          std::cout << "ERROR: Inlet type = " << type << " not supported." << std::endl;;
+        }
+        assert(false);
+        exit(1);
+      } else {
+        if (rank0) {
+          std::cout << "ERROR: Inlet type = " << type << " not supported." << std::endl;;
+        }
+        assert(false);
+        exit(1);
       }
     }
   }
-
-  for (int i = 0; i < numInlets; i++) {
-    if (config_->inletPatchType[i].second == InletType::UNI_DENS_VEL) {
-      if (rank0) std::cout << "Caught uniform inlet conditions " << endl;
-      buffer_tInletInf = new ParGridFunction(sfes);
-      buffer_tInlet = new ParGridFunction(sfes);
-      tInletField = new GridFunctionCoefficient(buffer_tInlet);
-      AddTempDirichletBC(tInletField, Tattr);
-
-    } else if (config_->inletPatchType[i].second == InletType::INTERPOLATE) {
-      if (rank0) std::cout << "Caught interpolated inlet conditions " << endl;
-      // interpolate from external file
-      buffer_tInletInf = new ParGridFunction(sfes);
-      buffer_tInlet = new ParGridFunction(sfes);
-      interpolateInlet();
-      if (rank0) std::cout << "ThermoChem interpolation complete... " << endl;
-
-      tInletField = new GridFunctionCoefficient(buffer_tInlet);
-      AddTempDirichletBC(tInletField, Tattr);
-      if (rank0) std::cout << "Interpolated temperature conditions applied " << endl;
-    }
-  }
-  if (rank0) std::cout << "ThermoChem inlet bc's completed: " << numInlets << endl;
 
   // outlet bc
-  Tattr = 0.0;
+  {
+    Array<int> attr_outlet(pmesh_->bdr_attributes.Max());
+    attr_outlet = 0;
 
-  // Wall bc
-  Vector wallBCs;
-  wallBCs.SetSize(numWalls);
-  for (int i = 0; i < numWalls; i++) {
-    wallBCs[i] = config_->wallBC[i].Th;
+    // No code for this yet, so die if detected
+    assert(numOutlets == 0);
+
+    // But... outlets will just get homogeneous Neumann on T, so
+    // basically need to do nothing.
   }
 
-  // for multiple walls at different temps => this is absolutely terrible
-  // ConstantCoefficient t_bc_coef(wallBCs);
-  if (numWalls > 0) {
-    t_bc_coef0 = new ConstantCoefficient();
-    t_bc_coef0->constant = wallBCs[0];
-  }
-  if (numWalls > 1) {
-    t_bc_coef1 = new ConstantCoefficient();
-    t_bc_coef1->constant = wallBCs[1];
-  }
-  if (numWalls > 2) {
-    t_bc_coef2 = new ConstantCoefficient();
-    t_bc_coef2->constant = wallBCs[2];
-  }
-  if (numWalls > 3) {
-    t_bc_coef3 = new ConstantCoefficient();
-    t_bc_coef3->constant = wallBCs[3];
-  }
+  // Wall BCs
+  {
+    std::cout << "There are " << pmesh_->bdr_attributes.Max() << " boundary attributes!" << std::endl;
+    Array<int> attr_wall(pmesh_->bdr_attributes.Max());
+    attr_wall = 0;
 
-  for (int i = 0; i < numWalls; i++) {
-    Tattr = 0;
-    // t_bc_coef.constant = config.wallBC[i].Th;
-    for (int iFace = 1; iFace < pmesh_->bdr_attributes.Max() + 1; iFace++) {
-      if (config_->wallPatchType[i].second == WallType::VISC_ISOTH) {
-        if (iFace == config_->wallPatchType[i].first) {
-          Tattr[iFace - 1] = 1;
-          if (rank0) std::cout << "Dirichlet wall temperature BC: " << iFace << endl;
+    for (int i = 1; i <= numWalls; i++) {
+      int patch;
+      std::string type;
+      std::string basepath("boundaryConditions/wall" + std::to_string(i));
 
-          if (config_->useWallFunction == true) {
-            AddTempDirichletBC(temp_wall, Tattr);
-            if (rank0) std::cout << "Using wall temp function bc for wall number: " << i + 1 << endl;
-          } else if (config_->useWallBox == true) {
-            AddTempDirichletBC(temp_wallBox, Tattr);
-            if (rank0) std::cout << "Using box temp bc for wall number: " << i + 1 << endl;
-          } else {
-            if (i == 0) {
-              AddTempDirichletBC(t_bc_coef0, Tattr);
-            }
-            if (i == 1) {
-              AddTempDirichletBC(t_bc_coef1, Tattr);
-            }
-            if (i == 2) {
-              AddTempDirichletBC(t_bc_coef2, Tattr);
-            }
-            if (i == 3) {
-              AddTempDirichletBC(t_bc_coef3, Tattr);
-            }
+      tpsP_->getRequiredInput((basepath + "/patch").c_str(), patch);
+      tpsP_->getRequiredInput((basepath + "/type").c_str(), type);
 
-            if (rank0) std::cout << i + 1 << ") wall temperature BC: " << config_->wallBC[i].Th << endl;
-          }
-        }
-      } else if (config_->wallPatchType[i].second == WallType::VISC_ADIAB) {
-        if (iFace == config_->wallPatchType[i].first) {
-          Tattr[iFace - 1] = 0;  // no essential
-          if (rank0) std::cout << "Insulated wall temperature BC: " << iFace << endl;
-        }
+      if (type == "viscous_isothermal") {
+        std::cout << "Adding patch = " << patch << " to isothermal wall list!" << std::endl;
+
+        attr_wall = 0;
+        attr_wall[patch-1] = 1;
+
+        double Twall;
+        tpsP_->getRequiredInput((basepath + "/temperature").c_str(), Twall);
+
+        ConstantCoefficient *Twall_coeff = new ConstantCoefficient();
+        Twall_coeff->constant = Twall;
+
+        AddTempDirichletBC(Twall_coeff, attr_wall);
       }
     }
+    if (rank0) std::cout << "Temp wall bc completed: " << numWalls << endl;
   }
-  if (rank0) std::cout << "Temp wall bc completed: " << numWalls << endl;
 
-  // Qt wall bc dirichlet (divU = 0)
-  Qattr = 0;
-  for (int i = 0; i < numWalls; i++) {
-    Qt_bc_coef.constant = 0.0;
-    for (int iFace = 1; iFace < pmesh_->bdr_attributes.Max() + 1; iFace++) {
-      if (config_->wallPatchType[i].second == WallType::VISC_ISOTH ||
-          config_->wallPatchType[i].second == WallType::VISC_ADIAB) {
-        if (iFace == config_->wallPatchType[i].first) {
-          Qattr[iFace - 1] = 1;
-          if (rank0) std::cout << "Dirichlet wall Qt BC: " << iFace << endl;
-        }
-      }
-    }
-  }
-  buffer_qbc = new ConstantCoefficient(Qt_bc_coef);
-  AddQtDirichletBC(buffer_qbc, Qattr);
+  // // Qt wall bc dirichlet (divU = 0)
+  // Qattr = 0;
+  // for (int i = 0; i < numWalls; i++) {
+  //   Qt_bc_coef.constant = 0.0;
+  //   for (int iFace = 1; iFace < pmesh_->bdr_attributes.Max() + 1; iFace++) {
+  //     if (config_->wallPatchType[i].second == WallType::VISC_ISOTH ||
+  //         config_->wallPatchType[i].second == WallType::VISC_ADIAB) {
+  //       if (iFace == config_->wallPatchType[i].first) {
+  //         Qattr[iFace - 1] = 1;
+  //         if (rank0) std::cout << "Dirichlet wall Qt BC: " << iFace << endl;
+  //       }
+  //     }
+  //   }
+  // }
+  // buffer_qbc = new ConstantCoefficient(Qt_bc_coef);
+  // AddQtDirichletBC(buffer_qbc, Qattr);
 
   sfes->GetEssentialTrueDofs(temp_ess_attr, temp_ess_tdof);
   sfes->GetEssentialTrueDofs(Qt_ess_attr, Qt_ess_tdof);
@@ -606,8 +588,8 @@ void ThermoChem::setup(double dt) {
   MvInv->SetOperator(*Mv);
   MvInv->SetPreconditioner(*MvInvPC);
   MvInv->SetPrintLevel(pl_mvsolve);
-  MvInv->SetRelTol(config_->solver_tol);
-  MvInv->SetMaxIter(config_->solver_iter);
+  MvInv->SetRelTol(1e-12); // config_->solver_tol);
+  MvInv->SetMaxIter(2000); // config_->solver_iter);
   if (rank0) std::cout << "ThermoChem MvInv operator set" << endl;
 
   if (partial_assembly) {
@@ -623,8 +605,8 @@ void ThermoChem::setup(double dt) {
   MsInv->SetOperator(*Ms);
   MsInv->SetPreconditioner(*MsInvPC);
   MsInv->SetPrintLevel(pl_mtsolve);
-  MsInv->SetRelTol(config_->solver_tol);
-  MsInv->SetMaxIter(config_->solver_iter);
+  MsInv->SetRelTol(1e-12); //config_->solver_tol);
+  MsInv->SetMaxIter(2000); // config_->solver_iter);
 
   if (partial_assembly) {
     Vector diag_pa(sfes->GetTrueVSize());
@@ -644,8 +626,8 @@ void ThermoChem::setup(double dt) {
   HtInv->SetOperator(*Ht);
   HtInv->SetPreconditioner(*HtInvPC);
   HtInv->SetPrintLevel(pl_htsolve);
-  HtInv->SetRelTol(config_->solver_tol);
-  HtInv->SetMaxIter(config_->solver_iter);
+  HtInv->SetRelTol(1e-12); // config_->solver_tol);
+  HtInv->SetMaxIter(2000); // config_->solver_iter);
   if (rank0) std::cout << "Temperature operators set" << endl;
 
   // Qt .....................................
@@ -676,8 +658,8 @@ void ThermoChem::setup(double dt) {
   MqInv->SetOperator(*Mq);
   MqInv->SetPreconditioner(*MqInvPC);
   MqInv->SetPrintLevel(pl_mtsolve);
-  MqInv->SetRelTol(config_->solver_tol);
-  MqInv->SetMaxIter(config_->solver_iter);
+  MqInv->SetRelTol(1e-12); // config_->solver_tol);
+  MqInv->SetMaxIter(2000); // config_->solver_iter);
 
   LQ_form = new ParBilinearForm(sfes);
   auto *lqd_blfi = new DiffusionIntegrator(*kappaField);
@@ -900,21 +882,25 @@ void ThermoChem::initializeIO(IODataOrganizer &io) {
   io.registerIOVar("/temperature", "temperature", 0);
 }
 
+void ThermoChem::initializeViz(ParaViewDataCollection &pvdc) {
+  pvdc.RegisterField("temperature", &Tn_gf);
+}
 
 /**
    Update boundary conditions for Temperature, useful for
    ramping a dirichlet condition over time
  */
 void ThermoChem::updateBC(int current_step) {
-  if (numInlets > 0) {
-    double *dTInf = buffer_tInletInf->HostReadWrite();
-    double *dT = buffer_tInlet->HostReadWrite();
-    int nRamp = config_->rampStepsInlet;
-    double wt = std::pow(std::min((double)current_step / (double)nRamp, 1.0), 1.0);
-    for (int i = 0; i < Sdof; i++) {
-      dT[i] = wt * dTInf[i] + (1.0 - wt) * config_->initRhoRhoVp[nvel + 1];
-    }
-  }
+  // if (numInlets > 0) {
+  //   double *dTInf = buffer_tInletInf->HostReadWrite();
+  //   double *dT = buffer_tInlet->HostReadWrite();
+  //   //int nRamp = config_->rampStepsInlet;
+  //   int nRamp = 1;
+  //   double wt = std::pow(std::min((double)current_step / (double)nRamp, 1.0), 1.0);
+  //   for (int i = 0; i < Sdof; i++) {
+  //     dT[i] = wt * dTInf[i] + (1.0 - wt) * config_->initRhoRhoVp[nvel + 1];
+  //   }
+  // }
 }
 
 void ThermoChem::extrapolateState() {
@@ -935,7 +921,8 @@ void ThermoChem::extrapolateState() {
 
 // update thermodynamic pressure
 void ThermoChem::updateThermoP(double dt) {
-  if (config_->isOpen != true) {
+  //if (config_->isOpen != true) {
+  if (false) {
     double allMass, PNM1;
     double myMass = 0.0;
     double *Tdata = Tn.HostReadWrite();
@@ -1085,8 +1072,9 @@ void ThermoChem::updateDiffusivity() {
     }
     for (int i = 0; i < Sdof; i++) {
       prim[1 + nvel] = Tdata[i];
-      transportPtr->GetViscosities(prim, prim, visc);  // returns dynamic
-      dataVisc[i] = visc[0];
+      // transportPtr->GetViscosities(prim, prim, visc);  // returns dynamic
+      // TODO(trevilo): Replace with Sutherland!
+      dataVisc[i] = 1.0e-5; // visc[0];
       // dataBVisc[i] = visc[1];
     }
   } else {

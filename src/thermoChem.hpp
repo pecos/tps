@@ -372,8 +372,8 @@ class ThermoChem : public ThermoChemModelBase {
   /**
    * @brief Hook to let derived classes register restart fields with the IODataOrganizer.
    */
-  void initializeIO(IODataOrganizer &io);
-
+  void initializeIO(IODataOrganizer &io) final;
+  void initializeViz(ParaViewDataCollection &pvdc) final;
 
   void updateThermoP(double dt);
   void extrapolateState();
