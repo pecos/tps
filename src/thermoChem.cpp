@@ -85,14 +85,12 @@ ThermoChem::ThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tempora
 
   tpsP_->getInput("loMach/ambientPressure", ambientPressure, 101325.0);
   thermoPressure = ambientPressure;
-
-  tpsP_->getInput("initialConditions/temperature", T_ic_, 300.0);
-
   tPm1 = thermoPressure;
   tPm2 = thermoPressure;
   dtP = 0.0;
 
-  // TODO(trevilo): Get parameters from input
+  tpsP_->getInput("initialConditions/temperature", T_ic_, 300.0);
+
   tpsP_->getInput("loMach/calperfect/Rgas", Rgas, 287.0);
   tpsP_->getInput("loMach/calperfect/Prandtl", Pr, 0.71);
   tpsP_->getInput("loMach/calperfect/gamma", gamma, 1.4);
@@ -105,10 +103,8 @@ void ThermoChem::initializeSelf() {
   if (verbose) grvy_printf(ginfo, "Initializing ThermoChem solver.\n");
 
   //-----------------------------------------------------
-  // 1) Prepare the required finite elements
+  // 1) Prepare the required finite element objects
   //-----------------------------------------------------
-
-  // scalar
   sfec = new H1_FECollection(order);
   sfes = new ParFiniteElementSpace(pmesh_, sfec);
 
@@ -164,22 +160,12 @@ void ThermoChem::initializeSelf() {
 
   visc.SetSize(sfes_truevsize);
   visc = 1.0e-12;
-#if 0
-  viscMult.SetSize(sfes_truevsize);
-  viscMult = 1.0;
-#endif
 
   kappa.SetSize(sfes_truevsize);
   kappa = 1.0e-12;
 
   kappa_gf.SetSpace(sfes);
   kappa_gf = 0.0;
-
-  subgridVisc.SetSize(sfes_truevsize);
-  subgridVisc = 1.0e-15;
-
-  eddyVisc_gf.SetSize(sfes_truevsize);
-  eddyVisc_gf = 1.0e-15;
 
   viscTotal_gf.SetSpace(sfes);
   viscTotal_gf = 0.0;
@@ -195,9 +181,6 @@ void ThermoChem::initializeSelf() {
   R0PM0_gf.SetSpace(sfes);
 
   rhoDt.SetSpace(sfes);
-#if 0
-  viscMult_gf.SetSpace(sfes);
-#endif
 
   if (verbose) grvy_printf(ginfo, "ThermoChem vectors and gf initialized...\n");
 
@@ -207,28 +190,22 @@ void ThermoChem::initializeSelf() {
   toFlow_interface_.thermal_divergence = &Qt_gf;
   toTurbModel_interface_.density = &rn_gf;
 
-  // // Initial conditions
-  // if (config_->useICFunction == true) {
-  //   FunctionCoefficient t_ic_coef(temp_ic);
-  //   if (!config_->restart) Tn_gf.ProjectCoefficient(t_ic_coef);
-  //   if (rank0) {
-  //     std::cout << "Using initial condition function" << endl;
-  //   }
-  // } else if (config_->useICBoxFunction == true) {
-  //   FunctionCoefficient t_ic_coef(temp_wallBox);
-  //   if (!config_->restart) Tn_gf.ProjectCoefficient(t_ic_coef);
-  //   if (rank0) {
-  //     std::cout << "Using initial condition box function" << endl;
-  //   }
-  // } else {
-  //   ConstantCoefficient t_ic_coef;
-  //   // t_ic_coef.constant = config.initRhoRhoVp[4] / (Rgas * config.initRhoRhoVp[0]);
-  //   t_ic_coef.constant = config_->initRhoRhoVp[4];
-  //   if (!config_->restart) Tn_gf.ProjectCoefficient(t_ic_coef);
-  //   if (rank0) {
-  //     std::cout << "Initial temperature set from input file: " << config_->initRhoRhoVp[4] << endl;
-  //   }
-  // }
+  //-----------------------------------------------------
+  // 2) Set the initial condition
+  //-----------------------------------------------------
+
+  // Notes:
+  //
+  // 1) If need arises, can provide spatially varying IC as follows:
+  //
+  // FunctionCoefficient t_ic_coef(temp_ic);
+  // Tn_gf.ProjectCoefficient(t_ic_coef);
+  //
+  // where temp_ic is a function that returns the IC temperature at a
+  // point in space.
+  //
+  // 2) For restarts, this IC is overwritten by the restart field,
+  // which is read later.
 
   ConstantCoefficient t_ic_coef;
   t_ic_coef.constant = T_ic_;
@@ -240,7 +217,9 @@ void ThermoChem::initializeSelf() {
   Tnm1_gf.GetTrueDofs(Tnm1);
   Tnm2_gf.GetTrueDofs(Tnm2);
 
-  // Boundary conditions
+  //-----------------------------------------------------
+  // 3) Set the boundary conditions
+  //-----------------------------------------------------
   int numWalls, numInlets, numOutlets;
   tpsP_->getInput("boundaryConditions/numWalls", numWalls, 0);
   tpsP_->getInput("boundaryConditions/numInlets", numInlets, 0);
@@ -328,6 +307,8 @@ void ThermoChem::initializeSelf() {
     if (rank0) std::cout << "Temp wall bc completed: " << numWalls << endl;
   }
 
+  // TODO(trevilo): Add BCs for Q!!!
+  //
   // // Qt wall bc dirichlet (divU = 0)
   // Qattr = 0;
   // for (int i = 0; i < numWalls; i++) {

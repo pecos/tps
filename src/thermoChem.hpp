@@ -153,7 +153,6 @@ class ThermoChem : public ThermoChemModelBase {
 
   ParGridFunction viscTotal_gf;
   ParGridFunction visc_gf;
-  ParGridFunction eddyVisc_gf;
   ParGridFunction kappa_gf;
   ParGridFunction R0PM0_gf;
   ParGridFunction Qt_gf;
@@ -203,8 +202,6 @@ class ThermoChem : public ThermoChemModelBase {
   Vector rn;
   Vector kappa;
   Vector visc;
-  Vector viscMult;
-  Vector subgridVisc;
 
   // Parameters and objects used in filter-based stabilization
   int filter_cutoff_modes = 0;
