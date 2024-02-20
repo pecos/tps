@@ -102,8 +102,6 @@ void ThermoChem::initializeSelf() {
 
   // TODO(trevilo): Get parameters from input
   static_rho = 1.0;  // config_->const_dens;
-  dyn_vis = 1.0e-5;  // config_->const_visc;
-
 
   tpsP_->getInput("loMach/ambientPressure", ambientPressure, 101325.0);
   thermoPressure = ambientPressure;
@@ -475,7 +473,6 @@ void ThermoChem::setup(double dt) {
   Lt_form->FormSystemMatrix(empty, Lt);
   if (rank0) std::cout << "ThermoChem Lt operator set" << endl;
 
-  // Ht_lincoeff.constant = kin_vis / Pr;
   Ht_bdfcoeff.constant = 1.0 / dt;
   Ht_form = new ParBilinearForm(sfes);
   hmt_blfi = new MassIntegrator(*rhoDtField);
@@ -1431,38 +1428,32 @@ void ThermoChem::computeQt() {
 
 void ThermoChem::computeQtTO() {
   Array<int> empty;
+  tmpR0 = 0.0;
+  LQ_bdry->Update();
+  LQ_bdry->Assemble();
+  LQ_bdry->ParallelAssemble(tmpR0);
+  tmpR0.Neg();
 
-  if (incompressibleSolve == true) {
-    Qt = 0.0;
+  LQ_form->Update();
+  LQ_form->Assemble();
+  LQ_form->FormSystemMatrix(empty, LQ);
+  LQ->AddMult(Tn_next, tmpR0);  // tmpR0 += LQ{Tn_next}
+  MqInv->Mult(tmpR0, Qt);
 
-  } else {
-    tmpR0 = 0.0;
-    LQ_bdry->Update();
-    LQ_bdry->Assemble();
-    LQ_bdry->ParallelAssemble(tmpR0);
-    tmpR0.Neg();
+  Qt *= -Rgas / thermoPressure;
 
-    LQ_form->Update();
-    LQ_form->Assemble();
-    LQ_form->FormSystemMatrix(empty, LQ);
-    LQ->AddMult(Tn_next, tmpR0);  // tmpR0 += LQ{Tn_next}
-    MqInv->Mult(tmpR0, Qt);
-
-    Qt *= -Rgas / thermoPressure;
-
-    /*
+  /*
     for (int be = 0; be < pmesh->GetNBE(); be++) {
-      int bAttr = pmesh.GetBdrElement(be)->GetAttribute();
-      if (bAttr == WallType::VISC_ISOTH || bAttr = WallType::VISC_ADIAB) {
-        Array<int> vdofs;
-        sfes->GetBdrElementVDofs(be, vdofs);
-        for (int i = 0; i < vdofs.Size(); i++) {
-          Qt[vdofs[i]] = 0.0;
-        }
-      }
+    int bAttr = pmesh.GetBdrElement(be)->GetAttribute();
+    if (bAttr == WallType::VISC_ISOTH || bAttr = WallType::VISC_ADIAB) {
+    Array<int> vdofs;
+    sfes->GetBdrElementVDofs(be, vdofs);
+    for (int i = 0; i < vdofs.Size(); i++) {
+    Qt[vdofs[i]] = 0.0;
     }
-    */
-  }
+    }
+    }
+  */
 
   Qt_gf.SetFromTrueDofs(Qt);
 }

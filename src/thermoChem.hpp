@@ -108,7 +108,7 @@ class ThermoChem : public ThermoChemModelBase {
   ParMesh *pmesh_ = nullptr;
 
   // The order of the scalar spaces
-  int order, porder, norder;
+  int order;
   IntegrationRules gll_rules;
 
   // local copies of time integration information
@@ -122,8 +122,6 @@ class ThermoChem : public ThermoChemModelBase {
   // loMach options to run as incompressible
   bool constantViscosity = false;
   bool constantDensity = false;
-  bool incompressibleSolve = false;
-  bool pFilter = false;
 
   // transport parameters
   double mu0_;
@@ -141,7 +139,6 @@ class ThermoChem : public ThermoChemModelBase {
 
   /// constant prop solves
   double Pr, Cp, gamma;
-  double kin_vis, dyn_vis;
   double static_rho, Rgas;
 
   /// pressure-related, closed-system thermo pressure changes
