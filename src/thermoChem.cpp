@@ -55,9 +55,9 @@ MFEM_HOST_DEVICE double Sutherland(const double T, const double mu_star, const d
   return mu_star * T_rat_32 * S_rat;
 }
 
-ThermoChem::ThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff,
+ThermoChem::ThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &time_coeff,
                        TPS::Tps *tps)
-    : tpsP_(tps), pmesh_(pmesh), timeCoeff_(timeCoeff) {
+    : tpsP_(tps), pmesh_(pmesh), time_coeff_(time_coeff) {
   rank0_ = (pmesh_->GetMyRank() == 0);
   order_ = loMach_opts->order;
 
@@ -132,12 +132,12 @@ ThermoChem::~ThermoChem() {
   delete MsRho_form;
   delete Ms_form;
   delete At_form;
-  delete rhou_coeff;
-  delete rhon_next_coeff;
-  delete un_next_coeff;
-  delete kap_gradT_coeff;
-  delete gradT_coeff;
-  delete thermal_diff_coeff;
+  delete rhou_coeff_;
+  delete rhon_next_coeff_;
+  delete un_next_coeff_;
+  delete kap_gradT_coeff_;
+  delete gradT_coeff_;
+  delete thermal_diff_coeff_;
   delete rhoDtField;
   delete Rho;
 
@@ -379,7 +379,7 @@ void ThermoChem::initializeSelf() {
 }
 
 void ThermoChem::initializeOperators() {
-  dt_ = timeCoeff_.dt;
+  dt_ = time_coeff_.dt;
 
   Array<int> empty;
 
@@ -400,17 +400,17 @@ void ThermoChem::initializeOperators() {
   rhoDtField = new GridFunctionCoefficient(&rhoDt);
 
   // thermal_diff_coeff.constant = thermal_diff;
-  thermal_diff_coeff = new GridFunctionCoefficient(&kappa_gf_);
-  gradT_coeff = new GradientGridFunctionCoefficient(&Tn_next_gf_);
-  kap_gradT_coeff = new ScalarVectorProductCoefficient(*thermal_diff_coeff, *gradT_coeff);
+  thermal_diff_coeff_ = new GridFunctionCoefficient(&kappa_gf_);
+  gradT_coeff_ = new GradientGridFunctionCoefficient(&Tn_next_gf_);
+  kap_gradT_coeff_ = new ScalarVectorProductCoefficient(*thermal_diff_coeff_, *gradT_coeff_);
 
   // Convection: Atemperature(i,j) = \int_{\Omega} \phi_i \rho u \cdot \nabla \phi_j
-  un_next_coeff = new VectorGridFunctionCoefficient(flow_interface_->velocity);
-  rhon_next_coeff = new GridFunctionCoefficient(&rn_gf_);
-  rhou_coeff = new ScalarVectorProductCoefficient(*rhon_next_coeff, *un_next_coeff);
+  un_next_coeff_ = new VectorGridFunctionCoefficient(flow_interface_->velocity);
+  rhon_next_coeff_ = new GridFunctionCoefficient(&rn_gf_);
+  rhou_coeff_ = new ScalarVectorProductCoefficient(*rhon_next_coeff_, *un_next_coeff_);
 
   At_form = new ParBilinearForm(sfes_);
-  auto *at_blfi = new ConvectionIntegrator(*rhou_coeff);
+  auto *at_blfi = new ConvectionIntegrator(*rhou_coeff_);
   if (numerical_integ_) {
     at_blfi->SetIntRule(&ir_nli);
   }
@@ -452,7 +452,7 @@ void ThermoChem::initializeOperators() {
 
   Ht_form = new ParBilinearForm(sfes_);
   auto *hmt_blfi = new MassIntegrator(*rhoDtField);
-  auto *hdt_blfi = new DiffusionIntegrator(*thermal_diff_coeff);
+  auto *hdt_blfi = new DiffusionIntegrator(*thermal_diff_coeff_);
 
   if (numerical_integ_) {
     hmt_blfi->SetIntRule(&ir_di);
@@ -534,7 +534,7 @@ void ThermoChem::initializeOperators() {
   MqInv->SetMaxIter(max_iter_);
 
   LQ_form = new ParBilinearForm(sfes_);
-  auto *lqd_blfi = new DiffusionIntegrator(*thermal_diff_coeff);
+  auto *lqd_blfi = new DiffusionIntegrator(*thermal_diff_coeff_);
   if (numerical_integ_) {
     lqd_blfi->SetIntRule(&ir_di);
   }
@@ -546,7 +546,7 @@ void ThermoChem::initializeOperators() {
   LQ_form->FormSystemMatrix(empty, LQ);
 
   LQ_bdry = new ParLinearForm(sfes_);
-  auto *lq_bdry_lfi = new BoundaryNormalLFIntegrator(*kap_gradT_coeff, 2, -1);
+  auto *lq_bdry_lfi = new BoundaryNormalLFIntegrator(*kap_gradT_coeff_, 2, -1);
   if (numerical_integ_) {
     lq_bdry_lfi->SetIntRule(&ir_di);
   }
@@ -616,8 +616,8 @@ void ThermoChem::UpdateTimestepHistory(double dt) {
 }
 
 void ThermoChem::step() {
-  dt_ = timeCoeff_.dt;
-  time_ = timeCoeff_.time;
+  dt_ = time_coeff_.dt;
+  time_ = time_coeff_.time;
 
   // Set current time for velocity Dirichlet boundary conditions.
   for (auto &temp_dbc : temp_dbcs_) {
@@ -639,9 +639,9 @@ void ThermoChem::step() {
   resT.Set(-1.0, tmpR0);
 
   // for unsteady term, compute and add known part of BDF unsteady term
-  tmpR0.Set(timeCoeff_.bd1 / dt_, Tn);
-  tmpR0.Add(timeCoeff_.bd2 / dt_, Tnm1);
-  tmpR0.Add(timeCoeff_.bd3 / dt_, Tnm2);
+  tmpR0.Set(time_coeff_.bd1 / dt_, Tn);
+  tmpR0.Add(time_coeff_.bd2 / dt_, Tnm1);
+  tmpR0.Add(time_coeff_.bd3 / dt_, Tnm2);
 
   MsRho->Mult(tmpR0, tmpR0b);
   resT.Add(-1.0, tmpR0b);
@@ -656,7 +656,7 @@ void ThermoChem::step() {
 
   // Update Helmholtz operator to account for changing dt, rho, and kappa
   rhoDt = rn_gf_;
-  rhoDt *= (timeCoeff_.bd0 / dt_);
+  rhoDt *= (time_coeff_.bd0 / dt_);
 
   Ht_form->Update();
   Ht_form->Assemble();
@@ -725,9 +725,9 @@ void ThermoChem::computeExplicitTempConvectionOP(bool extrap) {
 
   // ab predictor
   if (extrap == true) {
-    tmpR0.Set(timeCoeff_.ab1, NTn);
-    tmpR0.Add(timeCoeff_.ab2, NTnm1);
-    tmpR0.Add(timeCoeff_.ab3, NTnm2);
+    tmpR0.Set(time_coeff_.ab1, NTn);
+    tmpR0.Add(time_coeff_.ab2, NTnm1);
+    tmpR0.Add(time_coeff_.ab3, NTnm2);
   } else {
     tmpR0.Set(1.0, NTn);
   }
@@ -767,9 +767,9 @@ void ThermoChem::updateBC(int current_step) {
 
 void ThermoChem::extrapolateState() {
   // extrapolated temp at {n+1}
-  Text.Set(timeCoeff_.ab1, Tn);
-  Text.Add(timeCoeff_.ab2, Tnm1);
-  Text.Add(timeCoeff_.ab3, Tnm2);
+  Text.Set(time_coeff_.ab1, Tn);
+  Text.Add(time_coeff_.ab2, Tnm1);
+  Text.Add(time_coeff_.ab3, Tnm2);
 
   // store ext in _next containers, remove Text, Uext completely later
   Tn_next_gf_.SetFromTrueDofs(Text);

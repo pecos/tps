@@ -66,58 +66,37 @@ class ThermoChem : public ThermoChemModelBase {
   ParMesh *pmesh_ = nullptr;
   int order_;
   IntegrationRules gll_rules_;
-  const temporalSchemeCoefficients &timeCoeff_;
+  const temporalSchemeCoefficients &time_coeff_;
   double dt_;
   double time_;
 
   // Flags
-  bool rank0_;  // flag to indicate rank 0
-
-  /// Enable/disable partial assembly of forms.
-  bool partial_assembly_ = false;
-
-  /// Enable/disable numerical integration rules of forms.
-  bool numerical_integ_ = true;
-
-  // loMach options to run as incompressible
-  bool constant_viscosity_ = false;
-  bool constant_density_ = false;
-
-  bool domain_is_open_ = false;
+  bool rank0_;                      /**< true if this is rank 0 */
+  bool partial_assembly_ = false;   /**< Enable/disable partial assembly of forms. */
+  bool numerical_integ_ = true;     /**< Enable/disable numerical integration rules of forms. */
+  bool constant_viscosity_ = false; /**< Enable/disable constant viscosity */
+  bool constant_density_ = false;   /**< Enable/disable constant density */
+  bool domain_is_open_ = false;     /**< true if domain is open */
 
   // Linear-solver-related options
-
-  // Print levels.
-  int pl_solve_ = 0;
-
-  // max iterations
-  int max_iter_;
-
-  // Relative tolerances.
-  double rtol_ = 1e-12;
+  int pl_solve_ = 0;    /**< Verbosity level passed to mfem solvers */
+  int max_iter_;        /**< Maximum number of linear solver iterations */
+  double rtol_ = 1e-12; /**< Linear solver relative tolerance */
 
   // Boundary condition info
+  Array<int> temp_ess_attr_; /**< List of patches with Dirichlet BC on temperature */
+  Array<int> Qt_ess_attr_;   /**< List of patches with Dirichlet BC on Q (thermal divergence) */
 
-  // All essential attributes.
-  Array<int> temp_ess_attr_;
-  Array<int> Qt_ess_attr_;
+  Array<int> temp_ess_tdof_; /**< List of true dofs with Dirichlet BC on temperature */
+  Array<int> Qt_ess_tdof_;   /**< List of true dofs with Dirichlet BC on Q */
 
-  // All essential true dofs.
-  Array<int> temp_ess_tdof_;
-  Array<int> Qt_ess_tdof_;
-
-  // Bookkeeping for temperature dirichlet bcs.
-  std::vector<DirichletBC_T<Coefficient>> temp_dbcs_;
-
-  // Bookkeeping for Qt dirichlet bcs.
-  std::vector<DirichletBC_T<Coefficient>> Qt_dbcs_;
+  std::vector<DirichletBC_T<Coefficient>> temp_dbcs_; /**< vector of Dirichlet BC coefficients for T*/
+  std::vector<DirichletBC_T<Coefficient>> Qt_dbcs_;   /**< vector of Dirichlet BC coefficients for Q*/
 
   // Scalar modeling parameters
-
-  // transport parameters
-  double mu0_;
-  double sutherland_T0_;
-  double sutherland_S0_;
+  double mu0_;           /**< Dynamic viscosity, either multiplier for Sutherland or constant */
+  double sutherland_T0_; /**< Temperature constant for Sutherland's law */
+  double sutherland_S0_; /**< S constant for Sutherland's law */
 
   double Pr_, Cp_, gamma_, Rgas_;
   double static_rho_;
@@ -149,12 +128,12 @@ class ThermoChem : public ThermoChemModelBase {
   ParGridFunction R0PM0_gf_;
   ParGridFunction Qt_gf_;
 
-  VectorGridFunctionCoefficient *un_next_coeff = nullptr;
-  GridFunctionCoefficient *rhon_next_coeff = nullptr;
-  ScalarVectorProductCoefficient *rhou_coeff = nullptr;
-  GridFunctionCoefficient *thermal_diff_coeff = nullptr;
-  GradientGridFunctionCoefficient *gradT_coeff = nullptr;
-  ScalarVectorProductCoefficient *kap_gradT_coeff = nullptr;
+  VectorGridFunctionCoefficient *un_next_coeff_ = nullptr;
+  GridFunctionCoefficient *rhon_next_coeff_ = nullptr;
+  ScalarVectorProductCoefficient *rhou_coeff_ = nullptr;
+  GridFunctionCoefficient *thermal_diff_coeff_ = nullptr;
+  GradientGridFunctionCoefficient *gradT_coeff_ = nullptr;
+  ScalarVectorProductCoefficient *kap_gradT_coeff_ = nullptr;
 
   ConstantCoefficient *buffer_qbc = nullptr;
   GridFunctionCoefficient *rhoDtField = nullptr;
