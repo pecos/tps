@@ -55,13 +55,12 @@ double temp_wall(const Vector &x, double t);
 double temp_wallBox(const Vector &x, double t);
 double temp_inlet(const Vector &x, double t);
 
-double Sutherland(const double T, const double mu_star, const double T_star, const double S_star) {
+MFEM_HOST_DEVICE double Sutherland(const double T, const double mu_star, const double T_star, const double S_star) {
   const double T_rat = T / T_star;
   const double T_rat_32 = T_rat * sqrt(T_rat);
   const double S_rat = (T_star + S_star) / (T + S_star);
   return mu_star * T_rat_32 * S_rat;
 }
-
 
 ThermoChem::ThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, RunConfiguration *config,
                        temporalSchemeCoefficients &timeCoeff, TPS::Tps *tps)
@@ -88,7 +87,8 @@ void ThermoChem::initializeSelf() {
   //   incompressibleSolve = true;
   // }
 
-  constantViscosity = true;
+  // constantViscosity = true;
+  constantViscosity = false;
   // constantDensity = true;
 
   bool verbose = rank0;
@@ -1095,31 +1095,15 @@ void ThermoChem::viscSpongePlanar(double *x, double &wgt) {
 
 void ThermoChem::updateDiffusivity() {
   // viscosity
-  if (constantViscosity != true) {
-    // double *dataVisc = visc_gf.HostReadWrite();
-    // // double *dataBVisc = bulkVisc_gf->HostReadWrite();
-    // double *Tdata = Tn_gf.HostReadWrite();
-    // double *Rdata = rn_gf.HostReadWrite();
-    // double visc[2];
-    // // double prim[nvel + 2];
-    // double prim[5];
-    // for (int i = 0; i < nvel + 2; i++) {
-    //   prim[i] = 0.0;
-    // }
-    // for (int i = 0; i < Sdof; i++) {
-    //   prim[1 + nvel] = Tdata[i];
-    //   // transportPtr->GetViscosities(prim, prim, visc);  // returns dynamic
-    //   // TODO(trevilo): Replace with Sutherland!
-    //   dataVisc[i] = 1.8e-5; // visc[0];
-    //   // dataBVisc[i] = visc[1];
-    // }
-    visc = 1.8e-5;
+  if (!constantViscosity) {
+    double *d_visc = visc.Write();
+    const double *d_T = Tn.Read();
+    const double mu_star = 1.68e-5;
+    const double T_star = 273.0;
+    const double S_star = 110.4;
+    MFEM_FORALL(i, Tn.Size(), { d_visc[i] = Sutherland(d_T[i], mu_star, T_star, S_star); });
   } else {
-    // double *dataVisc = visc_gf.HostReadWrite();
-    // for (int i = 0; i < Sdof; i++) {
-    //   dataVisc[i] = 1.8e-5; // dyn_vis;
-    // }
-    visc = 1.8e-5;
+    visc = 1.68e-5;
   }
 
   // if (config_->sgsModelType > 0) {
@@ -1156,9 +1140,10 @@ void ThermoChem::updateDiffusivity() {
 
   // viscTotal_gf.GetTrueDofs(visc);
   viscTotal_gf.SetFromTrueDofs(visc);
+
+  // NB: Here kappa is kappa / Cp = mu / Pr
   kappa = visc;
   kappa /= Pr;
-  // kappa = 1.0;
   kappa_gf.SetFromTrueDofs(kappa);
 }
 
