@@ -64,27 +64,24 @@ class ThermoChem : public ThermoChemModelBase {
 
   // Mesh and discretization scheme info
   ParMesh *pmesh_ = nullptr;
-  int order;
-  IntegrationRules gll_rules;
+  int order_;
+  IntegrationRules gll_rules_;
   const temporalSchemeCoefficients &timeCoeff_;
-  double dt;
-  double time;
+  double dt_;
+  double time_;
 
   // Flags
-  bool rank0;  // flag to indicate rank 0
-
-  /// Enable/disable verbose output.
-  bool verbose = true;
+  bool rank0_;  // flag to indicate rank 0
 
   /// Enable/disable partial assembly of forms.
-  bool partial_assembly = false;
+  bool partial_assembly_ = false;
 
   /// Enable/disable numerical integration rules of forms.
-  bool numerical_integ = true;
+  bool numerical_integ_ = true;
 
   // loMach options to run as incompressible
-  bool constantViscosity = false;
-  bool constantDensity = false;
+  bool constant_viscosity_ = false;
+  bool constant_density_ = false;
 
   bool domain_is_open_ = false;
 

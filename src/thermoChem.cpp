@@ -58,21 +58,21 @@ MFEM_HOST_DEVICE double Sutherland(const double T, const double mu_star, const d
 ThermoChem::ThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff,
                        TPS::Tps *tps)
     : tpsP_(tps), pmesh_(pmesh), timeCoeff_(timeCoeff) {
-  rank0 = (pmesh_->GetMyRank() == 0);
-  order = loMach_opts->order;
+  rank0_ = (pmesh_->GetMyRank() == 0);
+  order_ = loMach_opts->order;
 
   std::string visc_model;
   tpsP_->getInput("loMach/calperfect/viscosity-model", visc_model, std::string("sutherland"));
   if (visc_model == "sutherland") {
-    constantViscosity = false;
+    constant_viscosity_ = false;
     tpsP_->getInput("loMach/calperfect/sutherland/mu0", mu0_, 1.68e-5);
     tpsP_->getInput("loMach/calperfect/sutherland/T0", sutherland_T0_, 273.0);
     tpsP_->getInput("loMach/calperfect/sutherland/S0", sutherland_S0_, 110.4);
   } else if (visc_model == "constant") {
-    constantViscosity = true;
+    constant_viscosity_ = true;
     tpsP_->getInput("loMach/calperfect/constant-visc/mu0", mu0_, 1.68e-5);
   } else {
-    if (rank0) {
+    if (rank0_) {
       std::cout << "ERROR: loMach/calperfect/viscosity-model = " << visc_model << " not supported." << std::endl;
     }
     assert(false);
@@ -82,12 +82,12 @@ ThermoChem::ThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tempora
   std::string density_model;
   tpsP_->getInput("loMach/calperfect/density-model", density_model, std::string("ideal-gas"));
   if (density_model == "ideal-gas") {
-    constantDensity = false;
+    constant_density_ = false;
   } else if (density_model == "constant") {
-    constantDensity = true;
+    constant_density_ = true;
     tpsP_->getInput("loMach/calperfect/constant-density", static_rho, 1.0);
   } else {
-    if (rank0) {
+    if (rank0_) {
       std::cout << "ERROR: loMach/calperfect/density-model = " << density_model << " not supported." << std::endl;
     }
     assert(false);
@@ -145,13 +145,12 @@ ThermoChem::~ThermoChem() {
 }
 
 void ThermoChem::initializeSelf() {
-  verbose = rank0;
-  if (verbose) grvy_printf(ginfo, "Initializing ThermoChem solver.\n");
+  if (rank0_) grvy_printf(ginfo, "Initializing ThermoChem solver.\n");
 
   //-----------------------------------------------------
   // 1) Prepare the required finite element objects
   //-----------------------------------------------------
-  sfec = new H1_FECollection(order);
+  sfec = new H1_FECollection(order_);
   sfes = new ParFiniteElementSpace(pmesh_, sfec);
 
   // Check if fully periodic mesh
@@ -162,7 +161,7 @@ void ThermoChem::initializeSelf() {
     Qt_ess_attr.SetSize(pmesh_->bdr_attributes.Max());
     Qt_ess_attr = 0;
   }
-  if (verbose) grvy_printf(ginfo, "ThermoChem paces constructed...\n");
+  if (rank0_) grvy_printf(ginfo, "ThermoChem paces constructed...\n");
 
   int sfes_truevsize = sfes->GetTrueVSize();
 
@@ -228,7 +227,7 @@ void ThermoChem::initializeSelf() {
 
   rhoDt.SetSpace(sfes);
 
-  if (verbose) grvy_printf(ginfo, "ThermoChem vectors and gf initialized...\n");
+  if (rank0_) grvy_printf(ginfo, "ThermoChem vectors and gf initialized...\n");
 
   // exports
   toFlow_interface_.density = &rn_gf;
@@ -288,19 +287,19 @@ void ThermoChem::initializeSelf() {
 
       // TODO(trevilo): inlet types uniform and interpolate should be supported
       if (type == "uniform") {
-        if (rank0) {
+        if (rank0_) {
           std::cout << "ERROR: Inlet type = " << type << " not supported." << std::endl;
         }
         assert(false);
         exit(1);
       } else if (type == "interpolate") {
-        if (rank0) {
+        if (rank0_) {
           std::cout << "ERROR: Inlet type = " << type << " not supported." << std::endl;
         }
         assert(false);
         exit(1);
       } else {
-        if (rank0) {
+        if (rank0_) {
           std::cout << "ERROR: Inlet type = " << type << " not supported." << std::endl;
         }
         assert(false);
@@ -350,7 +349,7 @@ void ThermoChem::initializeSelf() {
         AddTempDirichletBC(Twall_coeff, attr_wall);
       }
     }
-    if (rank0) std::cout << "Temp wall bc completed: " << numWalls << endl;
+    if (rank0_) std::cout << "Temp wall bc completed: " << numWalls << endl;
   }
 
   // TODO(trevilo): Add BCs for Q!!!
@@ -364,7 +363,7 @@ void ThermoChem::initializeSelf() {
   //         config_->wallPatchType[i].second == WallType::VISC_ADIAB) {
   //       if (iFace == config_->wallPatchType[i].first) {
   //         Qattr[iFace - 1] = 1;
-  //         if (rank0) std::cout << "Dirichlet wall Qt BC: " << iFace << endl;
+  //         if (rank0_) std::cout << "Dirichlet wall Qt BC: " << iFace << endl;
   //       }
   //     }
   //   }
@@ -374,11 +373,11 @@ void ThermoChem::initializeSelf() {
 
   sfes->GetEssentialTrueDofs(temp_ess_attr, temp_ess_tdof);
   sfes->GetEssentialTrueDofs(Qt_ess_attr, Qt_ess_tdof);
-  if (rank0) std::cout << "ThermoChem Essential true dof step" << endl;
+  if (rank0_) std::cout << "ThermoChem Essential true dof step" << endl;
 }
 
 void ThermoChem::initializeOperators() {
-  dt = timeCoeff_.dt;
+  dt_ = timeCoeff_.dt;
 
   Array<int> empty;
 
@@ -386,16 +385,16 @@ void ThermoChem::initializeOperators() {
   // unsteady: p+p [+p] = 2p [3p]
   // convection: p+p+(p-1) [+p] = 3p-1 [4p-1]
   // diffusion: (p-1)+(p-1) [+p] = 2p-2 [3p-2]
-  const IntegrationRule &ir_i = gll_rules.Get(sfes->GetFE(0)->GetGeomType(), 2 * order + 1);
-  const IntegrationRule &ir_nli = gll_rules.Get(sfes->GetFE(0)->GetGeomType(), 4 * order);
-  const IntegrationRule &ir_di = gll_rules.Get(sfes->GetFE(0)->GetGeomType(), 3 * order - 1);
-  if (rank0) std::cout << "Integration rules set" << endl;
+  const IntegrationRule &ir_i = gll_rules_.Get(sfes->GetFE(0)->GetGeomType(), 2 * order_ + 1);
+  const IntegrationRule &ir_nli = gll_rules_.Get(sfes->GetFE(0)->GetGeomType(), 4 * order_);
+  const IntegrationRule &ir_di = gll_rules_.Get(sfes->GetFE(0)->GetGeomType(), 3 * order_ - 1);
+  if (rank0_) std::cout << "Integration rules set" << endl;
 
   // coefficients for operators
   Rho = new GridFunctionCoefficient(&rn_gf);
 
   rhoDt = rn_gf;
-  rhoDt /= dt;
+  rhoDt /= dt_;
   rhoDtField = new GridFunctionCoefficient(&rhoDt);
 
   // thermal_diff_coeff.constant = thermal_diff;
@@ -410,25 +409,25 @@ void ThermoChem::initializeOperators() {
 
   At_form = new ParBilinearForm(sfes);
   auto *at_blfi = new ConvectionIntegrator(*rhou_coeff);
-  if (numerical_integ) {
+  if (numerical_integ_) {
     at_blfi->SetIntRule(&ir_nli);
   }
   At_form->AddDomainIntegrator(at_blfi);
-  if (partial_assembly) {
+  if (partial_assembly_) {
     At_form->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   }
   At_form->Assemble();
   At_form->FormSystemMatrix(empty, At);
-  if (rank0) std::cout << "ThermoChem At operator set" << endl;
+  if (rank0_) std::cout << "ThermoChem At operator set" << endl;
 
   // mass matrix
   Ms_form = new ParBilinearForm(sfes);
   auto *ms_blfi = new MassIntegrator;
-  if (numerical_integ) {
+  if (numerical_integ_) {
     ms_blfi->SetIntRule(&ir_i);
   }
   Ms_form->AddDomainIntegrator(ms_blfi);
-  if (partial_assembly) {
+  if (partial_assembly_) {
     Ms_form->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   }
   Ms_form->Assemble();
@@ -437,36 +436,36 @@ void ThermoChem::initializeOperators() {
   // mass matrix with rho
   MsRho_form = new ParBilinearForm(sfes);
   auto *msrho_blfi = new MassIntegrator(*Rho);
-  if (numerical_integ) {
+  if (numerical_integ_) {
     msrho_blfi->SetIntRule(&ir_i);
     // msrho_blfi->SetIntRule(&ir_di);
   }
   MsRho_form->AddDomainIntegrator(msrho_blfi);
-  if (partial_assembly) {
+  if (partial_assembly_) {
     MsRho_form->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   }
   MsRho_form->Assemble();
   MsRho_form->FormSystemMatrix(empty, MsRho);
-  if (rank0) std::cout << "ThermoChem MsRho operator set" << endl;
+  if (rank0_) std::cout << "ThermoChem MsRho operator set" << endl;
 
   Ht_form = new ParBilinearForm(sfes);
   auto *hmt_blfi = new MassIntegrator(*rhoDtField);
   auto *hdt_blfi = new DiffusionIntegrator(*thermal_diff_coeff);
 
-  if (numerical_integ) {
+  if (numerical_integ_) {
     hmt_blfi->SetIntRule(&ir_di);
     hdt_blfi->SetIntRule(&ir_di);
   }
   Ht_form->AddDomainIntegrator(hmt_blfi);
   Ht_form->AddDomainIntegrator(hdt_blfi);
-  if (partial_assembly) {
+  if (partial_assembly_) {
     Ht_form->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   }
   Ht_form->Assemble();
   Ht_form->FormSystemMatrix(temp_ess_tdof, Ht);
-  if (rank0) std::cout << "ThermoChem Ht operator set" << endl;
+  if (rank0_) std::cout << "ThermoChem Ht operator set" << endl;
 
-  if (partial_assembly) {
+  if (partial_assembly_) {
     Vector diag_pa(sfes->GetTrueVSize());
     Ms_form->AssembleDiagonal(diag_pa);
     MsInvPC = new OperatorJacobiSmoother(diag_pa, empty);
@@ -482,7 +481,7 @@ void ThermoChem::initializeOperators() {
   MsInv->SetRelTol(1e-12);  // config_->solver_tol);
   MsInv->SetMaxIter(2000);  // config_->solver_iter);
 
-  if (partial_assembly) {
+  if (partial_assembly_) {
     Vector diag_pa(sfes->GetTrueVSize());
     Ht_form->AssembleDiagonal(diag_pa);
     HtInvPC = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof);
@@ -499,24 +498,24 @@ void ThermoChem::initializeOperators() {
   HtInv->SetPrintLevel(pl_htsolve);
   HtInv->SetRelTol(1e-12);  // config_->solver_tol);
   HtInv->SetMaxIter(2000);  // config_->solver_iter);
-  if (rank0) std::cout << "Temperature operators set" << endl;
+  if (rank0_) std::cout << "Temperature operators set" << endl;
 
   // Qt .....................................
   Mq_form = new ParBilinearForm(sfes);
   auto *mq_blfi = new MassIntegrator;
-  if (numerical_integ) {
+  if (numerical_integ_) {
     mq_blfi->SetIntRule(&ir_i);
   }
   Mq_form->AddDomainIntegrator(mq_blfi);
-  if (partial_assembly) {
+  if (partial_assembly_) {
     Mq_form->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   }
   Mq_form->Assemble();
   Mq_form->FormSystemMatrix(Qt_ess_tdof, Mq);
   // Mq_form->FormSystemMatrix(empty, Mq);
-  if (rank0) std::cout << "ThermoChem Mq operator set" << endl;
+  if (rank0_) std::cout << "ThermoChem Mq operator set" << endl;
 
-  if (partial_assembly) {
+  if (partial_assembly_) {
     Vector diag_pa(sfes->GetTrueVSize());
     Mq_form->AssembleDiagonal(diag_pa);
     MqInvPC = new OperatorJacobiSmoother(diag_pa, empty);
@@ -534,11 +533,11 @@ void ThermoChem::initializeOperators() {
 
   LQ_form = new ParBilinearForm(sfes);
   auto *lqd_blfi = new DiffusionIntegrator(*thermal_diff_coeff);
-  if (numerical_integ) {
+  if (numerical_integ_) {
     lqd_blfi->SetIntRule(&ir_di);
   }
   LQ_form->AddDomainIntegrator(lqd_blfi);
-  if (partial_assembly) {
+  if (partial_assembly_) {
     LQ_form->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   }
   LQ_form->Assemble();
@@ -546,11 +545,11 @@ void ThermoChem::initializeOperators() {
 
   LQ_bdry = new ParLinearForm(sfes);
   auto *lq_bdry_lfi = new BoundaryNormalLFIntegrator(*kap_gradT_coeff, 2, -1);
-  if (numerical_integ) {
+  if (numerical_integ_) {
     lq_bdry_lfi->SetIntRule(&ir_di);
   }
   LQ_bdry->AddBoundaryIntegrator(lq_bdry_lfi, temp_ess_attr);
-  if (rank0) std::cout << "ThermoChem LQ operator set" << endl;
+  if (rank0_) std::cout << "ThermoChem LQ operator set" << endl;
 
   // // remaining initialization
   // if (config_->resetTemp == true) {
@@ -558,7 +557,7 @@ void ThermoChem::initializeOperators() {
   //   for (int i = 0; i < Sdof; i++) {
   //     data[i] = config_->initRhoRhoVp[4];
   //   }
-  //   if (rank0) std::cout << "Reset temperature to IC" << endl;
+  //   if (rank0_) std::cout << "Reset temperature to IC" << endl;
   // }
 
   // copy IC to other temp containers
@@ -568,7 +567,7 @@ void ThermoChem::initializeOperators() {
 
   // Temp filter
   if (filterTemp) {
-    sfec_filter = new H1_FECollection(order - filter_cutoff_modes);
+    sfec_filter = new H1_FECollection(order_ - filter_cutoff_modes);
     sfes_filter = new ParFiniteElementSpace(pmesh_, sfec_filter);
 
     Tn_NM1_gf.SetSpace(sfes_filter);
@@ -582,7 +581,7 @@ void ThermoChem::initializeOperators() {
   // ParGridFunction coordsDof(vfes);
   // pmesh_->GetNodes(coordsDof);
   // if (config_->linViscData.isEnabled) {
-  //   if (rank0) std::cout << "Viscous sponge active" << endl;
+  //   if (rank0_) std::cout << "Viscous sponge active" << endl;
   //   double *vMult = viscMult.HostReadWrite();
   //   double *hcoords = coordsDof.HostReadWrite();
   //   double wgt = 0.;
@@ -615,12 +614,12 @@ void ThermoChem::UpdateTimestepHistory(double dt) {
 }
 
 void ThermoChem::step() {
-  dt = timeCoeff_.dt;
-  time = timeCoeff_.time;
+  dt_ = timeCoeff_.dt;
+  time_ = timeCoeff_.time;
 
   // Set current time for velocity Dirichlet boundary conditions.
   for (auto &temp_dbc : temp_dbcs) {
-    temp_dbc.coeff->SetTime(time + dt);
+    temp_dbc.coeff->SetTime(time_ + dt_);
   }
 
   // Prepare for residual calc
@@ -638,9 +637,9 @@ void ThermoChem::step() {
   resT.Set(-1.0, tmpR0);
 
   // for unsteady term, compute and add known part of BDF unsteady term
-  tmpR0.Set(timeCoeff_.bd1 / dt, Tn);
-  tmpR0.Add(timeCoeff_.bd2 / dt, Tnm1);
-  tmpR0.Add(timeCoeff_.bd3 / dt, Tnm2);
+  tmpR0.Set(timeCoeff_.bd1 / dt_, Tn);
+  tmpR0.Add(timeCoeff_.bd2 / dt_, Tnm1);
+  tmpR0.Add(timeCoeff_.bd3 / dt_, Tnm2);
 
   MsRho->Mult(tmpR0, tmpR0b);
   resT.Add(-1.0, tmpR0b);
@@ -655,14 +654,14 @@ void ThermoChem::step() {
 
   // Update Helmholtz operator to account for changing dt, rho, and kappa
   rhoDt = rn_gf;
-  rhoDt *= (timeCoeff_.bd0 / dt);
+  rhoDt *= (timeCoeff_.bd0 / dt_);
 
   Ht_form->Update();
   Ht_form->Assemble();
   Ht_form->FormSystemMatrix(temp_ess_tdof, Ht);
 
   HtInv->SetOperator(*Ht);
-  if (partial_assembly) {
+  if (partial_assembly_) {
     delete HtInvPC;
     Vector diag_pa(sfes->GetTrueVSize());
     Ht_form->AssembleDiagonal(diag_pa);
@@ -677,7 +676,7 @@ void ThermoChem::step() {
   sfes->GetRestrictionMatrix()->MultTranspose(resT, resT_gf);
 
   Vector Xt2, Bt2;
-  if (partial_assembly) {
+  if (partial_assembly_) {
     auto *HC = Ht.As<ConstrainedOperator>();
     EliminateRHS(*Ht_form, *HC, temp_ess_tdof, Tn_next_gf, resT_gf, Xt2, Bt2, 1);
   } else {
@@ -717,7 +716,7 @@ void ThermoChem::step() {
   // computeQt();
   computeQtTO();
 
-  UpdateTimestepHistory(dt);
+  UpdateTimestepHistory(dt_);
 }
 
 void ThermoChem::computeExplicitTempConvectionOP(bool extrap) {
@@ -797,16 +796,16 @@ void ThermoChem::updateThermoP() {
     MPI_Allreduce(&myMass, &allMass, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
     PNM1 = thermoPressure;
     thermoPressure = systemMass / allMass * PNM1;
-    dtP = (thermoPressure - PNM1) / dt;
-    // if( rank0 == true ) std::cout << " Original closed system mass: " << systemMass << " [kg]" << endl;
-    // if( rank0 == true ) std::cout << " New (closed) system mass: " << allMass << " [kg]" << endl;
-    // if( rank0 == true ) std::cout << " ThermoP: " << thermoPressure << " dtP: " << dtP << endl;
+    dtP = (thermoPressure - PNM1) / dt_;
+    // if( rank0_ == true ) std::cout << " Original closed system mass: " << systemMass << " [kg]" << endl;
+    // if( rank0_ == true ) std::cout << " New (closed) system mass: " << allMass << " [kg]" << endl;
+    // if( rank0_ == true ) std::cout << " ThermoP: " << thermoPressure << " dtP: " << dtP << endl;
   }
 }
 
 void ThermoChem::updateDiffusivity() {
   // viscosity
-  if (!constantViscosity) {
+  if (!constant_viscosity_) {
     double *d_visc = visc.Write();
     const double *d_T = Tn.Read();
     const double mu_star = mu0_;
@@ -862,7 +861,7 @@ void ThermoChem::updateDensity(double tStep) {
   Array<int> empty;
 
   // set rn
-  if (constantDensity != true) {
+  if (constant_density_ != true) {
     if (tStep == 1.0) {
       rn = (thermoPressure / Rgas);
       rn /= Tn_next;
@@ -898,13 +897,13 @@ void ThermoChem::computeSystemMass() {
   Ms->Mult(rn, tmpR0);
   myMass = tmpR0.Sum();
   MPI_Allreduce(&myMass, &systemMass, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-  if (rank0 == true) std::cout << " Closed system mass: " << systemMass << " [kg]" << endl;
+  if (rank0_ == true) std::cout << " Closed system mass: " << systemMass << " [kg]" << endl;
 }
 
 void ThermoChem::AddTempDirichletBC(Coefficient *coeff, Array<int> &attr) {
   temp_dbcs.emplace_back(attr, coeff);
 
-  if (verbose && pmesh_->GetMyRank() == 0) {
+  if (rank0_ && pmesh_->GetMyRank() == 0) {
     mfem::out << "Adding Temperature Dirichlet BC to attributes ";
     for (int i = 0; i < attr.Size(); ++i) {
       if (attr[i] == 1) {
@@ -929,7 +928,7 @@ void ThermoChem::AddTempDirichletBC(ScalarFuncT *f, Array<int> &attr) {
 void ThermoChem::AddQtDirichletBC(Coefficient *coeff, Array<int> &attr) {
   Qt_dbcs.emplace_back(attr, coeff);
 
-  if (verbose && pmesh_->GetMyRank() == 0) {
+  if (rank0_ && pmesh_->GetMyRank() == 0) {
     mfem::out << "Adding Qt Dirichlet BC to attributes ";
     for (int i = 0; i < attr.Size(); ++i) {
       if (attr[i] == 1) {
@@ -1118,7 +1117,7 @@ void ThermoChem::interpolateInlet() {
   int nCount = 0;
 
   // open, find size
-  if (rank0) {
+  if (rank0_) {
     std::cout << " Attempting to open inlet file for counting... " << fname << endl;
     fflush(stdout);
 
@@ -1165,7 +1164,7 @@ void ThermoChem::interpolateInlet() {
   // 0) no, 1) x, 2) y, 3) z, 4) rho, 5) u, 6) v, 7) w
 
   // open, read data
-  if (rank0) {
+  if (rank0_) {
     std::cout << " Attempting to read line-by-line..." << endl;
     fflush(stdout);
 
@@ -1238,7 +1237,7 @@ void ThermoChem::interpolateInlet() {
 
   // broadcast data
   MPI_Bcast(&inlet, nCount * 8, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-  if (rank0) {
+  if (rank0_) {
     std::cout << " communicated inlet data" << endl;
     fflush(stdout);
   }
@@ -1306,7 +1305,7 @@ void ThermoChem::interpolateInlet() {
       // }
     }
 
-    // if(rank0) { std::cout << " attempting to record interpolated values in buffer" << endl; fflush(stdout); }
+    // if(rank0_) { std::cout << " attempting to record interpolated values in buffer" << endl; fflush(stdout); }
     if (wt_tot > 0.0) {
       dataTemp[n] = val_T / wt_tot;
       dataTempInf[n] = val_T / wt_tot;
