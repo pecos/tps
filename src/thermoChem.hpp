@@ -120,11 +120,11 @@ class ThermoChem : public ThermoChemModelBase {
   double sutherland_S0_;
 
   double Pr_, Cp_, gamma_, Rgas_;
-  double static_rho;
+  double static_rho_;
 
   /// pressure-related, closed-system thermo pressure changes
-  double ambientPressure, thermoPressure, systemMass;
-  double tPm1, tPm2, dtP;
+  double ambient_pressure_, thermo_pressure_, system_mass_;
+  double dtP_;
 
   // Initial temperature value (if constant IC)
   double T_ic_;
@@ -132,22 +132,22 @@ class ThermoChem : public ThermoChemModelBase {
   // FEM related fields and objects
 
   // Scalar \f$H^1\f$ finite element collection.
-  FiniteElementCollection *sfec = nullptr;
+  FiniteElementCollection *sfec_ = nullptr;
 
   // Scalar \f$H^1\f$ finite element space.
-  ParFiniteElementSpace *sfes = nullptr;
+  ParFiniteElementSpace *sfes_ = nullptr;
 
   // Fields
-  ParGridFunction Tnm1_gf, Tnm2_gf;
-  ParGridFunction Tn_gf, Tn_next_gf, Text_gf, resT_gf;
-  ParGridFunction rn_gf;
+  ParGridFunction Tnm1_gf_, Tnm2_gf_;
+  ParGridFunction Tn_gf_, Tn_next_gf_, Text_gf_, resT_gf_;
+  ParGridFunction rn_gf_;
   ParGridFunction rhoDt;
 
-  ParGridFunction viscTotal_gf;
-  ParGridFunction visc_gf;
-  ParGridFunction kappa_gf;
-  ParGridFunction R0PM0_gf;
-  ParGridFunction Qt_gf;
+  ParGridFunction viscTotal_gf_;
+  ParGridFunction visc_gf_;
+  ParGridFunction kappa_gf_;
+  ParGridFunction R0PM0_gf_;
+  ParGridFunction Qt_gf_;
 
   VectorGridFunctionCoefficient *un_next_coeff = nullptr;
   GridFunctionCoefficient *rhon_next_coeff = nullptr;
@@ -202,8 +202,8 @@ class ThermoChem : public ThermoChemModelBase {
 
   FiniteElementCollection *sfec_filter = nullptr;
   ParFiniteElementSpace *sfes_filter = nullptr;
-  ParGridFunction Tn_NM1_gf;
-  ParGridFunction Tn_filtered_gf;
+  ParGridFunction Tn_NM1_gf_;
+  ParGridFunction Tn_filtered_gf_;
 
 #if 0
   // TODO(trevilo): Re-enable variable inlet BC
@@ -243,19 +243,19 @@ class ThermoChem : public ThermoChemModelBase {
   void computeQtTO();
 
   /// Return a pointer to the current temperature ParGridFunction.
-  ParGridFunction *GetCurrentTemperature() { return &Tn_gf; }
+  ParGridFunction *GetCurrentTemperature() { return &Tn_gf_; }
 
   /// Return a pointer to the current density ParGridFunction.
-  ParGridFunction *GetCurrentDensity() { return &rn_gf; }
+  ParGridFunction *GetCurrentDensity() { return &rn_gf_; }
 
   /// Return a pointer to the current total viscosity ParGridFunction.
-  ParGridFunction *GetCurrentTotalViscosity() { return &viscTotal_gf; }
+  ParGridFunction *GetCurrentTotalViscosity() { return &viscTotal_gf_; }
 
   /// Return a pointer to the current total thermal diffusivity ParGridFunction.
-  ParGridFunction *GetCurrentTotalThermalDiffusivity() { return &kappa_gf; }
+  ParGridFunction *GetCurrentTotalThermalDiffusivity() { return &kappa_gf_; }
 
   /// Return a pointer to the current total thermal diffusivity ParGridFunction.
-  ParGridFunction *GetCurrentThermalDiv() { return &Qt_gf; }
+  ParGridFunction *GetCurrentThermalDiv() { return &Qt_gf_; }
 
   /// Rotate entries in the time step and solution history arrays.
   void UpdateTimestepHistory(double dt);
