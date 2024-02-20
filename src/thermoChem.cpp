@@ -67,7 +67,6 @@ ThermoChem::ThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, RunConf
     : tpsP_(tps), pmesh_(pmesh), loMach_opts_(loMach_opts), config_(config), timeCoeff_(timeCoeff) {}
 
 void ThermoChem::initializeSelf() {
-  // groupsMPI = pmesh->GetComm();
   rank = pmesh_->GetMyRank();
   rank0 = false;
   if (rank == 0) {
@@ -75,39 +74,33 @@ void ThermoChem::initializeSelf() {
   }
   dim = pmesh_->Dimension();
 
-  // // config settings for thermoChem
-  // if (config_->const_visc > 0.0) {
-  //   constantViscosity = true;
-  // }
-  // if (config_->const_dens > 0.0) {
-  //   constantDensity = true;
-  // }
-  // if (constantViscosity == true && constantDensity == true) {
-  //   incompressibleSolve = true;
-  // }
+  // Get options
+  std::string visc_model;
+  tpsP_->getInput("loMach/calperfect/viscosity-model", visc_model, std::string("sutherland"));
+  if (visc_model == "sutherland") {
+    constantViscosity = false;
+    // TODO(trevilo): Read parameters
+  } else if (visc_model == "constant") {
+    constantViscosity = true;
+  } else {
+    if (rank0) {
+      std::cout << "ERROR: loMach/calperfect/viscosity-model = " << visc_model << " not supported." << std::endl;
+    }
+    assert(false);
+    exit(1);
+  }
 
-  // constantViscosity = true;
-  constantViscosity = false;
   // constantDensity = true;
 
   bool verbose = rank0;
   if (verbose) grvy_printf(ginfo, "Initializing ThermoChem solver.\n");
 
-  // if (loMach_opts_->uOrder == -1) {
-  //   order = std::max(config_->solOrder, 1);
-  //   porder = order;
-  //   double no;
-  //   no = ceil(((double)order * 1.5));
-  //   norder = int(no);
-  // } else {
-  //   order = loMach_opts_->uOrder;
-  //   porder = loMach_opts_->pOrder;
-  //   norder = loMach_opts_->nOrder;
-  // }
   order = loMach_opts_->order;
 
+  // TODO(trevilo): Get parameters from input
   static_rho = 1.0;  // config_->const_dens;
   dyn_vis = 1.0e-5;  // config_->const_visc;
+
 
   tpsP_->getInput("loMach/ambientPressure", ambientPressure, 101325.0);
   thermoPressure = ambientPressure;
@@ -118,11 +111,12 @@ void ThermoChem::initializeSelf() {
   tPm2 = thermoPressure;
   dtP = 0.0;
 
-  // HARD CODE HARDCODE get for dry air
-  Rgas = 287.0;
-  Pr = 0.76;
-  Cp = 1000.5;
-  gamma = 1.4;
+  // TODO(trevilo): Get parameters from input
+  tpsP_->getInput("loMach/calperfect/Rgas", Rgas, 287.0);
+  tpsP_->getInput("loMach/calperfect/Prandtl", Pr, 0.71);
+  tpsP_->getInput("loMach/calperfect/gamma", gamma, 1.4);
+
+  Cp = gamma * Rgas / (gamma - 1);
 
   //-----------------------------------------------------
   // 2) Prepare the required finite elements
