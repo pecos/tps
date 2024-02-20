@@ -23,8 +23,9 @@ setup() {
     test -s $SOLN_FILE
 }
 
-# @test "[$TEST] verify tps output with input -> $RUNFILE" {
-#     test -s $SOLN_FILE
-#     test -s $REF_FILE
-#     ./soln_differ -r $SOLN_FILE $REF_FILE
-# }
+@test "[$TEST] verify tps output with input -> $RUNFILE" {
+    test -s $SOLN_FILE
+    test -s $REF_FILE
+
+    h5diff -r --relative=1e-14 $SOLN_FILE $REF_FILE /temperature/temperature
+}
