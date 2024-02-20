@@ -57,11 +57,10 @@ MFEM_HOST_DEVICE double Sutherland(const double T, const double mu_star, const d
 
 ThermoChem::ThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff,
                        TPS::Tps *tps)
-    : tpsP_(tps), loMach_opts_(loMach_opts), pmesh_(pmesh), timeCoeff_(timeCoeff) {
+    : tpsP_(tps), pmesh_(pmesh), timeCoeff_(timeCoeff) {
   rank0 = (pmesh_->GetMyRank() == 0);
-  order = loMach_opts_->order;
+  order = loMach_opts->order;
 
-  // Get some model options
   std::string visc_model;
   tpsP_->getInput("loMach/calperfect/viscosity-model", visc_model, std::string("sutherland"));
   if (visc_model == "sutherland") {
@@ -80,8 +79,20 @@ ThermoChem::ThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tempora
     exit(1);
   }
 
-  // TODO(trevilo): Get parameters from input
-  static_rho = 1.0;  // config_->const_dens;
+  std::string density_model;
+  tpsP_->getInput("loMach/calperfect/density-model", density_model, std::string("ideal-gas"));
+  if (density_model == "ideal-gas") {
+    constantDensity = false;
+  } else if (density_model == "constant") {
+    constantDensity = true;
+    tpsP_->getInput("loMach/calperfect/constant-density", static_rho, 1.0);
+  } else {
+    if (rank0) {
+      std::cout << "ERROR: loMach/calperfect/density-model = " << density_model << " not supported." << std::endl;
+    }
+    assert(false);
+    exit(1);
+  }
 
   tpsP_->getInput("loMach/ambientPressure", ambientPressure, 101325.0);
   thermoPressure = ambientPressure;
@@ -96,6 +107,10 @@ ThermoChem::ThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tempora
   tpsP_->getInput("loMach/calperfect/gamma", gamma, 1.4);
 
   Cp = gamma * Rgas / (gamma - 1);
+
+  filterTemp = loMach_opts->filterTemp;
+  filter_alpha = loMach_opts->filterWeight;
+  filter_cutoff_modes = loMach_opts->nFilter;
 }
 
 void ThermoChem::initializeSelf() {
@@ -521,10 +536,7 @@ void ThermoChem::initializeOperators() {
   Tn_next_gf.GetTrueDofs(Tn_next);
 
   // Temp filter
-  filter_alpha = loMach_opts_->filterWeight;
-  filter_cutoff_modes = loMach_opts_->nFilter;
-
-  if (loMach_opts_->filterTemp == true) {
+  if (filterTemp) {
     sfec_filter = new H1_FECollection(order - filter_cutoff_modes);
     sfes_filter = new ParFiniteElementSpace(pmesh_, sfec_filter);
 
@@ -588,86 +600,84 @@ void ThermoChem::step() {
     temp_dbc.coeff->SetTime(time + dt);
   }
 
-  if (loMach_opts_->solveTemp == true) {
-    resT = 0.0;
+  resT = 0.0;
 
-    // convection
-    computeExplicitTempConvectionOP(true);  // ->tmpR0
-    resT.Set(-1.0, tmpR0);
+  // convection
+  computeExplicitTempConvectionOP(true);  // ->tmpR0
+  resT.Set(-1.0, tmpR0);
 
-    // for unsteady term, compute and add known part of BDF unsteady term
-    tmpR0.Set(timeCoeff_.bd1 / dt, Tn);
-    tmpR0.Add(timeCoeff_.bd2 / dt, Tnm1);
-    tmpR0.Add(timeCoeff_.bd3 / dt, Tnm2);
+  // for unsteady term, compute and add known part of BDF unsteady term
+  tmpR0.Set(timeCoeff_.bd1 / dt, Tn);
+  tmpR0.Add(timeCoeff_.bd2 / dt, Tnm1);
+  tmpR0.Add(timeCoeff_.bd3 / dt, Tnm2);
 
-    MsRho->Mult(tmpR0, tmpR0b);
-    resT.Add(-1.0, tmpR0b);
+  MsRho->Mult(tmpR0, tmpR0b);
+  resT.Add(-1.0, tmpR0b);
 
-    // dPo/dt
-    // tmpR0 = (dtP / Cp);
-    // Ms->Mult(tmpR0, tmpR0b);
-    // resT.Add(1.0, tmpR0b);
+  // dPo/dt
+  // tmpR0 = (dtP / Cp);
+  // Ms->Mult(tmpR0, tmpR0b);
+  // resT.Add(1.0, tmpR0b);
 
-    // Add natural boundary terms here later
+  // Add natural boundary terms here later
 
-    // update Helmholtz operator, unsteady here, kappa in updateDiffusivity
-    {
-      rhoDt = rn_gf;
-      rhoDt *= (timeCoeff_.bd0 / dt);
-    }
-    Ht_form->Update();
-    Ht_form->Assemble();
-    Ht_form->FormSystemMatrix(temp_ess_tdof, Ht);
+  // update Helmholtz operator, unsteady here, kappa in updateDiffusivity
+  {
+    rhoDt = rn_gf;
+    rhoDt *= (timeCoeff_.bd0 / dt);
+  }
+  Ht_form->Update();
+  Ht_form->Assemble();
+  Ht_form->FormSystemMatrix(temp_ess_tdof, Ht);
 
-    HtInv->SetOperator(*Ht);
-    if (partial_assembly) {
-      delete HtInvPC;
-      Vector diag_pa(sfes->GetTrueVSize());
-      Ht_form->AssembleDiagonal(diag_pa);
-      HtInvPC = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof);
-      HtInv->SetPreconditioner(*HtInvPC);
-    }
+  HtInv->SetOperator(*Ht);
+  if (partial_assembly) {
+    delete HtInvPC;
+    Vector diag_pa(sfes->GetTrueVSize());
+    Ht_form->AssembleDiagonal(diag_pa);
+    HtInvPC = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof);
+    HtInv->SetPreconditioner(*HtInvPC);
+  }
 
-    for (auto &temp_dbc : temp_dbcs) {
-      Tn_next_gf.ProjectBdrCoefficient(*temp_dbc.coeff, temp_dbc.attr);
-    }
-    sfes->GetRestrictionMatrix()->MultTranspose(resT, resT_gf);
+  for (auto &temp_dbc : temp_dbcs) {
+    Tn_next_gf.ProjectBdrCoefficient(*temp_dbc.coeff, temp_dbc.attr);
+  }
+  sfes->GetRestrictionMatrix()->MultTranspose(resT, resT_gf);
 
-    Vector Xt2, Bt2;
-    if (partial_assembly) {
-      auto *HC = Ht.As<ConstrainedOperator>();
-      EliminateRHS(*Ht_form, *HC, temp_ess_tdof, Tn_next_gf, resT_gf, Xt2, Bt2, 1);
-    } else {
-      Ht_form->FormLinearSystem(temp_ess_tdof, Tn_next_gf, resT_gf, Ht, Xt2, Bt2, 1);
-    }
+  Vector Xt2, Bt2;
+  if (partial_assembly) {
+    auto *HC = Ht.As<ConstrainedOperator>();
+    EliminateRHS(*Ht_form, *HC, temp_ess_tdof, Tn_next_gf, resT_gf, Xt2, Bt2, 1);
+  } else {
+    Ht_form->FormLinearSystem(temp_ess_tdof, Tn_next_gf, resT_gf, Ht, Xt2, Bt2, 1);
+  }
 
-    // solve helmholtz eq for temp
-    HtInv->Mult(Bt2, Xt2);
+  // solve helmholtz eq for temp
+  HtInv->Mult(Bt2, Xt2);
 
-    if (!HtInv->GetConverged()) {
-      printf("Solver did not converge!!\n");
-    } else {
-      iter_htsolve = HtInv->GetNumIterations();
-      res_htsolve = HtInv->GetFinalNorm();
-      printf("Solver took %d iterations to get to residual = %.6e\n", iter_htsolve, res_htsolve);
-    }
-
+  if (!HtInv->GetConverged()) {
+    printf("Solver did not converge!!\n");
+  } else {
     iter_htsolve = HtInv->GetNumIterations();
     res_htsolve = HtInv->GetFinalNorm();
-    Ht_form->RecoverFEMSolution(Xt2, resT_gf, Tn_next_gf);
-    Tn_next_gf.GetTrueDofs(Tn_next);
+    printf("Solver took %d iterations to get to residual = %.6e\n", iter_htsolve, res_htsolve);
+  }
 
-    // explicit filter
-    if (loMach_opts_->filterTemp == true) {
-      const auto filter_alpha_ = filter_alpha;
-      Tn_NM1_gf.ProjectGridFunction(Tn_next_gf);
-      Tn_filtered_gf.ProjectGridFunction(Tn_NM1_gf);
-      const auto d_Tn_filtered_gf = Tn_filtered_gf.Read();
-      auto d_Tn_gf = Tn_next_gf.ReadWrite();
-      MFEM_FORALL(i, Tn_next_gf.Size(),
-                  { d_Tn_gf[i] = (1.0 - filter_alpha_) * d_Tn_gf[i] + filter_alpha_ * d_Tn_filtered_gf[i]; });
-      Tn_next_gf.GetTrueDofs(Tn_next);
-    }
+  iter_htsolve = HtInv->GetNumIterations();
+  res_htsolve = HtInv->GetFinalNorm();
+  Ht_form->RecoverFEMSolution(Xt2, resT_gf, Tn_next_gf);
+  Tn_next_gf.GetTrueDofs(Tn_next);
+
+  // explicit filter
+  if (filterTemp) {
+    const auto filter_alpha_ = filter_alpha;
+    Tn_NM1_gf.ProjectGridFunction(Tn_next_gf);
+    Tn_filtered_gf.ProjectGridFunction(Tn_NM1_gf);
+    const auto d_Tn_filtered_gf = Tn_filtered_gf.Read();
+    auto d_Tn_gf = Tn_next_gf.ReadWrite();
+    MFEM_FORALL(i, Tn_next_gf.Size(),
+                { d_Tn_gf[i] = (1.0 - filter_alpha_) * d_Tn_gf[i] + filter_alpha_ * d_Tn_filtered_gf[i]; });
+    Tn_next_gf.GetTrueDofs(Tn_next);
   }
 
   // prepare for external use

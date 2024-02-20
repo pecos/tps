@@ -61,7 +61,6 @@ class ThermoChem : public ThermoChemModelBase {
  private:
   // Options-related structures
   TPS::Tps *tpsP_ = nullptr;
-  LoMachOptions *loMach_opts_ = nullptr;
 
   // Mesh and discretization scheme info
   ParMesh *pmesh_ = nullptr;
@@ -204,6 +203,7 @@ class ThermoChem : public ThermoChemModelBase {
   Vector visc;
 
   // Parameters and objects used in filter-based stabilization
+  bool filterTemp = false;
   int filter_cutoff_modes = 0;
   double filter_alpha = 0.0;
 
