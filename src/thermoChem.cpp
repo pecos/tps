@@ -57,16 +57,11 @@ MFEM_HOST_DEVICE double Sutherland(const double T, const double mu_star, const d
 
 ThermoChem::ThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff,
                        TPS::Tps *tps)
-    : tpsP_(tps), loMach_opts_(loMach_opts), pmesh_(pmesh), timeCoeff_(timeCoeff) {}
+    : tpsP_(tps), loMach_opts_(loMach_opts), pmesh_(pmesh), timeCoeff_(timeCoeff) {
+  rank0 = (pmesh_->GetMyRank() == 0);
+  order = loMach_opts_->order;
 
-void ThermoChem::initializeSelf() {
-  rank = pmesh_->GetMyRank();
-  rank0 = false;
-  if (rank == 0) {
-    rank0 = true;
-  }
-
-  // Get options
+  // Get some model options
   std::string visc_model;
   tpsP_->getInput("loMach/calperfect/viscosity-model", visc_model, std::string("sutherland"));
   if (visc_model == "sutherland") {
@@ -84,13 +79,6 @@ void ThermoChem::initializeSelf() {
     assert(false);
     exit(1);
   }
-
-  // constantDensity = true;
-
-  bool verbose = rank0;
-  if (verbose) grvy_printf(ginfo, "Initializing ThermoChem solver.\n");
-
-  order = loMach_opts_->order;
 
   // TODO(trevilo): Get parameters from input
   static_rho = 1.0;  // config_->const_dens;
@@ -110,9 +98,14 @@ void ThermoChem::initializeSelf() {
   tpsP_->getInput("loMach/calperfect/gamma", gamma, 1.4);
 
   Cp = gamma * Rgas / (gamma - 1);
+}
+
+void ThermoChem::initializeSelf() {
+  verbose = rank0;
+  if (verbose) grvy_printf(ginfo, "Initializing ThermoChem solver.\n");
 
   //-----------------------------------------------------
-  // 2) Prepare the required finite elements
+  // 1) Prepare the required finite elements
   //-----------------------------------------------------
 
   // scalar

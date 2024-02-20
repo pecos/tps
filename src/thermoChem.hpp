@@ -71,12 +71,8 @@ class ThermoChem : public ThermoChemModelBase {
   double dt;
   double time;
 
-  // MPI-related
-  int nprocs_;  // total number of MPI procs
-  int rank;     // local MPI rank
-  bool rank0;   // flag to indicate rank 0
-
   // Flags
+  bool rank0;  // flag to indicate rank 0
 
   /// Enable/disable verbose output.
   bool verbose = true;
