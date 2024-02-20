@@ -378,7 +378,6 @@ void ThermoChem::initializeOperators() {
 
   // coefficients for operators
   Rho = new GridFunctionCoefficient(&rn_gf);
-  viscField = new GridFunctionCoefficient(&visc_gf);
   kappaField = new GridFunctionCoefficient(&kappa_gf);
 
   rhoDt = rn_gf;
@@ -1009,15 +1008,6 @@ void ThermoChem::updateDensity(double tStep) {
   // project to p-space in case not same as vel-temp
   R0PM0_gf.SetFromTrueDofs(rn);
   // R0PM1_gf.ProjectGridFunction(R0PM0_gf);
-
-  // Is bufferInvRho used anywhere????
-  // {
-  //   double *data = bufferInvRho->HostReadWrite();
-  //   double *rho = R0PM1_gf.HostReadWrite();
-  //   for (int i = 0; i < Pdof; i++) {
-  //     data[i] = 1.0 / rho[i];
-  //   }
-  // }
 }
 
 void ThermoChem::computeSystemMass() {

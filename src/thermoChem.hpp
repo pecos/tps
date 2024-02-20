@@ -146,31 +146,20 @@ class ThermoChem : public ThermoChemModelBase {
   GradientGridFunctionCoefficient *gradT_coeff = nullptr;
   ScalarVectorProductCoefficient *kap_gradT_coeff = nullptr;
 
-  ConstantCoefficient *t_bc_coef0;
-  ConstantCoefficient *t_bc_coef1;
-  ConstantCoefficient *t_bc_coef2;
-  ConstantCoefficient *t_bc_coef3;
-
-  ConstantCoefficient *buffer_tbc = nullptr;
   ConstantCoefficient *buffer_qbc = nullptr;
 
-  ParGridFunction *bufferInvRho = nullptr;
-  ParGridFunction *bufferVisc = nullptr;
-  ParGridFunction *bufferBulkVisc = nullptr;
-  ParGridFunction *bufferRho = nullptr;
   ParGridFunction rhoDt;
-  ParGridFunction *bufferTemp = nullptr;
 
-  GridFunctionCoefficient *viscField = nullptr;
-  GridFunctionCoefficient *bulkViscField = nullptr;
   GridFunctionCoefficient *rhoDtField = nullptr;
-  GridFunctionCoefficient *invRho = nullptr;
   GridFunctionCoefficient *Rho = nullptr;
   GridFunctionCoefficient *kappaField = nullptr;
 
+#if 0
+  // TODO(trevilo): Re-enable variable inlet BC
   ParGridFunction *buffer_tInlet = nullptr;
   ParGridFunction *buffer_tInletInf = nullptr;
   GridFunctionCoefficient *tInletField = nullptr;
+#endif
 
 #if 0
   // TODO(trevilo): Re-enable the viscosity multiplier functionality
