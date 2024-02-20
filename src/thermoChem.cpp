@@ -378,7 +378,6 @@ void ThermoChem::initializeOperators() {
 
   // coefficients for operators
   Rho = new GridFunctionCoefficient(&rn_gf);
-  kappaField = new GridFunctionCoefficient(&kappa_gf);
 
   rhoDt = rn_gf;
   rhoDt /= dt;
@@ -437,7 +436,7 @@ void ThermoChem::initializeOperators() {
 
   Ht_form = new ParBilinearForm(sfes);
   auto *hmt_blfi = new MassIntegrator(*rhoDtField);
-  auto *hdt_blfi = new DiffusionIntegrator(*kappaField);
+  auto *hdt_blfi = new DiffusionIntegrator(*thermal_diff_coeff);
 
   if (numerical_integ) {
     hmt_blfi->SetIntRule(&ir_di);
@@ -519,7 +518,7 @@ void ThermoChem::initializeOperators() {
   MqInv->SetMaxIter(2000);  // config_->solver_iter);
 
   LQ_form = new ParBilinearForm(sfes);
-  auto *lqd_blfi = new DiffusionIntegrator(*kappaField);
+  auto *lqd_blfi = new DiffusionIntegrator(*thermal_diff_coeff);
   if (numerical_integ) {
     lqd_blfi->SetIntRule(&ir_di);
   }

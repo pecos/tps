@@ -152,7 +152,6 @@ class ThermoChem : public ThermoChemModelBase {
 
   GridFunctionCoefficient *rhoDtField = nullptr;
   GridFunctionCoefficient *Rho = nullptr;
-  GridFunctionCoefficient *kappaField = nullptr;
 
 #if 0
   // TODO(trevilo): Re-enable variable inlet BC
@@ -179,7 +178,6 @@ class ThermoChem : public ThermoChemModelBase {
   OperatorHandle Ms;
   OperatorHandle MsRho;
   OperatorHandle Mq;
-  OperatorHandle Ds;
 
   mfem::Solver *MsInvPC = nullptr;
   mfem::CGSolver *MsInv = nullptr;
@@ -187,7 +185,6 @@ class ThermoChem : public ThermoChemModelBase {
   mfem::CGSolver *MqInv = nullptr;
   mfem::Solver *HtInvPC = nullptr;
   mfem::CGSolver *HtInv = nullptr;
-  mfem::Solver *MvInvPC = nullptr;
 
   ParGridFunction Tnm1_gf, Tnm2_gf;
   ParGridFunction Tn_gf, Tn_next_gf, Text_gf, resT_gf;
