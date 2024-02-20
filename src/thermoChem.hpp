@@ -44,21 +44,11 @@ class Tps;
 #include <iostream>
 
 #include "../utils/mfem_extras/pfem_extras.hpp"
-#include "argon_transport.hpp"
-#include "averaging_and_rms.hpp"
-#include "chemistry.hpp"
 #include "dirichlet_bc_helper.hpp"
 #include "io.hpp"
-#include "mfem.hpp"
-#include "mfem/linalg/solvers.hpp"
-#include "radiation.hpp"
 #include "run_configuration.hpp"
-#include "split_flow_base.hpp"
 #include "thermo_chem_base.hpp"
-#include "tps.hpp"
 #include "tps_mfem_wrap.hpp"
-#include "transport_properties.hpp"
-#include "turb_model_base.hpp"
 
 using VecFuncT = void(const Vector &x, double t, Vector &u);
 using ScalarFuncT = double(const Vector &x, double t);
@@ -217,9 +207,13 @@ class ThermoChem : public ThermoChemModelBase {
   ParGridFunction *buffer_tInletInf = nullptr;
   GridFunctionCoefficient *tInletField = nullptr;
 
+#if 0
+  // TODO(trevilo): Re-enable the viscosity multiplier functionality
   // space varying viscosity multiplier
   ParGridFunction viscMult_gf;
   viscositySpongeData vsd_;
+#endif
+
   ParGridFunction viscTotal_gf;
   ParGridFunction visc_gf;
   ParGridFunction eddyVisc_gf;

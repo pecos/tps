@@ -37,13 +37,12 @@
 
 #include <fstream>
 #include <iomanip>
+#include <mfem/general/forall.hpp>
 
-#include "../utils/mfem_extras/pfem_extras.hpp"
 #include "loMach.hpp"
 #include "loMach_options.hpp"
 #include "logger.hpp"
-#include "mfem/general/forall.hpp"
-#include "mfem/linalg/solvers.hpp"
+#include "tps.hpp"
 #include "utils.hpp"
 
 using namespace mfem;
@@ -190,8 +189,10 @@ void ThermoChem::initializeSelf() {
 
   visc.SetSize(sfes_truevsize);
   visc = 1.0e-12;
+#if 0
   viscMult.SetSize(sfes_truevsize);
   viscMult = 1.0;
+#endif
 
   kappa.SetSize(sfes_truevsize);
   kappa = 1.0e-12;
@@ -220,7 +221,9 @@ void ThermoChem::initializeSelf() {
   R0PM1_gf.SetSpace(pfes);
 
   rhoDt.SetSpace(sfes);
+#if 0
   viscMult_gf.SetSpace(sfes);
+#endif
 
   if (verbose) grvy_printf(ginfo, "ThermoChem vectors and gf initialized...\n");
 
@@ -878,6 +881,11 @@ void ThermoChem::updateThermoP() {
   }
 }
 
+#if 0
+// Temporarily remove viscous sponge capability.  This sould be housed
+// in a separate class that we just instantiate and call, rather than
+// directly in ThermoChem.
+
 /**
 Simple planar viscous sponge layer with smooth tanh-transtion using user-specified width and
 total amplification.  Note: duplicate in M2
@@ -988,6 +996,7 @@ void ThermoChem::viscSpongePlanar(double *x, double &wgt) {
   wgtAnn += 1.0;
   wgt = std::max(wgt, wgtAnn);
 }
+#endif
 
 void ThermoChem::updateDiffusivity() {
   // viscosity
