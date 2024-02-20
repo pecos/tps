@@ -110,7 +110,6 @@ class ThermoChem : public ThermoChemModelBase {
 
   double dt;
   double time;
-  int iter;
 
   // Coefficients necessary to take a time step (including dt).
   // Assumed to be externally managed and determined, so just get a
