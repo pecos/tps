@@ -88,35 +88,29 @@ class ThermoChem : public ThermoChemModelBase {
   // Linear-solver-related options
 
   // Print levels.
-  int pl_mvsolve = 0;
-  int pl_htsolve = 0;
-  int pl_mtsolve = 0;
+  int pl_solve_ = 0;
+
+  // max iterations
+  int max_iter_;
 
   // Relative tolerances.
-  double rtol_hsolve = 1e-12;
-  double rtol_htsolve = 1e-12;
-
-  // Iteration counts.
-  int iter_mtsolve = 0, iter_htsolve = 0;
-
-  // Residuals.
-  double res_mtsolve = 0.0, res_htsolve = 0.0;
+  double rtol_ = 1e-12;
 
   // Boundary condition info
 
   // All essential attributes.
-  Array<int> temp_ess_attr;
-  Array<int> Qt_ess_attr;
+  Array<int> temp_ess_attr_;
+  Array<int> Qt_ess_attr_;
 
   // All essential true dofs.
-  Array<int> temp_ess_tdof;
-  Array<int> Qt_ess_tdof;
+  Array<int> temp_ess_tdof_;
+  Array<int> Qt_ess_tdof_;
 
   // Bookkeeping for temperature dirichlet bcs.
-  std::vector<DirichletBC_T<Coefficient>> temp_dbcs;
+  std::vector<DirichletBC_T<Coefficient>> temp_dbcs_;
 
   // Bookkeeping for Qt dirichlet bcs.
-  std::vector<DirichletBC_T<Coefficient>> Qt_dbcs;
+  std::vector<DirichletBC_T<Coefficient>> Qt_dbcs_;
 
   // Scalar modeling parameters
 
@@ -125,8 +119,8 @@ class ThermoChem : public ThermoChemModelBase {
   double sutherland_T0_;
   double sutherland_S0_;
 
-  double Pr, Cp, gamma;
-  double static_rho, Rgas;
+  double Pr_, Cp_, gamma_, Rgas_;
+  double static_rho;
 
   /// pressure-related, closed-system thermo pressure changes
   double ambientPressure, thermoPressure, systemMass;

@@ -102,17 +102,21 @@ ThermoChem::ThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tempora
 
   tpsP_->getInput("initialConditions/temperature", T_ic_, 300.0);
 
-  tpsP_->getInput("loMach/calperfect/Rgas", Rgas, 287.0);
-  tpsP_->getInput("loMach/calperfect/Prandtl", Pr, 0.71);
-  tpsP_->getInput("loMach/calperfect/gamma", gamma, 1.4);
+  tpsP_->getInput("loMach/calperfect/Rgas", Rgas_, 287.0);
+  tpsP_->getInput("loMach/calperfect/Prandtl", Pr_, 0.71);
+  tpsP_->getInput("loMach/calperfect/gamma", gamma_, 1.4);
 
-  Cp = gamma * Rgas / (gamma - 1);
+  Cp_ = gamma_ * Rgas_ / (gamma_ - 1);
 
   filterTemp = loMach_opts->filterTemp;
   filter_alpha = loMach_opts->filterWeight;
   filter_cutoff_modes = loMach_opts->nFilter;
 
   tpsP_->getInput("loMach/openSystem", domain_is_open_, false);
+
+  tpsP_->getInput("loMach/calperfect/linear-solver-rtol", rtol_, 1e-12);
+  tpsP_->getInput("loMach/calperfect/linear-solver-max-iter", max_iter_, 1000);
+  tpsP_->getInput("loMach/calperfect/linear-solver-verbosity", pl_solve_, 0);
 }
 
 ThermoChem::~ThermoChem() {
@@ -155,11 +159,11 @@ void ThermoChem::initializeSelf() {
 
   // Check if fully periodic mesh
   if (!(pmesh_->bdr_attributes.Size() == 0)) {
-    temp_ess_attr.SetSize(pmesh_->bdr_attributes.Max());
-    temp_ess_attr = 0;
+    temp_ess_attr_.SetSize(pmesh_->bdr_attributes.Max());
+    temp_ess_attr_ = 0;
 
-    Qt_ess_attr.SetSize(pmesh_->bdr_attributes.Max());
-    Qt_ess_attr = 0;
+    Qt_ess_attr_.SetSize(pmesh_->bdr_attributes.Max());
+    Qt_ess_attr_ = 0;
   }
   if (rank0_) grvy_printf(ginfo, "ThermoChem paces constructed...\n");
 
@@ -371,8 +375,8 @@ void ThermoChem::initializeSelf() {
   // buffer_qbc = new ConstantCoefficient(Qt_bc_coef);
   // AddQtDirichletBC(buffer_qbc, Qattr);
 
-  sfes->GetEssentialTrueDofs(temp_ess_attr, temp_ess_tdof);
-  sfes->GetEssentialTrueDofs(Qt_ess_attr, Qt_ess_tdof);
+  sfes->GetEssentialTrueDofs(temp_ess_attr_, temp_ess_tdof_);
+  sfes->GetEssentialTrueDofs(Qt_ess_attr_, Qt_ess_tdof_);
   if (rank0_) std::cout << "ThermoChem Essential true dof step" << endl;
 }
 
@@ -462,7 +466,7 @@ void ThermoChem::initializeOperators() {
     Ht_form->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   }
   Ht_form->Assemble();
-  Ht_form->FormSystemMatrix(temp_ess_tdof, Ht);
+  Ht_form->FormSystemMatrix(temp_ess_tdof_, Ht);
   if (rank0_) std::cout << "ThermoChem Ht operator set" << endl;
 
   if (partial_assembly_) {
@@ -477,14 +481,14 @@ void ThermoChem::initializeOperators() {
   MsInv->iterative_mode = false;
   MsInv->SetOperator(*Ms);
   MsInv->SetPreconditioner(*MsInvPC);
-  MsInv->SetPrintLevel(pl_mtsolve);
-  MsInv->SetRelTol(1e-12);  // config_->solver_tol);
-  MsInv->SetMaxIter(2000);  // config_->solver_iter);
+  MsInv->SetPrintLevel(pl_solve_);
+  MsInv->SetRelTol(rtol_);
+  MsInv->SetMaxIter(max_iter_);
 
   if (partial_assembly_) {
     Vector diag_pa(sfes->GetTrueVSize());
     Ht_form->AssembleDiagonal(diag_pa);
-    HtInvPC = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof);
+    HtInvPC = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof_);
   } else {
     HtInvPC = new HypreSmoother(*Ht.As<HypreParMatrix>());
     dynamic_cast<HypreSmoother *>(HtInvPC)->SetType(HypreSmoother::Jacobi, 1);
@@ -495,9 +499,9 @@ void ThermoChem::initializeOperators() {
   HtInv->iterative_mode = true;
   HtInv->SetOperator(*Ht);
   HtInv->SetPreconditioner(*HtInvPC);
-  HtInv->SetPrintLevel(pl_htsolve);
-  HtInv->SetRelTol(1e-12);  // config_->solver_tol);
-  HtInv->SetMaxIter(2000);  // config_->solver_iter);
+  HtInv->SetPrintLevel(pl_solve_);
+  HtInv->SetRelTol(rtol_);
+  HtInv->SetMaxIter(max_iter_);
   if (rank0_) std::cout << "Temperature operators set" << endl;
 
   // Qt .....................................
@@ -511,7 +515,7 @@ void ThermoChem::initializeOperators() {
     Mq_form->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   }
   Mq_form->Assemble();
-  Mq_form->FormSystemMatrix(Qt_ess_tdof, Mq);
+  Mq_form->FormSystemMatrix(Qt_ess_tdof_, Mq);
   // Mq_form->FormSystemMatrix(empty, Mq);
   if (rank0_) std::cout << "ThermoChem Mq operator set" << endl;
 
@@ -527,9 +531,9 @@ void ThermoChem::initializeOperators() {
   MqInv->iterative_mode = false;
   MqInv->SetOperator(*Mq);
   MqInv->SetPreconditioner(*MqInvPC);
-  MqInv->SetPrintLevel(pl_mtsolve);
-  MqInv->SetRelTol(1e-12);  // config_->solver_tol);
-  MqInv->SetMaxIter(2000);  // config_->solver_iter);
+  MqInv->SetPrintLevel(pl_solve_);
+  MqInv->SetRelTol(rtol_);
+  MqInv->SetMaxIter(max_iter_);
 
   LQ_form = new ParBilinearForm(sfes);
   auto *lqd_blfi = new DiffusionIntegrator(*thermal_diff_coeff);
@@ -548,7 +552,7 @@ void ThermoChem::initializeOperators() {
   if (numerical_integ_) {
     lq_bdry_lfi->SetIntRule(&ir_di);
   }
-  LQ_bdry->AddBoundaryIntegrator(lq_bdry_lfi, temp_ess_attr);
+  LQ_bdry->AddBoundaryIntegrator(lq_bdry_lfi, temp_ess_attr_);
   if (rank0_) std::cout << "ThermoChem LQ operator set" << endl;
 
   // // remaining initialization
@@ -618,7 +622,7 @@ void ThermoChem::step() {
   time_ = timeCoeff_.time;
 
   // Set current time for velocity Dirichlet boundary conditions.
-  for (auto &temp_dbc : temp_dbcs) {
+  for (auto &temp_dbc : temp_dbcs_) {
     temp_dbc.coeff->SetTime(time_ + dt_);
   }
 
@@ -645,7 +649,7 @@ void ThermoChem::step() {
   resT.Add(-1.0, tmpR0b);
 
   // dPo/dt
-  tmpR0 = (dtP / Cp);
+  tmpR0 = (dtP / Cp_);
   Ms->Mult(tmpR0, tmpR0b);
   resT.Add(1.0, tmpR0b);
 
@@ -658,19 +662,19 @@ void ThermoChem::step() {
 
   Ht_form->Update();
   Ht_form->Assemble();
-  Ht_form->FormSystemMatrix(temp_ess_tdof, Ht);
+  Ht_form->FormSystemMatrix(temp_ess_tdof_, Ht);
 
   HtInv->SetOperator(*Ht);
   if (partial_assembly_) {
     delete HtInvPC;
     Vector diag_pa(sfes->GetTrueVSize());
     Ht_form->AssembleDiagonal(diag_pa);
-    HtInvPC = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof);
+    HtInvPC = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof_);
     HtInv->SetPreconditioner(*HtInvPC);
   }
 
   // Prepare for the solve
-  for (auto &temp_dbc : temp_dbcs) {
+  for (auto &temp_dbc : temp_dbcs_) {
     Tn_next_gf.ProjectBdrCoefficient(*temp_dbc.coeff, temp_dbc.attr);
   }
   sfes->GetRestrictionMatrix()->MultTranspose(resT, resT_gf);
@@ -678,24 +682,15 @@ void ThermoChem::step() {
   Vector Xt2, Bt2;
   if (partial_assembly_) {
     auto *HC = Ht.As<ConstrainedOperator>();
-    EliminateRHS(*Ht_form, *HC, temp_ess_tdof, Tn_next_gf, resT_gf, Xt2, Bt2, 1);
+    EliminateRHS(*Ht_form, *HC, temp_ess_tdof_, Tn_next_gf, resT_gf, Xt2, Bt2, 1);
   } else {
-    Ht_form->FormLinearSystem(temp_ess_tdof, Tn_next_gf, resT_gf, Ht, Xt2, Bt2, 1);
+    Ht_form->FormLinearSystem(temp_ess_tdof_, Tn_next_gf, resT_gf, Ht, Xt2, Bt2, 1);
   }
 
   // solve helmholtz eq for temp
   HtInv->Mult(Bt2, Xt2);
+  assert(HtInv->GetConverged());
 
-  if (!HtInv->GetConverged()) {
-    printf("Solver did not converge!!\n");
-  } else {
-    iter_htsolve = HtInv->GetNumIterations();
-    res_htsolve = HtInv->GetFinalNorm();
-    printf("Solver took %d iterations to get to residual = %.6e\n", iter_htsolve, res_htsolve);
-  }
-
-  iter_htsolve = HtInv->GetNumIterations();
-  res_htsolve = HtInv->GetFinalNorm();
   Ht_form->RecoverFEMSolution(Xt2, resT_gf, Tn_next_gf);
   Tn_next_gf.GetTrueDofs(Tn_next);
 
@@ -790,7 +785,7 @@ void ThermoChem::updateThermoP() {
     double myMass = 0.0;
     tmpR0 = 1.0;
     tmpR0 /= Tn;
-    tmpR0 *= (thermoPressure / Rgas);
+    tmpR0 *= (thermoPressure / Rgas_);
     Ms->Mult(tmpR0, tmpR0b);
     myMass = tmpR0b.Sum();
     MPI_Allreduce(&myMass, &allMass, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
@@ -853,7 +848,7 @@ void ThermoChem::updateDiffusivity() {
 
   // NB: Here kappa is kappa / Cp = mu / Pr
   kappa = visc;
-  kappa /= Pr;
+  kappa /= Pr_;
   kappa_gf.SetFromTrueDofs(kappa);
 }
 
@@ -863,15 +858,15 @@ void ThermoChem::updateDensity(double tStep) {
   // set rn
   if (constant_density_ != true) {
     if (tStep == 1.0) {
-      rn = (thermoPressure / Rgas);
+      rn = (thermoPressure / Rgas_);
       rn /= Tn_next;
     } else if (tStep == 0.5) {
-      multConstScalarInv((thermoPressure / Rgas), Tn_next, &tmpR0a);
-      multConstScalarInv((thermoPressure / Rgas), Tn, &tmpR0b);
+      multConstScalarInv((thermoPressure / Rgas_), Tn_next, &tmpR0a);
+      multConstScalarInv((thermoPressure / Rgas_), Tn, &tmpR0b);
       rn.Set(0.5, tmpR0a);
       rn.Add(0.5, tmpR0b);
     } else {
-      multConstScalarInv((thermoPressure / Rgas), Tn, &rn);
+      multConstScalarInv((thermoPressure / Rgas_), Tn, &rn);
     }
 
   } else {
@@ -892,7 +887,7 @@ void ThermoChem::updateDensity(double tStep) {
 void ThermoChem::computeSystemMass() {
   systemMass = 0.0;
   double myMass = 0.0;
-  rn = (thermoPressure / Rgas);
+  rn = (thermoPressure / Rgas_);
   rn /= Tn;
   Ms->Mult(rn, tmpR0);
   myMass = tmpR0.Sum();
@@ -901,7 +896,7 @@ void ThermoChem::computeSystemMass() {
 }
 
 void ThermoChem::AddTempDirichletBC(Coefficient *coeff, Array<int> &attr) {
-  temp_dbcs.emplace_back(attr, coeff);
+  temp_dbcs_.emplace_back(attr, coeff);
 
   if (rank0_ && pmesh_->GetMyRank() == 0) {
     mfem::out << "Adding Temperature Dirichlet BC to attributes ";
@@ -914,9 +909,9 @@ void ThermoChem::AddTempDirichletBC(Coefficient *coeff, Array<int> &attr) {
   }
 
   for (int i = 0; i < attr.Size(); ++i) {
-    MFEM_ASSERT((temp_ess_attr[i] && attr[i]) == 0, "Duplicate boundary definition deteceted.");
+    MFEM_ASSERT((temp_ess_attr_[i] && attr[i]) == 0, "Duplicate boundary definition deteceted.");
     if (attr[i] == 1) {
-      temp_ess_attr[i] = 1;
+      temp_ess_attr_[i] = 1;
     }
   }
 }
@@ -926,7 +921,7 @@ void ThermoChem::AddTempDirichletBC(ScalarFuncT *f, Array<int> &attr) {
 }
 
 void ThermoChem::AddQtDirichletBC(Coefficient *coeff, Array<int> &attr) {
-  Qt_dbcs.emplace_back(attr, coeff);
+  Qt_dbcs_.emplace_back(attr, coeff);
 
   if (rank0_ && pmesh_->GetMyRank() == 0) {
     mfem::out << "Adding Qt Dirichlet BC to attributes ";
@@ -939,9 +934,9 @@ void ThermoChem::AddQtDirichletBC(Coefficient *coeff, Array<int> &attr) {
   }
 
   for (int i = 0; i < attr.Size(); ++i) {
-    MFEM_ASSERT((Qt_ess_attr[i] && attr[i]) == 0, "Duplicate boundary definition deteceted.");
+    MFEM_ASSERT((Qt_ess_attr_[i] && attr[i]) == 0, "Duplicate boundary definition deteceted.");
     if (attr[i] == 1) {
-      Qt_ess_attr[i] = 1;
+      Qt_ess_attr_[i] = 1;
     }
   }
 }
@@ -964,7 +959,7 @@ void ThermoChem::computeQtTO() {
   LQ->AddMult(Tn_next, tmpR0);  // tmpR0 += LQ{Tn_next}
   MqInv->Mult(tmpR0, Qt);
 
-  Qt *= -Rgas / thermoPressure;
+  Qt *= -Rgas_ / thermoPressure;
 
   /*
     for (int be = 0; be < pmesh->GetNBE(); be++) {
@@ -1214,7 +1209,7 @@ void ThermoChem::interpolateInlet() {
         } else if (entry == 5) {
           inlet[nLines].rho = buffer;
           // to prevent nans in temp in out-of-domain plane regions
-          inlet[nLines].temp = thermoPressure / (Rgas * std::max(buffer, 1.0));
+          inlet[nLines].temp = thermoPressure / (Rgas_ * std::max(buffer, 1.0));
         } else if (entry == 6) {
           inlet[nLines].u = buffer;
         } else if (entry == 7) {
@@ -1330,7 +1325,7 @@ void ThermoChem::uniformInlet() {
 
   Vector inlet_vec(3);
   double inlet_temp, inlet_pres;
-  inlet_temp = config_->amb_pres / (Rgas * config_->densInlet);
+  inlet_temp = config_->amb_pres / (Rgas_ * config_->densInlet);
   inlet_pres = config_->amb_pres;
 
   for (int n = 0; n < sfes->GetNDofs(); n++) {
