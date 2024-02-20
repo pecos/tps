@@ -134,19 +134,17 @@ class ThermoChem : public ThermoChemModelBase {
   GridFunctionCoefficient *thermal_diff_coeff_ = nullptr;
   GradientGridFunctionCoefficient *gradT_coeff_ = nullptr;
   ScalarVectorProductCoefficient *kap_gradT_coeff_ = nullptr;
-
-  ConstantCoefficient *buffer_qbc = nullptr;
-  GridFunctionCoefficient *rhoDtField = nullptr;
-  GridFunctionCoefficient *Rho = nullptr;
+  GridFunctionCoefficient *rho_over_dt_coeff_ = nullptr;
+  GridFunctionCoefficient *rho_coeff_ = nullptr;
 
   // operators and solvers
-  ParBilinearForm *At_form = nullptr;
-  ParBilinearForm *Ms_form = nullptr;
-  ParBilinearForm *MsRho_form = nullptr;
-  ParBilinearForm *Ht_form = nullptr;
-  ParBilinearForm *Mq_form = nullptr;
-  ParBilinearForm *LQ_form = nullptr;
-  ParLinearForm *LQ_bdry = nullptr;
+  ParBilinearForm *At_form_ = nullptr;
+  ParBilinearForm *Ms_form_ = nullptr;
+  ParBilinearForm *MsRho_form_ = nullptr;
+  ParBilinearForm *Ht_form_ = nullptr;
+  ParBilinearForm *Mq_form_ = nullptr;
+  ParBilinearForm *LQ_form_ = nullptr;
+  ParLinearForm *LQ_bdry_ = nullptr;
 
   OperatorHandle LQ;
   OperatorHandle At;

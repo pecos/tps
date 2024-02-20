@@ -119,27 +119,27 @@ ThermoChem::ThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tempora
 
 ThermoChem::~ThermoChem() {
   // allocated in initializeOperators
-  delete LQ_bdry;
-  delete LQ_form;
+  delete LQ_bdry_;
+  delete LQ_form_;
   delete MqInv;
   delete MqInvPC;
-  delete Mq_form;
+  delete Mq_form_;
   delete HtInv;
   delete HtInvPC;
   delete MsInv;
   delete MsInvPC;
-  delete Ht_form;
-  delete MsRho_form;
-  delete Ms_form;
-  delete At_form;
+  delete Ht_form_;
+  delete MsRho_form_;
+  delete Ms_form_;
+  delete At_form_;
   delete rhou_coeff_;
   delete rhon_next_coeff_;
   delete un_next_coeff_;
   delete kap_gradT_coeff_;
   delete gradT_coeff_;
   delete thermal_diff_coeff_;
-  delete rhoDtField;
-  delete Rho;
+  delete rho_over_dt_coeff_;
+  delete rho_coeff_;
 
   // allocated in initializeSelf
   delete sfes_;
@@ -393,11 +393,11 @@ void ThermoChem::initializeOperators() {
   if (rank0_) std::cout << "Integration rules set" << endl;
 
   // coefficients for operators
-  Rho = new GridFunctionCoefficient(&rn_gf_);
+  rho_coeff_ = new GridFunctionCoefficient(&rn_gf_);
 
   rhoDt = rn_gf_;
   rhoDt /= dt_;
-  rhoDtField = new GridFunctionCoefficient(&rhoDt);
+  rho_over_dt_coeff_ = new GridFunctionCoefficient(&rhoDt);
 
   // thermal_diff_coeff.constant = thermal_diff;
   thermal_diff_coeff_ = new GridFunctionCoefficient(&kappa_gf_);
@@ -409,67 +409,67 @@ void ThermoChem::initializeOperators() {
   rhon_next_coeff_ = new GridFunctionCoefficient(&rn_gf_);
   rhou_coeff_ = new ScalarVectorProductCoefficient(*rhon_next_coeff_, *un_next_coeff_);
 
-  At_form = new ParBilinearForm(sfes_);
+  At_form_ = new ParBilinearForm(sfes_);
   auto *at_blfi = new ConvectionIntegrator(*rhou_coeff_);
   if (numerical_integ_) {
     at_blfi->SetIntRule(&ir_nli);
   }
-  At_form->AddDomainIntegrator(at_blfi);
+  At_form_->AddDomainIntegrator(at_blfi);
   if (partial_assembly_) {
-    At_form->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+    At_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   }
-  At_form->Assemble();
-  At_form->FormSystemMatrix(empty, At);
+  At_form_->Assemble();
+  At_form_->FormSystemMatrix(empty, At);
   if (rank0_) std::cout << "ThermoChem At operator set" << endl;
 
   // mass matrix
-  Ms_form = new ParBilinearForm(sfes_);
+  Ms_form_ = new ParBilinearForm(sfes_);
   auto *ms_blfi = new MassIntegrator;
   if (numerical_integ_) {
     ms_blfi->SetIntRule(&ir_i);
   }
-  Ms_form->AddDomainIntegrator(ms_blfi);
+  Ms_form_->AddDomainIntegrator(ms_blfi);
   if (partial_assembly_) {
-    Ms_form->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+    Ms_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   }
-  Ms_form->Assemble();
-  Ms_form->FormSystemMatrix(empty, Ms);
+  Ms_form_->Assemble();
+  Ms_form_->FormSystemMatrix(empty, Ms);
 
   // mass matrix with rho
-  MsRho_form = new ParBilinearForm(sfes_);
-  auto *msrho_blfi = new MassIntegrator(*Rho);
+  MsRho_form_ = new ParBilinearForm(sfes_);
+  auto *msrho_blfi = new MassIntegrator(*rho_coeff_);
   if (numerical_integ_) {
     msrho_blfi->SetIntRule(&ir_i);
     // msrho_blfi->SetIntRule(&ir_di);
   }
-  MsRho_form->AddDomainIntegrator(msrho_blfi);
+  MsRho_form_->AddDomainIntegrator(msrho_blfi);
   if (partial_assembly_) {
-    MsRho_form->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+    MsRho_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   }
-  MsRho_form->Assemble();
-  MsRho_form->FormSystemMatrix(empty, MsRho);
+  MsRho_form_->Assemble();
+  MsRho_form_->FormSystemMatrix(empty, MsRho);
   if (rank0_) std::cout << "ThermoChem MsRho operator set" << endl;
 
-  Ht_form = new ParBilinearForm(sfes_);
-  auto *hmt_blfi = new MassIntegrator(*rhoDtField);
+  Ht_form_ = new ParBilinearForm(sfes_);
+  auto *hmt_blfi = new MassIntegrator(*rho_over_dt_coeff_);
   auto *hdt_blfi = new DiffusionIntegrator(*thermal_diff_coeff_);
 
   if (numerical_integ_) {
     hmt_blfi->SetIntRule(&ir_di);
     hdt_blfi->SetIntRule(&ir_di);
   }
-  Ht_form->AddDomainIntegrator(hmt_blfi);
-  Ht_form->AddDomainIntegrator(hdt_blfi);
+  Ht_form_->AddDomainIntegrator(hmt_blfi);
+  Ht_form_->AddDomainIntegrator(hdt_blfi);
   if (partial_assembly_) {
-    Ht_form->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+    Ht_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   }
-  Ht_form->Assemble();
-  Ht_form->FormSystemMatrix(temp_ess_tdof_, Ht);
+  Ht_form_->Assemble();
+  Ht_form_->FormSystemMatrix(temp_ess_tdof_, Ht);
   if (rank0_) std::cout << "ThermoChem Ht operator set" << endl;
 
   if (partial_assembly_) {
     Vector diag_pa(sfes_->GetTrueVSize());
-    Ms_form->AssembleDiagonal(diag_pa);
+    Ms_form_->AssembleDiagonal(diag_pa);
     MsInvPC = new OperatorJacobiSmoother(diag_pa, empty);
   } else {
     MsInvPC = new HypreSmoother(*Ms.As<HypreParMatrix>());
@@ -485,7 +485,7 @@ void ThermoChem::initializeOperators() {
 
   if (partial_assembly_) {
     Vector diag_pa(sfes_->GetTrueVSize());
-    Ht_form->AssembleDiagonal(diag_pa);
+    Ht_form_->AssembleDiagonal(diag_pa);
     HtInvPC = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof_);
   } else {
     HtInvPC = new HypreSmoother(*Ht.As<HypreParMatrix>());
@@ -503,23 +503,23 @@ void ThermoChem::initializeOperators() {
   if (rank0_) std::cout << "Temperature operators set" << endl;
 
   // Qt .....................................
-  Mq_form = new ParBilinearForm(sfes_);
+  Mq_form_ = new ParBilinearForm(sfes_);
   auto *mq_blfi = new MassIntegrator;
   if (numerical_integ_) {
     mq_blfi->SetIntRule(&ir_i);
   }
-  Mq_form->AddDomainIntegrator(mq_blfi);
+  Mq_form_->AddDomainIntegrator(mq_blfi);
   if (partial_assembly_) {
-    Mq_form->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+    Mq_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   }
-  Mq_form->Assemble();
-  Mq_form->FormSystemMatrix(Qt_ess_tdof_, Mq);
-  // Mq_form->FormSystemMatrix(empty, Mq);
+  Mq_form_->Assemble();
+  Mq_form_->FormSystemMatrix(Qt_ess_tdof_, Mq);
+  // Mq_form_->FormSystemMatrix(empty, Mq);
   if (rank0_) std::cout << "ThermoChem Mq operator set" << endl;
 
   if (partial_assembly_) {
     Vector diag_pa(sfes_->GetTrueVSize());
-    Mq_form->AssembleDiagonal(diag_pa);
+    Mq_form_->AssembleDiagonal(diag_pa);
     MqInvPC = new OperatorJacobiSmoother(diag_pa, empty);
   } else {
     MqInvPC = new HypreSmoother(*Mq.As<HypreParMatrix>());
@@ -533,24 +533,24 @@ void ThermoChem::initializeOperators() {
   MqInv->SetRelTol(rtol_);
   MqInv->SetMaxIter(max_iter_);
 
-  LQ_form = new ParBilinearForm(sfes_);
+  LQ_form_ = new ParBilinearForm(sfes_);
   auto *lqd_blfi = new DiffusionIntegrator(*thermal_diff_coeff_);
   if (numerical_integ_) {
     lqd_blfi->SetIntRule(&ir_di);
   }
-  LQ_form->AddDomainIntegrator(lqd_blfi);
+  LQ_form_->AddDomainIntegrator(lqd_blfi);
   if (partial_assembly_) {
-    LQ_form->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+    LQ_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   }
-  LQ_form->Assemble();
-  LQ_form->FormSystemMatrix(empty, LQ);
+  LQ_form_->Assemble();
+  LQ_form_->FormSystemMatrix(empty, LQ);
 
-  LQ_bdry = new ParLinearForm(sfes_);
+  LQ_bdry_ = new ParLinearForm(sfes_);
   auto *lq_bdry_lfi = new BoundaryNormalLFIntegrator(*kap_gradT_coeff_, 2, -1);
   if (numerical_integ_) {
     lq_bdry_lfi->SetIntRule(&ir_di);
   }
-  LQ_bdry->AddBoundaryIntegrator(lq_bdry_lfi, temp_ess_attr_);
+  LQ_bdry_->AddBoundaryIntegrator(lq_bdry_lfi, temp_ess_attr_);
   if (rank0_) std::cout << "ThermoChem LQ operator set" << endl;
 
   // // remaining initialization
@@ -658,15 +658,15 @@ void ThermoChem::step() {
   rhoDt = rn_gf_;
   rhoDt *= (time_coeff_.bd0 / dt_);
 
-  Ht_form->Update();
-  Ht_form->Assemble();
-  Ht_form->FormSystemMatrix(temp_ess_tdof_, Ht);
+  Ht_form_->Update();
+  Ht_form_->Assemble();
+  Ht_form_->FormSystemMatrix(temp_ess_tdof_, Ht);
 
   HtInv->SetOperator(*Ht);
   if (partial_assembly_) {
     delete HtInvPC;
     Vector diag_pa(sfes_->GetTrueVSize());
-    Ht_form->AssembleDiagonal(diag_pa);
+    Ht_form_->AssembleDiagonal(diag_pa);
     HtInvPC = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof_);
     HtInv->SetPreconditioner(*HtInvPC);
   }
@@ -680,16 +680,16 @@ void ThermoChem::step() {
   Vector Xt2, Bt2;
   if (partial_assembly_) {
     auto *HC = Ht.As<ConstrainedOperator>();
-    EliminateRHS(*Ht_form, *HC, temp_ess_tdof_, Tn_next_gf_, resT_gf_, Xt2, Bt2, 1);
+    EliminateRHS(*Ht_form_, *HC, temp_ess_tdof_, Tn_next_gf_, resT_gf_, Xt2, Bt2, 1);
   } else {
-    Ht_form->FormLinearSystem(temp_ess_tdof_, Tn_next_gf_, resT_gf_, Ht, Xt2, Bt2, 1);
+    Ht_form_->FormLinearSystem(temp_ess_tdof_, Tn_next_gf_, resT_gf_, Ht, Xt2, Bt2, 1);
   }
 
   // solve helmholtz eq for temp
   HtInv->Mult(Bt2, Xt2);
   assert(HtInv->GetConverged());
 
-  Ht_form->RecoverFEMSolution(Xt2, resT_gf_, Tn_next_gf_);
+  Ht_form_->RecoverFEMSolution(Xt2, resT_gf_, Tn_next_gf_);
   Tn_next_gf_.GetTrueDofs(Tn_next);
 
   // explicit filter
@@ -714,9 +714,9 @@ void ThermoChem::step() {
 
 void ThermoChem::computeExplicitTempConvectionOP(bool extrap) {
   Array<int> empty;
-  At_form->Update();
-  At_form->Assemble();
-  At_form->FormSystemMatrix(empty, At);
+  At_form_->Update();
+  At_form_->Assemble();
+  At_form_->FormSystemMatrix(empty, At);
   if (extrap == true) {
     At->Mult(Tn, NTn);
   } else {
@@ -871,9 +871,9 @@ void ThermoChem::updateDensity(double tStep) {
   }
   rn_gf_.SetFromTrueDofs(rn);
 
-  MsRho_form->Update();
-  MsRho_form->Assemble();
-  MsRho_form->FormSystemMatrix(empty, MsRho);
+  MsRho_form_->Update();
+  MsRho_form_->Assemble();
+  MsRho_form_->FormSystemMatrix(empty, MsRho);
 
   // project to p-space in case not same as vel-temp
   R0PM0_gf_.SetFromTrueDofs(rn);
@@ -944,14 +944,14 @@ void ThermoChem::AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr) {
 void ThermoChem::computeQtTO() {
   Array<int> empty;
   tmpR0 = 0.0;
-  LQ_bdry->Update();
-  LQ_bdry->Assemble();
-  LQ_bdry->ParallelAssemble(tmpR0);
+  LQ_bdry_->Update();
+  LQ_bdry_->Assemble();
+  LQ_bdry_->ParallelAssemble(tmpR0);
   tmpR0.Neg();
 
-  LQ_form->Update();
-  LQ_form->Assemble();
-  LQ_form->FormSystemMatrix(empty, LQ);
+  LQ_form_->Update();
+  LQ_form_->Assemble();
+  LQ_form_->FormSystemMatrix(empty, LQ);
   LQ->AddMult(Tn_next, tmpR0);  // tmpR0 += LQ{Tn_next}
   MqInv->Mult(tmpR0, Qt);
 
