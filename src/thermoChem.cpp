@@ -71,7 +71,6 @@ void ThermoChem::initializeSelf() {
   if (rank == 0) {
     rank0 = true;
   }
-  dim = pmesh_->Dimension();
 
   // Get options
   std::string visc_model;
@@ -126,14 +125,6 @@ void ThermoChem::initializeSelf() {
   sfec = new H1_FECollection(order);
   sfes = new ParFiniteElementSpace(pmesh_, sfec);
 
-  // vector
-  vfec = new H1_FECollection(order, dim);
-  vfes = new ParFiniteElementSpace(pmesh_, vfec, dim);
-
-  // pressure (trevilo: do we need this space?)
-  pfec = new H1_FECollection(order);
-  pfes = new ParFiniteElementSpace(pmesh_, pfec);
-
   // Check if fully periodic mesh
   if (!(pmesh_->bdr_attributes.Size() == 0)) {
     temp_ess_attr.SetSize(pmesh_->bdr_attributes.Max());
@@ -144,7 +135,6 @@ void ThermoChem::initializeSelf() {
   }
   if (verbose) grvy_printf(ginfo, "ThermoChem paces constructed...\n");
 
-  int vfes_truevsize = vfes->GetTrueVSize();
   int sfes_truevsize = sfes->GetTrueVSize();
 
   Qt.SetSize(sfes_truevsize);
@@ -216,9 +206,8 @@ void ThermoChem::initializeSelf() {
   tmpR0a.SetSize(sfes_truevsize);
   tmpR0b.SetSize(sfes_truevsize);
   tmpR0c.SetSize(sfes_truevsize);
-  tmpR1.SetSize(vfes_truevsize);
+
   R0PM0_gf.SetSpace(sfes);
-  R0PM1_gf.SetSpace(pfes);
 
   rhoDt.SetSpace(sfes);
 #if 0
@@ -1081,7 +1070,7 @@ void ThermoChem::updateDensity(double tStep) {
 
   // project to p-space in case not same as vel-temp
   R0PM0_gf.SetFromTrueDofs(rn);
-  R0PM1_gf.ProjectGridFunction(R0PM0_gf);
+  // R0PM1_gf.ProjectGridFunction(R0PM0_gf);
 
   // Is bufferInvRho used anywhere????
   // {

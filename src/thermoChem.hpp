@@ -43,7 +43,6 @@ class Tps;
 
 #include <iostream>
 
-#include "../utils/mfem_extras/pfem_extras.hpp"
 #include "dirichlet_bc_helper.hpp"
 #include "io.hpp"
 #include "thermo_chem_base.hpp"
@@ -100,7 +99,6 @@ class ThermoChem : public ThermoChemModelBase {
   // local copies of time integration information
   double bd0, bd1, bd2, bd3;
   double ab1, ab2, ab3;
-  int dim;
 
   // just keep these saved for ease
   int numWalls, numInlets, numOutlets;
@@ -136,18 +134,6 @@ class ThermoChem : public ThermoChemModelBase {
 
   // Scalar \f$H^1\f$ finite element space.
   ParFiniteElementSpace *sfes = nullptr;
-
-  /// Velocity \f$H^1\f$ finite element collection.
-  FiniteElementCollection *vfec = nullptr;
-
-  /// Velocity \f$(H^1)^d\f$ finite element space.
-  ParFiniteElementSpace *vfes = nullptr;
-
-  /// Pressure \f$H^1\f$ finite element collection.
-  FiniteElementCollection *pfec = nullptr;
-
-  /// Pressure \f$H^1\f$ finite element space.
-  ParFiniteElementSpace *pfes = nullptr;
 
   // operators
   DiffusionIntegrator *hdt_blfi = nullptr;
@@ -244,9 +230,7 @@ class ThermoChem : public ThermoChemModelBase {
   ParGridFunction *subgridVisc_gf = nullptr;
 
   Vector tmpR0;
-  Vector tmpR1;
   ParGridFunction R0PM0_gf;
-  ParGridFunction R0PM1_gf;
 
   ParGridFunction Qt_gf;
 
