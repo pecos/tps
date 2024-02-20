@@ -79,9 +79,12 @@ void ThermoChem::initializeSelf() {
   tpsP_->getInput("loMach/calperfect/viscosity-model", visc_model, std::string("sutherland"));
   if (visc_model == "sutherland") {
     constantViscosity = false;
-    // TODO(trevilo): Read parameters
+    tpsP_->getInput("loMach/calperfect/sutherland/mu0", mu0_, 1.68e-5);
+    tpsP_->getInput("loMach/calperfect/sutherland/T0", sutherland_T0_, 273.0);
+    tpsP_->getInput("loMach/calperfect/sutherland/S0", sutherland_S0_, 110.4);
   } else if (visc_model == "constant") {
     constantViscosity = true;
+    tpsP_->getInput("loMach/calperfect/constant-visc/mu0", mu0_, 1.68e-5);
   } else {
     if (rank0) {
       std::cout << "ERROR: loMach/calperfect/viscosity-model = " << visc_model << " not supported." << std::endl;
@@ -1021,13 +1024,12 @@ void ThermoChem::updateDiffusivity() {
   if (!constantViscosity) {
     double *d_visc = visc.Write();
     const double *d_T = Tn.Read();
-    const double mu_star = 1.68e-5;
-    const double T_star = 273.0;
-    const double S_star = 110.4;
+    const double mu_star = mu0_;
+    const double T_star = sutherland_T0_;
+    const double S_star = sutherland_S0_;
     MFEM_FORALL(i, Tn.Size(), { d_visc[i] = Sutherland(d_T[i], mu_star, T_star, S_star); });
   } else {
-    // visc = 1.68e-5;
-    visc = 0.1;
+    visc = mu0_;
   }
 
   // if (config_->sgsModelType > 0) {

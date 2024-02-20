@@ -131,6 +131,11 @@ class ThermoChem : public ThermoChemModelBase {
   bool incompressibleSolve = false;
   bool pFilter = false;
 
+  // transport parameters
+  double mu0_;
+  double sutherland_T0_;
+  double sutherland_S0_;
+
   double dt;
   double time;
   int iter;
