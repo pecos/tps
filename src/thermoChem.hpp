@@ -158,9 +158,7 @@ class ThermoChem : public ThermoChemModelBase {
   // local copies of time integration information
   double bd0, bd1, bd2, bd3;
   double ab1, ab2, ab3;
-  int nvel, dim;
-  int num_equation;
-  int MaxIters;
+  int dim;
 
   // just keep these saved for ease
   int numWalls, numInlets, numOutlets;
@@ -210,12 +208,10 @@ class ThermoChem : public ThermoChemModelBase {
   // operators
   DiffusionIntegrator *hdt_blfi = nullptr;
   MassIntegrator *hmt_blfi = nullptr;
-  ParBilinearForm *Mv_form = nullptr;
   ParBilinearForm *Lt_form = nullptr;
   ParBilinearForm *At_form = nullptr;
   ParBilinearForm *Ms_form = nullptr;
   ParBilinearForm *MsRho_form = nullptr;
-  ParMixedBilinearForm *G_form = nullptr;
   ParMixedBilinearForm *Ds_form = nullptr;
   ParBilinearForm *Ht_form = nullptr;
   ParBilinearForm *Mq_form = nullptr;
@@ -275,8 +271,6 @@ class ThermoChem : public ThermoChemModelBase {
   OperatorHandle LQ;
   OperatorHandle At;
   OperatorHandle Ht;
-  OperatorHandle Mv;
-  OperatorHandle G;
   OperatorHandle Ms;
   OperatorHandle MsRho;
   OperatorHandle Mq;
@@ -289,11 +283,10 @@ class ThermoChem : public ThermoChemModelBase {
   mfem::Solver *HtInvPC = nullptr;
   mfem::CGSolver *HtInv = nullptr;
   mfem::Solver *MvInvPC = nullptr;
-  mfem::CGSolver *MvInv = nullptr;
 
   ParGridFunction Tnm1_gf, Tnm2_gf;
   ParGridFunction Tn_gf, Tn_next_gf, Text_gf, resT_gf;
-  ParGridFunction rn_gf, gradT_gf;
+  ParGridFunction rn_gf;
 
   Vector fTn, Tn, Tn_next, Tnm1, Tnm2, NTn, NTnm1, NTnm2;
   Vector Text, Text_bdr, t_bdr;
@@ -309,7 +302,6 @@ class ThermoChem : public ThermoChemModelBase {
 
   ParGridFunction Qt_gf;
 
-  Vector gradT;
   Vector gradMu, gradRho;
   Vector Qt;
   Vector rn;
@@ -345,22 +337,9 @@ class ThermoChem : public ThermoChemModelBase {
   ParGridFunction Tn_NM1_gf;
   ParGridFunction Tn_filtered_gf;
 
-  // Pointers to the different classes
-
-  // valid on host
-  GasMixture *mixture = nullptr;
-
-  // valid on device, when available; otherwise = mixture
-  GasMixture *d_mixture = nullptr;
-
-  // valid on both host and device
-  TransportProperties *transportPtr = NULL;
-
-  // valid on device, when available; otherwise = transportPtr
-  // TransportProperties *d_transport = NULL;
-
  public:
-  ThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, RunConfiguration *config, temporalSchemeCoefficients &timeCoeff, TPS::Tps *tps);
+  ThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, RunConfiguration *config,
+             temporalSchemeCoefficients &timeCoeff, TPS::Tps *tps);
 
   virtual ~ThermoChem() {}
 
@@ -378,8 +357,6 @@ class ThermoChem : public ThermoChemModelBase {
   void updateThermoP();
   void extrapolateState();
   void updateDensity(double tStep);
-  // void updateGradients(double tStep);
-  void updateGradientsOP(double tStep);
   void updateBC(int current_step);
   void updateDiffusivity();
   void computeSystemMass();

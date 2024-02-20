@@ -74,7 +74,6 @@ void ThermoChem::initializeSelf() {
     rank0 = true;
   }
   dim = pmesh_->Dimension();
-  nvel = dim;
 
   // // config settings for thermoChem
   // if (config_->const_visc > 0.0) {
@@ -107,8 +106,8 @@ void ThermoChem::initializeSelf() {
   // }
   order = loMach_opts_->order;
 
-  static_rho = 1.0; // config_->const_dens;
-  dyn_vis = 1.0e-5; //config_->const_visc;
+  static_rho = 1.0;  // config_->const_dens;
+  dyn_vis = 1.0e-5;  // config_->const_visc;
 
   tpsP_->getInput("loMach/ambientPressure", ambientPressure, 101325.0);
   thermoPressure = ambientPressure;
@@ -124,29 +123,6 @@ void ThermoChem::initializeSelf() {
   Pr = 0.76;
   Cp = 1000.5;
   gamma = 1.4;
-
-  mixture = NULL;
-
-  // TODO: Fix transport
-  transportPtr = NULL;
-
-  // // HARD CODE HARD CODE HARD CODE
-  // config_->dryAirInput.specific_heat_ratio = 1.4;
-  // config_->dryAirInput.gas_constant = 287.058;
-  // config_->dryAirInput.f = config_->workFluid;
-  // config_->dryAirInput.eq_sys = config_->eqSystem;
-  // mixture = new DryAir(*config_, dim, nvel);
-  // transportPtr = new DryAirTransport(mixture, *config_);
-
-  // MaxIters = config_->GetNumIters();
-  // num_equation = 1;  // hard code for now, fix with species
-  /*
-  numSpecies = mixture->GetNumSpecies();
-  numActiveSpecies = mixture->GetNumActiveSpecies();
-  ambipolar = mixture->IsAmbipolar();
-  twoTemperature_ = mixture->IsTwoTemperature();
-  num_equation = mixture->GetNumEquations();
-  */
 
   //-----------------------------------------------------
   // 2) Prepare the required finite elements
@@ -176,10 +152,6 @@ void ThermoChem::initializeSelf() {
 
   int vfes_truevsize = vfes->GetTrueVSize();
   int sfes_truevsize = sfes->GetTrueVSize();
-
-  // gradT.SetSize(vfes_truevsize);
-  // gradT = 0.0;
-  // gradT_gf.SetSpace(vfes);
 
   Qt.SetSize(sfes_truevsize);
   Qt = 0.0;
@@ -263,7 +235,6 @@ void ThermoChem::initializeSelf() {
   toFlow_interface_.thermal_divergence = &Qt_gf;
   toTurbModel_interface_.density = &rn_gf;
 
-
   // call setup
   setup(timeCoeff_.dt);
 
@@ -306,7 +277,7 @@ void ThermoChem::setup(double dt) {
   ConstantCoefficient t_ic_coef;
   // t_ic_coef.constant = config.initRhoRhoVp[4] / (Rgas * config.initRhoRhoVp[0]);
   t_ic_coef.constant = T_ic_;
-  //if (!config_->restart) Tn_gf.ProjectCoefficient(t_ic_coef);
+  // if (!config_->restart) Tn_gf.ProjectCoefficient(t_ic_coef);
   Tn_gf.ProjectCoefficient(t_ic_coef);
   if (rank0) {
     // std::cout << "Initial temperature set from input file: " << config_->initRhoRhoVp[4] << endl;
@@ -341,19 +312,22 @@ void ThermoChem::setup(double dt) {
       // TODO(trevilo): inlet types uniform and interpolate should be supported
       if (type == "uniform") {
         if (rank0) {
-          std::cout << "ERROR: Inlet type = " << type << " not supported." << std::endl;;
+          std::cout << "ERROR: Inlet type = " << type << " not supported." << std::endl;
+          ;
         }
         assert(false);
         exit(1);
       } else if (type == "interpolate") {
         if (rank0) {
-          std::cout << "ERROR: Inlet type = " << type << " not supported." << std::endl;;
+          std::cout << "ERROR: Inlet type = " << type << " not supported." << std::endl;
+          ;
         }
         assert(false);
         exit(1);
       } else {
         if (rank0) {
-          std::cout << "ERROR: Inlet type = " << type << " not supported." << std::endl;;
+          std::cout << "ERROR: Inlet type = " << type << " not supported." << std::endl;
+          ;
         }
         assert(false);
         exit(1);
@@ -391,7 +365,7 @@ void ThermoChem::setup(double dt) {
         std::cout << "Adding patch = " << patch << " to isothermal wall list!" << std::endl;
 
         attr_wall = 0;
-        attr_wall[patch-1] = 1;
+        attr_wall[patch - 1] = 1;
 
         double Twall;
         tpsP_->getRequiredInput((basepath + "/temperature").c_str(), Twall);
@@ -454,33 +428,6 @@ void ThermoChem::setup(double dt) {
   thermal_diff_coeff = new GridFunctionCoefficient(&kappa_gf);
   gradT_coeff = new GradientGridFunctionCoefficient(&Tn_next_gf);
   kap_gradT_coeff = new ScalarVectorProductCoefficient(*thermal_diff_coeff, *gradT_coeff);
-
-  // gradient of scalar
-  G_form = new ParMixedBilinearForm(sfes, vfes);
-  auto *g_mblfi = new GradientIntegrator();
-  if (numerical_integ) {
-    g_mblfi->SetIntRule(&ir_i);
-  }
-  G_form->AddDomainIntegrator(g_mblfi);
-  if (partial_assembly) {
-    G_form->SetAssemblyLevel(AssemblyLevel::PARTIAL);
-  }
-  G_form->Assemble();
-  G_form->FormRectangularSystemMatrix(empty, empty, G);
-  if (rank0) std::cout << "ThermoChem gradient operator set" << endl;
-
-  // mass matrix for vector
-  Mv_form = new ParBilinearForm(vfes);
-  auto *mv_blfi = new VectorMassIntegrator;
-  if (numerical_integ) {
-    mv_blfi->SetIntRule(&ir_i);
-  }
-  Mv_form->AddDomainIntegrator(mv_blfi);
-  if (partial_assembly) {
-    Mv_form->SetAssemblyLevel(AssemblyLevel::PARTIAL);
-  }
-  Mv_form->Assemble();
-  Mv_form->FormSystemMatrix(empty, Mv);
 
   // Convection: Atemperature(i,j) = \int_{\Omega} \phi_i \rho u \cdot \nabla \phi_j
   un_next_coeff = new VectorGridFunctionCoefficient(flow_interface_->velocity);
@@ -581,23 +528,6 @@ void ThermoChem::setup(double dt) {
   }
 
   if (partial_assembly) {
-    Vector diag_pa(vfes->GetTrueVSize());
-    Mv_form->AssembleDiagonal(diag_pa);
-    MvInvPC = new OperatorJacobiSmoother(diag_pa, empty);
-  } else {
-    MvInvPC = new HypreSmoother(*Mv.As<HypreParMatrix>());
-    dynamic_cast<HypreSmoother *>(MvInvPC)->SetType(HypreSmoother::Jacobi, 1);
-  }
-  MvInv = new CGSolver(vfes->GetComm());
-  MvInv->iterative_mode = false;
-  MvInv->SetOperator(*Mv);
-  MvInv->SetPreconditioner(*MvInvPC);
-  MvInv->SetPrintLevel(pl_mvsolve);
-  MvInv->SetRelTol(1e-12); // config_->solver_tol);
-  MvInv->SetMaxIter(2000); // config_->solver_iter);
-  if (rank0) std::cout << "ThermoChem MvInv operator set" << endl;
-
-  if (partial_assembly) {
     Vector diag_pa(sfes->GetTrueVSize());
     Ms_form->AssembleDiagonal(diag_pa);
     MsInvPC = new OperatorJacobiSmoother(diag_pa, empty);
@@ -610,8 +540,8 @@ void ThermoChem::setup(double dt) {
   MsInv->SetOperator(*Ms);
   MsInv->SetPreconditioner(*MsInvPC);
   MsInv->SetPrintLevel(pl_mtsolve);
-  MsInv->SetRelTol(1e-12); //config_->solver_tol);
-  MsInv->SetMaxIter(2000); // config_->solver_iter);
+  MsInv->SetRelTol(1e-12);  // config_->solver_tol);
+  MsInv->SetMaxIter(2000);  // config_->solver_iter);
 
   // if (partial_assembly) {
   //   Vector diag_pa(sfes->GetTrueVSize());
@@ -635,8 +565,8 @@ void ThermoChem::setup(double dt) {
   HtInv->SetOperator(*Ht);
   HtInv->SetPreconditioner(*HtInvPC);
   HtInv->SetPrintLevel(pl_htsolve);
-  HtInv->SetRelTol(1e-12); // config_->solver_tol);
-  HtInv->SetMaxIter(2000); // config_->solver_iter);
+  HtInv->SetRelTol(1e-12);  // config_->solver_tol);
+  HtInv->SetMaxIter(2000);  // config_->solver_iter);
   if (rank0) std::cout << "Temperature operators set" << endl;
 
   // Qt .....................................
@@ -667,8 +597,8 @@ void ThermoChem::setup(double dt) {
   MqInv->SetOperator(*Mq);
   MqInv->SetPreconditioner(*MqInvPC);
   MqInv->SetPrintLevel(pl_mtsolve);
-  MqInv->SetRelTol(1e-12); // config_->solver_tol);
-  MqInv->SetMaxIter(2000); // config_->solver_iter);
+  MqInv->SetRelTol(1e-12);  // config_->solver_tol);
+  MqInv->SetMaxIter(2000);  // config_->solver_iter);
 
   LQ_form = new ParBilinearForm(sfes);
   auto *lqd_blfi = new DiffusionIntegrator(*kappaField);
@@ -766,8 +696,7 @@ void ThermoChem::step() {
 
   // Prepare for residual calc
   extrapolateState();
-  updateBC(0); // NB: can't ramp right now
-  // updateGradientsOP(1.0);
+  updateBC(0);  // NB: can't ramp right now
   updateThermoP();
   updateDensity(1.0);
   updateDiffusivity();
@@ -954,8 +883,8 @@ void ThermoChem::extrapolateState() {
 
 // update thermodynamic pressure
 void ThermoChem::updateThermoP() {
-  //if (config_->isOpen != true) {
-  // if (false) {
+  // if (config_->isOpen != true) {
+  //  if (false) {
   if (false) {
     double allMass, PNM1;
     double myMass = 0.0;
@@ -1103,7 +1032,8 @@ void ThermoChem::updateDiffusivity() {
     const double S_star = 110.4;
     MFEM_FORALL(i, Tn.Size(), { d_visc[i] = Sutherland(d_T[i], mu_star, T_star, S_star); });
   } else {
-    visc = 1.68e-5;
+    // visc = 1.68e-5;
+    visc = 0.1;
   }
 
   // if (config_->sgsModelType > 0) {
@@ -1154,7 +1084,7 @@ void ThermoChem::updateDensity(double tStep) {
   if (constantDensity != true) {
     if (tStep == 1.0) {
       printf("Using variable density!\n");
-      //multConstScalarInv((thermoPressure / Rgas), Tn_next, &rn);
+      // multConstScalarInv((thermoPressure / Rgas), Tn_next, &rn);
       rn = (thermoPressure / Rgas);
       rn /= Tn_next;
     } else if (tStep == 0.5) {
@@ -1173,7 +1103,7 @@ void ThermoChem::updateDensity(double tStep) {
     }
 
   } else {
-    // 
+    //
     // double *data = rn.HostWrite();
     // for (int i = 0; i < SdofInt; i++) {
     //   data[i] = static_rho;
@@ -1199,16 +1129,6 @@ void ThermoChem::updateDensity(double tStep) {
   //     data[i] = 1.0 / rho[i];
   //   }
   // }
-}
-
-void ThermoChem::updateGradientsOP(double tStep) {
-  // gradient of temperature
-  if (tStep == 0.0) {
-    G->Mult(Tn, tmpR1);
-  } else {
-    G->Mult(Tn_next, tmpR1);
-  }
-  MvInv->Mult(tmpR1, gradT);
 }
 
 void ThermoChem::computeSystemMass() {
@@ -1242,7 +1162,7 @@ void ThermoChem::interpolateInlet() {
   const int fname_length = fname.length();
   char *char_array = new char[fname_length + 1];
   strcpy(char_array, fname.c_str());
-  //snprintf(char_array, fname.c_str());
+  // snprintf(char_array, fname.c_str());
   int nCount = 0;
 
   // open, find size
