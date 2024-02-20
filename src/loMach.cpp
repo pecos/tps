@@ -385,7 +385,7 @@ void LoMachSolver::initialize() {
   if (loMach_opts_.thermo_solver == "constant-property") {
     thermo_ = new ConstantPropertyThermoChem(pmesh_, loMach_opts_.order, 1.0, 1.0);
   } else if (loMach_opts_.thermo_solver == "calorically-perfect") {
-    thermo_ = new ThermoChem(pmesh_, &loMach_opts_, nullptr, temporal_coeff_, tpsP_);
+    thermo_ = new ThermoChem(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_);
   } else {
     // Unknown choice... die
     if (rank0_) {

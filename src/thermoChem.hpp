@@ -69,9 +69,6 @@ class ThermoChem : public ThermoChemModelBase {
   int rank;     // local MPI rank
   bool rank0;   // flag to indicate rank 0
 
-  // Run options
-  RunConfiguration *config_ = nullptr;
-
   // All essential attributes.
   Array<int> temp_ess_attr;
   Array<int> Qt_ess_attr;
@@ -290,8 +287,7 @@ class ThermoChem : public ThermoChemModelBase {
   ParGridFunction Tn_filtered_gf;
 
  public:
-  ThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, RunConfiguration *config,
-             temporalSchemeCoefficients &timeCoeff, TPS::Tps *tps);
+  ThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff, TPS::Tps *tps);
 
   virtual ~ThermoChem() {}
 

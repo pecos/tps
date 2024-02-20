@@ -61,9 +61,9 @@ MFEM_HOST_DEVICE double Sutherland(const double T, const double mu_star, const d
   return mu_star * T_rat_32 * S_rat;
 }
 
-ThermoChem::ThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, RunConfiguration *config,
-                       temporalSchemeCoefficients &timeCoeff, TPS::Tps *tps)
-    : tpsP_(tps), pmesh_(pmesh), loMach_opts_(loMach_opts), config_(config), timeCoeff_(timeCoeff) {}
+ThermoChem::ThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff,
+                       TPS::Tps *tps)
+    : tpsP_(tps), pmesh_(pmesh), loMach_opts_(loMach_opts), timeCoeff_(timeCoeff) {}
 
 void ThermoChem::initializeSelf() {
   rank = pmesh_->GetMyRank();
@@ -1104,6 +1104,7 @@ void ThermoChem::computeSystemMass() {
   if (rank0 == true) std::cout << " Closed system mass: " << systemMass << " [kg]" << endl;
 }
 
+#if 0
 /**
    Interpolation of inlet bc from external file using
    Gaussian interpolation.  Not at all general and only for use
@@ -1349,6 +1350,7 @@ void ThermoChem::uniformInlet() {
     dataTempInf[n] = inlet_temp;
   }
 }
+#endif
 
 void ThermoChem::AddTempDirichletBC(Coefficient *coeff, Array<int> &attr) {
   temp_dbcs.emplace_back(attr, coeff);
