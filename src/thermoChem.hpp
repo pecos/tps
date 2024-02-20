@@ -86,6 +86,8 @@ class ThermoChem : public ThermoChemModelBase {
   bool constantViscosity = false;
   bool constantDensity = false;
 
+  bool domain_is_open_ = false;
+
   // Linear-solver-related options
 
   // Print levels.

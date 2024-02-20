@@ -111,6 +111,8 @@ ThermoChem::ThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tempora
   filterTemp = loMach_opts->filterTemp;
   filter_alpha = loMach_opts->filterWeight;
   filter_cutoff_modes = loMach_opts->nFilter;
+
+  tpsP_->getInput("loMach/openSystem", domain_is_open_, false);
 }
 
 ThermoChem::~ThermoChem() {
@@ -613,9 +615,13 @@ void ThermoChem::UpdateTimestepHistory(double dt) {
 }
 
 void ThermoChem::step() {
-  // update bdf coefficients
   dt = timeCoeff_.dt;
   time = timeCoeff_.time;
+
+  // Set current time for velocity Dirichlet boundary conditions.
+  for (auto &temp_dbc : temp_dbcs) {
+    temp_dbc.coeff->SetTime(time + dt);
+  }
 
   // Prepare for residual calc
   extrapolateState();
@@ -624,11 +630,7 @@ void ThermoChem::step() {
   updateDensity(1.0);
   updateDiffusivity();
 
-  // Set current time for velocity Dirichlet boundary conditions.
-  for (auto &temp_dbc : temp_dbcs) {
-    temp_dbc.coeff->SetTime(time + dt);
-  }
-
+  // Build the right-hand-side
   resT = 0.0;
 
   // convection
@@ -644,17 +646,17 @@ void ThermoChem::step() {
   resT.Add(-1.0, tmpR0b);
 
   // dPo/dt
-  // tmpR0 = (dtP / Cp);
-  // Ms->Mult(tmpR0, tmpR0b);
-  // resT.Add(1.0, tmpR0b);
+  tmpR0 = (dtP / Cp);
+  Ms->Mult(tmpR0, tmpR0b);
+  resT.Add(1.0, tmpR0b);
 
   // Add natural boundary terms here later
+  // NB: adiabatic natural BC is handled, but don't have ability to impose non-zero heat flux yet
 
-  // update Helmholtz operator, unsteady here, kappa in updateDiffusivity
-  {
-    rhoDt = rn_gf;
-    rhoDt *= (timeCoeff_.bd0 / dt);
-  }
+  // Update Helmholtz operator to account for changing dt, rho, and kappa
+  rhoDt = rn_gf;
+  rhoDt *= (timeCoeff_.bd0 / dt);
+
   Ht_form->Update();
   Ht_form->Assemble();
   Ht_form->FormSystemMatrix(temp_ess_tdof, Ht);
@@ -668,6 +670,7 @@ void ThermoChem::step() {
     HtInv->SetPreconditioner(*HtInvPC);
   }
 
+  // Prepare for the solve
   for (auto &temp_dbc : temp_dbcs) {
     Tn_next_gf.ProjectBdrCoefficient(*temp_dbc.coeff, temp_dbc.attr);
   }
@@ -754,6 +757,10 @@ void ThermoChem::initializeViz(ParaViewDataCollection &pvdc) {
    ramping a dirichlet condition over time
  */
 void ThermoChem::updateBC(int current_step) {
+  // TODO(trevilo): By making the Dirichlet BC time dependent, we
+  // already have a mechanism to handle this.  Is there a reason not
+  // to do it that way?
+
   // if (numInlets > 0) {
   //   double *dTInf = buffer_tInletInf->HostReadWrite();
   //   double *dT = buffer_tInlet->HostReadWrite();
@@ -779,9 +786,7 @@ void ThermoChem::extrapolateState() {
 
 // update thermodynamic pressure
 void ThermoChem::updateThermoP() {
-  // if (config_->isOpen != true) {
-  //  if (false) {
-  if (false) {
+  if (!domain_is_open_) {
     double allMass, PNM1;
     double myMass = 0.0;
     tmpR0 = 1.0;
