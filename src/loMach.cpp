@@ -422,21 +422,19 @@ void LoMachSolver::initialize() {
 
   // Initialize model-owned data
   flow_->initializeSelf();
+  thermo_->initializeSelf();
 
   // Initialize restart read/write capability
   flow_->initializeIO(ioData);
-
-  // Weird ordering here, b/c thermo initializeSelf assumes flow interface already ready to go
-  thermo_->initializeFromFlow(&flow_->toThermoChem_interface);
-  thermo_->initializeSelf();
   thermo_->initializeIO(ioData);
 
   // Exchange interface information
   flow_->initializeFromThermoChem(&thermo_->toFlow_interface_);
+  thermo_->initializeFromFlow(&flow_->toThermoChem_interface);
 
   // Finish initializing operators
   flow_->initializeOperators();
-  // thermo_->initializeOperators();
+  thermo_->initializeOperators();
 
   // TODO(trevilo): Enable averaging.  See note in loMach.hpp
 

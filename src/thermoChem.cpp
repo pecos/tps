@@ -222,14 +222,6 @@ void ThermoChem::initializeSelf() {
   toFlow_interface_.thermal_divergence = &Qt_gf;
   toTurbModel_interface_.density = &rn_gf;
 
-  // call setup
-  setup(timeCoeff_.dt);
-
-  // and initialize system mass
-  computeSystemMass();
-}
-
-void ThermoChem::setup(double dt) {
   // // Initial conditions
   // if (config_->useICFunction == true) {
   //   FunctionCoefficient t_ic_coef(temp_ic);
@@ -254,13 +246,8 @@ void ThermoChem::setup(double dt) {
   // }
 
   ConstantCoefficient t_ic_coef;
-  // t_ic_coef.constant = config.initRhoRhoVp[4] / (Rgas * config.initRhoRhoVp[0]);
   t_ic_coef.constant = T_ic_;
-  // if (!config_->restart) Tn_gf.ProjectCoefficient(t_ic_coef);
   Tn_gf.ProjectCoefficient(t_ic_coef);
-  if (rank0) {
-    // std::cout << "Initial temperature set from input file: " << config_->initRhoRhoVp[4] << endl;
-  }
 
   Tn_gf.GetTrueDofs(Tn);
   Tnm1_gf.SetFromTrueDofs(Tn);
@@ -292,21 +279,18 @@ void ThermoChem::setup(double dt) {
       if (type == "uniform") {
         if (rank0) {
           std::cout << "ERROR: Inlet type = " << type << " not supported." << std::endl;
-          ;
         }
         assert(false);
         exit(1);
       } else if (type == "interpolate") {
         if (rank0) {
           std::cout << "ERROR: Inlet type = " << type << " not supported." << std::endl;
-          ;
         }
         assert(false);
         exit(1);
       } else {
         if (rank0) {
           std::cout << "ERROR: Inlet type = " << type << " not supported." << std::endl;
-          ;
         }
         assert(false);
         exit(1);
@@ -378,6 +362,10 @@ void ThermoChem::setup(double dt) {
   sfes->GetEssentialTrueDofs(temp_ess_attr, temp_ess_tdof);
   sfes->GetEssentialTrueDofs(Qt_ess_attr, Qt_ess_tdof);
   if (rank0) std::cout << "ThermoChem Essential true dof step" << endl;
+}
+
+void ThermoChem::initializeOperators() {
+  dt = timeCoeff_.dt;
 
   Array<int> empty;
 
@@ -640,6 +628,9 @@ void ThermoChem::setup(double dt) {
   //     vMult[n] = wgt + (config_->linViscData.uniformMult - 1.0);
   //   }
   // }
+
+  // and initialize system mass
+  computeSystemMass();
 }
 
 /**

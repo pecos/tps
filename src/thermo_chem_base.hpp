@@ -87,6 +87,16 @@ class ThermoChemModelBase {
   virtual void initializeSelf() = 0;
 
   /**
+   * @brief Initialize model operators
+   *
+   * Default implementation here does nothing.  This hook exists to
+   * allow the model to initialize operators that depend on the
+   * interface intformation.  Thus, it must be called *after* the
+   * interfaces are initialized (e.g., after initializeFromFlow).
+   */
+  virtual void initializeOperators() {}
+
+  /**
    * @brief Take a single time step
    */
   virtual void step() = 0;

@@ -269,10 +269,9 @@ class ThermoChem : public ThermoChemModelBase {
 
   virtual ~ThermoChem() {}
 
-  void initializeSelf();
-  void initializeFromFlow(flowToThermoChem *flow);
-  void initializeFromTurbModel(turbModelToThermoChem *turbModel);
-  void step();
+  void initializeSelf() final;
+  void initializeOperators() final;
+  void step() final;
 
   /**
    * @brief Hook to let derived classes register restart fields with the IODataOrganizer.
@@ -291,9 +290,6 @@ class ThermoChem : public ThermoChemModelBase {
   void computeQtTO();
   void interpolateInlet();
   void uniformInlet();
-
-  /// Initialize forms, solvers and preconditioners.
-  void setup(double dt);
 
   /// Return a pointer to the current temperature ParGridFunction.
   ParGridFunction *GetCurrentTemperature() { return &Tn_gf; }
