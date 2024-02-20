@@ -436,7 +436,6 @@ void ThermoChem::initializeOperators() {
   MsRho_form->FormSystemMatrix(empty, MsRho);
   if (rank0) std::cout << "ThermoChem MsRho operator set" << endl;
 
-  Ht_bdfcoeff.constant = 1.0 / dt;
   Ht_form = new ParBilinearForm(sfes);
   auto *hmt_blfi = new MassIntegrator(*rhoDtField);
   auto *hdt_blfi = new DiffusionIntegrator(*kappaField);

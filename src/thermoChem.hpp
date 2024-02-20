@@ -134,7 +134,6 @@ class ThermoChem : public ThermoChemModelBase {
   ParBilinearForm *At_form = nullptr;
   ParBilinearForm *Ms_form = nullptr;
   ParBilinearForm *MsRho_form = nullptr;
-  ParMixedBilinearForm *Ds_form = nullptr;
   ParBilinearForm *Ht_form = nullptr;
   ParBilinearForm *Mq_form = nullptr;
   ParBilinearForm *LQ_form = nullptr;
@@ -146,9 +145,6 @@ class ThermoChem : public ThermoChemModelBase {
   GridFunctionCoefficient *thermal_diff_coeff = nullptr;
   GradientGridFunctionCoefficient *gradT_coeff = nullptr;
   ScalarVectorProductCoefficient *kap_gradT_coeff = nullptr;
-
-  ConstantCoefficient Ht_lincoeff;
-  ConstantCoefficient Ht_bdfcoeff;
 
   ConstantCoefficient *t_bc_coef0;
   ConstantCoefficient *t_bc_coef1;
