@@ -63,7 +63,6 @@ class Tps;
 using VecFuncT = void(const Vector &x, double t, Vector &u);
 using ScalarFuncT = double(const Vector &x, double t);
 
-class LoMachSolver;
 class LoMachOptions;
 struct temporalSchemeCoefficients;
 
@@ -71,8 +70,6 @@ struct temporalSchemeCoefficients;
    Energy/species class specific for temperature solves with loMach flows
  */
 class ThermoChem : public ThermoChemModelBase {
-  friend class LoMachSolver;
-
  private:
   TPS::Tps *tpsP_;
   LoMachOptions *loMach_opts_ = nullptr;
@@ -98,9 +95,6 @@ class ThermoChem : public ThermoChemModelBase {
 
   // Bookkeeping for Qt dirichlet bcs.
   std::vector<DirichletBC_T<Coefficient>> Qt_dbcs;
-
-  // space sizes
-  int Sdof, SdofInt, Pdof, PdofInt, NdofInt, NdofR0Int;
 
   /// Enable/disable verbose output.
   bool verbose = true;

@@ -240,14 +240,6 @@ void ThermoChem::initializeSelf() {
 }
 
 void ThermoChem::setup(double dt) {
-  // if (verbose) grvy_printf(ginfo, "in Setup...\n");
-
-  Sdof = sfes->GetNDofs();
-  Pdof = pfes->GetNDofs();
-
-  SdofInt = sfes->GetTrueVSize();
-  PdofInt = pfes->GetTrueVSize();
-
   // // Initial conditions
   // if (config_->useICFunction == true) {
   //   FunctionCoefficient t_ic_coef(temp_ic);
@@ -412,13 +404,9 @@ void ThermoChem::setup(double dt) {
   Rho = new GridFunctionCoefficient(&rn_gf);
   viscField = new GridFunctionCoefficient(&visc_gf);
   kappaField = new GridFunctionCoefficient(&kappa_gf);
-  {
-    double *data = rhoDt.HostReadWrite();
-    double *Rdata = rn_gf.HostReadWrite();
-    for (int i = 0; i < Sdof; i++) {
-      data[i] = Rdata[i] / dt;
-    }
-  }
+
+  rhoDt = rn_gf;
+  rhoDt /= dt;
   rhoDtField = new GridFunctionCoefficient(&rhoDt);
 
   // thermal_diff_coeff.constant = thermal_diff;
@@ -729,13 +717,6 @@ void ThermoChem::step() {
 
     // update Helmholtz operator, unsteady here, kappa in updateDiffusivity
     {
-      // double *data = rhoDt.HostReadWrite();
-      // double *Rdata = rn_gf.HostReadWrite();
-      // // double coeff = Cp*bd0/dt;
-      // double coeff = bd0 / dt;
-      // for (int i = 0; i < Sdof; i++) {
-      //   data[i] = coeff * Rdata[i];
-      // }
       rhoDt = rn_gf;
       rhoDt *= (bd0 / dt);
     }
@@ -885,19 +866,11 @@ void ThermoChem::updateThermoP() {
   if (false) {
     double allMass, PNM1;
     double myMass = 0.0;
-    // double *Tdata = Tn.HostReadWrite();
-    // double *data = tmpR0.HostReadWrite();
-    // for (int i = 0; i < SdofInt; i++) {
-    //   data[i] = 1.0 / Tdata[i];
-    // }
     tmpR0 = 1.0;
     tmpR0 /= Tn;
-    // multConstScalarIP((thermoPressure/Rgas),&tmpR0);
     tmpR0 *= (thermoPressure / Rgas);
     Ms->Mult(tmpR0, tmpR0b);
-    for (int i = 0; i < SdofInt; i++) {
-      myMass += tmpR0b[i];
-    }
+    myMass = tmpR0b.Sum();
     MPI_Allreduce(&myMass, &allMass, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
     PNM1 = thermoPressure;
     thermoPressure = systemMass / allMass * PNM1;
@@ -1079,31 +1052,18 @@ void ThermoChem::updateDensity(double tStep) {
   // set rn
   if (constantDensity != true) {
     if (tStep == 1.0) {
-      printf("Using variable density!\n");
-      // multConstScalarInv((thermoPressure / Rgas), Tn_next, &rn);
       rn = (thermoPressure / Rgas);
       rn /= Tn_next;
     } else if (tStep == 0.5) {
       multConstScalarInv((thermoPressure / Rgas), Tn_next, &tmpR0a);
       multConstScalarInv((thermoPressure / Rgas), Tn, &tmpR0b);
-      {
-        double *data = rn.HostWrite();
-        double *data1 = tmpR0a.HostWrite();
-        double *data2 = tmpR0b.HostWrite();
-        for (int i = 0; i < SdofInt; i++) {
-          data[i] = 0.5 * (data1[i] + data2[i]);
-        }
-      }
+      rn.Set(0.5, tmpR0a);
+      rn.Add(0.5, tmpR0b);
     } else {
       multConstScalarInv((thermoPressure / Rgas), Tn, &rn);
     }
 
   } else {
-    //
-    // double *data = rn.HostWrite();
-    // for (int i = 0; i < SdofInt; i++) {
-    //   data[i] = static_rho;
-    // }
     printf("Using constant density!\n");
     rn = 1.0;
   }
@@ -1130,15 +1090,10 @@ void ThermoChem::updateDensity(double tStep) {
 void ThermoChem::computeSystemMass() {
   systemMass = 0.0;
   double myMass = 0.0;
-  double *Tdata = Tn.HostReadWrite();
-  double *Rdata = rn.HostReadWrite();
-  for (int i = 0; i < SdofInt; i++) {
-    Rdata[i] = thermoPressure / (Rgas * Tdata[i]);
-  }
+  rn = (thermoPressure / Rgas);
+  rn /= Tn;
   Ms->Mult(rn, tmpR0);
-  for (int i = 0; i < SdofInt; i++) {
-    myMass += tmpR0[i];
-  }
+  myMass = tmpR0.Sum();
   MPI_Allreduce(&myMass, &systemMass, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
   if (rank0 == true) std::cout << " Closed system mass: " << systemMass << " [kg]" << endl;
 }
