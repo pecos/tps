@@ -48,12 +48,6 @@
 using namespace mfem;
 using namespace mfem::common;
 
-// temporary
-double temp_ic(const Vector &coords, double t);
-double temp_wall(const Vector &x, double t);
-double temp_wallBox(const Vector &x, double t);
-double temp_inlet(const Vector &x, double t);
-
 MFEM_HOST_DEVICE double Sutherland(const double T, const double mu_star, const double T_star, const double S_star) {
   const double T_rat = T / T_star;
   const double T_rat_32 = T_rat * sqrt(T_rat);
@@ -792,6 +786,185 @@ void ThermoChem::updateThermoP() {
   }
 }
 
+void ThermoChem::updateDiffusivity() {
+  // viscosity
+  if (!constantViscosity) {
+    double *d_visc = visc.Write();
+    const double *d_T = Tn.Read();
+    const double mu_star = mu0_;
+    const double T_star = sutherland_T0_;
+    const double S_star = sutherland_S0_;
+    MFEM_FORALL(i, Tn.Size(), { d_visc[i] = Sutherland(d_T[i], mu_star, T_star, S_star); });
+  } else {
+    visc = mu0_;
+  }
+
+  // if (config_->sgsModelType > 0) {
+  //   const double *dataSubgrid = turbModel_interface_->eddy_viscosity->HostRead();
+  //   double *dataVisc = visc_gf.HostReadWrite();
+  //   double *data = viscTotal_gf.HostReadWrite();
+  //   double *Rdata = rn_gf.HostReadWrite();
+  //   for (int i = 0; i < Sdof; i++) {
+  //     data[i] = dataVisc[i] + Rdata[i] * dataSubgrid[i];
+  //   }
+  // }
+
+  // if (config_->linViscData.isEnabled) {
+  //   double *vMult = viscMult.HostReadWrite();
+  //   double *dataVisc = viscTotal_gf.HostReadWrite();
+  //   for (int i = 0; i < Sdof; i++) {
+  //     dataVisc[i] *= viscMult[i];
+  //   }
+  // }
+
+  // thermal diffusivity: storing as kappa eventhough does NOT
+  // include Cp for now
+  // {
+  //   double *data = kappa_gf.HostReadWrite();
+  //   double *dataVisc = viscTotal_gf.HostReadWrite();
+  //   // double Ctmp = Cp / Pr;
+  //   double Ctmp = 1.0 / Pr;
+  //   for (int i = 0; i < Sdof; i++) {
+  //     data[i] = Ctmp * dataVisc[i];
+  //   }
+  // }
+
+  // viscTotal_gf.SetFromTrueDofs(visc);
+
+  // viscTotal_gf.GetTrueDofs(visc);
+  viscTotal_gf.SetFromTrueDofs(visc);
+
+  // NB: Here kappa is kappa / Cp = mu / Pr
+  kappa = visc;
+  kappa /= Pr;
+  kappa_gf.SetFromTrueDofs(kappa);
+}
+
+void ThermoChem::updateDensity(double tStep) {
+  Array<int> empty;
+
+  // set rn
+  if (constantDensity != true) {
+    if (tStep == 1.0) {
+      rn = (thermoPressure / Rgas);
+      rn /= Tn_next;
+    } else if (tStep == 0.5) {
+      multConstScalarInv((thermoPressure / Rgas), Tn_next, &tmpR0a);
+      multConstScalarInv((thermoPressure / Rgas), Tn, &tmpR0b);
+      rn.Set(0.5, tmpR0a);
+      rn.Add(0.5, tmpR0b);
+    } else {
+      multConstScalarInv((thermoPressure / Rgas), Tn, &rn);
+    }
+
+  } else {
+    printf("Using constant density!\n");
+    rn = 1.0;
+  }
+  rn_gf.SetFromTrueDofs(rn);
+
+  MsRho_form->Update();
+  MsRho_form->Assemble();
+  MsRho_form->FormSystemMatrix(empty, MsRho);
+
+  // project to p-space in case not same as vel-temp
+  R0PM0_gf.SetFromTrueDofs(rn);
+  // R0PM1_gf.ProjectGridFunction(R0PM0_gf);
+}
+
+void ThermoChem::computeSystemMass() {
+  systemMass = 0.0;
+  double myMass = 0.0;
+  rn = (thermoPressure / Rgas);
+  rn /= Tn;
+  Ms->Mult(rn, tmpR0);
+  myMass = tmpR0.Sum();
+  MPI_Allreduce(&myMass, &systemMass, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+  if (rank0 == true) std::cout << " Closed system mass: " << systemMass << " [kg]" << endl;
+}
+
+void ThermoChem::AddTempDirichletBC(Coefficient *coeff, Array<int> &attr) {
+  temp_dbcs.emplace_back(attr, coeff);
+
+  if (verbose && pmesh_->GetMyRank() == 0) {
+    mfem::out << "Adding Temperature Dirichlet BC to attributes ";
+    for (int i = 0; i < attr.Size(); ++i) {
+      if (attr[i] == 1) {
+        mfem::out << i << " ";
+      }
+    }
+    mfem::out << std::endl;
+  }
+
+  for (int i = 0; i < attr.Size(); ++i) {
+    MFEM_ASSERT((temp_ess_attr[i] && attr[i]) == 0, "Duplicate boundary definition deteceted.");
+    if (attr[i] == 1) {
+      temp_ess_attr[i] = 1;
+    }
+  }
+}
+
+void ThermoChem::AddTempDirichletBC(ScalarFuncT *f, Array<int> &attr) {
+  AddTempDirichletBC(new FunctionCoefficient(f), attr);
+}
+
+void ThermoChem::AddQtDirichletBC(Coefficient *coeff, Array<int> &attr) {
+  Qt_dbcs.emplace_back(attr, coeff);
+
+  if (verbose && pmesh_->GetMyRank() == 0) {
+    mfem::out << "Adding Qt Dirichlet BC to attributes ";
+    for (int i = 0; i < attr.Size(); ++i) {
+      if (attr[i] == 1) {
+        mfem::out << i << " ";
+      }
+    }
+    mfem::out << std::endl;
+  }
+
+  for (int i = 0; i < attr.Size(); ++i) {
+    MFEM_ASSERT((Qt_ess_attr[i] && attr[i]) == 0, "Duplicate boundary definition deteceted.");
+    if (attr[i] == 1) {
+      Qt_ess_attr[i] = 1;
+    }
+  }
+}
+
+void ThermoChem::AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr) {
+  AddQtDirichletBC(new FunctionCoefficient(f), attr);
+}
+
+void ThermoChem::computeQtTO() {
+  Array<int> empty;
+  tmpR0 = 0.0;
+  LQ_bdry->Update();
+  LQ_bdry->Assemble();
+  LQ_bdry->ParallelAssemble(tmpR0);
+  tmpR0.Neg();
+
+  LQ_form->Update();
+  LQ_form->Assemble();
+  LQ_form->FormSystemMatrix(empty, LQ);
+  LQ->AddMult(Tn_next, tmpR0);  // tmpR0 += LQ{Tn_next}
+  MqInv->Mult(tmpR0, Qt);
+
+  Qt *= -Rgas / thermoPressure;
+
+  /*
+    for (int be = 0; be < pmesh->GetNBE(); be++) {
+    int bAttr = pmesh.GetBdrElement(be)->GetAttribute();
+    if (bAttr == WallType::VISC_ISOTH || bAttr = WallType::VISC_ADIAB) {
+    Array<int> vdofs;
+    sfes->GetBdrElementVDofs(be, vdofs);
+    for (int i = 0; i < vdofs.Size(); i++) {
+    Qt[vdofs[i]] = 0.0;
+    }
+    }
+    }
+  */
+
+  Qt_gf.SetFromTrueDofs(Qt);
+}
+
 #if 0
 // Temporarily remove viscous sponge capability.  This sould be housed
 // in a separate class that we just instantiate and call, rather than
@@ -907,106 +1080,7 @@ void ThermoChem::viscSpongePlanar(double *x, double &wgt) {
   wgtAnn += 1.0;
   wgt = std::max(wgt, wgtAnn);
 }
-#endif
 
-void ThermoChem::updateDiffusivity() {
-  // viscosity
-  if (!constantViscosity) {
-    double *d_visc = visc.Write();
-    const double *d_T = Tn.Read();
-    const double mu_star = mu0_;
-    const double T_star = sutherland_T0_;
-    const double S_star = sutherland_S0_;
-    MFEM_FORALL(i, Tn.Size(), { d_visc[i] = Sutherland(d_T[i], mu_star, T_star, S_star); });
-  } else {
-    visc = mu0_;
-  }
-
-  // if (config_->sgsModelType > 0) {
-  //   const double *dataSubgrid = turbModel_interface_->eddy_viscosity->HostRead();
-  //   double *dataVisc = visc_gf.HostReadWrite();
-  //   double *data = viscTotal_gf.HostReadWrite();
-  //   double *Rdata = rn_gf.HostReadWrite();
-  //   for (int i = 0; i < Sdof; i++) {
-  //     data[i] = dataVisc[i] + Rdata[i] * dataSubgrid[i];
-  //   }
-  // }
-
-  // if (config_->linViscData.isEnabled) {
-  //   double *vMult = viscMult.HostReadWrite();
-  //   double *dataVisc = viscTotal_gf.HostReadWrite();
-  //   for (int i = 0; i < Sdof; i++) {
-  //     dataVisc[i] *= viscMult[i];
-  //   }
-  // }
-
-  // thermal diffusivity: storing as kappa eventhough does NOT
-  // include Cp for now
-  // {
-  //   double *data = kappa_gf.HostReadWrite();
-  //   double *dataVisc = viscTotal_gf.HostReadWrite();
-  //   // double Ctmp = Cp / Pr;
-  //   double Ctmp = 1.0 / Pr;
-  //   for (int i = 0; i < Sdof; i++) {
-  //     data[i] = Ctmp * dataVisc[i];
-  //   }
-  // }
-
-  // viscTotal_gf.SetFromTrueDofs(visc);
-
-  // viscTotal_gf.GetTrueDofs(visc);
-  viscTotal_gf.SetFromTrueDofs(visc);
-
-  // NB: Here kappa is kappa / Cp = mu / Pr
-  kappa = visc;
-  kappa /= Pr;
-  kappa_gf.SetFromTrueDofs(kappa);
-}
-
-void ThermoChem::updateDensity(double tStep) {
-  Array<int> empty;
-
-  // set rn
-  if (constantDensity != true) {
-    if (tStep == 1.0) {
-      rn = (thermoPressure / Rgas);
-      rn /= Tn_next;
-    } else if (tStep == 0.5) {
-      multConstScalarInv((thermoPressure / Rgas), Tn_next, &tmpR0a);
-      multConstScalarInv((thermoPressure / Rgas), Tn, &tmpR0b);
-      rn.Set(0.5, tmpR0a);
-      rn.Add(0.5, tmpR0b);
-    } else {
-      multConstScalarInv((thermoPressure / Rgas), Tn, &rn);
-    }
-
-  } else {
-    printf("Using constant density!\n");
-    rn = 1.0;
-  }
-  rn_gf.SetFromTrueDofs(rn);
-
-  MsRho_form->Update();
-  MsRho_form->Assemble();
-  MsRho_form->FormSystemMatrix(empty, MsRho);
-
-  // project to p-space in case not same as vel-temp
-  R0PM0_gf.SetFromTrueDofs(rn);
-  // R0PM1_gf.ProjectGridFunction(R0PM0_gf);
-}
-
-void ThermoChem::computeSystemMass() {
-  systemMass = 0.0;
-  double myMass = 0.0;
-  rn = (thermoPressure / Rgas);
-  rn /= Tn;
-  Ms->Mult(rn, tmpR0);
-  myMass = tmpR0.Sum();
-  MPI_Allreduce(&myMass, &systemMass, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-  if (rank0 == true) std::cout << " Closed system mass: " << systemMass << " [kg]" << endl;
-}
-
-#if 0
 /**
    Interpolation of inlet bc from external file using
    Gaussian interpolation.  Not at all general and only for use
@@ -1252,89 +1326,6 @@ void ThermoChem::uniformInlet() {
     dataTempInf[n] = inlet_temp;
   }
 }
-#endif
-
-void ThermoChem::AddTempDirichletBC(Coefficient *coeff, Array<int> &attr) {
-  temp_dbcs.emplace_back(attr, coeff);
-
-  if (verbose && pmesh_->GetMyRank() == 0) {
-    mfem::out << "Adding Temperature Dirichlet BC to attributes ";
-    for (int i = 0; i < attr.Size(); ++i) {
-      if (attr[i] == 1) {
-        mfem::out << i << " ";
-      }
-    }
-    mfem::out << std::endl;
-  }
-
-  for (int i = 0; i < attr.Size(); ++i) {
-    MFEM_ASSERT((temp_ess_attr[i] && attr[i]) == 0, "Duplicate boundary definition deteceted.");
-    if (attr[i] == 1) {
-      temp_ess_attr[i] = 1;
-    }
-  }
-}
-
-void ThermoChem::AddTempDirichletBC(ScalarFuncT *f, Array<int> &attr) {
-  AddTempDirichletBC(new FunctionCoefficient(f), attr);
-}
-
-void ThermoChem::AddQtDirichletBC(Coefficient *coeff, Array<int> &attr) {
-  Qt_dbcs.emplace_back(attr, coeff);
-
-  if (verbose && pmesh_->GetMyRank() == 0) {
-    mfem::out << "Adding Qt Dirichlet BC to attributes ";
-    for (int i = 0; i < attr.Size(); ++i) {
-      if (attr[i] == 1) {
-        mfem::out << i << " ";
-      }
-    }
-    mfem::out << std::endl;
-  }
-
-  for (int i = 0; i < attr.Size(); ++i) {
-    MFEM_ASSERT((Qt_ess_attr[i] && attr[i]) == 0, "Duplicate boundary definition deteceted.");
-    if (attr[i] == 1) {
-      Qt_ess_attr[i] = 1;
-    }
-  }
-}
-
-void ThermoChem::AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr) {
-  AddQtDirichletBC(new FunctionCoefficient(f), attr);
-}
-
-void ThermoChem::computeQtTO() {
-  Array<int> empty;
-  tmpR0 = 0.0;
-  LQ_bdry->Update();
-  LQ_bdry->Assemble();
-  LQ_bdry->ParallelAssemble(tmpR0);
-  tmpR0.Neg();
-
-  LQ_form->Update();
-  LQ_form->Assemble();
-  LQ_form->FormSystemMatrix(empty, LQ);
-  LQ->AddMult(Tn_next, tmpR0);  // tmpR0 += LQ{Tn_next}
-  MqInv->Mult(tmpR0, Qt);
-
-  Qt *= -Rgas / thermoPressure;
-
-  /*
-    for (int be = 0; be < pmesh->GetNBE(); be++) {
-    int bAttr = pmesh.GetBdrElement(be)->GetAttribute();
-    if (bAttr == WallType::VISC_ISOTH || bAttr = WallType::VISC_ADIAB) {
-    Array<int> vdofs;
-    sfes->GetBdrElementVDofs(be, vdofs);
-    for (int i = 0; i < vdofs.Size(); i++) {
-    Qt[vdofs[i]] = 0.0;
-    }
-    }
-    }
-  */
-
-  Qt_gf.SetFromTrueDofs(Qt);
-}
 
 ///~ BC hard-codes ~///
 
@@ -1410,3 +1401,4 @@ double temp_inlet(const Vector &coords, double t) {
   temp = Tlo + (y + 0.5) * (Thi - Tlo);
   return temp;
 }
+#endif
