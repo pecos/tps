@@ -46,7 +46,6 @@ class Tps;
 #include "../utils/mfem_extras/pfem_extras.hpp"
 #include "dirichlet_bc_helper.hpp"
 #include "io.hpp"
-#include "run_configuration.hpp"
 #include "thermo_chem_base.hpp"
 #include "tps_mfem_wrap.hpp"
 
