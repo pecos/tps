@@ -468,23 +468,16 @@ void ThermoChem::initializeOperators() {
   MsInv->SetRelTol(1e-12);  // config_->solver_tol);
   MsInv->SetMaxIter(2000);  // config_->solver_iter);
 
-  // if (partial_assembly) {
-  //   Vector diag_pa(sfes->GetTrueVSize());
-  //   Ht_form->AssembleDiagonal(diag_pa);
-  //   HtInvPC = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof);
-  // } else {
-  //   HtInvPC = new HypreSmoother(*Ht.As<HypreParMatrix>());
-  //   dynamic_cast<HypreSmoother *>(HtInvPC)->SetType(HypreSmoother::Jacobi, 1);
-  // }
-  Vector diag_pa(sfes->GetTrueVSize());
-  Ht_form->AssembleDiagonal(diag_pa);
-  HtInvPC = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof);
+  if (partial_assembly) {
+    Vector diag_pa(sfes->GetTrueVSize());
+    Ht_form->AssembleDiagonal(diag_pa);
+    HtInvPC = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof);
+  } else {
+    HtInvPC = new HypreSmoother(*Ht.As<HypreParMatrix>());
+    dynamic_cast<HypreSmoother *>(HtInvPC)->SetType(HypreSmoother::Jacobi, 1);
+  }
 
   HtInv = new CGSolver(sfes->GetComm());
-
-  // make these options instead?
-  // HtInv = new GMRESSolver(sfes->GetComm());
-  // HtInv = new BiCGSTABSolver(sfes->GetComm());
 
   HtInv->iterative_mode = true;
   HtInv->SetOperator(*Ht);
@@ -639,10 +632,8 @@ void ThermoChem::step() {
     tmpR0.Add(timeCoeff_.bd2 / dt, Tnm1);
     tmpR0.Add(timeCoeff_.bd3 / dt, Tnm2);
 
-    // // multScalarScalarIP(rn,&tmpR0);
     MsRho->Mult(tmpR0, tmpR0b);
     resT.Add(-1.0, tmpR0b);
-    // // multConstScalarIP(Cp,&resT);
 
     // dPo/dt
     // tmpR0 = (dtP / Cp);
@@ -661,19 +652,13 @@ void ThermoChem::step() {
     Ht_form->FormSystemMatrix(temp_ess_tdof, Ht);
 
     HtInv->SetOperator(*Ht);
-    // if (partial_assembly) {
-    //   delete HtInvPC;
-    //   Vector diag_pa(sfes->GetTrueVSize());
-    //   Ht_form->AssembleDiagonal(diag_pa);
-    //   HtInvPC = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof);
-    //   HtInv->SetPreconditioner(*HtInvPC);
-    // }
-
-    delete HtInvPC;
-    Vector diag_pa(sfes->GetTrueVSize());
-    Ht_form->AssembleDiagonal(diag_pa);
-    HtInvPC = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof);
-    HtInv->SetPreconditioner(*HtInvPC);
+    if (partial_assembly) {
+      delete HtInvPC;
+      Vector diag_pa(sfes->GetTrueVSize());
+      Ht_form->AssembleDiagonal(diag_pa);
+      HtInvPC = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof);
+      HtInv->SetPreconditioner(*HtInvPC);
+    }
 
     for (auto &temp_dbc : temp_dbcs) {
       Tn_next_gf.ProjectBdrCoefficient(*temp_dbc.coeff, temp_dbc.attr);
