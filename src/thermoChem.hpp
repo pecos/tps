@@ -47,6 +47,7 @@ class Tps;
 #include "argon_transport.hpp"
 #include "averaging_and_rms.hpp"
 #include "chemistry.hpp"
+#include "dirichlet_bc_helper.hpp"
 #include "io.hpp"
 #include "mfem.hpp"
 #include "mfem/linalg/solvers.hpp"
@@ -65,45 +66,6 @@ using ScalarFuncT = double(const Vector &x, double t);
 class LoMachSolver;
 class LoMachOptions;
 struct temporalSchemeCoefficients;
-
-/// Container for a Dirichlet boundary condition of the temperature field.
-class TempDirichletBC_T {
- public:
-  TempDirichletBC_T(Array<int> attr, Coefficient *coeff) : attr(attr), coeff(coeff) {}
-
-  TempDirichletBC_T(TempDirichletBC_T &&obj) {
-    // Deep copy the attribute array
-    this->attr = obj.attr;
-
-    // Move the coefficient pointer
-    this->coeff = obj.coeff;
-    obj.coeff = nullptr;
-  }
-
-  ~TempDirichletBC_T() { delete coeff; }
-
-  Array<int> attr;
-  Coefficient *coeff;
-};
-
-class QtDirichletBC_T {
- public:
-  QtDirichletBC_T(Array<int> attr, Coefficient *coeff) : attr(attr), coeff(coeff) {}
-
-  QtDirichletBC_T(QtDirichletBC_T &&obj) {
-    // Deep copy the attribute array
-    this->attr = obj.attr;
-
-    // Move the coefficient pointer
-    this->coeff = obj.coeff;
-    obj.coeff = nullptr;
-  }
-
-  ~QtDirichletBC_T() { delete coeff; }
-
-  Array<int> attr;
-  Coefficient *coeff;
-};
 
 /**
    Energy/species class specific for temperature solves with loMach flows
@@ -132,10 +94,10 @@ class ThermoChem : public ThermoChemModelBase {
   Array<int> Qt_ess_tdof;
 
   // Bookkeeping for temperature dirichlet bcs.
-  std::vector<TempDirichletBC_T> temp_dbcs;
+  std::vector<DirichletBC_T<Coefficient>> temp_dbcs;
 
   // Bookkeeping for Qt dirichlet bcs.
-  std::vector<QtDirichletBC_T> Qt_dbcs;
+  std::vector<DirichletBC_T<Coefficient>> Qt_dbcs;
 
   // space sizes
   int Sdof, SdofInt, Pdof, PdofInt, NdofInt, NdofR0Int;
