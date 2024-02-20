@@ -668,8 +668,8 @@ void ThermoChem::step() {
     resT = 0.0;
 
     // convection
-    // computeExplicitTempConvectionOP(true);  // ->tmpR0
-    // resT.Set(-1.0, tmpR0);
+    computeExplicitTempConvectionOP(true);  // ->tmpR0
+    resT.Set(-1.0, tmpR0);
 
     // for unsteady term, compute and add known part of BDF unsteady term
     tmpR0.Set(timeCoeff_.bd1 / dt, Tn);
