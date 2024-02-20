@@ -2,9 +2,7 @@
 
 #include "tps.hpp"
 
-
-SubGridModelOptions::SubGridModelOptions()
-    : sgs_model_string_("none"), sgs_model_constant_(0.0), exclude_mean_(false) {
+SubGridModelOptions::SubGridModelOptions() : sgs_model_string_("none"), sgs_model_constant_(0.0), exclude_mean_(false) {
   sgs_model_map_["none"] = NONE;
   sgs_model_map_["smagorinsky"] = SMAGORINSKY;
   sgs_model_map_["sigma"] = SIGMA;

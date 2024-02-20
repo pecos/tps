@@ -426,8 +426,6 @@ void LoMachSolver::initialize() {
   // Initialize restart read/write capability
   flow_->initializeIO(ioData);
 
-
-
   // Weird ordering here, b/c thermo initializeSelf assumes flow interface already ready to go
   thermo_->initializeFromFlow(&flow_->toThermoChem_interface);
   thermo_->initializeSelf();
@@ -447,7 +445,6 @@ void LoMachSolver::initialize() {
   ioData.initializeSerial(rank0_, restart_serial, serial_mesh_, locToGlobElem, &partitioning_);
   MPI_Barrier(groupsMPI->getTPSCommWorld());
   if (verbose) grvy_printf(ginfo, "ioData.init thingy...\n");
-
 
   // Initialize visualization
   pvdc_ = new ParaViewDataCollection(loMach_opts_.io_opts_.output_dir_, pmesh_);
@@ -882,8 +879,7 @@ void LoMachSolver::PrintTimingData() {
     mfem::out << std::setw(10) << "SETUP" << std::setw(10) << "STEP"
               << "\n";
 
-    mfem::out << std::setprecision(3) << std::setw(10) << my_rt[0] << std::setw(10) << my_rt[1]
-              << "\n";
+    mfem::out << std::setprecision(3) << std::setw(10) << my_rt[0] << std::setw(10) << my_rt[1] << "\n";
 
     mfem::out << std::setprecision(8);
   }
