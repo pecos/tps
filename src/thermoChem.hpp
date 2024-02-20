@@ -59,27 +59,24 @@ struct temporalSchemeCoefficients;
  */
 class ThermoChem : public ThermoChemModelBase {
  private:
-  TPS::Tps *tpsP_;
+  // Options-related structures
+  TPS::Tps *tpsP_ = nullptr;
   LoMachOptions *loMach_opts_ = nullptr;
 
-  // MPI_Groups *groupsMPI;
+  // Mesh and discretization scheme info
+  ParMesh *pmesh_ = nullptr;
+  int order;
+  IntegrationRules gll_rules;
+  const temporalSchemeCoefficients &timeCoeff_;
+  double dt;
+  double time;
+
+  // MPI-related
   int nprocs_;  // total number of MPI procs
   int rank;     // local MPI rank
   bool rank0;   // flag to indicate rank 0
 
-  // All essential attributes.
-  Array<int> temp_ess_attr;
-  Array<int> Qt_ess_attr;
-
-  // All essential true dofs.
-  Array<int> temp_ess_tdof;
-  Array<int> Qt_ess_tdof;
-
-  // Bookkeeping for temperature dirichlet bcs.
-  std::vector<DirichletBC_T<Coefficient>> temp_dbcs;
-
-  // Bookkeeping for Qt dirichlet bcs.
-  std::vector<DirichletBC_T<Coefficient>> Qt_dbcs;
+  // Flags
 
   /// Enable/disable verbose output.
   bool verbose = true;
@@ -90,124 +87,11 @@ class ThermoChem : public ThermoChemModelBase {
   /// Enable/disable numerical integration rules of forms.
   bool numerical_integ = true;
 
-  ParMesh *pmesh_ = nullptr;
-
-  // The order of the scalar spaces
-  int order;
-  IntegrationRules gll_rules;
-
-  // just keep these saved for ease
-  int numWalls, numInlets, numOutlets;
-
   // loMach options to run as incompressible
   bool constantViscosity = false;
   bool constantDensity = false;
 
-  // transport parameters
-  double mu0_;
-  double sutherland_T0_;
-  double sutherland_S0_;
-
-  double dt;
-  double time;
-
-  // Coefficients necessary to take a time step (including dt).
-  // Assumed to be externally managed and determined, so just get a
-  // reference here.
-  const temporalSchemeCoefficients &timeCoeff_;
-
-  /// constant prop solves
-  double Pr, Cp, gamma;
-  double static_rho, Rgas;
-
-  /// pressure-related, closed-system thermo pressure changes
-  double ambientPressure, thermoPressure, systemMass;
-  double tPm1, tPm2, dtP;
-
-  // Scalar \f$H^1\f$ finite element collection.
-  FiniteElementCollection *sfec = nullptr;
-
-  // Scalar \f$H^1\f$ finite element space.
-  ParFiniteElementSpace *sfes = nullptr;
-
-  // operators
-  ParBilinearForm *At_form = nullptr;
-  ParBilinearForm *Ms_form = nullptr;
-  ParBilinearForm *MsRho_form = nullptr;
-  ParBilinearForm *Ht_form = nullptr;
-  ParBilinearForm *Mq_form = nullptr;
-  ParBilinearForm *LQ_form = nullptr;
-  ParLinearForm *LQ_bdry = nullptr;
-
-  VectorGridFunctionCoefficient *un_next_coeff = nullptr;
-  GridFunctionCoefficient *rhon_next_coeff = nullptr;
-  ScalarVectorProductCoefficient *rhou_coeff = nullptr;
-  GridFunctionCoefficient *thermal_diff_coeff = nullptr;
-  GradientGridFunctionCoefficient *gradT_coeff = nullptr;
-  ScalarVectorProductCoefficient *kap_gradT_coeff = nullptr;
-
-  ConstantCoefficient *buffer_qbc = nullptr;
-
-  ParGridFunction rhoDt;
-
-  GridFunctionCoefficient *rhoDtField = nullptr;
-  GridFunctionCoefficient *Rho = nullptr;
-
-#if 0
-  // TODO(trevilo): Re-enable variable inlet BC
-  ParGridFunction *buffer_tInlet = nullptr;
-  ParGridFunction *buffer_tInletInf = nullptr;
-  GridFunctionCoefficient *tInletField = nullptr;
-#endif
-
-#if 0
-  // TODO(trevilo): Re-enable the viscosity multiplier functionality
-  // space varying viscosity multiplier
-  ParGridFunction viscMult_gf;
-  viscositySpongeData vsd_;
-#endif
-
-  ParGridFunction viscTotal_gf;
-  ParGridFunction visc_gf;
-  ParGridFunction eddyVisc_gf;
-  ParGridFunction kappa_gf;
-
-  OperatorHandle LQ;
-  OperatorHandle At;
-  OperatorHandle Ht;
-  OperatorHandle Ms;
-  OperatorHandle MsRho;
-  OperatorHandle Mq;
-
-  mfem::Solver *MsInvPC = nullptr;
-  mfem::CGSolver *MsInv = nullptr;
-  mfem::Solver *MqInvPC = nullptr;
-  mfem::CGSolver *MqInv = nullptr;
-  mfem::Solver *HtInvPC = nullptr;
-  mfem::CGSolver *HtInv = nullptr;
-
-  ParGridFunction Tnm1_gf, Tnm2_gf;
-  ParGridFunction Tn_gf, Tn_next_gf, Text_gf, resT_gf;
-  ParGridFunction rn_gf;
-
-  Vector fTn, Tn, Tn_next, Tnm1, Tnm2, NTn, NTnm1, NTnm2;
-  Vector Text;
-  Vector resT, tmpR0a, tmpR0b, tmpR0c;
-
-  ParGridFunction *un_next_gf = nullptr;
-  ParGridFunction *subgridVisc_gf = nullptr;
-
-  Vector tmpR0;
-  ParGridFunction R0PM0_gf;
-
-  ParGridFunction Qt_gf;
-
-  Vector Qt;
-  Vector rn;
-  Vector kappa;
-  Vector visc;
-  Vector viscMult;
-  Vector subgridVisc;
+  // Linear-solver-related options
 
   // Print levels.
   int pl_mvsolve = 0;
@@ -224,33 +108,144 @@ class ThermoChem : public ThermoChemModelBase {
   // Residuals.
   double res_mtsolve = 0.0, res_htsolve = 0.0;
 
-  // Filter-based stabilization => move to "input" options
-  int filter_cutoff_modes = 0;
-  double filter_alpha = 0.0;
+  // Boundary condition info
+
+  // All essential attributes.
+  Array<int> temp_ess_attr;
+  Array<int> Qt_ess_attr;
+
+  // All essential true dofs.
+  Array<int> temp_ess_tdof;
+  Array<int> Qt_ess_tdof;
+
+  // Bookkeeping for temperature dirichlet bcs.
+  std::vector<DirichletBC_T<Coefficient>> temp_dbcs;
+
+  // Bookkeeping for Qt dirichlet bcs.
+  std::vector<DirichletBC_T<Coefficient>> Qt_dbcs;
+
+  // Scalar modeling parameters
+
+  // transport parameters
+  double mu0_;
+  double sutherland_T0_;
+  double sutherland_S0_;
+
+  double Pr, Cp, gamma;
+  double static_rho, Rgas;
+
+  /// pressure-related, closed-system thermo pressure changes
+  double ambientPressure, thermoPressure, systemMass;
+  double tPm1, tPm2, dtP;
 
   // Initial temperature value (if constant IC)
   double T_ic_;
+
+  // FEM related fields and objects
+
+  // Scalar \f$H^1\f$ finite element collection.
+  FiniteElementCollection *sfec = nullptr;
+
+  // Scalar \f$H^1\f$ finite element space.
+  ParFiniteElementSpace *sfes = nullptr;
+
+  // Fields
+  ParGridFunction Tnm1_gf, Tnm2_gf;
+  ParGridFunction Tn_gf, Tn_next_gf, Text_gf, resT_gf;
+  ParGridFunction rn_gf;
+  ParGridFunction rhoDt;
+
+  ParGridFunction viscTotal_gf;
+  ParGridFunction visc_gf;
+  ParGridFunction eddyVisc_gf;
+  ParGridFunction kappa_gf;
+  ParGridFunction R0PM0_gf;
+  ParGridFunction Qt_gf;
+
+  VectorGridFunctionCoefficient *un_next_coeff = nullptr;
+  GridFunctionCoefficient *rhon_next_coeff = nullptr;
+  ScalarVectorProductCoefficient *rhou_coeff = nullptr;
+  GridFunctionCoefficient *thermal_diff_coeff = nullptr;
+  GradientGridFunctionCoefficient *gradT_coeff = nullptr;
+  ScalarVectorProductCoefficient *kap_gradT_coeff = nullptr;
+
+  ConstantCoefficient *buffer_qbc = nullptr;
+  GridFunctionCoefficient *rhoDtField = nullptr;
+  GridFunctionCoefficient *Rho = nullptr;
+
+  // operators and solvers
+  ParBilinearForm *At_form = nullptr;
+  ParBilinearForm *Ms_form = nullptr;
+  ParBilinearForm *MsRho_form = nullptr;
+  ParBilinearForm *Ht_form = nullptr;
+  ParBilinearForm *Mq_form = nullptr;
+  ParBilinearForm *LQ_form = nullptr;
+  ParLinearForm *LQ_bdry = nullptr;
+
+  OperatorHandle LQ;
+  OperatorHandle At;
+  OperatorHandle Ht;
+  OperatorHandle Ms;
+  OperatorHandle MsRho;
+  OperatorHandle Mq;
+
+  mfem::Solver *MsInvPC = nullptr;
+  mfem::CGSolver *MsInv = nullptr;
+  mfem::Solver *MqInvPC = nullptr;
+  mfem::CGSolver *MqInv = nullptr;
+  mfem::Solver *HtInvPC = nullptr;
+  mfem::CGSolver *HtInv = nullptr;
+
+  // Vectors
+  Vector fTn, Tn, Tn_next, Tnm1, Tnm2, NTn, NTnm1, NTnm2;
+  Vector Text;
+  Vector resT, tmpR0a, tmpR0b, tmpR0c;
+
+  Vector tmpR0;
+
+  Vector Qt;
+  Vector rn;
+  Vector kappa;
+  Vector visc;
+  Vector viscMult;
+  Vector subgridVisc;
+
+  // Parameters and objects used in filter-based stabilization
+  int filter_cutoff_modes = 0;
+  double filter_alpha = 0.0;
 
   FiniteElementCollection *sfec_filter = nullptr;
   ParFiniteElementSpace *sfes_filter = nullptr;
   ParGridFunction Tn_NM1_gf;
   ParGridFunction Tn_filtered_gf;
 
+#if 0
+  // TODO(trevilo): Re-enable variable inlet BC
+  ParGridFunction *buffer_tInlet = nullptr;
+  ParGridFunction *buffer_tInletInf = nullptr;
+  GridFunctionCoefficient *tInletField = nullptr;
+
+  // TODO(trevilo): Re-enable the viscosity multiplier functionality
+  ParGridFunction viscMult_gf;
+  viscositySpongeData vsd_;
+
+  void interpolateInlet();
+  void uniformInlet();
+  void viscSpongePlanar(double *x, double &wgt);
+#endif
+
  public:
   ThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff, TPS::Tps *tps);
-
   virtual ~ThermoChem() {}
 
+  // Functions overriden from base class
   void initializeSelf() final;
   void initializeOperators() final;
   void step() final;
-
-  /**
-   * @brief Hook to let derived classes register restart fields with the IODataOrganizer.
-   */
   void initializeIO(IODataOrganizer &io) final;
   void initializeViz(ParaViewDataCollection &pvdc) final;
 
+  // Functions added here
   void updateThermoP();
   void extrapolateState();
   void updateDensity(double tStep);
@@ -260,8 +255,6 @@ class ThermoChem : public ThermoChemModelBase {
   void computeExplicitTempConvectionOP(bool extrap);
   void computeQt();
   void computeQtTO();
-  void interpolateInlet();
-  void uniformInlet();
 
   /// Return a pointer to the current temperature ParGridFunction.
   ParGridFunction *GetCurrentTemperature() { return &Tn_gf; }
@@ -286,8 +279,5 @@ class ThermoChem : public ThermoChemModelBase {
   void AddTempDirichletBC(ScalarFuncT *f, Array<int> &attr);
   void AddQtDirichletBC(Coefficient *coeff, Array<int> &attr);
   void AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr);
-
-  // MFEM_HOST_DEVICE
-  void viscSpongePlanar(double *x, double &wgt);
 };
 #endif  // THERMOCHEM_HPP_

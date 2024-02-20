@@ -63,7 +63,7 @@ MFEM_HOST_DEVICE double Sutherland(const double T, const double mu_star, const d
 
 ThermoChem::ThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff,
                        TPS::Tps *tps)
-    : tpsP_(tps), pmesh_(pmesh), loMach_opts_(loMach_opts), timeCoeff_(timeCoeff) {}
+    : tpsP_(tps), loMach_opts_(loMach_opts), pmesh_(pmesh), timeCoeff_(timeCoeff) {}
 
 void ThermoChem::initializeSelf() {
   rank = pmesh_->GetMyRank();
@@ -254,6 +254,7 @@ void ThermoChem::initializeSelf() {
   Tnm2_gf.GetTrueDofs(Tnm2);
 
   // Boundary conditions
+  int numWalls, numInlets, numOutlets;
   tpsP_->getInput("boundaryConditions/numWalls", numWalls, 0);
   tpsP_->getInput("boundaryConditions/numInlets", numInlets, 0);
   tpsP_->getInput("boundaryConditions/numOutlets", numOutlets, 0);
