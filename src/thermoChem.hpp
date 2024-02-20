@@ -133,7 +133,6 @@ class ThermoChem : public ThermoChemModelBase {
   // operators
   DiffusionIntegrator *hdt_blfi = nullptr;
   MassIntegrator *hmt_blfi = nullptr;
-  ParBilinearForm *Lt_form = nullptr;
   ParBilinearForm *At_form = nullptr;
   ParBilinearForm *Ms_form = nullptr;
   ParBilinearForm *MsRho_form = nullptr;
@@ -142,10 +141,6 @@ class ThermoChem : public ThermoChemModelBase {
   ParBilinearForm *Mq_form = nullptr;
   ParBilinearForm *LQ_form = nullptr;
   ParLinearForm *LQ_bdry = nullptr;
-  GridFunctionCoefficient *Text_gfcoeff = nullptr;
-  ParLinearForm *Text_bdr_form = nullptr;
-  ParLinearForm *ft_form = nullptr;
-  ParLinearForm *t_bdr_form = nullptr;
 
   VectorGridFunctionCoefficient *un_next_coeff = nullptr;
   GridFunctionCoefficient *rhon_next_coeff = nullptr;
@@ -154,7 +149,6 @@ class ThermoChem : public ThermoChemModelBase {
   GradientGridFunctionCoefficient *gradT_coeff = nullptr;
   ScalarVectorProductCoefficient *kap_gradT_coeff = nullptr;
 
-  ConstantCoefficient Lt_coeff;
   ConstantCoefficient Ht_lincoeff;
   ConstantCoefficient Ht_bdfcoeff;
 
@@ -196,7 +190,6 @@ class ThermoChem : public ThermoChemModelBase {
   ParGridFunction eddyVisc_gf;
   ParGridFunction kappa_gf;
 
-  OperatorHandle Lt;
   OperatorHandle LQ;
   OperatorHandle At;
   OperatorHandle Ht;
@@ -218,7 +211,7 @@ class ThermoChem : public ThermoChemModelBase {
   ParGridFunction rn_gf;
 
   Vector fTn, Tn, Tn_next, Tnm1, Tnm2, NTn, NTnm1, NTnm2;
-  Vector Text, Text_bdr, t_bdr;
+  Vector Text;
   Vector resT, tmpR0a, tmpR0b, tmpR0c;
 
   ParGridFunction *un_next_gf = nullptr;
@@ -229,7 +222,6 @@ class ThermoChem : public ThermoChemModelBase {
 
   ParGridFunction Qt_gf;
 
-  Vector gradMu, gradRho;
   Vector Qt;
   Vector rn;
   Vector kappa;

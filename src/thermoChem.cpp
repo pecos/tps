@@ -159,9 +159,7 @@ void ThermoChem::initializeSelf() {
   NTnm2 = 0.0;
 
   Text.SetSize(sfes_truevsize);
-  Text_bdr.SetSize(sfes_truevsize);
   Text_gf.SetSpace(sfes);
-  t_bdr.SetSize(sfes_truevsize);
 
   resT_gf.SetSpace(sfes);
   resT.SetSize(sfes_truevsize);
@@ -438,21 +436,6 @@ void ThermoChem::initializeOperators() {
   MsRho_form->FormSystemMatrix(empty, MsRho);
   if (rank0) std::cout << "ThermoChem MsRho operator set" << endl;
 
-  // temperature laplacian
-  Lt_form = new ParBilinearForm(sfes);
-  Lt_coeff.constant = -1.0;
-  auto *lt_blfi = new DiffusionIntegrator(Lt_coeff);
-  if (numerical_integ) {
-    lt_blfi->SetIntRule(&ir_di);
-  }
-  Lt_form->AddDomainIntegrator(lt_blfi);
-  if (partial_assembly) {
-    Lt_form->SetAssemblyLevel(AssemblyLevel::PARTIAL);
-  }
-  Lt_form->Assemble();
-  Lt_form->FormSystemMatrix(empty, Lt);
-  if (rank0) std::cout << "ThermoChem Lt operator set" << endl;
-
   Ht_bdfcoeff.constant = 1.0 / dt;
   Ht_form = new ParBilinearForm(sfes);
   hmt_blfi = new MassIntegrator(*rhoDtField);
@@ -470,24 +453,6 @@ void ThermoChem::initializeOperators() {
   Ht_form->Assemble();
   Ht_form->FormSystemMatrix(temp_ess_tdof, Ht);
   if (rank0) std::cout << "ThermoChem Ht operator set" << endl;
-
-  // temp boundary terms
-  Text_gfcoeff = new GridFunctionCoefficient(&Text_gf);
-  Text_bdr_form = new ParLinearForm(sfes);
-  auto *text_blfi = new BoundaryLFIntegrator(*Text_gfcoeff);
-  if (numerical_integ) {
-    text_blfi->SetIntRule(&ir_i);
-  }
-  Text_bdr_form->AddBoundaryIntegrator(text_blfi, temp_ess_attr);
-
-  t_bdr_form = new ParLinearForm(sfes);
-  for (auto &temp_dbc : temp_dbcs) {
-    auto *tbdr_blfi = new BoundaryLFIntegrator(*temp_dbc.coeff);
-    if (numerical_integ) {
-      tbdr_blfi->SetIntRule(&ir_i);
-    }
-    t_bdr_form->AddBoundaryIntegrator(tbdr_blfi, temp_dbc.attr);
-  }
 
   if (partial_assembly) {
     Vector diag_pa(sfes->GetTrueVSize());
@@ -1364,41 +1329,6 @@ void ThermoChem::AddQtDirichletBC(Coefficient *coeff, Array<int> &attr) {
 void ThermoChem::AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr) {
   AddQtDirichletBC(new FunctionCoefficient(f), attr);
 }
-
-/*
-void ThermoChem::computeQt() {
-
-  if (incompressibleSolve == true) {
-    Qt = 0.0;
-
-  } else {
-
-     // laplace(T)
-     double TdivFactor = 0.0;
-     if (loMach_opts_.thermalDiv == true) {
-       Lt->Mult(Tn_next,tmpR0);
-       MsInv->Mult(tmpR0, Qt);
-     }
-
-     //multScalarScalar(rn,viscSml,&tmpR0);
-     multScalarScalarIP(viscSml,&Qt);
-     double tmp = Rgas / (Pr * thermoPressure);
-     multConstScalarIP(tmp,&Qt);
-
-     // add closed-domain pressure term
-     if (config.isOpen != true) {
-       double *data = Qt.HostReadWrite();
-       for (int i = 0; i < SdofInt; i++) {
-         data[i] += ((gamma - 1.0)/gamma - Cp) * 1.0 / (Cp*thermoPressure) * dtP;
-       }
-     }
-
-   }
-
-   Qt_gf.SetFromTrueDofs(Qt);
-
-}
-*/
 
 void ThermoChem::computeQtTO() {
   Array<int> empty;
