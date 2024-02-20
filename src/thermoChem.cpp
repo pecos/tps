@@ -113,6 +113,35 @@ ThermoChem::ThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tempora
   filter_cutoff_modes = loMach_opts->nFilter;
 }
 
+ThermoChem::~ThermoChem() {
+  // allocated in initializeOperators
+  delete LQ_bdry;
+  delete LQ_form;
+  delete MqInv;
+  delete MqInvPC;
+  delete Mq_form;
+  delete HtInv;
+  delete HtInvPC;
+  delete MsInv;
+  delete MsInvPC;
+  delete Ht_form;
+  delete MsRho_form;
+  delete Ms_form;
+  delete At_form;
+  delete rhou_coeff;
+  delete rhon_next_coeff;
+  delete un_next_coeff;
+  delete kap_gradT_coeff;
+  delete gradT_coeff;
+  delete thermal_diff_coeff;
+  delete rhoDtField;
+  delete Rho;
+
+  // allocated in initializeSelf
+  delete sfes;
+  delete sfec;
+}
+
 void ThermoChem::initializeSelf() {
   verbose = rank0;
   if (verbose) grvy_printf(ginfo, "Initializing ThermoChem solver.\n");

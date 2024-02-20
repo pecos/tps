@@ -229,7 +229,7 @@ class ThermoChem : public ThermoChemModelBase {
 
  public:
   ThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff, TPS::Tps *tps);
-  virtual ~ThermoChem() {}
+  virtual ~ThermoChem();
 
   // Functions overriden from base class
   void initializeSelf() final;
