@@ -658,15 +658,8 @@ void ThermoChem::UpdateTimestepHistory(double dt) {
 
 void ThermoChem::step() {
   // update bdf coefficients
-  bd0 = timeCoeff_.bd0;
-  bd1 = timeCoeff_.bd1;
-  bd2 = timeCoeff_.bd2;
-  bd3 = timeCoeff_.bd3;
   dt = timeCoeff_.dt;
   time = timeCoeff_.time;
-
-  std::cout << "bd0 = " << bd0 << ", bd1 = " << bd1 << ", dt = " << dt << std::endl;
-  std::cout << "bd2 = " << bd2 << ", bd3 = " << bd3 << std::endl;
 
   // Prepare for residual calc
   extrapolateState();
@@ -688,9 +681,9 @@ void ThermoChem::step() {
     // resT.Set(-1.0, tmpR0);
 
     // for unsteady term, compute and add known part of BDF unsteady term
-    tmpR0.Set(bd1 / dt, Tn);
-    // tmpR0.Add(bd2 / dt, Tnm1);
-    // tmpR0.Add(bd3 / dt, Tnm2);
+    tmpR0.Set(timeCoeff_.bd1 / dt, Tn);
+    tmpR0.Add(timeCoeff_.bd2 / dt, Tnm1);
+    tmpR0.Add(timeCoeff_.bd3 / dt, Tnm2);
 
     // // multScalarScalarIP(rn,&tmpR0);
     MsRho->Mult(tmpR0, tmpR0b);
@@ -707,7 +700,7 @@ void ThermoChem::step() {
     // update Helmholtz operator, unsteady here, kappa in updateDiffusivity
     {
       rhoDt = rn_gf;
-      rhoDt *= (bd0 / dt);
+      rhoDt *= (timeCoeff_.bd0 / dt);
     }
     Ht_form->Update();
     Ht_form->Assemble();
@@ -789,16 +782,11 @@ void ThermoChem::computeExplicitTempConvectionOP(bool extrap) {
     At->Mult(Text, NTn);
   }
 
-  // update ab coefficients
-  ab1 = timeCoeff_.ab1;
-  ab2 = timeCoeff_.ab2;
-  ab3 = timeCoeff_.ab3;
-
   // ab predictor
   if (extrap == true) {
-    tmpR0.Set(ab1, NTn);
-    tmpR0.Add(ab2, NTnm1);
-    tmpR0.Add(ab3, NTnm2);
+    tmpR0.Set(timeCoeff_.ab1, NTn);
+    tmpR0.Add(timeCoeff_.ab2, NTnm1);
+    tmpR0.Add(timeCoeff_.ab3, NTnm2);
   } else {
     tmpR0.Set(1.0, NTn);
   }
@@ -833,15 +821,10 @@ void ThermoChem::updateBC(int current_step) {
 }
 
 void ThermoChem::extrapolateState() {
-  // update ab coefficients
-  ab1 = timeCoeff_.ab1;
-  ab2 = timeCoeff_.ab2;
-  ab3 = timeCoeff_.ab3;
-
   // extrapolated temp at {n+1}
-  Text.Set(ab1, Tn);
-  Text.Add(ab2, Tnm1);
-  Text.Add(ab3, Tnm2);
+  Text.Set(timeCoeff_.ab1, Tn);
+  Text.Add(timeCoeff_.ab2, Tnm1);
+  Text.Add(timeCoeff_.ab3, Tnm2);
 
   // store ext in _next containers, remove Text, Uext completely later
   Tn_next_gf.SetFromTrueDofs(Text);

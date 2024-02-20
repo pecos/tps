@@ -96,10 +96,6 @@ class ThermoChem : public ThermoChemModelBase {
   int order;
   IntegrationRules gll_rules;
 
-  // local copies of time integration information
-  double bd0, bd1, bd2, bd3;
-  double ab1, ab2, ab3;
-
   // just keep these saved for ease
   int numWalls, numInlets, numOutlets;
 
