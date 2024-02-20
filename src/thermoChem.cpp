@@ -438,8 +438,8 @@ void ThermoChem::initializeOperators() {
 
   Ht_bdfcoeff.constant = 1.0 / dt;
   Ht_form = new ParBilinearForm(sfes);
-  hmt_blfi = new MassIntegrator(*rhoDtField);
-  hdt_blfi = new DiffusionIntegrator(*kappaField);
+  auto *hmt_blfi = new MassIntegrator(*rhoDtField);
+  auto *hdt_blfi = new DiffusionIntegrator(*kappaField);
 
   if (numerical_integ) {
     hmt_blfi->SetIntRule(&ir_di);

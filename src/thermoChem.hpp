@@ -131,8 +131,6 @@ class ThermoChem : public ThermoChemModelBase {
   ParFiniteElementSpace *sfes = nullptr;
 
   // operators
-  DiffusionIntegrator *hdt_blfi = nullptr;
-  MassIntegrator *hmt_blfi = nullptr;
   ParBilinearForm *At_form = nullptr;
   ParBilinearForm *Ms_form = nullptr;
   ParBilinearForm *MsRho_form = nullptr;
