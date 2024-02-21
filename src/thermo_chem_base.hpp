@@ -144,7 +144,7 @@ class ThermoChemModelBase {
  * Provides simplest possible thermochemistry model---i.e., constant
  * density, constant viscosity, zero thermal divergence.
  */
-class ConstantPropertyThermoChem : public ThermoChemModelBase {
+class ConstantPropertyThermoChem final : public ThermoChemModelBase {
  protected:
   mfem::ParMesh *pmesh_;
   const int sorder_;

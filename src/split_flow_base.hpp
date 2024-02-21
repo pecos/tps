@@ -101,7 +101,7 @@ class FlowBase {
   virtual double computeL2Error() const { return -1.0; }
 };
 
-class ZeroFlow : public FlowBase {
+class ZeroFlow final : public FlowBase {
  protected:
   mfem::ParMesh *pmesh_;
   const int vorder_;

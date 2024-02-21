@@ -121,7 +121,7 @@ class TurbModelBase {
  * Provides simplest possible turbulence model---i.e.,
  * zero eddy viscosity.
  */
-class ZeroTurbModel : public TurbModelBase {
+class ZeroTurbModel final : public TurbModelBase {
  protected:
   mfem::ParMesh *pmesh_;
   const int sorder_;

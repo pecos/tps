@@ -72,7 +72,7 @@ class ForcingTerm_T {
   mfem::VectorCoefficient *coeff;
 };
 
-class Tomboulides : public FlowBase {
+class Tomboulides final : public FlowBase {
  protected:
   // true if this is root rank
   bool rank0_;
