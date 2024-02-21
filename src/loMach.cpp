@@ -338,9 +338,14 @@ void LoMachSolver::initialize() {
     double local_xmax = -1.0e18;
     double local_ymax = -1.0e18;
     double local_zmax = -1.0e18;
+
+    double coords[3];
+    for (int d = 0; d < 3; d++) {
+      coords[d] = 0.0;
+    }
+
     for (int n = 0; n < nVert; n++) {
       auto hcoords = coordsVert.HostRead();
-      double coords[3];
       for (int d = 0; d < dim_; d++) {
         coords[d] = hcoords[n + d * nVert];
       }
