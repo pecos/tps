@@ -54,8 +54,8 @@ MFEM_HOST_DEVICE double Sutherland(const double T, const double mu_star, const d
   return mu_star * T_rat_32 * S_rat;
 }
 
-ThermoChem::ThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &time_coeff,
-                       TPS::Tps *tps)
+CaloricallyPerfectThermoChem::CaloricallyPerfectThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts,
+                                                           temporalSchemeCoefficients &time_coeff, TPS::Tps *tps)
     : tpsP_(tps), pmesh_(pmesh), time_coeff_(time_coeff) {
   rank0_ = (pmesh_->GetMyRank() == 0);
   order_ = loMach_opts->order;
@@ -116,7 +116,7 @@ ThermoChem::ThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tempora
   tpsP_->getInput("loMach/calperfect/linear-solver-verbosity", pl_solve_, 0);
 }
 
-ThermoChem::~ThermoChem() {
+CaloricallyPerfectThermoChem::~CaloricallyPerfectThermoChem() {
   // allocated in initializeOperators
   delete sfes_filter_;
   delete sfec_filter_;
@@ -147,8 +147,8 @@ ThermoChem::~ThermoChem() {
   delete sfec_;
 }
 
-void ThermoChem::initializeSelf() {
-  if (rank0_) grvy_printf(ginfo, "Initializing ThermoChem solver.\n");
+void CaloricallyPerfectThermoChem::initializeSelf() {
+  if (rank0_) grvy_printf(ginfo, "Initializing CaloricallyPerfectThermoChem solver.\n");
 
   //-----------------------------------------------------
   // 1) Prepare the required finite element objects
@@ -164,7 +164,7 @@ void ThermoChem::initializeSelf() {
     Qt_ess_attr_.SetSize(pmesh_->bdr_attributes.Max());
     Qt_ess_attr_ = 0;
   }
-  if (rank0_) grvy_printf(ginfo, "ThermoChem paces constructed...\n");
+  if (rank0_) grvy_printf(ginfo, "CaloricallyPerfectThermoChem paces constructed...\n");
 
   int sfes_truevsize = sfes_->GetTrueVSize();
 
@@ -225,7 +225,7 @@ void ThermoChem::initializeSelf() {
 
   rhoDt.SetSpace(sfes_);
 
-  if (rank0_) grvy_printf(ginfo, "ThermoChem vectors and gf initialized...\n");
+  if (rank0_) grvy_printf(ginfo, "CaloricallyPerfectThermoChem vectors and gf initialized...\n");
 
   // exports
   toFlow_interface_.density = &rn_gf_;
@@ -371,10 +371,10 @@ void ThermoChem::initializeSelf() {
 
   sfes_->GetEssentialTrueDofs(temp_ess_attr_, temp_ess_tdof_);
   sfes_->GetEssentialTrueDofs(Qt_ess_attr_, Qt_ess_tdof_);
-  if (rank0_) std::cout << "ThermoChem Essential true dof step" << endl;
+  if (rank0_) std::cout << "CaloricallyPerfectThermoChem Essential true dof step" << endl;
 }
 
-void ThermoChem::initializeOperators() {
+void CaloricallyPerfectThermoChem::initializeOperators() {
   dt_ = time_coeff_.dt;
 
   Array<int> empty;
@@ -416,7 +416,7 @@ void ThermoChem::initializeOperators() {
   }
   At_form_->Assemble();
   At_form_->FormSystemMatrix(empty, At_);
-  if (rank0_) std::cout << "ThermoChem At operator set" << endl;
+  if (rank0_) std::cout << "CaloricallyPerfectThermoChem At operator set" << endl;
 
   // mass matrix
   Ms_form_ = new ParBilinearForm(sfes_);
@@ -444,7 +444,7 @@ void ThermoChem::initializeOperators() {
   }
   MsRho_form_->Assemble();
   MsRho_form_->FormSystemMatrix(empty, MsRho_);
-  if (rank0_) std::cout << "ThermoChem MsRho operator set" << endl;
+  if (rank0_) std::cout << "CaloricallyPerfectThermoChem MsRho operator set" << endl;
 
   Ht_form_ = new ParBilinearForm(sfes_);
   auto *hmt_blfi = new MassIntegrator(*rho_over_dt_coeff_);
@@ -461,7 +461,7 @@ void ThermoChem::initializeOperators() {
   }
   Ht_form_->Assemble();
   Ht_form_->FormSystemMatrix(temp_ess_tdof_, Ht_);
-  if (rank0_) std::cout << "ThermoChem Ht operator set" << endl;
+  if (rank0_) std::cout << "CaloricallyPerfectThermoChem Ht operator set" << endl;
 
   if (partial_assembly_) {
     Vector diag_pa(sfes_->GetTrueVSize());
@@ -511,7 +511,7 @@ void ThermoChem::initializeOperators() {
   Mq_form_->Assemble();
   Mq_form_->FormSystemMatrix(Qt_ess_tdof_, Mq_);
   // Mq_form_->FormSystemMatrix(empty, Mq);
-  if (rank0_) std::cout << "ThermoChem Mq operator set" << endl;
+  if (rank0_) std::cout << "CaloricallyPerfectThermoChem Mq operator set" << endl;
 
   if (partial_assembly_) {
     Vector diag_pa(sfes_->GetTrueVSize());
@@ -547,7 +547,7 @@ void ThermoChem::initializeOperators() {
     lq_bdry_lfi->SetIntRule(&ir_di);
   }
   LQ_bdry_->AddBoundaryIntegrator(lq_bdry_lfi, temp_ess_attr_);
-  if (rank0_) std::cout << "ThermoChem LQ operator set" << endl;
+  if (rank0_) std::cout << "CaloricallyPerfectThermoChem LQ operator set" << endl;
 
   // // remaining initialization
   // if (config_->resetTemp == true) {
@@ -600,7 +600,7 @@ void ThermoChem::initializeOperators() {
 /**
    Rotate temperature state in registers
  */
-void ThermoChem::UpdateTimestepHistory(double dt) {
+void CaloricallyPerfectThermoChem::UpdateTimestepHistory(double dt) {
   // temperature
   NTnm2_ = NTnm1_;
   NTnm1_ = NTn_;
@@ -611,7 +611,7 @@ void ThermoChem::UpdateTimestepHistory(double dt) {
   Tn_gf_.SetFromTrueDofs(Tn_);
 }
 
-void ThermoChem::step() {
+void CaloricallyPerfectThermoChem::step() {
   dt_ = time_coeff_.dt;
   time_ = time_coeff_.time;
 
@@ -706,7 +706,7 @@ void ThermoChem::step() {
   UpdateTimestepHistory(dt_);
 }
 
-void ThermoChem::computeExplicitTempConvectionOP(bool extrap) {
+void CaloricallyPerfectThermoChem::computeExplicitTempConvectionOP(bool extrap) {
   Array<int> empty;
   At_form_->Update();
   At_form_->Assemble();
@@ -727,12 +727,12 @@ void ThermoChem::computeExplicitTempConvectionOP(bool extrap) {
   }
 }
 
-void ThermoChem::initializeIO(IODataOrganizer &io) {
+void CaloricallyPerfectThermoChem::initializeIO(IODataOrganizer &io) {
   io.registerIOFamily("Temperature", "/temperature", &Tn_gf_, false);
   io.registerIOVar("/temperature", "temperature", 0);
 }
 
-void ThermoChem::initializeViz(ParaViewDataCollection &pvdc) {
+void CaloricallyPerfectThermoChem::initializeViz(ParaViewDataCollection &pvdc) {
   pvdc.RegisterField("temperature", &Tn_gf_);
   pvdc.RegisterField("density", &rn_gf_);
   pvdc.RegisterField("kappa", &kappa_gf_);
@@ -742,7 +742,7 @@ void ThermoChem::initializeViz(ParaViewDataCollection &pvdc) {
    Update boundary conditions for Temperature, useful for
    ramping a dirichlet condition over time
  */
-void ThermoChem::updateBC(int current_step) {
+void CaloricallyPerfectThermoChem::updateBC(int current_step) {
   // TODO(trevilo): By making the Dirichlet BC time dependent, we
   // already have a mechanism to handle this.  Is there a reason not
   // to do it that way?
@@ -759,7 +759,7 @@ void ThermoChem::updateBC(int current_step) {
   // }
 }
 
-void ThermoChem::extrapolateState() {
+void CaloricallyPerfectThermoChem::extrapolateState() {
   // extrapolated temp at {n+1}
   Text_.Set(time_coeff_.ab1, Tn_);
   Text_.Add(time_coeff_.ab2, Tnm1_);
@@ -771,7 +771,7 @@ void ThermoChem::extrapolateState() {
 }
 
 // update thermodynamic pressure
-void ThermoChem::updateThermoP() {
+void CaloricallyPerfectThermoChem::updateThermoP() {
   if (!domain_is_open_) {
     double allMass, PNM1;
     double myMass = 0.0;
@@ -790,7 +790,7 @@ void ThermoChem::updateThermoP() {
   }
 }
 
-void ThermoChem::updateDiffusivity() {
+void CaloricallyPerfectThermoChem::updateDiffusivity() {
   // viscosity
   if (!constant_viscosity_) {
     double *d_visc = visc_.Write();
@@ -844,7 +844,7 @@ void ThermoChem::updateDiffusivity() {
   kappa_gf_.SetFromTrueDofs(kappa_);
 }
 
-void ThermoChem::updateDensity(double tStep) {
+void CaloricallyPerfectThermoChem::updateDensity(double tStep) {
   Array<int> empty;
 
   // set rn
@@ -881,7 +881,7 @@ void ThermoChem::updateDensity(double tStep) {
   // R0PM1_gf.ProjectGridFunction(R0PM0_gf);
 }
 
-void ThermoChem::computeSystemMass() {
+void CaloricallyPerfectThermoChem::computeSystemMass() {
   system_mass_ = 0.0;
   double myMass = 0.0;
   rn_ = (thermo_pressure_ / Rgas_);
@@ -892,7 +892,7 @@ void ThermoChem::computeSystemMass() {
   if (rank0_ == true) std::cout << " Closed system mass: " << system_mass_ << " [kg]" << endl;
 }
 
-void ThermoChem::AddTempDirichletBC(Coefficient *coeff, Array<int> &attr) {
+void CaloricallyPerfectThermoChem::AddTempDirichletBC(Coefficient *coeff, Array<int> &attr) {
   temp_dbcs_.emplace_back(attr, coeff);
 
   if (rank0_ && pmesh_->GetMyRank() == 0) {
@@ -913,11 +913,11 @@ void ThermoChem::AddTempDirichletBC(Coefficient *coeff, Array<int> &attr) {
   }
 }
 
-void ThermoChem::AddTempDirichletBC(ScalarFuncT *f, Array<int> &attr) {
+void CaloricallyPerfectThermoChem::AddTempDirichletBC(ScalarFuncT *f, Array<int> &attr) {
   AddTempDirichletBC(new FunctionCoefficient(f), attr);
 }
 
-void ThermoChem::AddQtDirichletBC(Coefficient *coeff, Array<int> &attr) {
+void CaloricallyPerfectThermoChem::AddQtDirichletBC(Coefficient *coeff, Array<int> &attr) {
   Qt_dbcs_.emplace_back(attr, coeff);
 
   if (rank0_ && pmesh_->GetMyRank() == 0) {
@@ -938,11 +938,11 @@ void ThermoChem::AddQtDirichletBC(Coefficient *coeff, Array<int> &attr) {
   }
 }
 
-void ThermoChem::AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr) {
+void CaloricallyPerfectThermoChem::AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr) {
   AddQtDirichletBC(new FunctionCoefficient(f), attr);
 }
 
-void ThermoChem::computeQtTO() {
+void CaloricallyPerfectThermoChem::computeQtTO() {
   Array<int> empty;
   tmpR0_ = 0.0;
   LQ_bdry_->Update();
@@ -977,14 +977,14 @@ void ThermoChem::computeQtTO() {
 #if 0
 // Temporarily remove viscous sponge capability.  This sould be housed
 // in a separate class that we just instantiate and call, rather than
-// directly in ThermoChem.
+// directly in CaloricallyPerfectThermoChem.
 
 /**
 Simple planar viscous sponge layer with smooth tanh-transtion using user-specified width and
 total amplification.  Note: duplicate in M2
 */
 // MFEM_HOST_DEVICE
-void ThermoChem::viscSpongePlanar(double *x, double &wgt) {
+void CaloricallyPerfectThermoChem::viscSpongePlanar(double *x, double &wgt) {
   double normal[3];
   double point[3];
   double s[3];
@@ -1095,7 +1095,7 @@ void ThermoChem::viscSpongePlanar(double *x, double &wgt) {
    Gaussian interpolation.  Not at all general and only for use
    with torch
  */
-void ThermoChem::interpolateInlet() {
+void CaloricallyPerfectThermoChem::interpolateInlet() {
   int myRank;
   MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
   int Sdof = sfes_->GetNDofs();
@@ -1310,7 +1310,7 @@ void ThermoChem::interpolateInlet() {
   }
 }
 
-void ThermoChem::uniformInlet() {
+void CaloricallyPerfectThermoChem::uniformInlet() {
   int myRank;
   MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
   int Sdof = sfes_->GetNDofs();

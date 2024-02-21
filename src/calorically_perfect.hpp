@@ -30,8 +30,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
 
-#ifndef THERMOCHEM_HPP_
-#define THERMOCHEM_HPP_
+#ifndef CALORICALLY_PERFECT_HPP_
+#define CALORICALLY_PERFECT_HPP_
 
 // forward-declaration for Tps support class
 namespace TPS {
@@ -57,7 +57,7 @@ struct temporalSchemeCoefficients;
 /**
    Energy/species class specific for temperature solves with loMach flows
  */
-class ThermoChem : public ThermoChemModelBase {
+class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
  private:
   // Options-related structures
   TPS::Tps *tpsP_ = nullptr;
@@ -198,8 +198,9 @@ class ThermoChem : public ThermoChemModelBase {
 #endif
 
  public:
-  ThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff, TPS::Tps *tps);
-  virtual ~ThermoChem();
+  CaloricallyPerfectThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff,
+                               TPS::Tps *tps);
+  virtual ~CaloricallyPerfectThermoChem();
 
   // Functions overriden from base class
   void initializeSelf() final;
@@ -243,4 +244,4 @@ class ThermoChem : public ThermoChemModelBase {
   void AddQtDirichletBC(Coefficient *coeff, Array<int> &attr);
   void AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr);
 };
-#endif  // THERMOCHEM_HPP_
+#endif  // CALORICALLY_PERFECT_HPP_
