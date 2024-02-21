@@ -30,8 +30,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
 
-// #include "turbModel.hpp"
-#include "thermoChem.hpp"
+#include "calorically_perfect.hpp"
 
 #include <hdf5.h>
 

@@ -43,9 +43,9 @@
 #include <iomanip>
 #include <limits>
 
+#include "calorically_perfect.hpp"
 #include "io.hpp"
 #include "logger.hpp"
-#include "thermoChem.hpp"
 #include "tomboulides.hpp"
 #include "tps.hpp"
 #include "utils.hpp"
