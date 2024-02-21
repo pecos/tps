@@ -30,6 +30,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
 
+#if 0
+
 #include "turbModel.hpp"
 
 #include <hdf5.h>
@@ -301,3 +303,4 @@ void TurbModel::sgsSigma(const DenseMatrix &gradUp, double delta, double &nu) {
   // shouldnt be necessary
   if (nu != nu) nu = 0.0;
 }
+#endif

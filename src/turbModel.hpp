@@ -33,6 +33,7 @@
 #ifndef TURBMODEL_HPP_
 #define TURBMODEL_HPP_
 
+#if 0
 // forward-declaration for Tps support class
 namespace TPS {
 class Tps;
@@ -155,4 +156,5 @@ class TurbModel : public TurbModelBase {
   void sgsSmag(const DenseMatrix &gradUp, double delta, double &nu_sgs);
   void sgsSigma(const DenseMatrix &gradUp, double delta, double &nu_sgs);
 };
+#endif
 #endif  // TURBMODEL_HPP_

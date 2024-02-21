@@ -219,7 +219,7 @@ void Tomboulides::initializeSelf() {
 
   // TODO(trevilo): Get gravity from input file.  For now, hardcoded
   // to usual value acting in -y direction.
-  double *g = gravity.HostWrite();
+  // double *g = gravity.HostWrite();
   // g[1] = -9.81;
 
   // NB: ForcingTerm_T takes ownership of this vector.  Do not delete it.

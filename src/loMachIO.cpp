@@ -155,7 +155,7 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
 
   // determine restart file name (either serial or partitioned)
   string fileName;
-  bool restart_serial;
+  bool restart_serial = false;
   if (mode == "read") restart_serial = loMach_opts_.io_opts_.restart_serial_read_;
   if (mode == "write") restart_serial = loMach_opts_.io_opts_.restart_serial_write_;
   if (restart_serial) {
