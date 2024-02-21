@@ -146,39 +146,39 @@ class ThermoChem : public ThermoChemModelBase {
   ParBilinearForm *LQ_form_ = nullptr;
   ParLinearForm *LQ_bdry_ = nullptr;
 
-  OperatorHandle LQ;
-  OperatorHandle At;
-  OperatorHandle Ht;
-  OperatorHandle Ms;
-  OperatorHandle MsRho;
-  OperatorHandle Mq;
+  OperatorHandle LQ_;
+  OperatorHandle At_;
+  OperatorHandle Ht_;
+  OperatorHandle Ms_;
+  OperatorHandle MsRho_;
+  OperatorHandle Mq_;
 
-  mfem::Solver *MsInvPC = nullptr;
-  mfem::CGSolver *MsInv = nullptr;
-  mfem::Solver *MqInvPC = nullptr;
-  mfem::CGSolver *MqInv = nullptr;
-  mfem::Solver *HtInvPC = nullptr;
-  mfem::CGSolver *HtInv = nullptr;
+  mfem::Solver *MsInvPC_ = nullptr;
+  mfem::CGSolver *MsInv_ = nullptr;
+  mfem::Solver *MqInvPC_ = nullptr;
+  mfem::CGSolver *MqInv_ = nullptr;
+  mfem::Solver *HtInvPC_ = nullptr;
+  mfem::CGSolver *HtInv_ = nullptr;
 
   // Vectors
-  Vector fTn, Tn, Tn_next, Tnm1, Tnm2, NTn, NTnm1, NTnm2;
-  Vector Text;
-  Vector resT, tmpR0a, tmpR0b, tmpR0c;
+  Vector Tn_, Tn_next_, Tnm1_, Tnm2_;
+  Vector NTn_, NTnm1_, NTnm2_;
+  Vector Text_;
+  Vector resT_;
+  Vector tmpR0_, tmpR0b_;
 
-  Vector tmpR0;
-
-  Vector Qt;
-  Vector rn;
-  Vector kappa;
-  Vector visc;
+  Vector Qt_;
+  Vector rn_;
+  Vector kappa_;
+  Vector visc_;
 
   // Parameters and objects used in filter-based stabilization
-  bool filterTemp = false;
-  int filter_cutoff_modes = 0;
-  double filter_alpha = 0.0;
+  bool filter_temperature_ = false;
+  int filter_cutoff_modes_ = 0;
+  double filter_alpha_ = 0.0;
 
-  FiniteElementCollection *sfec_filter = nullptr;
-  ParFiniteElementSpace *sfes_filter = nullptr;
+  FiniteElementCollection *sfec_filter_ = nullptr;
+  ParFiniteElementSpace *sfes_filter_ = nullptr;
   ParGridFunction Tn_NM1_gf_;
   ParGridFunction Tn_filtered_gf_;
 
