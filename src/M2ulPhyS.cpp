@@ -2709,6 +2709,7 @@ void M2ulPhyS::parseStatOptions() {
   tpsP->getInput("averaging/startIter", config.startIter, 0);
   tpsP->getInput("averaging/sampleFreq", config.sampleInterval, 0);
   tpsP->getInput("averaging/enableContinuation", config.restartMean, false);
+  tpsP->getInput("averaging/restartRMS", config.restartRMS, false);
 }
 
 void M2ulPhyS::parseIOSettings() { config.io_opts_.read(tpsP); }

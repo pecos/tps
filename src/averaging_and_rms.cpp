@@ -56,6 +56,7 @@ Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollecti
 
   sampleInterval = config.GetMeanSampleInterval();
   samplesMean = 0;
+  samplesRMS = 0;
   startMean = config.GetMeanStartIter();
   computeMean = false;
   if (sampleInterval != 0) computeMean = true;
