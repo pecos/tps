@@ -617,7 +617,7 @@ void M2ulPhyS::initVariables() {
 #endif
   initSolutionAndVisualizationVectors();
 
-  average = new Averaging(Up, mesh, fec, fes, dfes, vfes, eqSystem, num_equation, dim, config, groupsMPI);
+  average = new Averaging(Up, mesh, fes, dfes, config);
 
   // NOTE: this should also be completed by the GasMixture class
   // Kevin: Do we need GasMixture class for this?

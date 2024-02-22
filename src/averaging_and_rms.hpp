@@ -39,7 +39,6 @@
 
 #include "dataStructures.hpp"
 #include "equation_of_state.hpp"
-#include "mpi_groups.hpp"
 #include "run_configuration.hpp"
 #include "tps_mfem_wrap.hpp"
 
@@ -51,16 +50,13 @@ class Averaging {
   // Primitive variables
   ParGridFunction *Up;
   ParMesh *mesh;
-  FiniteElementCollection *fec;
+  const FiniteElementCollection *fec;
   ParFiniteElementSpace *fes;
   ParFiniteElementSpace *dfes;
-  ParFiniteElementSpace *vfes;
-  Equations &eqSystem;
-  const int &num_equation;
-  const int &dim;
+  const int num_equation;
+  const int dim;
   const int nvel;
   RunConfiguration &config;
-  MPI_Groups *groupsMPI;
 
   // FES for RMS
   ParFiniteElementSpace *rmsFes;
@@ -87,15 +83,11 @@ class Averaging {
 
   void initiMeanAndRMS();
 
-  void addSample_cpu(GasMixture *mixture);
-
-  // GPU functions
-  void addSample_gpu(GasMixture *mixture);
+  void addSample(GasMixture *mixture);
 
  public:
-  Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollection *_fec, ParFiniteElementSpace *_fes,
-            ParFiniteElementSpace *_dfes, ParFiniteElementSpace *_vfes, Equations &_eqSys, const int &_num_equation,
-            const int &_dim, RunConfiguration &_config, MPI_Groups *_groupsMPI);
+  Averaging(ParGridFunction *_Up, ParMesh *_mesh, ParFiniteElementSpace *_fes, ParFiniteElementSpace *_dfes,
+            RunConfiguration &_config);
   ~Averaging();
 
   void addSampleMean(const int &iter, GasMixture *mixture = nullptr);

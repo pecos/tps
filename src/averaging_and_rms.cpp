@@ -34,21 +34,17 @@
 #include <mfem/general/forall.hpp>
 
 // TODO(kevin): add multi species and two temperature case.
-Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollection *_fec, ParFiniteElementSpace *_fes,
-                     ParFiniteElementSpace *_dfes, ParFiniteElementSpace *_vfes, Equations &_eqSys,
-                     const int &_num_equation, const int &_dim, RunConfiguration &_config, MPI_Groups *_groupsMPI)
+Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, ParFiniteElementSpace *_fes, ParFiniteElementSpace *_dfes,
+                     RunConfiguration &_config)
     : Up(_Up),
       mesh(_mesh),
-      fec(_fec),
+      fec(_Up->ParFESpace()->FEColl()),
       fes(_fes),
       dfes(_dfes),
-      vfes(_vfes),
-      eqSystem(_eqSys),
-      num_equation(_num_equation),
-      dim(_dim),
-      nvel(_config.isAxisymmetric() ? 3 : _dim),
-      config(_config),
-      groupsMPI(_groupsMPI) {
+      num_equation(_Up->ParFESpace()->GetVDim()),
+      dim(_mesh->Dimension()),
+      nvel(_config.isAxisymmetric() ? 3 : _mesh->Dimension()),
+      config(_config) {
   // Always assume 6 components of the Reynolds stress tensor
   numRMS = 6;
 
@@ -62,16 +58,12 @@ Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollecti
   if (computeMean) {
     rmsFes = new ParFiniteElementSpace(mesh, fec, numRMS, Ordering::byNODES);
 
-    meanUp = new ParGridFunction(vfes);
+    meanUp = new ParGridFunction(Up->ParFESpace());
     rms = new ParGridFunction(rmsFes);
 
     meanRho = new ParGridFunction(fes, meanUp->GetData());
     meanV = new ParGridFunction(dfes, meanUp->GetData() + fes->GetNDofs());
     meanP = new ParGridFunction(fes, meanUp->GetData() + (1 + nvel) * fes->GetNDofs());
-
-    meanScalar = NULL;
-    if (eqSystem == NS_PASSIVE)
-      meanScalar = new ParGridFunction(fes, meanUp->GetData() + (num_equation - 1) * fes->GetNDofs());
 
     initiMeanAndRMS();
 
@@ -97,8 +89,6 @@ Averaging::~Averaging() {
     delete meanP;
     delete meanV;
     delete meanRho;
-    if (eqSystem == NS_PASSIVE) delete meanScalar;
-
     delete rms;
     delete meanUp;
 
@@ -109,78 +99,16 @@ Averaging::~Averaging() {
 void Averaging::addSampleMean(const int &iter, GasMixture *mixture) {
   if (computeMean) {
     if (iter % sampleInterval == 0 && iter >= startMean) {
-      if (iter == startMean && groupsMPI->isWorldRoot()) cout << "Starting mean calculation." << endl;
+      if (iter == startMean && (mesh->GetMyRank() == 0)) cout << "Starting mean calculation." << endl;
 
       if (samplesRMS == 0) {
         *rms = 0.0;
       }
 
-      addSample_gpu(mixture);
+      addSample(mixture);
       samplesMean++;
       samplesRMS++;
     }
-  }
-}
-
-void Averaging::addSample_cpu(GasMixture *mixture) {
-  double *dataUp = Up->GetData();
-  double *dataMean = meanUp->GetData();
-  double *dataRMS = rms->GetData();
-  int dof = fes->GetNDofs();
-
-  Vector iUp(num_equation);
-
-  for (int n = 0; n < dof; n++) {
-    for (int eq = 0; eq < num_equation; eq++) iUp[eq] = dataUp[n + eq * dof];
-
-    // mean
-    for (int eq = 0; eq < num_equation; eq++) {
-      double mVal = double(samplesMean) * dataMean[n + eq * dof];
-      dataMean[n + eq * dof] = (mVal + iUp[eq]) / double(samplesMean + 1);
-
-      // presseure-temperature change
-      if (eq == dim + 1) {
-        double p = iUp[eq];
-        if (mixture != nullptr) {
-          p = mixture->ComputePressureFromPrimitives(iUp);
-        }
-        dataMean[n + eq * dof] = (mVal + p) / double(samplesMean + 1);
-      }
-    }
-
-    // ----- RMS -----
-    // velocities
-    Vector meanVel(3), vel(3);
-    meanVel = 0.;
-    vel = 0.;
-    for (int d = 0; d < nvel; d++) {
-      meanVel[d] = dataMean[n + dof * (d + 1)];
-      vel[d] = dataUp[n + dof * (d + 1)];
-    }
-
-    // xx
-    double val = dataRMS[n];
-    dataRMS[n] = (val * double(samplesRMS) + (vel[0] - meanVel[0]) * (vel[0] - meanVel[0])) / double(samplesRMS + 1);
-    // yy
-    val = dataRMS[n + dof];
-    dataRMS[n + dof] =
-        (val * double(samplesRMS) + (vel[1] - meanVel[1]) * (vel[1] - meanVel[1])) / double(samplesRMS + 1);
-    // zz
-    val = dataRMS[n + 2 * dof];
-    dataRMS[n + 2 * dof] =
-        (val * double(samplesRMS) + (vel[2] - meanVel[2]) * (vel[2] - meanVel[2])) / double(samplesRMS + 1);
-    // xy
-    val = dataRMS[n + 3 * dof];
-    dataRMS[n + 3 * dof] =
-        (val * double(samplesRMS) + (vel[0] - meanVel[0]) * (vel[1] - meanVel[1])) / double(samplesRMS + 1);
-    // xz
-    val = dataRMS[n + 4 * dof];
-    dataRMS[n + 4 * dof] =
-        (val * double(samplesRMS) + (vel[0] - meanVel[0]) * (vel[2] - meanVel[2])) / double(samplesRMS + 1);
-    // yz
-    val = dataRMS[n + 5 * dof];
-    dataRMS[n + 5 * dof] =
-        (val * double(samplesRMS) + (vel[1] - meanVel[1]) * (vel[2] - meanVel[2])) / double(samplesRMS + 1);
   }
 }
 
@@ -196,19 +124,11 @@ void Averaging::write_meanANDrms_restart_files(const int &iter, const double &ti
 }
 
 void Averaging::initiMeanAndRMS() {
-  // double *dataMean = meanUp->HostWrite();
-  // double *dataRMS = rms->HostWrite();
-  // int dof = vfes->GetNDofs();
-
-  // for (int i = 0; i < dof; i++) {
-  //   for (int eq = 0; eq < num_equation; eq++) dataMean[i + eq * dof] = 0.;
-  //   for (int n = 0; n < numRMS; n++) dataRMS[i + dof * n] = 0.;
-  // }
   *meanUp = 0.0;
   *rms = 0.0;
 }
 
-void Averaging::addSample_gpu(GasMixture *mixture) {
+void Averaging::addSample(GasMixture *mixture) {
   double *d_meanUp = meanUp->ReadWrite();
   double *d_rms = rms->ReadWrite();
   const double *d_Up = Up->Read();
