@@ -26,19 +26,19 @@ setup() {
 
     # p = 1, r = 0
     run $EXE --runFile $RUNFILE
-    [[ ${output} =~ "flow L2 error = 0.102434" ]]
+    [[ ${output} =~ "flow L2 error = 1.024337e-01" ]]
     echo ${output} > flow_p1_err.out
 
     # p = 1, r = 1
     cat $RUNFILE | sed 's/ref_levels = 0/ref_levels = 1/' > $RUNFILE_MOD
     run $EXE --runFile $RUNFILE_MOD
-    [[ ${output} =~ "flow L2 error = 0.0210383" ]]
+    [[ ${output} =~ "flow L2 error = 2.103825e-02" ]]
     echo ${output} >> flow_p1_err.out
 
     # p = 1, r = 2
     cat $RUNFILE | sed 's/ref_levels = 0/ref_levels = 2/' > $RUNFILE_MOD
     run $EXE --runFile $RUNFILE_MOD
-    [[ ${output} =~ "flow L2 error = 0.00497873" ]]
+    [[ ${output} =~ "flow L2 error = 4.978732e-03" ]]
     echo ${output} >> flow_p1_err.out
 
     rm -f $RUNFILE_MOD
@@ -53,19 +53,19 @@ setup() {
 
     # p = 1, r = 0
     run $EXE --runFile $RUNFILE_p2
-    [[ ${output} =~ "flow L2 error = 0.0342063" ]]
+    [[ ${output} =~ "flow L2 error = 3.420631e-02" ]]
     echo ${output} > flow_p2_err.out
 
     # p = 1, r = 1
     cat $RUNFILE_p2 | sed 's/ref_levels = 0/ref_levels = 1/' > $RUNFILE_MOD
     run $EXE --runFile $RUNFILE_MOD
-    [[ ${output} =~ "flow L2 error = 0.00750953" ]]
+    [[ ${output} =~ "flow L2 error = 7.509532e-03" ]]
     echo ${output} >> flow_p2_err.out
 
     # p = 1, r = 2
     cat $RUNFILE_p2 | sed 's/ref_levels = 0/ref_levels = 2/' > $RUNFILE_MOD
     run $EXE --runFile $RUNFILE_MOD
-    [[ ${output} =~ "flow L2 error = 0.000635744" ]]
+    [[ ${output} =~ "flow L2 error = 6.357444e-04" ]]
     echo ${output} >> flow_p2_err.out
 
     rm -f $RUNFILE_MOD $RUNFILE_p2

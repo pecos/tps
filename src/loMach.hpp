@@ -175,6 +175,7 @@ class LoMachSolver : public TPS::Solver {
 
   // Timers.
   StopWatch sw_setup, sw_step;
+  double tlast_;
 
   // I/O helpers
   ParaViewDataCollection *pvdc_;  // visualization

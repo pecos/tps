@@ -72,6 +72,9 @@ LoMachSolver::LoMachSolver(TPS::Tps *tps)
       remove("DIE");
     }
   }
+
+  // for timer purposes
+  tlast_ = 0.0;
 }
 
 LoMachSolver::~LoMachSolver() {
@@ -497,6 +500,28 @@ void LoMachSolver::solveBegin() {
   pvdc_->SetTime(temporal_coeff_.time);
   pvdc_->Save();
   if (rank0_ == true) std::cout << "Saving first step to paraview: " << iter << endl;
+
+  iter_start_ = iter;
+  if (rank0_ == true) {
+    std::cout << "Starting main loop, from " << iter_start_ << " to " << loMach_opts_.max_steps_ << endl;
+  }
+
+  if (rank0_) {
+    // TODO(trevilo): Add state summary
+    std::cout << std::endl;
+    std::cout << std::setw(11) << "#     Step ";
+    std::cout << std::setw(13) << "Time ";
+    std::cout << std::setw(13) << "dt ";
+    std::cout << std::setw(13) << "Wtime/Step ";
+    std::cout << std::endl;
+    std::cout << "#==================================================================" << std::endl;
+
+    std::cout << std::setw(10) << iter << " ";
+    std::cout << std::setw(10) << std::scientific << temporal_coeff_.time << " ";
+    std::cout << std::setw(10) << std::scientific << temporal_coeff_.dt << " ";
+    std::cout << std::setw(10) << std::scientific << 0.0 << " ";
+    std::cout << std::endl;
+  }
 }
 
 void LoMachSolver::solveStep() {
@@ -511,50 +536,26 @@ void LoMachSolver::solveStep() {
   }
   sw_step.Stop();
 
-  // if ((step < 10) || (step < 100 && step % 10 == 0) || (step % 100 == 0)) {
-  //   double maxT, minT, maxU;
-  //   double maxTall, minTall, maxUall;
-  //   maxT = -1.0e12;
-  //   minT = +1.0e12;
-  //   maxU = 0.0;
-  //   {
-  //     double *d_T = tcClass->Tn.HostReadWrite();
-  //     double *d_u = flowClass->un.HostReadWrite();
-  //     for (int i = 0; i < SdofInt; i++) {
-  //       maxT = max(d_T[i], maxT);
-  //       minT = min(d_T[i], minT);
-  //     }
-  //     for (int i = 0; i < SdofInt; i++) {
-  //       double Umag = d_u[i + 0 * SdofInt] * d_u[i + 0 * SdofInt] + d_u[i + 1 * SdofInt] * d_u[i + 1 * SdofInt] +
-  //                     d_u[i + 2 * SdofInt] * d_u[i + 2 * SdofInt];
-  //       Umag = sqrt(Umag);
-  //       maxU = max(Umag, maxU);
-  //     }
-  //   }
-  //   MPI_Allreduce(&minT, &minTall, 1, MPI_DOUBLE, MPI_MIN, groupsMPI->getTPSCommWorld());
-  //   MPI_Allreduce(&maxT, &maxTall, 1, MPI_DOUBLE, MPI_MAX, groupsMPI->getTPSCommWorld());
-  //   MPI_Allreduce(&maxU, &maxUall, 1, MPI_DOUBLE, MPI_MAX, groupsMPI->getTPSCommWorld());
-
-  //   if (dt_fixed < 0) {
-  //     if (rank0_ == true) {
-  //       std::cout << " " << step << "    " << time << "   " << dt << "   " << sw_step.RealTime() - time_previous
-  //                 << "   " << minTall << "   " << maxTall << "   " << maxUall << endl;
-  //     }
-
-  //   } else {
-  //     CFL_actual = computeCFL(dt);
-  //     if (rank0_ == true) {
-  //       std::cout << " " << step << "    " << time << "   " << CFL_actual << "   "
-  //                 << sw_step.RealTime() - time_previous << "   " << minTall << "   " << maxTall << "   " << maxUall
-  //                 << endl;
-  //     }
-  //   }
-  // }
-  // time_previous = sw_step.RealTime();
-
   UpdateTimestepHistory(temporal_coeff_.dt);
   temporal_coeff_.time += temporal_coeff_.dt;
   iter++;
+
+  if ((iter % loMach_opts_.timing_frequency_) == 0) {
+    double time_per_step = (sw_step.RealTime() - tlast_) / loMach_opts_.timing_frequency_;
+    tlast_ = sw_step.RealTime();
+
+    double max_time_per_step = 0.0;
+    MPI_Reduce(&time_per_step, &max_time_per_step, 1, MPI_DOUBLE, MPI_MAX, 0, groupsMPI->getTPSCommWorld());
+
+    if (rank0_) {
+      // TODO(trevilo): Add state summary
+      std::cout << std::setw(10) << iter << " ";
+      std::cout << std::setw(10) << std::scientific << temporal_coeff_.time << " ";
+      std::cout << std::setw(10) << std::scientific << temporal_coeff_.dt << " ";
+      std::cout << std::setw(10) << std::scientific << max_time_per_step << " ";
+      std::cout << std::endl;
+    }
+  }
 
   // restart files
   if (iter % loMach_opts_.output_frequency_ == 0 && iter != 0) {
@@ -607,28 +608,9 @@ void LoMachSolver::solveEnd() {
 void LoMachSolver::solve() {
   this->solveBegin();
 
-  const int MaxIters = loMach_opts_.max_steps_;
-
-  iter_start_ = iter;
-  if (rank0_ == true) std::cout << " Starting main loop, from " << iter_start_ << " to " << MaxIters << endl;
-
-  const double dt_fixed = loMach_opts_.ts_opts_.constant_dt_;
-  if (rank0_ == true) {
-    if (dt_fixed < 0) {
-      std::cout << " " << endl;
-      std::cout << " N     Time        dt      time/step    minT    maxT    max|U|" << endl;
-      std::cout << "==================================================================" << endl;
-    } else {
-      std::cout << " " << endl;
-      std::cout << " N     Time        cfl      time/step    minT    maxT    max|U|" << endl;
-      std::cout << "==================================================================" << endl;
-    }
-  }
-
-  while (iter < MaxIters) {
+  while (iter < loMach_opts_.max_steps_) {
     this->solveStep();
   }
-  MPI_Barrier(groupsMPI->getTPSCommWorld());
 
   this->solveEnd();
 }
