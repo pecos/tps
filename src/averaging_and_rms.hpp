@@ -83,8 +83,6 @@ class Averaging {
 
   void initiMeanAndRMS();
 
-  void addSample(GasMixture *mixture);
-
  public:
   Averaging(ParGridFunction *_Up, ParMesh *_mesh, ParFiniteElementSpace *_fes, ParFiniteElementSpace *_dfes,
             RunConfiguration &_config);
@@ -105,6 +103,8 @@ class Averaging {
   void SetSamplesMean(int &samples) { samplesMean = samples; }
   void SetSamplesRMS(int &samples) { samplesRMS = samples; }
   void SetSamplesInterval(int &interval) { sampleInterval = interval; }
+
+  void addSample(GasMixture *mixture);
 };
 
 #endif  // AVERAGING_AND_RMS_HPP_
