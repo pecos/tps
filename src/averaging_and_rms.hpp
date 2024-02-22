@@ -62,8 +62,6 @@ class Averaging {
   RunConfiguration &config;
   MPI_Groups *groupsMPI;
 
-  GasMixture *mixture;
-
   // FES for RMS
   ParFiniteElementSpace *rmsFes;
   int numRMS;
@@ -89,15 +87,15 @@ class Averaging {
 
   void initiMeanAndRMS();
 
-  void addSample_cpu();
+  void addSample_cpu(GasMixture *mixture);
 
  public:
   Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollection *_fec, ParFiniteElementSpace *_fes,
-            ParFiniteElementSpace *_dfes, ParFiniteElementSpace *_vfes, Equations &_eqSys, GasMixture *mixture,
-            const int &_num_equation, const int &_dim, RunConfiguration &_config, MPI_Groups *_groupsMPI);
+            ParFiniteElementSpace *_dfes, ParFiniteElementSpace *_vfes, Equations &_eqSys, const int &_num_equation,
+            const int &_dim, RunConfiguration &_config, MPI_Groups *_groupsMPI);
   ~Averaging();
 
-  void addSampleMean(const int &iter);
+  void addSampleMean(const int &iter, GasMixture *mixture = nullptr);
   void write_meanANDrms_restart_files(const int &iter, const double &time);
   void read_meanANDrms_restart_files();
 

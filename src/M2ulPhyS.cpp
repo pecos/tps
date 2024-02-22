@@ -617,7 +617,7 @@ void M2ulPhyS::initVariables() {
 #endif
   initSolutionAndVisualizationVectors();
 
-  average = new Averaging(Up, mesh, fec, fes, dfes, vfes, eqSystem, d_mixture, num_equation, dim, config, groupsMPI);
+  average = new Averaging(Up, mesh, fec, fes, dfes, vfes, eqSystem, num_equation, dim, config, groupsMPI);
 
   // NOTE: this should also be completed by the GasMixture class
   // Kevin: Do we need GasMixture class for this?
@@ -2064,7 +2064,7 @@ void M2ulPhyS::solveStep() {
     }  // plane dump
   }    // step check
 
-  average->addSampleMean(iter);
+  average->addSampleMean(iter, d_mixture);
 }
 
 void M2ulPhyS::solveEnd() {
@@ -4054,7 +4054,7 @@ void M2ulPhyS::visualization() {
 
     average->write_meanANDrms_restart_files(iter, time);
 
-    average->addSampleMean(iter);
+    average->addSampleMean(iter, d_mixture);
 
     // periodically check for DIE file which requests to terminate early
     if (Check_ExitEarly(fileIter)) {

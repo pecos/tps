@@ -36,8 +36,7 @@
 // TODO(kevin): add multi species and two temperature case.
 Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollection *_fec, ParFiniteElementSpace *_fes,
                      ParFiniteElementSpace *_dfes, ParFiniteElementSpace *_vfes, Equations &_eqSys,
-                     GasMixture *_mixture, const int &_num_equation, const int &_dim, RunConfiguration &_config,
-                     MPI_Groups *_groupsMPI)
+                     const int &_num_equation, const int &_dim, RunConfiguration &_config, MPI_Groups *_groupsMPI)
     : Up(_Up),
       mesh(_mesh),
       fec(_fec),
@@ -49,8 +48,7 @@ Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollecti
       dim(_dim),
       nvel(_config.isAxisymmetric() ? 3 : _dim),
       config(_config),
-      groupsMPI(_groupsMPI),
-      mixture(_mixture) {
+      groupsMPI(_groupsMPI) {
   // Always assume 6 components of the Reynolds stress tensor
   numRMS = 6;
 
@@ -62,8 +60,6 @@ Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollecti
   if (sampleInterval != 0) computeMean = true;
 
   if (computeMean) {
-    //     mixture = new DryAir(config,dim);
-
     rmsFes = new ParFiniteElementSpace(mesh, fec, numRMS, Ordering::byNODES);
 
     meanUp = new ParGridFunction(vfes);
@@ -96,7 +92,6 @@ Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollecti
 
 Averaging::~Averaging() {
   if (computeMean) {
-    //     delete mixture;
     delete paraviewMean;
 
     delete meanP;
@@ -111,14 +106,14 @@ Averaging::~Averaging() {
   }
 }
 
-void Averaging::addSampleMean(const int &iter) {
+void Averaging::addSampleMean(const int &iter, GasMixture *mixture) {
   if (computeMean) {
     if (iter % sampleInterval == 0 && iter >= startMean) {
       if (iter == startMean && groupsMPI->isWorldRoot()) cout << "Starting mean calculation." << endl;
 #ifdef _GPU_
       addSample_gpu(meanUp, rms, samplesMean, mixture, Up, fes->GetNDofs(), dim, num_equation);
 #else
-      addSample_cpu();
+      addSample_cpu(mixture);
 #endif
       samplesMean++;
       samplesRMS++;
@@ -126,7 +121,7 @@ void Averaging::addSampleMean(const int &iter) {
   }
 }
 
-void Averaging::addSample_cpu() {
+void Averaging::addSample_cpu(GasMixture *mixture) {
   double *dataUp = Up->GetData();
   double *dataMean = meanUp->GetData();
   double *dataRMS = rms->GetData();
@@ -154,7 +149,10 @@ void Averaging::addSample_cpu() {
 
       // presseure-temperature change
       if (eq == dim + 1) {
-        double p = mixture->ComputePressureFromPrimitives(iUp);
+        double p = iUp[eq];
+        if (mixture != nullptr) {
+          p = mixture->ComputePressureFromPrimitives(iUp);
+        }
         dataMean[n + eq * dof] = (mVal + p) / double(samplesMean + 1);
       }
     }
@@ -247,7 +245,10 @@ void Averaging::addSample_gpu(ParGridFunction *meanUp, ParGridFunction *rms, int
       if (eq != 1 + dim) {
         newMeanUp = (mVal + nUp[eq]) / (dSamplesMean + 1);
       } else {  // eq == 1+dim
-        double p = d_mixture->ComputePressureFromPrimitives(nUp);
+        double p = nUp[eq];
+        if (mixture != nullptr) {
+          p = d_mixture->ComputePressureFromPrimitives(nUp);
+        }
         newMeanUp = (mVal + p) / (dSamplesMean + 1);
       }
 
