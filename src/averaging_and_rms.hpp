@@ -51,8 +51,6 @@ class Averaging {
   ParGridFunction *Up;
   ParMesh *mesh;
   const FiniteElementCollection *fec;
-  ParFiniteElementSpace *fes;
-  ParFiniteElementSpace *dfes;
   const int num_equation;
   const int dim;
   const int nvel;
@@ -84,9 +82,10 @@ class Averaging {
   void initiMeanAndRMS();
 
  public:
-  Averaging(ParGridFunction *_Up, ParMesh *_mesh, ParFiniteElementSpace *_fes, ParFiniteElementSpace *_dfes,
-            RunConfiguration &_config);
+  Averaging(ParGridFunction *_Up, ParMesh *_mesh, RunConfiguration &_config);
   ~Averaging();
+
+  void initializeViz(ParFiniteElementSpace *fes, ParFiniteElementSpace *dfes);
 
   void addSampleMean(const int &iter, GasMixture *mixture = nullptr);
   void write_meanANDrms_restart_files(const int &iter, const double &time);

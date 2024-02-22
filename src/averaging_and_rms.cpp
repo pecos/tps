@@ -34,13 +34,10 @@
 #include <mfem/general/forall.hpp>
 
 // TODO(kevin): add multi species and two temperature case.
-Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, ParFiniteElementSpace *_fes, ParFiniteElementSpace *_dfes,
-                     RunConfiguration &_config)
+Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, RunConfiguration &_config)
     : Up(_Up),
       mesh(_mesh),
       fec(_Up->ParFESpace()->FEColl()),
-      fes(_fes),
-      dfes(_dfes),
       num_equation(_Up->ParFESpace()->GetVDim()),
       dim(_mesh->Dimension()),
       nvel(_config.isAxisymmetric() ? 3 : _mesh->Dimension()),
@@ -56,29 +53,12 @@ Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, ParFiniteElementSpace
   if (sampleInterval != 0) computeMean = true;
 
   if (computeMean) {
-    rmsFes = new ParFiniteElementSpace(mesh, fec, numRMS, Ordering::byNODES);
-
     meanUp = new ParGridFunction(Up->ParFESpace());
+
+    rmsFes = new ParFiniteElementSpace(mesh, fec, numRMS, Ordering::byNODES);
     rms = new ParGridFunction(rmsFes);
 
-    meanRho = new ParGridFunction(fes, meanUp->GetData());
-    meanV = new ParGridFunction(dfes, meanUp->GetData() + fes->GetNDofs());
-    meanP = new ParGridFunction(fes, meanUp->GetData() + (1 + nvel) * fes->GetNDofs());
-
     initiMeanAndRMS();
-
-    // ParaviewMean
-    string name = "mean_";
-    name.append(config.GetOutputName());
-    paraviewMean = new ParaViewDataCollection(name, mesh);
-    paraviewMean->SetLevelsOfDetail(config.GetSolutionOrder());
-    paraviewMean->SetHighOrderOutput(true);
-    paraviewMean->SetPrecision(8);
-
-    paraviewMean->RegisterField("dens", meanRho);
-    paraviewMean->RegisterField("vel", meanV);
-    paraviewMean->RegisterField("press", meanP);
-    paraviewMean->RegisterField("rms", rms);
   }
 }
 
@@ -93,6 +73,28 @@ Averaging::~Averaging() {
     delete meanUp;
 
     delete rmsFes;
+  }
+}
+
+void Averaging::initializeViz(ParFiniteElementSpace *fes, ParFiniteElementSpace *dfes) {
+  if (computeMean) {
+    // "helper" spaces to index into meanUp
+    meanRho = new ParGridFunction(fes, meanUp->GetData());
+    meanV = new ParGridFunction(dfes, meanUp->GetData() + fes->GetNDofs());
+    meanP = new ParGridFunction(fes, meanUp->GetData() + (1 + nvel) * fes->GetNDofs());
+
+    // ParaviewMean
+    string name = "mean_";
+    name.append(config.GetOutputName());
+    paraviewMean = new ParaViewDataCollection(name, mesh);
+    paraviewMean->SetLevelsOfDetail(config.GetSolutionOrder());
+    paraviewMean->SetHighOrderOutput(true);
+    paraviewMean->SetPrecision(8);
+
+    paraviewMean->RegisterField("dens", meanRho);
+    paraviewMean->RegisterField("vel", meanV);
+    paraviewMean->RegisterField("press", meanP);
+    paraviewMean->RegisterField("rms", rms);
   }
 }
 
@@ -138,7 +140,7 @@ void Averaging::addSample(GasMixture *mixture) {
 
   GasMixture *d_mixture = mixture;
 
-  const int Ndof = fes->GetNDofs();
+  const int Ndof = meanUp->ParFESpace()->GetNDofs();
   const int d_dim = dim;
   const int d_neqn = num_equation;
 
