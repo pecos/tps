@@ -91,9 +91,6 @@ class Averaging {
 
   void addSample_cpu();
 
-  Vector local_sums;
-  Vector tmp_vector;
-
  public:
   Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollection *_fec, ParFiniteElementSpace *_fes,
             ParFiniteElementSpace *_dfes, ParFiniteElementSpace *_vfes, Equations &_eqSys, GasMixture *mixture,
@@ -116,14 +113,10 @@ class Averaging {
   void SetSamplesRMS(int &samples) { samplesRMS = samples; }
   void SetSamplesInterval(int &interval) { sampleInterval = interval; }
 
-  const double *getLocalSums();
-
   // GPU functions
 #ifdef _GPU_
   void addSample_gpu(ParGridFunction *meanUp, ParGridFunction *rms, int &samplesMean, GasMixture *mixture,
                      const ParGridFunction *Up, const int &Ndof, const int &dim, const int &num_equation);
-  static void sumValues_gpu(const Vector &meanUp, const Vector &rms, Vector &local_sums, Vector &tmp_vector,
-                            const int &num_equation, const int &dim);
 #endif  // _GPU_
 };
 

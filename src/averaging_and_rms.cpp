@@ -91,18 +91,6 @@ Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollecti
     paraviewMean->RegisterField("vel", meanV);
     paraviewMean->RegisterField("press", meanP);
     paraviewMean->RegisterField("rms", rms);
-    if (eqSystem == NS_PASSIVE) paraviewMean->RegisterField("passScalar", meanScalar);
-
-    // NOTE(kevin): this variable is currently obsolete.
-    // It represents `dof`-averaged state, which is useless at this point.
-    // This will not be supported.
-    local_sums.UseDevice(true);
-    local_sums.SetSize(5 + 6);
-    local_sums = 0.;
-
-    tmp_vector.UseDevice(true);
-    tmp_vector.SetSize(rms->Size());
-    tmp_vector = 0.;
   }
 }
 
@@ -218,83 +206,6 @@ void Averaging::write_meanANDrms_restart_files(const int &iter, const double &ti
   }
 }
 
-void Averaging::read_meanANDrms_restart_files() {
-  //   if( computeMean && config.GetRestartMean() )
-  //   {
-  //     string serialName = "restart_mean_";
-  //     serialName.append( config.GetOutputName() );
-  //     serialName.append( ".sol" );
-  //
-  //     string serialNameRMS = "restart_rms_";
-  //     serialNameRMS.append( config.GetOutputName() );
-  //     serialNameRMS.append( ".sol" );
-  //
-  //     string fileName = groupsMPI->getParallelName( serialName );
-  //     ifstream file( fileName );
-  //
-  //     if( !file.is_open() )
-  //     {
-  //       cout<< "Could not open file \""<<fileName<<"\""<<endl;
-  //       return;
-  //     }else
-  //     {
-  //       double *dataUp = meanUp->GetData();
-  //
-  //       string line;
-  //       // read time and iters
-  //       {
-  //         getline(file,line);
-  //         istringstream ss(line);
-  //         string word;
-  //         ss >> word;
-  //         samplesMean = stoi( word );
-  //
-  //         ss >> word;
-  //         sampleInterval = stof( word );
-  //       }
-  //
-  //       int lines = 0;
-  //       while( getline(file,line) )
-  //       {
-  //         istringstream ss(line);
-  //         string word;
-  //         ss >> word;
-  //
-  //         dataUp[lines] = stof( word );
-  //         lines++;
-  //       }
-  //       file.close();
-  //     }
-  //
-  //     // read RMS
-  //     string rmsName  = groupsMPI->getParallelName( serialNameRMS );
-  //     ifstream rmsfile( rmsName );
-  //
-  //     if( !rmsfile.is_open() )
-  //     {
-  //       cout<< "Could not open file \""<<rmsName<<"\""<<endl;
-  //       return;
-  //     }else
-  //     {
-  //       double *dataRMS = rms->GetData();
-  //
-  //       string line;
-  //
-  //       int lines = 0;
-  //       while( getline(rmsfile,line) )
-  //       {
-  //         istringstream ss(line);
-  //         string word;
-  //         ss >> word;
-  //
-  //         dataRMS[lines] = stof( word );
-  //         lines++;
-  //       }
-  //       rmsfile.close();
-  //     }
-  //   }
-}
-
 void Averaging::initiMeanAndRMS() {
   double *dataMean = meanUp->HostWrite();
   double *dataRMS = rms->HostWrite();
@@ -304,33 +215,6 @@ void Averaging::initiMeanAndRMS() {
     for (int eq = 0; eq < num_equation; eq++) dataMean[i + eq * dof] = 0.;
     for (int n = 0; n < numRMS; n++) dataRMS[i + dof * n] = 0.;
   }
-}
-
-// NOTE(kevin): this routine is currently obsolete.
-// It computes `dof`-averaged state and time-derivative, which are useless at this point.
-// This will not be supported.
-const double *Averaging::getLocalSums() {
-#ifdef _GPU_
-  sumValues_gpu(*meanUp, *rms, local_sums, tmp_vector, num_equation, dim);
-#else
-  const int NDof = meanUp->Size() / num_equation;
-  const double ddof = static_cast<double>(NDof);
-
-  double *dataMean = meanUp->GetData();
-  double *dataRMS = rms->GetData();
-
-  local_sums = 0.;
-  for (int n = 0; n < NDof; n++) {
-    for (int eq = 0; eq < num_equation; eq++) local_sums(eq) += fabs(dataMean[n + eq * NDof]) / ddof;
-    for (int i = 0; i < 6; i++) local_sums(5 + i) += fabs(dataRMS[n + i * NDof]) / ddof;
-  }
-  if (nvel == 2) {
-    local_sums(4) = local_sums(3);
-    local_sums(3) = 0.;
-  }
-#endif
-
-  return local_sums.HostRead();
 }
 
 #ifdef _GPU_
@@ -405,75 +289,6 @@ void Averaging::addSample_gpu(ParGridFunction *meanUp, ParGridFunction *rms, int
     // yz
     val = d_rms[n + 5 * Ndof];
     d_rms[n + 5 * Ndof] = (val * dSamplesMean + (vel[1] - meanVel[1]) * (vel[2] - meanVel[2])) / (dSamplesMean + 1);
-  });
-}
-
-// NOTE(kevin): this routine is currently obsolete.
-// It computes `dof`-averaged state and time-derivative, which are useless at this point.
-// This will not be supported.
-void Averaging::sumValues_gpu(const Vector &meanUp, const Vector &rms, Vector &local_sums, Vector &tmp_vector,
-                              const int &num_equation, const int &dim) {
-  const int NDof = meanUp.Size() / num_equation;
-
-  auto d_Up = meanUp.Read();
-  auto d_rms = rms.Read();
-  auto d_tmp = tmp_vector.Write();
-  auto d_loc = local_sums.Write();
-
-  // copy up values to temp vector
-  MFEM_FORALL(n, meanUp.Size(), { d_tmp[n] = fabs(d_Up[n]); });
-
-  // sum up all Up values
-  MFEM_FORALL(n, NDof, {
-    int interval = 1;
-    while (interval < NDof) {
-      interval *= 2;
-      if (n % interval == 0) {
-        int n2 = n + interval / 2;
-        for (int eq = 0; eq < num_equation; eq++) {
-          if (n2 < NDof) d_tmp[n + eq * NDof] += d_tmp[n2 + eq * NDof];
-        }
-      }
-      MFEM_SYNC_THREAD;
-    }
-  });
-
-  // transfer to smaller vector
-  MFEM_FORALL(eq, num_equation, {
-    double ddof = (double)NDof;
-    d_loc[eq] = d_tmp[eq * NDof] / ddof;
-  });
-
-  // rearrange
-  if (dim == 2) {
-    MFEM_FORALL(eq, num_equation, {
-      if (eq == 0) {
-        d_loc[4] = d_loc[3];
-        d_loc[3] = 0.;
-      }
-    });
-  }
-
-  // REPEAT FOR RMS
-  MFEM_FORALL(n, rms.Size(), { d_tmp[n] = fabs(d_rms[n]); });
-
-  MFEM_FORALL(n, NDof, {
-    int interval = 1;
-    while (interval < NDof) {
-      interval *= 2;
-      if (n % interval == 0) {
-        int n2 = n + interval / 2;
-        for (int eq = 0; eq < 6; eq++) {
-          if (n2 < NDof) d_tmp[n + eq * NDof] += d_tmp[n2 + eq * NDof];
-        }
-      }
-      MFEM_SYNC_THREAD;
-    }
-  });
-
-  MFEM_FORALL(eq, 6, {
-    double ddof = (double)NDof;
-    d_loc[5 + eq] = d_tmp[eq * NDof] / ddof;
   });
 }
 
