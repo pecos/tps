@@ -457,6 +457,11 @@ void LoMachSolver::initialize() {
 
   flow_->initializeViz(*pvdc_);
   thermo_->initializeViz(*pvdc_);
+
+  // If restarting, read restart files
+  if (loMach_opts_.io_opts_.enable_restart_) {
+    restart_files_hdf5("read");
+  }
 }
 
 void LoMachSolver::UpdateTimestepHistory(double dt) {
@@ -482,161 +487,108 @@ void LoMachSolver::initialTimeStep() {
   }
 }
 
-void LoMachSolver::solve() {
-  // just restart here
-  if (loMach_opts_.io_opts_.enable_restart_) {
-    restart_files_hdf5("read");
-  }
-
+void LoMachSolver::solveBegin() {
   setTimestep();
-  if (iter == 0) {
-    // TODO(trevilo): Let user set initial dt
-    temporal_coeff_.dt = temporal_coeff_.dt;
-  }
-
-  // temporary hardcodes
-  // double CFL_actual;
-  CFL = loMach_opts_.ts_opts_.cfl_;
-
-  // int SdofInt = sfes->GetTrueVSize();
-  int Sdof = sfes->GetNDofs();
-
-  // dt_fixed is initialized to -1, so if it is positive,
-  // then the user requested a fixed dt run
-  const double dt_fixed = loMach_opts_.ts_opts_.constant_dt_;
-  if (dt_fixed > 0) {
-    temporal_coeff_.dt = dt_fixed;
-  }
-
   if (rank0_) std::cout << "Initial dt = " << temporal_coeff_.dt << std::endl;
 
-  // trevilo: What is this doing?
-  {
-    double *res = bufferGridScale->HostReadWrite();
-    double *data = resolution_gf.HostReadWrite();
-    for (int i = 0; i < Sdof; i++) {
-      data[i] = res[i];
-    }
-  }
+  resolution_gf = *bufferGridScale;
 
   pvdc_->SetCycle(iter);
   pvdc_->SetTime(temporal_coeff_.time);
   pvdc_->Save();
   if (rank0_ == true) std::cout << "Saving first step to paraview: " << iter << endl;
+}
 
-  const int MaxIters = loMach_opts_.max_steps_;
+void LoMachSolver::solveStep() {
+  sw_step.Start();
+  if (loMach_opts_.ts_opts_.integrator_type_ == LoMachTemporalOptions::CURL_CURL) {
+    SetTimeIntegrationCoefficients(iter - iter_start_);
+    thermo_->step();
+    flow_->step();
+  } else {
+    if (rank0_) std::cout << "Time integration not updated." << endl;
+    exit(1);
+  }
+  sw_step.Stop();
 
-  int iter_start = iter + 1;
-  if (rank0_ == true) std::cout << " Starting main loop, from " << iter_start << " to " << MaxIters << endl;
+  // if ((step < 10) || (step < 100 && step % 10 == 0) || (step % 100 == 0)) {
+  //   double maxT, minT, maxU;
+  //   double maxTall, minTall, maxUall;
+  //   maxT = -1.0e12;
+  //   minT = +1.0e12;
+  //   maxU = 0.0;
+  //   {
+  //     double *d_T = tcClass->Tn.HostReadWrite();
+  //     double *d_u = flowClass->un.HostReadWrite();
+  //     for (int i = 0; i < SdofInt; i++) {
+  //       maxT = max(d_T[i], maxT);
+  //       minT = min(d_T[i], minT);
+  //     }
+  //     for (int i = 0; i < SdofInt; i++) {
+  //       double Umag = d_u[i + 0 * SdofInt] * d_u[i + 0 * SdofInt] + d_u[i + 1 * SdofInt] * d_u[i + 1 * SdofInt] +
+  //                     d_u[i + 2 * SdofInt] * d_u[i + 2 * SdofInt];
+  //       Umag = sqrt(Umag);
+  //       maxU = max(Umag, maxU);
+  //     }
+  //   }
+  //   MPI_Allreduce(&minT, &minTall, 1, MPI_DOUBLE, MPI_MIN, groupsMPI->getTPSCommWorld());
+  //   MPI_Allreduce(&maxT, &maxTall, 1, MPI_DOUBLE, MPI_MAX, groupsMPI->getTPSCommWorld());
+  //   MPI_Allreduce(&maxU, &maxUall, 1, MPI_DOUBLE, MPI_MAX, groupsMPI->getTPSCommWorld());
 
-  if (rank0_ == true) {
-    if (dt_fixed < 0) {
-      std::cout << " " << endl;
-      std::cout << " N     Time        dt      time/step    minT    maxT    max|U|" << endl;
-      std::cout << "==================================================================" << endl;
-    } else {
-      std::cout << " " << endl;
-      std::cout << " N     Time        cfl      time/step    minT    maxT    max|U|" << endl;
-      std::cout << "==================================================================" << endl;
-    }
+  //   if (dt_fixed < 0) {
+  //     if (rank0_ == true) {
+  //       std::cout << " " << step << "    " << time << "   " << dt << "   " << sw_step.RealTime() - time_previous
+  //                 << "   " << minTall << "   " << maxTall << "   " << maxUall << endl;
+  //     }
+
+  //   } else {
+  //     CFL_actual = computeCFL(dt);
+  //     if (rank0_ == true) {
+  //       std::cout << " " << step << "    " << time << "   " << CFL_actual << "   "
+  //                 << sw_step.RealTime() - time_previous << "   " << minTall << "   " << maxTall << "   " << maxUall
+  //                 << endl;
+  //     }
+  //   }
+  // }
+  // time_previous = sw_step.RealTime();
+
+  UpdateTimestepHistory(temporal_coeff_.dt);
+  temporal_coeff_.time += temporal_coeff_.dt;
+  iter++;
+
+  // restart files
+  if (iter % loMach_opts_.output_frequency_ == 0 && iter != 0) {
+    // Write restart file!
+    restart_files_hdf5("write");
+
+    // Write visualization files
+    pvdc_->SetCycle(iter);
+    pvdc_->SetTime(temporal_coeff_.time);
+    pvdc_->Save();
   }
 
-  // double time_previous = 0.0;
-  for (int step = iter_start; step <= MaxIters; step++) {
-    iter = step;
-
-    // trevilo: necessary?
-    if (step > MaxIters) {
-      break;
-    }
-
-    sw_step.Start();
-    if (loMach_opts_.ts_opts_.integrator_type_ == LoMachTemporalOptions::CURL_CURL) {
-      SetTimeIntegrationCoefficients(step - iter_start);
-      thermo_->step();
-      flow_->step();
-    } else {
-      if (rank0_) std::cout << "Time integration not updated." << endl;
-      exit(1);
-    }
-    sw_step.Stop();
-
-    // if ((step < 10) || (step < 100 && step % 10 == 0) || (step % 100 == 0)) {
-    //   double maxT, minT, maxU;
-    //   double maxTall, minTall, maxUall;
-    //   maxT = -1.0e12;
-    //   minT = +1.0e12;
-    //   maxU = 0.0;
-    //   {
-    //     double *d_T = tcClass->Tn.HostReadWrite();
-    //     double *d_u = flowClass->un.HostReadWrite();
-    //     for (int i = 0; i < SdofInt; i++) {
-    //       maxT = max(d_T[i], maxT);
-    //       minT = min(d_T[i], minT);
-    //     }
-    //     for (int i = 0; i < SdofInt; i++) {
-    //       double Umag = d_u[i + 0 * SdofInt] * d_u[i + 0 * SdofInt] + d_u[i + 1 * SdofInt] * d_u[i + 1 * SdofInt] +
-    //                     d_u[i + 2 * SdofInt] * d_u[i + 2 * SdofInt];
-    //       Umag = sqrt(Umag);
-    //       maxU = max(Umag, maxU);
-    //     }
-    //   }
-    //   MPI_Allreduce(&minT, &minTall, 1, MPI_DOUBLE, MPI_MIN, groupsMPI->getTPSCommWorld());
-    //   MPI_Allreduce(&maxT, &maxTall, 1, MPI_DOUBLE, MPI_MAX, groupsMPI->getTPSCommWorld());
-    //   MPI_Allreduce(&maxU, &maxUall, 1, MPI_DOUBLE, MPI_MAX, groupsMPI->getTPSCommWorld());
-
-    //   if (dt_fixed < 0) {
-    //     if (rank0_ == true) {
-    //       std::cout << " " << step << "    " << time << "   " << dt << "   " << sw_step.RealTime() - time_previous
-    //                 << "   " << minTall << "   " << maxTall << "   " << maxUall << endl;
-    //     }
-
-    //   } else {
-    //     CFL_actual = computeCFL(dt);
-    //     if (rank0_ == true) {
-    //       std::cout << " " << step << "    " << time << "   " << CFL_actual << "   "
-    //                 << sw_step.RealTime() - time_previous << "   " << minTall << "   " << maxTall << "   " << maxUall
-    //                 << endl;
-    //     }
-    //   }
-    // }
-    // time_previous = sw_step.RealTime();
-
-    UpdateTimestepHistory(temporal_coeff_.dt);
-    temporal_coeff_.time += temporal_coeff_.dt;
-
-    // restart files
-    if (iter % loMach_opts_.output_frequency_ == 0 && iter != 0) {
-      // Write restart file!
-      restart_files_hdf5("write");
-
-      // Write visualization files
-      pvdc_->SetCycle(iter);
-      pvdc_->SetTime(temporal_coeff_.time);
-      pvdc_->Save();
-    }
-
-    // check for DIE
-    if (iter % loMach_opts_.io_opts_.exit_check_frequency_ == 0) {
-      int early_exit = 0;
-      if (rank0_) {
-        if (file_exists("DIE")) {
-          grvy_printf(gdebug, "Caught DIE file. Exiting...\n");
-          remove("DIE");
-          early_exit = 1;
-        }
+  // check for DIE
+  if (iter % loMach_opts_.io_opts_.exit_check_frequency_ == 0) {
+    int early_exit = 0;
+    if (rank0_) {
+      if (file_exists("DIE")) {
+        grvy_printf(gdebug, "Caught DIE file. Exiting...\n");
+        remove("DIE");
+        early_exit = 1;
       }
-      MPI_Bcast(&early_exit, 1, MPI_INT, 0, groupsMPI->getTPSCommWorld());
-      if (early_exit == 1) exit(-1);
     }
-
-    // update dt
-    if (dt_fixed < 0.0) {
-      updateTimestep();
-    }
+    MPI_Bcast(&early_exit, 1, MPI_INT, 0, groupsMPI->getTPSCommWorld());
+    if (early_exit == 1) exit(-1);
   }
-  MPI_Barrier(groupsMPI->getTPSCommWorld());
 
+  // update dt
+  // if (dt_fixed < 0.0) {
+  if (loMach_opts_.ts_opts_.constant_dt_ < 0.0) {
+    updateTimestep();
+  }
+}
+
+void LoMachSolver::solveEnd() {
   // evaluate error (if possible)
   const double flow_err = flow_->computeL2Error();
   if (flow_err >= 0.0) {
@@ -650,6 +602,35 @@ void LoMachSolver::solve() {
   pvdc_->Save();
   MPI_Barrier(groupsMPI->getTPSCommWorld());
   if (rank0_ == true) std::cout << " ...complete!" << endl;
+}
+
+void LoMachSolver::solve() {
+  this->solveBegin();
+
+  const int MaxIters = loMach_opts_.max_steps_;
+
+  iter_start_ = iter;
+  if (rank0_ == true) std::cout << " Starting main loop, from " << iter_start_ << " to " << MaxIters << endl;
+
+  const double dt_fixed = loMach_opts_.ts_opts_.constant_dt_;
+  if (rank0_ == true) {
+    if (dt_fixed < 0) {
+      std::cout << " " << endl;
+      std::cout << " N     Time        dt      time/step    minT    maxT    max|U|" << endl;
+      std::cout << "==================================================================" << endl;
+    } else {
+      std::cout << " " << endl;
+      std::cout << " N     Time        cfl      time/step    minT    maxT    max|U|" << endl;
+      std::cout << "==================================================================" << endl;
+    }
+  }
+
+  while (iter < MaxIters) {
+    this->solveStep();
+  }
+  MPI_Barrier(groupsMPI->getTPSCommWorld());
+
+  this->solveEnd();
 }
 
 void LoMachSolver::updateTimestep() {
@@ -801,20 +782,29 @@ void LoMachSolver::setTimestep() {
   double Umag;
   int Sdof = sfes->GetNDofs();
 
-  // auto dataU = flowClass->un_gf.HostRead();
-  auto dataU = flow_->getCurrentVelocity()->HostRead();
-  for (int n = 0; n < Sdof; n++) {
-    Umag = 0.0;
-    for (int eq = 0; eq < dim_; eq++) {
-      Umag += dataU[n + eq * Sdof] * dataU[n + eq * Sdof];
+  CFL = loMach_opts_.ts_opts_.cfl_;
+
+  // dt_fixed is initialized to -1, so if it is positive,
+  // then the user requested a fixed dt run
+  const double dt_fixed = loMach_opts_.ts_opts_.constant_dt_;
+  if (dt_fixed > 0) {
+    temporal_coeff_.dt = dt_fixed;
+  } else {
+    // auto dataU = flowClass->un_gf.HostRead();
+    auto dataU = flow_->getCurrentVelocity()->HostRead();
+    for (int n = 0; n < Sdof; n++) {
+      Umag = 0.0;
+      for (int eq = 0; eq < dim_; eq++) {
+        Umag += dataU[n + eq * Sdof] * dataU[n + eq * Sdof];
+      }
+      Umag = std::sqrt(Umag);
+      Umax_lcl = std::max(Umag, Umax_lcl);
     }
-    Umag = std::sqrt(Umag);
-    Umax_lcl = std::max(Umag, Umax_lcl);
+    MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, pmesh_->GetComm());
+    double dtInst = CFL * hmin / (max_speed * (double)order);
+    temporal_coeff_.dt = dtInst;
+    std::cout << "dt from setTimestep: " << temporal_coeff_.dt << " max_speed: " << max_speed << endl;
   }
-  MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, pmesh_->GetComm());
-  double dtInst = CFL * hmin / (max_speed * (double)order);
-  temporal_coeff_.dt = dtInst;
-  std::cout << "dt from setTimestep: " << temporal_coeff_.dt << " max_speed: " << max_speed << endl;
 }
 
 void LoMachSolver::SetTimeIntegrationCoefficients(int step) {
