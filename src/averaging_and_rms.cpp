@@ -34,7 +34,7 @@
 #include <mfem/general/forall.hpp>
 
 // TODO(kevin): add multi species and two temperature case.
-Averaging::Averaging(RunConfiguration &_config) : Up(nullptr), mesh(nullptr), config(_config) {
+Averaging::Averaging(RunConfiguration &_config) : mesh(nullptr), config(_config) {
   num_equation = 0;
   dim = 0;
   nvel = 0;
@@ -46,9 +46,6 @@ Averaging::Averaging(RunConfiguration &_config) : Up(nullptr), mesh(nullptr), co
   startMean = config.GetMeanStartIter();
   computeMean = false;
   if (sampleInterval != 0) computeMean = true;
-
-  // NB: Must call registerField to set up
-  meanUp = nullptr;
 }
 
 Averaging::~Averaging() {
@@ -57,17 +54,14 @@ Averaging::~Averaging() {
     delete meanP;
     delete meanV;
     delete meanRho;
-    delete rms;
-    delete meanUp;
     delete rmsFes;
   }
 }
 
 void Averaging::registerField(ParGridFunction *field_to_average) {
-  Up = field_to_average;
-  mesh = Up->ParFESpace()->GetParMesh();
+  mesh = field_to_average->ParFESpace()->GetParMesh();
 
-  num_equation = Up->ParFESpace()->GetVDim();
+  num_equation = field_to_average->ParFESpace()->GetVDim();
   dim = mesh->Dimension();
   nvel = (config.isAxisymmetric() ? 3 : mesh->Dimension());
 
@@ -75,18 +69,24 @@ void Averaging::registerField(ParGridFunction *field_to_average) {
   numRMS = 6;
 
   if (computeMean) {
-    meanUp = new ParGridFunction(Up->ParFESpace());
+    ParGridFunction *meanUp = new ParGridFunction(field_to_average->ParFESpace());
 
-    rmsFes = new ParFiniteElementSpace(mesh, Up->ParFESpace()->FEColl(), numRMS, Ordering::byNODES);
-    rms = new ParGridFunction(rmsFes);
+    rmsFes = new ParFiniteElementSpace(mesh, field_to_average->ParFESpace()->FEColl(), numRMS, Ordering::byNODES);
+    ParGridFunction *rms = new ParGridFunction(rmsFes);
 
-    initiMeanAndRMS();
+    *meanUp = 0.0;
+    *rms = 0.0;
+
+    avg_families_.emplace_back(AveragingFamily(field_to_average, meanUp, rms));
   }
 }
 
 void Averaging::initializeViz(ParFiniteElementSpace *fes, ParFiniteElementSpace *dfes) {
   if (computeMean) {
-    assert(meanUp != nullptr);
+    assert(avg_families_.size() == 1);
+
+    ParGridFunction *meanUp = avg_families_[0].mean_fcn_;
+    ParGridFunction *rms = avg_families_[0].rms_fcn_;
 
     // "helper" spaces to index into meanUp
     meanRho = new ParGridFunction(fes, meanUp->GetData());
@@ -110,12 +110,13 @@ void Averaging::initializeViz(ParFiniteElementSpace *fes, ParFiniteElementSpace 
 
 void Averaging::addSampleMean(const int &iter, GasMixture *mixture) {
   if (computeMean) {
-    assert(meanUp != nullptr);
+    assert(avg_families_.size() >= 1);
     if (iter % sampleInterval == 0 && iter >= startMean) {
       if (iter == startMean && (mesh->GetMyRank() == 0)) cout << "Starting mean calculation." << endl;
 
       if (samplesRMS == 0) {
-        *rms = 0.0;
+        // *rms = 0.0;
+        *avg_families_[0].rms_fcn_ = 0.0;
       }
 
       addSample(mixture);
@@ -136,90 +137,96 @@ void Averaging::write_meanANDrms_restart_files(const int &iter, const double &ti
   }
 }
 
-void Averaging::initiMeanAndRMS() {
-  assert(meanUp != nullptr);
-  assert(rms != nullptr);
-  *meanUp = 0.0;
-  *rms = 0.0;
-}
-
 void Averaging::addSample(GasMixture *mixture) {
-  double *d_meanUp = meanUp->ReadWrite();
-  double *d_rms = rms->ReadWrite();
-  const double *d_Up = Up->Read();
+  // Assert that there is something to average.  In principle we don't
+  // need this, b/c the loop below is a no-op if there are no
+  // families.  However, if you got to this point, you're expecting to
+  // average something, so if there is nothing to average, we should
+  // complain rather than silently do nothing.
+  assert(avg_families_.size() >= 1);
 
-  double dSamplesMean = (double)samplesMean;
-  double dSamplesRMS = (double)samplesRMS;
+  // Loop through families that have been registered and compute means and variances
+  for (size_t ifam = 0; ifam < avg_families_.size(); ifam++) {
+    AveragingFamily &fam = avg_families_[ifam];
 
-  GasMixture *d_mixture = mixture;
+    const double *d_Up = fam.instantaneous_fcn_->Read();
 
-  const int Ndof = meanUp->ParFESpace()->GetNDofs();
-  const int d_dim = dim;
-  const int d_neqn = num_equation;
+    double *d_meanUp = avg_families_[ifam].mean_fcn_->ReadWrite();
+    double *d_rms = avg_families_[ifam].rms_fcn_->ReadWrite();
 
-  MFEM_FORALL(n, Ndof, {
-    double meanVel[gpudata::MAXDIM], vel[gpudata::MAXDIM];  // double meanVel[3], vel[3];
-    // double nUp[20];  // NOTE: lets make sure we don't have more than 20 eq.
-    // NOTE(kevin): (presumably) marc left this hidden note here..
-    double nUp[gpudata::MAXEQUATIONS];
+    double dSamplesMean = (double)samplesMean;
+    double dSamplesRMS = (double)samplesRMS;
 
-    for (int eq = 0; eq < d_neqn; eq++) {
-      nUp[eq] = d_Up[n + eq * Ndof];
-    }
+    GasMixture *d_mixture = mixture;
 
-    // mean
-    for (int eq = 0; eq < d_neqn; eq++) {
-      double mUpi = d_meanUp[n + eq * Ndof];
-      double mVal = dSamplesMean * mUpi;
+    const int Ndof = avg_families_[ifam].mean_fcn_->ParFESpace()->GetNDofs();
+    const int d_dim = dim;
+    const int d_neqn = num_equation;
 
-      double newMeanUp;
-      if (eq != 1 + d_dim) {
-        newMeanUp = (mVal + nUp[eq]) / (dSamplesMean + 1);
-      } else {  // eq == 1+d_dim
-        double p = nUp[eq];
-        if (mixture != nullptr) {
-          p = d_mixture->ComputePressureFromPrimitives(nUp);
-        }
-        newMeanUp = (mVal + p) / (dSamplesMean + 1);
+    MFEM_FORALL(n, Ndof, {
+      double meanVel[gpudata::MAXDIM], vel[gpudata::MAXDIM];  // double meanVel[3], vel[3];
+      // double nUp[20];  // NOTE: lets make sure we don't have more than 20 eq.
+      // NOTE(kevin): (presumably) marc left this hidden note here..
+      double nUp[gpudata::MAXEQUATIONS];
+
+      for (int eq = 0; eq < d_neqn; eq++) {
+        nUp[eq] = d_Up[n + eq * Ndof];
       }
 
-      d_meanUp[n + eq * Ndof] = newMeanUp;
-    }
+      // mean
+      for (int eq = 0; eq < d_neqn; eq++) {
+        double mUpi = d_meanUp[n + eq * Ndof];
+        double mVal = dSamplesMean * mUpi;
 
-    // fill out mean velocity array
-    for (int d = 0; d < d_dim; d++) {
-      meanVel[d] = d_meanUp[n + (d + 1) * Ndof];
-      vel[d] = nUp[d + 1];
-    }
-    if (d_dim != 3) {
-      meanVel[2] = 0.;
-      vel[2] = 0.;
-    }
+        double newMeanUp;
+        if (eq != 1 + d_dim) {
+          newMeanUp = (mVal + nUp[eq]) / (dSamplesMean + 1);
+        } else {  // eq == 1+d_dim
+          double p = nUp[eq];
+          if (mixture != nullptr) {
+            p = d_mixture->ComputePressureFromPrimitives(nUp);
+          }
+          newMeanUp = (mVal + p) / (dSamplesMean + 1);
+        }
 
-    // ----- RMS -----
-    double val = 0.;
-    // xx
-    val = d_rms[n];
-    d_rms[n] = (val * dSamplesRMS + (vel[0] - meanVel[0]) * (vel[0] - meanVel[0])) / (dSamplesRMS + 1);
+        d_meanUp[n + eq * Ndof] = newMeanUp;
+      }
 
-    // yy
-    val = d_rms[n + Ndof];
-    d_rms[n + Ndof] = (val * dSamplesRMS + (vel[1] - meanVel[1]) * (vel[1] - meanVel[1])) / (dSamplesRMS + 1);
+      // fill out mean velocity array
+      for (int d = 0; d < d_dim; d++) {
+        meanVel[d] = d_meanUp[n + (d + 1) * Ndof];
+        vel[d] = nUp[d + 1];
+      }
+      if (d_dim != 3) {
+        meanVel[2] = 0.;
+        vel[2] = 0.;
+      }
 
-    // zz
-    val = d_rms[n + 2 * Ndof];
-    d_rms[n + 2 * Ndof] = (val * dSamplesRMS + (vel[2] - meanVel[2]) * (vel[2] - meanVel[2])) / (dSamplesRMS + 1);
+      // ----- RMS -----
+      double val = 0.;
+      // xx
+      val = d_rms[n];
+      d_rms[n] = (val * dSamplesRMS + (vel[0] - meanVel[0]) * (vel[0] - meanVel[0])) / (dSamplesRMS + 1);
 
-    // xy
-    val = d_rms[n + 3 * Ndof];
-    d_rms[n + 3 * Ndof] = (val * dSamplesRMS + (vel[0] - meanVel[0]) * (vel[1] - meanVel[1])) / (dSamplesRMS + 1);
+      // yy
+      val = d_rms[n + Ndof];
+      d_rms[n + Ndof] = (val * dSamplesRMS + (vel[1] - meanVel[1]) * (vel[1] - meanVel[1])) / (dSamplesRMS + 1);
 
-    // xz
-    val = d_rms[n + 4 * Ndof];
-    d_rms[n + 4 * Ndof] = (val * dSamplesRMS + (vel[0] - meanVel[0]) * (vel[2] - meanVel[2])) / (dSamplesRMS + 1);
+      // zz
+      val = d_rms[n + 2 * Ndof];
+      d_rms[n + 2 * Ndof] = (val * dSamplesRMS + (vel[2] - meanVel[2]) * (vel[2] - meanVel[2])) / (dSamplesRMS + 1);
 
-    // yz
-    val = d_rms[n + 5 * Ndof];
-    d_rms[n + 5 * Ndof] = (val * dSamplesRMS + (vel[1] - meanVel[1]) * (vel[2] - meanVel[2])) / (dSamplesRMS + 1);
-  });
+      // xy
+      val = d_rms[n + 3 * Ndof];
+      d_rms[n + 3 * Ndof] = (val * dSamplesRMS + (vel[0] - meanVel[0]) * (vel[1] - meanVel[1])) / (dSamplesRMS + 1);
+
+      // xz
+      val = d_rms[n + 4 * Ndof];
+      d_rms[n + 4 * Ndof] = (val * dSamplesRMS + (vel[0] - meanVel[0]) * (vel[2] - meanVel[2])) / (dSamplesRMS + 1);
+
+      // yz
+      val = d_rms[n + 5 * Ndof];
+      d_rms[n + 5 * Ndof] = (val * dSamplesRMS + (vel[1] - meanVel[1]) * (vel[2] - meanVel[2])) / (dSamplesRMS + 1);
+    });
+  }
 }

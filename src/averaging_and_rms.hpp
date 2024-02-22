@@ -45,10 +45,43 @@
 using namespace mfem;
 using namespace std;
 
+class AveragingFamily {
+ public:
+  ParGridFunction *instantaneous_fcn_;
+  ParGridFunction *mean_fcn_;
+  ParGridFunction *rms_fcn_;
+
+  AveragingFamily(ParGridFunction *instant, ParGridFunction *mean, ParGridFunction *rms) {
+    instantaneous_fcn_ = instant;
+    mean_fcn_ = mean;
+    rms_fcn_ = rms;
+  }
+
+  // Move constructor (required for emplace_back)
+  AveragingFamily(AveragingFamily &&fam) {
+    // Copy the pointers
+    this->instantaneous_fcn_ = fam.instantaneous_fcn_;
+    this->mean_fcn_ = fam.mean_fcn_;
+    this->rms_fcn_ = fam.rms_fcn_;
+
+    // Set incoming mean_fcn_ to null, which ensures memory that
+    // this->mean_fcn_ now points to is not deleted when the
+    // destructor of fam is called
+    fam.mean_fcn_ = nullptr;
+    fam.rms_fcn_ = nullptr;
+  }
+
+  ~AveragingFamily() {
+    delete mean_fcn_;
+    delete rms_fcn_;
+  }
+};
+
 class Averaging {
  private:
+  std::vector<AveragingFamily> avg_families_;
+
   // Primitive variables
-  ParGridFunction *Up;
   ParMesh *mesh;
   int num_equation;
   int dim;
@@ -60,8 +93,6 @@ class Averaging {
   int numRMS;
 
   // time averaged primitive variables
-  ParGridFunction *meanUp;
-  ParGridFunction *rms;
   ParGridFunction *diss;
 
   // time averaged p, rho, vel (pointers to meanUp) for Visualization
@@ -77,8 +108,6 @@ class Averaging {
   int sampleInterval;
   int startMean;
   bool computeMean;
-
-  void initiMeanAndRMS();
 
  public:
   Averaging(RunConfiguration &_config);
@@ -96,8 +125,9 @@ class Averaging {
   int GetSamplesInterval() { return sampleInterval; }
   bool ComputeMean() { return computeMean; }
 
-  ParGridFunction *GetMeanUp() { return meanUp; }
-  ParGridFunction *GetRMS() { return rms; }
+  // TODO(trevilo): Specific to single ParGridFunction case
+  ParGridFunction *GetMeanUp() { return avg_families_[0].mean_fcn_; }
+  ParGridFunction *GetRMS() { return avg_families_[0].rms_fcn_; }
 
   void SetSamplesMean(int &samples) { samplesMean = samples; }
   void SetSamplesRMS(int &samples) { samplesRMS = samples; }
