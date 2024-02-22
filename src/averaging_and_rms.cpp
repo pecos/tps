@@ -34,16 +34,11 @@
 #include <mfem/general/forall.hpp>
 
 // TODO(kevin): add multi species and two temperature case.
-Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, RunConfiguration &_config)
-    : Up(_Up),
-      mesh(_mesh),
-      fec(_Up->ParFESpace()->FEColl()),
-      num_equation(_Up->ParFESpace()->GetVDim()),
-      dim(_mesh->Dimension()),
-      nvel(_config.isAxisymmetric() ? 3 : _mesh->Dimension()),
-      config(_config) {
-  // Always assume 6 components of the Reynolds stress tensor
-  numRMS = 6;
+Averaging::Averaging(RunConfiguration &_config) : Up(nullptr), mesh(nullptr), config(_config) {
+  num_equation = 0;
+  dim = 0;
+  nvel = 0;
+  numRMS = 0;
 
   sampleInterval = config.GetMeanSampleInterval();
   samplesMean = 0;
@@ -52,32 +47,47 @@ Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, RunConfiguration &_co
   computeMean = false;
   if (sampleInterval != 0) computeMean = true;
 
+  // NB: Must call registerField to set up
+  meanUp = nullptr;
+}
+
+Averaging::~Averaging() {
+  if (computeMean) {
+    delete paraviewMean;
+    delete meanP;
+    delete meanV;
+    delete meanRho;
+    delete rms;
+    delete meanUp;
+    delete rmsFes;
+  }
+}
+
+void Averaging::registerField(ParGridFunction *field_to_average) {
+  Up = field_to_average;
+  mesh = Up->ParFESpace()->GetParMesh();
+
+  num_equation = Up->ParFESpace()->GetVDim();
+  dim = mesh->Dimension();
+  nvel = (config.isAxisymmetric() ? 3 : mesh->Dimension());
+
+  // Always assume 6 components of the Reynolds stress tensor
+  numRMS = 6;
+
   if (computeMean) {
     meanUp = new ParGridFunction(Up->ParFESpace());
 
-    rmsFes = new ParFiniteElementSpace(mesh, fec, numRMS, Ordering::byNODES);
+    rmsFes = new ParFiniteElementSpace(mesh, Up->ParFESpace()->FEColl(), numRMS, Ordering::byNODES);
     rms = new ParGridFunction(rmsFes);
 
     initiMeanAndRMS();
   }
 }
 
-Averaging::~Averaging() {
-  if (computeMean) {
-    delete paraviewMean;
-
-    delete meanP;
-    delete meanV;
-    delete meanRho;
-    delete rms;
-    delete meanUp;
-
-    delete rmsFes;
-  }
-}
-
 void Averaging::initializeViz(ParFiniteElementSpace *fes, ParFiniteElementSpace *dfes) {
   if (computeMean) {
+    assert(meanUp != nullptr);
+
     // "helper" spaces to index into meanUp
     meanRho = new ParGridFunction(fes, meanUp->GetData());
     meanV = new ParGridFunction(dfes, meanUp->GetData() + fes->GetNDofs());
@@ -100,6 +110,7 @@ void Averaging::initializeViz(ParFiniteElementSpace *fes, ParFiniteElementSpace 
 
 void Averaging::addSampleMean(const int &iter, GasMixture *mixture) {
   if (computeMean) {
+    assert(meanUp != nullptr);
     if (iter % sampleInterval == 0 && iter >= startMean) {
       if (iter == startMean && (mesh->GetMyRank() == 0)) cout << "Starting mean calculation." << endl;
 
@@ -126,6 +137,8 @@ void Averaging::write_meanANDrms_restart_files(const int &iter, const double &ti
 }
 
 void Averaging::initiMeanAndRMS() {
+  assert(meanUp != nullptr);
+  assert(rms != nullptr);
   *meanUp = 0.0;
   *rms = 0.0;
 }

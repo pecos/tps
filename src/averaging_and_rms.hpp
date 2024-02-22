@@ -50,10 +50,9 @@ class Averaging {
   // Primitive variables
   ParGridFunction *Up;
   ParMesh *mesh;
-  const FiniteElementCollection *fec;
-  const int num_equation;
-  const int dim;
-  const int nvel;
+  int num_equation;
+  int dim;
+  int nvel;
   RunConfiguration &config;
 
   // FES for RMS
@@ -82,9 +81,10 @@ class Averaging {
   void initiMeanAndRMS();
 
  public:
-  Averaging(ParGridFunction *_Up, ParMesh *_mesh, RunConfiguration &_config);
+  Averaging(RunConfiguration &_config);
   ~Averaging();
 
+  void registerField(ParGridFunction *field_to_average);
   void initializeViz(ParFiniteElementSpace *fes, ParFiniteElementSpace *dfes);
 
   void addSampleMean(const int &iter, GasMixture *mixture = nullptr);
