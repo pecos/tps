@@ -50,3 +50,20 @@
    fun:PMPI_Init
    fun:_ZN4mfem3Mpi5Init_EPiPPPc
 }
+
+{
+   <ibv-get-device-list-leak-2>
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:calloc
+   fun:ibv_get_device_list@@IBVERBS_1.1
+   fun:efa_device_init
+   fun:init_lower_efa_prov
+   fun:fi_efa_ini
+   fun:fi_ini
+   fun:fi_getinfo@@FABRIC_1.3
+   fun:MPIDI_OFI_mpi_init_hook
+   fun:MPID_Init
+   fun:MPIR_Init_thread
+   fun:PMPI_Init
+}
