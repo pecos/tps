@@ -164,6 +164,7 @@ class LoMachSolver : public TPS::Solver {
 
   // Time marching related parameters
   int iter;
+  int iter_start_;
   double CFL;
 
   int max_bdf_order;  // input option now
@@ -193,6 +194,9 @@ class LoMachSolver : public TPS::Solver {
   void initialize() override;
   void parseSolverOptions() override;
   void solve() override;
+  void solveStep() override;
+  void solveBegin() override;
+  void solveEnd() override;
 
   // time-step related functions
   void initialTimeStep();
