@@ -38,13 +38,16 @@
 #include "run_configuration.hpp"
 
 Averaging::Averaging(RunConfiguration &config) {
+  rank0_ = false;
+  compute_mean_ = false;
+
   sample_interval_ = config.GetMeanSampleInterval();
+  step_start_mean_ = config.GetMeanStartIter();
+
+  if (sample_interval_ != 0) compute_mean_ = true;
+
   ns_mean_ = 0;
   ns_vari_ = 0;
-  step_start_mean_ = config.GetMeanStartIter();
-  compute_mean_ = false;
-  if (sample_interval_ != 0) compute_mean_ = true;
-  rank0_ = false;
 
   mean_output_name_ = "mean_";
   mean_output_name_.append(config.GetOutputName());
@@ -68,30 +71,30 @@ void Averaging::registerField(const ParGridFunction *field_to_average, bool comp
   ParMesh *mesh = field_to_average->ParFESpace()->GetParMesh();
   rank0_ = (mesh->GetMyRank() == 0);
 
-  ParGridFunction *meanUp = new ParGridFunction(field_to_average->ParFESpace());
-  *meanUp = 0.0;
+  ParGridFunction *mean = new ParGridFunction(field_to_average->ParFESpace());
+  *mean = 0.0;
 
   // and maybe the rms
-  ParGridFunction *rms = nullptr;
+  ParGridFunction *vari = nullptr;
   if (compute_rms) {
     // make sure incoming field has enough components to satisfy rms request
     assert((rms_start_index + rms_components) <= field_to_average->ParFESpace()->GetVDim());
 
-    const int numRMS = rms_components * (rms_components + 1) / 2;
+    const int num_variance = rms_components * (rms_components + 1) / 2;
 
     const FiniteElementCollection *fec = field_to_average->ParFESpace()->FEColl();
     const int order = fec->GetOrder();
 
-    FiniteElementCollection *rms_fec = fec->Clone(order);
-    ParFiniteElementSpace *rmsFes = new ParFiniteElementSpace(mesh, rms_fec, numRMS, Ordering::byNODES);
-    rms = new ParGridFunction(rmsFes);
-    rms->MakeOwner(rms_fec);
+    FiniteElementCollection *vari_fec = fec->Clone(order);
+    ParFiniteElementSpace *vari_fes = new ParFiniteElementSpace(mesh, vari_fec, num_variance, Ordering::byNODES);
+    vari = new ParGridFunction(vari_fes);
+    vari->MakeOwner(vari_fec);
 
-    *rms = 0.0;
+    *vari = 0.0;
   }
 
   // and store those fields in an AveragingFamily object that gets appended to the avg_families_ vector
-  avg_families_.emplace_back(AveragingFamily(field_to_average, meanUp, rms, rms_start_index, rms_components));
+  avg_families_.emplace_back(AveragingFamily(field_to_average, mean, vari, rms_start_index, rms_components));
 }
 
 void Averaging::initializeViz(ParFiniteElementSpace *fes, ParFiniteElementSpace *dfes, int nvel) {
