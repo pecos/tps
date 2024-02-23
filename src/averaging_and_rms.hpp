@@ -50,11 +50,11 @@ class AveragingFamily {
   int rms_start_index_;
   int rms_components_;
 
-  ParGridFunction *instantaneous_fcn_;
+  const ParGridFunction *instantaneous_fcn_;
   ParGridFunction *mean_fcn_;
   ParGridFunction *rms_fcn_;
 
-  AveragingFamily(ParGridFunction *instant, ParGridFunction *mean, ParGridFunction *rms, int rms_start_index = 0,
+  AveragingFamily(const ParGridFunction *instant, ParGridFunction *mean, ParGridFunction *rms, int rms_start_index = 0,
                   int rms_components = 1) {
     rms_start_index_ = rms_start_index;
     rms_components_ = rms_components;
@@ -110,7 +110,7 @@ class Averaging {
   Averaging(RunConfiguration &_config);
   ~Averaging();
 
-  void registerField(ParGridFunction *field_to_average, bool compute_rms = true, int rms_start_index = 0,
+  void registerField(const ParGridFunction *field_to_average, bool compute_rms = true, int rms_start_index = 0,
                      int rms_components = 1);
   void initializeViz(ParFiniteElementSpace *fes, ParFiniteElementSpace *dfes);
 
