@@ -33,7 +33,7 @@
 
 #include <mfem/general/forall.hpp>
 
-Averaging::Averaging(RunConfiguration &_config) : config(_config) {
+Averaging::Averaging(RunConfiguration &config) {
   sampleInterval = config.GetMeanSampleInterval();
   samplesMean = 0;
   samplesRMS = 0;
@@ -41,6 +41,9 @@ Averaging::Averaging(RunConfiguration &_config) : config(_config) {
   computeMean = false;
   if (sampleInterval != 0) computeMean = true;
   rank0_ = false;
+
+  mean_output_name_ = "mean_";
+  mean_output_name_.append(config.GetOutputName());
 }
 
 Averaging::~Averaging() {
@@ -87,15 +90,17 @@ void Averaging::registerField(const ParGridFunction *field_to_average, bool comp
   avg_families_.emplace_back(AveragingFamily(field_to_average, meanUp, rms, rms_start_index, rms_components));
 }
 
-void Averaging::initializeViz(ParFiniteElementSpace *fes, ParFiniteElementSpace *dfes) {
+void Averaging::initializeViz(ParFiniteElementSpace *fes, ParFiniteElementSpace *dfes, int nvel) {
   if (computeMean) {
     assert(avg_families_.size() == 1);
 
     ParGridFunction *meanUp = avg_families_[0].mean_fcn_;
     ParGridFunction *rms = avg_families_[0].rms_fcn_;
 
+    const FiniteElementCollection *fec = meanUp->ParFESpace()->FEColl();
+    const int order = fec->GetOrder();
+
     ParMesh *mesh = meanUp->ParFESpace()->GetParMesh();
-    const int nvel = (config.isAxisymmetric() ? 3 : mesh->Dimension());
 
     // "helper" spaces to index into meanUp
     meanRho = new ParGridFunction(fes, meanUp->GetData());
@@ -103,10 +108,8 @@ void Averaging::initializeViz(ParFiniteElementSpace *fes, ParFiniteElementSpace 
     meanP = new ParGridFunction(fes, meanUp->GetData() + (1 + nvel) * fes->GetNDofs());
 
     // ParaviewMean
-    string name = "mean_";
-    name.append(config.GetOutputName());
-    paraviewMean = new ParaViewDataCollection(name, mesh);
-    paraviewMean->SetLevelsOfDetail(config.GetSolutionOrder());
+    paraviewMean = new ParaViewDataCollection(mean_output_name_, mesh);
+    paraviewMean->SetLevelsOfDetail(order);
     paraviewMean->SetHighOrderOutput(true);
     paraviewMean->SetPrecision(8);
 
@@ -135,9 +138,9 @@ void Averaging::addSampleMean(const int &iter, GasMixture *mixture) {
   }
 }
 
-void Averaging::write_meanANDrms_restart_files(const int &iter, const double &time) {
+void Averaging::write_meanANDrms_restart_files(const int &iter, const double &time, bool save_mean_hist) {
   if (computeMean) {
-    if (config.isMeanHistEnabled()) {
+    if (save_mean_hist) {
       paraviewMean->SetCycle(iter);
       paraviewMean->SetTime(time);
     }

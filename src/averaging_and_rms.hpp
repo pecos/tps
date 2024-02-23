@@ -90,12 +90,12 @@ class Averaging {
  private:
   bool rank0_;
   std::vector<AveragingFamily> avg_families_;
-  RunConfiguration &config;
 
   // time averaged p, rho, vel (pointers to meanUp) for Visualization
   ParGridFunction *meanP, *meanRho, *meanV;
   ParGridFunction *meanScalar;
 
+  std::string mean_output_name_;
   ParaViewDataCollection *paraviewMean = NULL;
 
   int samplesMean;
@@ -107,15 +107,15 @@ class Averaging {
   bool computeMean;
 
  public:
-  Averaging(RunConfiguration &_config);
+  Averaging(RunConfiguration &config);
   ~Averaging();
 
   void registerField(const ParGridFunction *field_to_average, bool compute_rms = true, int rms_start_index = 0,
                      int rms_components = 1);
-  void initializeViz(ParFiniteElementSpace *fes, ParFiniteElementSpace *dfes);
+  void initializeViz(ParFiniteElementSpace *fes, ParFiniteElementSpace *dfes, int nvel);
 
   void addSampleMean(const int &iter, GasMixture *mixture = nullptr);
-  void write_meanANDrms_restart_files(const int &iter, const double &time);
+  void write_meanANDrms_restart_files(const int &iter, const double &time, bool save_mean_hist);
   void read_meanANDrms_restart_files();
 
   int GetSamplesMean() { return samplesMean; }

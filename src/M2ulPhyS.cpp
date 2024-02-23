@@ -618,8 +618,8 @@ void M2ulPhyS::initVariables() {
   initSolutionAndVisualizationVectors();
 
   average = new Averaging(config);
-  average->registerField(Up, true, 1, dim);
-  average->initializeViz(fes, dfes);
+  average->registerField(Up, true, 1, nvel);
+  average->initializeViz(fes, dfes, nvel);
 
   // NOTE: this should also be completed by the GasMixture class
   // Kevin: Do we need GasMixture class for this?
@@ -2025,7 +2025,7 @@ void M2ulPhyS::solveStep() {
       // auto dUp = Up->ReadWrite();  // sets memory to GPU
       Up->ReadWrite();  // sets memory to GPU
 
-      average->write_meanANDrms_restart_files(iter, time);
+      average->write_meanANDrms_restart_files(iter, time, config.isMeanHistEnabled());
     }
 
     // make a separate routine! plane interp and dump here
@@ -2091,7 +2091,7 @@ void M2ulPhyS::solveEnd() {
     paraviewColl->SetTime(time);
     paraviewColl->Save();
 
-    average->write_meanANDrms_restart_files(iter, time);
+    average->write_meanANDrms_restart_files(iter, time, config.isMeanHistEnabled());
 
 #ifndef HAVE_MASA
     // // If HAVE_MASA is defined, this is handled above
@@ -4063,7 +4063,7 @@ void M2ulPhyS::visualization() {
     paraviewColl->SetTime(time);
     paraviewColl->Save();
 
-    average->write_meanANDrms_restart_files(iter, time);
+    average->write_meanANDrms_restart_files(iter, time, config.isMeanHistEnabled());
 
     average->addSampleMean(iter, d_mixture);
 
