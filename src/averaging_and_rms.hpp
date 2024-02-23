@@ -34,13 +34,13 @@
 
 #include <tps_config.h>
 
-#include <mfem/general/forall.hpp>
 #include <string>
 
-#include "dataStructures.hpp"
-#include "equation_of_state.hpp"
-#include "run_configuration.hpp"
 #include "tps_mfem_wrap.hpp"
+
+// Forward declarations
+class GasMixture;
+class RunConfiguration;
 
 using namespace mfem;
 using namespace std;
@@ -122,7 +122,6 @@ class AveragingFamily {
   }
 };
 
-
 /**
  * @brief Implements in situ statistics (mean and covariance) calculations
  *
@@ -136,28 +135,30 @@ class Averaging {
   bool rank0_;
 
   /// True if mean calculation is requested
-  bool computeMean;
+  bool compute_mean_;
 
   /// Time steps between updating stats with a new sample
-  int sampleInterval;
+  int sample_interval_;
 
   /// Time step at which to start computing stats
-  int startMean;
+  int step_start_mean_;
 
-  /// Samples used for the mean so far
-  int samplesMean;
+  /// Number of samples used for the mean so far
+  int ns_mean_;
 
-  /// Samples used for the variances so var
-  int samplesRMS;
+  /// Number of samples used for the variances so var
+  int ns_vari_;
 
   /// Visualization directory (i.e., paraview dumped to mean_output_name_)
   std::string mean_output_name_;
 
   /// mfem paraview data collection, used to write viz files
-  ParaViewDataCollection *paraviewMean = NULL;
+  ParaViewDataCollection *pvdc_ = nullptr;
 
   /// time averaged p, rho, vel (pointers to meanUp) for visualization (M2ulPhyS only!)
-  ParGridFunction *meanP, *meanRho, *meanV;
+  ParGridFunction *meanP = nullptr;
+  ParGridFunction *meanRho = nullptr;
+  ParGridFunction *meanV = nullptr;
 
  public:
   /// Constructor
@@ -193,14 +194,14 @@ class Averaging {
 
   void write_meanANDrms_restart_files(const int &iter, const double &time, bool save_mean_hist);
 
-  int GetSamplesMean() { return samplesMean; }
-  int GetSamplesRMS() { return samplesRMS; }
-  int GetSamplesInterval() { return sampleInterval; }
-  bool ComputeMean() { return computeMean; }
+  int GetSamplesMean() { return ns_mean_; }
+  int GetSamplesRMS() { return ns_vari_; }
+  int GetSamplesInterval() { return sample_interval_; }
+  bool ComputeMean() { return compute_mean_; }
 
-  void SetSamplesMean(int &samples) { samplesMean = samples; }
-  void SetSamplesRMS(int &samples) { samplesRMS = samples; }
-  void SetSamplesInterval(int &interval) { sampleInterval = interval; }
+  void SetSamplesMean(int &samples) { ns_mean_ = samples; }
+  void SetSamplesRMS(int &samples) { ns_vari_ = samples; }
+  void SetSamplesInterval(int &interval) { sample_interval_ = interval; }
 };
 
 #endif  // AVERAGING_AND_RMS_HPP_

@@ -33,13 +33,17 @@
 
 #include <mfem/general/forall.hpp>
 
+#include "dataStructures.hpp"
+#include "equation_of_state.hpp"
+#include "run_configuration.hpp"
+
 Averaging::Averaging(RunConfiguration &config) {
-  sampleInterval = config.GetMeanSampleInterval();
-  samplesMean = 0;
-  samplesRMS = 0;
-  startMean = config.GetMeanStartIter();
-  computeMean = false;
-  if (sampleInterval != 0) computeMean = true;
+  sample_interval_ = config.GetMeanSampleInterval();
+  ns_mean_ = 0;
+  ns_vari_ = 0;
+  step_start_mean_ = config.GetMeanStartIter();
+  compute_mean_ = false;
+  if (sample_interval_ != 0) compute_mean_ = true;
   rank0_ = false;
 
   mean_output_name_ = "mean_";
@@ -47,8 +51,8 @@ Averaging::Averaging(RunConfiguration &config) {
 }
 
 Averaging::~Averaging() {
-  if (computeMean) {
-    delete paraviewMean;
+  if (compute_mean_) {
+    delete pvdc_;
     delete meanP;
     delete meanV;
     delete meanRho;
@@ -58,7 +62,7 @@ Averaging::~Averaging() {
 void Averaging::registerField(const ParGridFunction *field_to_average, bool compute_rms, int rms_start_index,
                               int rms_components) {
   // quick return if not computing stats...
-  if (!computeMean) return;
+  if (!compute_mean_) return;
 
   // otherwise, set up ParGridFunction to hold mean...
   ParMesh *mesh = field_to_average->ParFESpace()->GetParMesh();
@@ -91,7 +95,7 @@ void Averaging::registerField(const ParGridFunction *field_to_average, bool comp
 }
 
 void Averaging::initializeViz(ParFiniteElementSpace *fes, ParFiniteElementSpace *dfes, int nvel) {
-  if (computeMean) {
+  if (compute_mean_) {
     assert(avg_families_.size() == 1);
 
     ParGridFunction *meanUp = avg_families_[0].mean_fcn_;
@@ -107,45 +111,45 @@ void Averaging::initializeViz(ParFiniteElementSpace *fes, ParFiniteElementSpace 
     meanV = new ParGridFunction(dfes, meanUp->GetData() + fes->GetNDofs());
     meanP = new ParGridFunction(fes, meanUp->GetData() + (1 + nvel) * fes->GetNDofs());
 
-    // ParaviewMean
-    paraviewMean = new ParaViewDataCollection(mean_output_name_, mesh);
-    paraviewMean->SetLevelsOfDetail(order);
-    paraviewMean->SetHighOrderOutput(true);
-    paraviewMean->SetPrecision(8);
+    // Register fields with paraview
+    pvdc_ = new ParaViewDataCollection(mean_output_name_, mesh);
+    pvdc_->SetLevelsOfDetail(order);
+    pvdc_->SetHighOrderOutput(true);
+    pvdc_->SetPrecision(8);
 
-    paraviewMean->RegisterField("dens", meanRho);
-    paraviewMean->RegisterField("vel", meanV);
-    paraviewMean->RegisterField("press", meanP);
-    paraviewMean->RegisterField("rms", rms);
+    pvdc_->RegisterField("dens", meanRho);
+    pvdc_->RegisterField("vel", meanV);
+    pvdc_->RegisterField("press", meanP);
+    pvdc_->RegisterField("rms", rms);
   }
 }
 
 void Averaging::addSampleMean(const int &iter, GasMixture *mixture) {
-  if (computeMean) {
+  if (compute_mean_) {
     assert(avg_families_.size() >= 1);
-    if (iter % sampleInterval == 0 && iter >= startMean) {
-      if (iter == startMean && rank0_) cout << "Starting mean calculation." << endl;
+    if (iter % sample_interval_ == 0 && iter >= step_start_mean_) {
+      if (iter == step_start_mean_ && rank0_) cout << "Starting mean calculation." << endl;
 
-      if (samplesRMS == 0) {
+      if (ns_vari_ == 0) {
         // *rms = 0.0;
         *avg_families_[0].rms_fcn_ = 0.0;
       }
 
       addSample(mixture);
-      samplesMean++;
-      samplesRMS++;
+      ns_mean_++;
+      ns_vari_++;
     }
   }
 }
 
 void Averaging::write_meanANDrms_restart_files(const int &iter, const double &time, bool save_mean_hist) {
-  if (computeMean) {
+  if (compute_mean_) {
     if (save_mean_hist) {
-      paraviewMean->SetCycle(iter);
-      paraviewMean->SetTime(time);
+      pvdc_->SetCycle(iter);
+      pvdc_->SetTime(time);
     }
 
-    paraviewMean->Save();
+    pvdc_->Save();
   }
 }
 
@@ -188,8 +192,8 @@ void Averaging::addSample(GasMixture *mixture) {
     const int d_rms_components = fam.rms_components_;
 
     // Extract sample size information for use on device
-    double dSamplesMean = (double)samplesMean;
-    double dSamplesRMS = (double)samplesRMS;
+    double dSamplesMean = (double)ns_mean_;
+    double dSamplesRMS = (double)ns_vari_;
 
     // "Loop" over all dofs and update statistics
     MFEM_FORALL(n, dof, {
