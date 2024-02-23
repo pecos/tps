@@ -618,7 +618,7 @@ void M2ulPhyS::initVariables() {
   initSolutionAndVisualizationVectors();
 
   average = new Averaging(config);
-  average->registerField(Up);
+  average->registerField(Up, true, 1, dim);
   average->initializeViz(fes, dfes);
 
   // NOTE: this should also be completed by the GasMixture class
@@ -648,12 +648,21 @@ void M2ulPhyS::initVariables() {
 
     // rms
     ioData.registerIOFamily("RMS velocity fluctuation", "/rmsData", average->GetRMS(), false, config.GetRestartMean());
-    ioData.registerIOVar("/rmsData", "uu", 0);
-    ioData.registerIOVar("/rmsData", "vv", 1);
-    ioData.registerIOVar("/rmsData", "ww", 2);
-    ioData.registerIOVar("/rmsData", "uv", 3);
-    ioData.registerIOVar("/rmsData", "uw", 4);
-    ioData.registerIOVar("/rmsData", "vw", 5);
+    if (nvel == 3) {
+      ioData.registerIOVar("/rmsData", "uu", 0);
+      ioData.registerIOVar("/rmsData", "vv", 1);
+      ioData.registerIOVar("/rmsData", "ww", 2);
+      ioData.registerIOVar("/rmsData", "uv", 3);
+      ioData.registerIOVar("/rmsData", "uw", 4);
+      ioData.registerIOVar("/rmsData", "vw", 5);
+    } else if (nvel == 2) {
+      ioData.registerIOVar("/rmsData", "uu", 0);
+      ioData.registerIOVar("/rmsData", "vv", 1);
+      ioData.registerIOVar("/rmsData", "uv", 2);
+    } else {
+      // only nvel = 2 or 3 supported
+      assert(false);
+    }
   }
 
   ioData.initializeSerial(rank0_, config.isRestartSerialized("either"), serial_mesh, locToGlobElem, &partitioning_);

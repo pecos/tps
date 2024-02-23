@@ -47,11 +47,17 @@ using namespace std;
 
 class AveragingFamily {
  public:
+  int rms_start_index_;
+  int rms_components_;
+
   ParGridFunction *instantaneous_fcn_;
   ParGridFunction *mean_fcn_;
   ParGridFunction *rms_fcn_;
 
-  AveragingFamily(ParGridFunction *instant, ParGridFunction *mean, ParGridFunction *rms) {
+  AveragingFamily(ParGridFunction *instant, ParGridFunction *mean, ParGridFunction *rms, int rms_start_index = 0,
+                  int rms_components = 1) {
+    rms_start_index_ = rms_start_index;
+    rms_components_ = rms_components;
     instantaneous_fcn_ = instant;
     mean_fcn_ = mean;
     rms_fcn_ = rms;
@@ -59,6 +65,9 @@ class AveragingFamily {
 
   // Move constructor (required for emplace_back)
   AveragingFamily(AveragingFamily &&fam) {
+    this->rms_start_index_ = fam.rms_start_index_;
+    this->rms_components_ = fam.rms_components_;
+
     // Copy the pointers
     this->instantaneous_fcn_ = fam.instantaneous_fcn_;
     this->mean_fcn_ = fam.mean_fcn_;
@@ -79,21 +88,9 @@ class AveragingFamily {
 
 class Averaging {
  private:
+  bool rank0_;
   std::vector<AveragingFamily> avg_families_;
-
-  // Primitive variables
-  ParMesh *mesh;
-  int num_equation;
-  int dim;
-  int nvel;
   RunConfiguration &config;
-
-  // FES for RMS
-  ParFiniteElementSpace *rmsFes;
-  int numRMS;
-
-  // time averaged primitive variables
-  ParGridFunction *diss;
 
   // time averaged p, rho, vel (pointers to meanUp) for Visualization
   ParGridFunction *meanP, *meanRho, *meanV;
@@ -113,7 +110,8 @@ class Averaging {
   Averaging(RunConfiguration &_config);
   ~Averaging();
 
-  void registerField(ParGridFunction *field_to_average);
+  void registerField(ParGridFunction *field_to_average, bool compute_rms = true, int rms_start_index = 0,
+                     int rms_components = 1);
   void initializeViz(ParFiniteElementSpace *fes, ParFiniteElementSpace *dfes);
 
   void addSampleMean(const int &iter, GasMixture *mixture = nullptr);
