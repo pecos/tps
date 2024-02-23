@@ -180,19 +180,53 @@ class Averaging {
 
   /**
    * @brief Initialize visualiztion for statistics
-   *
-   * Note: This method is current specific to M2ulPhyS
    */
-  void initializeViz(ParFiniteElementSpace *fes, ParFiniteElementSpace *dfes, int nvel);
+  void initializeViz();
+
+  /**
+   * @brief Add a sample to the statistics
+   *
+   * Checks iter to see if it is time to add a sample.  If not,
+   * returns.  If so, farms work out to appropriate addSampleInternal
+   * variant.
+   */
+  void addSample(const int &iter, GasMixture *mixture = nullptr);
+
+  /**
+   * @brief Write paraview visualization files with statistics
+   */
+  void writeViz(const int &iter, const double &time, bool save_mean_hist);
+
+  /**
+   * @brief Internal implementation of sample addition
+   *
+   * This method should be private, but is not b/c of a cuda
+   * requirement on device lambdas.  Instead of this method, you
+   * should call addSample (with mixture = nullptr).
+   */
+  void addSampleInternal();
+
+  /**
+   * @brief Internal implementation of sample addition (M2ulPhyS version)
+   *
+   * This method should be private, but is not b/c of a cuda
+   * requirement on device lambdas.  Instead of this method, you
+   * should call addSample (with mixture = a valid GasMixture object).
+   */
+  void addSampleInternal(GasMixture *mixture);
+
+  /**
+   * @brief Initialize visualiztion for statistics (M2ulPhyS version)
+   *
+   * Note: This method is included to provide backward compatibility
+   * with how stats viz files were originally labeled.  It should only
+   * be used inside M2ulPhyS.
+   */
+  void initializeVizForM2ulPhyS(ParFiniteElementSpace *fes, ParFiniteElementSpace *dfes, int nvel);
 
   // TODO(trevilo): Specific to single ParGridFunction case
   ParGridFunction *GetMeanUp() { return avg_families_[0].mean_fcn_; }
   ParGridFunction *GetRMS() { return avg_families_[0].rms_fcn_; }
-
-  void addSampleMean(const int &iter, GasMixture *mixture = nullptr);
-  void addSample(GasMixture *mixture);
-
-  void write_meanANDrms_restart_files(const int &iter, const double &time, bool save_mean_hist);
 
   int GetSamplesMean() { return ns_mean_; }
   int GetSamplesRMS() { return ns_vari_; }
