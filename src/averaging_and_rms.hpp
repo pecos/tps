@@ -45,15 +45,50 @@
 using namespace mfem;
 using namespace std;
 
+/**
+ * @brief Stores statistics fields (mean and variances) that are computed by Averaging
+ *
+ * This is a helper class for class Averaging.  It holds the
+ * statistics fields to update and a pointer to the instantaneous
+ * field being averaged.
+ */
 class AveragingFamily {
  public:
+  /** Variable index to "start" variances
+   *
+   * For example, if state vector is [rho, u, v, w, T] and you only
+   * want the velocity covariance matrix, rms_start_index_ should be 1
+   */
   int rms_start_index_;
+
+  /** Number of variables for covariance calculation
+   *
+   * For example, if state vector is [rho, u, v, w, T] and you only
+   * want the velocity covariance matrix, rms_components_ should be
+   * 3. This will lead to 6 covariance being computed (uu, vv, ww, uv,
+   * uw, and vw).
+   *
+   * It is assumed that the variance variables are contiguous---i.e.,
+   * there is no support for getting uT only.
+   */
   int rms_components_;
 
+  /** Pointer to function containing the instantaneous field being averaged (not owned) */
   const ParGridFunction *instantaneous_fcn_;
+
+  /** Pointer to mean field (owned) */
   ParGridFunction *mean_fcn_;
+
+  /** Pointer to variance field (owned) */
   ParGridFunction *rms_fcn_;
 
+  /**
+   * @brief Constructor
+   *
+   * Notes: the mean and rms grid functions should be allocated before
+   * constructing the AveragingFamily, but AveragingFamily then takes
+   * ownership.
+   */
   AveragingFamily(const ParGridFunction *instant, ParGridFunction *mean, ParGridFunction *rms, int rms_start_index = 0,
                   int rms_components = 1) {
     rms_start_index_ = rms_start_index;
@@ -63,7 +98,7 @@ class AveragingFamily {
     rms_fcn_ = rms;
   }
 
-  // Move constructor (required for emplace_back)
+  /// Move constructor (required for emplace_back)
   AveragingFamily(AveragingFamily &&fam) {
     this->rms_start_index_ = fam.rms_start_index_;
     this->rms_components_ = fam.rms_components_;
@@ -80,58 +115,92 @@ class AveragingFamily {
     fam.rms_fcn_ = nullptr;
   }
 
+  /// Destructor (deletes the mean and rms fields)
   ~AveragingFamily() {
     delete mean_fcn_;
     delete rms_fcn_;
   }
 };
 
+
+/**
+ * @brief Implements in situ statistics (mean and covariance) calculations
+ *
+ */
 class Averaging {
  private:
-  bool rank0_;
+  /// vector of families for averaging
   std::vector<AveragingFamily> avg_families_;
 
-  // time averaged p, rho, vel (pointers to meanUp) for Visualization
-  ParGridFunction *meanP, *meanRho, *meanV;
-  ParGridFunction *meanScalar;
+  /// Indicate if this is rank 0
+  bool rank0_;
 
-  std::string mean_output_name_;
-  ParaViewDataCollection *paraviewMean = NULL;
-
-  int samplesMean;
-  int samplesRMS;
-
-  // iteration interval between samples
-  int sampleInterval;
-  int startMean;
+  /// True if mean calculation is requested
   bool computeMean;
 
+  /// Time steps between updating stats with a new sample
+  int sampleInterval;
+
+  /// Time step at which to start computing stats
+  int startMean;
+
+  /// Samples used for the mean so far
+  int samplesMean;
+
+  /// Samples used for the variances so var
+  int samplesRMS;
+
+  /// Visualization directory (i.e., paraview dumped to mean_output_name_)
+  std::string mean_output_name_;
+
+  /// mfem paraview data collection, used to write viz files
+  ParaViewDataCollection *paraviewMean = NULL;
+
+  /// time averaged p, rho, vel (pointers to meanUp) for visualization (M2ulPhyS only!)
+  ParGridFunction *meanP, *meanRho, *meanV;
+
  public:
+  /// Constructor
   Averaging(RunConfiguration &config);
+
+  /// Destructor
   ~Averaging();
 
+  /**
+   * @brief Register a field for averaging
+   *
+   * @param field_to_average Pointer to the instantaneous data that will be used to update the statistics
+   * @param compute_rms Set to true to compute variances.  Otherwise only mean is computed.
+   * @param rms_start_index Variable index at which to start variances (see AveragingFamily)
+   * @param rms_components Number of variables in variances (see AveragingFamily)
+   */
   void registerField(const ParGridFunction *field_to_average, bool compute_rms = true, int rms_start_index = 0,
                      int rms_components = 1);
+
+  /**
+   * @brief Initialize visualiztion for statistics
+   *
+   * Note: This method is current specific to M2ulPhyS
+   */
   void initializeViz(ParFiniteElementSpace *fes, ParFiniteElementSpace *dfes, int nvel);
 
+  // TODO(trevilo): Specific to single ParGridFunction case
+  ParGridFunction *GetMeanUp() { return avg_families_[0].mean_fcn_; }
+  ParGridFunction *GetRMS() { return avg_families_[0].rms_fcn_; }
+
   void addSampleMean(const int &iter, GasMixture *mixture = nullptr);
+  void addSample(GasMixture *mixture);
+
   void write_meanANDrms_restart_files(const int &iter, const double &time, bool save_mean_hist);
-  void read_meanANDrms_restart_files();
 
   int GetSamplesMean() { return samplesMean; }
   int GetSamplesRMS() { return samplesRMS; }
   int GetSamplesInterval() { return sampleInterval; }
   bool ComputeMean() { return computeMean; }
 
-  // TODO(trevilo): Specific to single ParGridFunction case
-  ParGridFunction *GetMeanUp() { return avg_families_[0].mean_fcn_; }
-  ParGridFunction *GetRMS() { return avg_families_[0].rms_fcn_; }
-
   void SetSamplesMean(int &samples) { samplesMean = samples; }
   void SetSamplesRMS(int &samples) { samplesRMS = samples; }
   void SetSamplesInterval(int &interval) { sampleInterval = interval; }
-
-  void addSample(GasMixture *mixture);
 };
 
 #endif  // AVERAGING_AND_RMS_HPP_
