@@ -159,6 +159,7 @@ class Tomboulides final : public FlowBase {
   mfem::ParBilinearForm *L_iorho_form_ = nullptr;  // \int (1/\rho) \nabla \phi_i \cdot \nabla \phi_j
   mfem::ParLinearForm *forcing_form_ = nullptr;    // \int \phi_i f
   mfem::ParNonlinearForm *Nconv_form_ = nullptr;   // \int \vphi_i \cdot [(u \cdot \nabla) u]
+  mfem::ParBilinearForm *Ms_form_ = nullptr;       // mass matrix = \int \vphi_i \cdot \vphi_j
   mfem::ParBilinearForm *Mv_form_ = nullptr;       // mass matrix = \int \vphi_i \cdot \vphi_j
   mfem::ParMixedBilinearForm *D_form_ = nullptr;   // divergence = \int \phi_i \nabla \cdot \vphi_j
   mfem::ParMixedBilinearForm *G_form_ = nullptr;   // gradient = \int \vphi_i \cdot \nabla \phi_j
@@ -169,6 +170,7 @@ class Tomboulides final : public FlowBase {
 
   // mfem operator objects
   mfem::OperatorHandle L_iorho_op_;
+  mfem::OperatorHandle Ms_op_;
   mfem::OperatorHandle Mv_op_;
   mfem::OperatorHandle Mv_rho_op_;
   mfem::OperatorHandle D_op_;
@@ -204,6 +206,10 @@ class Tomboulides final : public FlowBase {
   mfem::Vector resp_vec_;
   mfem::Vector p_vec_;
   mfem::Vector resu_vec_;
+  mfem::Vector Qt_vec_;
+  mfem::Vector grad_Qt_vec_;
+  mfem::Vector rho_vec_;
+  mfem::Vector mu_vec_;
 
   // miscellaneous
   double volume_;

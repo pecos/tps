@@ -153,6 +153,7 @@ Tomboulides::~Tomboulides() {
   delete Mv_inv_;
   delete Mv_inv_pc_;
   delete Mv_form_;
+  delete Ms_form_;
   delete Nconv_form_;
   delete forcing_form_;
   delete L_iorho_inv_;
@@ -246,11 +247,15 @@ void Tomboulides::initializeSelf() {
   uext_vec_.SetSize(vfes_truevsize);
   pp_div_vec_.SetSize(vfes_truevsize);
   resu_vec_.SetSize(vfes_truevsize);
+  grad_Qt_vec_.SetSize(vfes_truevsize);
 
   resp_vec_.SetSize(pfes_truevsize);
   p_vec_.SetSize(pfes_truevsize);
   pp_div_bdr_vec_.SetSize(pfes_truevsize);
   u_bdr_vec_.SetSize(pfes_truevsize);
+  Qt_vec_.SetSize(pfes_truevsize);
+  rho_vec_.SetSize(pfes_truevsize);
+  mu_vec_.SetSize(pfes_truevsize);
 
   // zero vectors for now
   forcing_vec_ = 0.0;
@@ -264,11 +269,15 @@ void Tomboulides::initializeSelf() {
   uext_vec_ = 0.0;
   pp_div_vec_ = 0.0;
   resu_vec_ = 0.0;
+  grad_Qt_vec_ = 0.0;
 
   resp_vec_ = 0.0;
   p_vec_ = 0.0;
   pp_div_bdr_vec_ = 0.0;
   u_bdr_vec_ = 0.0;
+  Qt_vec_ = 0.0;
+  rho_vec_ = 0.0;
+  mu_vec_ = 0.0;
 
   // set IC if we have one at this point
   if (!ic_string_.empty()) {
@@ -366,6 +375,23 @@ void Tomboulides::initializeOperators() {
     Nconv_form_->Setup();
   }
 
+  // Mass matrix for the scalar space
+  // NB: this is used to add the Q contribution to the RHS of the
+  // pressure Poisson equation.  In doing so, we ASSUME that the
+  // pressure space and the Q space are the same.  Need to assert this
+  // somehow.
+  Ms_form_ = new ParBilinearForm(pfes_);
+  auto *ms_blfi = new MassIntegrator;
+  if (numerical_integ_) {
+    ms_blfi->SetIntRule(&ir_ni_p);
+  }
+  Ms_form_->AddDomainIntegrator(ms_blfi);
+  if (partial_assembly_) {
+    Ms_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+  }
+  Ms_form_->Assemble();
+  Ms_form_->FormSystemMatrix(empty, Ms_op_);
+
   // Mass matrix for the velocity
   Mv_form_ = new ParBilinearForm(vfes_);
   auto *mv_blfi = new VectorMassIntegrator;
@@ -392,7 +418,7 @@ void Tomboulides::initializeOperators() {
   Mv_rho_form_->Assemble();
   Mv_rho_form_->FormSystemMatrix(empty, Mv_rho_op_);
 
-  // Inverse (unweighted) mass operator
+  // Inverse (unweighted) mass operator (velocity space)
   if (partial_assembly_) {
     Vector diag_pa(vfes_->GetTrueVSize());
     Mv_form_->AssembleDiagonal(diag_pa);
@@ -665,34 +691,61 @@ void Tomboulides::step() {
   // Negate b/c term that appears in residual is -curl curl u
   pp_div_vec_.Neg();
 
-  // TODO(trevilo): Generalize the calculation below of the viscous
-  // contribution to the rhs of the pressure Poisson equation.  The
-  // current calculation is incomplete in two ways.  First, it
-  // neglects the contribution of gradient of the thermal divergence
-  // (\nabla Q).  Second, it is restricted to constant properties.
+  // TODO(trevilo): This calculation of the pressure Poisson RHS
+  // assumes that mu is constant (i.e., there are terms that are
+  // proportional to grad(mu) that are not included below).  Relax
+  // this assumption by adding the necessary terms!
 
-  // Restriction 1: This doesn't handle variable nu
-  auto rho = thermo_interface_->density->HostRead();
-  auto mu = thermo_interface_->viscosity->HostRead();
-  const double nu = mu[0] / rho[0];
-  pp_div_vec_ *= nu;
+  // Compute and add grad(Qt) contribution
+  assert(thermo_interface_->thermal_divergence != nullptr);
+  thermo_interface_->thermal_divergence->GetTrueDofs(Qt_vec_);
+  G_op_->Mult(Qt_vec_, resu_vec_);
+  Mv_inv_->Mult(resu_vec_, grad_Qt_vec_);
+  if (!Mv_inv_->GetConverged()) {
+    if (rank0_) std::cout << "ERROR: Mv inverse did not converge (grad Qt calc)." << std::endl;
+    exit(1);
+  }
+  grad_Qt_vec_ *= (4. / 3);
+  pp_div_vec_ += grad_Qt_vec_;
 
-  // Restriction 2: grad(Qt) term isn't here
-  // pp_div_vec_ += (4/3) grad(Qt) contribution
+  // Multiply pp_div_vec_ by nu
+  // TODO(trevilo): This is ugly.  Find a better way.
+  thermo_interface_->density->GetTrueDofs(rho_vec_);
+  thermo_interface_->viscosity->GetTrueDofs(mu_vec_);
+  if (dim_ == 2) {
+    auto d_pp_div_vec = pp_div_vec_.ReadWrite();
+    auto d_rho = rho_vec_.Read();
+    auto d_mu = mu_vec_.Read();
+    auto nnode = rho_vec_.Size();
+    MFEM_FORALL(i, nnode, {
+      d_pp_div_vec[i] *= (d_mu[i] / d_rho[i]);
+      d_pp_div_vec[nnode + i] *= (d_mu[i] / d_rho[i]);
+    });
+  } else {
+    auto d_pp_div_vec = pp_div_vec_.ReadWrite();
+    auto d_rho = rho_vec_.Read();
+    auto d_mu = mu_vec_.Read();
+    auto nnode = rho_vec_.Size();
+    MFEM_FORALL(i, nnode, {
+      d_pp_div_vec[i] *= (d_mu[i] / d_rho[i]);
+      d_pp_div_vec[nnode + i] *= (d_mu[i] / d_rho[i]);
+      d_pp_div_vec[2 * nnode + i] *= (d_mu[i] / d_rho[i]);
+    });
+  }
 
   // Add ustar/dt contribution
   pp_div_vec_ += ustar_vec_;
 
+  // rhs = div(pp_div_vec_)
   D_op_->Mult(pp_div_vec_, resp_vec_);
 
-  // TODO(trevilo): Add Qt term
-  // Ms->AddMult(Qt, resp, -bd0 / dt);
+  // Add Qt term (rhs += -bd0 * Qt / dt)
+  Ms_op_->AddMult(Qt_vec_, resp_vec_, -coeff_.bd0 / dt);
 
-  // Negate residual s.t. sign is consistent with
-  // -\nabla ( (1/\rho) \cdot \nabla p ) on LHS
+  // Negate residual s.t. sign is consistent with -\nabla ( (1/\rho) \cdot \nabla p ) on LHS
   resp_vec_.Neg();
 
-  // TODO(trevilo): Add boundary terms to residual
+  // Add boundary terms to residual
   pp_div_gf_->SetFromTrueDofs(pp_div_vec_);
   pp_div_bdr_form_->Assemble();
   pp_div_bdr_form_->ParallelAssemble(pp_div_bdr_vec_);
@@ -702,8 +755,8 @@ void Tomboulides::step() {
   u_bdr_form_->ParallelAssemble(u_bdr_vec_);
   resp_vec_.Add(-coeff_.bd0 / dt, u_bdr_vec_);
 
-  // TODO(trevilo): Only do this if no pressure BCs
-  // Since now we don't have BCs at all, have to do it
+  // TODO(trevilo): Only do this if no Dirichlet BCs on pressure
+  // For now this is the case, but will need to be fixed.
   Orthogonalize(resp_vec_, pfes_);
 
   // for (auto &pres_dbc : pres_dbcs) {
@@ -753,9 +806,9 @@ void Tomboulides::step() {
   // -grad(p)
   G_op_->AddMult(p_vec_, resu_vec_, -1.0);
 
-  // TODO(trevilo): Add grad(mu * Qt) term
-  // Qt *= mun_next; // NB: pointwise multiply
-  // G->AddMult(Qt, resu, 1.0 / 3.0);
+  // Add grad(mu * Qt) term
+  Qt_vec_ *= mu_vec_;  // NB: pointwise multiply
+  G_op_->AddMult(Qt_vec_, resu_vec_, 1.0 / 3.0);
 
   // rho * vstar / dt term
   Mv_rho_op_->AddMult(ustar_vec_, resu_vec_);
