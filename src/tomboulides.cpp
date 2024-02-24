@@ -83,6 +83,13 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
   if (tps != nullptr) {
     // if we have Tps object, use it to set other options...
 
+    // Gravity
+    assert(dim_ >= 2);
+    Vector zerog(dim_);
+    zerog = 0.0;
+    gravity_.SetSize(dim_);
+    tps->getVec("loMach/gravity", gravity_, dim_, zerog);
+
     // Initial condition function... options are
     // 1) "" (Empty string), velocity initialized to zero
     // 2) "tgv2d", velocity initialized using vel_exact_tgv2d function
@@ -210,23 +217,8 @@ void Tomboulides::initializeSelf() {
 
   toThermoChem_interface_.velocity = u_next_gf_;
 
-  // NEEDS TO BE ADDED
-  // toTurbModel_interface.gradU = gradU_gf_;
-  // toTurbModel_interface.gradV = gradV_gf_;
-  // toTurbModel_interface.gradW = gradW_gf_;
-
-  // Add gravity forcing
-  assert(dim_ >= 2);
-  Vector gravity(dim_);
-  gravity = 0.0;
-
-  // TODO(trevilo): Get gravity from input file.  For now, hardcoded
-  // to usual value acting in -y direction.
-  // double *g = gravity.HostWrite();
-  // g[1] = -9.81;
-
-  // NB: ForcingTerm_T takes ownership of this vector.  Do not delete it.
-  gravity_vec_ = new VectorConstantCoefficient(gravity);
+  // Gravity
+  gravity_vec_ = new VectorConstantCoefficient(gravity_);
   Array<int> domain_attr(pmesh_->attributes.Max());
   domain_attr = 1;
 
