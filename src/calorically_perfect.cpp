@@ -267,9 +267,6 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
   tpsP_->getInput("boundaryConditions/numInlets", numInlets, 0);
   tpsP_->getInput("boundaryConditions/numOutlets", numOutlets, 0);
 
-  ConstantCoefficient Qt_bc_coef;
-  Array<int> Qattr(pmesh_->bdr_attributes.Max());
-
   // inlet bc
   {
     Array<int> attr_inlet(pmesh_->bdr_attributes.Max());
@@ -344,29 +341,14 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
         Twall_coeff->constant = Twall;
 
         AddTempDirichletBC(Twall_coeff, attr_wall);
+
+        ConstantCoefficient *Qt_bc_coeff = new ConstantCoefficient();
+        Qt_bc_coeff->constant = 0.0;
+        AddQtDirichletBC(Qt_bc_coeff, attr_wall);
       }
     }
     if (rank0_) std::cout << "Temp wall bc completed: " << numWalls << endl;
   }
-
-  // TODO(trevilo): Add BCs for Q!!!
-  //
-  // // Qt wall bc dirichlet (divU = 0)
-  // Qattr = 0;
-  // for (int i = 0; i < numWalls; i++) {
-  //   Qt_bc_coef.constant = 0.0;
-  //   for (int iFace = 1; iFace < pmesh_->bdr_attributes.Max() + 1; iFace++) {
-  //     if (config_->wallPatchType[i].second == WallType::VISC_ISOTH ||
-  //         config_->wallPatchType[i].second == WallType::VISC_ADIAB) {
-  //       if (iFace == config_->wallPatchType[i].first) {
-  //         Qattr[iFace - 1] = 1;
-  //         if (rank0_) std::cout << "Dirichlet wall Qt BC: " << iFace << endl;
-  //       }
-  //     }
-  //   }
-  // }
-  // buffer_qbc = new ConstantCoefficient(Qt_bc_coef);
-  // AddQtDirichletBC(buffer_qbc, Qattr);
 
   sfes_->GetEssentialTrueDofs(temp_ess_attr_, temp_ess_tdof_);
   sfes_->GetEssentialTrueDofs(Qt_ess_attr_, Qt_ess_tdof_);
@@ -737,6 +719,7 @@ void CaloricallyPerfectThermoChem::initializeViz(ParaViewDataCollection &pvdc) {
   pvdc.RegisterField("temperature", &Tn_gf_);
   pvdc.RegisterField("density", &rn_gf_);
   pvdc.RegisterField("kappa", &kappa_gf_);
+  pvdc.RegisterField("Qt", &Qt_gf_);
 }
 
 /**
@@ -941,34 +924,31 @@ void CaloricallyPerfectThermoChem::AddQtDirichletBC(ScalarFuncT *f, Array<int> &
 }
 
 void CaloricallyPerfectThermoChem::computeQtTO() {
-  Array<int> empty;
   tmpR0_ = 0.0;
   LQ_bdry_->Update();
   LQ_bdry_->Assemble();
   LQ_bdry_->ParallelAssemble(tmpR0_);
   tmpR0_.Neg();
 
+  Array<int> empty;
   LQ_form_->Update();
   LQ_form_->Assemble();
   LQ_form_->FormSystemMatrix(empty, LQ_);
   LQ_->AddMult(Tn_next_, tmpR0_);  // tmpR0_ += LQ{Tn_next}
-  MqInv_->Mult(tmpR0_, Qt_);
 
+  sfes_->GetRestrictionMatrix()->MultTranspose(tmpR0_, resT_gf_);
+
+  Qt_ = 0.0;
+  Qt_gf_.SetFromTrueDofs(tmpR0_);
+
+  Vector Xqt, Bqt;
+  Mq_form_->FormLinearSystem(Qt_ess_tdof_, Qt_gf_, resT_gf_, Mq_, Xqt, Bqt, 1);
+
+  MqInv_->Mult(Bqt, Xqt);
+  Mq_form_->RecoverFEMSolution(Xqt, resT_gf_, Qt_gf_);
+
+  Qt_gf_.GetTrueDofs(Qt_);
   Qt_ *= -Rgas_ / thermo_pressure_;
-
-  /*
-    for (int be = 0; be < pmesh->GetNBE(); be++) {
-    int bAttr = pmesh.GetBdrElement(be)->GetAttribute();
-    if (bAttr == WallType::VISC_ISOTH || bAttr = WallType::VISC_ADIAB) {
-    Array<int> vdofs;
-    sfes_->GetBdrElementVDofs(be, vdofs);
-    for (int i = 0; i < vdofs.Size(); i++) {
-    Qt[vdofs[i]] = 0.0;
-    }
-    }
-    }
-  */
-
   Qt_gf_.SetFromTrueDofs(Qt_);
 }
 
