@@ -40,10 +40,31 @@
 
 // Forward declarations
 class GasMixture;
-class RunConfiguration;
+
+namespace TPS {
+class Tps;
+}
 
 using namespace mfem;
 using namespace std;
+
+/**
+ * @brief Options controlling behavior of Averaging class
+ */
+class AveragingOptions {
+ public:
+  AveragingOptions();
+
+  int sample_interval_; /**< Time steps between updating stats with a new sample */
+  int step_start_mean_; /**< Time step at which to start computing stats */
+
+  bool save_mean_history_;        /**< Whether to save viz files for the evolution of the mean */
+  bool enable_mean_continuation_; /**< Enable / disable continuation of the statistics calculations from a restart file
+                                   */
+  bool zero_variances_;           /**< Enable / disable zeroing out the variances at the beginning of a run */
+
+  void read(TPS::Tps *tps, std::string prefix = std::string(""));
+};
 
 /**
  * @brief Stores statistics fields (mean and variances) that are computed by Averaging
@@ -167,7 +188,7 @@ class Averaging {
 
  public:
   /// Constructor
-  Averaging(RunConfiguration &config);
+  Averaging(AveragingOptions &opts, std::string output_name);
 
   /// Destructor
   ~Averaging();

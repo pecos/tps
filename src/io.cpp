@@ -130,7 +130,7 @@ void M2ulPhyS::read_restart_files_hdf5(hid_t file, bool serialized_read) {
         samplesRMS = samplesMean;
       }
 
-      if (config.restartRMS == true) {
+      if (config.avg_opts_.zero_variances_ == true) {
         samplesRMS = 0;
       }
       average->SetSamplesRMS(samplesRMS);

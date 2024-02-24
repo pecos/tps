@@ -617,7 +617,7 @@ void M2ulPhyS::initVariables() {
 #endif
   initSolutionAndVisualizationVectors();
 
-  average = new Averaging(config);
+  average = new Averaging(config.avg_opts_, config.GetOutputName());
   average->registerField(std::string("primitive_state"), Up, true, 1, nvel);
   average->initializeVizForM2ulPhyS(fes, dfes, nvel);
 
@@ -2715,13 +2715,7 @@ void M2ulPhyS::parseTimeIntegrationOptions() {
   }
 }
 
-void M2ulPhyS::parseStatOptions() {
-  tpsP->getInput("averaging/saveMeanHist", config.meanHistEnable, false);
-  tpsP->getInput("averaging/startIter", config.startIter, 0);
-  tpsP->getInput("averaging/sampleFreq", config.sampleInterval, 0);
-  tpsP->getInput("averaging/enableContinuation", config.restartMean, false);
-  tpsP->getInput("averaging/restartRMS", config.restartRMS, false);
-}
+void M2ulPhyS::parseStatOptions() { config.avg_opts_.read(tpsP); }
 
 void M2ulPhyS::parseIOSettings() { config.io_opts_.read(tpsP); }
 

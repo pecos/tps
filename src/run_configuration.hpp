@@ -40,6 +40,7 @@
 #include <utility>
 #include <vector>
 
+#include "averaging_and_rms.hpp"
 #include "dataStructures.hpp"
 #include "io.hpp"
 #include "tps_mfem_wrap.hpp"
@@ -54,6 +55,9 @@ class RunConfiguration {
  public:
   // IO options
   IOOptions io_opts_;
+
+  // Averaging options
+  AveragingOptions avg_opts_;
 
   // mesh file file
   string meshFile;
@@ -123,13 +127,6 @@ class RunConfiguration {
   // Restart from different order solution on same mesh.  New order
   // set by POL_ORDER, old order determined from restart file.
   bool singleRestartFile;
-
-  // mean and RMS
-  int sampleInterval;
-  int startIter;
-  bool restartMean;
-  bool restartRMS;
-  bool meanHistEnable;
 
   // working fluid. Options thus far
   // DRY_AIR
@@ -348,10 +345,10 @@ class RunConfiguration {
   int GetNumItersOutput() { return itersOut; }
   bool RoeRiemannSolver() const { return useRoe; }
 
-  int GetMeanStartIter() { return startIter; }
-  int GetMeanSampleInterval() { return sampleInterval; }
-  bool GetRestartMean() { return restartMean; }
-  bool isMeanHistEnabled() { return meanHistEnable; }
+  int GetMeanStartIter() { return avg_opts_.step_start_mean_; }
+  int GetMeanSampleInterval() { return avg_opts_.sample_interval_; }
+  bool GetRestartMean() { return avg_opts_.enable_mean_continuation_; }
+  bool isMeanHistEnabled() { return avg_opts_.save_mean_history_; }
 
   WorkingFluid GetWorkingFluid() { return workFluid; }
   double GetViscMult() { return visc_mult; }

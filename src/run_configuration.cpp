@@ -57,11 +57,6 @@ RunConfiguration::RunConfiguration() {
   restart_cycle = 0;
   singleRestartFile = false;
 
-  sampleInterval = 0;
-  startIter = 0;
-  restartMean = false;
-  meanHistEnable = false;
-
   itersOut = 50;
   workFluid = DRY_AIR;
   eqSystem = EULER;

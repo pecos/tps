@@ -36,13 +36,37 @@
 #include "dataStructures.hpp"
 #include "equation_of_state.hpp"
 #include "run_configuration.hpp"
+#include "tps.hpp"
 
-Averaging::Averaging(RunConfiguration &config) {
+AveragingOptions::AveragingOptions() {
+  sample_interval_ = 0;
+  step_start_mean_ = 0;
+
+  save_mean_history_ = false;
+  enable_mean_continuation_ = false;
+  zero_variances_ = false;
+}
+
+void AveragingOptions::read(TPS::Tps *tps, std::string prefix) {
+  std::string basename;
+  if (!prefix.empty()) {
+    basename = prefix + "/averaging";
+  } else {
+    basename = "averaging";
+  }
+  tps->getInput((basename + "/sampleFreq").c_str(), sample_interval_, 0);
+  tps->getInput((basename + "/startIter").c_str(), step_start_mean_, 0);
+  tps->getInput((basename + "/enableContinuation").c_str(), enable_mean_continuation_, false);
+  tps->getInput((basename + "/restartRMS").c_str(), zero_variances_, false);
+  tps->getInput((basename + "/saveMeanHist").c_str(), save_mean_history_, false);
+}
+
+Averaging::Averaging(AveragingOptions &opts, std::string output_name) {
   rank0_ = false;
   compute_mean_ = false;
 
-  sample_interval_ = config.GetMeanSampleInterval();
-  step_start_mean_ = config.GetMeanStartIter();
+  sample_interval_ = opts.sample_interval_;
+  step_start_mean_ = opts.step_start_mean_;
 
   if (sample_interval_ != 0) compute_mean_ = true;
 
@@ -50,7 +74,7 @@ Averaging::Averaging(RunConfiguration &config) {
   ns_vari_ = 0;
 
   mean_output_name_ = "mean_";
-  mean_output_name_.append(config.GetOutputName());
+  mean_output_name_.append(output_name);
 }
 
 Averaging::~Averaging() {
