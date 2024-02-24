@@ -113,7 +113,7 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
       if (type == "viscous_isothermal" || type == "viscous_adiabatic" || type == "viscous" || type == "no-slip") {
         Array<int> wall_attr(pmesh_->bdr_attributes.Max());
         wall_attr = 0;
-        wall_attr[patch] = 1;
+        wall_attr[patch-1] = 1;
 
         Vector zero(dim_);
         zero = 0.0;
