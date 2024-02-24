@@ -62,8 +62,8 @@ Averaging::~Averaging() {
   }
 }
 
-void Averaging::registerField(const ParGridFunction *field_to_average, bool compute_rms, int rms_start_index,
-                              int rms_components) {
+void Averaging::registerField(std::string name, const ParGridFunction *field_to_average, bool compute_rms,
+                              int rms_start_index, int rms_components) {
   // quick return if not computing stats...
   if (!compute_mean_) return;
 
@@ -94,7 +94,7 @@ void Averaging::registerField(const ParGridFunction *field_to_average, bool comp
   }
 
   // and store those fields in an AveragingFamily object that gets appended to the avg_families_ vector
-  avg_families_.emplace_back(AveragingFamily(field_to_average, mean, vari, rms_start_index, rms_components));
+  avg_families_.emplace_back(AveragingFamily(name, field_to_average, mean, vari, rms_start_index, rms_components));
 }
 
 void Averaging::initializeViz() {
@@ -128,12 +128,12 @@ void Averaging::initializeViz() {
 
     // TODO(trevilo): Add a name to AveragingFamily so we can use it here
     std::string mean_name("mean_");
-    mean_name += std::to_string(i);
+    mean_name += avg_families_[i].name_;
     pvdc_->RegisterField(mean_name.c_str(), mean);
 
     if (vari != nullptr) {
       std::string vari_name("vari_");
-      vari_name += std::to_string(i);
+      vari_name += avg_families_[i].name_;
       pvdc_->RegisterField(vari_name.c_str(), vari);
     }
   }

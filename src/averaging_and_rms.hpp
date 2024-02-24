@@ -54,6 +54,9 @@ using namespace std;
  */
 class AveragingFamily {
  public:
+  /// The family name.  Should identify the data being averaged (e.g., "temperature")
+  std::string name_;
+
   /** Variable index to "start" variances
    *
    * For example, if state vector is [rho, u, v, w, T] and you only
@@ -89,8 +92,9 @@ class AveragingFamily {
    * constructing the AveragingFamily, but AveragingFamily then takes
    * ownership.
    */
-  AveragingFamily(const ParGridFunction *instant, ParGridFunction *mean, ParGridFunction *rms, int rms_start_index = 0,
-                  int rms_components = 1) {
+  AveragingFamily(std::string name, const ParGridFunction *instant, ParGridFunction *mean, ParGridFunction *rms,
+                  int rms_start_index = 0, int rms_components = 1) {
+    name_ = name;
     rms_start_index_ = rms_start_index;
     rms_components_ = rms_components;
     instantaneous_fcn_ = instant;
@@ -100,6 +104,7 @@ class AveragingFamily {
 
   /// Move constructor (required for emplace_back)
   AveragingFamily(AveragingFamily &&fam) {
+    this->name_ = fam.name_;
     this->rms_start_index_ = fam.rms_start_index_;
     this->rms_components_ = fam.rms_components_;
 
@@ -170,13 +175,14 @@ class Averaging {
   /**
    * @brief Register a field for averaging
    *
+   * @param name Name for the data being averaged (e.g., "temperature", or "primitive-state")
    * @param field_to_average Pointer to the instantaneous data that will be used to update the statistics
    * @param compute_rms Set to true to compute variances.  Otherwise only mean is computed.
    * @param rms_start_index Variable index at which to start variances (see AveragingFamily)
    * @param rms_components Number of variables in variances (see AveragingFamily)
    */
-  void registerField(const ParGridFunction *field_to_average, bool compute_rms = true, int rms_start_index = 0,
-                     int rms_components = 1);
+  void registerField(std::string name, const ParGridFunction *field_to_average, bool compute_rms = true,
+                     int rms_start_index = 0, int rms_components = 1);
 
   /**
    * @brief Initialize visualiztion for statistics
@@ -224,9 +230,24 @@ class Averaging {
    */
   void initializeVizForM2ulPhyS(ParFiniteElementSpace *fes, ParFiniteElementSpace *dfes, int nvel);
 
-  // TODO(trevilo): Specific to single ParGridFunction case
-  ParGridFunction *GetMeanUp() { return avg_families_[0].mean_fcn_; }
-  ParGridFunction *GetRMS() { return avg_families_[0].rms_fcn_; }
+  int getFamilyIndex(std::string name) const {
+    for (size_t i = 0; i < avg_families_.size(); i++) {
+      if (avg_families_[i].name_ == name) return i;
+    }
+    return -1;
+  }
+
+  ParGridFunction *GetMeanUp(std::string name) {
+    const int i = getFamilyIndex(name);
+    assert(i >= 0);
+    return avg_families_[i].mean_fcn_;
+  }
+
+  ParGridFunction *GetRMS(std::string name) {
+    const int i = getFamilyIndex(name);
+    assert(i >= 0);
+    return avg_families_[i].rms_fcn_;
+  }
 
   int GetSamplesMean() { return ns_mean_; }
   int GetSamplesRMS() { return ns_vari_; }
