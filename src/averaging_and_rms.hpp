@@ -59,8 +59,7 @@ class AveragingOptions {
   int step_start_mean_; /**< Time step at which to start computing stats */
 
   bool save_mean_history_;        /**< Whether to save viz files for the evolution of the mean */
-  bool enable_mean_continuation_; /**< Enable / disable continuation of the statistics calculations from a restart file
-                                   */
+  bool enable_mean_continuation_; /**< Enable / disable continuation of statistics calculations from restart file */
   bool zero_variances_;           /**< Enable / disable zeroing out the variances at the beginning of a run */
 
   void read(TPS::Tps *tps, std::string prefix = std::string(""));
