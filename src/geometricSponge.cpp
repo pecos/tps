@@ -127,14 +127,17 @@ void GeometricSponge::initializeSelf() {
   sfec_ = new H1_FECollection(order_);
   sfes_ = new ParFiniteElementSpace(pmesh_, sfec_);
 
-  int sfes_truevsize = sfes_->GetTrueVSize();
-
-  mult.SetSize(sfes_truevsize);
-  mult_gf.SetSpace(sfes_);
+  mult_gf_.SetSpace(sfes_);  
+  // int sfes_truevsize = sfes_->GetTrueVSize();
+  // mult.SetSize(sfes_truevsize);
 
   // exports
-  toFlow_interface_.visc_multiplier = &mult_gf;
-  toThermoChem_interface_.diff_multiplier = &mult_gf;
+  toFlow_interface_.visc_multiplier = &mult_gf_;
+  toThermoChem_interface_.diff_multiplier = &mult_gf_;
+}
+
+void GeometricSponge::initializeViz(ParaViewDataCollection &pvdc) {
+  pvdc.RegisterField("sponge", &mult_gf_);
 }
 
 void GeometricSponge::setup() {
@@ -142,7 +145,7 @@ void GeometricSponge::setup() {
   ParGridFunction coordsDof(sfes_);
   pmesh_->GetNodes(coordsDof);
   
-  double *data = mult_gf.HostReadWrite();
+  double *data = mult_gf_.HostReadWrite();
   double *hcoords = coordsDof.HostReadWrite();
   double wgt = 1.0;
   for (int n = 0; n < sfes_->GetNDofs(); n++) {    

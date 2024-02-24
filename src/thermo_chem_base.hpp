@@ -39,6 +39,8 @@
 
 class IODataOrganizer;
 struct flowToThermoChem;
+struct turbModelToThermoChem;
+struct spongeToThermoChem;
 
 /**
  * Provides wrapper for fields that need to be provided by the
@@ -49,8 +51,6 @@ struct thermoChemToFlow {
   const mfem::ParGridFunction *viscosity = nullptr;
   const mfem::ParGridFunction *thermal_divergence = nullptr;
 };
-
-struct turbModelToThermoChem;
 
 /**
  * Provides wrapper for fields that need to be provided by the
@@ -69,6 +69,7 @@ class ThermoChemModelBase {
  protected:
   const flowToThermoChem *flow_interface_;
   const turbModelToThermoChem *turbModel_interface_;
+  const spongeToThermoChem *sponge_interface_;  
 
  public:
   /// Destructor
@@ -138,6 +139,18 @@ class ThermoChemModelBase {
 
   /// Interface object, provides fields necessary for the turbModel
   thermoChemToTurbModel toTurbModel_interface_;
+
+  /**
+   * @brief Initialize data from the sponge class
+   *
+   * Initialize fields that the thermochemistry model needs from the
+   * sponge class.
+   */
+  void initializeFromSponge(spongeToThermoChem *sponge) { sponge_interface_ = sponge; }
+
+  /// Get interface provided by flow model
+  const spongeToThermoChem *getSpongeInterface() const { return sponge_interface_; }
+  
 };
 
 /**

@@ -151,7 +151,9 @@ class Tomboulides final : public FlowBase {
   mfem::ConstantCoefficient Hv_bdfcoeff_;
   mfem::ProductCoefficient *rho_over_dt_coeff_ = nullptr;
   mfem::GridFunctionCoefficient *mu_coeff_ = nullptr;
+  mfem::ProductCoefficient *mu_total_coeff_ = nullptr;  
   mfem::VectorGridFunctionCoefficient *pp_div_coeff_ = nullptr;
+  mfem::GridFunctionCoefficient *mult_coeff_ = nullptr;    
 
   // mfem "form" objects used to create operators
   mfem::ParBilinearForm *L_iorho_form_ = nullptr;  // \int (1/\rho) \nabla \phi_i \cdot \nabla \phi_j

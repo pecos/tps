@@ -205,7 +205,7 @@ void Tomboulides::initializeSelf() {
   *p_gf_ = 0.0;
   *resp_gf_ = 0.0;
 
-  toThermoChem_interface.velocity = u_next_gf_;
+  toThermoChem_interface_.velocity = u_next_gf_;
 
   // NEEDS TO BE ADDED
   // toTurbModel_interface.gradU = gradU_gf_;
@@ -289,6 +289,8 @@ void Tomboulides::initializeOperators() {
   Hv_bdfcoeff_.constant = 1.0 / coeff_.dt;
   rho_over_dt_coeff_ = new ProductCoefficient(Hv_bdfcoeff_, *rho_coeff_);
   mu_coeff_ = new GridFunctionCoefficient(thermo_interface_->viscosity);
+  mult_coeff_ = new GridFunctionCoefficient(sponge_interface_->visc_multiplier);
+  mu_total_coeff_ = new ProductCoefficient(*mult_coeff_, *mu_coeff_);   
   pp_div_coeff_ = new VectorGridFunctionCoefficient(pp_div_gf_);
 
   // Integration rules (only used if numerical_integ_ is true).  When
@@ -434,7 +436,8 @@ void Tomboulides::initializeOperators() {
   // Helmholtz
   Hv_form_ = new ParBilinearForm(vfes_);
   auto *hmv_blfi = new VectorMassIntegrator(*rho_over_dt_coeff_);
-  auto *hdv_blfi = new VectorDiffusionIntegrator(*mu_coeff_);
+  // auto *hdv_blfi = new VectorDiffusionIntegrator(*mu_coeff_);
+  auto *hdv_blfi = new VectorDiffusionIntegrator(*mu_total_coeff_);
   if (numerical_integ_) {
     hmv_blfi->SetIntRule(&ir_ni_v);
     hdv_blfi->SetIntRule(&ir_ni_v);

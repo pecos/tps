@@ -47,6 +47,7 @@
 #include "io.hpp"
 #include "logger.hpp"
 #include "tomboulides.hpp"
+#include "geometricSponge.hpp"
 #include "tps.hpp"
 #include "utils.hpp"
 
@@ -88,6 +89,7 @@ LoMachSolver::~LoMachSolver() {
   delete sfec;
   delete flow_;
   delete thermo_;
+  delete sponge_;
   delete pmesh_;
   delete serial_mesh_;
 
@@ -378,6 +380,9 @@ void LoMachSolver::initialize() {
   // 3) Prepare the sub-physics models/solvers
   //-----------------------------------------------------
 
+  // Instantiate sponge
+  sponge_ = new GeometricSponge(pmesh_, &loMach_opts_, tpsP_);  
+  
   // TODO(trevilo): Add support for turbulence modeling
   if (rank0_) {
     if (loMach_opts_.sgs_opts_.sgs_model_type_ == SubGridModelOptions::SMAGORINSKY) {
@@ -429,6 +434,7 @@ void LoMachSolver::initialize() {
   if (verbose) grvy_printf(ginfo, "got CFL...\n");
 
   // Initialize model-owned data
+  sponge_->initializeSelf();  
   flow_->initializeSelf();
   thermo_->initializeSelf();
 
@@ -437,12 +443,17 @@ void LoMachSolver::initialize() {
   thermo_->initializeIO(ioData);
 
   // Exchange interface information
+  flow_->initializeFromSponge(&sponge_->toFlow_interface_);    
+  thermo_->initializeFromSponge(&sponge_->toThermoChem_interface_);    
   flow_->initializeFromThermoChem(&thermo_->toFlow_interface_);
-  thermo_->initializeFromFlow(&flow_->toThermoChem_interface);
-
+  thermo_->initializeFromFlow(&flow_->toThermoChem_interface_);
+  
   // Finish initializing operators
   flow_->initializeOperators();
   thermo_->initializeOperators();
+
+  // Set static sponge field
+  sponge_->setup();
 
   // TODO(trevilo): Enable averaging.  See note in loMach.hpp
 
@@ -460,6 +471,7 @@ void LoMachSolver::initialize() {
 
   flow_->initializeViz(*pvdc_);
   thermo_->initializeViz(*pvdc_);
+  // sponge_->initializeViz(*pvdc_);  
 
   // If restarting, read restart files
   if (loMach_opts_.io_opts_.enable_restart_) {

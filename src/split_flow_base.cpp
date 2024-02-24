@@ -48,8 +48,8 @@ void ZeroFlow::initializeSelf() {
   velocity_ = new ParGridFunction(fes_);
   *velocity_ = 0.0;
 
-  toThermoChem_interface.velocity = velocity_;
-  toThermoChem_interface.swirl_supported = false;
+  toThermoChem_interface_.velocity = velocity_;
+  toThermoChem_interface_.swirl_supported = false;
 
   toTurbModel_interface.gradU = nullptr;
   toTurbModel_interface.gradV = nullptr;

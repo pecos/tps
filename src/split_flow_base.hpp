@@ -40,6 +40,7 @@
 class IODataOrganizer;
 struct thermoChemToFlow;
 struct turbModelToFlow;
+struct spongeToFlow;
 
 struct flowToThermoChem {
   const mfem::ParGridFunction *velocity = nullptr;
@@ -58,6 +59,7 @@ class FlowBase {
  protected:
   const thermoChemToFlow *thermo_interface_;
   const turbModelToFlow *turbModel_interface_;
+  const spongeToFlow *sponge_interface_;  
 
  public:
   /// Destructor
@@ -74,6 +76,7 @@ class FlowBase {
 
   void initializeFromThermoChem(thermoChemToFlow *thermo) { thermo_interface_ = thermo; }
   void initializeFromTurbModel(turbModelToFlow *turbModel) { turbModel_interface_ = turbModel; }
+  void initializeFromSponge(spongeToFlow *sponge) { sponge_interface_ = sponge; }  
 
   virtual void initializeOperators() {}
 
@@ -81,7 +84,7 @@ class FlowBase {
   virtual void initializeViz(mfem::ParaViewDataCollection &pvdc) const {}
 
   /// Interface object, provides fields necessary for the thermochemistry model
-  flowToThermoChem toThermoChem_interface;
+  flowToThermoChem toThermoChem_interface_;
 
   /// Get interface provided by thermo model
   const thermoChemToFlow *getThermoInterface() const { return thermo_interface_; }
@@ -91,6 +94,9 @@ class FlowBase {
 
   /// Get interface provided by thermo model
   const turbModelToFlow *getTurbModelInterface() const { return turbModel_interface_; }
+
+  /// Get interface provided by sponge
+  const spongeToFlow *getSpongeInterface() const { return sponge_interface_; }  
 
   /**
    * @brief A hook to evaluate L2 norm of error

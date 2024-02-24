@@ -133,19 +133,17 @@ class GeometricSponge : public SpongeBase {
   // Scalar \f$H^1\f$ finite element space.
   ParFiniteElementSpace *sfes_ = nullptr;
 
-  ParGridFunction mult_gf;
-  Vector mult;
+  ParGridFunction mult_gf_;
+  // Vector mult_;
 
  public:
   GeometricSponge(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, TPS::Tps *tps);
   virtual ~GeometricSponge() {}
 
   void initializeSelf();
-
-  void step();
-
-  /// Initialize forms, solvers and preconditioners.
+  void initializeViz(ParaViewDataCollection &pvdc) final;    
   void setup();
+  void step();
 
   void spongeUniform(double &wgt);
   void spongePlane(double *x, double &wgt);
@@ -153,7 +151,7 @@ class GeometricSponge : public SpongeBase {
   void spongeAnnulus(double *x, double &wgt);    
   
   /// Return a pointer to the current temperature ParGridFunction.
-  ParGridFunction *GetCurrentMultiplier() { return &mult_gf; }
+  ParGridFunction *GetCurrentMultiplier() { return &mult_gf_; }
   
 };
 #endif  // GEOMETRIC_SPONGE_HPP_

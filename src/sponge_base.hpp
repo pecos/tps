@@ -75,10 +75,18 @@ class SpongeBase {
   virtual void initializeSelf() = 0;
 
   /**
+   * @brief Hook to let derived classes register visualization fields with ParaViewDataCollection
+   */
+  virtual void initializeViz(mfem::ParaViewDataCollection &pvdc) {}
+  
+  /**
    * @brief Take a single time step
    */
   virtual void step() = 0;
 
+  /// Initialize sponge field, all thats necessary for static fields
+  virtual void setup() = 0;
+  
   /// Interface object, provides fields necessary for the flow
   spongeToFlow toFlow_interface_;
 
@@ -120,6 +128,7 @@ class UnitySponge final : public SpongeBase {
 
   /// Since everything is constant, step is a no-op
   void step() final {}
+  void setup() final {}
 };
 
 #endif  // SPONGE_BASE_HPP_
