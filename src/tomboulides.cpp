@@ -149,6 +149,8 @@ Tomboulides::~Tomboulides() {
   delete mass_lform_;
 
   // objects allocated by initializeOperators
+  delete S_mom_form_;
+  delete S_poisson_form_;
   delete u_bdr_form_;
   delete pp_div_bdr_form_;
   delete Hv_inv_;
@@ -157,6 +159,8 @@ Tomboulides::~Tomboulides() {
   delete Mv_rho_form_;
   delete G_form_;
   delete D_form_;
+  delete Mv_rho_inv_;
+  delete Mv_rho_inv_pc_;
   delete Mv_inv_;
   delete Mv_inv_pc_;
   delete Mv_form_;
@@ -168,6 +172,16 @@ Tomboulides::~Tomboulides() {
   delete L_iorho_inv_pc_;
   delete L_iorho_lor_;
   delete L_iorho_form_;
+  delete S_mom_coeff_;
+  delete S_poisson_coeff_;
+  delete gradmu_Qt_coeff_;
+  delete Qt_coeff_;
+  delete twoS_gradmu_coeff_;
+  delete graduT_gradmu_coeff_;
+  delete gradu_gradmu_coeff_;
+  delete grad_u_next_transp_coeff_;
+  delete grad_u_next_coeff_;
+  delete grad_mu_coeff_;
   delete pp_div_coeff_;
   delete mu_coeff_;
   delete mult_coeff_;
@@ -240,6 +254,8 @@ void Tomboulides::initializeSelf() {
   pp_div_vec_.SetSize(vfes_truevsize);
   resu_vec_.SetSize(vfes_truevsize);
   grad_Qt_vec_.SetSize(vfes_truevsize);
+  ress_vec_.SetSize(vfes_truevsize);
+  S_poisson_vec_.SetSize(vfes_truevsize);
 
   resp_vec_.SetSize(pfes_truevsize);
   p_vec_.SetSize(pfes_truevsize);
@@ -262,6 +278,8 @@ void Tomboulides::initializeSelf() {
   pp_div_vec_ = 0.0;
   resu_vec_ = 0.0;
   grad_Qt_vec_ = 0.0;
+  ress_vec_ = 0.0;
+  S_poisson_vec_ = 0.0;
 
   resp_vec_ = 0.0;
   p_vec_ = 0.0;
@@ -295,6 +313,21 @@ void Tomboulides::initializeOperators() {
   mult_coeff_ = new GridFunctionCoefficient(sponge_interface_->visc_multiplier);
   mu_total_coeff_ = new ProductCoefficient(*mult_coeff_, *mu_coeff_);
   pp_div_coeff_ = new VectorGridFunctionCoefficient(pp_div_gf_);
+
+  // coefficients used in the variable viscosity terms
+  grad_mu_coeff_ = new GradientGridFunctionCoefficient(thermo_interface_->viscosity);
+  grad_u_next_coeff_ = new GradientVectorGridFunctionCoefficient(u_next_gf_);
+  grad_u_next_transp_coeff_ = new TransposeMatrixCoefficient(*grad_u_next_coeff_);
+
+  gradu_gradmu_coeff_ = new MatrixVectorProductCoefficient(*grad_u_next_coeff_, *grad_mu_coeff_);
+  graduT_gradmu_coeff_ = new MatrixVectorProductCoefficient(*grad_u_next_transp_coeff_, *grad_mu_coeff_);
+  twoS_gradmu_coeff_ = new VectorSumCoefficient(*gradu_gradmu_coeff_, *graduT_gradmu_coeff_);
+
+  Qt_coeff_ = new GridFunctionCoefficient(thermo_interface_->thermal_divergence);
+  gradmu_Qt_coeff_ = new ScalarVectorProductCoefficient(*Qt_coeff_, *grad_mu_coeff_);
+
+  S_poisson_coeff_ = new VectorSumCoefficient(*twoS_gradmu_coeff_, *gradmu_Qt_coeff_, 1.0, -2./3);
+  S_mom_coeff_ = new VectorSumCoefficient(*graduT_gradmu_coeff_, *gradmu_Qt_coeff_, 1.0, -1.0);
 
   // Integration rules (only used if numerical_integ_ is true).  When
   // this is the case, the quadrature degree set such that the
@@ -427,6 +460,22 @@ void Tomboulides::initializeOperators() {
   Mv_inv_->SetRelTol(mass_inverse_rtol_);
   Mv_inv_->SetMaxIter(mass_inverse_max_iter_);
 
+  if (partial_assembly_) {
+    Vector diag_pa(vfes_->GetTrueVSize());
+    Mv_rho_form_->AssembleDiagonal(diag_pa);
+    Mv_rho_inv_pc_ = new OperatorJacobiSmoother(diag_pa, empty);
+  } else {
+    Mv_rho_inv_pc_ = new HypreSmoother(*Mv_rho_op_.As<HypreParMatrix>());
+    dynamic_cast<HypreSmoother *>(Mv_rho_inv_pc_)->SetType(HypreSmoother::Jacobi, 1);
+  }
+  Mv_rho_inv_ = new CGSolver(vfes_->GetComm());
+  Mv_rho_inv_->iterative_mode = false;
+  Mv_rho_inv_->SetOperator(*Mv_rho_op_);
+  Mv_rho_inv_->SetPreconditioner(*Mv_rho_inv_pc_);
+  Mv_rho_inv_->SetPrintLevel(mass_inverse_pl_);
+  Mv_rho_inv_->SetRelTol(mass_inverse_rtol_);
+  Mv_rho_inv_->SetMaxIter(mass_inverse_max_iter_);
+
   // Divergence operator
   D_form_ = new ParMixedBilinearForm(vfes_, pfes_);
   auto *vd_mblfi = new VectorDivergenceIntegrator();
@@ -505,6 +554,20 @@ void Tomboulides::initializeOperators() {
     }
     u_bdr_form_->AddBoundaryIntegrator(ubdr_bnlfi, vel_dbc.attr);
   }
+
+  S_poisson_form_ = new ParLinearForm(vfes_);
+  auto *s_rhs_dlfi = new VectorDomainLFIntegrator(*S_poisson_coeff_);
+  if (numerical_integ_) {
+    s_rhs_dlfi->SetIntRule(&ir_ni_v);
+  }
+  S_poisson_form_->AddDomainIntegrator(s_rhs_dlfi);
+
+  S_mom_form_ = new ParLinearForm(vfes_);
+  auto *s_mom_dlfi = new VectorDomainLFIntegrator(*S_mom_coeff_);
+  if (numerical_integ_) {
+    s_mom_dlfi->SetIntRule(&ir_ni_v);
+  }
+  S_mom_form_->AddDomainIntegrator(s_mom_dlfi);
 
   // Ensure u_vec_ consistent with u_curr_gf_
   u_curr_gf_->GetTrueDofs(u_vec_);
@@ -588,6 +651,8 @@ void Tomboulides::step() {
   Mv_rho_form_->Update();
   Mv_rho_form_->Assemble();
   Mv_rho_form_->FormSystemMatrix(empty, Mv_rho_op_);
+
+  Mv_rho_inv_->SetOperator(*Mv_rho_op_);
 
   // Update the Helmholtz operator and inverse
   Hv_bdfcoeff_.constant = coeff_.bd0 / dt;
@@ -728,6 +793,12 @@ void Tomboulides::step() {
   // Add ustar/dt contribution
   pp_div_vec_ += ustar_vec_;
 
+  // Evaluate and add variable viscosity terms
+  S_poisson_form_->Assemble();
+  S_poisson_form_->ParallelAssemble(ress_vec_);
+  Mv_rho_inv_->Mult(ress_vec_, S_poisson_vec_);
+  pp_div_vec_ += S_poisson_vec_;
+
   // rhs = div(pp_div_vec_)
   D_op_->Mult(pp_div_vec_, resp_vec_);
 
@@ -791,9 +862,8 @@ void Tomboulides::step() {
   resu_vec_ = 0.0;
 
   // Variable viscosity term
-  // TODO(trevilo): Add variable viscosity terms
-  // S_mom_form->Assemble();
-  // S_mom_form->ParallelAssemble(resu);
+  S_mom_form_->Assemble();
+  S_mom_form_->ParallelAssemble(resu_vec_);
 
   // -grad(p)
   G_op_->AddMult(p_vec_, resu_vec_, -1.0);

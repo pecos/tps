@@ -49,6 +49,7 @@ struct temporalSchemeCoefficients;
 
 #include "dirichlet_bc_helper.hpp"
 #include "split_flow_base.hpp"
+#include "utils.hpp"
 
 /// Container for forcing terms to be added to velocity equation
 class ForcingTerm_T {
@@ -156,6 +157,17 @@ class Tomboulides final : public FlowBase {
   mfem::VectorGridFunctionCoefficient *pp_div_coeff_ = nullptr;
   mfem::GridFunctionCoefficient *mult_coeff_ = nullptr;
 
+  mfem::GradientGridFunctionCoefficient *grad_mu_coeff_ = nullptr;
+  mfem::GradientVectorGridFunctionCoefficient *grad_u_next_coeff_ = nullptr;
+  mfem::TransposeMatrixCoefficient *grad_u_next_transp_coeff_ = nullptr;
+  mfem::MatrixVectorProductCoefficient *gradu_gradmu_coeff_ = nullptr;
+  mfem::MatrixVectorProductCoefficient *graduT_gradmu_coeff_ = nullptr;
+  mfem::VectorSumCoefficient *twoS_gradmu_coeff_ = nullptr;
+  mfem::GridFunctionCoefficient *Qt_coeff_ = nullptr;
+  mfem::ScalarVectorProductCoefficient *gradmu_Qt_coeff_ = nullptr;
+  mfem::VectorSumCoefficient *S_poisson_coeff_ = nullptr;
+  mfem::VectorSumCoefficient *S_mom_coeff_ = nullptr;
+
   // mfem "form" objects used to create operators
   mfem::ParBilinearForm *L_iorho_form_ = nullptr;  // \int (1/\rho) \nabla \phi_i \cdot \nabla \phi_j
   mfem::ParLinearForm *forcing_form_ = nullptr;    // \int \phi_i f
@@ -167,7 +179,9 @@ class Tomboulides final : public FlowBase {
   mfem::ParBilinearForm *Mv_rho_form_ = nullptr;   // mass matrix (density weighted) = \int \rho \vphi_i \cdot \vphi_j
   mfem::ParBilinearForm *Hv_form_ = nullptr;
   mfem::ParLinearForm *pp_div_bdr_form_ = nullptr;
-  mfem::ParLinearForm *u_bdr_form_;
+  mfem::ParLinearForm *u_bdr_form_ = nullptr;
+  mfem::ParLinearForm *S_poisson_form_ = nullptr;
+  mfem::ParLinearForm *S_mom_form_ = nullptr;
 
   // mfem operator objects
   mfem::OperatorHandle L_iorho_op_;
@@ -186,6 +200,9 @@ class Tomboulides final : public FlowBase {
 
   mfem::Solver *Mv_inv_pc_ = nullptr;
   mfem::CGSolver *Mv_inv_ = nullptr;
+
+  mfem::Solver *Mv_rho_inv_pc_ = nullptr;
+  mfem::CGSolver *Mv_rho_inv_ = nullptr;
 
   mfem::Solver *Hv_inv_pc_ = nullptr;
   mfem::CGSolver *Hv_inv_ = nullptr;
@@ -211,6 +228,8 @@ class Tomboulides final : public FlowBase {
   mfem::Vector grad_Qt_vec_;
   mfem::Vector rho_vec_;
   mfem::Vector mu_vec_;
+  mfem::Vector ress_vec_;
+  mfem::Vector S_poisson_vec_;
 
   // miscellaneous
   double volume_;
