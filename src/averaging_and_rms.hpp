@@ -80,21 +80,21 @@ class AveragingFamily {
   /** Variable index to "start" variances
    *
    * For example, if state vector is [rho, u, v, w, T] and you only
-   * want the velocity covariance matrix, rms_start_index_ should be 1
+   * want the velocity covariance matrix, vari_start_index_ should be 1
    */
-  int rms_start_index_;
+  int vari_start_index_;
 
   /** Number of variables for covariance calculation
    *
    * For example, if state vector is [rho, u, v, w, T] and you only
-   * want the velocity covariance matrix, rms_components_ should be
+   * want the velocity covariance matrix, vari_components_ should be
    * 3. This will lead to 6 covariance being computed (uu, vv, ww, uv,
    * uw, and vw).
    *
    * It is assumed that the variance variables are contiguous---i.e.,
    * there is no support for getting uT only.
    */
-  int rms_components_;
+  int vari_components_;
 
   /** Pointer to function containing the instantaneous field being averaged (not owned) */
   const ParGridFunction *instantaneous_fcn_;
@@ -103,47 +103,47 @@ class AveragingFamily {
   ParGridFunction *mean_fcn_;
 
   /** Pointer to variance field (owned) */
-  ParGridFunction *rms_fcn_;
+  ParGridFunction *vari_fcn_;
 
   /**
    * @brief Constructor
    *
-   * Notes: the mean and rms grid functions should be allocated before
+   * Notes: the mean and vari grid functions should be allocated before
    * constructing the AveragingFamily, but AveragingFamily then takes
    * ownership.
    */
-  AveragingFamily(std::string name, const ParGridFunction *instant, ParGridFunction *mean, ParGridFunction *rms,
-                  int rms_start_index = 0, int rms_components = 1) {
+  AveragingFamily(std::string name, const ParGridFunction *instant, ParGridFunction *mean, ParGridFunction *vari,
+                  int vari_start_index = 0, int vari_components = 1) {
     name_ = name;
-    rms_start_index_ = rms_start_index;
-    rms_components_ = rms_components;
+    vari_start_index_ = vari_start_index;
+    vari_components_ = vari_components;
     instantaneous_fcn_ = instant;
     mean_fcn_ = mean;
-    rms_fcn_ = rms;
+    vari_fcn_ = vari;
   }
 
   /// Move constructor (required for emplace_back)
   AveragingFamily(AveragingFamily &&fam) {
     this->name_ = fam.name_;
-    this->rms_start_index_ = fam.rms_start_index_;
-    this->rms_components_ = fam.rms_components_;
+    this->vari_start_index_ = fam.vari_start_index_;
+    this->vari_components_ = fam.vari_components_;
 
     // Copy the pointers
     this->instantaneous_fcn_ = fam.instantaneous_fcn_;
     this->mean_fcn_ = fam.mean_fcn_;
-    this->rms_fcn_ = fam.rms_fcn_;
+    this->vari_fcn_ = fam.vari_fcn_;
 
     // Set incoming mean_fcn_ to null, which ensures memory that
     // this->mean_fcn_ now points to is not deleted when the
     // destructor of fam is called
     fam.mean_fcn_ = nullptr;
-    fam.rms_fcn_ = nullptr;
+    fam.vari_fcn_ = nullptr;
   }
 
-  /// Destructor (deletes the mean and rms fields)
+  /// Destructor (deletes the mean and vari fields)
   ~AveragingFamily() {
     delete mean_fcn_;
-    delete rms_fcn_;
+    delete vari_fcn_;
   }
 };
 
@@ -197,12 +197,12 @@ class Averaging {
    *
    * @param name Name for the data being averaged (e.g., "temperature", or "primitive-state")
    * @param field_to_average Pointer to the instantaneous data that will be used to update the statistics
-   * @param compute_rms Set to true to compute variances.  Otherwise only mean is computed.
-   * @param rms_start_index Variable index at which to start variances (see AveragingFamily)
-   * @param rms_components Number of variables in variances (see AveragingFamily)
+   * @param compute_vari Set to true to compute variances.  Otherwise only mean is computed.
+   * @param vari_start_index Variable index at which to start variances (see AveragingFamily)
+   * @param vari_components Number of variables in variances (see AveragingFamily)
    */
-  void registerField(std::string name, const ParGridFunction *field_to_average, bool compute_rms = true,
-                     int rms_start_index = 0, int rms_components = 1);
+  void registerField(std::string name, const ParGridFunction *field_to_average, bool compute_vari = true,
+                     int vari_start_index = 0, int vari_components = 1);
 
   /**
    * @brief Initialize visualiztion for statistics
@@ -276,7 +276,7 @@ class Averaging {
   ParGridFunction *GetVariField(std::string name) {
     const int i = getFamilyIndex(name);
     assert(i >= 0);
-    return avg_families_[i].rms_fcn_;
+    return avg_families_[i].vari_fcn_;
   }
 
   int GetSamplesMean() { return ns_mean_; }

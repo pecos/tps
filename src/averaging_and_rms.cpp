@@ -86,8 +86,8 @@ Averaging::~Averaging() {
   }
 }
 
-void Averaging::registerField(std::string name, const ParGridFunction *field_to_average, bool compute_rms,
-                              int rms_start_index, int rms_components) {
+void Averaging::registerField(std::string name, const ParGridFunction *field_to_average, bool compute_vari,
+                              int vari_start_index, int vari_components) {
   // quick return if not computing stats...
   if (!compute_mean_) return;
 
@@ -98,13 +98,13 @@ void Averaging::registerField(std::string name, const ParGridFunction *field_to_
   ParGridFunction *mean = new ParGridFunction(field_to_average->ParFESpace());
   *mean = 0.0;
 
-  // and maybe the rms
+  // and maybe the vari
   ParGridFunction *vari = nullptr;
-  if (compute_rms) {
-    // make sure incoming field has enough components to satisfy rms request
-    assert((rms_start_index + rms_components) <= field_to_average->ParFESpace()->GetVDim());
+  if (compute_vari) {
+    // make sure incoming field has enough components to satisfy vari request
+    assert((vari_start_index + vari_components) <= field_to_average->ParFESpace()->GetVDim());
 
-    const int num_variance = rms_components * (rms_components + 1) / 2;
+    const int num_variance = vari_components * (vari_components + 1) / 2;
 
     const FiniteElementCollection *fec = field_to_average->ParFESpace()->FEColl();
     const int order = fec->GetOrder();
@@ -118,7 +118,7 @@ void Averaging::registerField(std::string name, const ParGridFunction *field_to_
   }
 
   // and store those fields in an AveragingFamily object that gets appended to the avg_families_ vector
-  avg_families_.emplace_back(AveragingFamily(name, field_to_average, mean, vari, rms_start_index, rms_components));
+  avg_families_.emplace_back(AveragingFamily(name, field_to_average, mean, vari, vari_start_index, vari_components));
 }
 
 void Averaging::initializeViz() {
@@ -130,7 +130,7 @@ void Averaging::initializeViz() {
   // Loop through the families and add them to the paraview output
   for (size_t i = 0; i < avg_families_.size(); i++) {
     ParGridFunction *mean = avg_families_[i].mean_fcn_;
-    ParGridFunction *vari = avg_families_[i].rms_fcn_;
+    ParGridFunction *vari = avg_families_[i].vari_fcn_;
 
     const FiniteElementCollection *fec = mean->ParFESpace()->FEColl();
     const int order = fec->GetOrder();
@@ -170,7 +170,7 @@ void Averaging::initializeVizForM2ulPhyS(ParFiniteElementSpace *fes, ParFiniteEl
   assert(avg_families_.size() == 1);
 
   ParGridFunction *meanUp = avg_families_[0].mean_fcn_;
-  ParGridFunction *rms = avg_families_[0].rms_fcn_;
+  ParGridFunction *vari = avg_families_[0].vari_fcn_;
 
   const FiniteElementCollection *fec = meanUp->ParFESpace()->FEColl();
   const int order = fec->GetOrder();
@@ -191,7 +191,7 @@ void Averaging::initializeVizForM2ulPhyS(ParFiniteElementSpace *fes, ParFiniteEl
   pvdc_->RegisterField("dens", meanRho);
   pvdc_->RegisterField("vel", meanV);
   pvdc_->RegisterField("press", meanP);
-  pvdc_->RegisterField("rms", rms);
+  pvdc_->RegisterField("rms", vari);
 }
 
 void Averaging::addSample(const int &iter, GasMixture *mixture) {
@@ -208,7 +208,7 @@ void Averaging::addSample(const int &iter, GasMixture *mixture) {
       // or the variances have been restarted.  Either way, valid to
       // set variances to zero.
       for (size_t ifam = 0; ifam < avg_families_.size(); ifam++) {
-        *avg_families_[ifam].rms_fcn_ = 0.0;
+        *avg_families_[ifam].vari_fcn_ = 0.0;
       }
     }
 
@@ -249,7 +249,7 @@ void Averaging::addSampleInternal() {
 
     const ParGridFunction *inst = fam.instantaneous_fcn_;
     ParGridFunction *mean = fam.mean_fcn_;
-    ParGridFunction *vari = fam.rms_fcn_;
+    ParGridFunction *vari = fam.vari_fcn_;
 
     const double *d_inst = inst->Read();
     double *d_mean = mean->ReadWrite();
@@ -259,12 +259,12 @@ void Averaging::addSampleInternal() {
     const int dof = mean->ParFESpace()->GetNDofs();  // dofs per scalar field
     const int neq = mean->ParFESpace()->GetVDim();   // number of scalar variables in mean field
 
-    const int d_rms_start = fam.rms_start_index_;
-    const int d_rms_components = fam.rms_components_;
+    const int d_vari_start = fam.vari_start_index_;
+    const int d_vari_components = fam.vari_components_;
 
     // Extract sample size information for use on device
     double dSamplesMean = (double)ns_mean_;
-    double dSamplesRMS = (double)ns_vari_;
+    double dSamplesVari = (double)ns_vari_;
 
     // "Loop" over all dofs and update statistics
     MFEM_FORALL(n, dof, {
@@ -281,31 +281,31 @@ void Averaging::addSampleInternal() {
         double val = 0.;
         double delta_i = 0.;
         double delta_j = 0.;
-        int rms_index = 0;
+        int vari_index = 0;
 
         // Variances first (i.e., diagonal of the covariance matrix)
-        for (int i = d_rms_start; i < d_rms_start + d_rms_components; i++) {
+        for (int i = d_vari_start; i < d_vari_start + d_vari_components; i++) {
           const double uinst = d_inst[n + i * dof];
           const double umean = d_mean[n + i * dof];
           delta_i = (uinst - umean);
-          val = d_vari[n + rms_index * dof];
-          d_vari[n + rms_index * dof] = (val * dSamplesRMS + delta_i * delta_i) / (dSamplesRMS + 1);
-          rms_index++;
+          val = d_vari[n + vari_index * dof];
+          d_vari[n + vari_index * dof] = (val * dSamplesVari + delta_i * delta_i) / (dSamplesVari + 1);
+          vari_index++;
         }
 
         // Covariances second (i.e., off-diagonal components, if any)
-        for (int i = d_rms_start; i < d_rms_start + d_rms_components - 1; i++) {
+        for (int i = d_vari_start; i < d_vari_start + d_vari_components - 1; i++) {
           const double uinst_i = d_inst[n + i * dof];
           const double umean_i = d_mean[n + i * dof];
           delta_i = uinst_i - umean_i;
-          for (int j = d_rms_start + 1; j < d_rms_start + d_rms_components; j++) {
+          for (int j = d_vari_start + 1; j < d_vari_start + d_vari_components; j++) {
             const double uinst_j = d_inst[n + j * dof];
             const double umean_j = d_mean[n + j * dof];
             delta_j = uinst_j - umean_j;
 
-            val = d_vari[n + rms_index * dof];
-            d_vari[n + rms_index * dof] = (val * dSamplesRMS + delta_i * delta_j) / (dSamplesRMS + 1);
-            rms_index++;
+            val = d_vari[n + vari_index * dof];
+            d_vari[n + vari_index * dof] = (val * dSamplesVari + delta_i * delta_j) / (dSamplesVari + 1);
+            vari_index++;
           }
         }
       }  // end variance
@@ -328,7 +328,7 @@ void Averaging::addSampleInternal(GasMixture *mixture) {
 
     const ParGridFunction *inst = fam.instantaneous_fcn_;
     ParGridFunction *mean = fam.mean_fcn_;
-    ParGridFunction *vari = fam.rms_fcn_;
+    ParGridFunction *vari = fam.vari_fcn_;
 
     const double *d_inst = inst->Read();
     double *d_mean = mean->ReadWrite();
@@ -348,12 +348,12 @@ void Averaging::addSampleInternal(GasMixture *mixture) {
     const int neq = mean->ParFESpace()->GetVDim();                  // number of scalar variables in mean field
     const int dim = mean->ParFESpace()->GetParMesh()->Dimension();  // spatial dimension
 
-    const int d_rms_start = fam.rms_start_index_;
-    const int d_rms_components = fam.rms_components_;
+    const int d_vari_start = fam.vari_start_index_;
+    const int d_vari_components = fam.vari_components_;
 
     // Extract sample size information for use on device
     double dSamplesMean = (double)ns_mean_;
-    double dSamplesRMS = (double)ns_vari_;
+    double dSamplesVari = (double)ns_vari_;
 
     // "Loop" over all dofs and update statistics
     MFEM_FORALL(n, dof, {
@@ -391,24 +391,24 @@ void Averaging::addSampleInternal(GasMixture *mixture) {
         double val = 0.;
         double delta_i = 0.;
         double delta_j = 0.;
-        int rms_index = 0;
+        int vari_index = 0;
 
         // Variances first (i.e., diagonal of the covariance matrix)
-        for (int i = d_rms_start; i < d_rms_start + d_rms_components; i++) {
-          val = d_vari[n + rms_index * dof];
+        for (int i = d_vari_start; i < d_vari_start + d_vari_components; i++) {
+          val = d_vari[n + vari_index * dof];
           delta_i = (nUp[i] - mean_state[i]);
-          d_vari[n + rms_index * dof] = (val * dSamplesRMS + delta_i * delta_i) / (dSamplesRMS + 1);
-          rms_index++;
+          d_vari[n + vari_index * dof] = (val * dSamplesVari + delta_i * delta_i) / (dSamplesVari + 1);
+          vari_index++;
         }
 
         // Covariances second (i.e., off-diagonal components, if any)
-        for (int i = d_rms_start; i < d_rms_start + d_rms_components - 1; i++) {
-          for (int j = d_rms_start + 1; j < d_rms_start + d_rms_components; j++) {
-            val = d_vari[n + rms_index * dof];
+        for (int i = d_vari_start; i < d_vari_start + d_vari_components - 1; i++) {
+          for (int j = d_vari_start + 1; j < d_vari_start + d_vari_components; j++) {
+            val = d_vari[n + vari_index * dof];
             delta_i = (nUp[i] - mean_state[i]);
             delta_j = (nUp[j] - mean_state[j]);
-            d_vari[n + rms_index * dof] = (val * dSamplesRMS + delta_i * delta_j) / (dSamplesRMS + 1);
-            rms_index++;
+            d_vari[n + vari_index * dof] = (val * dSamplesVari + delta_i * delta_j) / (dSamplesVari + 1);
+            vari_index++;
           }
         }
       }  // end variance
