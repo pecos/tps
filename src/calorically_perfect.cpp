@@ -173,6 +173,7 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
   Qt_.SetSize(sfes_truevsize);
   Qt_ = 0.0;
   Qt_gf_.SetSpace(sfes_);
+  Qt_gf_ = 0.0;
 
   Tn_.SetSize(sfes_truevsize);
   Tn_next_.SetSize(sfes_truevsize);
