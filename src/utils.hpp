@@ -181,4 +181,30 @@ void EliminateRHS(Operator &A, ConstrainedOperator &constrainedA, const Array<in
  */
 void Orthogonalize(Vector &v, MPI_Comm comm);
 
+// Adding to the mfem namespace
+namespace mfem {
+
+/// Matrix coefficient defined as the Gradient of a Vector GridFunction
+class GradientVectorGridFunctionCoefficient : public MatrixCoefficient {
+ protected:
+  const GridFunction *GridFunc;
+
+ public:
+  /** @brief Construct the coefficient with a scalar grid function @a gf. The
+      grid function is not owned by the coefficient. */
+  GradientVectorGridFunctionCoefficient(const GridFunction *gf);
+
+  /// Set the scalar grid function.
+  void SetGridFunction(const GridFunction *gf);
+
+  /// Get the scalar grid function.
+  const GridFunction *GetGridFunction() const { return GridFunc; }
+
+  /// Evaluate the gradient vector coefficient at @a ip.
+  virtual void Eval(DenseMatrix &G, ElementTransformation &T, const IntegrationPoint &ip);
+
+  virtual ~GradientVectorGridFunctionCoefficient() {}
+};
+}  // namespace mfem
+
 #endif  // UTILS_HPP_
