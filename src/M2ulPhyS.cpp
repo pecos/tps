@@ -627,7 +627,7 @@ void M2ulPhyS::initVariables() {
   if (average->ComputeMean()) {
     // meanUp
     ioData.registerIOFamily("Time-averaged primitive vars", "/meanSolution",
-                            average->GetMeanUp(std::string("primitive_state")), false, config.GetRestartMean());
+                            average->GetMeanField(std::string("primitive_state")), false, config.GetRestartMean());
     ioData.registerIOVar("/meanSolution", "meanDens", 0);
     ioData.registerIOVar("/meanSolution", "mean-u", 1);
     ioData.registerIOVar("/meanSolution", "mean-v", 2);
@@ -647,8 +647,8 @@ void M2ulPhyS::initVariables() {
     }
 
     // rms
-    ioData.registerIOFamily("RMS velocity fluctuation", "/rmsData", average->GetRMS(std::string("primitive_state")),
-                            false, config.GetRestartMean());
+    ioData.registerIOFamily("RMS velocity fluctuation", "/rmsData",
+                            average->GetVariField(std::string("primitive_state")), false, config.GetRestartMean());
     if (nvel == 3) {
       ioData.registerIOVar("/rmsData", "uu", 0);
       ioData.registerIOVar("/rmsData", "vv", 1);
@@ -2040,9 +2040,9 @@ void M2ulPhyS::solveStep() {
       } else if (config.planeDump.primitive == true) {
         u_gf = getPrimitiveGF();
       } else if (config.planeDump.mean == true) {
-        u_gf = average->GetMeanUp(std::string("primitive_state"));
+        u_gf = average->GetMeanField(std::string("primitive_state"));
       } else if (config.planeDump.reynolds == true) {
-        u_gf = average->GetRMS(std::string("primitive_state"));
+        u_gf = average->GetVariField(std::string("primitive_state"));
       } else {
         grvy_printf(GRVY_ERROR, "\nSpecified interpolation type not supported.\n");
         exit(ERROR);

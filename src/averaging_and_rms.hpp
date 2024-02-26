@@ -257,13 +257,23 @@ class Averaging {
     return -1;
   }
 
-  ParGridFunction *GetMeanUp(std::string name) {
+  /**
+   * @brief Get pointer to mean field for a family
+   *
+   * @param name Name of the family
+   */
+  ParGridFunction *GetMeanField(std::string name) {
     const int i = getFamilyIndex(name);
     assert(i >= 0);
     return avg_families_[i].mean_fcn_;
   }
 
-  ParGridFunction *GetRMS(std::string name) {
+  /**
+   * @brief Get pointer to variance field for a family
+   *
+   * @param name Name of the family
+   */
+  ParGridFunction *GetVariField(std::string name) {
     const int i = getFamilyIndex(name);
     assert(i >= 0);
     return avg_families_[i].rms_fcn_;
