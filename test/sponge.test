@@ -1,0 +1,37 @@
+#!./bats
+# -*- mode: sh -*-
+
+TEST="spongeBox"
+RUNFILE="inputs/input.spongeZF.ini"
+EXE="../src/tps"
+RESTART="ref_solns/spongeBox/restart_output.sol.h5"
+
+setup() {
+    SOLN_FILE=restart_output.sol.h5
+    REF_FILE=ref_solns/spongeBox/restart_output.sol.h5
+}
+
+@test "[$TEST] check for input file $RUNFILE" {
+    test -s $RUNFILE
+}
+
+#@test "[$TEST] run tps with input -> $RUNFILE" {
+#    rm -rf output/*
+#    rm -f $SOLN_FILE
+#    run $EXE --runFile $RUNFILE
+#    [[ ${status} -eq 0 ]]
+#    test -s $SOLN_FILE
+#}
+
+@test "[$TEST] run tps with input -> $RUNFILE" {
+    rm -rf output/*
+    rm -f $SOLN_FILE
+    run $EXE --runFile $RUNFILE
+    test -s $SOLN_FILE
+}
+
+@test "[$TEST] verify tps output with input -> $RUNFILE" {
+    test -s $SOLN_FILE
+    test -s $REF_FILE
+    h5diff -r --relative=1e-13 $SOLN_FILE $REF_FILE /temperature/temperature
+}

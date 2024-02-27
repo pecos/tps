@@ -262,7 +262,7 @@ int main(int argc, char *argv[]) {
 
   // Exchange interface information
   flow->initializeFromThermoChem(&thermo->toFlow_interface_);
-  thermo->initializeFromFlow(&flow->toThermoChem_interface);
+  thermo->initializeFromFlow(&flow->toThermoChem_interface_);
 
   // And now we can finish initializing the flow
   flow->initializeOperators();

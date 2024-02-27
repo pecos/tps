@@ -131,12 +131,12 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   GridFunctionCoefficient *rhon_next_coeff_ = nullptr;
   ScalarVectorProductCoefficient *rhou_coeff_ = nullptr;
   GridFunctionCoefficient *thermal_diff_coeff_ = nullptr;
-  ProductCoefficient *thermal_diff_total_coeff_ = nullptr;  
+  ProductCoefficient *thermal_diff_total_coeff_ = nullptr;
   GradientGridFunctionCoefficient *gradT_coeff_ = nullptr;
   ScalarVectorProductCoefficient *kap_gradT_coeff_ = nullptr;
   GridFunctionCoefficient *rho_over_dt_coeff_ = nullptr;
   GridFunctionCoefficient *rho_coeff_ = nullptr;
-  GridFunctionCoefficient *mult_coeff_ = nullptr;  
+  GridFunctionCoefficient *mult_coeff_ = nullptr;
 
   // operators and solvers
   ParBilinearForm *At_form_ = nullptr;

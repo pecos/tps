@@ -57,8 +57,6 @@ struct spongeToThermoChem {
  * Provides interface for viscous sponge implementation
  */
 class SpongeBase {
- protected:
-
  public:
   /// Destructor
   virtual ~SpongeBase() {}
@@ -78,7 +76,7 @@ class SpongeBase {
    * @brief Hook to let derived classes register visualization fields with ParaViewDataCollection
    */
   virtual void initializeViz(mfem::ParaViewDataCollection &pvdc) {}
-  
+
   /**
    * @brief Take a single time step
    */
@@ -86,7 +84,7 @@ class SpongeBase {
 
   /// Initialize sponge field, all thats necessary for static fields
   virtual void setup() = 0;
-  
+
   /// Interface object, provides fields necessary for the flow
   spongeToFlow toFlow_interface_;
 

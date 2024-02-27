@@ -30,16 +30,17 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
 
-#ifndef GEOMETRIC_SPONGE_HPP_
-#define GEOMETRIC_SPONGE_HPP_
+#ifndef GEOMETRICSPONGE_HPP_
+#define GEOMETRICSPONGE_HPP_
 
 // forward-declaration for Tps support class
 namespace TPS {
 class Tps;
 }
 
-#include <iostream>
 #include <tps_config.h>
+
+#include <iostream>
 
 #include "../utils/mfem_extras/pfem_extras.hpp"
 #include "io.hpp"
@@ -47,10 +48,10 @@ class Tps;
 #include "mfem/linalg/solvers.hpp"
 #include "run_configuration.hpp"
 #include "split_flow_base.hpp"
+#include "sponge_base.hpp"
 #include "thermo_chem_base.hpp"
 #include "tps.hpp"
 #include "tps_mfem_wrap.hpp"
-#include "sponge_base.hpp"
 
 struct geomUniform {
   bool isEnabled;
@@ -58,7 +59,7 @@ struct geomUniform {
 };
 
 struct geomPlane {
-  bool isEnabled;  
+  bool isEnabled;
   double point[3];
   double normal[3];
   double width;
@@ -66,47 +67,43 @@ struct geomPlane {
 };
 
 struct geomCylinder {
-  bool isEnabled;  
+  bool isEnabled;
   double point[3];
   double normal[3];
   double radiusX;
   double radiusY;
-  double radiusZ;  
+  double radiusZ;
   double width;
   double mult;
 };
 
 struct geomAnnulus {
-  bool isEnabled;  
+  bool isEnabled;
   double point[3];
   double normal[3];
   double radiusX;
   double radiusY;
-  double radiusZ;  
+  double radiusZ;
   double width;
   double mult;
-}; 
-  
-class LoMachSolver;
+};
+
 class LoMachOptions;
 
 /// Add some description here...
 class GeometricSponge : public SpongeBase {
-  friend class LoMachSolver;
-
  private:
-
-  // pointer to parent Tps class  
+  // pointer to parent Tps class
   TPS::Tps *tpsP_ = nullptr;
 
-  // Run options  
-  LoMachOptions *loMach_opts_ = nullptr;
+  // Run options
+  LoMachOptions *loMach_opts_;
 
-  // MPI helpers  
-  MPI_Groups *groupsMPI = nullptr;  
+  // MPI helpers
+  MPI_Groups *groupsMPI_ = nullptr;
   int nprocs_;  // total number of MPI procs
-  int rank_;     // local MPI rank
-  bool rank0_;   // flag to indicate rank 0
+  int rank_;    // local MPI rank
+  bool rank0_;  // flag to indicate rank 0
 
   // space sizes
   int Sdof_, SdofInt_;
@@ -114,22 +111,23 @@ class GeometricSponge : public SpongeBase {
   /// Enable/disable verbose output.
   bool verbose = true;
 
-  ParMesh *pmesh_ = nullptr;
+  ParMesh *pmesh_;
 
   // The order of the scalar spaces
   int order_;
 
-  int nvel_;
   int dim_;
-  //double dt;
-  //double time;
-  //int iter;
+
+  // for future use of sponge to stabilize and IC
+  // double dt;
+  // double time;
+  // int iter;
 
   geomUniform uniform;
   geomPlane plane;
   geomCylinder cylinder;
   geomAnnulus annulus;
-  
+
   // Scalar \f$H^1\f$ finite element collection.
   FiniteElementCollection *sfec_ = nullptr;
 
@@ -138,27 +136,26 @@ class GeometricSponge : public SpongeBase {
 
   // Vector \f$H^1\f$ finite element collection & space
   FiniteElementCollection *vfec_ = nullptr;
-  ParFiniteElementSpace *vfes_ = nullptr;  
+  ParFiniteElementSpace *vfes_ = nullptr;
 
   ParGridFunction mult_gf_;
   // Vector mult_;
 
  public:
   GeometricSponge(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, TPS::Tps *tps);
-  virtual ~GeometricSponge() {}
+  virtual ~GeometricSponge();
 
   void initializeSelf();
-  void initializeViz(ParaViewDataCollection &pvdc) final;    
+  void initializeViz(ParaViewDataCollection &pvdc) final;
   void setup();
   void step();
 
   void spongeUniform(double &wgt);
   void spongePlane(double *x, double &wgt);
   void spongeCylinder(double *x, double &wgt);
-  void spongeAnnulus(double *x, double &wgt);    
-  
+  void spongeAnnulus(double *x, double &wgt);
+
   /// Return a pointer to the current temperature ParGridFunction.
   ParGridFunction *GetCurrentMultiplier() { return &mult_gf_; }
-  
 };
-#endif  // GEOMETRIC_SPONGE_HPP_
+#endif  // GEOMETRICSPONGE_HPP_

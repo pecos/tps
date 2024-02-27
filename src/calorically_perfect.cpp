@@ -141,6 +141,8 @@ CaloricallyPerfectThermoChem::~CaloricallyPerfectThermoChem() {
   delete thermal_diff_coeff_;
   delete rho_over_dt_coeff_;
   delete rho_coeff_;
+  delete mult_coeff_;
+  delete thermal_diff_total_coeff_;
 
   // allocated in initializeSelf
   delete sfes_;
@@ -395,8 +397,8 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   // thermal_diff_coeff.constant = thermal_diff;
   thermal_diff_coeff_ = new GridFunctionCoefficient(&kappa_gf_);
   mult_coeff_ = new GridFunctionCoefficient(sponge_interface_->diff_multiplier);
-  gradT_coeff_ = new GradientGridFunctionCoefficient(&Tn_next_gf_);  
-  thermal_diff_total_coeff_ = new ProductCoefficient(*mult_coeff_, *thermal_diff_coeff_); 
+  gradT_coeff_ = new GradientGridFunctionCoefficient(&Tn_next_gf_);
+  thermal_diff_total_coeff_ = new ProductCoefficient(*mult_coeff_, *thermal_diff_coeff_);
   kap_gradT_coeff_ = new ScalarVectorProductCoefficient(*thermal_diff_total_coeff_, *gradT_coeff_);
 
   // Convection: Atemperature(i,j) = \int_{\Omega} \phi_i \rho u \cdot \nabla \phi_j
@@ -447,7 +449,6 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
 
   Ht_form_ = new ParBilinearForm(sfes_);
   auto *hmt_blfi = new MassIntegrator(*rho_over_dt_coeff_);
-  // auto *hdt_blfi = new DiffusionIntegrator(*thermal_diff_coeff_);
   auto *hdt_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
 
   if (numerical_integ_) {
@@ -802,7 +803,7 @@ void CaloricallyPerfectThermoChem::updateDiffusivity() {
   } else {
     visc_ = mu0_;
   }
-  
+
   // if (config_->sgsModelType > 0) {
   //   const double *dataSubgrid = turbModel_interface_->eddy_viscosity->HostRead();
   //   double *dataVisc = visc_gf.HostReadWrite();
@@ -833,17 +834,12 @@ void CaloricallyPerfectThermoChem::updateDiffusivity() {
   //   }
   // }
 
-  // viscTotal_gf.SetFromTrueDofs(visc);
-
-  // viscTotal_gf.GetTrueDofs(visc);
-  //viscTotal_gf_.SetFromTrueDofs(visc_);
-  visc_gf_.SetFromTrueDofs(visc_);  
+  visc_gf_.SetFromTrueDofs(visc_);
 
   // NB: Here kappa is kappa / Cp = mu / Pr
   kappa_ = visc_;
   kappa_ /= Pr_;
   kappa_gf_.SetFromTrueDofs(kappa_);
-  
 }
 
 void CaloricallyPerfectThermoChem::updateDensity(double tStep) {

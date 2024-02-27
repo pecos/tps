@@ -44,10 +44,10 @@
 #include <limits>
 
 #include "calorically_perfect.hpp"
+#include "geometricSponge.hpp"
 #include "io.hpp"
 #include "logger.hpp"
 #include "tomboulides.hpp"
-#include "geometricSponge.hpp"
 #include "tps.hpp"
 #include "utils.hpp"
 
@@ -381,8 +381,8 @@ void LoMachSolver::initialize() {
   //-----------------------------------------------------
 
   // Instantiate sponge
-  sponge_ = new GeometricSponge(pmesh_, &loMach_opts_, tpsP_);  
-  
+  sponge_ = new GeometricSponge(pmesh_, &loMach_opts_, tpsP_);
+
   // TODO(trevilo): Add support for turbulence modeling
   if (rank0_) {
     if (loMach_opts_.sgs_opts_.sgs_model_type_ == SubGridModelOptions::SMAGORINSKY) {
@@ -447,15 +447,13 @@ void LoMachSolver::initialize() {
   thermo_->initializeFromSponge(&sponge_->toThermoChem_interface_);
   flow_->initializeFromThermoChem(&thermo_->toFlow_interface_);
   thermo_->initializeFromFlow(&flow_->toThermoChem_interface_);
-  
+
+  // static sponge
+  sponge_->setup();
+
   // Finish initializing operators
   flow_->initializeOperators();
   thermo_->initializeOperators();
-  MPI_Barrier(groupsMPI->getTPSCommWorld());    
-
-  // Set static sponge field
-  sponge_->setup();
-  MPI_Barrier(groupsMPI->getTPSCommWorld());  
 
   // TODO(trevilo): Enable averaging.  See note in loMach.hpp
 
@@ -573,7 +571,6 @@ void LoMachSolver::solveStep() {
 
   // restart files
   if (iter % loMach_opts_.output_frequency_ == 0 && iter != 0) {
-    
     // Write restart file!
     restart_files_hdf5("write");
 
@@ -581,7 +578,6 @@ void LoMachSolver::solveStep() {
     pvdc_->SetCycle(iter);
     pvdc_->SetTime(temporal_coeff_.time);
     pvdc_->Save();
-    
   }
 
   // check for DIE

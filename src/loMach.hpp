@@ -65,8 +65,8 @@ class Tps;
 #include "loMach_options.hpp"
 #include "solver.hpp"
 #include "split_flow_base.hpp"
-#include "thermo_chem_base.hpp"
 #include "sponge_base.hpp"
+#include "thermo_chem_base.hpp"
 #include "tps_mfem_wrap.hpp"
 
 struct temporalSchemeCoefficients {
@@ -118,7 +118,7 @@ class LoMachSolver : public TPS::Solver {
   // TurbModel *turbClass = nullptr;
   ThermoChemModelBase *thermo_ = nullptr;
   FlowBase *flow_ = nullptr;
-  SpongeBase *sponge_ = nullptr;  
+  SpongeBase *sponge_ = nullptr;
 
   // Mesh and geometry related
   ParMesh *pmesh_ = nullptr;

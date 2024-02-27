@@ -26,7 +26,7 @@ EXTRA_DIST  = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes lte-
 	          ref_solns/*.h5 ref_solns/collisions/*.h5 ref_solns/transport/*.h5 \
 			  ref_solns/reaction/*.h5 ref_solns/noSGM1K/*.h5 ref_solns/smag1K_1/*.h5 \
 			  ref_solns/sigma1K_1/*.h5 ref_solns/plate150K/*.h5 ref_solns/plate150K_1step/*.h5 \
-              ref_solns/heatedBox/*.h5 \
+              ref_solns/heatedBox/*.h5 ref_solns/spongeBox/*.h5 \
 		      vpath.sh die.sh count_gpus.sh sniff_mpirun.sh \
 		      cyl3d.gpu.test cyl3d.mflow.gpu.test wedge.gpu.test \
 	          averaging.gpu.test cyl3d.test cyl3d.gpu.python.test cyl3d.mflow.test cyl3d.dtconst.test \
@@ -39,7 +39,7 @@ EXTRA_DIST  = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes lte-
 		      independent_coupling.test interp_em.test mms.euler_2d.test mms.cns_2d.test \
 		      gradient.test coupled-3d.test coupled-3d.splitcomm.test coupled-3d.py-loop.test \
 		      tabulated.test lte_mixture.test distance_fcn.test \
-              sgsSmag.test sgsSigma.test heatEq.test sponfe.tet plate.test pipe.mix.test lte2noneq-restart.test \
+              sgsSmag.test sgsSigma.test heatEq.test sponge.test plate.test pipe.mix.test lte2noneq-restart.test \
               coupled-3d.interface.test plasma.axisym.test plasma.axisym.lte1d.test \
 	      lomach-flow.test
 

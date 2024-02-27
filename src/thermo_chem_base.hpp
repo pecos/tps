@@ -69,7 +69,7 @@ class ThermoChemModelBase {
  protected:
   const flowToThermoChem *flow_interface_;
   const turbModelToThermoChem *turbModel_interface_;
-  const spongeToThermoChem *sponge_interface_;  
+  const spongeToThermoChem *sponge_interface_;
 
  public:
   /// Destructor
@@ -150,7 +150,6 @@ class ThermoChemModelBase {
 
   /// Get interface provided by flow model
   const spongeToThermoChem *getSpongeInterface() const { return sponge_interface_; }
-  
 };
 
 /**
