@@ -29,8 +29,8 @@ EXTRA_DIST  = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes lte-
               ref_solns/heatedBox/*.h5 \
 		      vpath.sh die.sh count_gpus.sh sniff_mpirun.sh \
 		      cyl3d.gpu.test cyl3d.mflow.gpu.test wedge.gpu.test \
-	          averages.gpu.test cyl3d.test cyl3d.gpu.python.test cyl3d.mflow.test cyl3d.dtconst.test \
-		      die.test averages.test wedge.test cyl3d.interp.test qms.rings.test qms.axisym.test \
+	          averaging.gpu.test cyl3d.test cyl3d.gpu.python.test cyl3d.mflow.test cyl3d.dtconst.test \
+		      die.test averaging.test wedge.test cyl3d.interp.test qms.rings.test qms.axisym.test \
 		      sponge_zone.test annulus.test pipe.test valgrind.test valgrind.suppressions \
 		      mms.euler.test reaction.test perfect_gas.test collision_integrals.test \
 	 	      argon_minimal.test argon_minimal.binary.test diffusion_wall.test \
@@ -50,7 +50,7 @@ if GPU_ENABLED
 TESTS += cyl3d.gpu.test \
 	 cyl3d.mflow.gpu.test \
 	 wedge.gpu.test \
-	 averages.gpu.test \
+	 averaging.gpu.test \
 	 argon_minimal.binary.test \
 	 diffusion_wall.test \
 	 reaction.test \
@@ -71,7 +71,7 @@ else
 TESTS += cyl3d.test \
 	 cyl3d.mflow.test \
 	 cyl3d.dtconst.test \
-	 averages.test \
+	 averaging.test \
 	 wedge.test \
 	 qms.rings.test \
 	 qms.axisym.test \

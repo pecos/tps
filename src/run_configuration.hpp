@@ -40,7 +40,7 @@
 #include <utility>
 #include <vector>
 
-#include "averaging_and_rms.hpp"
+#include "averaging.hpp"
 #include "dataStructures.hpp"
 #include "io.hpp"
 #include "tps_mfem_wrap.hpp"

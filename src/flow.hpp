@@ -45,7 +45,7 @@ class Tps;
 
 // #include "loMach_options.hpp"
 #include "argon_transport.hpp"
-#include "averaging_and_rms.hpp"
+#include "averaging.hpp"
 #include "chemistry.hpp"
 #include "io.hpp"
 #include "mfem.hpp"

@@ -29,7 +29,7 @@ tps_LDFLAGS += -fgpu-rdc
 endif
 
 # C++ solver library sources
-cxx_sources          = averaging_and_rms.cpp faceGradientIntegration.cpp M2ulPhyS.cpp rhs_operator.cpp wallBC.cpp \
+cxx_sources          = averaging.cpp faceGradientIntegration.cpp M2ulPhyS.cpp rhs_operator.cpp wallBC.cpp \
 		       BCintegrator.cpp face_integrator.cpp riemann_solver.cpp BoundaryCondition.cpp fluxes.cpp \
                        masa_handler.cpp run_configuration.cpp domain_integrator.cpp forcing_terms.cpp mpi_groups.cpp \
 	               equation_of_state.cpp transport_properties.cpp inletBC.cpp outletBC.cpp utils.cpp io.cpp \
@@ -42,7 +42,7 @@ cxx_sources          = averaging_and_rms.cpp faceGradientIntegration.cpp M2ulPhy
 
 mfem_extra_sources   = ../utils/mfem_extras/pfem_extras.cpp
 
-headers              = averaging_and_rms.hpp equation_of_state.hpp transport_properties.hpp forcing_terms.hpp mpi_groups.hpp \
+headers              = averaging.hpp equation_of_state.hpp transport_properties.hpp forcing_terms.hpp mpi_groups.hpp \
 		       run_configuration.hpp BCintegrator.hpp faceGradientIntegration.hpp inletBC.hpp outletBC.hpp \
 	               BoundaryCondition.hpp face_integrator.hpp M2ulPhyS.hpp rhs_operator.hpp \
 	               wallBC.hpp domain_integrator.hpp fluxes.hpp masa_handler.hpp riemann_solver.hpp \

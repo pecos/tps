@@ -29,8 +29,8 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
-#ifndef AVERAGING_AND_RMS_HPP_
-#define AVERAGING_AND_RMS_HPP_
+#ifndef AVERAGING_HPP_
+#define AVERAGING_HPP_
 
 #include <tps_config.h>
 
@@ -289,4 +289,4 @@ class Averaging {
   void SetSamplesInterval(int &interval) { sample_interval_ = interval; }
 };
 
-#endif  // AVERAGING_AND_RMS_HPP_
+#endif  // AVERAGING_HPP_

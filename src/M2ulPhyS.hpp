@@ -52,7 +52,7 @@ class Tps;
 
 #include "BCintegrator.hpp"
 #include "argon_transport.hpp"
-#include "averaging_and_rms.hpp"
+#include "averaging.hpp"
 #include "chemistry.hpp"
 #include "dataStructures.hpp"
 #include "dgNonlinearForm.hpp"
