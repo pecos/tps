@@ -120,7 +120,7 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
       if (type == "viscous_isothermal" || type == "viscous_adiabatic" || type == "viscous" || type == "no-slip") {
         Array<int> wall_attr(pmesh_->bdr_attributes.Max());
         wall_attr = 0;
-        wall_attr[patch-1] = 1;
+        wall_attr[patch - 1] = 1;
 
         Vector zero(dim_);
         zero = 0.0;
@@ -326,7 +326,7 @@ void Tomboulides::initializeOperators() {
   Qt_coeff_ = new GridFunctionCoefficient(thermo_interface_->thermal_divergence);
   gradmu_Qt_coeff_ = new ScalarVectorProductCoefficient(*Qt_coeff_, *grad_mu_coeff_);
 
-  S_poisson_coeff_ = new VectorSumCoefficient(*twoS_gradmu_coeff_, *gradmu_Qt_coeff_, 1.0, -2./3);
+  S_poisson_coeff_ = new VectorSumCoefficient(*twoS_gradmu_coeff_, *gradmu_Qt_coeff_, 1.0, -2. / 3);
   S_mom_coeff_ = new VectorSumCoefficient(*graduT_gradmu_coeff_, *gradmu_Qt_coeff_, 1.0, -1.0);
 
   // Integration rules (only used if numerical_integ_ is true).  When
