@@ -39,7 +39,7 @@ cxx_sources          = averaging.cpp faceGradientIntegration.cpp M2ulPhyS.cpp rh
                        lte_transport_properties.cpp mixing_length_transport.cpp tps2Boltzmann.cpp  M2ulPhyS2Boltzmann.cpp \
                        pybindings.cpp gslib_interpolator.cpp loMach.cpp loMachIO.cpp loMach_options.cpp turbModel.cpp calorically_perfect.cpp \
 	               turb_model_base.cpp thermo_chem_base.cpp split_flow_base.cpp tomboulides.cpp dirichlet_bc_helper.cpp \
-                       sponge_base.cpp geometricSponge.cpp
+                       sponge_base.cpp geometricSponge.cpp externalData_base.cpp gaussianInterpExtData.cpp
 
 mfem_extra_sources   = ../utils/mfem_extras/pfem_extras.cpp
 
@@ -54,7 +54,7 @@ headers              = averaging.hpp equation_of_state.hpp transport_properties.
                        lte_transport_properties.hpp mixing_length_transport.hpp tps2Boltzmann.hpp gslib_interpolator.hpp \
                        loMach.hpp loMach_options.hpp turbModel.hpp calorically_perfect.hpp turb_model_base.hpp \
 		       thermo_chem_base.hpp split_flow_base.hpp tomboulides.hpp dirichlet_bc_helper.hpp \
-                       sponge_base.hpp geometricSponge.hpp
+                       sponge_base.hpp geometricSponge.hpp externalData_base.hpp gaussianInterpExtData.hpp
 
 mfem_extra_headers   = ../utils/mfem_extras/pfem_extras.hpp
 
