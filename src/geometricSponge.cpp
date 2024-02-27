@@ -50,51 +50,56 @@ using namespace mfem;
 using namespace mfem::common;
 
 GeometricSponge::GeometricSponge(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, TPS::Tps *tps)
-    : tpsP_(tps), pmesh_(pmesh), loMach_opts_(loMach_opts) {
-  
+    : tpsP_(tps),
+      groupsMPI(new MPI_Groups(tps->getTPSCommWorld())),
+      nprocs_(groupsMPI->getTPSWorldSize()),      
+      pmesh_(pmesh),
+      loMach_opts_(loMach_opts) {
+
+  rank_ = pmesh_->GetMyRank();
   rank0_ = (pmesh_->GetMyRank() == 0);
   order_ = loMach_opts->order;
 
-  tpsP_->getInput("spongeMultiplierFunction/uniform", uniform.isEnabled, false);
-  tpsP_->getInput("spongeMultiplierFunction/plane", plane.isEnabled, false);
-  tpsP_->getInput("spongeMultiplierFunction/cylinder", cylinder.isEnabled, false);
-  tpsP_->getInput("spongeMultiplierFunction/annulus", annulus.isEnabled, false);    
+  tpsP_->getInput("spongeMultiplier/uniform", uniform.isEnabled, false);
+  tpsP_->getInput("spongeMultiplier/plane", plane.isEnabled, false);
+  tpsP_->getInput("spongeMultiplier/cylinder", cylinder.isEnabled, false);
+  tpsP_->getInput("spongeMultiplier/annulus", annulus.isEnabled, false);    
   
   if (uniform.isEnabled) {
-    tpsP_->getRequiredInput("spongeMultiplierFunction/uniformMult", uniform.mult);    
+    tpsP_->getRequiredInput("spongeMultiplier/uniformMult", uniform.mult);    
   }
 
   if (plane.isEnabled) {  
-    tpsP_->getRequiredVecElem("spongeMultiplierFunction/planeNormal", plane.normal[0], 0);
-    tpsP_->getRequiredVecElem("spongeMultiplierFunction/planeNormal", plane.normal[1], 1);
-    tpsP_->getRequiredVecElem("spongeMultiplierFunction/planeNormal", plane.normal[2], 2);
-    tpsP_->getRequiredVecElem("spongeMultiplierFunction/planePoint", plane.point[0], 0);
-    tpsP_->getRequiredVecElem("spongeMultiplierFunction/planePoint", plane.point[1], 1);
-    tpsP_->getRequiredVecElem("spongeMultiplierFunction/planePoint", plane.point[2], 2);    
-    tpsP_->getRequiredInput("spongeMultiplierFunction/planeWidth", plane.width);
-    tpsP_->getRequiredInput("spongeMultiplierFunction/planeMult", plane.mult);
+    tpsP_->getRequiredVecElem("spongeMultiplier/planeNormal", plane.normal[0], 0);
+    tpsP_->getRequiredVecElem("spongeMultiplier/planeNormal", plane.normal[1], 1);
+    tpsP_->getRequiredVecElem("spongeMultiplier/planeNormal", plane.normal[2], 2);
+    tpsP_->getRequiredVecElem("spongeMultiplier/planePoint", plane.point[0], 0);
+    tpsP_->getRequiredVecElem("spongeMultiplier/planePoint", plane.point[1], 1);
+    tpsP_->getRequiredVecElem("spongeMultiplier/planePoint", plane.point[2], 2);    
+    tpsP_->getRequiredInput("spongeMultiplier/planeWidth", plane.width);
+    tpsP_->getRequiredInput("spongeMultiplier/planeMult", plane.mult);
   } 
 
   if (cylinder.isEnabled) {      
-    tpsP_->getRequiredVecElem("spongeMultiplierFunction/cylinderPoint", cylinder.point[0], 0);
-    tpsP_->getRequiredVecElem("spongeMultiplierFunction/cylinderPoint", cylinder.point[1], 1);
-    tpsP_->getRequiredVecElem("spongeMultiplierFunction/cylinderPoint", cylinder.point[2], 2);
-    tpsP_->getInput("spongeMultiplierFunction/cylinderRadiusX", cylinder.radiusX, -1.0);
-    tpsP_->getInput("spongeMultiplierFunction/cylinderRadiusY", cylinder.radiusY, -1.0);
-    tpsP_->getInput("spongeMultiplierFunction/cylinderRadiusZ", cylinder.radiusZ, -1.0);    
-    tpsP_->getInput("spongeMultiplierFunction/cylinderWidth", cylinder.width, 1.0e-8);    
-    tpsP_->getRequiredInput("spongeMultiplierFunction/cylinderMult", cylinder.mult);    
+    tpsP_->getRequiredVecElem("spongeMultiplier/cylinderPoint", cylinder.point[0], 0);
+    tpsP_->getRequiredVecElem("spongeMultiplier/cylinderPoint", cylinder.point[1], 1);
+    tpsP_->getRequiredVecElem("spongeMultiplier/cylinderPoint", cylinder.point[2], 2);
+    tpsP_->getInput("spongeMultiplier/cylinderRadiusX", cylinder.radiusX, -1.0);
+    tpsP_->getInput("spongeMultiplier/cylinderRadiusY", cylinder.radiusY, -1.0);
+    tpsP_->getInput("spongeMultiplier/cylinderRadiusZ", cylinder.radiusZ, -1.0);    
+    tpsP_->getInput("spongeMultiplier/cylinderWidth", cylinder.width, 1.0e-8);    
+    tpsP_->getRequiredInput("spongeMultiplier/cylinderMult", cylinder.mult);    
   }
   
   if (annulus.isEnabled) {      
-    tpsP_->getRequiredVecElem("spongeMultiplierFunction/annulusPoint", annulus.point[0], 0);
-    tpsP_->getRequiredVecElem("spongeMultiplierFunction/annulusPoint", annulus.point[1], 1);
-    tpsP_->getRequiredVecElem("spongeMultiplierFunction/annulusPoint", annulus.point[2], 2);
-    tpsP_->getInput("spongeMultiplierFunction/annulusRadiusX", annulus.radiusX, -1.0);
-    tpsP_->getInput("spongeMultiplierFunction/annulusRadiusY", annulus.radiusY, -1.0);
-    tpsP_->getInput("spongeMultiplierFunction/annulusRadiusZ", annulus.radiusZ, -1.0);    
-    tpsP_->getInput("spongeMultiplierFunction/annulusWidth", annulus.width, 1.0e-8);    
-    tpsP_->getRequiredInput("spongeMultiplierFunction/annulusMult", annulus.mult); 
+    tpsP_->getRequiredVecElem("spongeMultiplier/annulusPoint", annulus.point[0], 0);
+    tpsP_->getRequiredVecElem("spongeMultiplier/annulusPoint", annulus.point[1], 1);
+    tpsP_->getRequiredVecElem("spongeMultiplier/annulusPoint", annulus.point[2], 2);
+    tpsP_->getInput("spongeMultiplier/annulusRadiusX", annulus.radiusX, -1.0);
+    tpsP_->getInput("spongeMultiplier/annulusRadiusY", annulus.radiusY, -1.0);
+    tpsP_->getInput("spongeMultiplier/annulusRadiusZ", annulus.radiusZ, -1.0);    
+    tpsP_->getInput("spongeMultiplier/annulusWidth", annulus.width, 1.0e-8);    
+    tpsP_->getRequiredInput("spongeMultiplier/annulusMult", annulus.mult); 
   }
 
   // TODO: add checks and error msg for invalid sponge settings
@@ -110,7 +115,7 @@ void GeometricSponge::initializeSelf() {
   }
   dim_ = pmesh_->Dimension();
   nvel_ = dim_;
-
+  
   bool verbose = rank0_;
   if (verbose) grvy_printf(ginfo, "Initializing Sponge.\n");
 
@@ -127,6 +132,11 @@ void GeometricSponge::initializeSelf() {
   sfec_ = new H1_FECollection(order_);
   sfes_ = new ParFiniteElementSpace(pmesh_, sfec_);
 
+  vfec_ = new H1_FECollection(order_);
+  vfes_ = new ParFiniteElementSpace(pmesh_, vfec_, dim_);
+  
+  Sdof_ = sfes_->GetNDofs();  
+  
   mult_gf_.SetSpace(sfes_);  
   // int sfes_truevsize = sfes_->GetTrueVSize();
   // mult.SetSize(sfes_truevsize);
@@ -142,24 +152,27 @@ void GeometricSponge::initializeViz(ParaViewDataCollection &pvdc) {
 
 void GeometricSponge::setup() {
 
-  ParGridFunction coordsDof(sfes_);
+  ParGridFunction coordsDof(vfes_);
   pmesh_->GetNodes(coordsDof);
   
   double *data = mult_gf_.HostReadWrite();
   double *hcoords = coordsDof.HostReadWrite();
-  double wgt = 1.0;
-  for (int n = 0; n < sfes_->GetNDofs(); n++) {    
+  
+  for (int i = 0; i < Sdof_; i++) {
+    
     double coords[3];
     for (int d = 0; d < dim_; d++) {
-      coords[d] = hcoords[n + d * sfes_->GetNDofs()];
-    }    
+      coords[d] = hcoords[i + d * Sdof_];
+    }
+
+    double wgt = 1.0;    
     if(uniform.isEnabled) spongeUniform(wgt);
     if(plane.isEnabled) spongePlane(coords, wgt);
     if(cylinder.isEnabled) spongeCylinder(coords, wgt);              
-    if(annulus.isEnabled) spongeAnnulus(coords, wgt);          
-    data[n] = wgt; 
+    if(annulus.isEnabled) spongeAnnulus(coords, wgt);
+    data[i] = wgt;
+
   }
-  // mult_gf.GetTrueDofs(mult);
   
 }
 
@@ -174,7 +187,7 @@ void GeometricSponge::spongeUniform(double &wgt) {
 }
 
 void GeometricSponge::spongePlane(double *x, double &wgt) {
- 
+  
   double normal[dim_];
   double point[dim_];
   double s[dim_];
@@ -207,12 +220,12 @@ void GeometricSponge::spongePlane(double *x, double &wgt) {
 
 //  TODO: add suppport for arbitrary orientation of cylinder axis
 void GeometricSponge::spongeCylinder(double *xGlobal, double &wgt) {
-
+  
   double normal[dim_];
   double point[dim_];
   double s[dim_];
   double factor, width, dist, wgt0;  
-  double wgtCyl;  
+  double wgtCyl;
   
   // cylinder orientation and size
   double cylX = cylinder.radiusX;
@@ -225,7 +238,8 @@ void GeometricSponge::spongeCylinder(double *xGlobal, double &wgt) {
   for(int i=0; i<dim_; i++) { point[i] = cylinder.point[i]; }  
   for(int i=0; i<dim_; i++) { x[i] = xGlobal[i] - point[i]; }
 
-  factor = cylinder.mult;  
+  factor = cylinder.mult;
+  wgt0 = 0.5 * (tanh(0.0 / width - 2.0) + 1.0);    
 
   // cylinder aligned with one axis
   if ( cylX > 0.0) {
@@ -242,7 +256,7 @@ void GeometricSponge::spongeCylinder(double *xGlobal, double &wgt) {
   } else if (cylY > 0.0) {
     dist = x[0] * x[0] + x[2] * x[2];
     dist = std::sqrt(dist);
-    dist = dist - cylY;
+    dist = dist - cylY;    
     wgtCyl = 0.5 * (tanh(dist / width - 2.0) + 1.0);
     wgtCyl = (wgtCyl - wgt0) * 1.0 / (1.0 - wgt0);
     wgtCyl = std::max(wgtCyl, 0.0);

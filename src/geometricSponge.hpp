@@ -95,12 +95,15 @@ class GeometricSponge : public SpongeBase {
   friend class LoMachSolver;
 
  private:
-  // Options-related structures
+
+  // pointer to parent Tps class  
   TPS::Tps *tpsP_ = nullptr;
-  
+
+  // Run options  
   LoMachOptions *loMach_opts_ = nullptr;
 
-  // MPI_Groups *groupsMPI;
+  // MPI helpers  
+  MPI_Groups *groupsMPI = nullptr;  
   int nprocs_;  // total number of MPI procs
   int rank_;     // local MPI rank
   bool rank0_;   // flag to indicate rank 0
@@ -132,6 +135,10 @@ class GeometricSponge : public SpongeBase {
 
   // Scalar \f$H^1\f$ finite element space.
   ParFiniteElementSpace *sfes_ = nullptr;
+
+  // Vector \f$H^1\f$ finite element collection & space
+  FiniteElementCollection *vfec_ = nullptr;
+  ParFiniteElementSpace *vfes_ = nullptr;  
 
   ParGridFunction mult_gf_;
   // Vector mult_;

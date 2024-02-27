@@ -434,7 +434,7 @@ void LoMachSolver::initialize() {
   if (verbose) grvy_printf(ginfo, "got CFL...\n");
 
   // Initialize model-owned data
-  sponge_->initializeSelf();  
+  sponge_->initializeSelf();
   flow_->initializeSelf();
   thermo_->initializeSelf();
 
@@ -443,17 +443,19 @@ void LoMachSolver::initialize() {
   thermo_->initializeIO(ioData);
 
   // Exchange interface information
-  flow_->initializeFromSponge(&sponge_->toFlow_interface_);    
-  thermo_->initializeFromSponge(&sponge_->toThermoChem_interface_);    
+  flow_->initializeFromSponge(&sponge_->toFlow_interface_);
+  thermo_->initializeFromSponge(&sponge_->toThermoChem_interface_);
   flow_->initializeFromThermoChem(&thermo_->toFlow_interface_);
   thermo_->initializeFromFlow(&flow_->toThermoChem_interface_);
   
   // Finish initializing operators
   flow_->initializeOperators();
   thermo_->initializeOperators();
+  MPI_Barrier(groupsMPI->getTPSCommWorld());    
 
   // Set static sponge field
   sponge_->setup();
+  MPI_Barrier(groupsMPI->getTPSCommWorld());  
 
   // TODO(trevilo): Enable averaging.  See note in loMach.hpp
 
@@ -471,7 +473,7 @@ void LoMachSolver::initialize() {
 
   flow_->initializeViz(*pvdc_);
   thermo_->initializeViz(*pvdc_);
-  // sponge_->initializeViz(*pvdc_);  
+  sponge_->initializeViz(*pvdc_);
 
   // If restarting, read restart files
   if (loMach_opts_.io_opts_.enable_restart_) {
@@ -571,6 +573,7 @@ void LoMachSolver::solveStep() {
 
   // restart files
   if (iter % loMach_opts_.output_frequency_ == 0 && iter != 0) {
+    
     // Write restart file!
     restart_files_hdf5("write");
 
@@ -578,6 +581,7 @@ void LoMachSolver::solveStep() {
     pvdc_->SetCycle(iter);
     pvdc_->SetTime(temporal_coeff_.time);
     pvdc_->Save();
+    
   }
 
   // check for DIE
