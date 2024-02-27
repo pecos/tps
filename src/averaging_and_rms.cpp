@@ -149,8 +149,6 @@ void Averaging::initializeViz() {
     }
 
     // Register fields with paraview
-
-    // TODO(trevilo): Add a name to AveragingFamily so we can use it here
     std::string mean_name("mean_");
     mean_name += avg_families_[i].name_;
     pvdc_->RegisterField(mean_name.c_str(), mean);
@@ -263,8 +261,8 @@ void Averaging::addSampleInternal() {
     const int d_vari_components = fam.vari_components_;
 
     // Extract sample size information for use on device
-    double dSamplesMean = (double)ns_mean_;
-    double dSamplesVari = (double)ns_vari_;
+    double d_ns_mean = (double)ns_mean_;
+    double d_ns_vari = (double)ns_vari_;
 
     // "Loop" over all dofs and update statistics
     MFEM_FORALL(n, dof, {
@@ -272,8 +270,8 @@ void Averaging::addSampleInternal() {
       for (int eq = 0; eq < neq; eq++) {
         const double uinst = d_inst[n + eq * dof];
         const double umean = d_mean[n + eq * dof];
-        const double N_umean = dSamplesMean * umean;
-        d_mean[n + eq * dof] = (N_umean + uinst) / (dSamplesMean + 1);
+        const double N_umean = d_ns_mean * umean;
+        d_mean[n + eq * dof] = (N_umean + uinst) / (d_ns_mean + 1);
       }
 
       // Update variances (only computed if we have a place to put them)
@@ -289,7 +287,7 @@ void Averaging::addSampleInternal() {
           const double umean = d_mean[n + i * dof];
           delta_i = (uinst - umean);
           val = d_vari[n + vari_index * dof];
-          d_vari[n + vari_index * dof] = (val * dSamplesVari + delta_i * delta_i) / (dSamplesVari + 1);
+          d_vari[n + vari_index * dof] = (val * d_ns_vari + delta_i * delta_i) / (d_ns_vari + 1);
           vari_index++;
         }
 
@@ -304,7 +302,7 @@ void Averaging::addSampleInternal() {
             delta_j = uinst_j - umean_j;
 
             val = d_vari[n + vari_index * dof];
-            d_vari[n + vari_index * dof] = (val * dSamplesVari + delta_i * delta_j) / (dSamplesVari + 1);
+            d_vari[n + vari_index * dof] = (val * d_ns_vari + delta_i * delta_j) / (d_ns_vari + 1);
             vari_index++;
           }
         }
@@ -352,8 +350,8 @@ void Averaging::addSampleInternal(GasMixture *mixture) {
     const int d_vari_components = fam.vari_components_;
 
     // Extract sample size information for use on device
-    double dSamplesMean = (double)ns_mean_;
-    double dSamplesVari = (double)ns_vari_;
+    double d_ns_mean = (double)ns_mean_;
+    double d_ns_vari = (double)ns_vari_;
 
     // "Loop" over all dofs and update statistics
     MFEM_FORALL(n, dof, {
@@ -367,16 +365,16 @@ void Averaging::addSampleInternal(GasMixture *mixture) {
       for (int eq = 0; eq < neq; eq++) {
         const double uinst = d_inst[n + eq * dof];
         const double umean = d_mean[n + eq * dof];
-        const double N_umean = dSamplesMean * umean;
+        const double N_umean = d_ns_mean * umean;
 
         if (eq != 1 + dim) {
-          d_mean[n + eq * dof] = (N_umean + uinst) / (dSamplesMean + 1);
+          d_mean[n + eq * dof] = (N_umean + uinst) / (d_ns_mean + 1);
         } else {  // eq == 1+dim
           double p = nUp[eq];
           if (mixture != nullptr) {
             p = d_mixture->ComputePressureFromPrimitives(nUp);
           }
-          d_mean[n + eq * dof] = (N_umean + p) / (dSamplesMean + 1);
+          d_mean[n + eq * dof] = (N_umean + p) / (d_ns_mean + 1);
         }
       }
 
@@ -397,7 +395,7 @@ void Averaging::addSampleInternal(GasMixture *mixture) {
         for (int i = d_vari_start; i < d_vari_start + d_vari_components; i++) {
           val = d_vari[n + vari_index * dof];
           delta_i = (nUp[i] - mean_state[i]);
-          d_vari[n + vari_index * dof] = (val * dSamplesVari + delta_i * delta_i) / (dSamplesVari + 1);
+          d_vari[n + vari_index * dof] = (val * d_ns_vari + delta_i * delta_i) / (d_ns_vari + 1);
           vari_index++;
         }
 
@@ -407,7 +405,7 @@ void Averaging::addSampleInternal(GasMixture *mixture) {
             val = d_vari[n + vari_index * dof];
             delta_i = (nUp[i] - mean_state[i]);
             delta_j = (nUp[j] - mean_state[j]);
-            d_vari[n + vari_index * dof] = (val * dSamplesVari + delta_i * delta_j) / (dSamplesVari + 1);
+            d_vari[n + vari_index * dof] = (val * d_ns_vari + delta_i * delta_j) / (d_ns_vari + 1);
             vari_index++;
           }
         }
