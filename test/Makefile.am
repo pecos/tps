@@ -42,7 +42,7 @@ EXTRA_DIST  = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes lte-
 		      tabulated.test lte_mixture.test distance_fcn.test \
               sgsSmag.test sgsSigma.test heatEq.test sponge.test plate.test pipe.mix.test lte2noneq-restart.test \
               coupled-3d.interface.test plasma.axisym.test plasma.axisym.lte1d.test \
-	      lomach-flow.test lomach-lequere.test
+	      lomach-flow.test lomach-lequere.test interpInlet.test
 
 TESTS = vpath.sh
 XFAIL_TESTS =
@@ -104,7 +104,8 @@ TESTS += cyl3d.test \
 	 plasma.axisym.test \
 	 plasma.axisym.lte1d.test \
 	 lomach-flow.test \
-	 lomach-lequere.test
+	 lomach-lequere.test \
+         interpInlet.test
 
 if PYTHON_ENABLED
 TESTS += cyl3d.python.test \

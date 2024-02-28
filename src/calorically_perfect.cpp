@@ -286,21 +286,18 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
       if (type == "uniform") {
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
         inlet_attr = 0;
-        inlet_attr[patch] = 1;
- 
+        inlet_attr[patch-1] = 1;
         double temperature_value;
         tpsP_->getRequiredInput((basepath + "/temperature").c_str(), temperature_value);
-
         if (rank0_) {
           std::cout << "Calorically Perfect: Setting uniform Dirichlet temperature on patch = " << patch << std::endl;
         }
         AddTempDirichletBC(temperature_value, inlet_attr);
 	
       } else if (type == "interpolate") {
-        // if (rank0_) {std::cout << "caught interpolate..." << endl;}  	
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
         inlet_attr = 0;
-        inlet_attr[patch] = 1;
+        inlet_attr[patch-1] = 1;
         temperature_field_ = new GridFunctionCoefficient(extData_interface_->Tdata);
         if (rank0_) {
           std::cout << "Calorically Perfect: Setting interpolated Dirichlet temperature on patch = " << patch << std::endl;
@@ -322,6 +319,7 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
 	      }
 	    }
 	  }
+          Tn_gf_.GetTrueDofs(Tn_);	  
 	}
 	
       } else {
@@ -700,7 +698,7 @@ void CaloricallyPerfectThermoChem::step() {
   assert(HtInv_->GetConverged());
 
   Ht_form_->RecoverFEMSolution(Xt2, resT_gf_, Tn_next_gf_);
-  Tn_next_gf_.GetTrueDofs(Tn_next_);
+  Tn_next_gf_.GetTrueDofs(Tn_next_);  
 
   // explicit filter
   if (filter_temperature_) {
@@ -919,8 +917,16 @@ void CaloricallyPerfectThermoChem::AddTempDirichletBC(const double &temp, Array<
 
 void CaloricallyPerfectThermoChem::AddTempDirichletBC(Coefficient *coeff, Array<int> &attr) {
   temp_dbcs_.emplace_back(attr, coeff);
+  for (int i = 0; i < attr.Size(); ++i) {
+    if (attr[i] == 1) {
+      // std::cout << "patch: " << i << " temp_ess_attr: " << temp_ess_attr_[i] << endl;
+      assert(!temp_ess_attr_[i]);
+      temp_ess_attr_[i] = 1;
+    }
+  }  
 
-  if (rank0_ && pmesh_->GetMyRank() == 0) {
+  /*
+  if (rank0_) {
     mfem::out << "Adding Temperature Dirichlet BC to attributes ";
     for (int i = 0; i < attr.Size(); ++i) {
       if (attr[i] == 1) {
@@ -936,6 +942,7 @@ void CaloricallyPerfectThermoChem::AddTempDirichletBC(Coefficient *coeff, Array<
       temp_ess_attr_[i] = 1;
     }
   }
+  */
 }
 
 void CaloricallyPerfectThermoChem::AddTempDirichletBC(ScalarFuncT *f, Array<int> &attr) {

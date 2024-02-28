@@ -121,7 +121,7 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
       if (type == "uniform") {
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
         inlet_attr = 0;
-        inlet_attr[patch] = 1;
+        inlet_attr[patch-1] = 1;
 
         Vector zero(dim_);
         zero = 0.0;
@@ -137,7 +137,7 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
       } else if (type == "interpolate") {
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
         inlet_attr = 0;
-        inlet_attr[patch] = 1;
+        inlet_attr[patch-1] = 1;
         velocity_field_ = new VectorGridFunctionCoefficient(extData_interface_->Udata);	
         if (pmesh_->GetMyRank() == 0) {
           std::cout << "Tomboulides: Setting interpolated Dirichlet velocity on patch = " << patch << std::endl;
