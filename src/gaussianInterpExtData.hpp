@@ -105,9 +105,7 @@ class GaussianInterpExtData : public ExternalDataBase {
   ParFiniteElementSpace *vfes_ = nullptr;
 
   ParGridFunction temperature_gf_;
-  ParGridFunction velocityU_gf_;
-  ParGridFunction velocityV_gf_;
-  ParGridFunction velocityW_gf_;    
+  ParGridFunction velocity_gf_;
 
  public:
   GaussianInterpExtData(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, TPS::Tps *tps);
@@ -121,14 +119,8 @@ class GaussianInterpExtData : public ExternalDataBase {
   /// Return a pointer to the current temperature ParGridFunction.
   ParGridFunction *GetExternalInterpolatedTemperature() { return &temperature_gf_; }
 
-  /// Return a pointer to the current u-velocity ParGridFunction.
-  ParGridFunction *GetExternalInterpolatedVelocityU() { return &velocityU_gf_; }
-
-  /// Return a pointer to the current v-velocity ParGridFunction.
-  ParGridFunction *GetExternalInterpolatedVelocityV() { return &velocityV_gf_; }
-
-  /// Return a pointer to the current w-velocity ParGridFunction.
-  ParGridFunction *GetExternalInterpolatedVelocityW() { return &velocityW_gf_; }  
+  /// Return a pointer to the current velocity ParGridFunction.
+  ParGridFunction *GetExternalInterpolatedVelocity() { return &velocity_gf_; }
   
 };
 #endif  // GAUSSIAN_INTERP_EXT_HPP_

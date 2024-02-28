@@ -234,6 +234,7 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
   toFlow_interface_.viscosity = &visc_gf_;
   toFlow_interface_.thermal_divergence = &Qt_gf_;
   toTurbModel_interface_.density = &rn_gf_;
+  if (rank0_) {std::cout << "exports set..." << endl;}  
 
   //-----------------------------------------------------
   // 2) Set the initial condition
@@ -290,30 +291,39 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
         double temperature_value;
         tpsP_->getRequiredInput((basepath + "/temperature").c_str(), temperature_value);
 
-        if (pmesh_->GetMyRank() == 0) {
+        if (rank0_) {
           std::cout << "Calorically Perfect: Setting uniform Dirichlet temperature on patch = " << patch << std::endl;
         }
         AddTempDirichletBC(temperature_value, inlet_attr);
 	
       } else if (type == "interpolate") {
+        // if (rank0_) {std::cout << "caught interpolate..." << endl;}  	
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
         inlet_attr = 0;
         inlet_attr[patch] = 1;
-
-        buffer_tInlet_ = new ParGridFunction(sfes_);	
-        {
-          double *data = buffer_tInlet_->HostReadWrite();
-	  const double *Tdata = (extData_interface_->Tdata)->HostRead();
-          for (int n = 0; n < Sdof_; i++) {
-  	    data[n] = Tdata[n];
-          }
-        }   		
-        temperature_field_ = new GridFunctionCoefficient(buffer_tInlet_);
-        if (pmesh_->GetMyRank() == 0) {
+        temperature_field_ = new GridFunctionCoefficient(extData_interface_->Tdata);
+        if (rank0_) {
           std::cout << "Calorically Perfect: Setting interpolated Dirichlet temperature on patch = " << patch << std::endl;
         }	
 	AddTempDirichletBC(temperature_field_, inlet_attr);	
 
+	// copy interpolated bc onto initial field
+	{
+	  const double *extData = (extData_interface_->Tdata)->HostRead();
+	  double *Tdata = Tn_gf_.HostReadWrite();
+          for (int be = 0; be < pmesh_->GetNBE(); be++) {
+            int bAttr = pmesh_->GetBdrElement(be)->GetAttribute();
+	    if (inlet_attr[bAttr] == 1) {
+              Array<int> vdofs;
+              sfes_->GetBdrElementVDofs(be, vdofs);
+              for (int i = 0; i < vdofs.Size(); i++) {
+  	        int n = vdofs[i];
+	        Tdata[n] = extData[n];
+	      }
+	    }
+	  }
+	}
+	
       } else {
         if (rank0_) {
           std::cout << "ERROR: Calorically Perfect inlet type = " << type << " not supported." << std::endl;
@@ -323,6 +333,7 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
       }
     }
   }
+  if (rank0_) {std::cout << "inlet bc set..." << endl;}    
 
   // outlet bc
   {

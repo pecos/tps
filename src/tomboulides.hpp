@@ -141,7 +141,7 @@ class Tomboulides final : public FlowBase {
   mfem::ParGridFunction *curlcurl_gf_ = nullptr;
   mfem::ParGridFunction *resu_gf_ = nullptr;
   mfem::ParGridFunction *pp_div_gf_ = nullptr;
-  mfem::ParGridFunction *buffer_uInlet_ = nullptr;
+  // mfem::ParGridFunction *buffer_uInlet_ = nullptr;
   mfem::VectorGridFunctionCoefficient *velocity_field_ = nullptr;  
 
   /// Pressure FEM objects and fields

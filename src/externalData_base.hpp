@@ -43,8 +43,6 @@
  */
 struct extDataToFlow {
   const mfem::ParGridFunction *Udata = nullptr;
-  const mfem::ParGridFunction *Vdata = nullptr;
-  const mfem::ParGridFunction *Wdata = nullptr;  
 };
 
 /**
@@ -98,13 +96,14 @@ class ZeroExternalData final : public ExternalDataBase {
  protected:
   mfem::ParMesh *pmesh_;
   const int sorder_;
+  int dim_;
 
   mfem::FiniteElementCollection *fec_ = nullptr;
   mfem::ParFiniteElementSpace *fes_ = nullptr;
+  mfem::FiniteElementCollection *vfec_ = nullptr;
+  mfem::ParFiniteElementSpace *vfes_ = nullptr;  
   mfem::ParGridFunction *Tdata_ = nullptr;
   mfem::ParGridFunction *Udata_ = nullptr;
-  mfem::ParGridFunction *Vdata_ = nullptr;
-  mfem::ParGridFunction *Wdata_ = nullptr;  
 
  public:
   /**

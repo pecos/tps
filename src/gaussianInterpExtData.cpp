@@ -73,6 +73,9 @@ GaussianInterpExtData::GaussianInterpExtData(mfem::ParMesh *pmesh, LoMachOptions
 }
 
 void GaussianInterpExtData::initializeSelf() {
+
+  if(!isInterpInlet_) {return;}
+  
   rank_ = pmesh_->GetMyRank();
   rank0_ = false;
   if (rank_ == 0) {
@@ -80,8 +83,6 @@ void GaussianInterpExtData::initializeSelf() {
   }
   dim_ = pmesh_->Dimension();
   nvel_ = dim_;
-
-  if(!isInterpInlet_) {return;}
   
   bool verbose = rank0_;
   if (verbose) grvy_printf(ginfo, "Initializing Gaussian interpolation inlet.\n");
@@ -93,39 +94,34 @@ void GaussianInterpExtData::initializeSelf() {
   vfes_ = new ParFiniteElementSpace(pmesh_, vfec_, dim_);
 
   Sdof_ = sfes_->GetNDofs();
-  // int sfes_truevsize = sfes_->GetTrueVSize();
   
   temperature_gf_.SetSpace(sfes_);
-  velocityU_gf_.SetSpace(sfes_);
-  velocityV_gf_.SetSpace(sfes_);
-  velocityW_gf_.SetSpace(sfes_);    
+  temperature_gf_ = 0.0;
+  velocity_gf_.SetSpace(vfes_);
+  velocity_gf_ = 0.0;  
 
   // exports
   toThermoChem_interface_.Tdata = &temperature_gf_;
-  toFlow_interface_.Udata = &velocityU_gf_;
-  toFlow_interface_.Vdata = &velocityV_gf_;
-  toFlow_interface_.Wdata = &velocityW_gf_;  
+  toFlow_interface_.Udata = &velocity_gf_;
 }
 
 void GaussianInterpExtData::initializeViz(ParaViewDataCollection &pvdc) {
   if(!isInterpInlet_) {return;}  
   pvdc.RegisterField("externalTemp", &temperature_gf_);
-  pvdc.RegisterField("externalU", &velocityU_gf_);
-  pvdc.RegisterField("externalV", &velocityV_gf_);
-  pvdc.RegisterField("externalW", &velocityW_gf_);
+  pvdc.RegisterField("externalU", &velocity_gf_);
 }
 
 // TODO: add a translation and rotation for external data plane
 void GaussianInterpExtData::setup() {
 
+  if(rank0_) {std::cout << "in interp setup..." << endl;}
+  
   if(!isInterpInlet_) {return;}  
   ParGridFunction coordsDof(vfes_);
   pmesh_->GetNodes(coordsDof);
-
+  
   double *Tdata = temperature_gf_.HostReadWrite();
-  double *Udata = velocityU_gf_.HostReadWrite();
-  double *Vdata = velocityV_gf_.HostReadWrite();
-  double *Wdata = velocityW_gf_.HostReadWrite();    
+  double *Udata = velocity_gf_.HostReadWrite();
   double *hcoords = coordsDof.HostReadWrite();
 
   struct inlet_profile {
@@ -141,16 +137,15 @@ void GaussianInterpExtData::setup() {
   string fnameBase;  
   std::string basepath("./inputs/");
   fnameBase = (basepath + fname_);
-  const char* fnameRead = fnameBase.c_str(); 
-  
+  const char* fnameRead = fnameBase.c_str();   
   int nCount = 0;
+  // if(rank0_) {std::cout << "check: 1..." << endl;}  
     
   // find size    
   if(rank0_) {
 
-    std::cout << " Attempting to open inlet file for counting... " << fnameRead << endl; fflush(stdout);
+    std::cout << " Attempting to open inlet file for counting... " << fnameRead << " " ;
 
-      // HARDCODE
       FILE *inlet_file;
       // if ( inlet_file = fopen("./inputs/inletPlane.csv","r") ) {
       if ( inlet_file = fopen(fnameRead,"r") ) {	
@@ -165,22 +160,21 @@ void GaussianInterpExtData::setup() {
       size_t len = 0;
       ssize_t read;
 
-      std::cout << " ...starting count" << endl; fflush(stdout);
+      // std::cout << " ...starting count" << endl; fflush(stdout);
       for (ch = getc(inlet_file); ch != EOF; ch = getc(inlet_file)) {
         if (ch == '\n') {
           nCount++;
 	}
       }      
       fclose(inlet_file);      
-      std::cout << " final count: " << nCount << endl; fflush(stdout);
+      std::cout << " final external data line count: " << nCount << endl; fflush(stdout);
 
     }
 
     // broadcast size
     MPI_Bcast(&nCount, 1, MPI_INT, 0, tpsP_->getTPSCommWorld());
-
+    int nSamples = sqrt(nCount);    
     struct inlet_profile inlet[nCount];
-    double junk;    
     
     // mean output from plane interpolation
     // 0) no, 1) x, 2) y, 3) z, 4) rho, 5) u, 6) v, 7) w
@@ -190,15 +184,14 @@ void GaussianInterpExtData::setup() {
     if (rank0_) {    
     
       ifstream file;
-
-      // HARDCODE
-      file.open("./inputs/inletPlane.csv");
+      //file.open("./inputs/inletPlane.csv");
+      file.open(fnameRead);
       
       string line;
       getline(file, line);
       int nLines = 0;
       while (getline(file, line)) {
-        // cout << line << endl;
+	// std::cout << line << endl;
 	stringstream sline(line);
 	int entry = 0;
         while (sline.good()) {
@@ -234,7 +227,7 @@ void GaussianInterpExtData::setup() {
 	nLines++;
       }
       file.close();
-      std::cout << " " << endl; fflush(stdout);    
+      // std::cout << " " << endl; fflush(stdout);    
     }
   
     // broadcast data
@@ -243,42 +236,46 @@ void GaussianInterpExtData::setup() {
 
     /*
     // width of interpolation stencil
-    double Lx, Ly, Lz, Lmax;
-    Lx = xmax - xmin;
-    Ly = ymax - ymin;
-    Lz = zmax - zmin;
-    Lmax = std::max(Lx,Ly);
-    Lmax = std::max(Lmax,Lz);    
+    // double Lx, Ly, Lz, Lmax;
+    // Lx = xmax - xmin;
+    // Ly = ymax - ymin;
+    // Lz = zmax - zmin;
+    // Lmax = std::max(Lx,Ly);
+    // Lmax = std::max(Lmax,Lz);    
     //radius = 0.25 * Lmax;
     //radius = 0.01 * Lmax;
 
-    double torch_radius = 28.062/1000.0;
-    radius = 2.0 * torch_radius / 300.0; // 300 from nxn interp plane
+    // double torch_radius = 28.062/1000.0;
+    double torch_radius = 0.2;
+    double radius = 2.0 * torch_radius / nSamples; // 300 from nxn interp plane
     */
-    double radius;
+    double radius = 1.0;
     
     // TODO: dont need to fill entire gf, just appropriate face
     for (int be = 0; be < pmesh_->GetNBE(); be++) {
+      // std::cout << " in bdry ele loop..." << endl;
       int bAttr = pmesh_->GetBdrElement(be)->GetAttribute();
-      if (bAttr == InletType::INTERPOLATE) {
+      // std::cout << " bAttr: " << bAttr << endl;      
+      // if (bAttr == InletType::INTERPOLATE) {
+      // std::cout << " caught interp bc..." << bAttr << endl;
         Array<int> vdofs;
         sfes_->GetBdrElementVDofs(be, vdofs);
         for (int i = 0; i < vdofs.Size(); i++) {
+          // std::cout << " in interp dof loop..." << endl;	  
 
 	  // index in gf of bndry element
 	  int n = vdofs[i];
 
           // get coords
-          auto hcoords = coordsDof.HostRead();  
           double xp[dim_];      
           for (int d = 0; d < dim_; d++) {
-            xp[d] = hcoords[n + d * vfes_->GetNDofs()];
+            xp[d] = hcoords[n + d * Sdof_];
           }
 
           int iCount = 0;      
-          double dist, wt;
-          double wt_tot = 0.0;          
-          // double val_rho = 0.0;
+          double dist = 0.0;
+	  double wt = 0.0;
+          double wt_tot = 0.0;
           double val_u = 0.0;
           double val_v = 0.0;
           double val_w = 0.0;
@@ -286,46 +283,50 @@ void GaussianInterpExtData::setup() {
 
           // minimum distance in interpolant field
           double distMin = 1.0e12;
-          for (int j = 0; j < nCount; j++) {	    
-            dist = (xp[0]-inlet[j].x)*(xp[0]-inlet[j].x)
-   	         + (xp[1]-inlet[j].y)*(xp[1]-inlet[j].y)
-	         + (xp[2]-inlet[j].z)*(xp[2]-inlet[j].z);
-            dist = sqrt(dist);
+          for (int j = 0; j < nCount; j++) {
+
+  	    // exclude points outside the domain
+	    if (inlet[j].temp < 0.0) { continue; }	    
+	    
+            dist = sqrt( (xp[0]-inlet[j].x) * (xp[0]-inlet[j].x)
+   	               + (xp[1]-inlet[j].y) * (xp[1]-inlet[j].y)
+		       + (xp[2]-inlet[j].z) * (xp[2]-inlet[j].z) );
     	    distMin = std::min(distMin, dist);
           }
       
           // find second closest data pt
           double distMinSecond = 1.0e12;
-          for (int j = 0; j < nCount; j++) {	    
-            dist = (xp[0]-inlet[j].x)*(xp[0]-inlet[j].x)
-   	         + (xp[1]-inlet[j].y)*(xp[1]-inlet[j].y)
-	         + (xp[2]-inlet[j].z)*(xp[2]-inlet[j].z);	
-            dist = sqrt(dist);
-  	    if (dist > distMin) {
-	    distMinSecond = std::min(distMinSecond, dist);
-	  }
-        }      
+          for (int j = 0; j < nCount; j++) {
 
+  	    // exclude points outside the domain
+	    if (inlet[j].temp < 0.0) { continue; }	    
+	    
+            dist = sqrt( (xp[0]-inlet[j].x) * (xp[0]-inlet[j].x)
+   	               + (xp[1]-inlet[j].y) * (xp[1]-inlet[j].y)
+		       + (xp[2]-inlet[j].z) * (xp[2]-inlet[j].z) );	    
+  	    if (dist > distMin) {
+	      distMinSecond = std::min(distMinSecond, dist);
+	    }
+	  }
+	  
         // radius for Gaussian interpolation
         radius = distMinSecond;
         // std::cout << " radius for interpoaltion: " << radius << endl; fflush(stdout);
-      
-        for (int j=0; j < nCount; j++) {
-	    
-          dist = (xp[0]-inlet[j].x)*(xp[0]-inlet[j].x)
-   	       + (xp[1]-inlet[j].y)*(xp[1]-inlet[j].y)
-	       + (xp[2]-inlet[j].z)*(xp[2]-inlet[j].z);	
-          dist = sqrt(dist);
+
+        for (int j = 0; j < nCount; j++) {
 
 	  // exclude points outside the domain
-	  if (inlet[j].temp < 1.0e-8) { continue; }
+	  if (inlet[j].temp < 0.0) { continue; }
+	  
+          dist = sqrt( (xp[0]-inlet[j].x) * (xp[0]-inlet[j].x)
+   	             + (xp[1]-inlet[j].y) * (xp[1]-inlet[j].y)
+      	             + (xp[2]-inlet[j].z) * (xp[2]-inlet[j].z) );	    	  
 	
 	  // gaussian interpolation
 	  if(dist <= 1.5*radius) {
             // std::cout << " Caught an interp point " << dist << endl; fflush(stdout);	  
-            wt = exp(-(dist*dist)/(radius*radius));
-            wt_tot = wt_tot + wt;	      
-            // val_rho = val_rho + wt*inlet[j].rho;
+            wt = exp( -(dist*dist) / (radius*radius) );
+            wt_tot += wt;	      
             val_u = val_u + wt*inlet[j].u;
             val_v = val_v + wt*inlet[j].v;
             val_w = val_w + wt*inlet[j].w;	  
@@ -348,21 +349,21 @@ void GaussianInterpExtData::setup() {
         }
 
         if (wt_tot > 0.0) {
-          Udata[n] = val_u / wt_tot;
-          Vdata[n] = val_v / wt_tot;
-          Wdata[n] = val_w / wt_tot;
+          Udata[n + 0*Sdof_] = val_u / wt_tot;
+          Udata[n + 1*Sdof_] = val_v / wt_tot;
+          Udata[n + 2*Sdof_] = val_w / wt_tot;
           Tdata[n] = val_T / wt_tot;
-          // std::cout << n << " point set to: " << dataVel[n + 0*Sdof] << " " << dataTemp[n] << endl; fflush(stdout);
+          // std::cout << n << " point set to: " << Tdata[n] << " with pts: " << iCount << endl; fflush(stdout);
         } else {
-          Udata[n] = 0.0;
-          Vdata[n] = 0.0;
-          Wdata[n] = 0.0;
+          Udata[n + 0*Sdof_] = 0.0;
+          Udata[n + 1*Sdof_] = 0.0;
+          Udata[n + 2*Sdof_] = 0.0;
           Tdata[n] = 0.0;
           // std::cout << " iCount of zero..." << endl; fflush(stdout);	  
         }
         	  
 	}
-      }
+     //}
     }
 
 

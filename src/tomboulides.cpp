@@ -138,20 +138,7 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
         inlet_attr = 0;
         inlet_attr[patch] = 1;
-
-        buffer_uInlet_ = new ParGridFunction(vfes_);	
-        {
-          double *data = buffer_uInlet_->HostReadWrite();
-	  const double *Udata = (extData_interface_->Udata)->HostRead();
-	  const double *Vdata = (extData_interface_->Vdata)->HostRead();
-          const double *Wdata = (extData_interface_->Wdata)->HostRead();	   
-          for (int n = 0; n < Sdof_; i++) {
-  	    data[n + 0*Sdof_] = Udata[n];
-  	    data[n + 1*Sdof_] = Vdata[n];
-  	    data[n + 2*Sdof_] = Wdata[n];  	    
-          }
-        }   		
-        velocity_field_ = new VectorGridFunctionCoefficient(buffer_uInlet_);
+        velocity_field_ = new VectorGridFunctionCoefficient(extData_interface_->Udata);	
         if (pmesh_->GetMyRank() == 0) {
           std::cout << "Tomboulides: Setting interpolated Dirichlet velocity on patch = " << patch << std::endl;
         }	

@@ -435,6 +435,12 @@ void LoMachSolver::initialize() {
   CFL = loMach_opts_.ts_opts_.cfl_;
   if (verbose) grvy_printf(ginfo, "got CFL...\n");
 
+  // read-in external data if requested in bc setting  
+  extData_->initializeSelf(); 
+  extData_->setup();
+  flow_->initializeFromExtData(&extData_->toFlow_interface_); 
+  thermo_->initializeFromExtData(&extData_->toThermoChem_interface_);
+  
   // Initialize model-owned data
   sponge_->initializeSelf();
   extData_->initializeSelf();
@@ -443,7 +449,7 @@ void LoMachSolver::initialize() {
 
   // Initialize restart read/write capability
   flow_->initializeIO(ioData);
-  thermo_->initializeIO(ioData);
+  thermo_->initializeIO(ioData);  
 
   const bool restart_serial =
       (loMach_opts_.io_opts_.restart_serial_read_ || loMach_opts_.io_opts_.restart_serial_write_);
@@ -468,9 +474,7 @@ void LoMachSolver::initialize() {
   // Finish initializing operators
   flow_->initializeOperators();
   thermo_->initializeOperators();
-
-  // read-in external data if requested in bc setting
-  extData_->setup();
+  // if(rank0_) {std::cout << "check: ops set..." << endl;}  
   
   // TODO(trevilo): Enable averaging.  See note in loMach.hpp
 

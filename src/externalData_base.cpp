@@ -34,35 +34,32 @@
 
 using namespace mfem;
 
-ZeroExternalData::ZeroExternalData(ParMesh *pmesh, int sorder) : pmesh_(pmesh), sorder_(sorder) {}
+ZeroExternalData::ZeroExternalData(ParMesh *pmesh, int sorder) : pmesh_(pmesh), sorder_(sorder) {
+  dim_ = pmesh_->Dimension();
+}
 
 ZeroExternalData::~ZeroExternalData() {
   delete Tdata_;
   delete Udata_;
-  delete Vdata_;
-  delete Wdata_;  
   delete fes_;
   delete fec_;
+  delete vfes_;
+  delete vfec_;  
 }
 
 void ZeroExternalData::initializeSelf() {
   fec_ = new H1_FECollection(sorder_);
   fes_ = new ParFiniteElementSpace(pmesh_, fec_);
 
+  vfec_ = new H1_FECollection(sorder_);
+  vfes_ = new ParFiniteElementSpace(pmesh_, fec_, dim_);  
+  
   Tdata_ = new ParGridFunction(fes_);
   *Tdata_ = 0.0;
 
-  Udata_ = new ParGridFunction(fes_);
+  Udata_ = new ParGridFunction(vfes_);
   *Udata_ = 0.0;
-
-  Vdata_ = new ParGridFunction(fes_);
-  *Vdata_ = 0.0;
-
-  Wdata_ = new ParGridFunction(fes_);
-  *Wdata_ = 0.0;  
   
   toThermoChem_interface_.Tdata = Tdata_;
   toFlow_interface_.Udata = Udata_;
-  toFlow_interface_.Vdata = Vdata_;
-  toFlow_interface_.Wdata = Wdata_;  
 }

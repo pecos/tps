@@ -129,8 +129,8 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   ParGridFunction R0PM0_gf_;
   ParGridFunction Qt_gf_;
 
-  mfem::ParGridFunction *buffer_tInlet_ = nullptr;
-  mfem::GridFunctionCoefficient *temperature_field_ = nullptr;  
+  // ParGridFunction *buffer_tInlet_ = nullptr;
+  GridFunctionCoefficient *temperature_field_ = nullptr;  
   
   VectorGridFunctionCoefficient *un_next_coeff_ = nullptr;
   GridFunctionCoefficient *rhon_next_coeff_ = nullptr;
