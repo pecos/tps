@@ -62,12 +62,21 @@ GaussianInterpExtData::GaussianInterpExtData(mfem::ParMesh *pmesh, LoMachOptions
 
   // only allows one inlet now
   isInterpInlet_ = false;
-  std::string type;
-  std::string basepath("boundaryConditions/inlet1");
-  tpsP_->getRequiredInput((basepath + "/type").c_str(), type);
-  if (type == "interpolate") {
-    isInterpInlet_ = true;
-    tpsP_->getInput((basepath + "/name").c_str(), fname_, std::string("inletPlane.csv"));
+
+  int numInlets;
+  tpsP_->getInput("boundaryConditions/numInlets", numInlets, 0);
+
+  if (numInlets == 1) {
+    std::string type;
+    std::string basepath("boundaryConditions/inlet1");
+    tpsP_->getRequiredInput((basepath + "/type").c_str(), type);
+    if (type == "interpolate") {
+      isInterpInlet_ = true;
+      tpsP_->getInput((basepath + "/name").c_str(), fname_, std::string("inletPlane.csv"));
+    } else {
+      if (rank0_) {std::cout << "Only one interpolated inlet currently supported." << endl;}
+      exit(1);
+    }
   }
 
   // TODO(swh): add checks and error msg for invalid sponge settings
