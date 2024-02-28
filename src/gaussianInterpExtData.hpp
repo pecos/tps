@@ -30,8 +30,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
 
-#ifndef GAUSSIAN_INTERP_EXT_HPP_
-#define GAUSSIAN_INTERP_EXT_HPP_
+#ifndef GAUSSIANINTERPEXTDATA_HPP_
+#define GAUSSIANINTERPEXTDATA_HPP_
 
 // forward-declaration for Tps support class
 namespace TPS {
@@ -43,11 +43,11 @@ class Tps;
 #include <iostream>
 
 #include "../utils/mfem_extras/pfem_extras.hpp"
+#include "externalData_base.hpp"
 #include "io.hpp"
 #include "mfem.hpp"
 #include "mfem/linalg/solvers.hpp"
 #include "run_configuration.hpp"
-#include "externalData_base.hpp"
 #include "split_flow_base.hpp"
 #include "thermo_chem_base.hpp"
 #include "tps.hpp"
@@ -65,7 +65,7 @@ class GaussianInterpExtData : public ExternalDataBase {
   TPS::Tps *tpsP_ = nullptr;
 
   // Run options
-  LoMachOptions *loMach_opts_; //  = nullptr;
+  LoMachOptions *loMach_opts_;  //  = nullptr;
 
   // MPI helpers
   MPI_Groups *groupsMPI = nullptr;
@@ -79,7 +79,7 @@ class GaussianInterpExtData : public ExternalDataBase {
   /// Enable/disable verbose output.
   bool verbose = true;
 
-  ParMesh *pmesh_; //  = nullptr;
+  ParMesh *pmesh_;  //  = nullptr;
 
   // The order of the scalar spaces
   int order_;
@@ -92,8 +92,8 @@ class GaussianInterpExtData : public ExternalDataBase {
 
   bool isInterpInlet_;
 
-  std::string fname_;    
-  
+  std::string fname_;
+
   // Scalar \f$H^1\f$ finite element collection.
   FiniteElementCollection *sfec_ = nullptr;
 
@@ -121,6 +121,5 @@ class GaussianInterpExtData : public ExternalDataBase {
 
   /// Return a pointer to the current velocity ParGridFunction.
   ParGridFunction *GetExternalInterpolatedVelocity() { return &velocity_gf_; }
-  
 };
-#endif  // GAUSSIAN_INTERP_EXT_HPP_
+#endif  // GAUSSIANINTERPEXTDATA_HPP_

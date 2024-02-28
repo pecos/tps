@@ -44,7 +44,7 @@ ZeroExternalData::~ZeroExternalData() {
   delete fes_;
   delete fec_;
   delete vfes_;
-  delete vfec_;  
+  delete vfec_;
 }
 
 void ZeroExternalData::initializeSelf() {
@@ -52,14 +52,14 @@ void ZeroExternalData::initializeSelf() {
   fes_ = new ParFiniteElementSpace(pmesh_, fec_);
 
   vfec_ = new H1_FECollection(sorder_);
-  vfes_ = new ParFiniteElementSpace(pmesh_, fec_, dim_);  
-  
+  vfes_ = new ParFiniteElementSpace(pmesh_, fec_, dim_);
+
   Tdata_ = new ParGridFunction(fes_);
   *Tdata_ = 0.0;
 
   Udata_ = new ParGridFunction(vfes_);
   *Udata_ = 0.0;
-  
+
   toThermoChem_interface_.Tdata = Tdata_;
   toFlow_interface_.Udata = Udata_;
 }

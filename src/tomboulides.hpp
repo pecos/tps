@@ -142,7 +142,7 @@ class Tomboulides final : public FlowBase {
   mfem::ParGridFunction *resu_gf_ = nullptr;
   mfem::ParGridFunction *pp_div_gf_ = nullptr;
   // mfem::ParGridFunction *buffer_uInlet_ = nullptr;
-  mfem::VectorGridFunctionCoefficient *velocity_field_ = nullptr;  
+  mfem::VectorGridFunctionCoefficient *velocity_field_ = nullptr;
 
   /// Pressure FEM objects and fields
   mfem::FiniteElementCollection *pfec_ = nullptr;
@@ -152,7 +152,7 @@ class Tomboulides final : public FlowBase {
 
   /// Scalar FEM objects of vorder
   mfem::FiniteElementCollection *sfec_ = nullptr;
-  mfem::ParFiniteElementSpace *sfes_ = nullptr;    
+  mfem::ParFiniteElementSpace *sfes_ = nullptr;
 
   /// mfem::Coefficients used in forming necessary operators
   mfem::GridFunctionCoefficient *rho_coeff_ = nullptr;
@@ -296,7 +296,7 @@ class Tomboulides final : public FlowBase {
 
   /// Add a Dirichlet boundary condition to the velocity field
   void addVelDirichletBC(const mfem::Vector &u, mfem::Array<int> &attr);
-  void addVelDirichletBC(mfem::VectorCoefficient *coeff, mfem::Array<int> &attr);  
+  void addVelDirichletBC(mfem::VectorCoefficient *coeff, mfem::Array<int> &attr);
 
   /// Add a Dirichlet boundary condition to the pressure field.
   void addPresDirichletBC(double p, mfem::Array<int> &attr);

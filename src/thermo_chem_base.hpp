@@ -71,7 +71,7 @@ class ThermoChemModelBase {
   const flowToThermoChem *flow_interface_;
   const turbModelToThermoChem *turbModel_interface_;
   const spongeToThermoChem *sponge_interface_;
-  const extDataToThermoChem *extData_interface_;  
+  const extDataToThermoChem *extData_interface_;
 
  public:
   /// Destructor
@@ -154,8 +154,7 @@ class ThermoChemModelBase {
   const spongeToThermoChem *getSpongeInterface() const { return sponge_interface_; }
 
   void initializeFromExtData(extDataToThermoChem *extData) { extData_interface_ = extData; }
-  const extDataToThermoChem *getExtDataInterface() const { return extData_interface_; }  
-  
+  const extDataToThermoChem *getExtDataInterface() const { return extData_interface_; }
 };
 
 /**

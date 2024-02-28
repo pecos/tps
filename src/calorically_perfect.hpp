@@ -117,7 +117,7 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   ParFiniteElementSpace *sfes_ = nullptr;
 
   int Sdof_;
-  
+
   // Fields
   ParGridFunction Tnm1_gf_, Tnm2_gf_;
   ParGridFunction Tn_gf_, Tn_next_gf_, Text_gf_, resT_gf_;
@@ -130,8 +130,8 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   ParGridFunction Qt_gf_;
 
   // ParGridFunction *buffer_tInlet_ = nullptr;
-  GridFunctionCoefficient *temperature_field_ = nullptr;  
-  
+  GridFunctionCoefficient *temperature_field_ = nullptr;
+
   VectorGridFunctionCoefficient *un_next_coeff_ = nullptr;
   GridFunctionCoefficient *rhon_next_coeff_ = nullptr;
   ScalarVectorProductCoefficient *rhou_coeff_ = nullptr;
@@ -245,7 +245,7 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   void UpdateTimestepHistory(double dt);
 
   /// Add a Dirichlet boundary condition to the temperature and Qt field.
-  void AddTempDirichletBC(const double &temp, Array<int> &attr);  
+  void AddTempDirichletBC(const double &temp, Array<int> &attr);
   void AddTempDirichletBC(Coefficient *coeff, Array<int> &attr);
   void AddTempDirichletBC(ScalarFuncT *f, Array<int> &attr);
   void AddQtDirichletBC(Coefficient *coeff, Array<int> &attr);

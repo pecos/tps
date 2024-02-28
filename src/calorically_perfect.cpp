@@ -159,7 +159,7 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
   sfes_ = new ParFiniteElementSpace(pmesh_, sfec_);
 
   Sdof_ = sfes_->GetNDofs();
-  
+
   // Check if fully periodic mesh
   if (!(pmesh_->bdr_attributes.Size() == 0)) {
     temp_ess_attr_.SetSize(pmesh_->bdr_attributes.Max());
@@ -234,7 +234,9 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
   toFlow_interface_.viscosity = &visc_gf_;
   toFlow_interface_.thermal_divergence = &Qt_gf_;
   toTurbModel_interface_.density = &rn_gf_;
-  if (rank0_) {std::cout << "exports set..." << endl;}  
+  if (rank0_) {
+    std::cout << "exports set..." << endl;
+  }
 
   //-----------------------------------------------------
   // 2) Set the initial condition
@@ -286,42 +288,43 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
       if (type == "uniform") {
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
         inlet_attr = 0;
-        inlet_attr[patch-1] = 1;
+        inlet_attr[patch - 1] = 1;
         double temperature_value;
         tpsP_->getRequiredInput((basepath + "/temperature").c_str(), temperature_value);
         if (rank0_) {
           std::cout << "Calorically Perfect: Setting uniform Dirichlet temperature on patch = " << patch << std::endl;
         }
         AddTempDirichletBC(temperature_value, inlet_attr);
-	
+
       } else if (type == "interpolate") {
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
         inlet_attr = 0;
-        inlet_attr[patch-1] = 1;
+        inlet_attr[patch - 1] = 1;
         temperature_field_ = new GridFunctionCoefficient(extData_interface_->Tdata);
         if (rank0_) {
-          std::cout << "Calorically Perfect: Setting interpolated Dirichlet temperature on patch = " << patch << std::endl;
-        }	
-	AddTempDirichletBC(temperature_field_, inlet_attr);	
+          std::cout << "Calorically Perfect: Setting interpolated Dirichlet temperature on patch = " << patch
+                    << std::endl;
+        }
+        AddTempDirichletBC(temperature_field_, inlet_attr);
 
-	// copy interpolated bc onto initial field
-	{
-	  const double *extData = (extData_interface_->Tdata)->HostRead();
-	  double *Tdata = Tn_gf_.HostReadWrite();
+        // copy interpolated bc onto initial field
+        {
+          const double *extData = (extData_interface_->Tdata)->HostRead();
+          double *Tdata = Tn_gf_.HostReadWrite();
           for (int be = 0; be < pmesh_->GetNBE(); be++) {
             int bAttr = pmesh_->GetBdrElement(be)->GetAttribute();
-	    if (inlet_attr[bAttr] == 1) {
+            if (inlet_attr[bAttr] == 1) {
               Array<int> vdofs;
               sfes_->GetBdrElementVDofs(be, vdofs);
               for (int i = 0; i < vdofs.Size(); i++) {
-  	        int n = vdofs[i];
-	        Tdata[n] = extData[n];
-	      }
-	    }
-	  }
-          Tn_gf_.GetTrueDofs(Tn_);	  
-	}
-	
+                int n = vdofs[i];
+                Tdata[n] = extData[n];
+              }
+            }
+          }
+          Tn_gf_.GetTrueDofs(Tn_);
+        }
+
       } else {
         if (rank0_) {
           std::cout << "ERROR: Calorically Perfect inlet type = " << type << " not supported." << std::endl;
@@ -331,7 +334,9 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
       }
     }
   }
-  if (rank0_) {std::cout << "inlet bc set..." << endl;}    
+  if (rank0_) {
+    std::cout << "inlet bc set..." << endl;
+  }
 
   // outlet bc
   {
@@ -698,7 +703,7 @@ void CaloricallyPerfectThermoChem::step() {
   assert(HtInv_->GetConverged());
 
   Ht_form_->RecoverFEMSolution(Xt2, resT_gf_, Tn_next_gf_);
-  Tn_next_gf_.GetTrueDofs(Tn_next_);  
+  Tn_next_gf_.GetTrueDofs(Tn_next_);
 
   // explicit filter
   if (filter_temperature_) {
@@ -923,7 +928,7 @@ void CaloricallyPerfectThermoChem::AddTempDirichletBC(Coefficient *coeff, Array<
       assert(!temp_ess_attr_[i]);
       temp_ess_attr_[i] = 1;
     }
-  }  
+  }
 
   /*
   if (rank0_) {

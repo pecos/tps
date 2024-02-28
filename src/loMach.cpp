@@ -44,13 +44,13 @@
 #include <limits>
 
 #include "calorically_perfect.hpp"
+#include "gaussianInterpExtData.hpp"
 #include "geometricSponge.hpp"
 #include "io.hpp"
 #include "logger.hpp"
 #include "tomboulides.hpp"
 #include "tps.hpp"
 #include "utils.hpp"
-#include "gaussianInterpExtData.hpp"
 
 using namespace mfem;
 using namespace mfem::common;
@@ -384,7 +384,7 @@ void LoMachSolver::initialize() {
   // Instantiate sponge
   sponge_ = new GeometricSponge(pmesh_, &loMach_opts_, tpsP_);
   extData_ = new GaussianInterpExtData(pmesh_, &loMach_opts_, tpsP_);
-  
+
   // TODO(trevilo): Add support for turbulence modeling
   if (rank0_) {
     if (loMach_opts_.sgs_opts_.sgs_model_type_ == SubGridModelOptions::SMAGORINSKY) {
@@ -435,12 +435,12 @@ void LoMachSolver::initialize() {
   CFL = loMach_opts_.ts_opts_.cfl_;
   if (verbose) grvy_printf(ginfo, "got CFL...\n");
 
-  // read-in external data if requested in bc setting  
-  extData_->initializeSelf(); 
+  // read-in external data if requested in bc setting
+  extData_->initializeSelf();
   extData_->setup();
-  flow_->initializeFromExtData(&extData_->toFlow_interface_); 
+  flow_->initializeFromExtData(&extData_->toFlow_interface_);
   thermo_->initializeFromExtData(&extData_->toThermoChem_interface_);
-  
+
   // Initialize model-owned data
   sponge_->initializeSelf();
   extData_->initializeSelf();
@@ -449,7 +449,7 @@ void LoMachSolver::initialize() {
 
   // Initialize restart read/write capability
   flow_->initializeIO(ioData);
-  thermo_->initializeIO(ioData);  
+  thermo_->initializeIO(ioData);
 
   const bool restart_serial =
       (loMach_opts_.io_opts_.restart_serial_read_ || loMach_opts_.io_opts_.restart_serial_write_);
@@ -474,8 +474,8 @@ void LoMachSolver::initialize() {
   // Finish initializing operators
   flow_->initializeOperators();
   thermo_->initializeOperators();
-  // if(rank0_) {std::cout << "check: ops set..." << endl;}  
-  
+  // if(rank0_) {std::cout << "check: ops set..." << endl;}
+
   // TODO(trevilo): Enable averaging.  See note in loMach.hpp
 
   // Initialize visualization
@@ -487,7 +487,7 @@ void LoMachSolver::initialize() {
   flow_->initializeViz(*pvdc_);
   thermo_->initializeViz(*pvdc_);
   sponge_->initializeViz(*pvdc_);
-  extData_->initializeViz(*pvdc_);  
+  extData_->initializeViz(*pvdc_);
 }
 
 void LoMachSolver::UpdateTimestepHistory(double dt) {

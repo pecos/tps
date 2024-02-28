@@ -34,10 +34,10 @@
 
 #include <mfem/general/forall.hpp>
 
+#include "externalData_base.hpp"
 #include "io.hpp"
 #include "loMach.hpp"
 #include "thermo_chem_base.hpp"
-#include "externalData_base.hpp"
 #include "tps.hpp"
 #include "utils.hpp"
 
@@ -110,7 +110,7 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
     assert(numOutlets == 0);
 
     // Inlet Bcs
-   for (int i = 0; i < numInlets; i++) {
+    for (int i = 0; i < numInlets; i++) {
       int patch;
       std::string type;
       std::string basepath("boundaryConditions/inlet" + std::to_string(i));
@@ -121,7 +121,7 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
       if (type == "uniform") {
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
         inlet_attr = 0;
-        inlet_attr[patch-1] = 1;
+        inlet_attr[patch - 1] = 1;
 
         Vector zero(dim_);
         zero = 0.0;
@@ -133,17 +133,17 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
           std::cout << "Tomboulides: Setting uniform Dirichlet velocity on patch = " << patch << std::endl;
         }
         addVelDirichletBC(velocity_value, inlet_attr);
-	
+
       } else if (type == "interpolate") {
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
         inlet_attr = 0;
-        inlet_attr[patch-1] = 1;
-        velocity_field_ = new VectorGridFunctionCoefficient(extData_interface_->Udata);	
+        inlet_attr[patch - 1] = 1;
+        velocity_field_ = new VectorGridFunctionCoefficient(extData_interface_->Udata);
         if (pmesh_->GetMyRank() == 0) {
           std::cout << "Tomboulides: Setting interpolated Dirichlet velocity on patch = " << patch << std::endl;
-        }	
-	addVelDirichletBC(velocity_field_, inlet_attr);	
-	
+        }
+        addVelDirichletBC(velocity_field_, inlet_attr);
+
       } else {
         if (pmesh_->GetMyRank() == 0) {
           std::cout << "Tomboulides: When reading " << basepath << ", encountered inlet type = " << type << std::endl;
@@ -151,9 +151,9 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
         }
         assert(false);
         exit(1);
-      }     
-   }
-    
+      }
+    }
+
     // Wall Bcs
     for (int i = 1; i <= numWalls; i++) {
       int patch;
@@ -256,7 +256,7 @@ void Tomboulides::initializeSelf() {
   vfec_ = new H1_FECollection(vorder_, dim_);
   vfes_ = new ParFiniteElementSpace(pmesh_, vfec_, dim_);
   sfec_ = new H1_FECollection(vorder_, dim_);
-  sfes_ = new ParFiniteElementSpace(pmesh_, sfec_);  
+  sfes_ = new ParFiniteElementSpace(pmesh_, sfec_);
   u_curr_gf_ = new ParGridFunction(vfes_);
   u_next_gf_ = new ParGridFunction(vfes_);
   curl_gf_ = new ParGridFunction(vfes_);
@@ -1016,9 +1016,8 @@ void Tomboulides::addVelDirichletBC(VectorCoefficient *coeff, Array<int> &attr) 
       assert(!vel_ess_attr_[i]);
       vel_ess_attr_[i] = 1;
     }
-  }   
+  }
 }
-
 
 /// Add a Dirichlet boundary condition to the pressure field.
 void Tomboulides::addPresDirichletBC(double p, Array<int> &attr) {}

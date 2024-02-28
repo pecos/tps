@@ -61,7 +61,7 @@ class FlowBase {
   const thermoChemToFlow *thermo_interface_;
   const turbModelToFlow *turbModel_interface_;
   const spongeToFlow *sponge_interface_;
-  const extDataToFlow *extData_interface_;  
+  const extDataToFlow *extData_interface_;
 
  public:
   /// Destructor
@@ -79,7 +79,7 @@ class FlowBase {
   void initializeFromThermoChem(thermoChemToFlow *thermo) { thermo_interface_ = thermo; }
   void initializeFromTurbModel(turbModelToFlow *turbModel) { turbModel_interface_ = turbModel; }
   void initializeFromSponge(spongeToFlow *sponge) { sponge_interface_ = sponge; }
-  void initializeFromExtData(extDataToFlow *extData) { extData_interface_ = extData; }  
+  void initializeFromExtData(extDataToFlow *extData) { extData_interface_ = extData; }
 
   virtual void initializeOperators() {}
 
@@ -103,7 +103,7 @@ class FlowBase {
 
   /// Get interface provided by external data
   const extDataToFlow *getExtDataInterface() const { return extData_interface_; }
-  
+
   /**
    * @brief A hook to evaluate L2 norm of error
    *

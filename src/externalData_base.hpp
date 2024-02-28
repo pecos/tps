@@ -29,8 +29,8 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
-#ifndef EXTERNAL_DATA_BASE_HPP_
-#define EXTERNAL_DATA_BASE_HPP_
+#ifndef EXTERNALDATA_BASE_HPP_
+#define EXTERNALDATA_BASE_HPP_
 /** @file
  * @brief Contains base class and simplest possible variant of external data
  */
@@ -57,7 +57,6 @@ struct extDataToThermoChem {
  * Provides interface for ext data implementation
  */
 class ExternalDataBase {
- protected:
  public:
   /// Destructor
   virtual ~ExternalDataBase() {}
@@ -73,7 +72,7 @@ class ExternalDataBase {
    * @brief Hook to let derived classes register visualization fields with ParaViewDataCollection
    */
   virtual void initializeViz(mfem::ParaViewDataCollection &pvdc) {}
-  
+
   /**
    * @brief Take a single time step
    */
@@ -101,7 +100,7 @@ class ZeroExternalData final : public ExternalDataBase {
   mfem::FiniteElementCollection *fec_ = nullptr;
   mfem::ParFiniteElementSpace *fes_ = nullptr;
   mfem::FiniteElementCollection *vfec_ = nullptr;
-  mfem::ParFiniteElementSpace *vfes_ = nullptr;  
+  mfem::ParFiniteElementSpace *vfes_ = nullptr;
   mfem::ParGridFunction *Tdata_ = nullptr;
   mfem::ParGridFunction *Udata_ = nullptr;
 
@@ -128,4 +127,4 @@ class ZeroExternalData final : public ExternalDataBase {
   void setup() final {}
 };
 
-#endif  // EXTERNAL_DATA_BASE_HPP_
+#endif  // EXTERNALDATA_BASE_HPP_
