@@ -41,6 +41,7 @@ class IODataOrganizer;
 struct flowToThermoChem;
 struct turbModelToThermoChem;
 struct spongeToThermoChem;
+struct extDataToThermoChem;
 
 /**
  * Provides wrapper for fields that need to be provided by the
@@ -70,6 +71,7 @@ class ThermoChemModelBase {
   const flowToThermoChem *flow_interface_;
   const turbModelToThermoChem *turbModel_interface_;
   const spongeToThermoChem *sponge_interface_;
+  const extDataToThermoChem *extData_interface_;  
 
  public:
   /// Destructor
@@ -134,7 +136,7 @@ class ThermoChemModelBase {
    */
   void initializeFromTurbModel(turbModelToThermoChem *turbModel) { turbModel_interface_ = turbModel; }
 
-  /// Get interface provided by flow model
+  /// Get interface provided by turb model
   const turbModelToThermoChem *getTurbModelInterface() const { return turbModel_interface_; }
 
   /// Interface object, provides fields necessary for the turbModel
@@ -150,6 +152,10 @@ class ThermoChemModelBase {
 
   /// Get interface provided by flow model
   const spongeToThermoChem *getSpongeInterface() const { return sponge_interface_; }
+
+  void initializeFromExtData(extDataToThermoChem *extData) { extData_interface_ = extData; }
+  const extDataToThermoChem *getExtDataInterface() const { return extData_interface_; }  
+  
 };
 
 /**

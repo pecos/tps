@@ -66,7 +66,7 @@ GaussianInterpExtData::GaussianInterpExtData(mfem::ParMesh *pmesh, LoMachOptions
   tpsP_->getRequiredInput((basepath + "/type").c_str(), type);
   if (type == "interpolate") {
     isInterpInlet_ = true;
-    tpsP_->getRequiredInput((basepath + "/name").c_str(), fname_);    
+    tpsP_->getInput((basepath + "/name").c_str(), fname_, std::string("inletPlane.csv"));    
   }  
 
   // TODO: add checks and error msg for invalid sponge settings

@@ -50,6 +50,7 @@
 #include "tomboulides.hpp"
 #include "tps.hpp"
 #include "utils.hpp"
+#include "gaussianInterpExtData.hpp"
 
 using namespace mfem;
 using namespace mfem::common;
@@ -382,7 +383,8 @@ void LoMachSolver::initialize() {
 
   // Instantiate sponge
   sponge_ = new GeometricSponge(pmesh_, &loMach_opts_, tpsP_);
-
+  extData_ = new GaussianInterpExtData(pmesh_, &loMach_opts_, tpsP_);
+  
   // TODO(trevilo): Add support for turbulence modeling
   if (rank0_) {
     if (loMach_opts_.sgs_opts_.sgs_model_type_ == SubGridModelOptions::SMAGORINSKY) {
@@ -435,6 +437,7 @@ void LoMachSolver::initialize() {
 
   // Initialize model-owned data
   sponge_->initializeSelf();
+  extData_->initializeSelf();
   flow_->initializeSelf();
   thermo_->initializeSelf();
 
@@ -466,6 +469,9 @@ void LoMachSolver::initialize() {
   flow_->initializeOperators();
   thermo_->initializeOperators();
 
+  // read-in external data if requested in bc setting
+  extData_->setup();
+  
   // TODO(trevilo): Enable averaging.  See note in loMach.hpp
 
   // Initialize visualization
@@ -477,6 +483,7 @@ void LoMachSolver::initialize() {
   flow_->initializeViz(*pvdc_);
   thermo_->initializeViz(*pvdc_);
   sponge_->initializeViz(*pvdc_);
+  extData_->initializeViz(*pvdc_);  
 }
 
 void LoMachSolver::UpdateTimestepHistory(double dt) {

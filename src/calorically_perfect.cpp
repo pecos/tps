@@ -158,6 +158,8 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
   sfec_ = new H1_FECollection(order_);
   sfes_ = new ParFiniteElementSpace(pmesh_, sfec_);
 
+  Sdof_ = sfes_->GetNDofs();
+  
   // Check if fully periodic mesh
   if (!(pmesh_->bdr_attributes.Size() == 0)) {
     temp_ess_attr_.SetSize(pmesh_->bdr_attributes.Max());
@@ -280,22 +282,41 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
       tpsP_->getRequiredInput((basepath + "/patch").c_str(), patch);
       tpsP_->getRequiredInput((basepath + "/type").c_str(), type);
 
-      // TODO(trevilo): inlet types uniform and interpolate should be supported
       if (type == "uniform") {
-        if (rank0_) {
-          std::cout << "ERROR: Inlet type = " << type << " not supported." << std::endl;
+        Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
+        inlet_attr = 0;
+        inlet_attr[patch] = 1;
+ 
+        double temperature_value;
+        tpsP_->getRequiredInput((basepath + "/temperature").c_str(), temperature_value);
+
+        if (pmesh_->GetMyRank() == 0) {
+          std::cout << "Calorically Perfect: Setting uniform Dirichlet temperature on patch = " << patch << std::endl;
         }
-        assert(false);
-        exit(1);
+        AddTempDirichletBC(temperature_value, inlet_attr);
+	
       } else if (type == "interpolate") {
-        if (rank0_) {
-          std::cout << "ERROR: Inlet type = " << type << " not supported." << std::endl;
-        }
-        assert(false);
-        exit(1);
+        Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
+        inlet_attr = 0;
+        inlet_attr[patch] = 1;
+
+        buffer_tInlet_ = new ParGridFunction(sfes_);	
+        {
+          double *data = buffer_tInlet_->HostReadWrite();
+	  const double *Tdata = (extData_interface_->Tdata)->HostRead();
+          for (int n = 0; n < Sdof_; i++) {
+  	    data[n] = Tdata[n];
+          }
+        }   		
+        temperature_field_ = new GridFunctionCoefficient(buffer_tInlet_);
+        if (pmesh_->GetMyRank() == 0) {
+          std::cout << "Calorically Perfect: Setting interpolated Dirichlet temperature on patch = " << patch << std::endl;
+        }	
+	AddTempDirichletBC(temperature_field_, inlet_attr);	
+
       } else {
         if (rank0_) {
-          std::cout << "ERROR: Inlet type = " << type << " not supported." << std::endl;
+          std::cout << "ERROR: Calorically Perfect inlet type = " << type << " not supported." << std::endl;
         }
         assert(false);
         exit(1);
@@ -872,6 +893,17 @@ void CaloricallyPerfectThermoChem::computeSystemMass() {
   myMass = tmpR0_.Sum();
   MPI_Allreduce(&myMass, &system_mass_, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
   if (rank0_ == true) std::cout << " Closed system mass: " << system_mass_ << " [kg]" << endl;
+}
+
+/// Add a Dirichlet boundary condition to the temperature field
+void CaloricallyPerfectThermoChem::AddTempDirichletBC(const double &temp, Array<int> &attr) {
+  temp_dbcs_.emplace_back(attr, new ConstantCoefficient(temp));
+  for (int i = 0; i < attr.Size(); ++i) {
+    if (attr[i] == 1) {
+      assert(!temp_ess_attr_[i]);
+      temp_ess_attr_[i] = 1;
+    }
+  }
 }
 
 void CaloricallyPerfectThermoChem::AddTempDirichletBC(Coefficient *coeff, Array<int> &attr) {

@@ -105,6 +105,9 @@ class Tomboulides final : public FlowBase {
   const int porder_;
   const int dim_;
 
+  // number of scalar dofs per rank
+  int Sdof_;
+
   // Coefficients necessary to take a time step (including dt).
   // Assumed to be externally managed and determined, so just get a
   // reference here.
@@ -138,12 +141,18 @@ class Tomboulides final : public FlowBase {
   mfem::ParGridFunction *curlcurl_gf_ = nullptr;
   mfem::ParGridFunction *resu_gf_ = nullptr;
   mfem::ParGridFunction *pp_div_gf_ = nullptr;
+  mfem::ParGridFunction *buffer_uInlet_ = nullptr;
+  mfem::VectorGridFunctionCoefficient *velocity_field_ = nullptr;  
 
-  /// Presser FEM objects and fields
+  /// Pressure FEM objects and fields
   mfem::FiniteElementCollection *pfec_ = nullptr;
   mfem::ParFiniteElementSpace *pfes_ = nullptr;
   mfem::ParGridFunction *p_gf_ = nullptr;
   mfem::ParGridFunction *resp_gf_ = nullptr;
+
+  /// Scalar FEM objects of vorder
+  mfem::FiniteElementCollection *sfec_ = nullptr;
+  mfem::ParFiniteElementSpace *sfes_ = nullptr;    
 
   /// mfem::Coefficients used in forming necessary operators
   mfem::GridFunctionCoefficient *rho_coeff_ = nullptr;
@@ -287,6 +296,7 @@ class Tomboulides final : public FlowBase {
 
   /// Add a Dirichlet boundary condition to the velocity field
   void addVelDirichletBC(const mfem::Vector &u, mfem::Array<int> &attr);
+  void addVelDirichletBC(mfem::VectorCoefficient *coeff, mfem::Array<int> &attr);  
 
   /// Add a Dirichlet boundary condition to the pressure field.
   void addPresDirichletBC(double p, mfem::Array<int> &attr);

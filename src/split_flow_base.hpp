@@ -41,6 +41,7 @@ class IODataOrganizer;
 struct thermoChemToFlow;
 struct turbModelToFlow;
 struct spongeToFlow;
+struct extDataToFlow;
 
 struct flowToThermoChem {
   const mfem::ParGridFunction *velocity = nullptr;
@@ -60,6 +61,7 @@ class FlowBase {
   const thermoChemToFlow *thermo_interface_;
   const turbModelToFlow *turbModel_interface_;
   const spongeToFlow *sponge_interface_;
+  const extDataToFlow *extData_interface_;  
 
  public:
   /// Destructor
@@ -77,6 +79,7 @@ class FlowBase {
   void initializeFromThermoChem(thermoChemToFlow *thermo) { thermo_interface_ = thermo; }
   void initializeFromTurbModel(turbModelToFlow *turbModel) { turbModel_interface_ = turbModel; }
   void initializeFromSponge(spongeToFlow *sponge) { sponge_interface_ = sponge; }
+  void initializeFromExtData(extDataToFlow *extData) { extData_interface_ = extData; }  
 
   virtual void initializeOperators() {}
 
@@ -90,7 +93,7 @@ class FlowBase {
   const thermoChemToFlow *getThermoInterface() const { return thermo_interface_; }
 
   /// Interface object, provides fields necessary for the turbulence model
-  flowToTurbModel toTurbModel_interface;
+  flowToTurbModel toTurbModel_interface_;
 
   /// Get interface provided by thermo model
   const turbModelToFlow *getTurbModelInterface() const { return turbModel_interface_; }
@@ -98,6 +101,9 @@ class FlowBase {
   /// Get interface provided by sponge
   const spongeToFlow *getSpongeInterface() const { return sponge_interface_; }
 
+  /// Get interface provided by external data
+  const extDataToFlow *getExtDataInterface() const { return extData_interface_; }
+  
   /**
    * @brief A hook to evaluate L2 norm of error
    *
