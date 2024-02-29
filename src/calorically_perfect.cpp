@@ -158,8 +158,6 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
   sfec_ = new H1_FECollection(order_);
   sfes_ = new ParFiniteElementSpace(pmesh_, sfec_);
 
-  Sdof_ = sfes_->GetNDofs();
-
   // Check if fully periodic mesh
   if (!(pmesh_->bdr_attributes.Size() == 0)) {
     temp_ess_attr_.SetSize(pmesh_->bdr_attributes.Max());
@@ -300,30 +298,15 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
         inlet_attr = 0;
         inlet_attr[patch - 1] = 1;
-        temperature_field_ = new GridFunctionCoefficient(extData_interface_->Tdata);
+        temperature_bc_field_ = new GridFunctionCoefficient(extData_interface_->Tdata);
         if (rank0_) {
           std::cout << "Calorically Perfect: Setting interpolated Dirichlet temperature on patch = " << patch
                     << std::endl;
         }
-        AddTempDirichletBC(temperature_field_, inlet_attr);
+        AddTempDirichletBC(temperature_bc_field_, inlet_attr);
 
         // copy interpolated bc onto initial field
-        {
-          const double *extData = (extData_interface_->Tdata)->HostRead();
-          double *Tdata = Tn_gf_.HostReadWrite();
-          for (int be = 0; be < pmesh_->GetNBE(); be++) {
-            int bAttr = pmesh_->GetBdrElement(be)->GetAttribute();
-            if (inlet_attr[bAttr] == 1) {
-              Array<int> vdofs;
-              sfes_->GetBdrElementVDofs(be, vdofs);
-              for (int i = 0; i < vdofs.Size(); i++) {
-                int n = vdofs[i];
-                Tdata[n] = extData[n];
-              }
-            }
-          }
-          Tn_gf_.GetTrueDofs(Tn_);
-        }
+        Tn_gf_.ProjectBdrCoefficient(*temperature_bc_field_, inlet_attr);
 
       } else {
         if (rank0_) {
@@ -593,24 +576,6 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
     Tn_filtered_gf_.SetSpace(sfes_);
     Tn_filtered_gf_ = 0.0;
   }
-
-  // // viscous sponge
-  // ParGridFunction coordsDof(vfes);
-  // pmesh_->GetNodes(coordsDof);
-  // if (config_->linViscData.isEnabled) {
-  //   if (rank0_) std::cout << "Viscous sponge active" << endl;
-  //   double *vMult = viscMult.HostReadWrite();
-  //   double *hcoords = coordsDof.HostReadWrite();
-  //   double wgt = 0.;
-  //   for (int n = 0; n < sfes_->GetNDofs(); n++) {
-  //     double coords[3];
-  //     for (int d = 0; d < dim; d++) {
-  //       coords[d] = hcoords[n + d * sfes_->GetNDofs()];
-  //     }
-  //     viscSpongePlanar(coords, wgt);
-  //     vMult[n] = wgt + (config_->linViscData.uniformMult - 1.0);
-  //   }
-  // }
 
   // and initialize system mass
   computeSystemMass();
@@ -1132,7 +1097,6 @@ void CaloricallyPerfectThermoChem::viscSpongePlanar(double *x, double &wgt) {
 void CaloricallyPerfectThermoChem::interpolateInlet() {
   int myRank;
   MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
-  int Sdof = sfes_->GetNDofs();
 
   int nCount = 0;
 
@@ -1341,7 +1305,6 @@ void CaloricallyPerfectThermoChem::interpolateInlet() {
 void CaloricallyPerfectThermoChem::uniformInlet() {
   int myRank;
   MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
-  int Sdof = sfes_->GetNDofs();
 
   ParGridFunction coordsDof(vfes);
   pmesh_->GetNodes(coordsDof);

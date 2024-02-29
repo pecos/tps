@@ -50,12 +50,7 @@ using namespace mfem;
 using namespace mfem::common;
 
 GaussianInterpExtData::GaussianInterpExtData(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, TPS::Tps *tps)
-    : tpsP_(tps),
-      loMach_opts_(loMach_opts),
-      groupsMPI(new MPI_Groups(tps->getTPSCommWorld())),
-      nprocs_(groupsMPI->getTPSWorldSize()),
-      pmesh_(pmesh) {
-
+    : tpsP_(tps), loMach_opts_(loMach_opts), pmesh_(pmesh) {
   rank_ = pmesh_->GetMyRank();
   rank0_ = (pmesh_->GetMyRank() == 0);
   order_ = loMach_opts->order;
@@ -74,12 +69,19 @@ GaussianInterpExtData::GaussianInterpExtData(mfem::ParMesh *pmesh, LoMachOptions
       isInterpInlet_ = true;
       tpsP_->getInput((basepath + "/name").c_str(), fname_, std::string("inletPlane.csv"));
     } else {
-      if (rank0_) {std::cout << "Only one interpolated inlet currently supported." << endl;}
+      if (rank0_) {
+        std::cout << "Only one interpolated inlet currently supported." << endl;
+      }
       exit(1);
     }
   }
+}
 
-  // TODO(swh): add checks and error msg for invalid sponge settings
+GaussianInterpExtData::~GaussianInterpExtData() {
+  delete sfec_;
+  delete sfes_;
+  delete vfec_;
+  delete vfes_;
 }
 
 void GaussianInterpExtData::initializeSelf() {
@@ -93,7 +95,6 @@ void GaussianInterpExtData::initializeSelf() {
     rank0_ = true;
   }
   dim_ = pmesh_->Dimension();
-  nvel_ = dim_;
 
   bool verbose = rank0_;
   if (verbose) grvy_printf(ginfo, "Initializing Gaussian interpolation inlet.\n");
@@ -163,7 +164,7 @@ void GaussianInterpExtData::setup() {
 
     FILE *inlet_file;
     // if ( inlet_file = fopen("./inputs/inletPlane.csv","r") ) {
-    if ( (inlet_file = fopen(fnameRead, "r")) ) {
+    if ((inlet_file = fopen(fnameRead, "r"))) {
       std::cout << " ...and open" << endl;
       fflush(stdout);
     } else {

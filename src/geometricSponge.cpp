@@ -50,9 +50,7 @@ using namespace mfem;
 using namespace mfem::common;
 
 GeometricSponge::GeometricSponge(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, TPS::Tps *tps)
-    : tpsP_(tps),
-      loMach_opts_(loMach_opts),
-      pmesh_(pmesh) {
+    : tpsP_(tps), loMach_opts_(loMach_opts), pmesh_(pmesh) {
   rank_ = pmesh_->GetMyRank();
   rank0_ = (pmesh_->GetMyRank() == 0);
   order_ = loMach_opts->order;
@@ -99,7 +97,7 @@ GeometricSponge::GeometricSponge(mfem::ParMesh *pmesh, LoMachOptions *loMach_opt
     tpsP_->getRequiredInput("spongeMultiplier/annulusMult", annulus.mult);
   }
 
-  if (!uniform.isEnabled && !plane.isEnabled  && !cylinder.isEnabled  && !annulus.isEnabled) {
+  if (!uniform.isEnabled && !plane.isEnabled && !cylinder.isEnabled && !annulus.isEnabled) {
     if (rank0_) {
       std::cout << "No sponge enabled.  Supported types: unifrom, plane, cylinder, and annulus" << endl;
     }

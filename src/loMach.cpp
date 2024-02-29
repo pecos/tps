@@ -88,6 +88,7 @@ LoMachSolver::~LoMachSolver() {
   delete bufferGridScale;
   delete sfes;
   delete sfec;
+  delete extData_;
   delete flow_;
   delete thermo_;
   delete sponge_;
@@ -383,6 +384,8 @@ void LoMachSolver::initialize() {
 
   // Instantiate sponge
   sponge_ = new GeometricSponge(pmesh_, &loMach_opts_, tpsP_);
+
+  // Instantiate external data
   extData_ = new GaussianInterpExtData(pmesh_, &loMach_opts_, tpsP_);
 
   // TODO(trevilo): Add support for turbulence modeling
@@ -443,7 +446,6 @@ void LoMachSolver::initialize() {
 
   // Initialize model-owned data
   sponge_->initializeSelf();
-  extData_->initializeSelf();
   flow_->initializeSelf();
   thermo_->initializeSelf();
 

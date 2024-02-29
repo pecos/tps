@@ -68,7 +68,7 @@ class GaussianInterpExtData : public ExternalDataBase {
   LoMachOptions *loMach_opts_;  //  = nullptr;
 
   // MPI helpers
-  MPI_Groups *groupsMPI = nullptr;
+  MPI_Groups *groupsMPI_ = nullptr;
   int nprocs_;  // total number of MPI procs
   int rank_;    // local MPI rank
   bool rank0_;  // flag to indicate rank 0
@@ -84,8 +84,9 @@ class GaussianInterpExtData : public ExternalDataBase {
   // The order of the scalar spaces
   int order_;
 
-  int nvel_;
   int dim_;
+
+  // to-be used fro time or timestep dep bc
   // double dt;
   // double time;
   // int iter;
@@ -109,7 +110,7 @@ class GaussianInterpExtData : public ExternalDataBase {
 
  public:
   GaussianInterpExtData(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, TPS::Tps *tps);
-  virtual ~GaussianInterpExtData() {}
+  virtual ~GaussianInterpExtData();
 
   void initializeSelf();
   void initializeViz(ParaViewDataCollection &pvdc) final;

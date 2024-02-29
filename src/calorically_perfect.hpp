@@ -116,8 +116,6 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   // Scalar \f$H^1\f$ finite element space.
   ParFiniteElementSpace *sfes_ = nullptr;
 
-  int Sdof_;
-
   // Fields
   ParGridFunction Tnm1_gf_, Tnm2_gf_;
   ParGridFunction Tn_gf_, Tn_next_gf_, Text_gf_, resT_gf_;
@@ -130,7 +128,7 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   ParGridFunction Qt_gf_;
 
   // ParGridFunction *buffer_tInlet_ = nullptr;
-  GridFunctionCoefficient *temperature_field_ = nullptr;
+  GridFunctionCoefficient *temperature_bc_field_ = nullptr;
 
   VectorGridFunctionCoefficient *un_next_coeff_ = nullptr;
   GridFunctionCoefficient *rhon_next_coeff_ = nullptr;

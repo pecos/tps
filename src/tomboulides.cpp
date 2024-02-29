@@ -255,8 +255,6 @@ void Tomboulides::initializeSelf() {
   // Initialize minimal state and interface
   vfec_ = new H1_FECollection(vorder_, dim_);
   vfes_ = new ParFiniteElementSpace(pmesh_, vfec_, dim_);
-  sfec_ = new H1_FECollection(vorder_, dim_);
-  sfes_ = new ParFiniteElementSpace(pmesh_, sfec_);
   u_curr_gf_ = new ParGridFunction(vfes_);
   u_next_gf_ = new ParGridFunction(vfes_);
   curl_gf_ = new ParGridFunction(vfes_);
@@ -289,8 +287,6 @@ void Tomboulides::initializeSelf() {
   // Allocate Vector storage
   const int vfes_truevsize = vfes_->GetTrueVSize();
   const int pfes_truevsize = pfes_->GetTrueVSize();
-
-  Sdof_ = sfes_->GetNDofs();
 
   forcing_vec_.SetSize(vfes_truevsize);
   u_vec_.SetSize(vfes_truevsize);

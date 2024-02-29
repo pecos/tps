@@ -105,9 +105,6 @@ class Tomboulides final : public FlowBase {
   const int porder_;
   const int dim_;
 
-  // number of scalar dofs per rank
-  int Sdof_;
-
   // Coefficients necessary to take a time step (including dt).
   // Assumed to be externally managed and determined, so just get a
   // reference here.
@@ -149,10 +146,6 @@ class Tomboulides final : public FlowBase {
   mfem::ParFiniteElementSpace *pfes_ = nullptr;
   mfem::ParGridFunction *p_gf_ = nullptr;
   mfem::ParGridFunction *resp_gf_ = nullptr;
-
-  /// Scalar FEM objects of vorder
-  mfem::FiniteElementCollection *sfec_ = nullptr;
-  mfem::ParFiniteElementSpace *sfes_ = nullptr;
 
   /// mfem::Coefficients used in forming necessary operators
   mfem::GridFunctionCoefficient *rho_coeff_ = nullptr;
