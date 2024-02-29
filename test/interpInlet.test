@@ -4,7 +4,7 @@
 TEST="interpInletBox"
 RUNFILE="inputs/input.interpZF.ini"
 EXE="../src/tps"
-RESTART="ref_solns/interpInlet/restart_output.sol.h5"
+RESTART=
 
 setup() {
     SOLN_FILE=restart_output.sol.h5
