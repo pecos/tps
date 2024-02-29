@@ -77,6 +77,7 @@ class Tomboulides final : public FlowBase {
  protected:
   // true if this is root rank
   bool rank0_;
+  bool axisym_;
 
   // Options
   // TODO(trevilo): hardcoded for testing.  Need to set based on input file.
@@ -151,6 +152,7 @@ class Tomboulides final : public FlowBase {
   mfem::ParFiniteElementSpace *pfes_ = nullptr;
   mfem::ParGridFunction *p_gf_ = nullptr;
   mfem::ParGridFunction *resp_gf_ = nullptr;
+  mfem::ParGridFunction *pp_div_rad_comp_gf_ = nullptr;
 
   /// mfem::Coefficients used in forming necessary operators
   mfem::GridFunctionCoefficient *rho_coeff_ = nullptr;
@@ -177,6 +179,13 @@ class Tomboulides final : public FlowBase {
   mfem::VectorSumCoefficient *S_poisson_coeff_ = nullptr;
   mfem::VectorSumCoefficient *S_mom_coeff_ = nullptr;
 
+  mfem::ProductCoefficient *rad_rho_coeff_ = nullptr;
+  mfem::ProductCoefficient *rad_rho_over_dt_coeff_ = nullptr;
+  mfem::ProductCoefficient *rad_mu_coeff_ = nullptr;
+  mfem::RatioCoefficient *mu_over_rad_coeff_ = nullptr;
+  mfem::VectorArrayCoefficient *visc_forcing_coeff_ = nullptr;
+  mfem::GridFunctionCoefficient *pp_div_rad_comp_coeff_ = nullptr;
+
   // mfem "form" objects used to create operators
   mfem::ParBilinearForm *L_iorho_form_ = nullptr;  // \int (1/\rho) \nabla \phi_i \cdot \nabla \phi_j
   mfem::ParLinearForm *forcing_form_ = nullptr;    // \int \phi_i f
@@ -191,6 +200,7 @@ class Tomboulides final : public FlowBase {
   mfem::ParLinearForm *u_bdr_form_ = nullptr;
   mfem::ParLinearForm *S_poisson_form_ = nullptr;
   mfem::ParLinearForm *S_mom_form_ = nullptr;
+  mfem::ParLinearForm *Faxi_poisson_form_ = nullptr;
 
   // mfem operator objects
   mfem::OperatorHandle L_iorho_op_;
@@ -244,6 +254,7 @@ class Tomboulides final : public FlowBase {
   mfem::Vector mu_vec_;
   mfem::Vector ress_vec_;
   mfem::Vector S_poisson_vec_;
+  mfem::Vector Faxi_poisson_vec_;
 
   // miscellaneous
   double volume_;

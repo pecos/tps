@@ -44,6 +44,12 @@
 
 using namespace mfem;
 
+double radius(const Vector &pos) { return pos[0]; }
+FunctionCoefficient radius_coeff(radius);
+
+double negativeRadius(const Vector &pos) { return -pos[0]; }
+FunctionCoefficient negative_radius_coeff(negativeRadius);
+
 /// forward declarations
 void vel_exact_tgv2d(const Vector &x, double t, Vector &u);
 
@@ -72,6 +78,7 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
   assert(pmesh_ != NULL);
 
   rank0_ = (pmesh_->GetMyRank() == 0);
+  axisym_ = false;
 
   // make sure there is room for BC attributes
   if (!(pmesh_->bdr_attributes.Size() == 0)) {
@@ -84,6 +91,9 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
 
   if (tps != nullptr) {
     // if we have Tps object, use it to set other options...
+
+    // Axisymmetric simulation?
+    tps->getInput("loMach/axisymmetric", axisym_, false);
 
     // Gravity
     assert(dim_ >= 2);
@@ -196,6 +206,7 @@ Tomboulides::~Tomboulides() {
   delete mass_lform_;
 
   // objects allocated by initializeOperators
+  delete Faxi_poisson_form_;
   delete S_mom_form_;
   delete S_poisson_form_;
   delete u_bdr_form_;
@@ -219,6 +230,10 @@ Tomboulides::~Tomboulides() {
   delete L_iorho_inv_pc_;
   delete L_iorho_lor_;
   delete L_iorho_form_;
+  delete visc_forcing_coeff_;
+  delete rad_mu_coeff_;
+  delete rad_rho_over_dt_coeff_;
+  delete rad_rho_coeff_;
   delete S_mom_coeff_;
   delete S_poisson_coeff_;
   delete gradmu_Qt_coeff_;
@@ -229,6 +244,7 @@ Tomboulides::~Tomboulides() {
   delete grad_u_next_transp_coeff_;
   delete grad_u_next_coeff_;
   delete grad_mu_coeff_;
+  delete pp_div_rad_comp_coeff_;
   delete pp_div_coeff_;
   delete mu_coeff_;
   delete mut_coeff_;
@@ -240,6 +256,7 @@ Tomboulides::~Tomboulides() {
   delete rho_coeff_;
 
   // objects allocated by initalizeSelf
+  delete pp_div_rad_comp_gf_;
   delete resp_gf_;
   delete p_gf_;
   delete pfes_;
@@ -279,6 +296,8 @@ void Tomboulides::initializeSelf() {
   pfes_ = new ParFiniteElementSpace(pmesh_, pfec_);
   p_gf_ = new ParGridFunction(pfes_);
   resp_gf_ = new ParGridFunction(pfes_);
+
+  pp_div_rad_comp_gf_ = new ParGridFunction(pfes_, *pp_div_gf_);
 
   *u_curr_gf_ = 0.0;
   *u_next_gf_ = 0.0;
@@ -327,6 +346,7 @@ void Tomboulides::initializeSelf() {
   Qt_vec_.SetSize(pfes_truevsize);
   rho_vec_.SetSize(pfes_truevsize);
   mu_vec_.SetSize(pfes_truevsize);
+  Faxi_poisson_vec_.SetSize(pfes_truevsize);
 
   tmpR0_.SetSize(sfes_truevsize);
   tmpR1_.SetSize(vfes_truevsize);
@@ -375,7 +395,12 @@ void Tomboulides::initializeOperators() {
 
   // Create all the Coefficient objects we need
   rho_coeff_ = new GridFunctionCoefficient(thermo_interface_->density);
-  iorho_coeff_ = new RatioCoefficient(1.0, *rho_coeff_);
+
+  if (axisym_) {
+    iorho_coeff_ = new RatioCoefficient(radius_coeff, *rho_coeff_);
+  } else {
+    iorho_coeff_ = new RatioCoefficient(1.0, *rho_coeff_);
+  }
 
   Hv_bdfcoeff_.constant = 1.0 / coeff_.dt;
   rho_over_dt_coeff_ = new ProductCoefficient(Hv_bdfcoeff_, *rho_coeff_);
@@ -385,6 +410,7 @@ void Tomboulides::initializeOperators() {
   mult_coeff_ = new GridFunctionCoefficient(sponge_interface_->visc_multiplier);
   mu_total_coeff_ = new ProductCoefficient(*mult_coeff_, *mu_sum_coeff_);
   pp_div_coeff_ = new VectorGridFunctionCoefficient(pp_div_gf_);
+  pp_div_rad_comp_coeff_ = new GridFunctionCoefficient(pp_div_rad_comp_gf_);
 
   // coefficients used in the variable viscosity terms
   grad_mu_coeff_ = new GradientGridFunctionCoefficient(thermo_interface_->viscosity);
@@ -400,6 +426,18 @@ void Tomboulides::initializeOperators() {
 
   S_poisson_coeff_ = new VectorSumCoefficient(*twoS_gradmu_coeff_, *gradmu_Qt_coeff_, 1.0, -2. / 3);
   S_mom_coeff_ = new VectorSumCoefficient(*graduT_gradmu_coeff_, *gradmu_Qt_coeff_, 1.0, -1.0);
+
+  // Coefficients for axisymmetric
+  if (axisym_) {
+    rad_rho_coeff_ = new ProductCoefficient(radius_coeff, *rho_coeff_);
+    rad_rho_over_dt_coeff_ = new ProductCoefficient(Hv_bdfcoeff_, *rad_rho_coeff_);
+    rad_mu_coeff_ = new ProductCoefficient(radius_coeff, *mu_coeff_);
+    mu_over_rad_coeff_ = new RatioCoefficient(*mu_coeff_, radius_coeff);
+
+    // NB: Takes ownership of mu_over_rad_coeff_
+    visc_forcing_coeff_ = new VectorArrayCoefficient(2);
+    visc_forcing_coeff_->Set(0, mu_over_rad_coeff_);
+  }
 
   // Integration rules (only used if numerical_integ_ is true).  When
   // this is the case, the quadrature degree set such that the
@@ -462,7 +500,12 @@ void Tomboulides::initializeOperators() {
   // Coefficient is -1 so we can just add to rhs
   nlcoeff_.constant = -1.0;
   Nconv_form_ = new ParNonlinearForm(vfes_);
-  auto *nlc_nlfi = new VectorConvectionNLFIntegrator(nlcoeff_);
+  VectorConvectionNLFIntegrator *nlc_nlfi;
+  if (axisym_) {
+    nlc_nlfi = new VectorConvectionNLFIntegrator(negative_radius_coeff);
+  } else {
+    nlc_nlfi = new VectorConvectionNLFIntegrator(nlcoeff_);
+  }
   if (numerical_integ_) {
     nlc_nlfi->SetIntRule(&ir_ni_v);
   }
@@ -491,7 +534,12 @@ void Tomboulides::initializeOperators() {
 
   // Mass matrix for the velocity
   Mv_form_ = new ParBilinearForm(vfes_);
-  auto *mv_blfi = new VectorMassIntegrator;
+  VectorMassIntegrator *mv_blfi;
+  if (axisym_) {
+    mv_blfi = new VectorMassIntegrator(radius_coeff);
+  } else {
+    mv_blfi = new VectorMassIntegrator();
+  }
   if (numerical_integ_) {
     mv_blfi->SetIntRule(&ir_ni_v);
   }
@@ -550,7 +598,12 @@ void Tomboulides::initializeOperators() {
 
   // Divergence operator
   D_form_ = new ParMixedBilinearForm(vfes_, pfes_);
-  auto *vd_mblfi = new VectorDivergenceIntegrator();
+  VectorDivergenceIntegrator *vd_mblfi;
+  if (axisym_) {
+    vd_mblfi = new VectorDivergenceIntegrator(radius_coeff);
+  } else {
+    vd_mblfi = new VectorDivergenceIntegrator();
+  }
   if (numerical_integ_) {
     vd_mblfi->SetIntRule(&ir_ni_v);
   }
@@ -563,7 +616,13 @@ void Tomboulides::initializeOperators() {
 
   // Gradient
   G_form_ = new ParMixedBilinearForm(pfes_, vfes_);
-  auto *g_mblfi = new GradientIntegrator();
+  // auto *g_mblfi = new GradientIntegrator();
+  GradientIntegrator *g_mblfi;
+  if (axisym_) {
+    g_mblfi = new GradientIntegrator(radius_coeff);
+  } else {
+    g_mblfi = new GradientIntegrator();
+  }
   if (numerical_integ_) {
     g_mblfi->SetIntRule(&ir_ni_v);
   }
@@ -576,14 +635,26 @@ void Tomboulides::initializeOperators() {
 
   // Helmholtz
   Hv_form_ = new ParBilinearForm(vfes_);
-  auto *hmv_blfi = new VectorMassIntegrator(*rho_over_dt_coeff_);
-  auto *hdv_blfi = new VectorDiffusionIntegrator(*mu_total_coeff_);
+  VectorMassIntegrator *hmv_blfi;
+  VectorDiffusionIntegrator *hdv_blfi;
+  if (axisym_) {
+    //TODO: Use mu_total_coeff for diffusion to capture sponge!
+    hmv_blfi = new VectorMassIntegrator(*rad_rho_over_dt_coeff_);
+    hdv_blfi = new VectorDiffusionIntegrator(*rad_mu_coeff_);
+  } else {
+    hmv_blfi = new VectorMassIntegrator(*rho_over_dt_coeff_);
+    hdv_blfi = new VectorDiffusionIntegrator(*mu_total_coeff_);
+  }
   if (numerical_integ_) {
     hmv_blfi->SetIntRule(&ir_ni_v);
     hdv_blfi->SetIntRule(&ir_ni_v);
   }
   Hv_form_->AddDomainIntegrator(hmv_blfi);
   Hv_form_->AddDomainIntegrator(hdv_blfi);
+  if (axisym_) {
+    auto *hfv_blfi = new VectorMassIntegrator(*visc_forcing_coeff_);
+    Hv_form_->AddDomainIntegrator(hfv_blfi);
+  }
   if (partial_assembly_) {
     // Partial assembly is not supported for variable coefficient
     // VectorMassIntegrator (as of mfem 4.5.2 at least)
@@ -640,6 +711,13 @@ void Tomboulides::initializeOperators() {
     s_mom_dlfi->SetIntRule(&ir_ni_v);
   }
   S_mom_form_->AddDomainIntegrator(s_mom_dlfi);
+
+  Faxi_poisson_form_ = new ParLinearForm(pfes_);
+  auto *f_rhs_dlfi = new DomainLFIntegrator(*pp_div_rad_comp_coeff_);
+  if (numerical_integ_) {
+    f_rhs_dlfi->SetIntRule(&ir_ni_p);
+  }
+  Faxi_poisson_form_->AddDomainIntegrator(f_rhs_dlfi);
 
   // Ensure u_vec_ consistent with u_curr_gf_
   u_curr_gf_->GetTrueDofs(u_vec_);
@@ -789,6 +867,8 @@ void Tomboulides::step() {
 
   // At this point ustar_vec_ holds vstar/dt!
 
+  // NB: axisymmetric (no swirl!) implemented to here
+
   //------------------------------------------------------------------------
   // Step 3: Poisson
   // ------------------------------------------------------------------------
@@ -807,14 +887,18 @@ void Tomboulides::step() {
   u_next_gf_->SetFromTrueDofs(uext_vec_);
 
   // Evaluate the double curl of the extrapolated velocity field
-  if (dim_ == 2) {
-    ComputeCurl2D(*u_next_gf_, *curl_gf_, false);
-    ComputeCurl2D(*curl_gf_, *curlcurl_gf_, true);
+  if (axisym_) {
+    ComputeCurlAxi(*u_next_gf_, *curl_gf_, false);
+    ComputeCurlAxi(*curl_gf_, *curlcurl_gf_, true);
   } else {
-    ComputeCurl3D(*u_next_gf_, *curl_gf_);
-    ComputeCurl3D(*curl_gf_, *curlcurl_gf_);
+    if (dim_ == 2) {
+      ComputeCurl2D(*u_next_gf_, *curl_gf_, false);
+      ComputeCurl2D(*curl_gf_, *curlcurl_gf_, true);
+    } else {
+      ComputeCurl3D(*u_next_gf_, *curl_gf_);
+      ComputeCurl3D(*curl_gf_, *curlcurl_gf_);
+    }
   }
-
   curlcurl_gf_->GetTrueDofs(pp_div_vec_);
 
   // Negate b/c term that appears in residual is -curl curl u
@@ -871,17 +955,26 @@ void Tomboulides::step() {
   Mv_rho_inv_->Mult(ress_vec_, S_poisson_vec_);
   pp_div_vec_ += S_poisson_vec_;
 
+  pp_div_gf_->SetFromTrueDofs(pp_div_vec_);
+
   // rhs = div(pp_div_vec_)
   D_op_->Mult(pp_div_vec_, resp_vec_);
 
   // Add Qt term (rhs += -bd0 * Qt / dt)
   Ms_op_->AddMult(Qt_vec_, resp_vec_, -coeff_.bd0 / dt);
 
+  // Add axisymmetric "forcing" term to rhs
+  if (axisym_) {
+    Faxi_poisson_form_->Update();
+    Faxi_poisson_form_->Assemble();
+    Faxi_poisson_form_->ParallelAssemble(Faxi_poisson_vec_);
+    resp_vec_ += Faxi_poisson_vec_;
+  }
+
   // Negate residual s.t. sign is consistent with -\nabla ( (1/\rho) \cdot \nabla p ) on LHS
   resp_vec_.Neg();
 
   // Add boundary terms to residual
-  pp_div_gf_->SetFromTrueDofs(pp_div_vec_);
   pp_div_bdr_form_->Assemble();
   pp_div_bdr_form_->ParallelAssemble(pp_div_bdr_vec_);
   resp_vec_.Add(1.0, pp_div_bdr_vec_);

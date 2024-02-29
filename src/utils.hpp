@@ -162,6 +162,8 @@ void setScalarFromVector(Vector A, int ind, Vector *C);
 /// Compute \f$\nabla \times \nabla \times u\f$ for \f$u \in (H^1)^2\f$.
 void ComputeCurl2D(ParGridFunction &u, ParGridFunction &cu, bool assume_scalar = false);
 
+void ComputeCurlAxi(ParGridFunction &u, ParGridFunction &cu, bool assume_scalar = false);
+
 /// Compute \f$\nabla \times \nabla \times u\f$ for \f$u \in (H^1)^3\f$.
 void ComputeCurl3D(ParGridFunction &u, ParGridFunction &cu);
 
