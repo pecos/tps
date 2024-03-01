@@ -186,6 +186,9 @@ class Tomboulides final : public FlowBase {
   mfem::VectorArrayCoefficient *visc_forcing_coeff_ = nullptr;
   mfem::GridFunctionCoefficient *pp_div_rad_comp_coeff_ = nullptr;
 
+  mfem::ScalarVectorProductCoefficient *rad_pp_div_coeff_ = nullptr;
+  std::vector<mfem::ScalarVectorProductCoefficient *> rad_vel_coeff_;
+
   // mfem "form" objects used to create operators
   mfem::ParBilinearForm *L_iorho_form_ = nullptr;  // \int (1/\rho) \nabla \phi_i \cdot \nabla \phi_j
   mfem::ParLinearForm *forcing_form_ = nullptr;    // \int \phi_i f

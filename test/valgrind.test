@@ -6,6 +6,7 @@ RUNFILE="inputs/input.dtconst.2iters.cyl.ini"
 LOMACH_RUNFILE="inputs/lomach.tgv2d.ini"
 HEAT_RUNFILE="inputs/input.heatedBox.ini"
 RUNFILE_AVG="inputs/input.cyl-2d.caseA.ini"
+PIPE_RUNFILE="inputs/lomach.pipe.ini"
 EXE="../src/tps"
 LIBTOOL_RUN="../libtool --mode=execute"
 VALGRIND="valgrind --suppressions=valgrind.suppressions --tool=memcheck --leak-check=full --error-exitcode=1"
@@ -55,4 +56,15 @@ setup() {
 @test "[$TEST] run tps with input -> $RUNFILE_AVG under valgrind" {
     test -s $RUNFILE_AVG
     $LIBTOOL_RUN $VALGRIND $EXE -run $RUNFILE_AVG
+}
+
+@test "[$TEST] run tps with input -> $PIPE_RUNFILE under valgrind" {
+    test -s $PIPE_RUNFILE
+
+    # reduce number of steps, just for brevity of run
+    cat $PIPE_RUNFILE | sed 's/maxIters = 1000/maxIters = 5/' > tmp.runfile.ini
+    # run $LIBTOOL_RUN $VALGRIND $EXE -run tmp.runfile.ini
+    $LIBTOOL_RUN $VALGRIND $EXE -run tmp.runfile.ini
+    # rm tmp.runfile.ini
+    # [[ "${status}" -eq 0 ]]
 }

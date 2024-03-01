@@ -96,6 +96,14 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
     // Axisymmetric simulation?
     tps->getInput("loMach/axisymmetric", axisym_, false);
 
+    // Use "numerical integration" (i.e., under-integrate so that mass matrix is diagonal)
+    tps->getInput("loMach/tomboulides/numerical-integ", numerical_integ_, true);
+
+    // Can't use numerical integration with axisymmetric b/c it
+    // locates quadrature points on the axis, which can lead to
+    // singular mass matrices and evaluations of 1/r = 1/0.
+    if (axisym_) assert(!numerical_integ_);
+
     // Gravity
     assert(dim_ >= 2);
     Vector zerog(dim_);
@@ -155,9 +163,6 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
         inlet_attr = 0;
         inlet_attr[patch - 1] = 1;
-
-        Vector velocity_value(dim_);
-        tps->getRequiredVec((basepath + "/velocity").c_str(), velocity_value, dim_);
 
         if (pmesh_->GetMyRank() == 0) {
           std::cout << "Tomboulides: Setting uniform inlet velocity on patch = " << patch << std::endl;
@@ -271,6 +276,10 @@ Tomboulides::~Tomboulides() {
   delete L_iorho_inv_pc_;
   delete L_iorho_lor_;
   delete L_iorho_form_;
+
+  for (size_t i = 0; i < rad_vel_coeff_.size(); i++) delete rad_vel_coeff_[i];
+
+  delete rad_pp_div_coeff_;
   delete visc_forcing_coeff_;
   delete rad_mu_coeff_;
   delete rad_rho_over_dt_coeff_;
@@ -531,6 +540,7 @@ void Tomboulides::initializeOperators() {
   L_iorho_inv_->SetMaxIter(pressure_solve_max_iter_);
 
   // Forcing term in the velocity equation: du/dt + ... = ... + f
+  // TODO(trevilo): Multiply by r in the axisymmetric case
   forcing_form_ = new ParLinearForm(vfes_);
   for (auto &force : forcing_terms_) {
     auto *fdlfi = new VectorDomainLFIntegrator(*force.coeff);
@@ -565,7 +575,12 @@ void Tomboulides::initializeOperators() {
   // pressure space and the Q space are the same.  Need to assert this
   // somehow.
   Ms_form_ = new ParBilinearForm(pfes_);
-  auto *ms_blfi = new MassIntegrator;
+  MassIntegrator *ms_blfi;
+  if (axisym_) {
+    ms_blfi = new MassIntegrator(radius_coeff);
+  } else {
+    ms_blfi = new MassIntegrator();
+  }
   if (numerical_integ_) {
     ms_blfi->SetIntRule(&ir_ni_p);
   }
@@ -596,7 +611,12 @@ void Tomboulides::initializeOperators() {
 
   // Mass matrix (density weighted) for the velocity
   Mv_rho_form_ = new ParBilinearForm(vfes_);
-  auto *mvr_blfi = new VectorMassIntegrator(*rho_coeff_);
+  VectorMassIntegrator *mvr_blfi;
+  if (axisym_) {
+    mvr_blfi = new VectorMassIntegrator(*rad_rho_coeff_);
+  } else {
+    mvr_blfi = new VectorMassIntegrator(*rho_coeff_);
+  }
   if (numerical_integ_) {
     mvr_blfi->SetIntRule(&ir_ni_v);
   }
@@ -727,7 +747,13 @@ void Tomboulides::initializeOperators() {
 
   //
   pp_div_bdr_form_ = new ParLinearForm(pfes_);
-  auto *ppd_bnlfi = new BoundaryNormalLFIntegrator(*pp_div_coeff_);
+  BoundaryNormalLFIntegrator *ppd_bnlfi;
+  if (axisym_) {
+    rad_pp_div_coeff_ = new ScalarVectorProductCoefficient(radius_coeff, *pp_div_coeff_);
+    ppd_bnlfi = new BoundaryNormalLFIntegrator(*rad_pp_div_coeff_);
+  } else {
+    ppd_bnlfi = new BoundaryNormalLFIntegrator(*pp_div_coeff_);
+  }
   if (numerical_integ_) {
     ppd_bnlfi->SetIntRule(&ir_ni_p);
   }
@@ -735,7 +761,13 @@ void Tomboulides::initializeOperators() {
 
   u_bdr_form_ = new ParLinearForm(pfes_);
   for (auto &vel_dbc : vel_dbcs_) {
-    auto *ubdr_bnlfi = new BoundaryNormalLFIntegrator(*vel_dbc.coeff);
+    BoundaryNormalLFIntegrator *ubdr_bnlfi;
+    if (axisym_) {
+      rad_vel_coeff_.push_back(new ScalarVectorProductCoefficient(radius_coeff, *vel_dbc.coeff));
+      ubdr_bnlfi = new BoundaryNormalLFIntegrator(*rad_vel_coeff_[rad_vel_coeff_.size() - 1]);
+    } else {
+      ubdr_bnlfi = new BoundaryNormalLFIntegrator(*vel_dbc.coeff);
+    }
     if (numerical_integ_) {
       ubdr_bnlfi->SetIntRule(&ir_ni_p);
     }
