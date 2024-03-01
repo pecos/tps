@@ -34,6 +34,7 @@
 
 #include <mfem/general/forall.hpp>
 
+#include "algebraicSubgridModels.hpp"
 #include "externalData_base.hpp"
 #include "io.hpp"
 #include "loMach.hpp"
@@ -230,7 +231,9 @@ Tomboulides::~Tomboulides() {
   delete grad_mu_coeff_;
   delete pp_div_coeff_;
   delete mu_coeff_;
+  delete mut_coeff_;
   delete mult_coeff_;
+  delete mu_sum_coeff_;
   delete mu_total_coeff_;
   delete rho_over_dt_coeff_;
   delete iorho_coeff_;
@@ -247,8 +250,13 @@ Tomboulides::~Tomboulides() {
   delete curl_gf_;
   delete u_next_gf_;
   delete u_curr_gf_;
+  delete gradU_gf_;
+  delete gradV_gf_;
+  delete gradW_gf_;
   delete vfes_;
   delete vfec_;
+  delete sfes_;
+  delete sfec_;
 }
 
 void Tomboulides::initializeSelf() {
@@ -261,6 +269,11 @@ void Tomboulides::initializeSelf() {
   curlcurl_gf_ = new ParGridFunction(vfes_);
   resu_gf_ = new ParGridFunction(vfes_);
   pp_div_gf_ = new ParGridFunction(vfes_);
+  gradU_gf_ = new ParGridFunction(vfes_);
+  gradV_gf_ = new ParGridFunction(vfes_);
+  gradW_gf_ = new ParGridFunction(vfes_);
+  sfec_ = new H1_FECollection(vorder_);
+  sfes_ = new ParFiniteElementSpace(pmesh_, sfec_);
 
   pfec_ = new H1_FECollection(porder_);
   pfes_ = new ParFiniteElementSpace(pmesh_, pfec_);
@@ -276,6 +289,9 @@ void Tomboulides::initializeSelf() {
   *resp_gf_ = 0.0;
 
   toThermoChem_interface_.velocity = u_next_gf_;
+  toTurbModel_interface_.gradU = gradU_gf_;
+  toTurbModel_interface_.gradV = gradV_gf_;
+  toTurbModel_interface_.gradW = gradW_gf_;
 
   // Gravity
   gravity_vec_ = new VectorConstantCoefficient(gravity_);
@@ -286,6 +302,7 @@ void Tomboulides::initializeSelf() {
 
   // Allocate Vector storage
   const int vfes_truevsize = vfes_->GetTrueVSize();
+  const int sfes_truevsize = sfes_->GetTrueVSize();
   const int pfes_truevsize = pfes_->GetTrueVSize();
 
   forcing_vec_.SetSize(vfes_truevsize);
@@ -310,6 +327,13 @@ void Tomboulides::initializeSelf() {
   Qt_vec_.SetSize(pfes_truevsize);
   rho_vec_.SetSize(pfes_truevsize);
   mu_vec_.SetSize(pfes_truevsize);
+
+  tmpR0_.SetSize(sfes_truevsize);
+  tmpR1_.SetSize(vfes_truevsize);
+
+  gradU_.SetSize(vfes_truevsize);
+  gradV_.SetSize(vfes_truevsize);
+  gradW_.SetSize(vfes_truevsize);
 
   // zero vectors for now
   forcing_vec_ = 0.0;
@@ -356,8 +380,10 @@ void Tomboulides::initializeOperators() {
   Hv_bdfcoeff_.constant = 1.0 / coeff_.dt;
   rho_over_dt_coeff_ = new ProductCoefficient(Hv_bdfcoeff_, *rho_coeff_);
   mu_coeff_ = new GridFunctionCoefficient(thermo_interface_->viscosity);
+  mut_coeff_ = new GridFunctionCoefficient(turbModel_interface_->eddy_viscosity);
+  mu_sum_coeff_ = new SumCoefficient(*mut_coeff_, *mu_coeff_, 1.0, 1.0);
   mult_coeff_ = new GridFunctionCoefficient(sponge_interface_->visc_multiplier);
-  mu_total_coeff_ = new ProductCoefficient(*mult_coeff_, *mu_coeff_);
+  mu_total_coeff_ = new ProductCoefficient(*mult_coeff_, *mu_sum_coeff_);
   pp_div_coeff_ = new VectorGridFunctionCoefficient(pp_div_gf_);
 
   // coefficients used in the variable viscosity terms
@@ -955,6 +981,23 @@ void Tomboulides::step() {
   u_next_gf_->GetTrueDofs(u_next_vec_);
   u_vec_ = u_next_vec_;
   u_curr_gf_->SetFromTrueDofs(u_vec_);
+
+  // update gradients for turbulence model
+  // TODO(swh): move when full viscous terms are added
+  setScalarFromVector(u_next_vec_, 0, &tmpR0_);
+  G_op_->Mult(tmpR0_, tmpR1_);
+  Mv_inv_->Mult(tmpR1_, gradU_);
+  setScalarFromVector(u_next_vec_, 1, &tmpR0_);
+  G_op_->Mult(tmpR0_, tmpR1_);
+  Mv_inv_->Mult(tmpR1_, gradV_);
+  if (dim_ == 3) {
+    setScalarFromVector(u_next_vec_, 2, &tmpR0_);
+    G_op_->Mult(tmpR0_, tmpR1_);
+    Mv_inv_->Mult(tmpR1_, gradW_);
+  }
+  gradU_gf_->SetFromTrueDofs(gradU_);
+  gradV_gf_->SetFromTrueDofs(gradV_);
+  gradW_gf_->SetFromTrueDofs(gradW_);
 }
 
 double Tomboulides::computeL2Error() const {

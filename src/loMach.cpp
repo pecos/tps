@@ -43,6 +43,7 @@
 #include <iomanip>
 #include <limits>
 
+#include "algebraicSubgridModels.hpp"
 #include "calorically_perfect.hpp"
 #include "gaussianInterpExtData.hpp"
 #include "geometricSponge.hpp"
@@ -82,16 +83,13 @@ LoMachSolver::LoMachSolver(TPS::Tps *tps)
 LoMachSolver::~LoMachSolver() {
   // allocated in initialize()
   delete pvdc_;
-  delete bufferGridScaleZ;
-  delete bufferGridScaleY;
-  delete bufferGridScaleX;
-  delete bufferGridScale;
-  delete sfes;
-  delete sfec;
+  delete sfes_;
+  delete sfec_;
   delete extData_;
   delete flow_;
   delete thermo_;
   delete sponge_;
+  delete turbModel_;
   delete pmesh_;
   delete serial_mesh_;
 
@@ -211,14 +209,15 @@ void LoMachSolver::initialize() {
   // TODO(trevilo): This code is necessary here b/c LoMachSolver owns
   // the grid resolution objects.  We should refactor them into a
   // "MeshHelper" class or some such thing.
-  sfec = new H1_FECollection(order);
-  sfes = new ParFiniteElementSpace(pmesh_, sfec);
+  sfec_ = new H1_FECollection(order);
+  sfes_ = new ParFiniteElementSpace(pmesh_, sfec_);
 
   if (verbose) grvy_printf(ginfo, "Spaces constructed...\n");
 
-  int sfes_truevsize = sfes->GetTrueVSize();
-  if (verbose) grvy_printf(ginfo, "Got sizes...\n");
+  // int sfes_truevsize = sfes_->GetTrueVSize();
+  // if (verbose) grvy_printf(ginfo, "Got sizes...\n");
 
+  /*
   gridScaleSml.SetSize(sfes_truevsize);
   gridScaleSml = 0.0;
   gridScaleXSml.SetSize(sfes_truevsize);
@@ -231,9 +230,12 @@ void LoMachSolver::initialize() {
   // for paraview
   resolution_gf.SetSpace(sfes);
   resolution_gf = 0.0;
+  */
 
   if (verbose) grvy_printf(ginfo, "vectors and gf initialized...\n");
 
+  // TODO(swh): not sure where this shoudl go but until dt calcs are
+  // farmed out, leaving in loMach for time being
   // Determine the minimum element size.
   {
     double local_hmin = 1.0e18;
@@ -254,88 +256,9 @@ void LoMachSolver::initialize() {
   }
   if (verbose) grvy_printf(ginfo, "Max element size found...\n");
 
-  // Build grid size vector and grid function
-  bufferGridScale = new ParGridFunction(sfes);
-  bufferGridScaleX = new ParGridFunction(sfes);
-  bufferGridScaleY = new ParGridFunction(sfes);
-  bufferGridScaleZ = new ParGridFunction(sfes);
-  ParGridFunction dofCount(sfes);
-  {
-    int elndofs;
-    Array<int> vdofs;
-    Vector vals;
-    Vector loc_data;
-    int nSize = bufferGridScale->Size();
-    Array<int> zones_per_vdof;
-    zones_per_vdof.SetSize(sfes->GetVSize());
-    zones_per_vdof = 0;
-    Array<int> zones_per_vdofALL;
-    zones_per_vdofALL.SetSize(sfes->GetVSize());
-    zones_per_vdofALL = 0;
-
-    double *data = bufferGridScale->HostReadWrite();
-    double *count = dofCount.HostReadWrite();
-
-    for (int i = 0; i < sfes->GetNDofs(); i++) {
-      data[i] = 0.0;
-      count[i] = 0.0;
-    }
-
-    // element loop
-    for (int e = 0; e < sfes->GetNE(); ++e) {
-      sfes->GetElementVDofs(e, vdofs);
-      vals.SetSize(vdofs.Size());
-      ElementTransformation *tr = sfes->GetElementTransformation(e);
-      const FiniteElement *el = sfes->GetFE(e);
-      elndofs = el->GetDof();
-      double delta;
-
-      // element dof
-      for (int dof = 0; dof < elndofs; ++dof) {
-        const IntegrationPoint &ip = el->GetNodes().IntPoint(dof);
-        tr->SetIntPoint(&ip);
-        delta = pmesh_->GetElementSize(tr->ElementNo, 1);
-        delta = delta / ((double)order);
-        vals(dof) = delta;
-      }
-
-      // Accumulate values in all dofs, count the zones.
-      for (int j = 0; j < vdofs.Size(); j++) {
-        int ldof = vdofs[j];
-        data[ldof + 0 * nSize] += vals[j];
-      }
-
-      for (int j = 0; j < vdofs.Size(); j++) {
-        int ldof = vdofs[j];
-        zones_per_vdof[ldof]++;
-      }
-    }
-
-    // Count the zones globally.
-    GroupCommunicator &gcomm = bufferGridScale->ParFESpace()->GroupComm();
-    gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
-    gcomm.Bcast(zones_per_vdof);
-
-    // Accumulate for all vdofs.
-    gcomm.Reduce<double>(bufferGridScale->GetData(), GroupCommunicator::Sum);
-    gcomm.Bcast<double>(bufferGridScale->GetData());
-
-    // Compute means.
-    for (int i = 0; i < nSize; i++) {
-      const int nz = zones_per_vdof[i];
-      if (nz) {
-        data[i] /= nz;
-      }
-    }
-
-    bufferGridScale->GetTrueDofs(gridScaleSml);
-    bufferGridScaleX->GetTrueDofs(gridScaleXSml);
-    bufferGridScaleY->GetTrueDofs(gridScaleYSml);
-    bufferGridScaleZ->GetTrueDofs(gridScaleZSml);
-  }
-
+  // TODO(swh): this bit will be used for improving perodicity
   // Determine domain bounding box size
-  ParGridFunction coordsVert(sfes);
+  ParGridFunction coordsVert(sfes_);
   pmesh_->GetVertices(coordsVert);
   int nVert = coordsVert.Size() / dim_;
   {
@@ -389,15 +312,22 @@ void LoMachSolver::initialize() {
   extData_ = new GaussianInterpExtData(pmesh_, &loMach_opts_, tpsP_);
 
   // TODO(trevilo): Add support for turbulence modeling
-  if (rank0_) {
-    if (loMach_opts_.sgs_opts_.sgs_model_type_ == SubGridModelOptions::SMAGORINSKY) {
-      std::cout << "Smagorinsky subgrid model active" << endl;
-    } else if (loMach_opts_.sgs_opts_.sgs_model_type_ == SubGridModelOptions::SIGMA) {
-      std::cout << "Sigma subgrid model active" << endl;
+  if (loMach_opts_.sgs_opts_.sgs_model_type_ == SubGridModelOptions::SMAGORINSKY) {
+    turbModel_ = new AlgebraicSubgridModels(pmesh_, &loMach_opts_, tpsP_, 1);
+  } else if (loMach_opts_.sgs_opts_.sgs_model_type_ == SubGridModelOptions::SIGMA) {
+    turbModel_ = new AlgebraicSubgridModels(pmesh_, &loMach_opts_, tpsP_, 2);
+  } else if (loMach_opts_.sgs_opts_.sgs_model_type_ == SubGridModelOptions::NONE) {
+    // default
+    turbModel_ = new ZeroTurbModel(pmesh_, loMach_opts_.order);
+  } else {
+    // Unknown choice... die
+    if (rank0_) {
+      grvy_printf(GRVY_ERROR, "Unknown loMach/turbulence-model option \n");
     }
+    exit(ERROR);
   }
   // Turbulence modeling not supported yet
-  assert(loMach_opts_.sgs_opts_.sgs_model_type_ == SubGridModelOptions::NONE);
+  // assert(loMach_opts_.sgs_opts_.sgs_model_type_ == SubGridModelOptions::NONE);
 
   // Instantiate thermochemical model
   if (loMach_opts_.thermo_solver == "constant-property") {
@@ -446,6 +376,7 @@ void LoMachSolver::initialize() {
 
   // Initialize model-owned data
   sponge_->initializeSelf();
+  turbModel_->initializeSelf();
   flow_->initializeSelf();
   thermo_->initializeSelf();
 
@@ -465,15 +396,21 @@ void LoMachSolver::initialize() {
   }
 
   // Exchange interface information
-  flow_->initializeFromSponge(&sponge_->toFlow_interface_);
-  thermo_->initializeFromSponge(&sponge_->toThermoChem_interface_);
+  turbModel_->initializeFromThermoChem(&thermo_->toTurbModel_interface_);
+  turbModel_->initializeFromFlow(&flow_->toTurbModel_interface_);
+  flow_->initializeFromTurbModel(&turbModel_->toFlow_interface_);
+  thermo_->initializeFromTurbModel(&turbModel_->toThermoChem_interface_);
   flow_->initializeFromThermoChem(&thermo_->toFlow_interface_);
   thermo_->initializeFromFlow(&flow_->toThermoChem_interface_);
+  flow_->initializeFromSponge(&sponge_->toFlow_interface_);
+  thermo_->initializeFromSponge(&sponge_->toThermoChem_interface_);
 
   // static sponge
   sponge_->setup();
 
   // Finish initializing operators
+  turbModel_->setup();
+  turbModel_->initializeOperators();
   flow_->initializeOperators();
   thermo_->initializeOperators();
   // if(rank0_) {std::cout << "check: ops set..." << endl;}
@@ -486,6 +423,7 @@ void LoMachSolver::initialize() {
   pvdc_->SetHighOrderOutput(true);
   pvdc_->SetLevelsOfDetail(order);
 
+  turbModel_->initializeViz(*pvdc_);
   flow_->initializeViz(*pvdc_);
   thermo_->initializeViz(*pvdc_);
   sponge_->initializeViz(*pvdc_);
@@ -518,8 +456,6 @@ void LoMachSolver::initialTimeStep() {
 void LoMachSolver::solveBegin() {
   setTimestep();
   if (rank0_) std::cout << "Initial dt = " << temporal_coeff_.dt << std::endl;
-
-  resolution_gf = *bufferGridScale;
 
   pvdc_->SetCycle(iter);
   pvdc_->SetTime(temporal_coeff_.time);
@@ -555,6 +491,7 @@ void LoMachSolver::solveStep() {
     SetTimeIntegrationCoefficients(iter - iter_start_);
     thermo_->step();
     flow_->step();
+    turbModel_->step();
   } else {
     if (rank0_) std::cout << "Time integration not updated." << endl;
     exit(1);
@@ -647,13 +584,14 @@ void LoMachSolver::updateTimestep() {
   double Umax_lcl = 1.0e-12;
   double max_speed = Umax_lcl;
   double Umag;
-  int Sdof = sfes->GetNDofs();
+  int Sdof = sfes_->GetNDofs();
   // TODO(trevilo): Let user set dtFactor
   double dtFactor = 1.0;
   auto dataU = flow_->getCurrentVelocity()->HostRead();
 
   // come in divided by order
-  const double *dataD = bufferGridScale->HostRead();
+  // const double *dataD = bufferGridScale->HostRead();
+  const double *dataD = (turbModel_->getGridScale())->HostRead();
 
   for (int n = 0; n < Sdof; n++) {
     Umag = 0.0;
@@ -726,10 +664,11 @@ double LoMachSolver::computeCFL() {
   double Umax_lcl = 1.0e-12;
   double max_speed = Umax_lcl;
   double Umag;
-  int Sdof = sfes->GetNDofs();
+  int Sdof = sfes_->GetNDofs();
 
   // come in divided by order
-  double *dataD = bufferGridScale->HostReadWrite();
+  // double *dataD = bufferGridScale->HostReadWrite();
+  double *dataD = (turbModel_->getGridScale())->HostReadWrite();
   auto dataU = flow_->getCurrentVelocity()->HostRead();
 
   for (int n = 0; n < Sdof; n++) {
@@ -787,7 +726,7 @@ void LoMachSolver::setTimestep() {
   double Umax_lcl = 1.0e-12;
   double max_speed = Umax_lcl;
   double Umag;
-  int Sdof = sfes->GetNDofs();
+  int Sdof = sfes_->GetNDofs();
 
   CFL = loMach_opts_.ts_opts_.cfl_;
 

@@ -51,7 +51,8 @@ void ZeroFlow::initializeSelf() {
   toThermoChem_interface_.velocity = velocity_;
   toThermoChem_interface_.swirl_supported = false;
 
-  toTurbModel_interface_.gradU = nullptr;
-  toTurbModel_interface_.gradV = nullptr;
-  toTurbModel_interface_.gradW = nullptr;
+  // no need to create additional zero vectors
+  toTurbModel_interface_.gradU = velocity_;
+  toTurbModel_interface_.gradV = velocity_;
+  toTurbModel_interface_.gradW = velocity_;
 }

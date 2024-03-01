@@ -84,9 +84,29 @@ class TurbModelBase {
   virtual void initializeSelf() = 0;
 
   /**
+   * @brief Hook to let derived classes register visualization fields with ParaViewDataCollection
+   */
+  virtual void initializeViz(mfem::ParaViewDataCollection &pvdc) {}
+
+  /**
+   * @brief Initialize model operators
+   *
+   * Default implementation here does nothing.  This hook exists to
+   * allow the model to initialize operators that depend on the
+   * interface intformation.  Thus, it must be called *after* the
+   * interfaces are initialized (e.g., after initializeFromFlow).
+   */
+  virtual void initializeOperators() {}
+
+  /**
    * @brief Take a single time step
    */
   virtual void step() = 0;
+
+  /**
+   * @brief Grid-related
+   */
+  virtual void setup() = 0;
 
   /**
    * @brief Initialize data from the flow class
@@ -115,6 +135,9 @@ class TurbModelBase {
 
   /// Interface object, provides fields necessary for the turbModel
   turbModelToThermoChem toThermoChem_interface_;
+
+  virtual mfem::ParGridFunction *getCurrentEddyViscosity() { return nullptr; }
+  virtual mfem::ParGridFunction *getGridScale() { return nullptr; }
 };
 
 /**
@@ -125,7 +148,6 @@ class ZeroTurbModel final : public TurbModelBase {
  protected:
   mfem::ParMesh *pmesh_;
   const int sorder_;
-  // const double nuT_;
 
   mfem::FiniteElementCollection *fec_ = nullptr;
   mfem::ParFiniteElementSpace *fes_ = nullptr;
@@ -150,7 +172,8 @@ class ZeroTurbModel final : public TurbModelBase {
   /// Allocate and initialize the interface fields to constant values
   void initializeSelf() final;
 
-  /// Since everything is constant, step is a no-op
+  /// Since everything is constant, step and setup are a no-op
+  void setup() final {}
   void step() final {}
 };
 

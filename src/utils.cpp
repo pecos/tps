@@ -676,6 +676,13 @@ void multScalarVectorIP(Vector A, Vector *C, int dim) {
   }
 }
 
+void setScalarFromVector(Vector A, int ind, Vector *C) {
+  int Ndof = C->Size();
+  const double *dataA = A.Read();
+  double *data = C->Write();
+  MFEM_FORALL(i, Ndof, { data[i] = dataA[i + ind * Ndof]; });
+}
+
 void ComputeCurl3D(ParGridFunction &u, ParGridFunction &cu) {
   FiniteElementSpace *fes = u.FESpace();
 

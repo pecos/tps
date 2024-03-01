@@ -27,6 +27,7 @@ EXTRA_DIST  = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes lte-
 			  ref_solns/reaction/*.h5 ref_solns/noSGM1K/*.h5 ref_solns/smag1K_1/*.h5 \
 			  ref_solns/sigma1K_1/*.h5 ref_solns/plate150K/*.h5 ref_solns/plate150K_1step/*.h5 \
               ref_solns/heatedBox/*.h5 ref_solns/spongeBox/*.h5 ref_solns/interpInlet/*.h5 \
+              ref_solns/sgsLoMach/*.h5 \
 	      ref_solns/lequere-varmu/*.h5 \
 		      vpath.sh die.sh count_gpus.sh sniff_mpirun.sh \
 		      cyl3d.gpu.test cyl3d.mflow.gpu.test wedge.gpu.test \
@@ -42,7 +43,7 @@ EXTRA_DIST  = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes lte-
 		      tabulated.test lte_mixture.test distance_fcn.test \
               sgsSmag.test sgsSigma.test heatEq.test sponge.test plate.test pipe.mix.test lte2noneq-restart.test \
               coupled-3d.interface.test plasma.axisym.test plasma.axisym.lte1d.test \
-	      lomach-flow.test lomach-lequere.test interpInlet.test
+	      lomach-flow.test lomach-lequere.test interpInlet.test sgsLoMach.test
 
 TESTS = vpath.sh
 XFAIL_TESTS =
@@ -97,6 +98,7 @@ TESTS += cyl3d.test \
          sgsSigma.test \
          heatEq.test \
 	 sponge.test \
+         sgsLoMach.test \
          plate.test \
          pipe.mix.test \
 	 lte2noneq-restart.test \

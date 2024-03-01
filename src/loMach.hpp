@@ -69,6 +69,7 @@ class Tps;
 #include "sponge_base.hpp"
 #include "thermo_chem_base.hpp"
 #include "tps_mfem_wrap.hpp"
+#include "turb_model_base.hpp"
 
 struct temporalSchemeCoefficients {
   // Current time
@@ -116,7 +117,7 @@ class LoMachSolver : public TPS::Solver {
   bool loadFromAuxSol;  // load restart of different polynomial order
 
   // Model classes
-  // TurbModel *turbClass = nullptr;
+  TurbModelBase *turbModel_ = nullptr;
   ThermoChemModelBase *thermo_ = nullptr;
   FlowBase *flow_ = nullptr;
   SpongeBase *sponge_ = nullptr;
@@ -147,11 +148,12 @@ class LoMachSolver : public TPS::Solver {
   double xmax, ymax, zmax;
 
   /// Scalar \f$H^1\f$ finite element collection.
-  FiniteElementCollection *sfec = nullptr;
+  FiniteElementCollection *sfec_ = nullptr;
 
   /// Scalar \f$H^1\f$ finite element space.
-  ParFiniteElementSpace *sfes = nullptr;
+  ParFiniteElementSpace *sfes_ = nullptr;
 
+  /*
   Vector gridScaleSml;
   Vector gridScaleXSml;
   Vector gridScaleYSml;
@@ -165,6 +167,7 @@ class LoMachSolver : public TPS::Solver {
   ParGridFunction *bufferGridScaleX = nullptr;
   ParGridFunction *bufferGridScaleY = nullptr;
   ParGridFunction *bufferGridScaleZ = nullptr;
+  */
 
   // Time marching related parameters
   int iter;

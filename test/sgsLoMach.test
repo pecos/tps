@@ -1,14 +1,14 @@
 #!./bats
 # -*- mode: sh -*-
 
-TEST="heatedBox"
-RUNFILE="inputs/input.heatedBox.ini"
+TEST="flatBox"
+RUNFILE="inputs/input.sgsLoMach.ini"
 EXE="../src/tps"
-RESTART="ref_solns/heatedBox/restart_output.sol.h5"
+RESTART="ref_solns/sgsLoMach/restart_output.sol.h5"
 
 setup() {
     SOLN_FILE=restart_output.sol.h5
-    REF_FILE=ref_solns/heatedBox/restart_output.sol.h5
+    REF_FILE=ref_solns/sgsLoMach/restart_output.sol.h5
 }
 
 @test "[$TEST] check for input file $RUNFILE" {
@@ -18,12 +18,13 @@ setup() {
 @test "[$TEST] run tps with input -> $RUNFILE" {
     rm -rf output/*
     rm -f $SOLN_FILE
-    $EXE --runFile $RUNFILE
-    test -s $SOLN_FILE    
+    run $EXE --runFile $RUNFILE
+    [[ ${status} -eq 0 ]]
+    test -s $SOLN_FILE
 }
 
 @test "[$TEST] verify tps output with input -> $RUNFILE" {
     test -s $SOLN_FILE
     test -s $REF_FILE
-    h5diff -r --relative=1e-13 $SOLN_FILE $REF_FILE /temperature/temperature
+    h5diff -r --relative=1e-12 $SOLN_FILE $REF_FILE /velocity/velocity
 }

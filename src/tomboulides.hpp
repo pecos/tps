@@ -132,12 +132,17 @@ class Tomboulides final : public FlowBase {
   /// Velocity FEM objects and fields
   mfem::FiniteElementCollection *vfec_ = nullptr;
   mfem::ParFiniteElementSpace *vfes_ = nullptr;
+  mfem::FiniteElementCollection *sfec_ = nullptr;
+  mfem::ParFiniteElementSpace *sfes_ = nullptr;
   mfem::ParGridFunction *u_curr_gf_ = nullptr;
   mfem::ParGridFunction *u_next_gf_ = nullptr;
   mfem::ParGridFunction *curl_gf_ = nullptr;
   mfem::ParGridFunction *curlcurl_gf_ = nullptr;
   mfem::ParGridFunction *resu_gf_ = nullptr;
   mfem::ParGridFunction *pp_div_gf_ = nullptr;
+  mfem::ParGridFunction *gradU_gf_ = nullptr;
+  mfem::ParGridFunction *gradV_gf_ = nullptr;
+  mfem::ParGridFunction *gradW_gf_ = nullptr;
   // mfem::ParGridFunction *buffer_uInlet_ = nullptr;
   mfem::VectorGridFunctionCoefficient *velocity_field_ = nullptr;
 
@@ -155,9 +160,11 @@ class Tomboulides final : public FlowBase {
   mfem::ConstantCoefficient Hv_bdfcoeff_;
   mfem::ProductCoefficient *rho_over_dt_coeff_ = nullptr;
   mfem::GridFunctionCoefficient *mu_coeff_ = nullptr;
+  mfem::GridFunctionCoefficient *mut_coeff_ = nullptr;
+  mfem::GridFunctionCoefficient *mult_coeff_ = nullptr;
+  mfem::SumCoefficient *mu_sum_coeff_ = nullptr;
   mfem::ProductCoefficient *mu_total_coeff_ = nullptr;
   mfem::VectorGridFunctionCoefficient *pp_div_coeff_ = nullptr;
-  mfem::GridFunctionCoefficient *mult_coeff_ = nullptr;
 
   mfem::GradientGridFunctionCoefficient *grad_mu_coeff_ = nullptr;
   mfem::GradientVectorGridFunctionCoefficient *grad_u_next_coeff_ = nullptr;
@@ -226,6 +233,11 @@ class Tomboulides final : public FlowBase {
   mfem::Vector resp_vec_;
   mfem::Vector p_vec_;
   mfem::Vector resu_vec_;
+  mfem::Vector tmpR0_;
+  mfem::Vector tmpR1_;
+  mfem::Vector gradU_;
+  mfem::Vector gradV_;
+  mfem::Vector gradW_;
   mfem::Vector Qt_vec_;
   mfem::Vector grad_Qt_vec_;
   mfem::Vector rho_vec_;

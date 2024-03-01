@@ -98,7 +98,7 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   double sutherland_T0_; /**< Temperature constant for Sutherland's law */
   double sutherland_S0_; /**< S constant for Sutherland's law */
 
-  double Pr_, Cp_, gamma_, Rgas_;
+  double Pr_, invPr_, Cp_, gamma_, Rgas_;
   double static_rho_;
 
   /// pressure-related, closed-system thermo pressure changes
@@ -134,12 +134,14 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   GridFunctionCoefficient *rhon_next_coeff_ = nullptr;
   ScalarVectorProductCoefficient *rhou_coeff_ = nullptr;
   GridFunctionCoefficient *thermal_diff_coeff_ = nullptr;
+  GridFunctionCoefficient *mut_coeff_ = nullptr;
+  GridFunctionCoefficient *mult_coeff_ = nullptr;
+  SumCoefficient *thermal_diff_sum_coeff_ = nullptr;
   ProductCoefficient *thermal_diff_total_coeff_ = nullptr;
   GradientGridFunctionCoefficient *gradT_coeff_ = nullptr;
   ScalarVectorProductCoefficient *kap_gradT_coeff_ = nullptr;
   GridFunctionCoefficient *rho_over_dt_coeff_ = nullptr;
   GridFunctionCoefficient *rho_coeff_ = nullptr;
-  GridFunctionCoefficient *mult_coeff_ = nullptr;
 
   // operators and solvers
   ParBilinearForm *At_form_ = nullptr;

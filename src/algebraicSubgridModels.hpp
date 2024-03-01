@@ -30,10 +30,9 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
 
-#ifndef TURBMODEL_HPP_
-#define TURBMODEL_HPP_
+#ifndef ALGEBRAICSUBGRIDMODELS_HPP_
+#define ALGEBRAICSUBGRIDMODELS_HPP_
 
-#if 0
 // forward-declaration for Tps support class
 namespace TPS {
 class Tps;
@@ -63,24 +62,21 @@ class LoMachOptions;
 struct temporalSchemeCoefficients;
 
 /// Add some description here...
-class TurbModel : public TurbModelBase {
+class AlgebraicSubgridModels : public TurbModelBase {
   friend class LoMachSolver;
 
  private:
-  // TPS::Tps *tpsP_;
+  TPS::Tps *tpsP_;
   // LoMachSolver *loMach_;
   LoMachOptions *loMach_opts_ = nullptr;
 
   // MPI_Groups *groupsMPI;
-  int nprocs_;  // total number of MPI procs
-  int rank;     // local MPI rank
-  bool rank0;   // flag to indicate rank 0
-
-  // Run options
-  RunConfiguration *config_ = nullptr;
+  // int nprocs_;  // total number of MPI procs
+  int rank_;    // local MPI rank
+  bool rank0_;  // flag to indicate rank 0
 
   // space sizes
-  int Sdof, SdofInt;
+  int Sdof_, SdofInt_;
 
   /// Enable/disable verbose output.
   bool verbose = true;
@@ -88,73 +84,80 @@ class TurbModel : public TurbModelBase {
   ParMesh *pmesh_ = nullptr;
 
   // The order of the scalar spaces
-  int order;
+  int order_;
 
-  int nvel, dim;
+  int nvel_, dim_;
 
   // just keep these saved for ease
-  int numWalls, numInlets, numOutlets;
+  int numWalls_, numInlets_, numOutlets_;
 
-  // loMach options to run as incompressible
-  bool pFilter = false;
-
-  double dt;
-  double time;
-  int iter;
+  // model selection, passed in
+  int sModel_;
 
   // Coefficients necessary to take a time step (including dt).
   // Assumed to be externally managed and determined, so just get a
   // reference here.
-  const temporalSchemeCoefficients &timeCoeff_;
+  // const temporalSchemeCoefficients &timeCoeff_;
 
   // Scalar \f$H^1\f$ finite element collection.
-  FiniteElementCollection *sfec = nullptr;
+  FiniteElementCollection *sfec_ = nullptr;
 
   // Scalar \f$H^1\f$ finite element space.
-  ParFiniteElementSpace *sfes = nullptr;
+  ParFiniteElementSpace *sfes_ = nullptr;
 
   /// Velocity \f$H^1\f$ finite element collection.
-  FiniteElementCollection *vfec = nullptr;
+  FiniteElementCollection *vfec_ = nullptr;
 
   /// Velocity \f$(H^1)^d\f$ finite element space.
-  ParFiniteElementSpace *vfes = nullptr;
+  ParFiniteElementSpace *vfes_ = nullptr;
 
-  ParGridFunction *gradU_gf = nullptr;
-  ParGridFunction *gradV_gf = nullptr;
-  ParGridFunction *gradW_gf = nullptr;
-  Vector gradU;
-  Vector gradV;
-  Vector gradW;
+  ParGridFunction *gradU_gf_ = nullptr;
+  ParGridFunction *gradV_gf_ = nullptr;
+  ParGridFunction *gradW_gf_ = nullptr;
+  Vector gradU_;
+  Vector gradV_;
+  Vector gradW_;
 
-  ParGridFunction *rn_gf = nullptr;
-  Vector rn;
+  ParGridFunction *rn_gf_ = nullptr;
+  Vector rn_;
 
-  ParGridFunction *delta_gf = nullptr;
-  Vector delta;
+  ParGridFunction *delta_gf_ = nullptr;
+  Vector delta_;
 
-  Vector subgridVisc;
-  ParGridFunction subgridVisc_gf;
+  ParGridFunction subgridVisc_gf_;
+  Vector subgridVisc_;
+
+  // for plotting
+  ParGridFunction resolution_gf_;
+  Vector gridScale_;
+
+  // grid information
+  ParGridFunction *bufferGridScale_ = nullptr;
+  // ParGridFunction *bufferGridScaleX = nullptr;
+  // ParGridFunction *bufferGridScaleY = nullptr;
+  // ParGridFunction *bufferGridScaleZ = nullptr;
+
+  double sgs_model_const_;
 
  public:
-  TurbModel(mfem::ParMesh *pmesh, RunConfiguration *config, LoMachOptions *loMach_opts,
-            temporalSchemeCoefficients &timeCoeff);
-  virtual ~TurbModel() {}
+  AlgebraicSubgridModels(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, TPS::Tps *tps, int sModel);
+  virtual ~AlgebraicSubgridModels();
 
-  void initializeSelf();
-  void initializeExternal(ParGridFunction *gradU_gf_, ParGridFunction *gradV_gf_, ParGridFunction *gradW_gf_,
-                          ParGridFunction *delta_gf_);
-
-  void step();
-
-  /// Initialize forms, solvers and preconditioners.
-  void setup(double dt);
+  // Functions overriden from base class
+  void initializeSelf() final;
+  void initializeOperators() final;
+  void step() final;
+  void setup() final;
+  void initializeViz(ParaViewDataCollection &pvdc) final;
 
   /// Return a pointer to the current temperature ParGridFunction.
-  ParGridFunction *GetCurrentEddyViscosity() { return &subgridVisc_gf; }
+  ParGridFunction *getCurrentEddyViscosity() { return &subgridVisc_gf_; }
+
+  /// Return a pointer to the scalar grid size measure ParGridFunction.
+  ParGridFunction *getGridScale() { return &resolution_gf_; }
 
   // subgrid scale models => move to turb model class
   void sgsSmag(const DenseMatrix &gradUp, double delta, double &nu_sgs);
   void sgsSigma(const DenseMatrix &gradUp, double delta, double &nu_sgs);
 };
-#endif
-#endif  // TURBMODEL_HPP_
+#endif  // ALGEBRAICSUBGRIDMODELS_HPP_

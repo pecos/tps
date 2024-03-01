@@ -102,6 +102,7 @@ CaloricallyPerfectThermoChem::CaloricallyPerfectThermoChem(mfem::ParMesh *pmesh,
   tpsP_->getInput("loMach/calperfect/Rgas", Rgas_, 287.0);
   tpsP_->getInput("loMach/calperfect/Prandtl", Pr_, 0.71);
   tpsP_->getInput("loMach/calperfect/gamma", gamma_, 1.4);
+  invPr_ = 1.0 / Pr_;
 
   Cp_ = gamma_ * Rgas_ / (gamma_ - 1);
 
@@ -138,11 +139,13 @@ CaloricallyPerfectThermoChem::~CaloricallyPerfectThermoChem() {
   delete un_next_coeff_;
   delete kap_gradT_coeff_;
   delete gradT_coeff_;
+  delete mut_coeff_;
+  delete mult_coeff_;
   delete thermal_diff_coeff_;
+  delete thermal_diff_sum_coeff_;
+  delete thermal_diff_total_coeff_;
   delete rho_over_dt_coeff_;
   delete rho_coeff_;
-  delete mult_coeff_;
-  delete thermal_diff_total_coeff_;
 
   // allocated in initializeSelf
   delete sfes_;
@@ -402,9 +405,11 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
 
   // thermal_diff_coeff.constant = thermal_diff;
   thermal_diff_coeff_ = new GridFunctionCoefficient(&kappa_gf_);
+  mut_coeff_ = new GridFunctionCoefficient(turbModel_interface_->eddy_viscosity);
+  thermal_diff_sum_coeff_ = new SumCoefficient(*mut_coeff_, *thermal_diff_coeff_, invPr_, 1.0);
   mult_coeff_ = new GridFunctionCoefficient(sponge_interface_->diff_multiplier);
+  thermal_diff_total_coeff_ = new ProductCoefficient(*mult_coeff_, *thermal_diff_sum_coeff_);
   gradT_coeff_ = new GradientGridFunctionCoefficient(&Tn_next_gf_);
-  thermal_diff_total_coeff_ = new ProductCoefficient(*mult_coeff_, *thermal_diff_coeff_);
   kap_gradT_coeff_ = new ScalarVectorProductCoefficient(*thermal_diff_total_coeff_, *gradT_coeff_);
 
   // Convection: Atemperature(i,j) = \int_{\Omega} \phi_i \rho u \cdot \nabla \phi_j
@@ -825,7 +830,7 @@ void CaloricallyPerfectThermoChem::updateDiffusivity() {
 
   visc_gf_.SetFromTrueDofs(visc_);
 
-  // NB: Here kappa is kappa / Cp = mu / Pr
+  // NB: Here "kappa" is kappa/Cp = mu/Pr
   kappa_ = visc_;
   kappa_ /= Pr_;
   kappa_gf_.SetFromTrueDofs(kappa_);
