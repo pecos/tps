@@ -52,6 +52,7 @@ FunctionCoefficient negative_radius_coeff(negativeRadius);
 
 /// forward declarations
 void vel_exact_tgv2d(const Vector &x, double t, Vector &u);
+void vel_exact_pipe(const Vector &x, double t, Vector &u);
 
 /**
  * @brief Helper function to remove mean from a vector
@@ -115,13 +116,8 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
     tps->getInput("boundaryConditions/numInlets", numInlets, 0);
     tps->getInput("boundaryConditions/numOutlets", numOutlets, 0);
 
-    // Inlet and outlet not supported yet!
-    // TODO(trevilo): Add support
-    // assert(numInlets == 0);
-    assert(numOutlets == 0);
-
-    // Inlet Bcs
-    for (int i = 0; i < numInlets; i++) {
+    // Inlet BCs (Dirichlet on velocity)
+    for (int i = 1; i <= numInlets; i++) {
       int patch;
       std::string type;
       std::string basepath("boundaryConditions/inlet" + std::to_string(i));
@@ -154,6 +150,19 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
           std::cout << "Tomboulides: Setting interpolated Dirichlet velocity on patch = " << patch << std::endl;
         }
         addVelDirichletBC(velocity_field_, inlet_attr);
+
+      } else if (type == "fully-developed-pipe") {
+        Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
+        inlet_attr = 0;
+        inlet_attr[patch - 1] = 1;
+
+        Vector velocity_value(dim_);
+        tps->getRequiredVec((basepath + "/velocity").c_str(), velocity_value, dim_);
+
+        if (pmesh_->GetMyRank() == 0) {
+          std::cout << "Tomboulides: Setting uniform inlet velocity on patch = " << patch << std::endl;
+        }
+        addVelDirichletBC(vel_exact_pipe, inlet_attr);
 
       } else {
         if (pmesh_->GetMyRank() == 0) {
@@ -198,6 +207,38 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
         exit(1);
       }
     }
+
+    // Outlet BCs
+    for (int i = 1; i <= numOutlets; i++) {
+      int patch;
+      std::string type;
+      std::string basepath("boundaryConditions/outlet" + std::to_string(i));
+
+      tps->getRequiredInput((basepath + "/patch").c_str(), patch);
+      tps->getRequiredInput((basepath + "/type").c_str(), type);
+
+      if (type == "uniform") {
+        Array<int> outlet_attr(pmesh_->bdr_attributes.Max());
+        outlet_attr = 0;
+        outlet_attr[patch - 1] = 1;
+
+        double pback;
+        tps->getInput((basepath + "/pressure").c_str(), pback, 0.0);
+
+        if (pmesh_->GetMyRank() == 0) {
+          std::cout << "Tomboulides: Setting uniform outlet pressure on patch = " << patch << std::endl;
+        }
+        addPresDirichletBC(pback, outlet_attr);
+      } else {
+        if (pmesh_->GetMyRank() == 0) {
+          std::cout << "Tomboulides: When reading " << basepath << ", encountered outlet type = " << type << std::endl;
+          std::cout << "Tomboulides: Tomboulides flow solver does not support this type." << std::endl;
+        }
+        assert(false);
+        exit(1);
+      }
+    }
+
   }
 }
 
@@ -452,6 +493,7 @@ void Tomboulides::initializeOperators() {
 
   // Get Dirichlet dofs
   vfes_->GetEssentialTrueDofs(vel_ess_attr_, vel_ess_tdof_);
+  pfes_->GetEssentialTrueDofs(pres_ess_attr_, pres_ess_tdof_);
 
   // Create the operators
 
@@ -466,11 +508,10 @@ void Tomboulides::initializeOperators() {
     L_iorho_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   }
   L_iorho_form_->Assemble();
-  // TODO(trevilo): BC infrastructure
-  L_iorho_form_->FormSystemMatrix(empty, L_iorho_op_);
+  L_iorho_form_->FormSystemMatrix(pres_ess_tdof_, L_iorho_op_);
 
   // Variable coefficient Laplacian inverse
-  L_iorho_lor_ = new ParLORDiscretization(*L_iorho_form_, empty);
+  L_iorho_lor_ = new ParLORDiscretization(*L_iorho_form_, pres_ess_tdof_);
   L_iorho_inv_pc_ = new HypreBoomerAMG(L_iorho_lor_->GetAssembledMatrix());
   L_iorho_inv_pc_->SetPrintLevel(0);
   L_iorho_inv_ortho_pc_ = new OrthoSolver(pfes_->GetComm());
@@ -479,8 +520,11 @@ void Tomboulides::initializeOperators() {
   L_iorho_inv_ = new CGSolver(pfes_->GetComm());
   L_iorho_inv_->iterative_mode = true;
   L_iorho_inv_->SetOperator(*L_iorho_op_);
-  // TODO(trevilo): BC infrastructure (b/c empty, force ortho for now)
-  L_iorho_inv_->SetPreconditioner(*L_iorho_inv_ortho_pc_);
+  if (pres_dbcs_.empty()) {
+    L_iorho_inv_->SetPreconditioner(*L_iorho_inv_ortho_pc_);
+  } else {
+    L_iorho_inv_->SetPreconditioner(*L_iorho_inv_pc_);
+  }
   L_iorho_inv_->SetPrintLevel(pressure_solve_pl_);
   L_iorho_inv_->SetRelTol(pressure_solve_rtol_);
   L_iorho_inv_->SetAbsTol(pressure_solve_atol_);
@@ -760,9 +804,6 @@ void Tomboulides::step() {
   // Ensure u_vec_ consistent with u_curr_gf_
   u_curr_gf_->GetTrueDofs(u_vec_);
 
-  // TODO(trevilo): Have to implement some BC infrastructure
-  Array<int> empty;
-
   //------------------------------------------------------------------------
   // Step 1: Update any operators invalidated by changing data
   // external to this class
@@ -772,7 +813,7 @@ void Tomboulides::step() {
   // in density
   L_iorho_form_->Update();
   L_iorho_form_->Assemble();
-  L_iorho_form_->FormSystemMatrix(empty, L_iorho_op_);
+  L_iorho_form_->FormSystemMatrix(pres_ess_tdof_, L_iorho_op_);
 
   // Update inverse for the variable coefficient Laplacian
   // TODO(trevilo): Really need to delete and recreate???
@@ -781,7 +822,7 @@ void Tomboulides::step() {
   delete L_iorho_inv_pc_;
   delete L_iorho_lor_;
 
-  L_iorho_lor_ = new ParLORDiscretization(*L_iorho_form_, empty);
+  L_iorho_lor_ = new ParLORDiscretization(*L_iorho_form_, pres_ess_tdof_);
   L_iorho_inv_pc_ = new HypreBoomerAMG(L_iorho_lor_->GetAssembledMatrix());
   L_iorho_inv_pc_->SetPrintLevel(0);
   L_iorho_inv_ortho_pc_ = new OrthoSolver(pfes_->GetComm());
@@ -790,14 +831,18 @@ void Tomboulides::step() {
   L_iorho_inv_ = new CGSolver(pfes_->GetComm());
   L_iorho_inv_->iterative_mode = true;
   L_iorho_inv_->SetOperator(*L_iorho_op_);
-  // TODO(trevilo): BC infrastructure (b/c empty, force ortho for now)
-  L_iorho_inv_->SetPreconditioner(*L_iorho_inv_ortho_pc_);
+  if (pres_dbcs_.empty()) {
+    L_iorho_inv_->SetPreconditioner(*L_iorho_inv_ortho_pc_);
+  } else {
+    L_iorho_inv_->SetPreconditioner(*L_iorho_inv_pc_);
+  }
   L_iorho_inv_->SetPrintLevel(pressure_solve_pl_);
   L_iorho_inv_->SetRelTol(pressure_solve_rtol_);
   L_iorho_inv_->SetAbsTol(pressure_solve_atol_);
   L_iorho_inv_->SetMaxIter(pressure_solve_max_iter_);
 
   // Update density weighted mass
+  Array<int> empty;
   Mv_rho_form_->Update();
   Mv_rho_form_->Assemble();
   Mv_rho_form_->FormSystemMatrix(empty, Mv_rho_op_);
@@ -983,13 +1028,14 @@ void Tomboulides::step() {
   u_bdr_form_->ParallelAssemble(u_bdr_vec_);
   resp_vec_.Add(-coeff_.bd0 / dt, u_bdr_vec_);
 
-  // TODO(trevilo): Only do this if no Dirichlet BCs on pressure
-  // For now this is the case, but will need to be fixed.
-  Orthogonalize(resp_vec_, pfes_);
+  // Orthogonalize rhs if no Dirichlet BCs on pressure
+  if (pres_dbcs_.empty()) {
+    Orthogonalize(resp_vec_, pfes_);
+  }
 
-  // for (auto &pres_dbc : pres_dbcs) {
-  //   pn_gf.ProjectBdrCoefficient(*pres_dbc.coeff, pres_dbc.attr);
-  // }
+  for (auto &pres_dbc : pres_dbcs_) {
+    p_gf_->ProjectBdrCoefficient(*pres_dbc.coeff, pres_dbc.attr);
+  }
 
   // Isn't this the same as SetFromTrueDofs????
   pfes_->GetRestrictionMatrix()->MultTranspose(resp_vec_, *resp_gf_);
@@ -1001,7 +1047,7 @@ void Tomboulides::step() {
     // auto *SpC = Sp.As<ConstrainedOperator>();
     // EliminateRHS(*Sp_form, *SpC, pres_ess_tdof, pn_gf, resp_gf, X1, B1, 1);
   } else {
-    L_iorho_form_->FormLinearSystem(empty, *p_gf_, *resp_gf_, L_iorho_op_, X1, B1, 1);
+    L_iorho_form_->FormLinearSystem(pres_ess_tdof_, *p_gf_, *resp_gf_, L_iorho_op_, X1, B1, 1);
   }
 
   L_iorho_inv_->Mult(B1, X1);
@@ -1018,7 +1064,9 @@ void Tomboulides::step() {
   // nullspace by removing the mean of the pressure solution. This is also
   // ensured by the OrthoSolver wrapper for the preconditioner which removes
   // the nullspace after every application.
-  meanZero(*p_gf_);
+  if (pres_dbcs_.empty()) {
+    meanZero(*p_gf_);
+  }
   p_gf_->GetTrueDofs(p_vec_);
 
   //------------------------------------------------------------------------
@@ -1151,8 +1199,20 @@ void Tomboulides::addVelDirichletBC(VectorCoefficient *coeff, Array<int> &attr) 
   }
 }
 
+void Tomboulides::addVelDirichletBC(void (*f)(const Vector &, double, Vector &), Array<int> &attr) {
+  addVelDirichletBC(new VectorFunctionCoefficient(dim_, f), attr);
+}
+
 /// Add a Dirichlet boundary condition to the pressure field.
-void Tomboulides::addPresDirichletBC(double p, Array<int> &attr) {}
+void Tomboulides::addPresDirichletBC(double p, Array<int> &attr) {
+  pres_dbcs_.emplace_back(attr, new ConstantCoefficient(p));
+  for (int i = 0; i < attr.Size(); ++i) {
+    if (attr[i] == 1) {
+      assert(!pres_ess_attr_[i]);  // if pres_ess_attr[i] already set, fail b/c duplicate
+      pres_ess_attr_[i] = 1;
+    }
+  }
+}
 
 // Non-class functions that are only used in this file below here
 
@@ -1163,4 +1223,10 @@ void vel_exact_tgv2d(const Vector &x, double t, Vector &u) {
 
   u(0) = F * std::sin(x[0]) * std::cos(x[1]);
   u(1) = -F * std::cos(x[0]) * std::sin(x[1]);
+}
+
+/// Used to for pipe flow test case
+void vel_exact_pipe(const Vector &x, double t, Vector &u) {
+  u(0) = 0.0;
+  u(1) = 2.0 * (1 - x[0] * x[0]);
 }

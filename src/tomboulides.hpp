@@ -313,6 +313,7 @@ class Tomboulides final : public FlowBase {
   /// Add a Dirichlet boundary condition to the velocity field
   void addVelDirichletBC(const mfem::Vector &u, mfem::Array<int> &attr);
   void addVelDirichletBC(mfem::VectorCoefficient *coeff, mfem::Array<int> &attr);
+  void addVelDirichletBC(void (*f)(const Vector &, double, Vector &), Array<int> &attr);
 
   /// Add a Dirichlet boundary condition to the pressure field.
   void addPresDirichletBC(double p, mfem::Array<int> &attr);
