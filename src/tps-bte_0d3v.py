@@ -69,6 +69,7 @@ sys.path.append(path + "/.libs")
 sys.path.append(path + "/../../boltzmann/BESolver/python")
 import libtps
 from   bte_0d3v_batched import bte_0d3v_batched as BoltzmannSolver
+import utils as bte_utils
 
 WITH_PARLA = 1
 if WITH_PARLA:
@@ -464,7 +465,9 @@ class Boltzmann0D2VBactchedSolver:
         Ex                 = ExbyN * self.param.n0 * self.param.Td_fac
         Ey                 = EybyN * self.param.n0 * self.param.Td_fac
         
-        ion_deg            = species_densities[TPSINDEX.ELE_IDX]/n0
+        ion_deg              = species_densities[TPSINDEX.ELE_IDX]/n0
+        ion_deg[ion_deg<0]   = 1e-16
+        ns_by_n0[ns_by_n0<0] = 0
         m_bte              = np.concatenate([ExbyN.reshape((-1, 1)), EybyN.reshape((-1, 1)), Tg.reshape((-1, 1)), ion_deg.reshape((-1, 1))] + [ ns_by_n0[i].reshape((-1, 1)) for i in range(ns_by_n0.shape[0])], axis=1)
         
         self.sub_cluster_idx_to_pidx = None
@@ -668,7 +671,14 @@ class Boltzmann0D2VBactchedSolver:
                 @spawn(ts[grid_idx], placement=[gpu(dev_id)], vcus=0.0)
                 def t1():
                     ts_op_setup(grid_idx)
-                    f_mw = self.bte_solver.get_boltzmann_parameter(grid_idx, "f_mw")
+                    
+                    vth          = self.bte_solver._par_vth[grid_idx]
+                    qA           = self.bte_solver._op_diag_dg[grid_idx]
+                    mw           = bte_utils.get_maxwellian_3d(vth, 1)
+                    mm_op        = self.bte_solver._op_mass[grid_idx] * mw(0) * vth**3
+                    f_mw         = self.bte_solver.get_boltzmann_parameter(grid_idx, "f_mw")
+                    f_mw         = f_mw/cp.dot(mm_op, f_mw)
+                    f_mw         = cp.dot(qA.T, f_mw)
                     
                     if (use_interp==True):
                         self.bte_solver.set_boltzmann_parameter(grid_idx, "u0", cp.copy(f_mw[: , 0:self.param.n_sub_clusters]))
@@ -684,7 +694,15 @@ class Boltzmann0D2VBactchedSolver:
                 @spawn(ts[grid_idx], placement=[cpu], vcus=0.0)
                 def t1():
                     ts_op_setup(grid_idx)
-                    f_mw = self.bte_solver.get_boltzmann_parameter(grid_idx, "f_mw")
+                    
+                    vth          = self.bte_solver._par_vth[grid_idx]
+                    qA           = self.bte_solver._op_diag_dg[grid_idx]
+                    mw           = bte_utils.get_maxwellian_3d(vth, 1)
+                    mm_op        = self.bte_solver._op_mass[grid_idx] * mw(0) * vth**3
+                    f_mw         = self.bte_solver.get_boltzmann_parameter(grid_idx, "f_mw")
+                    f_mw         = f_mw/np.dot(mm_op, f_mw)
+                    f_mw         = np.dot(qA.T, f_mw)
+                    
                     if (use_interp==True):
                         self.bte_solver.set_boltzmann_parameter(grid_idx, "u0", np.copy(f_mw[: , 0:self.param.n_sub_clusters]))
                     else:
@@ -1045,7 +1063,7 @@ if __name__=="__main__":
             tt        = 0#interface.currentTime()
             tau       = (1/boltzmann.param.Efreq)
             dt_tps    = interface.timeStep()
-            dt_bte    = 1e-2 * tau #boltzmann.param.dt * (dt_tps)
+            dt_bte    = boltzmann.param.dt * tau 
             bte_steps = int(dt_tps/dt_bte)
             n_grids   = boltzmann.param.n_grids
             
@@ -1055,8 +1073,8 @@ if __name__=="__main__":
             
             tps_sper_cycle = int(xp.ceil(tau/dt_tps))
             bte_sper_cycle = int(xp.ceil(tau/dt_bte))
-            bte_max_cycles = 10
-            tps_max_cycles = 1000
+            bte_max_cycles = int(boltzmann.param.cycles)
+            tps_max_cycles = 500
             
             print("tps steps per cycle : ", tps_sper_cycle, "bte_steps per cycle", bte_sper_cycle)
             tps.solveStep()
@@ -1199,8 +1217,8 @@ if __name__=="__main__":
                         
                         p_t3 = min_mean_max(p_t2-p_t1, comm)
                         print("[TPS] step = %04d time = %.4E ||u1 - u0|| = %.4E ||u0 - u1|| / ||u0|| = %.4E -- runtime = %.4E (s)"%(tps_idx, tt_tps, np.max(abs_error), np.max(rel_error), p_t3[2]))
-                        if (np.max(abs_error) < boltzmann.param.atol or np.max(rel_error) < max(1e-6,boltzmann.param.rtol)):
-                            break
+                        # if (np.max(abs_error) < boltzmann.param.atol or np.max(rel_error) < max(1e-6,boltzmann.param.rtol)):
+                        #     break
                     
                     if (tps_idx == tps_sper_cycle * tps_max_cycles):
                         break
