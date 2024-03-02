@@ -909,7 +909,7 @@ class Boltzmann0D2VBactchedSolver:
                         
                 await ts
                 rates = rates.reshape((-1))
-                rates[rates<0] = 0.0
+                #rates[rates<0] = 0.0
         else:
             if(n_reactions>0):
                 rates[:,:] = 0.0
@@ -928,7 +928,7 @@ class Boltzmann0D2VBactchedSolver:
                         
                 await ts
                 rates = rates.reshape((-1))
-                rates[rates<0] = 0.0
+                #rates[rates<0] = 0.0
         return 
     
     def io_output_data(self, grid_idx, u0, plot_data:bool, export_csv:bool, fname:str):
@@ -1074,7 +1074,7 @@ if __name__=="__main__":
             tps_sper_cycle = int(xp.ceil(tau/dt_tps))
             bte_sper_cycle = int(xp.ceil(tau/dt_bte))
             bte_max_cycles = int(boltzmann.param.cycles)
-            tps_max_cycles = 500
+            tps_max_cycles = 100
             
             print("tps steps per cycle : ", tps_sper_cycle, "bte_steps per cycle", bte_sper_cycle)
             tps.solveStep()
