@@ -909,7 +909,7 @@ class Boltzmann0D2VBactchedSolver:
                         
                 await ts
                 rates = rates.reshape((-1))
-                #rates[rates<0] = 0.0
+                rates[rates<0] = 0.0
         else:
             if(n_reactions>0):
                 rates[:,:] = 0.0
@@ -928,7 +928,7 @@ class Boltzmann0D2VBactchedSolver:
                         
                 await ts
                 rates = rates.reshape((-1))
-                #rates[rates<0] = 0.0
+                rates[rates<0] = 0.0
         return 
     
     def io_output_data(self, grid_idx, u0, plot_data:bool, export_csv:bool, fname:str):
