@@ -80,6 +80,7 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
 
   rank0_ = (pmesh_->GetMyRank() == 0);
   axisym_ = false;
+  nvel_ = dim_;
 
   // make sure there is room for BC attributes
   if (!(pmesh_->bdr_attributes.Size() == 0)) {
@@ -95,6 +96,11 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
 
     // Axisymmetric simulation?
     tps->getInput("loMach/axisymmetric", axisym_, false);
+
+    if (axisym_) {
+      assert(dim_ == 2);
+      nvel_ = 3;
+    }
 
     // Use "numerical integration" (i.e., under-integrate so that mass matrix is diagonal)
     tps->getInput("loMach/tomboulides/numerical-integ", numerical_integ_, true);
@@ -306,6 +312,8 @@ Tomboulides::~Tomboulides() {
   delete rho_coeff_;
 
   // objects allocated by initalizeSelf
+  delete utheta_next_gf_;
+  delete utheta_gf_;
   delete pp_div_rad_comp_gf_;
   delete resp_gf_;
   delete p_gf_;
@@ -349,6 +357,11 @@ void Tomboulides::initializeSelf() {
 
   pp_div_rad_comp_gf_ = new ParGridFunction(pfes_, *pp_div_gf_);
 
+  if (axisym_) {
+    utheta_gf_ = new ParGridFunction(pfes_);
+    utheta_next_gf_ = new ParGridFunction(pfes_);
+  }
+
   *u_curr_gf_ = 0.0;
   *u_next_gf_ = 0.0;
   *curl_gf_ = 0.0;
@@ -357,7 +370,17 @@ void Tomboulides::initializeSelf() {
   *p_gf_ = 0.0;
   *resp_gf_ = 0.0;
 
+  if (axisym_) {
+    *utheta_gf_ = 0.0;
+    *utheta_next_gf_ = 0.0;
+  }
+
   toThermoChem_interface_.velocity = u_next_gf_;
+  if (axisym_) {
+    toThermoChem_interface_.swirl_supported = true;
+    toThermoChem_interface_.swirl = utheta_next_gf_;
+  }
+
   toTurbModel_interface_.gradU = gradU_gf_;
   toTurbModel_interface_.gradV = gradV_gf_;
   toTurbModel_interface_.gradW = gradW_gf_;
@@ -804,11 +827,19 @@ void Tomboulides::initializeIO(IODataOrganizer &io) const {
   io.registerIOVar("/velocity", "x-comp", 0);
   if (dim_ >= 2) io.registerIOVar("/velocity", "y-comp", 1);
   if (dim_ == 3) io.registerIOVar("/velocity", "z-comp", 2);
+
+  if (axisym_) {
+    io.registerIOFamily("Velocity azimuthal", "/swirl", utheta_gf_, false);
+    io.registerIOVar("/swirl", "swirl", 0);
+  }
 }
 
 void Tomboulides::initializeViz(mfem::ParaViewDataCollection &pvdc) const {
   pvdc.RegisterField("velocity", u_curr_gf_);
   pvdc.RegisterField("pressure", p_gf_);
+  if (axisym_) {
+    pvdc.RegisterField("swirl", utheta_gf_);
+  }
 }
 
 void Tomboulides::step() {

@@ -105,6 +105,7 @@ class Tomboulides final : public FlowBase {
   const int vorder_;
   const int porder_;
   const int dim_;
+  int nvel_;
 
   // Coefficients necessary to take a time step (including dt).
   // Assumed to be externally managed and determined, so just get a
@@ -153,6 +154,10 @@ class Tomboulides final : public FlowBase {
   mfem::ParGridFunction *p_gf_ = nullptr;
   mfem::ParGridFunction *resp_gf_ = nullptr;
   mfem::ParGridFunction *pp_div_rad_comp_gf_ = nullptr;
+
+  /// Swirl
+  mfem::ParGridFunction *utheta_gf_ = nullptr;
+  mfem::ParGridFunction *utheta_next_gf_ = nullptr;
 
   /// mfem::Coefficients used in forming necessary operators
   mfem::GridFunctionCoefficient *rho_coeff_ = nullptr;
