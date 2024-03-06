@@ -194,6 +194,11 @@ class Tomboulides final : public FlowBase {
   mfem::ScalarVectorProductCoefficient *rad_pp_div_coeff_ = nullptr;
   std::vector<mfem::ScalarVectorProductCoefficient *> rad_vel_coeff_;
 
+  mfem::GridFunctionCoefficient *utheta_coeff_ = nullptr;
+  mfem::ProductCoefficient *utheta2_coeff_ = nullptr;
+  mfem::ProductCoefficient *rho_utheta2_coeff_ = nullptr;
+  mfem::VectorArrayCoefficient *ur_conv_forcing_coeff_ = nullptr;
+
   // mfem "form" objects used to create operators
   mfem::ParBilinearForm *L_iorho_form_ = nullptr;  // \int (1/\rho) \nabla \phi_i \cdot \nabla \phi_j
   mfem::ParLinearForm *forcing_form_ = nullptr;    // \int \phi_i f
@@ -209,6 +214,7 @@ class Tomboulides final : public FlowBase {
   mfem::ParLinearForm *S_poisson_form_ = nullptr;
   mfem::ParLinearForm *S_mom_form_ = nullptr;
   mfem::ParLinearForm *Faxi_poisson_form_ = nullptr;
+  mfem::ParLinearForm *ur_conv_axi_form_ = nullptr;
 
   // mfem operator objects
   mfem::OperatorHandle L_iorho_op_;
@@ -263,6 +269,7 @@ class Tomboulides final : public FlowBase {
   mfem::Vector ress_vec_;
   mfem::Vector S_poisson_vec_;
   mfem::Vector Faxi_poisson_vec_;
+  mfem::Vector ur_conv_forcing_vec_;
 
   // miscellaneous
   double volume_;

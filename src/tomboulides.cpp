@@ -258,6 +258,7 @@ Tomboulides::~Tomboulides() {
   delete mass_lform_;
 
   // objects allocated by initializeOperators
+  delete ur_conv_axi_form_;
   delete Faxi_poisson_form_;
   delete S_mom_form_;
   delete S_poisson_form_;
@@ -282,6 +283,10 @@ Tomboulides::~Tomboulides() {
   delete L_iorho_inv_pc_;
   delete L_iorho_lor_;
   delete L_iorho_form_;
+
+  delete ur_conv_forcing_coeff_;
+  delete utheta2_coeff_;
+  delete utheta_coeff_;
 
   for (size_t i = 0; i < rad_vel_coeff_.size(); i++) delete rad_vel_coeff_[i];
 
@@ -411,6 +416,9 @@ void Tomboulides::initializeSelf() {
   grad_Qt_vec_.SetSize(vfes_truevsize);
   ress_vec_.SetSize(vfes_truevsize);
   S_poisson_vec_.SetSize(vfes_truevsize);
+  if (axisym_) {
+    ur_conv_forcing_vec_.SetSize(vfes_truevsize);
+  }
 
   resp_vec_.SetSize(pfes_truevsize);
   p_vec_.SetSize(pfes_truevsize);
@@ -510,6 +518,14 @@ void Tomboulides::initializeOperators() {
     // NB: Takes ownership of mu_over_rad_coeff_
     visc_forcing_coeff_ = new VectorArrayCoefficient(2);
     visc_forcing_coeff_->Set(0, mu_over_rad_coeff_);
+
+    utheta_coeff_ = new GridFunctionCoefficient(utheta_next_gf_);
+    utheta2_coeff_ = new ProductCoefficient(*utheta_coeff_, *utheta_coeff_);
+    rho_utheta2_coeff_ = new ProductCoefficient(*rho_coeff_, *utheta2_coeff_);
+
+    // NB: Takes ownership of rho_utheta2_coeff_
+    ur_conv_forcing_coeff_ = new VectorArrayCoefficient(2);
+    ur_conv_forcing_coeff_->Set(0, rho_utheta2_coeff_);
   }
 
   // Integration rules (only used if numerical_integ_ is true).  When
@@ -811,12 +827,21 @@ void Tomboulides::initializeOperators() {
   }
   S_mom_form_->AddDomainIntegrator(s_mom_dlfi);
 
-  Faxi_poisson_form_ = new ParLinearForm(pfes_);
-  auto *f_rhs_dlfi = new DomainLFIntegrator(*pp_div_rad_comp_coeff_);
-  if (numerical_integ_) {
-    f_rhs_dlfi->SetIntRule(&ir_ni_p);
+  if (axisym_) {
+    Faxi_poisson_form_ = new ParLinearForm(pfes_);
+    auto *f_rhs_dlfi = new DomainLFIntegrator(*pp_div_rad_comp_coeff_);
+    if (numerical_integ_) {
+      f_rhs_dlfi->SetIntRule(&ir_ni_p);
+    }
+    Faxi_poisson_form_->AddDomainIntegrator(f_rhs_dlfi);
+
+    ur_conv_axi_form_ = new ParLinearForm(vfes_);
+    auto *urca_dlfi = new VectorDomainLFIntegrator(*ur_conv_forcing_coeff_);
+    if (numerical_integ_) {
+      urca_dlfi->SetIntRule(&ir_ni_v);
+    }
+    ur_conv_axi_form_->AddDomainIntegrator(urca_dlfi);
   }
-  Faxi_poisson_form_->AddDomainIntegrator(f_rhs_dlfi);
 
   // Ensure u_vec_ consistent with u_curr_gf_
   u_curr_gf_->GetTrueDofs(u_vec_);
@@ -949,6 +974,12 @@ void Tomboulides::step() {
     const auto ab2 = coeff_.ab2;
     const auto ab3 = coeff_.ab3;
     MFEM_FORALL(i, forcing_vec_.Size(), { d_force[i] += (ab1 * d_N[i] + ab2 * d_Nm1[i] + ab3 * d_Nm2[i]); });
+  }
+
+  if (axisym_) {
+    ur_conv_axi_form_->Assemble();
+    ur_conv_axi_form_->ParallelAssemble(ur_conv_forcing_vec_);
+    forcing_vec_ += ur_conv_forcing_vec_;
   }
 
   // vstar / dt = M^{-1} (extrapolated nonlinear + forcing) --- eqn.
