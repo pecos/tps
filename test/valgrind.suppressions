@@ -10,6 +10,32 @@
 }
 
 {
+   <mpi-finalize-skip-2>
+   Memcheck:Cond
+   fun:MPIDI_OFI_mpi_finalize_hook
+   fun:MPID_Finalize
+   fun:PMPI_Finalize
+   fun:_ZN4mfem3Mpi8FinalizeEv
+   fun:_ZN4mfem3MpiD1Ev
+   fun:__run_exit_handlers
+   fun:exit
+   fun:(below main)
+}
+
+{
+   <mpi-finalize-skip-3>
+   Memcheck:Cond
+   fun:MPIDI_OFI_mpi_finalize_hook
+   fun:MPID_Finalize
+   fun:PMPI_Finalize
+   fun:_ZN4mfem3Mpi8FinalizeEv
+   fun:_ZN4mfem3MpiD1Ev
+   fun:__run_exit_handlers
+   fun:exit
+   fun:(below main)
+}
+
+{
    <mpi-finalize-skip-4realz>
    Memcheck:Cond
    fun:MPIDI_OFI_mpi_finalize_hook
@@ -22,6 +48,7 @@
    fun:exit
    fun:(below main)
 }
+
 
 {
    <grvy-parse-leak>
