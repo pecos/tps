@@ -1,0 +1,31 @@
+#!./bats
+# -*- mode: sh -*-
+
+TEST="lomach-lequere"
+
+EXE="../src/tps"
+
+setup() {
+    RESTART="ref_solns/lequere-varmu/restart_output-lequere-varmu.sol.h5"
+    RUNFILE="inputs/lomach.lequere.varmu.ini"
+    REF_SOLN="ref_solns/lequere-varmu/reference-lequere-varmu.sol.h5"
+    SOLN_FILE="restart_output-lequere-varmu.sol.h5"
+}
+
+@test "[$TEST] Le Quere low Mach, thermally-driven cavity regression with variable viscosity" {
+    # NB: There is a restart issue for closed domain cases (see #256).
+    # When this is resolved, this regression test will need to be
+    # updated (b/c the reference solution will change).
+
+    rm -f $SOLN_FILE
+
+    # run
+    cp $RESTART .
+    $EXE --runFile $RUNFILE
+
+    # check
+    h5diff -r --relative=1e-16 $SOLN_FILE $REF_SOLN /temperature/temperature
+    h5diff -r --relative=1e-16 $SOLN_FILE $REF_SOLN /velocity/x-comp
+    h5diff -r --relative=1e-16 $SOLN_FILE $REF_SOLN /velocity/y-comp
+}
+
