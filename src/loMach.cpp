@@ -442,6 +442,17 @@ void LoMachSolver::initialize() {
   flow_->initializeIO(ioData);
   thermo_->initializeIO(ioData);
 
+  const bool restart_serial =
+      (loMach_opts_.io_opts_.restart_serial_read_ || loMach_opts_.io_opts_.restart_serial_write_);
+  ioData.initializeSerial(rank0_, restart_serial, serial_mesh_, locToGlobElem, &partitioning_);
+  MPI_Barrier(groupsMPI->getTPSCommWorld());
+  if (verbose) grvy_printf(ginfo, "ioData.init thingy...\n");
+
+  // If restarting, read restart files
+  if (loMach_opts_.io_opts_.enable_restart_) {
+    restart_files_hdf5("read");
+  }
+
   // Exchange interface information
   flow_->initializeFromSponge(&sponge_->toFlow_interface_);
   thermo_->initializeFromSponge(&sponge_->toThermoChem_interface_);
@@ -457,12 +468,6 @@ void LoMachSolver::initialize() {
 
   // TODO(trevilo): Enable averaging.  See note in loMach.hpp
 
-  const bool restart_serial =
-      (loMach_opts_.io_opts_.restart_serial_read_ || loMach_opts_.io_opts_.restart_serial_write_);
-  ioData.initializeSerial(rank0_, restart_serial, serial_mesh_, locToGlobElem, &partitioning_);
-  MPI_Barrier(groupsMPI->getTPSCommWorld());
-  if (verbose) grvy_printf(ginfo, "ioData.init thingy...\n");
-
   // Initialize visualization
   pvdc_ = new ParaViewDataCollection(loMach_opts_.io_opts_.output_dir_, pmesh_);
   pvdc_->SetDataFormat(VTKFormat::BINARY32);
@@ -472,11 +477,6 @@ void LoMachSolver::initialize() {
   flow_->initializeViz(*pvdc_);
   thermo_->initializeViz(*pvdc_);
   sponge_->initializeViz(*pvdc_);
-
-  // If restarting, read restart files
-  if (loMach_opts_.io_opts_.enable_restart_) {
-    restart_files_hdf5("read");
-  }
 }
 
 void LoMachSolver::UpdateTimestepHistory(double dt) {
