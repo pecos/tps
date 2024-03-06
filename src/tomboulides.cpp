@@ -102,6 +102,11 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
       nvel_ = 3;
     }
 
+    if (axisym_) {
+      swirl_ess_attr_.SetSize(pmesh_->bdr_attributes.Max());
+      swirl_ess_attr_ = 0;
+    }
+
     // Use "numerical integration" (i.e., under-integrate so that mass matrix is diagonal)
     tps->getInput("loMach/tomboulides/numerical-integ", numerical_integ_, true);
 
@@ -155,6 +160,10 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
         }
         addVelDirichletBC(velocity_value, inlet_attr);
 
+        if (axisym_) {
+          addSwirlDirichletBC(0.0, inlet_attr);
+        }
+
       } else if (type == "interpolate") {
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
         inlet_attr = 0;
@@ -164,6 +173,9 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
           std::cout << "Tomboulides: Setting interpolated Dirichlet velocity on patch = " << patch << std::endl;
         }
         addVelDirichletBC(velocity_field_, inlet_attr);
+
+        // axisymmetric not testsed with interpolation BCs yet.  For now, just stop.
+        assert(!axisym_);
 
       } else if (type == "fully-developed-pipe") {
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
@@ -175,6 +187,9 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
         }
         addVelDirichletBC(vel_exact_pipe, inlet_attr);
 
+        if (axisym_) {
+          addSwirlDirichletBC(0.0, inlet_attr);
+        }
       } else {
         if (pmesh_->GetMyRank() == 0) {
           std::cout << "Tomboulides: When reading " << basepath << ", encountered inlet type = " << type << std::endl;
@@ -209,6 +224,12 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
           std::cout << "Tomboulides: Setting Dirichlet velocity on patch = " << patch << std::endl;
         }
         addVelDirichletBC(velocity_value, wall_attr);
+
+        if (axisym_) {
+          double swirl;
+          tps->getInput((basepath + "/swirl").c_str(), swirl, 0.0);
+          addSwirlDirichletBC(swirl, wall_attr);
+        }
       } else {
         if (pmesh_->GetMyRank() == 0) {
           std::cout << "Tomboulides: When reading " << basepath << ", encountered wall type = " << type << std::endl;
@@ -249,7 +270,6 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
         exit(1);
       }
     }
-
   }
 }
 
@@ -258,6 +278,10 @@ Tomboulides::~Tomboulides() {
   delete mass_lform_;
 
   // objects allocated by initializeOperators
+  delete Ms_rho_form_;
+  delete Hs_form_;
+  delete Hs_inv_;
+  delete Hs_inv_pc_;
   delete ur_conv_axi_form_;
   delete Faxi_poisson_form_;
   delete S_mom_form_;
@@ -428,6 +452,12 @@ void Tomboulides::initializeSelf() {
   rho_vec_.SetSize(pfes_truevsize);
   mu_vec_.SetSize(pfes_truevsize);
   Faxi_poisson_vec_.SetSize(pfes_truevsize);
+  if (axisym_) {
+    utheta_vec_.SetSize(pfes_truevsize);
+    utheta_m1_vec_.SetSize(pfes_truevsize);
+    utheta_m2_vec_.SetSize(pfes_truevsize);
+    utheta_next_vec_.SetSize(pfes_truevsize);
+  }
 
   tmpR0_.SetSize(sfes_truevsize);
   tmpR1_.SetSize(vfes_truevsize);
@@ -459,6 +489,13 @@ void Tomboulides::initializeSelf() {
   Qt_vec_ = 0.0;
   rho_vec_ = 0.0;
   mu_vec_ = 0.0;
+
+  if (axisym_) {
+    utheta_vec_ = 0.0;
+    utheta_m1_vec_ = 0.0;
+    utheta_m2_vec_ = 0.0;
+    utheta_next_vec_ = 0.0;
+  }
 
   // set IC if we have one at this point
   if (!ic_string_.empty()) {
@@ -542,6 +579,9 @@ void Tomboulides::initializeOperators() {
   // Get Dirichlet dofs
   vfes_->GetEssentialTrueDofs(vel_ess_attr_, vel_ess_tdof_);
   pfes_->GetEssentialTrueDofs(pres_ess_attr_, pres_ess_tdof_);
+  if (axisym_) {
+    pfes_->GetEssentialTrueDofs(swirl_ess_attr_, swirl_ess_tdof_);
+  }
 
   // Create the operators
 
@@ -629,6 +669,23 @@ void Tomboulides::initializeOperators() {
   }
   Ms_form_->Assemble();
   Ms_form_->FormSystemMatrix(empty, Ms_op_);
+
+  Ms_rho_form_ = new ParBilinearForm(pfes_);
+  MassIntegrator *msr_blfi;
+  if (axisym_) {
+    msr_blfi = new MassIntegrator(*rad_rho_coeff_);
+  } else {
+    msr_blfi = new MassIntegrator(*rho_coeff_);
+  }
+  if (numerical_integ_) {
+    msr_blfi->SetIntRule(&ir_ni_p);
+  }
+  Ms_rho_form_->AddDomainIntegrator(msr_blfi);
+  if (partial_assembly_) {
+    Ms_rho_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+  }
+  Ms_rho_form_->Assemble();
+  Ms_rho_form_->FormSystemMatrix(empty, Ms_rho_op_);
 
   // Mass matrix for the velocity
   Mv_form_ = new ParBilinearForm(vfes_);
@@ -741,7 +798,7 @@ void Tomboulides::initializeOperators() {
   VectorMassIntegrator *hmv_blfi;
   VectorDiffusionIntegrator *hdv_blfi;
   if (axisym_) {
-    //TODO: Use mu_total_coeff for diffusion to capture sponge!
+    // TODO: Use mu_total_coeff for diffusion to capture sponge!
     hmv_blfi = new VectorMassIntegrator(*rad_rho_over_dt_coeff_);
     hdv_blfi = new VectorDiffusionIntegrator(*rad_mu_coeff_);
   } else {
@@ -841,10 +898,37 @@ void Tomboulides::initializeOperators() {
       urca_dlfi->SetIntRule(&ir_ni_v);
     }
     ur_conv_axi_form_->AddDomainIntegrator(urca_dlfi);
+
+    // Helmholtz
+    Hs_form_ = new ParBilinearForm(pfes_);
+    auto *hms_blfi = new MassIntegrator(*rad_rho_over_dt_coeff_);
+    auto *hds_blfi = new DiffusionIntegrator(*rad_mu_coeff_);
+    auto *hfs_blfi = new MassIntegrator(*mu_over_rad_coeff_);
+
+    Hs_form_->AddDomainIntegrator(hms_blfi);
+    Hs_form_->AddDomainIntegrator(hds_blfi);
+    Hs_form_->AddDomainIntegrator(hfs_blfi);
+
+    Hs_form_->Assemble();
+    Hs_form_->FormSystemMatrix(swirl_ess_tdof_, Hs_op_);
+
+    Hs_inv_pc_ = new HypreSmoother(*Hs_op_.As<HypreParMatrix>());
+    dynamic_cast<HypreSmoother *>(Hs_inv_pc_)->SetType(HypreSmoother::Jacobi, 1);
+
+    Hs_inv_ = new CGSolver(pfes_->GetComm());
+    Hs_inv_->iterative_mode = true;
+    Hs_inv_->SetOperator(*Hs_op_);
+    Hs_inv_->SetPreconditioner(*Hs_inv_pc_);
+    Hs_inv_->SetPrintLevel(hsolve_pl_);
+    Hs_inv_->SetRelTol(hsolve_rtol_);
+    Hs_inv_->SetMaxIter(hsolve_max_iter_);
   }
 
   // Ensure u_vec_ consistent with u_curr_gf_
   u_curr_gf_->GetTrueDofs(u_vec_);
+  if (axisym_) {
+    utheta_gf_->GetTrueDofs(utheta_vec_);
+  }
 }
 
 void Tomboulides::initializeIO(IODataOrganizer &io) const {
@@ -977,6 +1061,20 @@ void Tomboulides::step() {
   }
 
   if (axisym_) {
+    // Extrapolate the swirl velocity
+    {
+      const auto d_u = utheta_vec_.Read();
+      const auto d_um1 = utheta_m1_vec_.Read();
+      const auto d_um2 = utheta_m2_vec_.Read();
+      auto d_uext = utheta_next_vec_.Write();
+      const auto ab1 = coeff_.ab1;
+      const auto ab2 = coeff_.ab2;
+      const auto ab3 = coeff_.ab3;
+      MFEM_FORALL(i, utheta_next_vec_.Size(), { d_uext[i] = ab1 * d_u[i] + ab2 * d_um1[i] + ab3 * d_um2[i]; });
+    }
+    utheta_next_gf_->SetFromTrueDofs(utheta_next_vec_);
+
+    // evaluate the rho u_{\theta}^2 term (from convection)
     ur_conv_axi_form_->Assemble();
     ur_conv_axi_form_->ParallelAssemble(ur_conv_forcing_vec_);
     forcing_vec_ += ur_conv_forcing_vec_;
@@ -1233,6 +1331,61 @@ void Tomboulides::step() {
   gradU_gf_->SetFromTrueDofs(gradU_);
   gradV_gf_->SetFromTrueDofs(gradV_);
   gradW_gf_->SetFromTrueDofs(gradW_);
+
+  if (axisym_) {
+    // Update the Helmholtz operator and inverse
+    Hv_bdfcoeff_.constant = coeff_.bd0 / dt;
+    Hs_form_->Update();
+    Hs_form_->Assemble();
+    Hs_form_->FormSystemMatrix(swirl_ess_tdof_, Hs_op_);
+    Hs_inv_->SetOperator(*Hs_op_);
+
+    Ms_rho_form_->Update();
+    Ms_rho_form_->Assemble();
+    Ms_rho_form_->FormSystemMatrix(empty, Ms_rho_op_);
+
+    // Unsteady contribution to RHS
+    {
+      const double bd1idt = -coeff_.bd1 / dt;
+      const double bd2idt = -coeff_.bd2 / dt;
+      const double bd3idt = -coeff_.bd3 / dt;
+      const auto d_u = utheta_vec_.Read();
+      const auto d_um1 = utheta_m1_vec_.Read();
+      const auto d_um2 = utheta_m2_vec_.Read();
+      auto d_ut_next = utheta_next_vec_.Write();
+      MFEM_FORALL(i, utheta_next_vec_.Size(),
+                  { d_ut_next[i] = bd1idt * d_u[i] + bd2idt * d_um1[i] + bd3idt * d_um2[i]; });
+    }
+
+    Ms_rho_op_->Mult(utheta_next_vec_, resp_vec_);
+
+    // Apply swirl Dirichlet BC
+    for (auto &swirl_dbc : swirl_dbcs_) {
+      utheta_next_gf_->ProjectBdrCoefficient(*swirl_dbc.coeff, swirl_dbc.attr);
+    }
+
+    pfes_->GetRestrictionMatrix()->MultTranspose(resp_vec_, *resp_gf_);
+
+    Vector Xs, Bs;
+    Hs_form_->FormLinearSystem(swirl_ess_tdof_, *utheta_next_gf_, *resp_gf_, Hs_op_, Xs, Bs, 1);
+
+    Hs_inv_->Mult(Bs, Xs);
+    if (!Hs_inv_->GetConverged()) {
+      if (rank0_) std::cout << "ERROR: Helmholtz solve did not converge." << std::endl;
+      exit(1);
+    }
+    Hs_form_->RecoverFEMSolution(Xs, *resp_gf_, *utheta_next_gf_);
+    utheta_next_gf_->GetTrueDofs(utheta_next_vec_);
+
+    // Rotate values in solution history
+    utheta_m2_vec_ = utheta_m1_vec_;
+    utheta_m1_vec_ = utheta_vec_;
+
+    // Update the current solution and corresponding GridFunction
+    utheta_next_gf_->GetTrueDofs(utheta_next_vec_);
+    utheta_vec_ = utheta_next_vec_;
+    utheta_gf_->SetFromTrueDofs(utheta_vec_);
+  }
 }
 
 double Tomboulides::computeL2Error() const {
@@ -1304,6 +1457,17 @@ void Tomboulides::addPresDirichletBC(double p, Array<int> &attr) {
     if (attr[i] == 1) {
       assert(!pres_ess_attr_[i]);  // if pres_ess_attr[i] already set, fail b/c duplicate
       pres_ess_attr_[i] = 1;
+    }
+  }
+}
+
+void Tomboulides::addSwirlDirichletBC(double ut, mfem::Array<int> &attr) {
+  assert(axisym_);
+  swirl_dbcs_.emplace_back(attr, new ConstantCoefficient(ut));
+  for (int i = 0; i < attr.Size(); ++i) {
+    if (attr[i] == 1) {
+      assert(!swirl_ess_attr_[i]);  // if swirl_ess_attr[i] already set, fail b/c duplicate
+      swirl_ess_attr_[i] = 1;
     }
   }
 }

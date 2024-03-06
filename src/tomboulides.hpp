@@ -122,14 +122,17 @@ class Tomboulides final : public FlowBase {
   // BCs holders
   std::vector<DirichletBC_T<mfem::VectorCoefficient>> vel_dbcs_;
   std::vector<DirichletBC_T<mfem::Coefficient>> pres_dbcs_;
+  std::vector<DirichletBC_T<mfem::Coefficient>> swirl_dbcs_;
 
   // List of essential boundaries
   mfem::Array<int> vel_ess_attr_;
   mfem::Array<int> pres_ess_attr_;
+  mfem::Array<int> swirl_ess_attr_;
 
   // All essential true dofs.
   mfem::Array<int> vel_ess_tdof_;
   mfem::Array<int> pres_ess_tdof_;
+  mfem::Array<int> swirl_ess_tdof_;
 
   /// Velocity FEM objects and fields
   mfem::FiniteElementCollection *vfec_ = nullptr;
@@ -216,6 +219,9 @@ class Tomboulides final : public FlowBase {
   mfem::ParLinearForm *Faxi_poisson_form_ = nullptr;
   mfem::ParLinearForm *ur_conv_axi_form_ = nullptr;
 
+  mfem::ParBilinearForm *Ms_rho_form_ = nullptr;
+  mfem::ParBilinearForm *Hs_form_ = nullptr;
+
   // mfem operator objects
   mfem::OperatorHandle L_iorho_op_;
   mfem::OperatorHandle Ms_op_;
@@ -224,6 +230,8 @@ class Tomboulides final : public FlowBase {
   mfem::OperatorHandle D_op_;
   mfem::OperatorHandle G_op_;
   mfem::OperatorHandle Hv_op_;
+  mfem::OperatorHandle Ms_rho_op_;
+  mfem::OperatorHandle Hs_op_;
 
   // solver objects
   mfem::ParLORDiscretization *L_iorho_lor_ = nullptr;
@@ -239,6 +247,9 @@ class Tomboulides final : public FlowBase {
 
   mfem::Solver *Hv_inv_pc_ = nullptr;
   mfem::CGSolver *Hv_inv_ = nullptr;
+
+  mfem::Solver *Hs_inv_pc_ = nullptr;
+  mfem::CGSolver *Hs_inv_ = nullptr;
 
   // Vectors
   mfem::Vector forcing_vec_;
@@ -270,6 +281,10 @@ class Tomboulides final : public FlowBase {
   mfem::Vector S_poisson_vec_;
   mfem::Vector Faxi_poisson_vec_;
   mfem::Vector ur_conv_forcing_vec_;
+  mfem::Vector utheta_vec_;
+  mfem::Vector utheta_m1_vec_;
+  mfem::Vector utheta_m2_vec_;
+  mfem::Vector utheta_next_vec_;
 
   // miscellaneous
   double volume_;
@@ -332,6 +347,9 @@ class Tomboulides final : public FlowBase {
 
   /// Add a Dirichlet boundary condition to the pressure field.
   void addPresDirichletBC(double p, mfem::Array<int> &attr);
+
+  /// Add constant swirl
+  void addSwirlDirichletBC(double ut, mfem::Array<int> &attr);
 };
 
 #endif  // TOMBOULIDES_HPP_
