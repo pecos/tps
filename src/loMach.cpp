@@ -349,7 +349,7 @@ void LoMachSolver::initialize() {
 
   // Instantiate thermochemical model
   if (loMach_opts_.thermo_solver == "constant-property") {
-    thermo_ = new ConstantPropertyThermoChem(pmesh_, loMach_opts_.order, 1.0, 1.0);
+    thermo_ = new ConstantPropertyThermoChem(pmesh_, loMach_opts_.order, tpsP_);
   } else if (loMach_opts_.thermo_solver == "calorically-perfect") {
     thermo_ = new CaloricallyPerfectThermoChem(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_);
   } else {

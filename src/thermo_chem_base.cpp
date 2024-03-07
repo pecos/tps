@@ -32,10 +32,19 @@
 
 #include "thermo_chem_base.hpp"
 
+#include "tps.hpp"
+
 using namespace mfem;
 
 ConstantPropertyThermoChem::ConstantPropertyThermoChem(ParMesh *pmesh, int sorder, double rho, double mu)
     : pmesh_(pmesh), sorder_(sorder), rho_(rho), mu_(mu) {}
+
+ConstantPropertyThermoChem::ConstantPropertyThermoChem(ParMesh *pmesh, int sorder, TPS::Tps *tps)
+    : pmesh_(pmesh), sorder_(sorder) {
+  assert(tps != nullptr);
+  tps->getInput("loMach/constprop/rho", rho_, 1.0);
+  tps->getInput("loMach/constprop/mu", mu_, 1.0);
+}
 
 ConstantPropertyThermoChem::~ConstantPropertyThermoChem() {
   delete thermal_divergence_;

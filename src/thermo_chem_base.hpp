@@ -37,6 +37,10 @@
 
 #include "tps_mfem_wrap.hpp"
 
+namespace TPS {
+class Tps;
+}
+
 class IODataOrganizer;
 struct flowToThermoChem;
 struct turbModelToThermoChem;
@@ -165,8 +169,8 @@ class ConstantPropertyThermoChem final : public ThermoChemModelBase {
  protected:
   mfem::ParMesh *pmesh_;
   const int sorder_;
-  const double rho_;
-  const double mu_;
+  double rho_;
+  double mu_;
 
   mfem::FiniteElementCollection *fec_ = nullptr;
   mfem::ParFiniteElementSpace *fes_ = nullptr;
@@ -187,6 +191,15 @@ class ConstantPropertyThermoChem final : public ThermoChemModelBase {
    * @param mu The (constant) value to use for the viscosity
    */
   ConstantPropertyThermoChem(mfem::ParMesh *pmesh, int sorder, double rho, double mu);
+
+  /**
+   * @brief Constructor
+   *
+   * @param pmesh A pointer to the mesh
+   * @param sorder The polynomial order for scalar fields
+   * @param tps Pointer to Tps object so that rho and mu can be obtained from input file
+   */
+  ConstantPropertyThermoChem(mfem::ParMesh *pmesh, int sorder, TPS::Tps *tps);
 
   /// Free the interface fields and support objects
   ~ConstantPropertyThermoChem() final;
