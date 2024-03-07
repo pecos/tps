@@ -305,9 +305,14 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
         }
         AddTempDirichletBC(temperature_bc_field_, inlet_attr);
 
-        // copy interpolated bc onto initial field
+        // Force the IC to agree with the interpolated inlet BC
+        //
+        // NB: It is still possible for Tn_gf_ on a restart to
+        // disagree with this BC.  Specifically, since the restart
+        // field is read after this projection, if it does not satisfy
+        // this BC, there will be a discrepancy (which will be
+        // eliminated after the first step).
         Tn_gf_.ProjectBdrCoefficient(*temperature_bc_field_, inlet_attr);
-
       } else {
         if (rank0_) {
           std::cout << "ERROR: Calorically Perfect inlet type = " << type << " not supported." << std::endl;
