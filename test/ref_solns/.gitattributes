@@ -3,3 +3,4 @@ pipe.100100.dtconst.sol.h5 filter=lfs diff=lfs merge=lfs -text
 plasma.lte2d.final.h5 filter=lfs diff=lfs merge=lfs -text
 plasma.lte2d.restart.h5 filter=lfs diff=lfs merge=lfs -text
 ref_solns/heatedBox/restart_output.sol.h5 filter=lfs diff=lfs merge=lfs -text
+taylor-couette/restart_output-tc.Re100.h5 filter=lfs diff=lfs merge=lfs -text

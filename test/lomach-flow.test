@@ -15,6 +15,9 @@ setup() {
     RUNFILE_LID_MOD="inputs/lomach.lid.mod.ini"
 
     RUNFILE_PIPE="inputs/lomach.pipe.ini"
+
+    RUNFILE_TC="inputs/lomach.taylor.couette.ini"
+    REF_SOLN_TC="ref_solns/taylor-couette/restart_output-tc.Re100.h5"
 }
 
 @test "[$TEST] check convergence for 2D Taylor-Green case using p = 1" {
@@ -110,4 +113,11 @@ setup() {
 @test "[$TEST] check that fully developed pipe (axisymmetric) runs" {
     run $EXE --runFile $RUNFILE_PIPE
     [[ ${status} -eq 0 ]]
+}
+
+@test "[$TEST] check that Taylor-Couette (axisymmetric, with swirl) runs and verify result" {
+    run $EXE --runFile $RUNFILE_TC
+    [[ ${status} -eq 0 ]]
+    test -s restart_output-tc.sol.h5
+    h5diff -r --relative=1e-14 restart_output-tc.sol.h5 $REF_SOLN_TC
 }
