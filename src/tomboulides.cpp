@@ -278,6 +278,8 @@ Tomboulides::~Tomboulides() {
   delete mass_lform_;
 
   // objects allocated by initializeOperators
+  delete rho_ur_ut_form_;
+  delete As_form_;
   delete Ms_rho_form_;
   delete Hs_form_;
   delete Hs_inv_;
@@ -308,6 +310,11 @@ Tomboulides::~Tomboulides() {
   delete L_iorho_lor_;
   delete L_iorho_form_;
 
+  delete rho_ur_ut_coeff_;
+  delete ur_ut_coeff_;
+  delete u_next_rad_coeff_;
+  delete rad_rhou_coeff_;
+  delete u_next_coeff_;
   delete ur_conv_forcing_coeff_;
   delete utheta2_coeff_;
   delete utheta_coeff_;
@@ -343,6 +350,7 @@ Tomboulides::~Tomboulides() {
   // objects allocated by initalizeSelf
   delete utheta_next_gf_;
   delete utheta_gf_;
+  delete u_next_rad_comp_gf_;
   delete pp_div_rad_comp_gf_;
   delete resp_gf_;
   delete p_gf_;
@@ -385,6 +393,7 @@ void Tomboulides::initializeSelf() {
   resp_gf_ = new ParGridFunction(pfes_);
 
   pp_div_rad_comp_gf_ = new ParGridFunction(pfes_, *pp_div_gf_);
+  u_next_rad_comp_gf_ = new ParGridFunction(pfes_, *u_next_gf_);
 
   if (axisym_) {
     utheta_gf_ = new ParGridFunction(pfes_);
@@ -563,6 +572,13 @@ void Tomboulides::initializeOperators() {
     // NB: Takes ownership of rho_utheta2_coeff_
     ur_conv_forcing_coeff_ = new VectorArrayCoefficient(2);
     ur_conv_forcing_coeff_->Set(0, rho_utheta2_coeff_);
+
+    u_next_coeff_ = new VectorGridFunctionCoefficient(u_next_gf_);
+    rad_rhou_coeff_ = new ScalarVectorProductCoefficient(*rad_rho_coeff_, *u_next_coeff_);
+
+    u_next_rad_coeff_ = new GridFunctionCoefficient(u_next_rad_comp_gf_);
+    ur_ut_coeff_ = new ProductCoefficient(*u_next_rad_coeff_, *utheta_coeff_);
+    rho_ur_ut_coeff_ = new ProductCoefficient(*rho_coeff_, *ur_ut_coeff_);
   }
 
   // Integration rules (only used if numerical_integ_ is true).  When
@@ -922,6 +938,20 @@ void Tomboulides::initializeOperators() {
     Hs_inv_->SetPrintLevel(hsolve_pl_);
     Hs_inv_->SetRelTol(hsolve_rtol_);
     Hs_inv_->SetMaxIter(hsolve_max_iter_);
+
+    // Convection terms
+    As_form_ = new ParBilinearForm(pfes_);
+
+    // NB: -1 so that sign is correct on rhs
+    auto *as_blfi = new ConvectionIntegrator(*rad_rhou_coeff_, -1.0);
+
+    As_form_->AddDomainIntegrator(as_blfi);
+    As_form_->Assemble();
+    As_form_->FormSystemMatrix(empty, As_op_);
+
+    rho_ur_ut_form_ = new ParLinearForm(pfes_);
+    auto *rurut_dlfi = new DomainLFIntegrator(*rho_ur_ut_coeff_);
+    rho_ur_ut_form_->AddDomainIntegrator(rurut_dlfi);
   }
 
   // Ensure u_vec_ consistent with u_curr_gf_
@@ -1340,11 +1370,27 @@ void Tomboulides::step() {
     Hs_form_->FormSystemMatrix(swirl_ess_tdof_, Hs_op_);
     Hs_inv_->SetOperator(*Hs_op_);
 
+    // Update scalar, density weighted mass matrix
     Ms_rho_form_->Update();
     Ms_rho_form_->Assemble();
     Ms_rho_form_->FormSystemMatrix(empty, Ms_rho_op_);
 
-    // Unsteady contribution to RHS
+    // Update convection operator
+    As_form_->Update();
+    As_form_->Assemble();
+    As_form_->FormSystemMatrix(empty, As_op_);
+
+    rho_ur_ut_form_->Update();
+    rho_ur_ut_form_->Assemble();
+
+    // Form convection contribution, starting with -rho*ur*utheta
+    rho_ur_ut_form_->ParallelAssemble(resp_vec_);
+    resp_vec_.Neg();
+
+    // Convection contribution to the rhs (NB: utheta_next_vec_ contains extrapolated utheta at this point)
+    As_op_->Mult(utheta_next_vec_, resp_vec_);
+
+    // Unsteady contribution to RHS (overwrites extrapolated utheta b/c no longer necessary)
     {
       const double bd1idt = -coeff_.bd1 / dt;
       const double bd2idt = -coeff_.bd2 / dt;
@@ -1357,7 +1403,7 @@ void Tomboulides::step() {
                   { d_ut_next[i] = bd1idt * d_u[i] + bd2idt * d_um1[i] + bd3idt * d_um2[i]; });
     }
 
-    Ms_rho_op_->Mult(utheta_next_vec_, resp_vec_);
+    Ms_rho_op_->AddMult(utheta_next_vec_, resp_vec_);
 
     // Apply swirl Dirichlet BC
     for (auto &swirl_dbc : swirl_dbcs_) {

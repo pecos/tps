@@ -161,6 +161,7 @@ class Tomboulides final : public FlowBase {
   /// Swirl
   mfem::ParGridFunction *utheta_gf_ = nullptr;
   mfem::ParGridFunction *utheta_next_gf_ = nullptr;
+  mfem::ParGridFunction *u_next_rad_comp_gf_ = nullptr;
 
   /// mfem::Coefficients used in forming necessary operators
   mfem::GridFunctionCoefficient *rho_coeff_ = nullptr;
@@ -201,6 +202,11 @@ class Tomboulides final : public FlowBase {
   mfem::ProductCoefficient *utheta2_coeff_ = nullptr;
   mfem::ProductCoefficient *rho_utheta2_coeff_ = nullptr;
   mfem::VectorArrayCoefficient *ur_conv_forcing_coeff_ = nullptr;
+  mfem::VectorGridFunctionCoefficient *u_next_coeff_ = nullptr;
+  mfem::ScalarVectorProductCoefficient *rad_rhou_coeff_ = nullptr;
+  mfem::GridFunctionCoefficient *u_next_rad_coeff_ = nullptr;
+  mfem::ProductCoefficient *ur_ut_coeff_ = nullptr;
+  mfem::ProductCoefficient *rho_ur_ut_coeff_ = nullptr;
 
   // mfem "form" objects used to create operators
   mfem::ParBilinearForm *L_iorho_form_ = nullptr;  // \int (1/\rho) \nabla \phi_i \cdot \nabla \phi_j
@@ -221,6 +227,8 @@ class Tomboulides final : public FlowBase {
 
   mfem::ParBilinearForm *Ms_rho_form_ = nullptr;
   mfem::ParBilinearForm *Hs_form_ = nullptr;
+  mfem::ParBilinearForm *As_form_ = nullptr;
+  mfem::ParLinearForm *rho_ur_ut_form_ = nullptr;
 
   // mfem operator objects
   mfem::OperatorHandle L_iorho_op_;
@@ -232,6 +240,7 @@ class Tomboulides final : public FlowBase {
   mfem::OperatorHandle Hv_op_;
   mfem::OperatorHandle Ms_rho_op_;
   mfem::OperatorHandle Hs_op_;
+  mfem::OperatorHandle As_op_;
 
   // solver objects
   mfem::ParLORDiscretization *L_iorho_lor_ = nullptr;
