@@ -61,18 +61,18 @@ GaussianInterpExtData::GaussianInterpExtData(mfem::ParMesh *pmesh, LoMachOptions
   int numInlets;
   tpsP_->getInput("boundaryConditions/numInlets", numInlets, 0);
 
-  if (numInlets == 1) {
+  for (int i = 1; i <= numInlets; i++) {
     std::string type;
-    std::string basepath("boundaryConditions/inlet1");
+    std::string basepath("boundaryConditions/inlet" + std::to_string(i));
     tpsP_->getRequiredInput((basepath + "/type").c_str(), type);
     if (type == "interpolate") {
+      if (isInterpInlet_) {
+        // If we've already set isInterpInlet_, then user requested
+        // multiple interpolation BCs, which is not supported
+        if (rank0_) std::cout << "Only one interpolated inlet currently supported." << endl;
+      }
       isInterpInlet_ = true;
       tpsP_->getInput((basepath + "/name").c_str(), fname_, std::string("inletPlane.csv"));
-    } else {
-      if (rank0_) {
-        std::cout << "Only one interpolated inlet currently supported." << endl;
-      }
-      exit(1);
     }
   }
 }
