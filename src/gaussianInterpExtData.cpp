@@ -145,25 +145,17 @@ void GaussianInterpExtData::setup() {
     double x, y, z, rho, temp, u, v, w;
   };
 
-  // string fname;
-  // fname = "./inputs/inletPlane.csv";
-  // const int fname_length = fname.length();
-  // char* char_array = new char[fname_length + 1];
-  // strcpy(char_array, fname.c_str());
-
   string fnameBase;
   std::string basepath("./inputs/");
   fnameBase = (basepath + fname_);
   const char *fnameRead = fnameBase.c_str();
   int nCount = 0;
-  // if(rank0_) {std::cout << "check: 1..." << endl;}
 
   // find size
   if (rank0_) {
     std::cout << " Attempting to open inlet file for counting... " << fnameRead << " ";
 
     FILE *inlet_file;
-    // if ( inlet_file = fopen("./inputs/inletPlane.csv","r") ) {
     if ((inlet_file = fopen(fnameRead, "r"))) {
       std::cout << " ...and open" << endl;
       fflush(stdout);
@@ -172,12 +164,7 @@ void GaussianInterpExtData::setup() {
       fflush(stdout);
     }
 
-    // char *line = NULL;
     int ch = 0;
-    // size_t len = 0;
-    // ssize_t read;
-
-    // std::cout << " ...starting count" << endl; fflush(stdout);
     for (ch = getc(inlet_file); ch != EOF; ch = getc(inlet_file)) {
       if (ch == '\n') {
         nCount++;
@@ -190,7 +177,6 @@ void GaussianInterpExtData::setup() {
 
   // broadcast size
   MPI_Bcast(&nCount, 1, MPI_INT, 0, tpsP_->getTPSCommWorld());
-  // int nSamples = sqrt(nCount);
   struct inlet_profile inlet[nCount];
 
   // mean output from plane interpolation
@@ -200,14 +186,12 @@ void GaussianInterpExtData::setup() {
   // open, read data
   if (rank0_) {
     ifstream file;
-    // file.open("./inputs/inletPlane.csv");
     file.open(fnameRead);
 
     string line;
     getline(file, line);
     int nLines = 0;
     while (getline(file, line)) {
-      // std::cout << line << endl;
       stringstream sline(line);
       int entry = 0;
       while (sline.good()) {
@@ -242,7 +226,6 @@ void GaussianInterpExtData::setup() {
       nLines++;
     }
     file.close();
-    // std::cout << " " << endl; fflush(stdout);
   }
 
   // broadcast data
@@ -270,22 +253,14 @@ void GaussianInterpExtData::setup() {
   double radius = 1.0;
 
   // TODO(swh): dont need to fill entire gf, just appropriate face
+  // NB: be careful with GetNBE (see comments in mfem/mesh/mesh.hpp)
   for (int be = 0; be < pmesh_->GetNBE(); be++) {
-    // std::cout << " in bdry ele loop..." << endl;
-    // int bAttr = pmesh_->GetBdrElement(be)->GetAttribute();
-    // std::cout << " bAttr: " << bAttr << endl;
-    // if (bAttr == InletType::INTERPOLATE) {
-    // std::cout << " caught interp bc..." << bAttr << endl;
     Array<int> vdofs;
     sfes_->GetBdrElementVDofs(be, vdofs);
     for (int i = 0; i < vdofs.Size(); i++) {
-      // std::cout << " in interp dof loop..." << endl;
-
       // index in gf of bndry element
       int n = vdofs[i];
 
-      // get coords, c-std is terrible and req xp[3]
-      // double xp[dim_];
       double xp[3];
       for (int d = 0; d < dim_; d++) {
         xp[d] = hcoords[n + d * Sdof_];
@@ -330,7 +305,6 @@ void GaussianInterpExtData::setup() {
 
       // radius for Gaussian interpolation
       radius = distMinSecond;
-      // std::cout << " radius for interpoaltion: " << radius << endl; fflush(stdout);
 
       for (int j = 0; j < nCount; j++) {
         // exclude points outside the domain
@@ -343,15 +317,12 @@ void GaussianInterpExtData::setup() {
 
         // gaussian interpolation
         if (dist <= 1.5 * radius) {
-          // std::cout << " Caught an interp point " << dist << endl; fflush(stdout);
           wt = exp(-(dist * dist) / (radius * radius));
           wt_tot += wt;
           val_u = val_u + wt * inlet[j].u;
           val_v = val_v + wt * inlet[j].v;
           val_w = val_w + wt * inlet[j].w;
           val_T = val_T + wt * inlet[j].temp;
-          // iCount++;
-          // std::cout << "* " << n << " "  << iCount << " " << wt_tot << " " << val_T << endl; fflush(stdout);
         }
 
         // nearest, just for testing
@@ -371,118 +342,14 @@ void GaussianInterpExtData::setup() {
         Udata[n + 1 * Sdof_] = val_v / wt_tot;
         Udata[n + 2 * Sdof_] = val_w / wt_tot;
         Tdata[n] = val_T / wt_tot;
-        // std::cout << n << " point set to: " << Tdata[n] << " with pts: " << iCount << endl; fflush(stdout);
       } else {
         Udata[n + 0 * Sdof_] = 0.0;
         Udata[n + 1 * Sdof_] = 0.0;
         Udata[n + 2 * Sdof_] = 0.0;
         Tdata[n] = 0.0;
-        // std::cout << " iCount of zero..." << endl; fflush(stdout);
       }
     }
-    //}
   }
-
-  /*
-  for (int n = 0; n < sfes->GetNDofs(); n++) {
-
-    // get coords
-    auto hcoords = coordsDof.HostRead();
-    double xp[3];
-    for (int d = 0; d < dim; d++) {
-      xp[d] = hcoords[n + d * vfes->GetNDofs()];
-    }
-
-    int iCount = 0;
-    double dist, wt;
-    double wt_tot = 0.0;
-    double val_rho = 0.0;
-    double val_u = 0.0;
-    double val_v = 0.0;
-    double val_w = 0.0;
-    double val_T = 0.0;
-    double dmin = 1.0e15;
-
-    // minimum distance in interpolant field
-    double distMin = 1.0e12;
-    for (int j = 0; j < nCount; j++) {
-      dist = (xp[0]-inlet[j].x)*(xp[0]-inlet[j].x)
-           + (xp[1]-inlet[j].y)*(xp[1]-inlet[j].y)
-           + (xp[2]-inlet[j].z)*(xp[2]-inlet[j].z);
-      dist = sqrt(dist);
-      distMin = std::min(distMin, dist);
-    }
-
-    // find second closest data pt
-    double distMinSecond = 1.0e12;
-    for (int j = 0; j < nCount; j++) {
-      dist = (xp[0]-inlet[j].x)*(xp[0]-inlet[j].x)
-           + (xp[1]-inlet[j].y)*(xp[1]-inlet[j].y)
-           + (xp[2]-inlet[j].z)*(xp[2]-inlet[j].z);
-      dist = sqrt(dist);
-      if (dist > distMin) {
-        distMinSecond = std::min(distMinSecond, dist);
-      }
-    }
-
-    // radius for Gaussian interpolation
-    radius = distMinSecond;
-    // std::cout << " radius for interpoaltion: " << radius << endl; fflush(stdout);
-
-    for (int j=0; j < nCount; j++) {
-
-      dist = (xp[0]-inlet[j].x)*(xp[0]-inlet[j].x)
-           + (xp[1]-inlet[j].y)*(xp[1]-inlet[j].y)
-           + (xp[2]-inlet[j].z)*(xp[2]-inlet[j].z);
-      dist = sqrt(dist);
-
-      // exclude points outside the domain
-      if (inlet[j].rho < 1.0e-8) { continue; }
-
-      // gaussian interpolation
-      if(dist <= 1.5*radius) {
-        // std::cout << " Caught an interp point " << dist << endl; fflush(stdout);
-        wt = exp(-(dist*dist)/(radius*radius));
-        wt_tot = wt_tot + wt;
-        val_rho = val_rho + wt*inlet[j].rho;
-        val_u = val_u + wt*inlet[j].u;
-        val_v = val_v + wt*inlet[j].v;
-        val_w = val_w + wt*inlet[j].w;
-        val_T = val_T + wt*inlet[j].temp;
-        iCount++;
-        // std::cout << "* " << n << " "  << iCount << " " << wt_tot << " " << val_T << endl; fflush(stdout);
-      }
-
-      // nearest, just for testing
-      // if(dist <= dmin) {
-      //  dmin = dist;
-      //  wt_tot = 1.0;
-      //   val_rho = inlet[j].rho;
-      //   val_u = inlet[j].u;
-      //   val_v = inlet[j].v;
-      //   val_w = inlet[j].w;
-      //   val_T = inlet[j].temp;
-      //   iCount = 1;
-      // }
-
-    }
-
-    if (wt_tot > 0.0) {
-      Udata[n] = val_u / wt_tot;
-      Vdata[n] = val_v / wt_tot;
-      Wdata[n] = val_w / wt_tot;
-      Tdata[n] = val_T / wt_tot;
-      // std::cout << n << " point set to: " << dataVel[n + 0*Sdof] << " " << dataTemp[n] << endl; fflush(stdout);
-    } else {
-      Udata[n] = 0.0;
-      Vdata[n] = 0.0;
-      Wdata[n] = 0.0;
-      Tdata[n] = 0.0;
-      // std::cout << " iCount of zero..." << endl; fflush(stdout);
-    }
-
-  }
-  */
 }
 
 void GaussianInterpExtData::step() {
