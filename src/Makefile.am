@@ -39,7 +39,7 @@ cxx_sources          = averaging.cpp faceGradientIntegration.cpp M2ulPhyS.cpp rh
                        lte_transport_properties.cpp mixing_length_transport.cpp tps2Boltzmann.cpp  M2ulPhyS2Boltzmann.cpp \
                        pybindings.cpp gslib_interpolator.cpp loMach.cpp loMachIO.cpp loMach_options.cpp turbModel.cpp calorically_perfect.cpp \
 	               turb_model_base.cpp thermo_chem_base.cpp split_flow_base.cpp tomboulides.cpp dirichlet_bc_helper.cpp \
-                       sponge_base.cpp geometricSponge.cpp externalData_base.cpp gaussianInterpExtData.cpp
+                       sponge_base.cpp geometricSponge.cpp gaussianInterpExtData.cpp
 
 mfem_extra_sources   = ../utils/mfem_extras/pfem_extras.cpp
 

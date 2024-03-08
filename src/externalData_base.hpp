@@ -88,43 +88,4 @@ class ExternalDataBase {
   extDataToThermoChem toThermoChem_interface_;
 };
 
-/**
- * Provides trivial field
- */
-class ZeroExternalData final : public ExternalDataBase {
- protected:
-  mfem::ParMesh *pmesh_;
-  const int sorder_;
-  int dim_;
-
-  mfem::FiniteElementCollection *fec_ = nullptr;
-  mfem::ParFiniteElementSpace *fes_ = nullptr;
-  mfem::FiniteElementCollection *vfec_ = nullptr;
-  mfem::ParFiniteElementSpace *vfes_ = nullptr;
-  mfem::ParGridFunction *Tdata_ = nullptr;
-  mfem::ParGridFunction *Udata_ = nullptr;
-
- public:
-  /**
-   * @brief Constructor
-   *
-   * Capture information necessary to set up the class, which includes
-   *
-   * @param pmesh A pointer to the mesh
-   * @param sorder The polynomial order for scalar fields
-   * @param data The field data
-   */
-  ZeroExternalData(mfem::ParMesh *pmesh, int sorder);
-
-  /// Free the interface fields and support objects
-  ~ZeroExternalData() final;
-
-  /// Allocate and initialize the interface fields to constant values
-  void initializeSelf() final;
-
-  /// Since everything is constant, step is a no-op
-  void step() final {}
-  void setup() final {}
-};
-
 #endif  // EXTERNALDATA_BASE_HPP_
