@@ -108,6 +108,63 @@ void LoMachSolver::initialize() {
   // 1) Prepare the mesh
   //-----------------------------------------------------
 
+  // Determine domain bounding box size
+  {
+    Mesh temp_mesh = Mesh(loMach_opts_.mesh_file.c_str());
+    int dim = temp_mesh.Dimension();
+    H1_FECollection fec(order, dim);
+    FiniteElementSpace fes(&temp_mesh, &fec);
+    GridFunction coordsVert(&fes);
+    temp_mesh.GetVertices(coordsVert);
+    int nVert = coordsVert.Size() / dim;
+    {
+      double local_xmin = 1.0e18;
+      double local_ymin = 1.0e18;
+      double local_zmin = 1.0e18;
+      double local_xmax = -1.0e18;
+      double local_ymax = -1.0e18;
+      double local_zmax = -1.0e18;
+
+      double coords[3];
+      for (int d = 0; d < 3; d++) {
+        coords[d] = 0.0;
+      }
+
+      for (int n = 0; n < nVert; n++) {
+        auto hcoords = coordsVert.HostRead();
+        for (int d = 0; d < dim; d++) {
+          coords[d] = hcoords[n + d * nVert];
+        }
+        local_xmin = min(coords[0], local_xmin);
+        local_ymin = min(coords[1], local_ymin);
+        if (dim == 3) {
+          local_zmin = min(coords[2], local_zmin);
+        }
+        local_xmax = max(coords[0], local_xmax);
+        local_ymax = max(coords[1], local_ymax);
+        if (dim == 3) {
+          local_zmax = max(coords[2], local_zmax);
+        }
+      }
+      xmin_ = local_xmin;
+      xmax_ = local_xmax;
+      ymin_ = local_ymin;
+      ymax_ = local_ymax;
+      zmin_ = local_zmin;
+      zmax_ = local_zmax;
+    }
+
+    if (loMach_opts_.periodicX) {
+      loMach_opts_.x_trans = xmax_ - xmin_;
+    }
+    if (loMach_opts_.periodicY) {
+      loMach_opts_.y_trans = ymax_ - ymin_;
+    }
+    if (loMach_opts_.periodicZ) {
+      loMach_opts_.z_trans = zmax_ - zmin_;
+    }
+  }
+
   // Generate serial mesh, making it periodic if requested
   if (loMach_opts_.periodic) {
     Mesh temp_mesh = Mesh(loMach_opts_.mesh_file.c_str());
@@ -244,7 +301,7 @@ void LoMachSolver::initialize() {
     }
     MPI_Allreduce(&local_hmin, &hmin, 1, MPI_DOUBLE, MPI_MIN, pmesh_->GetComm());
   }
-  if (verbose) grvy_printf(ginfo, "Min element size found...\n");
+  // if (verbose) grvy_printf(ginfo, "Min element size found...\n");
 
   // maximum size
   {
@@ -254,49 +311,7 @@ void LoMachSolver::initialize() {
     }
     MPI_Allreduce(&local_hmax, &hmax, 1, MPI_DOUBLE, MPI_MAX, pmesh_->GetComm());
   }
-  if (verbose) grvy_printf(ginfo, "Max element size found...\n");
-
-  // TODO(swh): this bit will be used for improving perodicity
-  // Determine domain bounding box size
-  ParGridFunction coordsVert(sfes_);
-  pmesh_->GetVertices(coordsVert);
-  int nVert = coordsVert.Size() / dim_;
-  {
-    double local_xmin = 1.0e18;
-    double local_ymin = 1.0e18;
-    double local_zmin = 1.0e18;
-    double local_xmax = -1.0e18;
-    double local_ymax = -1.0e18;
-    double local_zmax = -1.0e18;
-
-    double coords[3];
-    for (int d = 0; d < 3; d++) {
-      coords[d] = 0.0;
-    }
-
-    for (int n = 0; n < nVert; n++) {
-      auto hcoords = coordsVert.HostRead();
-      for (int d = 0; d < dim_; d++) {
-        coords[d] = hcoords[n + d * nVert];
-      }
-      local_xmin = min(coords[0], local_xmin);
-      local_ymin = min(coords[1], local_ymin);
-      if (dim_ == 3) {
-        local_zmin = min(coords[2], local_zmin);
-      }
-      local_xmax = max(coords[0], local_xmax);
-      local_ymax = max(coords[1], local_ymax);
-      if (dim_ == 3) {
-        local_zmax = max(coords[2], local_zmax);
-      }
-    }
-    MPI_Allreduce(&local_xmin, &xmin, 1, MPI_DOUBLE, MPI_MIN, pmesh_->GetComm());
-    MPI_Allreduce(&local_ymin, &ymin, 1, MPI_DOUBLE, MPI_MIN, pmesh_->GetComm());
-    MPI_Allreduce(&local_zmin, &zmin, 1, MPI_DOUBLE, MPI_MIN, pmesh_->GetComm());
-    MPI_Allreduce(&local_xmax, &xmax, 1, MPI_DOUBLE, MPI_MAX, pmesh_->GetComm());
-    MPI_Allreduce(&local_ymax, &ymax, 1, MPI_DOUBLE, MPI_MAX, pmesh_->GetComm());
-    MPI_Allreduce(&local_zmax, &zmax, 1, MPI_DOUBLE, MPI_MAX, pmesh_->GetComm());
-  }
+  // if (verbose) grvy_printf(ginfo, "Max element size found...\n");
 
   if (rank0_) cout << "Maximum element size: " << hmax << "m" << endl;
   if (rank0_) cout << "Minimum element size: " << hmin << "m" << endl;
@@ -877,4 +892,7 @@ void LoMachSolver::parseSolverOptions() {
   tpsP_->getInput("periodicity/xTrans", loMach_opts_.x_trans, 1.0e12);
   tpsP_->getInput("periodicity/yTrans", loMach_opts_.y_trans, 1.0e12);
   tpsP_->getInput("periodicity/zTrans", loMach_opts_.z_trans, 1.0e12);
+  tpsP_->getInput("periodicity/periodicX", loMach_opts_.periodicX, false);
+  tpsP_->getInput("periodicity/periodicY", loMach_opts_.periodicY, false);
+  tpsP_->getInput("periodicity/periodicZ", loMach_opts_.periodicZ, false);
 }
