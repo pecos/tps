@@ -163,6 +163,9 @@ void LoMachSolver::initialize() {
     if (loMach_opts_.periodicZ) {
       loMach_opts_.z_trans = zmax_ - zmin_;
     }
+    if (loMach_opts_.periodicX || loMach_opts_.periodicY || loMach_opts_.periodicZ) {
+      loMach_opts_.periodic = true;
+    }    
   }
 
   // Generate serial mesh, making it periodic if requested
