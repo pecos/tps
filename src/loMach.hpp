@@ -144,8 +144,8 @@ class LoMachSolver : public TPS::Solver {
   double hmin, hmax;
 
   // domain extent
-  double xmin, ymin, zmin;
-  double xmax, ymax, zmax;
+  double xmin_, ymin_, zmin_;
+  double xmax_, ymax_, zmax_;
 
   /// Scalar \f$H^1\f$ finite element collection.
   FiniteElementCollection *sfec_ = nullptr;

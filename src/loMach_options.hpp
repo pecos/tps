@@ -99,10 +99,14 @@ class LoMachOptions {
   double scale_mesh;
   int ref_levels; /**< Number of uniform mesh refinements */
 
+  // Periodic domain
   bool periodic;
   double x_trans;
   double y_trans;
   double z_trans;
+  bool periodicX;
+  bool periodicY;
+  bool periodicZ;
 
   // FEM
   int order; /**< Element order */
