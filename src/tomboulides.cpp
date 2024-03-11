@@ -278,6 +278,7 @@ Tomboulides::~Tomboulides() {
   delete mass_lform_;
 
   // objects allocated by initializeOperators
+  delete swirl_var_viscosity_form_;
   delete rho_ur_ut_form_;
   delete As_form_;
   delete Ms_rho_form_;
@@ -310,6 +311,8 @@ Tomboulides::~Tomboulides() {
   delete L_iorho_lor_;
   delete L_iorho_form_;
 
+  delete swirl_var_viscosity_coeff_;
+  delete utheta_vec_coeff_;
   delete rho_ur_ut_coeff_;
   delete ur_ut_coeff_;
   delete u_next_rad_coeff_;
@@ -317,7 +320,7 @@ Tomboulides::~Tomboulides() {
   delete u_next_coeff_;
   delete ur_conv_forcing_coeff_;
   delete utheta2_coeff_;
-  delete utheta_coeff_;
+  // delete utheta_coeff_;
 
   for (size_t i = 0; i < rad_vel_coeff_.size(); i++) delete rad_vel_coeff_[i];
 
@@ -579,6 +582,13 @@ void Tomboulides::initializeOperators() {
     u_next_rad_coeff_ = new GridFunctionCoefficient(u_next_rad_comp_gf_);
     ur_ut_coeff_ = new ProductCoefficient(*u_next_rad_coeff_, *utheta_coeff_);
     rho_ur_ut_coeff_ = new ProductCoefficient(*rho_coeff_, *ur_ut_coeff_);
+
+    // NB: This is a sort of hacky/sneaky way to form the variable
+    // viscosity contribution to the swirl equation.  Should find a
+    // better way.
+    utheta_vec_coeff_ = new VectorArrayCoefficient(2);
+    utheta_vec_coeff_->Set(0, utheta_coeff_);
+    swirl_var_viscosity_coeff_ = new InnerProductCoefficient(*grad_mu_coeff_, *utheta_vec_coeff_);
   }
 
   // Integration rules (only used if numerical_integ_ is true).  When
@@ -952,6 +962,10 @@ void Tomboulides::initializeOperators() {
     rho_ur_ut_form_ = new ParLinearForm(pfes_);
     auto *rurut_dlfi = new DomainLFIntegrator(*rho_ur_ut_coeff_);
     rho_ur_ut_form_->AddDomainIntegrator(rurut_dlfi);
+
+    swirl_var_viscosity_form_ = new ParLinearForm(pfes_);
+    auto *svv_dlfi = new DomainLFIntegrator(*swirl_var_viscosity_coeff_);
+    swirl_var_viscosity_form_->AddDomainIntegrator(svv_dlfi);
   }
 
   // Ensure u_vec_ consistent with u_curr_gf_
@@ -1383,8 +1397,17 @@ void Tomboulides::step() {
     rho_ur_ut_form_->Update();
     rho_ur_ut_form_->Assemble();
 
+    swirl_var_viscosity_form_->Update();
+    swirl_var_viscosity_form_->Assemble();
+
+    // Form variable viscosity contribution (d(mu)/dr * utheta)
+    swirl_var_viscosity_form_->ParallelAssemble(Faxi_poisson_vec_);
+
     // Form convection contribution, starting with -rho*ur*utheta
     rho_ur_ut_form_->ParallelAssemble(resp_vec_);
+    resp_vec_ += Faxi_poisson_vec_;
+
+    // res -> -d(mu)/dr * utheta - rho*ur*utheta
     resp_vec_.Neg();
 
     // Convection contribution to the rhs (NB: utheta_next_vec_ contains extrapolated utheta at this point)

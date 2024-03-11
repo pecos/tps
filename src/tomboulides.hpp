@@ -207,6 +207,8 @@ class Tomboulides final : public FlowBase {
   mfem::GridFunctionCoefficient *u_next_rad_coeff_ = nullptr;
   mfem::ProductCoefficient *ur_ut_coeff_ = nullptr;
   mfem::ProductCoefficient *rho_ur_ut_coeff_ = nullptr;
+  mfem::VectorArrayCoefficient *utheta_vec_coeff_ = nullptr;
+  mfem::InnerProductCoefficient *swirl_var_viscosity_coeff_ = nullptr;
 
   // mfem "form" objects used to create operators
   mfem::ParBilinearForm *L_iorho_form_ = nullptr;  // \int (1/\rho) \nabla \phi_i \cdot \nabla \phi_j
@@ -229,6 +231,7 @@ class Tomboulides final : public FlowBase {
   mfem::ParBilinearForm *Hs_form_ = nullptr;
   mfem::ParBilinearForm *As_form_ = nullptr;
   mfem::ParLinearForm *rho_ur_ut_form_ = nullptr;
+  mfem::ParLinearForm *swirl_var_viscosity_form_ = nullptr;
 
   // mfem operator objects
   mfem::OperatorHandle L_iorho_op_;
