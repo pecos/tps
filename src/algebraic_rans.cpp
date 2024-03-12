@@ -59,6 +59,24 @@ AlgebraicRans::AlgebraicRans(Mesh *smesh, ParMesh *pmesh, const Array<int> &part
   // Build a list of wall patches based on BCs
   Array<int> wall_patch_list;
 
+  int num_walls;
+  tps->getInput("boundaryConditions/numWalls", num_walls, 0);
+
+  // Wall Bcs
+  for (int i = 1; i <= num_walls; i++) {
+    int patch;
+    std::string type;
+    std::string basepath("boundaryConditions/wall" + std::to_string(i));
+
+    tps->getRequiredInput((basepath + "/patch").c_str(), patch);
+    tps->getRequiredInput((basepath + "/type").c_str(), type);
+
+    // NB: Only catch "no-slip" type walls here
+    if (type == "viscous_isothermal" || type == "viscous_adiabatic" || type == "viscous" || type == "no-slip") {
+      wall_patch_list.Append(patch);
+    }
+  }
+
   // Evaluate the (serial) distance function
   evaluateDistanceSerial(*smesh, wall_patch_list, coordinates, serial_distance);
 
