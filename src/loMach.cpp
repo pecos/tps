@@ -44,6 +44,7 @@
 #include <limits>
 
 #include "algebraicSubgridModels.hpp"
+#include "algebraic_rans.hpp"
 #include "calorically_perfect.hpp"
 #include "gaussianInterpExtData.hpp"
 #include "geometricSponge.hpp"
