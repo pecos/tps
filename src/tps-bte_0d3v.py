@@ -1099,9 +1099,13 @@ if __name__=="__main__":
                     await ts
                     
                     await boltzmann.push(interface, use_interp=bte_use_interp)
+                    
                     for grid_idx in boltzmann.active_grid_idx:
-                        u_vec   = boltzmann.bte_solver.get_boltzmann_parameter(grid_idx, "u_avg")
-                        boltzmann.io_output_data(grid_idx, u_vec, plot_data=True, export_csv=True, fname=boltzmann.param.out_fname+"_grid_%02d"%(grid_idx))
+                        dev_id  = gidx_to_device_map(grid_idx,n_grids)
+                        with cp.cuda.Device(dev_id):
+                            u_vec   = boltzmann.bte_solver.get_boltzmann_parameter(grid_idx, "u_avg")
+                            boltzmann.io_output_data(grid_idx, u_vec, plot_data=True, export_csv=True, fname=boltzmann.param.out_fname+"_grid_%02d"%(grid_idx))
+                    
                     
                 else:
                     assert boltzmann.param.solver_type == "transient", "unknown BTE solver type"
@@ -1127,8 +1131,6 @@ if __name__=="__main__":
                                 def t1():
                                     u0      = boltzmann.bte_solver.get_boltzmann_parameter(grid_idx, "u0")
                                     fname   = "%s_iter%04d_grid_%04d_cycle_%0d"%(boltzmann.param.out_fname, iter, grid_idx, bte_idx//bte_sper_cycle)
-                                    
-                                    #boltzmann.io_output_data(grid_idx, u0, False, True, fname)
                                     
                                     abs_error[grid_idx] = xp.max(xp.abs(bte_v[grid_idx]-u0))
                                     rel_error[grid_idx] = abs_error[grid_idx] / xp.max(xp.abs(u0))
@@ -1189,8 +1191,11 @@ if __name__=="__main__":
                     await boltzmann.push(interface, use_interp=bte_use_interp)
                     
                     for grid_idx in boltzmann.active_grid_idx:
-                        u_vec   = boltzmann.bte_solver.get_boltzmann_parameter(grid_idx, "u_avg")
-                        boltzmann.io_output_data(grid_idx, u_vec, plot_data=True, export_csv=True, fname=boltzmann.param.out_fname+"_grid_%02d"%(grid_idx))
+                        dev_id  = gidx_to_device_map(grid_idx,n_grids)
+                        with cp.cuda.Device(dev_id):
+                            u_vec   = boltzmann.bte_solver.get_boltzmann_parameter(grid_idx, "u_avg")
+                            boltzmann.io_output_data(grid_idx, u_vec, plot_data=True, export_csv=True, fname=boltzmann.param.out_fname+"_grid_%02d"%(grid_idx))
+                    
                     
                 ################### tps solve ######################################
                 tps.fetch(interface)
