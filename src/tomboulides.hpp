@@ -164,6 +164,9 @@ class Tomboulides final : public FlowBase {
   mfem::ParGridFunction *utheta_next_gf_ = nullptr;
   mfem::ParGridFunction *u_next_rad_comp_gf_ = nullptr;
 
+  /// "total" viscosity, including fluid, turbulence, sponge
+  mfem::ParGridFunction *mu_total_gf_ = nullptr;
+
   /// mfem::Coefficients used in forming necessary operators
   mfem::GridFunctionCoefficient *rho_coeff_ = nullptr;
   mfem::RatioCoefficient *iorho_coeff_ = nullptr;
@@ -172,10 +175,6 @@ class Tomboulides final : public FlowBase {
   mfem::ConstantCoefficient Hv_bdfcoeff_;
   mfem::ProductCoefficient *rho_over_dt_coeff_ = nullptr;
   mfem::GridFunctionCoefficient *mu_coeff_ = nullptr;
-  mfem::GridFunctionCoefficient *mut_coeff_ = nullptr;
-  mfem::GridFunctionCoefficient *mult_coeff_ = nullptr;
-  mfem::SumCoefficient *mu_sum_coeff_ = nullptr;
-  mfem::ProductCoefficient *mu_total_coeff_ = nullptr;
   mfem::VectorGridFunctionCoefficient *pp_div_coeff_ = nullptr;
 
   mfem::GradientGridFunctionCoefficient *grad_mu_coeff_ = nullptr;
@@ -311,6 +310,11 @@ class Tomboulides final : public FlowBase {
    * @brief Zero the mean of the input function
    */
   void meanZero(mfem::ParGridFunction &v);
+
+  /**
+   * @brief Update total viscosity using latest inputs
+   */
+  void updateTotalViscosity();
 
  public:
   /// Constructor

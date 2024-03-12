@@ -35,14 +35,26 @@
 
 #include "algebraic_rans.hpp"
 
+#include "split_flow_base.hpp"
+#include "thermo_chem_base.hpp"
+
 using namespace mfem;
 
 AlgebraicRans::AlgebraicRans(Mesh *smesh, ParMesh *pmesh, const Array<int> &partitioning, int order, TPS::Tps *tps)
     : pmesh_(pmesh), order_(order) {
-  // Serial FE space for scalar variable
+  dim_ = pmesh_->Dimension();
+
+  // Check for axisymmetric flag
+  tps->getInput("loMach/axisymmetric", axisym_, false);
+
+  tps->getInput("loMach/algebraic-rans/max-mixing-length", max_mixing_length_, 1e10);
+  tps->getInput("loMach/algebraic-rans/von-karman", kappa_von_karman_, 0.41);
+
+  // Scalar FEM space
   sfec_ = new H1_FECollection(order_);
   sfes_ = new ParFiniteElementSpace(pmesh_, sfec_);
 
+  // Evaluate distance function
   FiniteElementSpace serial_fes(smesh, sfec_);
   GridFunction serial_distance(&serial_fes);
 
@@ -51,8 +63,7 @@ AlgebraicRans::AlgebraicRans(Mesh *smesh, ParMesh *pmesh, const Array<int> &part
     smesh->SetCurvature(1);
   }
 
-  int dim = smesh->Dimension();
-  FiniteElementSpace tmp_dfes(smesh, sfec_, dim, Ordering::byNODES);
+  FiniteElementSpace tmp_dfes(smesh, sfec_, dim_, Ordering::byNODES);
   GridFunction coordinates(&tmp_dfes);
   smesh->GetNodes(coordinates);
 
@@ -93,6 +104,11 @@ AlgebraicRans::AlgebraicRans(Mesh *smesh, ParMesh *pmesh, const Array<int> &part
 
 AlgebraicRans::~AlgebraicRans() {
   // Alloced in initializeSelf
+  delete ell_mix_gf_;
+  delete swirl_vorticity_gf_;
+  delete vorticity_gf_;
+  delete vfes_;
+  delete vfec_;
   delete mut_;
 
   // Alloced in ctor
@@ -102,9 +118,28 @@ AlgebraicRans::~AlgebraicRans() {
 }
 
 void AlgebraicRans::initializeSelf() {
+  // Eddy viscosity
   mut_ = new ParGridFunction(sfes_);
   *mut_ = 0.0;
 
+  // Space for vorticity
+  vfec_ = new H1_FECollection(order_, dim_);
+  vfes_ = new ParFiniteElementSpace(pmesh_, vfec_, dim_);
+
+  // Vorticity
+  vorticity_gf_ = new ParGridFunction(vfes_);
+  *vorticity_gf_ = 0.0;
+
+  // If necessary, the swirl contribution to the vorticity
+  if (axisym_) {
+    swirl_vorticity_gf_ = new ParGridFunction(vfes_);
+    *swirl_vorticity_gf_ = 0.0;
+  }
+
+  ell_mix_gf_ = new ParGridFunction(sfes_);
+  *ell_mix_gf_ = 0.0;
+
+  // Initialize the interfaces
   toFlow_interface_.eddy_viscosity = mut_;
   toThermoChem_interface_.eddy_viscosity = mut_;
 }
@@ -114,4 +149,69 @@ void AlgebraicRans::initializeViz(mfem::ParaViewDataCollection &pvdc) {
   pvdc.RegisterField("distance", distance_);
 }
 
-void AlgebraicRans::step() {}
+void AlgebraicRans::step() {
+  // Evaluate the vorticity
+  if (axisym_) {
+    ComputeCurlAxi(*flow_interface_->velocity, *vorticity_gf_, false);    // only first component valid
+    ComputeCurlAxi(*flow_interface_->swirl, *swirl_vorticity_gf_, true);  // both components valid
+  } else {
+    if (dim_ == 2) {
+      ComputeCurl2D(*flow_interface_->velocity, *vorticity_gf_, false);  // only first component valid
+    } else {
+      ComputeCurl3D(*flow_interface_->velocity, *vorticity_gf_);  // all components valid
+    }
+  }
+
+  // Compute the magnitude of the vorticity (dof-wise) and fill into
+  // mut_, since rest of operations are multiplicative
+  if (axisym_) {
+    int ndof = sfes_->GetNDofs();
+    double *d_mut = mut_->Write();
+    const double *d_omega = vorticity_gf_->Read();
+    const double *d_swirl_omega = swirl_vorticity_gf_->Read();
+    MFEM_FORALL(i, ndof, {
+      double omega_r = d_swirl_omega[i];
+      double omega_th = d_omega[i];
+      double omega_z = d_swirl_omega[ndof + i];
+      double magn_omega_2 = omega_r * omega_r + omega_th * omega_th + omega_z * omega_z;
+      d_mut[i] = sqrt(magn_omega_2);
+    });
+  } else {
+    if (dim_ == 2) {
+      int ndof = sfes_->GetNDofs();
+      double *d_mut = mut_->Write();
+      const double *d_omega = vorticity_gf_->Read();
+      MFEM_FORALL(i, ndof, {
+        double omega_z = d_omega[i];
+        double magn_omega_2 = omega_z * omega_z;
+        d_mut[i] = sqrt(magn_omega_2);
+      });
+    } else {  // dim_ == 3
+      int ndof = sfes_->GetNDofs();
+      double *d_mut = mut_->Write();
+      const double *d_omega = vorticity_gf_->Read();
+      MFEM_FORALL(i, ndof, {
+        double omega_x = d_omega[i];
+        double omega_y = d_omega[ndof + i];
+        double omega_z = d_omega[2 * ndof + i];
+        double magn_omega_2 = omega_x * omega_x + omega_y * omega_y + omega_z * omega_z;
+        d_mut[i] = sqrt(magn_omega_2);
+      });
+    }
+  }
+
+  // Evaluate the mixing length
+  {
+    int ndof = sfes_->GetNDofs();
+    double *d_ellmix = ell_mix_gf_->Write();
+    const double *d_dist = distance_->Read();
+    const double kap = kappa_von_karman_;
+    const double max_ell = max_mixing_length_;
+    MFEM_FORALL(i, ndof, { d_ellmix[i] = min(kap * d_dist[i], max_ell); });
+  }
+
+  // Fill the eddy viscosity (dof-wise)
+  *mut_ *= (*ell_mix_gf_);
+  *mut_ *= (*ell_mix_gf_);
+  *mut_ *= *thermoChem_interface_->density;
+}

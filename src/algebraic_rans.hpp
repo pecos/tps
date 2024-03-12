@@ -48,12 +48,24 @@ class AlgebraicRans : public TurbModelBase {
  protected:
   mfem::ParMesh *pmesh_ = nullptr;
   int order_;
+  int dim_;
+  bool axisym_;
+
+  double max_mixing_length_;
+  double kappa_von_karman_;
 
   mfem::FiniteElementCollection *sfec_ = nullptr;
   mfem::ParFiniteElementSpace *sfes_ = nullptr;
 
+  mfem::FiniteElementCollection *vfec_ = nullptr;
+  mfem::ParFiniteElementSpace *vfes_ = nullptr;
+
+  mfem::ParGridFunction *vorticity_gf_ = nullptr;
+  mfem::ParGridFunction *swirl_vorticity_gf_ = nullptr;
+
   mfem::ParGridFunction *mut_ = nullptr;
   mfem::ParGridFunction *distance_ = nullptr;
+  mfem::ParGridFunction *ell_mix_gf_ = nullptr;
 
  public:
   /// Constructor
@@ -64,10 +76,9 @@ class AlgebraicRans : public TurbModelBase {
   virtual ~AlgebraicRans();
 
   /**
-   * @brief Initialize the model-owned data.
+   * @brief Allocate the eddy viscosity
    *
-   * Here, the model-owned data are the eddy viscosity and the
-   * distance function.
+   * Initialized to zero b/c the required interface fields are cannot be assumed valid yet.
    */
   void initializeSelf() override;
 
@@ -77,7 +88,14 @@ class AlgebraicRans : public TurbModelBase {
   void initializeViz(mfem::ParaViewDataCollection &pvdc) override;
 
   /**
-   * @brief Take a single time step
+   * @brief Initialize the eddy viscosity.
+   *
+   * Compute the eddy viscosity by calling "step".
+   */
+  void initializeOperators() override { this->step(); }
+
+  /**
+   * @brief Compute the current eddy viscosity using the current velocity field.
    */
   void step() override;
 

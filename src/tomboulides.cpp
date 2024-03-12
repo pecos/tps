@@ -346,10 +346,6 @@ Tomboulides::~Tomboulides() {
   delete pp_div_rad_comp_coeff_;
   delete pp_div_coeff_;
   delete mu_coeff_;
-  delete mut_coeff_;
-  delete mult_coeff_;
-  delete mu_sum_coeff_;
-  delete mu_total_coeff_;
   delete rho_over_dt_coeff_;
   delete iorho_coeff_;
   delete rho_coeff_;
@@ -360,6 +356,7 @@ Tomboulides::~Tomboulides() {
   delete utheta_gf_;
   delete u_next_rad_comp_gf_;
   delete pp_div_rad_comp_gf_;
+  delete mu_total_gf_;
   delete resp_gf_;
   delete p_gf_;
   delete pfes_;
@@ -400,6 +397,8 @@ void Tomboulides::initializeSelf() {
   p_gf_ = new ParGridFunction(pfes_);
   resp_gf_ = new ParGridFunction(pfes_);
 
+  mu_total_gf_ = new ParGridFunction(pfes_);
+
   pp_div_rad_comp_gf_ = new ParGridFunction(pfes_, *pp_div_gf_);
   u_next_rad_comp_gf_ = new ParGridFunction(pfes_, *u_next_gf_);
 
@@ -415,6 +414,7 @@ void Tomboulides::initializeSelf() {
   *resu_gf_ = 0.0;
   *p_gf_ = 0.0;
   *resp_gf_ = 0.0;
+  *mu_total_gf_ = 0.0;
 
   if (axisym_) {
     *utheta_gf_ = 0.0;
@@ -549,16 +549,15 @@ void Tomboulides::initializeOperators() {
 
   Hv_bdfcoeff_.constant = 1.0 / coeff_.dt;
   rho_over_dt_coeff_ = new ProductCoefficient(Hv_bdfcoeff_, *rho_coeff_);
-  mu_coeff_ = new GridFunctionCoefficient(thermo_interface_->viscosity);
-  mut_coeff_ = new GridFunctionCoefficient(turbModel_interface_->eddy_viscosity);
-  mu_sum_coeff_ = new SumCoefficient(*mut_coeff_, *mu_coeff_, 1.0, 1.0);
-  mult_coeff_ = new GridFunctionCoefficient(sponge_interface_->visc_multiplier);
-  mu_total_coeff_ = new ProductCoefficient(*mult_coeff_, *mu_sum_coeff_);
+
+  updateTotalViscosity();
+
+  mu_coeff_ = new GridFunctionCoefficient(mu_total_gf_);
   pp_div_coeff_ = new VectorGridFunctionCoefficient(pp_div_gf_);
   pp_div_rad_comp_coeff_ = new GridFunctionCoefficient(pp_div_rad_comp_gf_);
 
   // coefficients used in the variable viscosity terms
-  grad_mu_coeff_ = new GradientGridFunctionCoefficient(thermo_interface_->viscosity);
+  grad_mu_coeff_ = new GradientGridFunctionCoefficient(mu_total_gf_);
   grad_u_next_coeff_ = new GradientVectorGridFunctionCoefficient(u_next_gf_);
   grad_u_next_transp_coeff_ = new TransposeMatrixCoefficient(*grad_u_next_coeff_);
 
@@ -840,12 +839,11 @@ void Tomboulides::initializeOperators() {
   VectorMassIntegrator *hmv_blfi;
   VectorDiffusionIntegrator *hdv_blfi;
   if (axisym_) {
-    // TODO(trevilo): Use mu_total_coeff for diffusion to capture sponge!
     hmv_blfi = new VectorMassIntegrator(*rad_rho_over_dt_coeff_);
     hdv_blfi = new VectorDiffusionIntegrator(*rad_mu_coeff_);
   } else {
     hmv_blfi = new VectorMassIntegrator(*rho_over_dt_coeff_);
-    hdv_blfi = new VectorDiffusionIntegrator(*mu_total_coeff_);
+    hdv_blfi = new VectorDiffusionIntegrator(*mu_coeff_);
   }
   if (numerical_integ_) {
     hmv_blfi->SetIntRule(&ir_ni_v);
@@ -1050,6 +1048,9 @@ void Tomboulides::step() {
   // Step 1: Update any operators invalidated by changing data
   // external to this class
   // ------------------------------------------------------------------------
+
+  // Update total viscosity field
+  updateTotalViscosity();
 
   // Update the variable coefficient Laplacian to account for change
   // in density
@@ -1517,6 +1518,12 @@ void Tomboulides::meanZero(ParGridFunction &v) {
   double integ = mass_lform_->operator()(v);
 
   v -= integ / volume_;
+}
+
+void Tomboulides::updateTotalViscosity() {
+  *mu_total_gf_ = (*thermo_interface_->viscosity);
+  *mu_total_gf_ += (*turbModel_interface_->eddy_viscosity);
+  *mu_total_gf_ *= (*sponge_interface_->visc_multiplier);
 }
 
 /// Add a Dirichlet boundary condition to the velocity field
