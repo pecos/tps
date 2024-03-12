@@ -330,12 +330,14 @@ void LoMachSolver::initialize() {
   // Instantiate external data
   extData_ = new GaussianInterpExtData(pmesh_, &loMach_opts_, tpsP_);
 
-  // TODO(trevilo): Add support for turbulence modeling
-  if (loMach_opts_.sgs_opts_.sgs_model_type_ == SubGridModelOptions::SMAGORINSKY) {
+  // Instantiate turbulence model
+  if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::SMAGORINSKY) {
     turbModel_ = new AlgebraicSubgridModels(pmesh_, &loMach_opts_, tpsP_, 1);
-  } else if (loMach_opts_.sgs_opts_.sgs_model_type_ == SubGridModelOptions::SIGMA) {
+  } else if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::SIGMA) {
     turbModel_ = new AlgebraicSubgridModels(pmesh_, &loMach_opts_, tpsP_, 2);
-  } else if (loMach_opts_.sgs_opts_.sgs_model_type_ == SubGridModelOptions::NONE) {
+  } else if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::ALGEBRAIC_RANS) {
+    turbModel_ = new AlgebraicRans(serial_mesh_, pmesh_, partitioning_, loMach_opts_.order, tpsP_);
+  } else if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::NONE) {
     // default
     turbModel_ = new ZeroTurbModel(pmesh_, loMach_opts_.order);
   } else {
@@ -345,8 +347,6 @@ void LoMachSolver::initialize() {
     }
     exit(ERROR);
   }
-  // Turbulence modeling not supported yet
-  // assert(loMach_opts_.sgs_opts_.sgs_model_type_ == SubGridModelOptions::NONE);
 
   // Instantiate thermochemical model
   if (loMach_opts_.thermo_solver == "constant-property") {
@@ -880,8 +880,8 @@ void LoMachSolver::parseSolverOptions() {
   tpsP_->getInput("loMach/outputFreq", loMach_opts_.output_frequency_, 50);
   tpsP_->getInput("loMach/timingFreq", loMach_opts_.timing_frequency_, 100);
 
-  // SGS model options
-  loMach_opts_.sgs_opts_.read(tpsP_, std::string("loMach"));
+  // Turbulence model options
+  loMach_opts_.turb_opts_.read(tpsP_, std::string("loMach"));
 
   // time integration controls
   loMach_opts_.ts_opts_.read(tpsP_);
