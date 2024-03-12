@@ -427,6 +427,11 @@ void Tomboulides::initializeSelf() {
     toThermoChem_interface_.swirl = utheta_next_gf_;
   }
 
+  toTurbModel_interface_.velocity = u_next_gf_;
+  if (axisym_) {
+    toTurbModel_interface_.swirl_supported = true;
+    toTurbModel_interface_.swirl = utheta_next_gf_;
+  }
   toTurbModel_interface_.gradU = gradU_gf_;
   toTurbModel_interface_.gradV = gradV_gf_;
   toTurbModel_interface_.gradW = gradW_gf_;

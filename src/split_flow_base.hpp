@@ -51,6 +51,11 @@ struct flowToThermoChem {
 };
 
 struct flowToTurbModel {
+  const mfem::ParGridFunction *velocity = nullptr;
+
+  bool swirl_supported = false;
+  const mfem::ParGridFunction *swirl = nullptr;
+
   const mfem::ParGridFunction *gradU = nullptr;
   const mfem::ParGridFunction *gradV = nullptr;
   const mfem::ParGridFunction *gradW = nullptr;
