@@ -683,8 +683,8 @@ void setScalarFromVector(Vector A, int ind, Vector *C) {
   MFEM_FORALL(i, Ndof, { data[i] = dataA[i + ind * Ndof]; });
 }
 
-void ComputeCurl3D(ParGridFunction &u, ParGridFunction &cu) {
-  FiniteElementSpace *fes = u.FESpace();
+void ComputeCurl3D(const ParGridFunction &u, ParGridFunction &cu) {
+  const FiniteElementSpace *fes = u.FESpace();
 
   // AccumulateAndCountZones.
   Array<int> zones_per_vdof;
@@ -898,8 +898,8 @@ void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu) {
   }
 }
 
-void ComputeCurl2D(ParGridFunction &u, ParGridFunction &cu, bool assume_scalar) {
-  FiniteElementSpace *fes = u.FESpace();
+void ComputeCurl2D(const ParGridFunction &u, ParGridFunction &cu, bool assume_scalar) {
+  const FiniteElementSpace *fes = u.FESpace();
 
   // AccumulateAndCountZones.
   Array<int> zones_per_vdof;
@@ -987,12 +987,13 @@ void ComputeCurl2D(ParGridFunction &u, ParGridFunction &cu, bool assume_scalar) 
   }
 }
 
-void ComputeCurlAxi(ParGridFunction &u, ParGridFunction &cu, bool assume_scalar) {
-  FiniteElementSpace *fes = u.FESpace();
+void ComputeCurlAxi(const ParGridFunction &u, ParGridFunction &cu, bool assume_scalar) {
+  const FiniteElementSpace *fes = u.FESpace();
+  const FiniteElementSpace *cfes = cu.FESpace();
 
   // AccumulateAndCountZones.
   Array<int> zones_per_vdof;
-  zones_per_vdof.SetSize(fes->GetVSize());
+  zones_per_vdof.SetSize(cfes->GetVSize());
   zones_per_vdof = 0;
 
   cu = 0.0;
@@ -1000,6 +1001,7 @@ void ComputeCurlAxi(ParGridFunction &u, ParGridFunction &cu, bool assume_scalar)
   // Local interpolation.
   int elndofs;
   Array<int> vdofs;
+  Array<int> cvdofs;
   Vector vals;
   Vector loc_data;
   int vdim = fes->GetVDim();
@@ -1011,8 +1013,10 @@ void ComputeCurlAxi(ParGridFunction &u, ParGridFunction &cu, bool assume_scalar)
 
   for (int e = 0; e < fes->GetNE(); ++e) {
     fes->GetElementVDofs(e, vdofs);
+    cfes->GetElementVDofs(e, cvdofs);
     u.GetSubVector(vdofs, loc_data);
-    vals.SetSize(vdofs.Size());
+    vals.SetSize(cvdofs.Size());
+
     ElementTransformation *tr = fes->GetElementTransformation(e);
     const FiniteElement *el = fes->GetFE(e);
     elndofs = el->GetDof();
@@ -1059,8 +1063,8 @@ void ComputeCurlAxi(ParGridFunction &u, ParGridFunction &cu, bool assume_scalar)
     }
 
     // Accumulate values in all dofs, count the zones.
-    for (int j = 0; j < vdofs.Size(); j++) {
-      int ldof = vdofs[j];
+    for (int j = 0; j < cvdofs.Size(); j++) {
+      int ldof = cvdofs[j];
       cu(ldof) += vals[j];
       zones_per_vdof[ldof]++;
     }
