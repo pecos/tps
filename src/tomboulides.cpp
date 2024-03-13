@@ -355,6 +355,7 @@ Tomboulides::~Tomboulides() {
   delete rho_coeff_;
 
   // objects allocated by initalizeSelf
+  if (axisym_) delete gravity_vec_;
   delete utheta_next_gf_;
   delete utheta_gf_;
   delete u_next_rad_comp_gf_;
@@ -435,7 +436,12 @@ void Tomboulides::initializeSelf() {
   Array<int> domain_attr(pmesh_->attributes.Max());
   domain_attr = 1;
 
-  forcing_terms_.emplace_back(domain_attr, gravity_vec_);
+  if (axisym_) {
+    rad_gravity_vec_ = new ScalarVectorProductCoefficient(radius_coeff, *gravity_vec_);
+    forcing_terms_.emplace_back(domain_attr, rad_gravity_vec_);
+  } else {
+    forcing_terms_.emplace_back(domain_attr, gravity_vec_);
+  }
 
   // Allocate Vector storage
   const int vfes_truevsize = vfes_->GetTrueVSize();
@@ -651,7 +657,6 @@ void Tomboulides::initializeOperators() {
   L_iorho_inv_->SetMaxIter(pressure_solve_max_iter_);
 
   // Forcing term in the velocity equation: du/dt + ... = ... + f
-  // TODO(trevilo): Multiply by r in the axisymmetric case
   forcing_form_ = new ParLinearForm(vfes_);
   for (auto &force : forcing_terms_) {
     auto *fdlfi = new VectorDomainLFIntegrator(*force.coeff);

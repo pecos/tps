@@ -117,6 +117,7 @@ class Tomboulides final : public FlowBase {
   // Object used to build forcing
   mfem::Vector gravity_;
   mfem::VectorConstantCoefficient *gravity_vec_;
+  mfem::ScalarVectorProductCoefficient *rad_gravity_vec_;
   std::vector<ForcingTerm_T> forcing_terms_;
 
   // BCs holders
