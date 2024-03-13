@@ -161,7 +161,9 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
         addVelDirichletBC(velocity_value, inlet_attr);
 
         if (axisym_) {
-          addSwirlDirichletBC(0.0, inlet_attr);
+          double swirl;
+          tps->getInput((basepath + "/swirl").c_str(), swirl, 0.0);
+          addSwirlDirichletBC(swirl, inlet_attr);
         }
 
       } else if (type == "interpolate") {
