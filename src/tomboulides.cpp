@@ -835,7 +835,7 @@ void Tomboulides::initializeOperators() {
   VectorMassIntegrator *hmv_blfi;
   VectorDiffusionIntegrator *hdv_blfi;
   if (axisym_) {
-    // TODO: Use mu_total_coeff for diffusion to capture sponge!
+    // TODO(trevilo): Use mu_total_coeff for diffusion to capture sponge!
     hmv_blfi = new VectorMassIntegrator(*rad_rho_over_dt_coeff_);
     hdv_blfi = new VectorDiffusionIntegrator(*rad_mu_coeff_);
   } else {
