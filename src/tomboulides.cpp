@@ -331,6 +331,8 @@ Tomboulides::~Tomboulides() {
   delete rad_mu_coeff_;
   delete rad_rho_over_dt_coeff_;
   delete rad_rho_coeff_;
+  delete rad_S_mom_coeff_;
+  delete rad_S_poisson_coeff_;
   delete S_mom_coeff_;
   delete S_poisson_coeff_;
   delete gradmu_Qt_coeff_;
@@ -565,6 +567,8 @@ void Tomboulides::initializeOperators() {
     rad_rho_over_dt_coeff_ = new ProductCoefficient(Hv_bdfcoeff_, *rad_rho_coeff_);
     rad_mu_coeff_ = new ProductCoefficient(radius_coeff, *mu_coeff_);
     mu_over_rad_coeff_ = new RatioCoefficient(*mu_coeff_, radius_coeff);
+    rad_S_poisson_coeff_ = new ScalarVectorProductCoefficient(radius_coeff, *S_poisson_coeff_);
+    rad_S_mom_coeff_ = new ScalarVectorProductCoefficient(radius_coeff, *S_mom_coeff_);
 
     // NB: Takes ownership of mu_over_rad_coeff_
     visc_forcing_coeff_ = new VectorArrayCoefficient(2);
@@ -899,14 +903,24 @@ void Tomboulides::initializeOperators() {
   }
 
   S_poisson_form_ = new ParLinearForm(vfes_);
-  auto *s_rhs_dlfi = new VectorDomainLFIntegrator(*S_poisson_coeff_);
+  VectorDomainLFIntegrator *s_rhs_dlfi;
+  if (axisym_) {
+    s_rhs_dlfi = new VectorDomainLFIntegrator(*rad_S_poisson_coeff_);
+  } else {
+    s_rhs_dlfi = new VectorDomainLFIntegrator(*S_poisson_coeff_);
+  }
   if (numerical_integ_) {
     s_rhs_dlfi->SetIntRule(&ir_ni_v);
   }
   S_poisson_form_->AddDomainIntegrator(s_rhs_dlfi);
 
   S_mom_form_ = new ParLinearForm(vfes_);
-  auto *s_mom_dlfi = new VectorDomainLFIntegrator(*S_mom_coeff_);
+  VectorDomainLFIntegrator *s_mom_dlfi;
+  if (axisym_) {
+    s_mom_dlfi = new VectorDomainLFIntegrator(*rad_S_mom_coeff_);
+  } else {
+    s_mom_dlfi = new VectorDomainLFIntegrator(*S_mom_coeff_);
+  }
   if (numerical_integ_) {
     s_mom_dlfi->SetIntRule(&ir_ni_v);
   }
