@@ -70,7 +70,7 @@ struct temporalSchemeCoefficients;
  * equilibrium calculations (for variable temperature, fixed pressure)
  * for some given mixture, but this is entirely up to the user.
  */
-class LteThermoChem : public ThermoChemModelBase {
+class LteThermoChem final : public ThermoChemModelBase {
  private:
   // Options-related structures
   TPS::Tps *tpsP_ = nullptr;
@@ -162,13 +162,15 @@ class LteThermoChem : public ThermoChemModelBase {
   // operators and solvers
   ParBilinearForm *At_form_ = nullptr;
   ParBilinearForm *Ms_form_ = nullptr;
-  ParBilinearForm *MsRho_form_ = nullptr;
+  ParBilinearForm *M_rho_form_ = nullptr;
+  ParBilinearForm *M_rho_Cp_form_ = nullptr;
   ParBilinearForm *Ht_form_ = nullptr;
 
   OperatorHandle At_;
   OperatorHandle Ht_;
   OperatorHandle Ms_;
-  OperatorHandle MsRho_;
+  OperatorHandle M_rho_;
+  OperatorHandle M_rho_Cp_;
 
   mfem::Solver *MsInvPC_ = nullptr;
   mfem::CGSolver *MsInv_ = nullptr;
@@ -212,14 +214,14 @@ class LteThermoChem : public ThermoChemModelBase {
 
   // Functions added here
   void updateThermoP();
-  void extrapolateState();
-  void updateDensity(double tStep);
-  void updateBC(int current_step);
-  void updateDiffusivity();
+  void extrapolateTemperature();
+  void updateDensity();
+  void updateProperties();
   void computeSystemMass();
-  void computeExplicitTempConvectionOP(bool extrap);
+  void computeExplicitTempConvectionOP();
   void computeQt();
   void computeQtTO();
+  void updateHistory();
 
   /// Return a pointer to the current temperature ParGridFunction.
   ParGridFunction *GetCurrentTemperature() { return &Tn_gf_; }
@@ -235,9 +237,6 @@ class LteThermoChem : public ThermoChemModelBase {
 
   /// Return a pointer to the current total thermal diffusivity ParGridFunction.
   ParGridFunction *GetCurrentThermalDiv() { return &Qt_gf_; }
-
-  /// Rotate entries in the time step and solution history arrays.
-  void UpdateTimestepHistory(double dt);
 
   /// Add a Dirichlet boundary condition to the temperature and Qt field.
   void AddTempDirichletBC(const double &temp, Array<int> &attr);

@@ -106,7 +106,8 @@ LteThermoChem::~LteThermoChem() {
   delete MsInv_;
   delete MsInvPC_;
   delete Ht_form_;
-  delete MsRho_form_;
+  delete M_rho_form_;
+  delete M_rho_Cp_form_;
   delete Ms_form_;
   delete At_form_;
   delete rho_Cp_u_coeff_;
@@ -449,20 +450,31 @@ void LteThermoChem::initializeOperators() {
   Ms_form_->Assemble();
   Ms_form_->FormSystemMatrix(empty, Ms_);
 
-  // mass matrix with rho
-  MsRho_form_ = new ParBilinearForm(sfes_);
+  // mass matrix with rho * Cp weight
+  M_rho_Cp_form_ = new ParBilinearForm(sfes_);
+  auto *mrc_blfi = new MassIntegrator(*rho_Cp_coeff_);
+  if (numerical_integ_) {
+    mrc_blfi->SetIntRule(&ir_i);
+  }
+  M_rho_Cp_form_->AddDomainIntegrator(mrc_blfi);
+  if (partial_assembly_) {
+    M_rho_Cp_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+  }
+  M_rho_Cp_form_->Assemble();
+  M_rho_Cp_form_->FormSystemMatrix(empty, M_rho_Cp_);
+
+  // mass matrix with rho weight (used in Qt solve)
+  M_rho_form_ = new ParBilinearForm(sfes_);
   auto *msrho_blfi = new MassIntegrator(*rho_Cp_coeff_);
   if (numerical_integ_) {
     msrho_blfi->SetIntRule(&ir_i);
-    // msrho_blfi->SetIntRule(&ir_di);
   }
-  MsRho_form_->AddDomainIntegrator(msrho_blfi);
+  M_rho_form_->AddDomainIntegrator(msrho_blfi);
   if (partial_assembly_) {
-    MsRho_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+    M_rho_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   }
-  MsRho_form_->Assemble();
-  MsRho_form_->FormSystemMatrix(empty, MsRho_);
-  if (rank0_) std::cout << "LteThermoChem MsRho operator set" << endl;
+  M_rho_form_->Assemble();
+  M_rho_form_->FormSystemMatrix(empty, M_rho_);
 
   // helmholtz
   Ht_form_ = new ParBilinearForm(sfes_);
@@ -544,7 +556,7 @@ void LteThermoChem::initializeOperators() {
 /**
    Rotate temperature state in registers
  */
-void LteThermoChem::UpdateTimestepHistory(double dt) {
+void LteThermoChem::updateHistory() {
   // temperature
   NTnm2_ = NTnm1_;
   NTnm1_ = NTn_;
@@ -564,17 +576,25 @@ void LteThermoChem::step() {
     temp_dbc.coeff->SetTime(time_ + dt_);
   }
 
+  // Sequence:
+  //   1) Extrapolate temperature
+  //   2) Compute transport and thermo properties with extrapolated temperature
+  //   3) Compute density with extrapolated temperature and updated Rgas
+  //   4) Form operators and residual based on extrapolated state
+  //   5) Solve for new temperature
+  //   6) Compute provisional density (i.e., using old pressure)
+  //   7) Update pressure and density to conserve mass (if closed)
+
   // Prepare for residual calc
-  extrapolateState();
-  updateThermoP();
-  updateDensity(1.0);
-  updateDiffusivity();
+  extrapolateTemperature();
+  updateProperties();
+  updateDensity();
 
   // Build the right-hand-side
   resT_ = 0.0;
 
   // convection
-  computeExplicitTempConvectionOP(true);  // ->tmpR0_
+  computeExplicitTempConvectionOP();  // --> Writes to tmpR0_
   resT_.Set(-1.0, tmpR0_);
 
   // for unsteady term, compute and add known part of BDF unsteady term
@@ -582,7 +602,7 @@ void LteThermoChem::step() {
   tmpR0_.Add(time_coeff_.bd2 / dt_, Tnm1_);
   tmpR0_.Add(time_coeff_.bd3 / dt_, Tnm2_);
 
-  MsRho_->AddMult(tmpR0_, resT_, -1.0);
+  M_rho_Cp_->AddMult(tmpR0_, resT_, -1.0);
 
   // dPo/dt
   tmpR0_ = dtP_;
@@ -636,32 +656,28 @@ void LteThermoChem::step() {
     Tn_next_gf_.GetTrueDofs(Tn_next_);
   }
 
-  // prepare for external use
-  updateDensity(1.0);
+  // prepare for external use and next step
+  updateProperties();
+  updateDensity();
+  updateThermoP();
+
   computeQtTO();
 
-  UpdateTimestepHistory(dt_);
+  updateHistory();
 }
 
-void LteThermoChem::computeExplicitTempConvectionOP(bool extrap) {
+void LteThermoChem::computeExplicitTempConvectionOP() {
   Array<int> empty;
   At_form_->Update();
   At_form_->Assemble();
   At_form_->FormSystemMatrix(empty, At_);
-  if (extrap == true) {
-    At_->Mult(Tn_, NTn_);
-  } else {
-    At_->Mult(Text_, NTn_);
-  }
+
+  At_->Mult(Tn_, NTn_);
 
   // ab predictor
-  if (extrap == true) {
-    tmpR0_.Set(time_coeff_.ab1, NTn_);
-    tmpR0_.Add(time_coeff_.ab2, NTnm1_);
-    tmpR0_.Add(time_coeff_.ab3, NTnm2_);
-  } else {
-    tmpR0_.Set(1.0, NTn_);
-  }
+  tmpR0_.Set(time_coeff_.ab1, NTn_);
+  tmpR0_.Add(time_coeff_.ab2, NTnm1_);
+  tmpR0_.Add(time_coeff_.ab3, NTnm2_);
 }
 
 void LteThermoChem::initializeIO(IODataOrganizer &io) {
@@ -678,13 +694,13 @@ void LteThermoChem::initializeViz(ParaViewDataCollection &pvdc) {
   pvdc.RegisterField("Cp", &Cp_gf_);
 }
 
-void LteThermoChem::extrapolateState() {
+void LteThermoChem::extrapolateTemperature() {
   // extrapolated temp at {n+1}
   Text_.Set(time_coeff_.ab1, Tn_);
   Text_.Add(time_coeff_.ab2, Tnm1_);
   Text_.Add(time_coeff_.ab3, Tnm2_);
 
-  // store ext in _next containers, remove Text_, Uext completely later
+  // store ext in _next containers
   Tn_next_gf_.SetFromTrueDofs(Text_);
   Tn_next_gf_.GetTrueDofs(Tn_next_);
 }
@@ -695,20 +711,23 @@ void LteThermoChem::updateThermoP() {
 
   const double dt_ = time_coeff_.dt;
 
-  // TODO(trevilo): Make sure rn_ is up to date when this fcn is called!
-
-  // TODO(trevilo): Generalize to variable Rgas
   double allMass, PNM1;
   double myMass = 0.0;
   Ms_->Mult(rn_, tmpR0b_);
   myMass = tmpR0b_.Sum();
   MPI_Allreduce(&myMass, &allMass, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
   PNM1 = thermo_pressure_;
+
+  // Scale pressure
   thermo_pressure_ = system_mass_ / allMass * PNM1;
   dtP_ = (thermo_pressure_ - PNM1) / dt_;
+
+  // Scale density
+  rn_ *= (system_mass_ / allMass);
+  rn_gf_.SetFromTrueDofs(rn_);
 }
 
-void LteThermoChem::updateDiffusivity() {
+void LteThermoChem::updateProperties() {
   // TODO(trevilo): Refactor for gpu support
   {
     const double *d_T = Tn_.Read();
@@ -721,10 +740,6 @@ void LteThermoChem::updateDiffusivity() {
   }
   mu_gf_.SetFromTrueDofs(visc_);
   kappa_gf_.SetFromTrueDofs(kappa_);
-}
-
-void LteThermoChem::updateDensity(double tStep) {
-  // TODO(trevilo): Generlize for gpu
 
   // Update the gas constant and Cp
   {
@@ -738,7 +753,9 @@ void LteThermoChem::updateDensity(double tStep) {
   }
   Rgas_gf_.SetFromTrueDofs(Rgas_);
   Cp_gf_.SetFromTrueDofs(Cp_);
+}
 
+void LteThermoChem::updateDensity() {
   // Update the density using the ideal gas law
   rn_ = thermo_pressure_;
   rn_ /= Rgas_;
@@ -747,9 +764,9 @@ void LteThermoChem::updateDensity(double tStep) {
 
   // Update the density-weighted mass matrix
   Array<int> empty;
-  MsRho_form_->Update();
-  MsRho_form_->Assemble();
-  MsRho_form_->FormSystemMatrix(empty, MsRho_);
+  M_rho_Cp_form_->Update();
+  M_rho_Cp_form_->Assemble();
+  M_rho_Cp_form_->FormSystemMatrix(empty, M_rho_Cp_);
 }
 
 void LteThermoChem::computeSystemMass() {
