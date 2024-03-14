@@ -358,7 +358,7 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
 
   // Wall BCs
   {
-    std::cout << "There are " << pmesh_->bdr_attributes.Max() << " boundary attributes!" << std::endl;
+    if (rank0_) std::cout << "There are " << pmesh_->bdr_attributes.Max() << " boundary attributes" << std::endl;
     Array<int> attr_wall(pmesh_->bdr_attributes.Max());
     attr_wall = 0;
 
@@ -371,7 +371,7 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
       tpsP_->getRequiredInput((basepath + "/type").c_str(), type);
 
       if (type == "viscous_isothermal") {
-        std::cout << "Adding patch = " << patch << " to isothermal wall list!" << std::endl;
+        if (rank0_) std::cout << "Adding patch = " << patch << " to isothermal wall list" << std::endl;
 
         attr_wall = 0;
         attr_wall[patch - 1] = 1;
@@ -381,7 +381,6 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
 
         ConstantCoefficient *Twall_coeff = new ConstantCoefficient();
         Twall_coeff->constant = Twall;
-
         AddTempDirichletBC(Twall_coeff, attr_wall);
 
         ConstantCoefficient *Qt_bc_coeff = new ConstantCoefficient();
@@ -557,7 +556,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   MqInv_->SetMaxIter(max_iter_);
 
   LQ_form_ = new ParBilinearForm(sfes_);
-  auto *lqd_blfi = new DiffusionIntegrator(*thermal_diff_coeff_);
+  auto *lqd_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
   if (numerical_integ_) {
     lqd_blfi->SetIntRule(&ir_di);
   }

@@ -51,6 +51,7 @@
 #include "io.hpp"
 #include "logger.hpp"
 #include "lte_thermo_chem.hpp"
+#include "reactingFlow.hpp"
 #include "tomboulides.hpp"
 #include "tps.hpp"
 #include "utils.hpp"
@@ -167,6 +168,8 @@ void LoMachSolver::initialize() {
     thermo_ = new CaloricallyPerfectThermoChem(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_);
   } else if (loMach_opts_.thermo_solver == "lte-thermo-chem") {
     thermo_ = new LteThermoChem(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_);
+  } else if (loMach_opts_.thermo_solver == "reacting-flow") {
+    thermo_ = new ReactingFlow(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_);
   } else {
     // Unknown choice... die
     if (rank0_) {
@@ -704,7 +707,7 @@ void LoMachSolver::parseSolverOptions() {
 
   tpsP_->getInput("loMach/thermo-solver", loMach_opts_.thermo_solver, string("constant-property"));
   assert(loMach_opts_.thermo_solver == "constant-property" || loMach_opts_.thermo_solver == "calorically-perfect" ||
-         loMach_opts_.thermo_solver == "lte-thermo-chem");
+         loMach_opts_.thermo_solver == "lte-thermo-chem" || loMach_opts_.thermo_solver == "reacting-flow");
 
   tpsP_->getInput("loMach/order", loMach_opts_.order, 1);
   assert(loMach_opts_.order >= 1);
