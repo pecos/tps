@@ -45,6 +45,7 @@
 
 #include "algebraicSubgridModels.hpp"
 #include "calorically_perfect.hpp"
+#include "reactingFlow.hpp"
 #include "gaussianInterpExtData.hpp"
 #include "geometricSponge.hpp"
 #include "io.hpp"
@@ -352,6 +353,8 @@ void LoMachSolver::initialize() {
     thermo_ = new ConstantPropertyThermoChem(pmesh_, loMach_opts_.order, 1.0, 1.0);
   } else if (loMach_opts_.thermo_solver == "calorically-perfect") {
     thermo_ = new CaloricallyPerfectThermoChem(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_);
+  } else if (loMach_opts_.thermo_solver == "reacting-flow") {
+    thermo_ = new ReactingFlow(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_);    
   } else {
     // Unknown choice... die
     if (rank0_) {

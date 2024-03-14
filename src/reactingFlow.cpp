@@ -30,7 +30,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
 
-#include "calorically_perfect.hpp"
+#include "reactingFlow.hpp"
 
 #include <hdf5.h>
 
@@ -47,14 +47,14 @@
 using namespace mfem;
 using namespace mfem::common;
 
-MFEM_HOST_DEVICE double Sutherland(const double T, const double mu_star, const double T_star, const double S_star) {
+MFEM_HOST_DEVICE double Sutherland_lcl(const double T, const double mu_star, const double T_star, const double S_star) {
   const double T_rat = T / T_star;
   const double T_rat_32 = T_rat * sqrt(T_rat);
   const double S_rat = (T_star + S_star) / (T + S_star);
   return mu_star * T_rat_32 * S_rat;
 }
 
-CaloricallyPerfectThermoChem::CaloricallyPerfectThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts,
+ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts,
                                                            temporalSchemeCoefficients &time_coeff, TPS::Tps *tps)
     : tpsP_(tps), pmesh_(pmesh), time_coeff_(time_coeff) {
   rank0_ = (pmesh_->GetMyRank() == 0);
@@ -102,7 +102,9 @@ CaloricallyPerfectThermoChem::CaloricallyPerfectThermoChem(mfem::ParMesh *pmesh,
   tpsP_->getInput("loMach/calperfect/Rgas", Rgas_, 287.0);
   tpsP_->getInput("loMach/calperfect/Prandtl", Pr_, 0.71);
   tpsP_->getInput("loMach/calperfect/gamma", gamma_, 1.4);
+  tpsP_->getInput("loMach/calperfect/Schmidt", Sc_, 0.71);  
   invPr_ = 1.0 / Pr_;
+  invSc_ = 1.0 / Sc_;    
 
   Cp_ = gamma_ * Rgas_ / (gamma_ - 1);
 
@@ -115,9 +117,29 @@ CaloricallyPerfectThermoChem::CaloricallyPerfectThermoChem(mfem::ParMesh *pmesh,
   tpsP_->getInput("loMach/calperfect/linear-solver-rtol", rtol_, 1e-12);
   tpsP_->getInput("loMach/calperfect/linear-solver-max-iter", max_iter_, 1000);
   tpsP_->getInput("loMach/calperfect/linear-solver-verbosity", pl_solve_, 0);
+
+
+  // fix above, beginning reacting options
+
+  /*
+  config.GetWorkingFluid()
+  case WorkingFluid::DRY_AIR:
+  mixture = new DryAir(config, dim, nvel);
+  transportPtr = new DryAirTransport(mixture, config); 
+  case WorkingFluid::USER_DEFINED:      
+  mixture = new PerfectMixture(config, dim, nvel);
+  transportPtr = new ArgonMinimalTransport(mixture, config);      
+  transportPtr = new ArgonMixtureTransport(mixture, config); 
+  chemistry_ = new Chemistry(mixture, config.chemistryInput);
+      
+  nSpecies_ = mixture->GetNumSpecies();
+  nActiveSpecies_ = mixture->GetNumActiveSpecies();
+  twoTemperature_ = mixture->IsTwoTemperature();
+  */
+  
 }
 
-CaloricallyPerfectThermoChem::~CaloricallyPerfectThermoChem() {
+ReactingFlow::~ReactingFlow() {
   // allocated in initializeOperators
   delete sfes_filter_;
   delete sfec_filter_;
@@ -147,13 +169,22 @@ CaloricallyPerfectThermoChem::~CaloricallyPerfectThermoChem() {
   delete rho_over_dt_coeff_;
   delete rho_coeff_;
 
+  delete HyInv_;
+  delete HyInvPC_;
+  delete Hy_form_;  
+  delete species_diff_coeff_;
+  delete species_diff_sum_coeff_;
+  delete species_diff_total_coeff_;  
+  
   // allocated in initializeSelf
   delete sfes_;
   delete sfec_;
+  delete yfes_;
+  delete yfec_;  
 }
 
-void CaloricallyPerfectThermoChem::initializeSelf() {
-  if (rank0_) grvy_printf(ginfo, "Initializing CaloricallyPerfectThermoChem solver.\n");
+void ReactingFlow::initializeSelf() {
+  if (rank0_) grvy_printf(ginfo, "Initializing ReactingFlow solver.\n");
 
   //-----------------------------------------------------
   // 1) Prepare the required finite element objects
@@ -161,6 +192,9 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
   sfec_ = new H1_FECollection(order_);
   sfes_ = new ParFiniteElementSpace(pmesh_, sfec_);
 
+  yfec_ = new H1_FECollection(order_, nSpecies_);
+  yfes_ = new ParFiniteElementSpace(pmesh_, yfec_, nSpecies_);
+  
   // Check if fully periodic mesh
   if (!(pmesh_->bdr_attributes.Size() == 0)) {
     temp_ess_attr_.SetSize(pmesh_->bdr_attributes.Max());
@@ -168,35 +202,39 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
 
     Qt_ess_attr_.SetSize(pmesh_->bdr_attributes.Max());
     Qt_ess_attr_ = 0;
+
+    spec_ess_attr_.SetSize(pmesh_->bdr_attributes.Max());
+    spec_ess_attr_ = 0;    
   }
-  if (rank0_) grvy_printf(ginfo, "CaloricallyPerfectThermoChem paces constructed...\n");
+  if (rank0_) grvy_printf(ginfo, "ReactingFlow paces constructed...\n");
 
-  int sfes_truevsize = sfes_->GetTrueVSize();
+  int sDofInt_ = sfes_->GetTrueVSize();
+  int yDofInt_ = yfes_->GetTrueVSize();  
 
-  Qt_.SetSize(sfes_truevsize);
+  Qt_.SetSize(sDofInt_);
   Qt_ = 0.0;
   Qt_gf_.SetSpace(sfes_);
   Qt_gf_ = 0.0;
 
-  Tn_.SetSize(sfes_truevsize);
-  Tn_next_.SetSize(sfes_truevsize);
+  Tn_.SetSize(sDofInt_);
+  Tn_next_.SetSize(sDofInt_);
 
-  Tnm1_.SetSize(sfes_truevsize);
-  Tnm2_.SetSize(sfes_truevsize);
+  Tnm1_.SetSize(sDofInt_);
+  Tnm2_.SetSize(sDofInt_);
 
   // temp convection terms
-  NTn_.SetSize(sfes_truevsize);
-  NTnm1_.SetSize(sfes_truevsize);
-  NTnm2_.SetSize(sfes_truevsize);
+  NTn_.SetSize(sDofInt_);
+  NTnm1_.SetSize(sDofInt_);
+  NTnm2_.SetSize(sDofInt_);
   NTn_ = 0.0;
   NTnm1_ = 0.0;
   NTnm2_ = 0.0;
 
-  Text_.SetSize(sfes_truevsize);
+  Text_.SetSize(sDofInt_);
   Text_gf_.SetSpace(sfes_);
 
   resT_gf_.SetSpace(sfes_);
-  resT_.SetSize(sfes_truevsize);
+  resT_.SetSize(sDofInt_);
   resT_ = 0.0;
 
   Tn_next_gf_.SetSpace(sfes_);
@@ -204,31 +242,75 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
   Tnm1_gf_.SetSpace(sfes_);
   Tnm2_gf_.SetSpace(sfes_);
 
-  rn_.SetSize(sfes_truevsize);
+  // species
+  Yn_.SetSize(yDofInt_);
+  Yn_next_.SetSize(yDofInt_);
+  Ynm1_.SetSize(yDofInt_);
+  Ynm2_.SetSize(yDofInt_);
+  Yext_.SetSize(yDofInt_);
+  Yn_ = 0.0;
+  Ynm1_ = 0.0;
+  Ynm2_ = 0.0;
+  
+  resY_.SetSize(sDofInt_);  
+  resY_ = 0.0;
+
+  hw_.SetSize(yDofInt_);
+  hw_ = 0.0;
+
+  // only YnFull for plotting
+  YnFull_gf_.SetSpace(yfes_);  
+
+  // rest can just be sfes
+  Yn_gf_.SetSpace(sfes_);  
+  Yext_gf_.SetSpace(sfes_);  
+  resY_gf_.SetSpace(sfes_);  
+  Yn_next_gf_.SetSpace(sfes_);
+  Ynm1_gf_.SetSpace(sfes_);
+  Ynm2_gf_.SetSpace(sfes_);  
+  
+  rn_.SetSize(sDofInt_);
   rn_ = 1.0;
   rn_gf_.SetSpace(sfes_);
   rn_gf_ = 1.0;
 
-  visc_.SetSize(sfes_truevsize);
+  visc_.SetSize(sDofInt_);
   visc_ = 1.0e-12;
 
-  kappa_.SetSize(sfes_truevsize);
+  visc_gf_.SetSpace(sfes_);
+  visc_gf_ = 0.0;  
+
+  kappa_.SetSize(sDofInt_);
   kappa_ = 1.0e-12;
 
   kappa_gf_.SetSpace(sfes_);
   kappa_gf_ = 0.0;
 
-  visc_gf_.SetSpace(sfes_);
-  visc_gf_ = 0.0;
+  diffY_.SetSize(yDofInt_);
+  diffY_ = 1.0e-12;
 
-  tmpR0_.SetSize(sfes_truevsize);
-  tmpR0b_.SetSize(sfes_truevsize);
+  diffY_gf_.SetSpace(sfes_);
+  diffY_gf_ = 0.0;
+
+  prodY_.SetSize(yDofInt_);
+  prodY_ = 1.0e-12;
+
+  hw_.SetSize(yDofInt_);
+  hw_ = 0.0;
+  
+  prodY_gf_.SetSpace(sfes_);
+  prodY_gf_ = 0.0;    
+
+  tmpR0_.SetSize(sDofInt_);
+  tmpR0a_.SetSize(sDofInt_);  
+  tmpR0b_.SetSize(sDofInt_);
+  tmpR0c_.SetSize(sDofInt_);  
 
   R0PM0_gf_.SetSpace(sfes_);
 
   rhoDt.SetSpace(sfes_);
 
-  if (rank0_) grvy_printf(ginfo, "CaloricallyPerfectThermoChem vectors and gf initialized...\n");
+  if (rank0_) grvy_printf(ginfo, "ReactingFlow vectors and gf initialized...\n");
 
   // exports
   toFlow_interface_.density = &rn_gf_;
@@ -343,7 +425,7 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
 
   // Wall BCs
   {
-   if (rank0_) std::cout << "There are " << pmesh_->bdr_attributes.Max() << " boundary attributes" << std::endl;
+    std::cout << "There are " << pmesh_->bdr_attributes.Max() << " boundary attributes!" << std::endl;
     Array<int> attr_wall(pmesh_->bdr_attributes.Max());
     attr_wall = 0;
 
@@ -356,7 +438,7 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
       tpsP_->getRequiredInput((basepath + "/type").c_str(), type);
 
       if (type == "viscous_isothermal") {
-        if (rank0_) std::cout << "Adding patch = " << patch << " to isothermal wall list" << std::endl;
+        std::cout << "Adding patch = " << patch << " to isothermal wall list!" << std::endl;
 
         attr_wall = 0;
         attr_wall[patch - 1] = 1;
@@ -366,6 +448,7 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
 
         ConstantCoefficient *Twall_coeff = new ConstantCoefficient();
         Twall_coeff->constant = Twall;
+
         AddTempDirichletBC(Twall_coeff, attr_wall);
 
         ConstantCoefficient *Qt_bc_coeff = new ConstantCoefficient();
@@ -378,10 +461,10 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
 
   sfes_->GetEssentialTrueDofs(temp_ess_attr_, temp_ess_tdof_);
   sfes_->GetEssentialTrueDofs(Qt_ess_attr_, Qt_ess_tdof_);
-  if (rank0_) std::cout << "CaloricallyPerfectThermoChem Essential true dof step" << endl;
+  if (rank0_) std::cout << "ReactingFlow Essential true dof step" << endl;
 }
 
-void CaloricallyPerfectThermoChem::initializeOperators() {
+void ReactingFlow::initializeOperators() {
   dt_ = time_coeff_.dt;
 
   Array<int> empty;
@@ -411,6 +494,11 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   gradT_coeff_ = new GradientGridFunctionCoefficient(&Tn_next_gf_);
   kap_gradT_coeff_ = new ScalarVectorProductCoefficient(*thermal_diff_total_coeff_, *gradT_coeff_);
 
+  // species diff coeff, diffY_gf gets filled with correct species diffusivity before its solve
+  species_diff_coeff_ = new GridFunctionCoefficient(&diffY_gf_);
+  species_diff_sum_coeff_ = new SumCoefficient(*mut_coeff_, *species_diff_coeff_, invSc_, 1.0); // is this correct?
+  species_diff_total_coeff_ = new ProductCoefficient(*mult_coeff_, *species_diff_sum_coeff_);
+  
   // Convection: Atemperature(i,j) = \int_{\Omega} \phi_i \rho u \cdot \nabla \phi_j
   un_next_coeff_ = new VectorGridFunctionCoefficient(flow_interface_->velocity);
   rhon_next_coeff_ = new GridFunctionCoefficient(&rn_gf_);
@@ -427,7 +515,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   }
   At_form_->Assemble();
   At_form_->FormSystemMatrix(empty, At_);
-  if (rank0_) std::cout << "CaloricallyPerfectThermoChem At operator set" << endl;
+  if (rank0_) std::cout << "ReactingFlow At operator set" << endl;
 
   // mass matrix
   Ms_form_ = new ParBilinearForm(sfes_);
@@ -455,8 +543,9 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   }
   MsRho_form_->Assemble();
   MsRho_form_->FormSystemMatrix(empty, MsRho_);
-  if (rank0_) std::cout << "CaloricallyPerfectThermoChem MsRho operator set" << endl;
+  if (rank0_) std::cout << "ReactingFlow MsRho operator set" << endl;
 
+  // temperature Helmholtz
   Ht_form_ = new ParBilinearForm(sfes_);
   auto *hmt_blfi = new MassIntegrator(*rho_over_dt_coeff_);
   auto *hdt_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
@@ -472,8 +561,26 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   }
   Ht_form_->Assemble();
   Ht_form_->FormSystemMatrix(temp_ess_tdof_, Ht_);
-  if (rank0_) std::cout << "CaloricallyPerfectThermoChem Ht operator set" << endl;
+  if (rank0_) std::cout << "ReactingFlow Ht operator set" << endl;
 
+  // species Helmholtz
+  Hy_form_ = new ParBilinearForm(sfes_);
+  auto *hmy_blfi = new MassIntegrator(*rho_over_dt_coeff_);
+  auto *hdy_blfi = new DiffusionIntegrator(*species_diff_total_coeff_);
+
+  if (numerical_integ_) {
+    hmy_blfi->SetIntRule(&ir_di);
+    hdy_blfi->SetIntRule(&ir_di);
+  }
+  Hy_form_->AddDomainIntegrator(hmy_blfi);
+  Hy_form_->AddDomainIntegrator(hdy_blfi);
+  if (partial_assembly_) {
+    Hy_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+  }
+  Hy_form_->Assemble();
+  Hy_form_->FormSystemMatrix(spec_ess_tdof_, Hy_);
+  if (rank0_) std::cout << "ReactingFlow Hy operator set" << endl;
+  
   if (partial_assembly_) {
     Vector diag_pa(sfes_->GetTrueVSize());
     Ms_form_->AssembleDiagonal(diag_pa);
@@ -499,8 +606,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
     dynamic_cast<HypreSmoother *>(HtInvPC_)->SetType(HypreSmoother::Jacobi, 1);
   }
 
-  HtInv_ = new CGSolver(sfes_->GetComm());
-
+  HtInv_ = new CGSolver(sfes_->GetComm());  
   HtInv_->iterative_mode = true;
   HtInv_->SetOperator(*Ht_);
   HtInv_->SetPreconditioner(*HtInvPC_);
@@ -509,6 +615,24 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   HtInv_->SetMaxIter(max_iter_);
   if (rank0_) std::cout << "Temperature operators set" << endl;
 
+  if (partial_assembly_) {
+    Vector diag_pa(sfes_->GetTrueVSize());
+    Hy_form_->AssembleDiagonal(diag_pa);
+    HyInvPC_ = new OperatorJacobiSmoother(diag_pa, spec_ess_tdof_);
+  } else {
+    HyInvPC_ = new HypreSmoother(*Hy_.As<HypreParMatrix>());
+    dynamic_cast<HypreSmoother *>(HyInvPC_)->SetType(HypreSmoother::Jacobi, 1);
+  }
+
+  HyInv_ = new CGSolver(sfes_->GetComm());
+  HyInv_->iterative_mode = true;
+  HyInv_->SetOperator(*Hy_);
+  HyInv_->SetPreconditioner(*HyInvPC_);
+  HyInv_->SetPrintLevel(pl_solve_);
+  HyInv_->SetRelTol(rtol_);
+  HyInv_->SetMaxIter(max_iter_);
+  if (rank0_) std::cout << "Species operators set" << endl;
+  
   // Qt .....................................
   Mq_form_ = new ParBilinearForm(sfes_);
   auto *mq_blfi = new MassIntegrator;
@@ -522,7 +646,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   Mq_form_->Assemble();
   Mq_form_->FormSystemMatrix(Qt_ess_tdof_, Mq_);
   // Mq_form_->FormSystemMatrix(empty, Mq);
-  if (rank0_) std::cout << "CaloricallyPerfectThermoChem Mq operator set" << endl;
+  if (rank0_) std::cout << "ReactingFlow Mq operator set" << endl;
 
   if (partial_assembly_) {
     Vector diag_pa(sfes_->GetTrueVSize());
@@ -541,7 +665,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   MqInv_->SetMaxIter(max_iter_);
 
   LQ_form_ = new ParBilinearForm(sfes_);
-  auto *lqd_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
+  auto *lqd_blfi = new DiffusionIntegrator(*thermal_diff_coeff_);
   if (numerical_integ_) {
     lqd_blfi->SetIntRule(&ir_di);
   }
@@ -558,7 +682,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
     lq_bdry_lfi->SetIntRule(&ir_di);
   }
   LQ_bdry_->AddBoundaryIntegrator(lq_bdry_lfi, temp_ess_attr_);
-  if (rank0_) std::cout << "CaloricallyPerfectThermoChem LQ operator set" << endl;
+  if (rank0_) std::cout << "ReactingFlow LQ operator set" << endl;
 
   // // remaining initialization
   // if (config_->resetTemp == true) {
@@ -593,7 +717,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
 /**
    Rotate temperature state in registers
  */
-void CaloricallyPerfectThermoChem::UpdateTimestepHistory(double dt) {
+void ReactingFlow::UpdateTimestepHistory(double dt) {
   // temperature
   NTnm2_ = NTnm1_;
   NTnm1_ = NTn_;
@@ -604,7 +728,7 @@ void CaloricallyPerfectThermoChem::UpdateTimestepHistory(double dt) {
   Tn_gf_.SetFromTrueDofs(Tn_);
 }
 
-void CaloricallyPerfectThermoChem::step() {
+void ReactingFlow::step() {
   dt_ = time_coeff_.dt;
   time_ = time_coeff_.time;
 
@@ -619,7 +743,42 @@ void CaloricallyPerfectThermoChem::step() {
   updateThermoP();
   updateDensity(1.0);
   updateDiffusivity();
+  speciesProduction();
 
+  // advance species, zero slot is from calculated sum of others
+  for (int iSpecies = 1; iSpecies < nSpecies_; iSpecies++) {
+    speciesStep(iSpecies);
+  }
+  speciesOneStep();
+  YnFull_gf_.SetFromTrueDofs(Yn_next_);
+  heatOfFormation();
+
+  // advance temperature
+  temperatureStep();
+
+  // explicit filter temperature
+  if (filter_temperature_) {
+    const auto filter_alpha = filter_alpha_;
+    Tn_NM1_gf_.ProjectGridFunction(Tn_next_gf_);
+    Tn_filtered_gf_.ProjectGridFunction(Tn_NM1_gf_);
+    const auto d_Tn_filtered_gf = Tn_filtered_gf_.Read();
+    auto d_Tn_gf = Tn_next_gf_.ReadWrite();
+    MFEM_FORALL(i, Tn_next_gf_.Size(),
+                { d_Tn_gf[i] = (1.0 - filter_alpha) * d_Tn_gf[i] + filter_alpha * d_Tn_filtered_gf[i]; });
+    Tn_next_gf_.GetTrueDofs(Tn_next_);
+  }
+
+  // explicit filter species (is this necessary?)
+  
+  // prepare for external use
+  updateDensity(1.0);
+  // computeQt();
+  computeQtTO();
+
+  UpdateTimestepHistory(dt_);
+}
+
+void ReactingFlow::temperatureStep() {
   // Build the right-hand-side
   resT_ = 0.0;
 
@@ -637,6 +796,9 @@ void CaloricallyPerfectThermoChem::step() {
   // dPo/dt
   tmpR0_ = (dtP_ / Cp_);
   Ms_->AddMult(tmpR0_, resT_);
+
+  // heat of formation
+  Ms_->AddMult(hw_, resT_);  
 
   // Add natural boundary terms here later
   // NB: adiabatic natural BC is handled, but don't have ability to impose non-zero heat flux yet
@@ -679,27 +841,114 @@ void CaloricallyPerfectThermoChem::step() {
   Ht_form_->RecoverFEMSolution(Xt2, resT_gf_, Tn_next_gf_);
   Tn_next_gf_.GetTrueDofs(Tn_next_);
 
-  // explicit filter
-  if (filter_temperature_) {
-    const auto filter_alpha = filter_alpha_;
-    Tn_NM1_gf_.ProjectGridFunction(Tn_next_gf_);
-    Tn_filtered_gf_.ProjectGridFunction(Tn_NM1_gf_);
-    const auto d_Tn_filtered_gf = Tn_filtered_gf_.Read();
-    auto d_Tn_gf = Tn_next_gf_.ReadWrite();
-    MFEM_FORALL(i, Tn_next_gf_.Size(),
-                { d_Tn_gf[i] = (1.0 - filter_alpha) * d_Tn_gf[i] + filter_alpha * d_Tn_filtered_gf[i]; });
-    Tn_next_gf_.GetTrueDofs(Tn_next_);
-  }
-
-  // prepare for external use
-  updateDensity(1.0);
-  // computeQt();
-  computeQtTO();
-
-  UpdateTimestepHistory(dt_);
 }
 
-void CaloricallyPerfectThermoChem::computeExplicitTempConvectionOP(bool extrap) {
+void ReactingFlow::speciesOneStep() {
+  tmpR0_ = 0.0;
+  double *dataYn = Yn_next_.HostReadWrite();
+  double *dataY0 = tmpR0_.HostReadWrite();    
+  for (int n = 1; n < nSpecies_; n++) {
+    for (int i = 0; i < sDofInt_; i++) {
+      dataT0[i] += dataYn[i + n * sDofInt];
+    }
+  }
+  for (int i = 0; i < sDofInt_; i++) {
+    dataYn[i + 0 * sDofInt] = 1.0 - dataT0[i];
+  }  
+}
+
+void ReactingFlow::speciesStep(int iSpec) {
+
+  // copy relevant species properties from full Vector to particular case
+  setScalarFromVector(diffY_, iSpec, &tmpR0_);  
+  diffY_gf_.SetFromTrueDofs(tmpR0_);  
+  
+  // Build the right-hand-side  
+  resY_ = 0.0;
+
+  // convection
+  computeExplicitSpecConvectionOP(iSpec, true);  // ->tmpR0_
+  resY_.Set(-1.0, tmpR0_);
+
+  // for unsteady term, compute and add known part of BDF unsteady term
+  setScalarFromVector(Yn_,   iSpec, &tmpR0a_);
+  setScalarFromVector(Ynm1_, iSpec, &tmpR0b_);
+  setScalarFromVector(Ynm2_, iSpec, &tmpR0c_);     
+  tmpR0_.Set(time_coeff_.bd1 / dt_, tmpR0a_);
+  tmpR0_.Add(time_coeff_.bd2 / dt_, tmpR0b_);
+  tmpR0_.Add(time_coeff_.bd3 / dt_, tmpR0c_);
+
+  MsRho_->AddMult(tmpR0_, resY_, -1.0);
+
+  // production of iSpec
+  setScalarFromVector(prodY_, iSpec, &tmpR0_);
+  Ms_->AddMult(tmpR0_, resT_);
+
+  // Add natural boundary terms here later
+  // NB: adiabatic natural BC is handled, but don't have ability to impose non-zero heat flux yet
+
+  // Update Helmholtz operator to account for changing dt, rho, and kappa
+  rhoDt = rn_gf_;
+  rhoDt *= (time_coeff_.bd0 / dt_);
+
+  Hy_form_->Update();
+  Hy_form_->Assemble();
+  Hy_form_->FormSystemMatrix(spec_ess_tdof_, Hy_);
+
+  HyInv_->SetOperator(*Hy_);
+  if (partial_assembly_) {
+    delete HyInvPC_;
+    Vector diag_pa(sfes_->GetTrueVSize());
+    Hy_form_->AssembleDiagonal(diag_pa);
+    HyInvPC_ = new OperatorJacobiSmoother(diag_pa, spec_ess_tdof_);
+    HyInv_->SetPreconditioner(*HyInvPC_);
+  }
+
+  // Prepare for the solve
+  for (auto &spec_dbc : spec_dbcs_) {
+    Yn_next_gf_.ProjectBdrCoefficient(*spec_dbc.coeff, spec_dbc.attr);
+  }
+  sfes_->GetRestrictionMatrix()->MultTranspose(resY_, resY_gf_);
+
+  Vector Xt2, Bt2;
+  if (partial_assembly_) {
+    auto *HC = Hy_.As<ConstrainedOperator>();
+    EliminateRHS(*Hy_form_, *HC, spec_ess_tdof_, Yn_next_gf_, resY_gf_, Xt2, Bt2, 1);
+  } else {
+    Hy_form_->FormLinearSystem(spec_ess_tdof_, Yn_next_gf_, resY_gf_, Hy_, Xt2, Bt2, 1);
+  }
+
+  // solve helmholtz eq for iSpec
+  HyInv_->Mult(Bt2, Xt2);
+  assert(HyInv_->GetConverged());
+
+  // copy into full species vector & gf
+  Hy_form_->RecoverFEMSolution(Xt2, resT_gf_, Yn_next_gf_);
+  Yn_next_gf_.GetTrueDofs(tmpR0_);
+  setVectorFromScalar(tmpR0_, iSpec, &Yn_next_);
+}
+
+void ReactingFlow::speciesProduction() {
+  for (int n = 0; n < nSpecies_; n++) {
+    for (int i = 0; i < sDofInt_; i++) {
+      prodY_[i + n * sDofInt_] = 0.0;
+    }
+  }
+}
+
+void ReactingFlow::heatOfFormation() {
+  double *data = hw_.HostReadWrite();
+  double *dw = prodY_.HostReadWrite();
+  double ho;
+  for (int n = 0; n < nSpecies_; n++) {
+    ho = 0.0; // replace with each species enth of formation
+    for (int i = 0; i < sDofInt_; i++) {
+      hw_[i + n * sDofInt_] = ho * dw[i + n * sDofInt_];
+    }
+  }
+}
+
+void ReactingFlow::computeExplicitTempConvectionOP(bool extrap) {
   Array<int> empty;
   At_form_->Update();
   At_form_->Assemble();
@@ -720,23 +969,58 @@ void CaloricallyPerfectThermoChem::computeExplicitTempConvectionOP(bool extrap) 
   }
 }
 
-void CaloricallyPerfectThermoChem::initializeIO(IODataOrganizer &io) {
-  io.registerIOFamily("Temperature", "/temperature", &Tn_gf_, false);
-  io.registerIOVar("/temperature", "temperature", 0);
+void ReactingFlow::computeExplicitSpecConvectionOP(int iSpec, bool extrap) {
+
+  Array<int> empty;
+  At_form_->Update();
+  At_form_->Assemble();
+  At_form_->FormSystemMatrix(empty, At_);
+  if (extrap == true) {
+    setScalarFromVector(Yn_, iSpec, &tmpR0_);
+  } else {
+    setScalarFromVector(Yext_, iSpec, &tmpR0_);
+  }
+  At_->Mult(tmpR0_, tmpR0a_);
+
+  // ab predictor
+  if (extrap == true) {
+    setScalarFromVector(NYnm1_, iSpec, &tmpR0b_);
+    setScalarFromVector(NYnm2_, iSpec, &tmpR0c_);         
+    tmpR0_.Set(time_coeff_.ab1, tmpR0a_);
+    tmpR0_.Add(time_coeff_.ab2, tmpR0b_);
+    tmpR0_.Add(time_coeff_.ab3, tmpR0c_);
+  } else {
+    tmpR0_.Set(1.0, tmpR0a_);
+  }
+  setVectorFromScalar(tmpR0a_, iSpec, &NYn_);   
 }
 
-void CaloricallyPerfectThermoChem::initializeViz(ParaViewDataCollection &pvdc) {
+void ReactingFlow::initializeIO(IODataOrganizer &io) {
+  io.registerIOFamily("Temperature", "/temperature", &Tn_gf_, false);
+  io.registerIOVar("/temperature", "temperature", 0);
+  
+  io.registerIOFamily("Species", "/species", &YnFull_gf_, false);
+  io.registerIOVar("/species", "Spec1", 0);
+  if (nSpecies_ >= 2) io.registerIOVar("/velocity", "Spec2", 1);
+  if (nSpecies_ >= 3) io.registerIOVar("/velocity", "Spec3", 2);
+  if (nSpecies_ >= 4) io.registerIOVar("/velocity", "Spec4", 3);
+  if (nSpecies_ == 5) io.registerIOVar("/velocity", "Spec5", 4);
+  
+}
+
+void ReactingFlow::initializeViz(ParaViewDataCollection &pvdc) {
   pvdc.RegisterField("temperature", &Tn_gf_);
   pvdc.RegisterField("density", &rn_gf_);
   pvdc.RegisterField("kappa", &kappa_gf_);
   pvdc.RegisterField("Qt", &Qt_gf_);
+  pvdc.RegisterField("Species", &YnFull_gf_);  
 }
 
 /**
    Update boundary conditions for Temperature, useful for
    ramping a dirichlet condition over time
  */
-void CaloricallyPerfectThermoChem::updateBC(int current_step) {
+void ReactingFlow::updateBC(int current_step) {
   // TODO(trevilo): By making the Dirichlet BC time dependent, we
   // already have a mechanism to handle this.  Is there a reason not
   // to do it that way?
@@ -753,7 +1037,7 @@ void CaloricallyPerfectThermoChem::updateBC(int current_step) {
   // }
 }
 
-void CaloricallyPerfectThermoChem::extrapolateState() {
+void ReactingFlow::extrapolateState() {
   // extrapolated temp at {n+1}
   Text_.Set(time_coeff_.ab1, Tn_);
   Text_.Add(time_coeff_.ab2, Tnm1_);
@@ -762,10 +1046,15 @@ void CaloricallyPerfectThermoChem::extrapolateState() {
   // store ext in _next containers, remove Text_, Uext completely later
   Tn_next_gf_.SetFromTrueDofs(Text_);
   Tn_next_gf_.GetTrueDofs(Tn_next_);
+
+  // extrapolated species at {n+1}
+  Yext_.Set(time_coeff_.ab1, Yn_);
+  Yext_.Add(time_coeff_.ab2, Ynm1_);
+  Yext_.Add(time_coeff_.ab3, Ynm2_);  
 }
 
 // update thermodynamic pressure
-void CaloricallyPerfectThermoChem::updateThermoP() {
+void ReactingFlow::updateThermoP() {
   if (!domain_is_open_) {
     double allMass, PNM1;
     double myMass = 0.0;
@@ -784,7 +1073,73 @@ void CaloricallyPerfectThermoChem::updateThermoP() {
   }
 }
 
-void CaloricallyPerfectThermoChem::updateDiffusivity() {
+void ReactingFlow::updateDiffusivity() {
+
+  /*
+  double vel[gpudata::MAXDIM];
+  double vtmp[gpudata::MAXDIM];
+  double stress[gpudata::MAXDIM * gpudata::MAXDIM];
+
+  // TODO(kevin): update E-field with EM coupling.
+  double Efield[gpudata::MAXDIM];
+  for (int v = 0; v < nvel; v++) Efield[v] = 0.0;
+
+  double speciesEnthalpies[gpudata::MAXSPECIES];
+  mixture->computeSpeciesEnthalpies(state, speciesEnthalpies);
+
+  double transportBuffer[FluxTrns::NUM_FLUX_TRANS];
+  // NOTE(kevin): in flux, only dim-components of diffusionVelocity will be used.
+  double diffusionVelocity[gpudata::MAXSPECIES * gpudata::MAXDIM];
+
+  transport->ComputeFluxTransportProperties(state, gradUp, Efield, radius, distance, transportBuffer,
+                                            diffusionVelocity);
+  double visc = transportBuffer[FluxTrns::VISCOSITY];
+  double bulkViscosity = transportBuffer[FluxTrns::BULK_VISCOSITY];
+  bulkViscosity -= 2. / 3. * visc;
+  double k = transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY];
+  double ke = transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY];
+  double Pr_Cp = visc / k;
+
+  if (twoTemperature) {
+    for (int d = 0; d < dim; d++) {
+      double qeFlux = ke * gradUp[num_equation - 1 + d * num_equation];
+      flux[1 + nvel + d * num_equation] += qeFlux;
+      flux[num_equation - 1 + d * num_equation] += qeFlux;
+      flux[num_equation - 1 + d * num_equation] -=
+          speciesEnthalpies[numSpecies - 2] * diffusionVelocity[numSpecies - 2 + d * numSpecies];
+    }
+  } else {
+    k += ke;
+  }
+
+  // make sure density visc. flux is 0
+  for (int d = 0; d < dim; d++) flux[0 + d * num_equation] = 0.;
+
+  for (int d = 0; d < dim; d++) {
+    flux[(1 + nvel) + d * num_equation] += vtmp[d];
+    flux[(1 + nvel) + d * num_equation] += k * gradUp[(1 + nvel) + d * num_equation];
+    // compute diffusive enthalpy flux.
+    for (int sp = 0; sp < numSpecies; sp++) {
+      flux[(1 + nvel) + d * num_equation] -= speciesEnthalpies[sp] * diffusionVelocity[sp + d * numSpecies];
+    }
+  }
+
+  // if (eqSystem == NS_PASSIVE) {
+  //   double Sc = mixture->GetSchmidtNum();
+  //   for (int d = 0; d < dim; d++) flux(num_equation - 1, d) = visc / Sc * gradUp(num_equation - 1, d);
+  // }
+  // NOTE: NS_PASSIVE will not be needed (automatically incorporated).
+  for (int sp = 0; sp < numActiveSpecies; sp++) {
+    // NOTE: diffusionVelocity is set to be (numSpecies,nvel)-matrix.
+    // however only dim-components are used for flux.
+    for (int d = 0; d < dim; d++)
+      flux[(nvel + 2 + sp) + d * num_equation] = -state[nvel + 2 + sp] * diffusionVelocity[sp + d * numSpecies];
+  }
+  */
+
+
+  // >>> OLD
+  
   // viscosity
   if (!constant_viscosity_) {
     double *d_visc = visc_.Write();
@@ -792,40 +1147,10 @@ void CaloricallyPerfectThermoChem::updateDiffusivity() {
     const double mu_star = mu0_;
     const double T_star = sutherland_T0_;
     const double S_star = sutherland_S0_;
-    MFEM_FORALL(i, Tn_.Size(), { d_visc[i] = Sutherland(d_T[i], mu_star, T_star, S_star); });
+    MFEM_FORALL(i, Tn_.Size(), { d_visc[i] = Sutherland_lcl(d_T[i], mu_star, T_star, S_star); });
   } else {
     visc_ = mu0_;
   }
-
-  // if (config_->sgsModelType > 0) {
-  //   const double *dataSubgrid = turbModel_interface_->eddy_viscosity->HostRead();
-  //   double *dataVisc = visc_gf.HostReadWrite();
-  //   double *data = viscTotal_gf.HostReadWrite();
-  //   double *Rdata = rn_gf.HostReadWrite();
-  //   for (int i = 0; i < Sdof; i++) {
-  //     data[i] = dataVisc[i] + Rdata[i] * dataSubgrid[i];
-  //   }
-  // }
-
-  // if (config_->linViscData.isEnabled) {
-  //   double *vMult = viscMult.HostReadWrite();
-  //   double *dataVisc = viscTotal_gf.HostReadWrite();
-  //   for (int i = 0; i < Sdof; i++) {
-  //     dataVisc[i] *= viscMult[i];
-  //   }
-  // }
-
-  // thermal diffusivity: storing as kappa eventhough does NOT
-  // include Cp for now
-  // {
-  //   double *data = kappa_gf.HostReadWrite();
-  //   double *dataVisc = viscTotal_gf.HostReadWrite();
-  //   // double Ctmp = Cp / Pr;
-  //   double Ctmp = 1.0 / Pr;
-  //   for (int i = 0; i < Sdof; i++) {
-  //     data[i] = Ctmp * dataVisc[i];
-  //   }
-  // }
 
   visc_gf_.SetFromTrueDofs(visc_);
 
@@ -833,9 +1158,16 @@ void CaloricallyPerfectThermoChem::updateDiffusivity() {
   kappa_ = visc_;
   kappa_ /= Pr_;
   kappa_gf_.SetFromTrueDofs(kappa_);
+
+  // temporary
+  for (int n = 0; n < nSpecies_; n++) {
+    setVectorFromScalar(visc_, n, &diffY_);    
+  }
+  diffY_ /= Sc_;      
+  
 }
 
-void CaloricallyPerfectThermoChem::updateDensity(double tStep) {
+void ReactingFlow::updateDensity(double tStep) {
   Array<int> empty;
 
   // set rn
@@ -872,7 +1204,7 @@ void CaloricallyPerfectThermoChem::updateDensity(double tStep) {
   // R0PM1_gf.ProjectGridFunction(R0PM0_gf);
 }
 
-void CaloricallyPerfectThermoChem::computeSystemMass() {
+void ReactingFlow::computeSystemMass() {
   system_mass_ = 0.0;
   double myMass = 0.0;
   rn_ = (thermo_pressure_ / Rgas_);
@@ -884,7 +1216,7 @@ void CaloricallyPerfectThermoChem::computeSystemMass() {
 }
 
 /// Add a Dirichlet boundary condition to the temperature field
-void CaloricallyPerfectThermoChem::AddTempDirichletBC(const double &temp, Array<int> &attr) {
+void ReactingFlow::AddTempDirichletBC(const double &temp, Array<int> &attr) {
   temp_dbcs_.emplace_back(attr, new ConstantCoefficient(temp));
   for (int i = 0; i < attr.Size(); ++i) {
     if (attr[i] == 1) {
@@ -894,7 +1226,7 @@ void CaloricallyPerfectThermoChem::AddTempDirichletBC(const double &temp, Array<
   }
 }
 
-void CaloricallyPerfectThermoChem::AddTempDirichletBC(Coefficient *coeff, Array<int> &attr) {
+void ReactingFlow::AddTempDirichletBC(Coefficient *coeff, Array<int> &attr) {
   temp_dbcs_.emplace_back(attr, coeff);
   for (int i = 0; i < attr.Size(); ++i) {
     if (attr[i] == 1) {
@@ -924,11 +1256,11 @@ void CaloricallyPerfectThermoChem::AddTempDirichletBC(Coefficient *coeff, Array<
   */
 }
 
-void CaloricallyPerfectThermoChem::AddTempDirichletBC(ScalarFuncT *f, Array<int> &attr) {
+void ReactingFlow::AddTempDirichletBC(ScalarFuncT *f, Array<int> &attr) {
   AddTempDirichletBC(new FunctionCoefficient(f), attr);
 }
 
-void CaloricallyPerfectThermoChem::AddQtDirichletBC(Coefficient *coeff, Array<int> &attr) {
+void ReactingFlow::AddQtDirichletBC(Coefficient *coeff, Array<int> &attr) {
   Qt_dbcs_.emplace_back(attr, coeff);
 
   if (rank0_ && pmesh_->GetMyRank() == 0) {
@@ -949,11 +1281,11 @@ void CaloricallyPerfectThermoChem::AddQtDirichletBC(Coefficient *coeff, Array<in
   }
 }
 
-void CaloricallyPerfectThermoChem::AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr) {
+void ReactingFlow::AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr) {
   AddQtDirichletBC(new FunctionCoefficient(f), attr);
 }
 
-void CaloricallyPerfectThermoChem::computeQtTO() {
+void ReactingFlow::computeQtTO() {
   tmpR0_ = 0.0;
   LQ_bdry_->Update();
   LQ_bdry_->Assemble();
@@ -983,335 +1315,7 @@ void CaloricallyPerfectThermoChem::computeQtTO() {
 }
 
 #if 0
-// Temporarily remove viscous sponge capability.  This sould be housed
-// in a separate class that we just instantiate and call, rather than
-// directly in CaloricallyPerfectThermoChem.
-
-/**
-Simple planar viscous sponge layer with smooth tanh-transtion using user-specified width and
-total amplification.  Note: duplicate in M2
-*/
-// MFEM_HOST_DEVICE
-void CaloricallyPerfectThermoChem::viscSpongePlanar(double *x, double &wgt) {
-  double normal[3];
-  double point[3];
-  double s[3];
-  double factor, width, dist, wgt0;
-
-  for (int d = 0; d < dim; d++) normal[d] = config_->linViscData.normal[d];
-  for (int d = 0; d < dim; d++) point[d] = config_->linViscData.point0[d];
-  width = config_->linViscData.width;
-  factor = config_->linViscData.viscRatio;
-
-  // get settings
-  factor = max(factor, 1.0);
-  // width = vsd_.width;
-
-  // distance from plane
-  dist = 0.;
-  for (int d = 0; d < dim; d++) s[d] = (x[d] - point[d]);
-  for (int d = 0; d < dim; d++) dist += s[d] * normal[d];
-
-  // weight
-  wgt0 = 0.5 * (tanh(0.0 / width - 2.0) + 1.0);
-  wgt = 0.5 * (tanh(dist / width - 2.0) + 1.0);
-  wgt = (wgt - wgt0) * 1.0 / (1.0 - wgt0);
-  wgt = std::max(wgt, 0.0);
-  wgt *= (factor - 1.0);
-  wgt += 1.0;
-
-  // add cylindrical area
-  double cylX = config_->linViscData.cylXradius;
-  double cylY = config_->linViscData.cylYradius;
-  double cylZ = config_->linViscData.cylZradius;
-  double wgtCyl;
-  if (config_->linViscData.cylXradius > 0.0) {
-    dist = x[1] * x[1] + x[2] * x[2];
-    dist = std::sqrt(dist);
-    dist = dist - cylX;
-    wgtCyl = 0.5 * (tanh(dist / width - 2.0) + 1.0);
-    wgtCyl = (wgtCyl - wgt0) * 1.0 / (1.0 - wgt0);
-    wgtCyl = std::max(wgtCyl, 0.0);
-    wgtCyl *= (factor - 1.0);
-    wgtCyl += 1.0;
-    wgt = std::max(wgt, wgtCyl);
-  } else if (config_->linViscData.cylYradius > 0.0) {
-    dist = x[0] * x[0] + x[2] * x[2];
-    dist = std::sqrt(dist);
-    dist = dist - cylY;
-    wgtCyl = 0.5 * (tanh(dist / width - 2.0) + 1.0);
-    wgtCyl = (wgtCyl - wgt0) * 1.0 / (1.0 - wgt0);
-    wgtCyl = std::max(wgtCyl, 0.0);
-    wgtCyl *= (factor - 1.0);
-    wgtCyl += 1.0;
-    wgt = std::max(wgt, wgtCyl);
-  } else if (config_->linViscData.cylZradius > 0.0) {
-    dist = x[0] * x[0] + x[1] * x[1];
-    dist = std::sqrt(dist);
-    dist = dist - cylZ;
-    wgtCyl = 0.5 * (tanh(dist / width - 2.0) + 1.0);
-    wgtCyl = (wgtCyl - wgt0) * 1.0 / (1.0 - wgt0);
-    wgtCyl = std::max(wgtCyl, 0.0);
-    wgtCyl *= (factor - 1.0);
-    wgtCyl += 1.0;
-    wgt = std::max(wgt, wgtCyl);
-  }
-
-  // add annulus sponge => NOT GENERAL, only for annulus aligned with y
-  /**/
-  double centerAnnulus[3];
-  // for (int d = 0; d < dim; d++) normalAnnulus[d] = config.linViscData.normalA[d];
-  for (int d = 0; d < dim; d++) centerAnnulus[d] = config_->linViscData.pointA[d];
-  double rad1 = config_->linViscData.annulusRadius;
-  double rad2 = config_->linViscData.annulusThickness;
-  double factorA = config_->linViscData.viscRatioAnnulus;
-
-  // distance to center
-  double dist1 = x[0] * x[0] + x[2] * x[2];
-  dist1 = std::sqrt(dist1);
-
-  // coordinates of nearest point on annulus center ring
-  for (int d = 0; d < dim; d++) s[d] = (rad1 / dist1) * x[d];
-  s[1] = centerAnnulus[1];
-
-  // distance to ring
-  for (int d = 0; d < dim; d++) s[d] = x[d] - s[d];
-  double dist2 = s[0] * s[0] + s[1] * s[1] + s[2] * s[2];
-  dist2 = std::sqrt(dist2);
-
-  // if (x[1] <= centerAnnulus[1]+rad2) {
-  //   std::cout << " rad ratio: " << rad1/dist1 << " ring dist: " << dist2 << endl;
-  // }
-
-  // if (dist2 <= rad2) {
-  //   std::cout << " rad ratio: " << rad1/dist1 << " ring dist: " << dist2 << " fA: " << factorA << endl;
-  // }
-
-  // sponge weight
-  double wgtAnn;
-  wgtAnn = 0.5 * (tanh(10.0 * (1.0 - dist2 / rad2)) + 1.0);
-  wgtAnn = (wgtAnn - wgt0) * 1.0 / (1.0 - wgt0);
-  wgtAnn = std::max(wgtAnn, 0.0);
-  // if (dist2 <= rad2) wgtAnn = 1.0; // testing....
-  wgtAnn *= (factorA - 1.0);
-  wgtAnn += 1.0;
-  wgt = std::max(wgt, wgtAnn);
-}
-
-/**
-   Interpolation of inlet bc from external file using
-   Gaussian interpolation.  Not at all general and only for use
-   with torch
- */
-void CaloricallyPerfectThermoChem::interpolateInlet() {
-  int myRank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
-
-  int nCount = 0;
-
-  // open, find size
-  if (rank0_) {
-    std::cout << " Attempting to open inlet file for counting... " << fname << endl;
-    fflush(stdout);
-
-    FILE *inlet_file;
-    if (inlet_file = fopen("./inputs/inletPlane.csv", "r")) {
-      std::cout << " ...and open" << endl;
-      fflush(stdout);
-    } else {
-      std::cout << " ...CANNOT OPEN FILE" << endl;
-      fflush(stdout);
-    }
-
-    char *line = NULL;
-    int ch = 0;
-    size_t len = 0;
-    ssize_t read;
-
-    std::cout << " ...starting count" << endl;
-    fflush(stdout);
-    for (ch = getc(inlet_file); ch != EOF; ch = getc(inlet_file)) {
-      if (ch == '\n') {
-        nCount++;
-      }
-    }
-    fclose(inlet_file);
-    std::cout << " final count: " << nCount << endl;
-    fflush(stdout);
-  }
-
-  // broadcast size
-  MPI_Bcast(&nCount, 1, MPI_INT, 0, MPI_COMM_WORLD);
-
-  // set size
-  struct inlet_profile {
-    double x, y, z, rho, temp, u, v, w;
-  };
-  struct inlet_profile inlet[nCount];
-  double junk;
-
-  // paraview slice output from mean
-  // 0)"dens",1)"rms:0",2)"rms:1",3)"rms:2",4)"rms:3",5)"rms:4",6)"rms:5",7)"temp",8)"vel:0",9)"vel:1",10)"vel:2",11)"Points:0",12)"Points:1",13)"Points:2"
-
-  // mean output from plane interpolation
-  // 0) no, 1) x, 2) y, 3) z, 4) rho, 5) u, 6) v, 7) w
-
-  // open, read data
-  if (rank0_) {
-    std::cout << " Attempting to read line-by-line..." << endl;
-    fflush(stdout);
-
-    ifstream file;
-    file.open("./inputs/inletPlane.csv");
-    string line;
-    getline(file, line);
-    int nLines = 0;
-    while (getline(file, line)) {
-      stringstream sline(line);
-      int entry = 0;
-      while (sline.good()) {
-        string substr;
-        getline(sline, substr, ',');  // csv delimited
-        double buffer = std::stod(substr);
-        entry++;
-
-        // using paraview dump
-        /*
-        if (entry == 1) {
-          inlet[nLines].rho = buffer;
-        } else if (entry == 8) {
-          inlet[nLines].temp = buffer;
-        } else if (entry == 9) {
-          inlet[nLines].u = buffer;
-        } else if (entry == 10) {
-          inlet[nLines].v = buffer;
-        } else if (entry == 11) {
-          inlet[nLines].w = buffer;
-        } else if (entry == 12) {
-          inlet[nLines].x = buffer;
-        } else if (entry == 13) {
-          inlet[nLines].y = buffer;
-        } else if (entry == 14) {
-          inlet[nLines].z = buffer;
-        }
-        */
-
-        // using code plane interp
-        /**/
-        if (entry == 2) {
-          inlet[nLines].x = buffer;
-        } else if (entry == 3) {
-          inlet[nLines].y = buffer;
-        } else if (entry == 4) {
-          inlet[nLines].z = buffer;
-        } else if (entry == 5) {
-          inlet[nLines].rho = buffer;
-          // to prevent nans in temp in out-of-domain plane regions
-          inlet[nLines].temp = thermo_pressure_ / (Rgas_ * std::max(buffer, 1.0));
-        } else if (entry == 6) {
-          inlet[nLines].u = buffer;
-        } else if (entry == 7) {
-          inlet[nLines].v = buffer;
-        } else if (entry == 8) {
-          inlet[nLines].w = buffer;
-        }
-        /**/
-      }
-      // std::cout << inlet[nLines].rho << " " << inlet[nLines].temp << " " << inlet[nLines].u << " " << inlet[nLines].x
-      // << " " << inlet[nLines].y << " " << inlet[nLines].z << endl; fflush(stdout);
-      nLines++;
-    }
-    file.close();
-
-    // std::cout << " stream method ^" << endl; fflush(stdout);
-    std::cout << " " << endl;
-    fflush(stdout);
-  }
-
-  // broadcast data
-  MPI_Bcast(&inlet, nCount * 8, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-  if (rank0_) {
-    std::cout << " communicated inlet data" << endl;
-    fflush(stdout);
-  }
-
-  // width of interpolation stencil
-  double radius;
-  double torch_radius = 28.062 / 1000.0;
-  radius = 2.0 * torch_radius / 300.0;  // 300 from nxn interp plane
-
-  ParGridFunction coordsDof(vfes);
-  pmesh_->GetNodes(coordsDof);
-  double *dataTemp = buffer_tInlet->HostWrite();
-  double *dataTempInf = buffer_tInletInf->HostWrite();
-  for (int n = 0; n < sfes_->GetNDofs(); n++) {
-    // get coords
-    auto hcoords = coordsDof.HostRead();
-    double xp[3];
-    for (int d = 0; d < dim; d++) {
-      xp[d] = hcoords[n + d * vfes->GetNDofs()];
-    }
-
-    int iCount = 0;
-    double dist, wt;
-    double wt_tot = 0.0;
-    double val_rho = 0.0;
-    double val_u = 0.0;
-    double val_v = 0.0;
-    double val_w = 0.0;
-    double val_T = 0.0;
-    double dmin = 1.0e15;
-
-    for (int j = 0; j < nCount; j++) {
-      dist = (xp[0] - inlet[j].x) * (xp[0] - inlet[j].x) + (xp[1] - inlet[j].y) * (xp[1] - inlet[j].y) +
-             (xp[2] - inlet[j].z) * (xp[2] - inlet[j].z);
-      dist = sqrt(dist);
-      // std::cout << " Gaussian interpolation, point " << n << " with distance " << dist << endl; fflush(stdout);
-
-      // exclude points outside the domain
-      if (inlet[j].rho < 1.0e-8) {
-        continue;
-      }
-
-      // gaussian
-      if (dist <= 1.0 * radius) {
-        // std::cout << " Caught an interp point " << dist << endl; fflush(stdout);
-        wt = exp(-(dist * dist) / (radius * radius));
-        wt_tot = wt_tot + wt;
-        val_rho = val_rho + wt * inlet[j].rho;
-        val_u = val_u + wt * inlet[j].u;
-        val_v = val_v + wt * inlet[j].v;
-        val_w = val_w + wt * inlet[j].w;
-        val_T = val_T + wt * inlet[j].temp;
-        iCount++;
-        // std::cout << "* " << n << " "  << iCount << " " << wt_tot << " " << val_T << endl; fflush(stdout);
-      }
-      // nearest, just for testing
-      // if(dist <= dmin) {
-      //  dmin = dist;
-      //  wt_tot = 1.0;
-      //   val_rho = inlet[j].rho;
-      //   val_u = inlet[j].u;
-      //   val_v = inlet[j].v;
-      //   val_w = inlet[j].w;
-      //   iCount = 1;
-      // }
-    }
-
-    // if(rank0_) { std::cout << " attempting to record interpolated values in buffer" << endl; fflush(stdout); }
-    if (wt_tot > 0.0) {
-      dataTemp[n] = val_T / wt_tot;
-      dataTempInf[n] = val_T / wt_tot;
-      // std::cout << n << " point set to: " << dataVel[n + 0*Sdof] << " " << dataTemp[n] << endl; fflush(stdout);
-    } else {
-      dataTemp[n] = 0.0;
-      dataTempInf[n] = 0.0;
-      // std::cout << " iCount of zero..." << endl; fflush(stdout);
-    }
-  }
-}
-
-void CaloricallyPerfectThermoChem::uniformInlet() {
+void ReactingFlow::uniformInlet() {
   int myRank;
   MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
 
