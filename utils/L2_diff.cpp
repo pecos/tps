@@ -55,7 +55,7 @@ int main (int argc, char *argv[])
   ParGridFunction *src_state1 = NULL;
   ParGridFunction *src_state2 = NULL;
 
-  src_fec = srcField1->GetFEC();
+  src_fec = srcField1->getFEC();
   src_fes = srcField1->getFESpace();
   src_state1 = srcField1->GetSolutionGF();
   src_state2 = srcField2->GetSolutionGF();

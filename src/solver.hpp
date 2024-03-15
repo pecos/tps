@@ -105,6 +105,12 @@ class Solver {
     return nullptr;
   }
 
+  virtual mfem::FiniteElementCollection *getFEC() const {
+    cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
+    exit(1);
+    return nullptr;
+  }
+
   virtual mfem::ParFiniteElementSpace *getFESpace() const {
     cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
     exit(1);
@@ -122,6 +128,12 @@ class FlowSolver : public Solver {
     cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
     exit(1);
     return nullptr;
+  }
+
+  /// Update the plasma conductivity
+  virtual void evaluatePlasmaConductivityGF() {
+    cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
+    exit(1);
   }
 
   /// Fetch the Joule heating grid function

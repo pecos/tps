@@ -103,7 +103,7 @@ CycleAvgJouleCoupling::CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tp
   }
   flow_solver_ = new M2ulPhyS(inputFileName, tps);
 
-  solve_em_every_n_ = flow_solver_->getMaximumIterations();
+  tps->getRequiredInput("cycle-avg-joule-coupled/solve-em-every-n", solve_em_every_n_); //  solve_em_every_n_ = flow_solver_->getMaximumIterations();
   max_iters_ = max_out * solve_em_every_n_;
 #ifdef HAVE_GSLIB
   interp_flow_to_em_ = new FindPointsGSLIB(tps->getTPSCommWorld());
@@ -437,7 +437,7 @@ void CycleAvgJouleCoupling::initInterface(TPS::Tps2Boltzmann &interface) {
   interface.init(flow_solver_);
   qmsa_solver_->setStoreE(true);
   // Get the FEC of the efield from the flow solver
-  efieldFEC_ = flow_solver_->GetFEC();
+  efieldFEC_ = flow_solver_->getFEC();
   // Set up efield function space
   if (efieldFES_) delete efieldFES_;
   efield_ncomp_ = interface.NeFieldComps() / 2;

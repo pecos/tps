@@ -43,7 +43,7 @@ int main (int argc, char *argv[])
   ParFiniteElementSpace *src_fes = NULL;
   ParGridFunction *src_state = NULL;
 
-  src_fec = srcField->GetFEC();
+  src_fec = srcField->getFEC();
   src_fes = srcField->getFESpace();
   src_state = srcField->GetSolutionGF();
 
