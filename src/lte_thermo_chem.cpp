@@ -105,6 +105,8 @@ LteThermoChem::~LteThermoChem() {
   delete HtInvPC_;
   delete MsInv_;
   delete MsInvPC_;
+  delete MrhoInv_;
+  delete MrhoInvPC_;
   delete Ht_form_;
   delete M_rho_form_;
   delete M_rho_Cp_form_;
@@ -182,6 +184,11 @@ void LteThermoChem::initializeSelf() {
 
   rn_.SetSize(sfes_truevsize);
   rn_ = 1.0;
+
+  rnm1_.SetSize(sfes_truevsize);
+  rnm2_.SetSize(sfes_truevsize);
+  rnm3_.SetSize(sfes_truevsize);
+
   rn_gf_.SetSpace(sfes_);
   rn_gf_ = 1.0;
 
@@ -512,6 +519,22 @@ void LteThermoChem::initializeOperators() {
 
   if (partial_assembly_) {
     Vector diag_pa(sfes_->GetTrueVSize());
+    M_rho_form_->AssembleDiagonal(diag_pa);
+    MrhoInvPC_ = new OperatorJacobiSmoother(diag_pa, empty);
+  } else {
+    MrhoInvPC_ = new HypreSmoother(*M_rho_.As<HypreParMatrix>());
+    dynamic_cast<HypreSmoother *>(MrhoInvPC_)->SetType(HypreSmoother::Jacobi, 1);
+  }
+  MrhoInv_ = new CGSolver(sfes_->GetComm());
+  MrhoInv_->iterative_mode = false;
+  MrhoInv_->SetOperator(*M_rho_);
+  MrhoInv_->SetPreconditioner(*MrhoInvPC_);
+  MrhoInv_->SetPrintLevel(pl_solve_);
+  MrhoInv_->SetRelTol(rtol_);
+  MrhoInv_->SetMaxIter(max_iter_);
+
+  if (partial_assembly_) {
+    Vector diag_pa(sfes_->GetTrueVSize());
     Ht_form_->AssembleDiagonal(diag_pa);
     HtInvPC_ = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof_);
   } else {
@@ -537,6 +560,14 @@ void LteThermoChem::initializeOperators() {
   Tn_next_gf_.SetFromTrueDofs(Tn_);
   Tn_next_gf_.GetTrueDofs(Tn_next_);
 
+  // After IC is filled, compute density
+  updateDensity();
+
+  // And prepare history
+  rnm3_ = 0.0;
+  rnm2_ = 0.0;
+  rnm1_ = rn_;
+
   // Temp filter
   if (filter_temperature_) {
     sfec_filter_ = new H1_FECollection(order_ - filter_cutoff_modes_);
@@ -557,14 +588,21 @@ void LteThermoChem::initializeOperators() {
    Rotate temperature state in registers
  */
 void LteThermoChem::updateHistory() {
-  // temperature
+  // convection term
   NTnm2_ = NTnm1_;
   NTnm1_ = NTn_;
+
+  // temperature
   Tnm2_ = Tnm1_;
   Tnm1_ = Tn_;
   Tn_next_gf_.GetTrueDofs(Tn_next_);
   Tn_ = Tn_next_;
   Tn_gf_.SetFromTrueDofs(Tn_);
+
+  // density (used in Qt calc)
+  rnm3_ = rnm2_;
+  rnm2_ = rnm1_;
+  rnm1_ = rn_;
 }
 
 void LteThermoChem::step() {
@@ -661,7 +699,7 @@ void LteThermoChem::step() {
   updateDensity();
   updateThermoP();
 
-  computeQtTO();
+  computeQt();
 
   updateHistory();
 }
@@ -830,35 +868,37 @@ void LteThermoChem::AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr) {
   AddQtDirichletBC(new FunctionCoefficient(f), attr);
 }
 
-void LteThermoChem::computeQtTO() {
-  // TODO(trevilo): Generalize to handle varying Rgas!
+void LteThermoChem::computeQt() {
   Qt_ = 0.0;
   Qt_gf_.SetFromTrueDofs(Qt_);
 
-  // tmpR0_ = 0.0;
-  // LQ_bdry_->Update();
-  // LQ_bdry_->Assemble();
-  // LQ_bdry_->ParallelAssemble(tmpR0_);
-  // tmpR0_.Neg();
+  Array<int> empty;
+  M_rho_form_->Update();
+  M_rho_form_->Assemble();
+  M_rho_form_->FormSystemMatrix(empty, M_rho_);
 
-  // Array<int> empty;
-  // LQ_form_->Update();
-  // LQ_form_->Assemble();
-  // LQ_form_->FormSystemMatrix(empty, LQ_);
-  // LQ_->AddMult(Tn_next_, tmpR0_);  // tmpR0_ += LQ{Tn_next}
+  MrhoInv_->SetOperator(*M_rho_);
 
-  // sfes_->GetRestrictionMatrix()->MultTranspose(tmpR0_, resT_gf_);
+  const double dt = time_coeff_.dt;
+  tmpR0_.Set(time_coeff_.bd0 / dt, rn_);
+  tmpR0_.Add(time_coeff_.bd1 / dt, rnm1_);
+  tmpR0_.Add(time_coeff_.bd2 / dt, rnm2_);
+  tmpR0_.Add(time_coeff_.bd3 / dt, rnm3_);
+  tmpR0_.Neg();
 
-  // Qt_ = 0.0;
-  // Qt_gf_.SetFromTrueDofs(tmpR0_);
+  Ms_->Mult(tmpR0_, resT_);
 
-  // Vector Xqt, Bqt;
-  // Mq_form_->FormLinearSystem(Qt_ess_tdof_, Qt_gf_, resT_gf_, Mq_, Xqt, Bqt, 1);
+  // TODO(trevilo): Add convection contribution to residual
 
-  // MqInv_->Mult(Bqt, Xqt);
-  // Mq_form_->RecoverFEMSolution(Xqt, resT_gf_, Qt_gf_);
+  sfes_->GetRestrictionMatrix()->MultTranspose(resT_, resT_gf_);
 
-  // Qt_gf_.GetTrueDofs(Qt_);
+  Vector Xqt, Bqt;
+  M_rho_form_->FormLinearSystem(Qt_ess_tdof_, Qt_gf_, resT_gf_, M_rho_, Xqt, Bqt, 1);
+
+  MrhoInv_->Mult(Bqt, Xqt);
+  M_rho_form_->RecoverFEMSolution(Xqt, resT_gf_, Qt_gf_);
+
+  Qt_gf_.GetTrueDofs(Qt_);
   // Qt_ *= -Rgas_ / thermo_pressure_;
   // Qt_gf_.SetFromTrueDofs(Qt_);
 }
