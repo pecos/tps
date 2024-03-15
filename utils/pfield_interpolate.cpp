@@ -102,7 +102,7 @@ int main (int argc, char *argv[])
 
   // Setup the FiniteElementSpace and GridFunction on the target mesh.
   FiniteElementCollection* tar_fec = tarField.GetFEC();
-  ParFiniteElementSpace* tar_fes = tarField.GetFESpace();
+  ParFiniteElementSpace* tar_fes = tarField.getFESpace();
   ParGridFunction* func_target = tarField.GetSolutionGF();
   std::cout << "Target FE collection: " << tar_fec->Name() << std::endl;
 

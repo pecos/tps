@@ -47,7 +47,7 @@ int main (int argc, char *argv[])
 
   // 2) Set up source field
   FiniteElementCollection *src_fec = srcField->GetFEC();
-  ParFiniteElementSpace *src_fes = srcField->GetFESpace();
+  ParFiniteElementSpace *src_fes = srcField->getFESpace();
   ParFiniteElementSpace *scalar_fes = srcField->GetScalarFES();
   ParFiniteElementSpace *vector_fes = srcField->GetVectorFES();
   const int nDofs = scalar_fes->GetNDofs();

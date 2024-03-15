@@ -133,7 +133,7 @@ int main (int argc, char *argv[])
   cout << "Source mesh curvature: "
        << mesh->GetNodes()->OwnFEC()->Name() << endl;
 
-  ParFiniteElementSpace *src_fes = srcField->GetFESpace();
+  ParFiniteElementSpace *src_fes = srcField->getFESpace();
   const int nDofs = src_fes->GetNDofs();
   ParFiniteElementSpace dfes(src_fes->GetParMesh(), src_fes->FEColl(), dim, Ordering::byNODES);
   ParGridFunction coordinates(&dfes);

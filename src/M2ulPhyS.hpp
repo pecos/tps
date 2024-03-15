@@ -90,7 +90,7 @@ namespace TPS {
 class Tps2Boltzmann;
 }
 
-class M2ulPhyS : public TPS::Solver {
+class M2ulPhyS : public TPS::FlowSolver {
  private:
   MPI_Groups *groupsMPI;
   int nprocs_;  // total number of MPI procs
@@ -411,13 +411,16 @@ class M2ulPhyS : public TPS::Solver {
   void solveEnd() override;
   void visualization() override;
   ParMesh *getMesh() const override { return mesh; }
+  ParFiniteElementSpace *getFESpace() const override { return vfes; }
+
+  ParGridFunction *getPlasmaConductivityGF() override { return plasma_conductivity_; }
+  ParGridFunction *getJouleHeatingGF() override { return joule_heating_; }
 
   void updateVisualizationVariables();
 
   // Accessors
   RHSoperator *getRHSoperator() { return rhsOperator; }
   FiniteElementCollection *GetFEC() { return fec; }
-  ParFiniteElementSpace *GetFESpace() { return vfes; }
   ParFiniteElementSpace *GetScalarFES() { return fes; }
   ParFiniteElementSpace *GetVectorFES() { return dfes; }
   ParaViewDataCollection *GetParaviewColl() { return paraviewColl; }
@@ -434,8 +437,6 @@ class M2ulPhyS : public TPS::Solver {
 
   void updatePrimitives();
 
-  ParGridFunction *GetPlasmaConductivityGF() { return plasma_conductivity_; }
-  ParGridFunction *GetJouleHeatingGF() { return joule_heating_; }
 
   static int Check_NaN_GPU(ParGridFunction *U, int lengthU, Array<int> &loc_print);
   void Check_Undershoot();

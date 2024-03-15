@@ -104,6 +104,32 @@ class Solver {
     exit(1);
     return nullptr;
   }
+
+  virtual mfem::ParFiniteElementSpace *getFESpace() const {
+    cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
+    exit(1);
+    return nullptr;
+  }
+};
+
+// Base class for flow solver implementations
+class FlowSolver : public Solver {
+ public:
+  virtual ~FlowSolver() {}
+
+  /// Fetch the plasma electrical conductivity grid function
+  virtual mfem::ParGridFunction *getPlasmaConductivityGF() {
+    cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
+    exit(1);
+    return nullptr;
+  }
+
+  /// Fetch the Joule heating grid function
+  virtual mfem::ParGridFunction *getJouleHeatingGF() {
+    cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
+    exit(1);
+    return nullptr;
+  }
 };
 
 }  // end namespace TPS

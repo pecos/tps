@@ -44,7 +44,7 @@ int main (int argc, char *argv[])
   ParGridFunction *src_state = NULL;
 
   src_fec = srcField->GetFEC();
-  src_fes = srcField->GetFESpace();
+  src_fes = srcField->getFESpace();
   src_state = srcField->GetSolutionGF();
 
   std::cout << "Source FE collection: " << src_fec->Name() << std::endl;

@@ -155,7 +155,7 @@ void CycleAvgJouleCoupling::initializeInterpolationData() {
   }
 
   // Determine numbers of points to interpolate to
-  const ParFiniteElementSpace *flow_fespace = flow_solver_->GetFESpace();
+  const ParFiniteElementSpace *flow_fespace = flow_solver_->getFESpace();
   n_flow_interp_nodes_ = 0;
   for (int i = 0; i < flow_mesh->GetNE(); i++) {
     n_flow_interp_nodes_ += flow_fespace->GetFE(i)->GetNodes().GetNPoints();
@@ -210,7 +210,7 @@ void CycleAvgJouleCoupling::interpConductivityFromFlowToEM() {
 
   // Interpolate
   Vector conductivity_em(n_em_interp_nodes_);
-  const ParGridFunction *conductivity_flow_gf = flow_solver_->GetPlasmaConductivityGF();
+  const ParGridFunction *conductivity_flow_gf = flow_solver_->getPlasmaConductivityGF();
   interp_flow_to_em_->Interpolate(vxyz, *conductivity_flow_gf, conductivity_em);
 
   // Set grid function
@@ -276,7 +276,7 @@ void CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow() {
   if (verbose) grvy_printf(ginfo, "Interpolating Joule heating to flow mesh.\n");
 
 #ifdef HAVE_GSLIB
-  const ParFiniteElementSpace *flow_fespace = flow_solver_->GetFESpace();
+  const ParFiniteElementSpace *flow_fespace = flow_solver_->getFESpace();
 
   // Generate list of points where the grid function will be evaluated.
   Vector vxyz;
@@ -288,7 +288,7 @@ void CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow() {
   const ParGridFunction *joule_heating_gf = qmsa_solver_->getJouleHeatingGF();
   interp_em_to_flow_->Interpolate(vxyz, *joule_heating_gf, interp_vals);
 
-  ParGridFunction *joule_heating_flow = flow_solver_->GetJouleHeatingGF();
+  ParGridFunction *joule_heating_flow = flow_solver_->getJouleHeatingGF();
   joule_heating_flow->SetFromTrueDofs(interp_vals);
 #else
   mfem_error("Cannot interpolate without GSLIB support.");
