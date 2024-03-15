@@ -47,6 +47,9 @@
 using namespace mfem;
 using namespace mfem::common;
 
+/// forward declarations
+double temp_rt3d(const Vector &x, double t);
+
 MFEM_HOST_DEVICE double Sutherland(const double T, const double mu_star, const double T_star, const double S_star) {
   const double T_rat = T / T_star;
   const double T_rat_32 = T_rat * sqrt(T_rat);
@@ -256,10 +259,22 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
   // 2) For restarts, this IC is overwritten by the restart field,
   // which is read later.
 
-  ConstantCoefficient t_ic_coef;
-  t_ic_coef.constant = T_ic_;
-  Tn_gf_.ProjectCoefficient(t_ic_coef);
-
+  tpsP_->getInput("loMach/calperfect/ic", ic_string_, std::string(""));
+  
+  // set IC if we have one at this point
+  if (!ic_string_.empty()) {
+    if (ic_string_ == "rt3D") {
+      if(rank0_) std::cout << "Setting rt3D IC..." << std::endl;
+      FunctionCoefficient t_excoeff(temp_rt3d);
+      t_excoeff.SetTime(0.0);
+      Tn_gf_.ProjectCoefficient(t_excoeff);      
+    }
+  } else {
+    ConstantCoefficient t_ic_coef;
+    t_ic_coef.constant = T_ic_;
+    Tn_gf_.ProjectCoefficient(t_ic_coef);    
+  }
+  
   Tn_gf_.GetTrueDofs(Tn_);
   Tnm1_gf_.SetFromTrueDofs(Tn_);
   Tnm2_gf_.SetFromTrueDofs(Tn_);
@@ -342,8 +357,10 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
   }
 
   // Wall BCs
+  t_bc_coeff1_ = new ConstantCoefficient(300.0);
+  t_bc_coeff2_ = new ConstantCoefficient(300.0);    
   {
-    std::cout << "There are " << pmesh_->bdr_attributes.Max() << " boundary attributes!" << std::endl;
+    if(rank0_) std::cout << "There are " << pmesh_->bdr_attributes.Max() << " boundary attributes" << std::endl;
     Array<int> attr_wall(pmesh_->bdr_attributes.Max());
     attr_wall = 0;
 
@@ -356,7 +373,6 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
       tpsP_->getRequiredInput((basepath + "/type").c_str(), type);
 
       if (type == "viscous_isothermal") {
-        std::cout << "Adding patch = " << patch << " to isothermal wall list!" << std::endl;
 
         attr_wall = 0;
         attr_wall[patch - 1] = 1;
@@ -364,14 +380,26 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
         double Twall;
         tpsP_->getRequiredInput((basepath + "/temperature").c_str(), Twall);
 
-        ConstantCoefficient *Twall_coeff = new ConstantCoefficient();
-        Twall_coeff->constant = Twall;
+        // ConstantCoefficient *Twall_coeff = new ConstantCoefficient();
+        // Twall_coeff->constant = Twall;
+        // AddTempDirichletBC(Twall_coeff, attr_wall);
 
-        AddTempDirichletBC(Twall_coeff, attr_wall);
+	if (i==1) {
+          t_bc_coeff1_->constant = Twall;
+	  AddTempDirichletBC(t_bc_coeff1_, attr_wall);
+	}
 
+	if (i==2) {
+          t_bc_coeff2_->constant = Twall;
+	  AddTempDirichletBC(t_bc_coeff2_, attr_wall);
+	}
+	
         ConstantCoefficient *Qt_bc_coeff = new ConstantCoefficient();
         Qt_bc_coeff->constant = 0.0;
         AddQtDirichletBC(Qt_bc_coeff, attr_wall);
+
+        if(rank0_) std::cout << i << ") Adding patch = " << patch << " to isothermal wall list at " << Twall << std::endl;	
+	
       }
     }
     if (rank0_) std::cout << "Temp wall bc completed: " << numWalls << endl;
@@ -542,7 +570,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   MqInv_->SetMaxIter(max_iter_);
 
   LQ_form_ = new ParBilinearForm(sfes_);
-  auto *lqd_blfi = new DiffusionIntegrator(*thermal_diff_coeff_);
+  auto *lqd_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
   if (numerical_integ_) {
     lqd_blfi->SetIntRule(&ir_di);
   }
@@ -613,6 +641,7 @@ void CaloricallyPerfectThermoChem::step() {
   for (auto &temp_dbc : temp_dbcs_) {
     temp_dbc.coeff->SetTime(time_ + dt_);
   }
+  //if (rank0_) { std::cout << "check 1..." << std::endl; }
 
   // Prepare for residual calc
   extrapolateState();
@@ -620,6 +649,7 @@ void CaloricallyPerfectThermoChem::step() {
   updateThermoP();
   updateDensity(1.0);
   updateDiffusivity();
+  //if (rank0_) { std::cout << "check 2..." << std::endl; }  
 
   // Build the right-hand-side
   resT_ = 0.0;
@@ -634,10 +664,12 @@ void CaloricallyPerfectThermoChem::step() {
   tmpR0_.Add(time_coeff_.bd3 / dt_, Tnm2_);
 
   MsRho_->AddMult(tmpR0_, resT_, -1.0);
+  //if (rank0_) { std::cout << "check 3..." << std::endl; }  
 
   // dPo/dt
   tmpR0_ = (dtP_ / Cp_);
   Ms_->AddMult(tmpR0_, resT_);
+  //if (rank0_) { std::cout << "check 4..." << std::endl; }  
 
   // Add natural boundary terms here later
   // NB: adiabatic natural BC is handled, but don't have ability to impose non-zero heat flux yet
@@ -649,6 +681,7 @@ void CaloricallyPerfectThermoChem::step() {
   Ht_form_->Update();
   Ht_form_->Assemble();
   Ht_form_->FormSystemMatrix(temp_ess_tdof_, Ht_);
+  //if (rank0_) { std::cout << "check 5..." << std::endl; }    
 
   HtInv_->SetOperator(*Ht_);
   if (partial_assembly_) {
@@ -658,6 +691,7 @@ void CaloricallyPerfectThermoChem::step() {
     HtInvPC_ = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof_);
     HtInv_->SetPreconditioner(*HtInvPC_);
   }
+  //if (rank0_) { std::cout << "check 6..." << std::endl; }    
 
   // Prepare for the solve
   for (auto &temp_dbc : temp_dbcs_) {
@@ -672,13 +706,15 @@ void CaloricallyPerfectThermoChem::step() {
   } else {
     Ht_form_->FormLinearSystem(temp_ess_tdof_, Tn_next_gf_, resT_gf_, Ht_, Xt2, Bt2, 1);
   }
-
+  //if (rank0_) { std::cout << "check 7..." << std::endl; }
+  
   // solve helmholtz eq for temp
   HtInv_->Mult(Bt2, Xt2);
   assert(HtInv_->GetConverged());
 
   Ht_form_->RecoverFEMSolution(Xt2, resT_gf_, Tn_next_gf_);
   Tn_next_gf_.GetTrueDofs(Tn_next_);
+  //if (rank0_) { std::cout << "check 8..." << std::endl; }    
 
   // explicit filter
   if (filter_temperature_) {
@@ -694,9 +730,11 @@ void CaloricallyPerfectThermoChem::step() {
 
   // prepare for external use
   updateDensity(1.0);
+  //if (rank0_) { std::cout << "check 9..." << std::endl; }    
   // computeQt();
   computeQtTO();
-
+  //if (rank0_) { std::cout << "check 10..." << std::endl; }  
+  
   UpdateTimestepHistory(dt_);
 }
 
@@ -898,16 +936,16 @@ void CaloricallyPerfectThermoChem::AddTempDirichletBC(const double &temp, Array<
 void CaloricallyPerfectThermoChem::AddTempDirichletBC(Coefficient *coeff, Array<int> &attr) {
   temp_dbcs_.emplace_back(attr, coeff);
   for (int i = 0; i < attr.Size(); ++i) {
+    if(rank0_) std::cout << "*patch: " << i << " of: " << attr.Size() << " & attr = " << attr[i] << endl;            
     if (attr[i] == 1) {
-      // std::cout << "patch: " << i << " temp_ess_attr: " << temp_ess_attr_[i] << endl;
       assert(!temp_ess_attr_[i]);
       temp_ess_attr_[i] = 1;
+      if(rank0_) std::cout << "*patch: " << i << " temp_ess_attr: " << temp_ess_attr_[i] << endl;      
     }
   }
 
-  /*
   if (rank0_) {
-    mfem::out << "Adding Temperature Dirichlet BC to attributes ";
+    if(rank0_) mfem::out << "Adding Temperature Dirichlet BC to attributes ";
     for (int i = 0; i < attr.Size(); ++i) {
       if (attr[i] == 1) {
         mfem::out << i << " ";
@@ -922,7 +960,7 @@ void CaloricallyPerfectThermoChem::AddTempDirichletBC(Coefficient *coeff, Array<
       temp_ess_attr_[i] = 1;
     }
   }
-  */
+
 }
 
 void CaloricallyPerfectThermoChem::AddTempDirichletBC(ScalarFuncT *f, Array<int> &attr) {
@@ -932,7 +970,7 @@ void CaloricallyPerfectThermoChem::AddTempDirichletBC(ScalarFuncT *f, Array<int>
 void CaloricallyPerfectThermoChem::AddQtDirichletBC(Coefficient *coeff, Array<int> &attr) {
   Qt_dbcs_.emplace_back(attr, coeff);
 
-  if (rank0_ && pmesh_->GetMyRank() == 0) {
+  if (rank0_) {
     mfem::out << "Adding Qt Dirichlet BC to attributes ";
     for (int i = 0; i < attr.Size(); ++i) {
       if (attr[i] == 1) {
@@ -954,29 +992,38 @@ void CaloricallyPerfectThermoChem::AddQtDirichletBC(ScalarFuncT *f, Array<int> &
   AddQtDirichletBC(new FunctionCoefficient(f), attr);
 }
 
-void CaloricallyPerfectThermoChem::computeQtTO() {
+void CaloricallyPerfectThermoChem::computeQtTO() {  
   tmpR0_ = 0.0;
   LQ_bdry_->Update();
   LQ_bdry_->Assemble();
   LQ_bdry_->ParallelAssemble(tmpR0_);
   tmpR0_.Neg();
+  //if (rank0_) { std::cout << "check 9a..." << std::endl; }      
 
   Array<int> empty;
   LQ_form_->Update();
+  //if (rank0_) { std::cout << "check 9aa..." << std::endl; }        
   LQ_form_->Assemble();
+  //if (rank0_) { std::cout << "check 9ab..." << std::endl; }        
   LQ_form_->FormSystemMatrix(empty, LQ_);
+  // LQ_form_->FormSystemMatrix(temp_ess_tdof_, LQ_);
+  //if (rank0_) { std::cout << "check 9ac..." << std::endl; }        
   LQ_->AddMult(Tn_next_, tmpR0_);  // tmpR0_ += LQ{Tn_next}
+  //if (rank0_) { std::cout << "check 9b..." << std::endl; }      
 
   sfes_->GetRestrictionMatrix()->MultTranspose(tmpR0_, resT_gf_);
 
   Qt_ = 0.0;
   Qt_gf_.SetFromTrueDofs(tmpR0_);
+  //if (rank0_) { std::cout << "check 9c..." << std::endl; }      
 
   Vector Xqt, Bqt;
   Mq_form_->FormLinearSystem(Qt_ess_tdof_, Qt_gf_, resT_gf_, Mq_, Xqt, Bqt, 1);
+  //if (rank0_) { std::cout << "check 9d..." << std::endl; }      
 
   MqInv_->Mult(Bqt, Xqt);
   Mq_form_->RecoverFEMSolution(Xqt, resT_gf_, Qt_gf_);
+  //if (rank0_) { std::cout << "check 9e..." << std::endl; }      
 
   Qt_gf_.GetTrueDofs(Qt_);
   Qt_ *= -Rgas_ / thermo_pressure_;
@@ -1412,3 +1459,25 @@ double temp_inlet(const Vector &coords, double t) {
   return temp;
 }
 #endif
+
+double temp_rt3d(const Vector &x, double t) {
+  double CC = 0.05;
+  double twoPi = 6.28318530718;
+  double yWidth = 0.1;
+  double yInt, dy, wt;
+  double temp, dT;
+  double Tlo = 100.0;
+  double Thi = 1500.0;  
+
+  yInt = std::cos(twoPi * x[0]) + std::cos(twoPi * x[2]);
+  yInt *= CC;
+  yInt += 4.0;
+  
+  dy = x[1] - yInt;
+  dT = Thi - Tlo;
+
+  wt = 0.5 * (tanh(-dy/yWidth) + 1.0);
+  temp = Tlo + wt*dT;
+
+  return temp;
+}

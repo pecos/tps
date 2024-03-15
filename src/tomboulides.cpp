@@ -122,6 +122,16 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
     gravity_.SetSize(dim_);
     tps->getVec("loMach/gravity", gravity_, dim_, zerog);
 
+    // Pressure Gradient
+    pressGrad_.SetSize(dim_);
+    tps->getVec("loMach/pressureGrad", pressGrad_, dim_, zerog);
+
+    // summed
+    bodyTotal_.SetSize(dim_);    
+    for (int i = 0; i < dim_; i++) {
+      bodyTotal_[i] = gravity_[i] + pressGrad_[i];
+    }
+    
     // Initial condition function... options are
     // 1) "" (Empty string), velocity initialized to zero
     // 2) "tgv2d", velocity initialized using vel_exact_tgv2d function
@@ -432,7 +442,8 @@ void Tomboulides::initializeSelf() {
   toTurbModel_interface_.gradW = gradW_gf_;
 
   // Gravity
-  gravity_vec_ = new VectorConstantCoefficient(gravity_);
+  // gravity_vec_ = new VectorConstantCoefficient(gravity_);
+  gravity_vec_ = new VectorConstantCoefficient(bodyTotal_);
   Array<int> domain_attr(pmesh_->attributes.Max());
   domain_attr = 1;
 
@@ -443,6 +454,17 @@ void Tomboulides::initializeSelf() {
     forcing_terms_.emplace_back(domain_attr, gravity_vec_);
   }
 
+  // Pressure gradient
+  /*
+  pressGrad_vec_ = new VectorConstantCoefficient(pressGrad_);
+  if (axisym_) {
+    rad_pressGrad_vec_ = new ScalarVectorProductCoefficient(radius_coeff, *pressGrad_vec_);
+    forcing_terms_.emplace_back(domain_attr, rad_pressGrad_vec_);
+  } else {
+    forcing_terms_.emplace_back(domain_attr, pressGrad_vec_);
+  }
+  */
+  
   // Allocate Vector storage
   const int vfes_truevsize = vfes_->GetTrueVSize();
   const int sfes_truevsize = sfes_->GetTrueVSize();
@@ -522,7 +544,7 @@ void Tomboulides::initializeSelf() {
   // set IC if we have one at this point
   if (!ic_string_.empty()) {
     if (ic_string_ == "tgv2d") {
-      std::cout << "Setting tgv2d IC..." << std::endl;
+      if(rank0_) std::cout << "Setting tgv2d IC..." << std::endl;
       VectorFunctionCoefficient u_excoeff(2, vel_exact_tgv2d);
       u_excoeff.SetTime(0.0);
       u_curr_gf_->ProjectCoefficient(u_excoeff);

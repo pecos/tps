@@ -67,6 +67,9 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   int order_;
   IntegrationRules gll_rules_;
   const temporalSchemeCoefficients &time_coeff_;
+
+  std::string ic_string_;
+  
   double dt_;
   double time_;
 
@@ -127,6 +130,9 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   ParGridFunction R0PM0_gf_;
   ParGridFunction Qt_gf_;
 
+  ConstantCoefficient *t_bc_coeff1_ = nullptr;
+  ConstantCoefficient *t_bc_coeff2_ = nullptr;  
+  
   // ParGridFunction *buffer_tInlet_ = nullptr;
   GridFunctionCoefficient *temperature_bc_field_ = nullptr;
 

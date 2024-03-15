@@ -536,7 +536,7 @@ void LoMachSolver::solveStep() {
       std::cout << std::endl;
     }
   }
-
+  
   // restart files
   if (iter % loMach_opts_.output_frequency_ == 0 && iter != 0) {
     // Write restart file!
@@ -587,7 +587,7 @@ void LoMachSolver::solveEnd() {
 
 void LoMachSolver::solve() {
   this->solveBegin();
-
+  
   while (iter < loMach_opts_.max_steps_) {
     this->solveStep();
   }
@@ -767,7 +767,7 @@ void LoMachSolver::setTimestep() {
     MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, pmesh_->GetComm());
     double dtInst = CFL * hmin / (max_speed * (double)order);
     temporal_coeff_.dt = dtInst;
-    std::cout << "dt from setTimestep: " << temporal_coeff_.dt << " max_speed: " << max_speed << endl;
+    if(rank0_) std::cout << "dt from setTimestep: " << temporal_coeff_.dt << " max_speed: " << max_speed << endl;
   }
 }
 

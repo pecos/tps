@@ -85,16 +85,16 @@ class Tomboulides final : public FlowBase {
   bool partial_assembly_ = false;
 
   int pressure_solve_pl_ = 0;
-  int pressure_solve_max_iter_ = 100;
+  int pressure_solve_max_iter_ = 2000;
   double pressure_solve_rtol_ = 1e-8;
   double pressure_solve_atol_ = 1e-18;
 
   int mass_inverse_pl_ = 0;
-  int mass_inverse_max_iter_ = 200;
+  int mass_inverse_max_iter_ = 2000;
   double mass_inverse_rtol_ = 1e-12;
 
   int hsolve_pl_ = 0;
-  int hsolve_max_iter_ = 200;
+  int hsolve_max_iter_ = 2000;
   double hsolve_rtol_ = 1e-12;
 
   // To use "numerical integration", quadrature rule must persist
@@ -118,6 +118,10 @@ class Tomboulides final : public FlowBase {
   mfem::Vector gravity_;
   mfem::VectorConstantCoefficient *gravity_vec_;
   mfem::ScalarVectorProductCoefficient *rad_gravity_vec_;
+  mfem::Vector pressGrad_;
+  mfem::VectorConstantCoefficient *pressGrad_vec_;
+  mfem::ScalarVectorProductCoefficient *rad_pressGrad_vec_;
+  mfem::Vector bodyTotal_;  
   std::vector<ForcingTerm_T> forcing_terms_;
 
   // BCs holders
