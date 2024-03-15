@@ -553,7 +553,19 @@ void LteThermoChem::initializeOperators() {
   if (rank0_) std::cout << "Temperature operators set" << endl;
 
   // Qt .....................................
-  // TODO(trevilo): Refactor Qt to handle variable R
+
+  // Convection (for rho): Arho(i,j) = \int_{\Omega} \phi_i u \cdot \nabla \phi_j
+  A_rho_form_ = new ParBilinearForm(sfes_);
+  auto *ar_blfi = new ConvectionIntegrator(*un_next_coeff_);
+  if (numerical_integ_) {
+    ar_blfi->SetIntRule(&ir_nli);
+  }
+  A_rho_form_->AddDomainIntegrator(ar_blfi);
+  if (partial_assembly_) {
+    A_rho_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+  }
+  A_rho_form_->Assemble();
+  A_rho_form_->FormSystemMatrix(empty, A_rho_);
 
   // copy IC to other temp containers
   Tn_gf_.GetTrueDofs(Tn_);
@@ -873,32 +885,39 @@ void LteThermoChem::computeQt() {
   Qt_gf_.SetFromTrueDofs(Qt_);
 
   Array<int> empty;
+
+  // Update rho weighted mass matrix and solver
   M_rho_form_->Update();
   M_rho_form_->Assemble();
   M_rho_form_->FormSystemMatrix(empty, M_rho_);
-
   MrhoInv_->SetOperator(*M_rho_);
 
+  // Convection contribution
+  A_rho_form_->Update();
+  A_rho_form_->Assemble();
+  A_rho_form_->FormSystemMatrix(empty, A_rho_);
+  A_rho_->Mult(rn_, resT_);
+
+  // Unsteady contribution
   const double dt = time_coeff_.dt;
   tmpR0_.Set(time_coeff_.bd0 / dt, rn_);
   tmpR0_.Add(time_coeff_.bd1 / dt, rnm1_);
   tmpR0_.Add(time_coeff_.bd2 / dt, rnm2_);
   tmpR0_.Add(time_coeff_.bd3 / dt, rnm3_);
-  tmpR0_.Neg();
+  Ms_->AddMult(tmpR0_, resT_);
 
-  Ms_->Mult(tmpR0_, resT_);
+  // rho Qt = -D\rho/Dt (this .Neg() handles - on rhs)
+  resT_.Neg();
 
-  // TODO(trevilo): Add convection contribution to residual
-
+  // Prep for solve
   sfes_->GetRestrictionMatrix()->MultTranspose(resT_, resT_gf_);
 
   Vector Xqt, Bqt;
   M_rho_form_->FormLinearSystem(Qt_ess_tdof_, Qt_gf_, resT_gf_, M_rho_, Xqt, Bqt, 1);
 
+  // Solve
   MrhoInv_->Mult(Bqt, Xqt);
   M_rho_form_->RecoverFEMSolution(Xqt, resT_gf_, Qt_gf_);
 
   Qt_gf_.GetTrueDofs(Qt_);
-  // Qt_ *= -Rgas_ / thermo_pressure_;
-  // Qt_gf_.SetFromTrueDofs(Qt_);
 }
