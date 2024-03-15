@@ -24,8 +24,8 @@ lassen:
    - export MODULEPATH=${SW_HOME}/modules/gcc:$MODULEPATH
    - module --force purge
    - module load StdEnv
-   - module swap xl ${COMPILER}
-   - module load grvy hypre metis cuda/${CUDA_VER}
+   - module swap base-gcc/8.3.1 ${COMPILER}
+   - module load hdf5-parallel grvy hypre metis cuda/${CUDA_VER}
    - module list
    - export MFEM_DIR=/usr/workspace/oliver33/lassen/sw/mfem-4.5.2-cuda/
    - ./bootstrap
