@@ -134,6 +134,7 @@ class LteThermoChem final : public ThermoChemModelBase {
   ParGridFunction mu_gf_;
   ParGridFunction kappa_gf_;
   ParGridFunction sigma_gf_;
+  ParGridFunction jh_gf_;
   ParGridFunction Rgas_gf_;
   ParGridFunction Cp_gf_;
 
@@ -194,6 +195,7 @@ class LteThermoChem final : public ThermoChemModelBase {
   Vector rn_, rnm1_, rnm2_, rnm3_;
   Vector kappa_;
   Vector visc_;
+  Vector sigma_;
   Vector Rgas_;
   Vector Cp_;
 
@@ -217,6 +219,7 @@ class LteThermoChem final : public ThermoChemModelBase {
   void step() final;
   void initializeIO(IODataOrganizer &io) final;
   void initializeViz(ParaViewDataCollection &pvdc) final;
+  void evaluatePlasmaConductivityGF() final;
 
   // Functions added here
   void updateThermoP();
