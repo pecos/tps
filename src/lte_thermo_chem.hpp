@@ -162,18 +162,24 @@ class LteThermoChem final : public ThermoChemModelBase {
   // operators and solvers
   ParBilinearForm *At_form_ = nullptr;
   ParBilinearForm *Ms_form_ = nullptr;
-  ParBilinearForm *M_rho_form_ = nullptr;
   ParBilinearForm *M_rho_Cp_form_ = nullptr;
   ParBilinearForm *Ht_form_ = nullptr;
+
+  ParBilinearForm *M_rho_form_ = nullptr;
+  ParBilinearForm *A_rho_form_ = nullptr;
+
 
   OperatorHandle At_;
   OperatorHandle Ht_;
   OperatorHandle Ms_;
-  OperatorHandle M_rho_;
   OperatorHandle M_rho_Cp_;
+  OperatorHandle M_rho_;
+  OperatorHandle A_rho_;
 
   mfem::Solver *MsInvPC_ = nullptr;
   mfem::CGSolver *MsInv_ = nullptr;
+  mfem::Solver *MrhoInvPC_ = nullptr;
+  mfem::CGSolver *MrhoInv_ = nullptr;
   mfem::Solver *HtInvPC_ = nullptr;
   mfem::CGSolver *HtInv_ = nullptr;
 
@@ -185,7 +191,7 @@ class LteThermoChem final : public ThermoChemModelBase {
   Vector tmpR0_, tmpR0b_;
 
   Vector Qt_;
-  Vector rn_;
+  Vector rn_, rnm1_, rnm2_, rnm3_;
   Vector kappa_;
   Vector visc_;
   Vector Rgas_;
@@ -220,7 +226,6 @@ class LteThermoChem final : public ThermoChemModelBase {
   void computeSystemMass();
   void computeExplicitTempConvectionOP();
   void computeQt();
-  void computeQtTO();
   void updateHistory();
 
   /// Return a pointer to the current temperature ParGridFunction.
