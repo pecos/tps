@@ -198,6 +198,9 @@ void LteThermoChem::initializeSelf() {
   kappa_.SetSize(sfes_truevsize);
   kappa_ = 1.0e-12;
 
+  sigma_.SetSize(sfes_truevsize);
+  sigma_ = 0.0;
+
   Rgas_.SetSize(sfes_truevsize);
   Rgas_ = 0.0;
 
@@ -231,6 +234,8 @@ void LteThermoChem::initializeSelf() {
   toFlow_interface_.viscosity = &mu_gf_;
   toFlow_interface_.thermal_divergence = &Qt_gf_;
   toTurbModel_interface_.density = &rn_gf_;
+
+  plasma_conductivity_gf_ = &sigma_gf_;
 
   //-----------------------------------------------------
   // 2) Set the initial condition
@@ -803,6 +808,16 @@ void LteThermoChem::updateProperties() {
   }
   Rgas_gf_.SetFromTrueDofs(Rgas_);
   Cp_gf_.SetFromTrueDofs(Cp_);
+}
+
+void LteThermoChem::evaluatePlasmaConductivityGF() {
+  {
+    const double *d_T = Tn_next_.Read();
+
+    double *d_sigma = sigma_.Write();
+    MFEM_FORALL(i, Tn_.Size(), { d_sigma[i] = sigma_table_->eval(d_T[i]); });
+  }
+  sigma_gf_.SetFromTrueDofs(Rgas_);
 }
 
 void LteThermoChem::updateDensity() {

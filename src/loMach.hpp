@@ -222,6 +222,24 @@ class LoMachSolver : public TPS::PlasmaSolver {
 
   /// Rotate entries in the time step and solution history arrays.
   void UpdateTimestepHistory(double dt);
+
+  // Functions necessary for coupled EM+plasma simulations
+  // These are overriden from TPS::Solver or TPS::PlasmaSolver
+  mfem::ParMesh *getMesh() const override { return pmesh_; }
+  mfem::FiniteElementCollection *getFEC() const override { return sfec_; }
+  mfem::ParFiniteElementSpace *getFESpace() const override { return sfes_; }
+
+  mfem::ParGridFunction *getPlasmaConductivityGF() override {
+    return thermo_->getPlasmaConductivityGF();
+  }
+
+  void evaluatePlasmaConductivityGF() override {
+    thermo_->evaluatePlasmaConductivityGF();
+  }
+
+  virtual mfem::ParGridFunction *getJouleHeatingGF() override {
+    return thermo_->getJouleHeatingGF();
+  }
 };
 
 #endif  // LOMACH_HPP_

@@ -77,6 +77,9 @@ class ThermoChemModelBase {
   const spongeToThermoChem *sponge_interface_;
   const extDataToThermoChem *extData_interface_;
 
+  mfem::ParGridFunction *plasma_conductivity_gf_ = nullptr;
+  mfem::ParGridFunction *joule_heating_gf_ = nullptr;
+
  public:
   /// Destructor
   virtual ~ThermoChemModelBase() {}
@@ -159,6 +162,13 @@ class ThermoChemModelBase {
 
   void initializeFromExtData(extDataToThermoChem *extData) { extData_interface_ = extData; }
   const extDataToThermoChem *getExtDataInterface() const { return extData_interface_; }
+
+  mfem::ParGridFunction *getPlasmaConductivityGF() { return plasma_conductivity_gf_; }
+  mfem::ParGridFunction *getJouleHeatingGF() { return joule_heating_gf_; }
+  virtual void evaluatePlasmaConductivityGF() {
+    std::cout << "ERROR: " << __func__ << " remains unimplemented" << std::endl;
+    exit(1);
+  }
 };
 
 /**
