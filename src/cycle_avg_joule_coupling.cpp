@@ -31,6 +31,7 @@
 // -----------------------------------------------------------------------------------el-
 #include "cycle_avg_joule_coupling.hpp"
 
+#include "loMach.hpp"
 #include "M2ulPhyS.hpp"
 #include "em_options.hpp"
 #include "quasimagnetostatic.hpp"
@@ -53,6 +54,8 @@ CycleAvgJouleCoupling::CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tp
   else
     rank0_ = false;
 
+  std::string plasma_solver;
+  tps->getInput("cycle-avg-joule-coupled/plasma-solver", plasma_solver, std::string("compressible"));
   tps->getRequiredInput("cycle-avg-joule-coupled/solve-em-every-n", solve_em_every_n_);
   tps->getRequiredInput("cycle-avg-joule-coupled/max-iters", max_iters_);
   tps->getInput("cycle-avg-joule-coupled/timing-frequency", timing_freq_, 100);
@@ -67,7 +70,15 @@ CycleAvgJouleCoupling::CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tp
   } else {
     qmsa_solver_ = new QuasiMagnetostaticSolver3D(em_opt_, tps);
   }
-  flow_solver_ = new M2ulPhyS(inputFileName, tps);
+
+  if (plasma_solver == "compressible") {
+    flow_solver_ = new M2ulPhyS(inputFileName, tps);
+  } else if (plasma_solver == "lomach") {
+    flow_solver_ = new LoMachSolver(tps);
+  } else {
+    assert(false);
+    exit(-1);
+  }
 
 #ifdef HAVE_GSLIB
   interp_flow_to_em_ = new FindPointsGSLIB(tps->getTPSCommWorld());

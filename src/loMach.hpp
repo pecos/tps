@@ -99,7 +99,7 @@ struct temporalSchemeCoefficients {
 /**
  * @brief Driver class for models based on low Mach, variable density formulation
  */
-class LoMachSolver : public TPS::Solver {
+class LoMachSolver : public TPS::PlasmaSolver {
  protected:
   // pointer to parent Tps class
   TPS::Tps *tpsP_ = nullptr;
