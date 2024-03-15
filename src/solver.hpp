@@ -34,6 +34,8 @@
 
 #include "utils.hpp"
 
+#include "tps_mfem_wrap.hpp"
+
 using namespace std;
 
 namespace TPS {
@@ -94,6 +96,51 @@ class Solver {
   virtual void fetch(Tps2Boltzmann& interface) {
     cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
     exit(1);
+  }
+
+  /// Get the mesh used by this Solver
+  virtual mfem::ParMesh *getMesh() const {
+    cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
+    exit(1);
+    return nullptr;
+  }
+
+  virtual mfem::FiniteElementCollection *getFEC() const {
+    cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
+    exit(1);
+    return nullptr;
+  }
+
+  virtual mfem::ParFiniteElementSpace *getFESpace() const {
+    cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
+    exit(1);
+    return nullptr;
+  }
+};
+
+// Base class for flow solver implementations
+class PlasmaSolver : public Solver {
+ public:
+  virtual ~PlasmaSolver() {}
+
+  /// Fetch the plasma electrical conductivity grid function
+  virtual mfem::ParGridFunction *getPlasmaConductivityGF() {
+    cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
+    exit(1);
+    return nullptr;
+  }
+
+  /// Update the plasma conductivity
+  virtual void evaluatePlasmaConductivityGF() {
+    cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
+    exit(1);
+  }
+
+  /// Fetch the Joule heating grid function
+  virtual mfem::ParGridFunction *getJouleHeatingGF() {
+    cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
+    exit(1);
+    return nullptr;
   }
 };
 

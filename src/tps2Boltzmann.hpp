@@ -90,7 +90,7 @@ class Tps2Boltzmann {
   const std::size_t NIndexes;
 
   Tps2Boltzmann(Tps *tps);
-  void init(M2ulPhyS *flowSolver);
+  void init(TPS::PlasmaSolver *flowSolver);
   bool IsInitialized() const { return all_fes_ != nullptr; }
 
   const mfem::ParFiniteElementSpace &Fes(Index index) const { return *(list_fes_[index]); }

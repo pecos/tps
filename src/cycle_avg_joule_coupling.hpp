@@ -42,7 +42,6 @@ class Tps;
 #include <iostream>
 #include <mfem.hpp>
 
-#include "M2ulPhyS.hpp"
 #include "em_options.hpp"
 #include "quasimagnetostatic.hpp"
 #include "solver.hpp"
@@ -51,7 +50,7 @@ class CycleAvgJouleCoupling : public TPS::Solver {
  private:
   ElectromagneticOptions em_opt_;
   QuasiMagnetostaticSolverBase *qmsa_solver_;
-  M2ulPhyS *flow_solver_;
+  TPS::PlasmaSolver *flow_solver_;
 
   // Only needed for Boltzmann interface
   int efield_ncomp_;
@@ -125,7 +124,7 @@ class CycleAvgJouleCoupling : public TPS::Solver {
   /// Fetch solver variables from interface
   void fetch(TPS::Tps2Boltzmann &interface) override;
 
-  M2ulPhyS *getFlowSolver() { return flow_solver_; }
+  TPS::PlasmaSolver *getFlowSolver() { return flow_solver_; }
   QuasiMagnetostaticSolverBase *getEMSolver() { return qmsa_solver_; }
 };
 #endif  // CYCLE_AVG_JOULE_COUPLING_HPP_

@@ -92,9 +92,9 @@ Tps2Boltzmann::Tps2Boltzmann(Tps *tps) : NIndexes(7), tps_(tps), all_fes_(nullpt
   ncomps.SetSize(NIndexes + 1);
 }
 
-void Tps2Boltzmann::init(M2ulPhyS *flowSolver) {
+void Tps2Boltzmann::init(TPS::PlasmaSolver *flowSolver) {
   std::cout << "Tps2Boltzmann::init is called" << std::endl;
-  mfem::ParMesh *pmesh(flowSolver->GetMesh());
+  mfem::ParMesh *pmesh(flowSolver->getMesh());
   fec_ = new mfem::L2_FECollection(order_, pmesh->Dimension(), basis_type_);
   switch (pmesh->Dimension()) {
     case 2:
@@ -143,7 +143,7 @@ void Tps2Boltzmann::init(M2ulPhyS *flowSolver) {
   fields_[Index::All] = all;
 
   // Native spaces
-  mfem::FiniteElementCollection *fec_native(flowSolver->GetFEC());
+  mfem::FiniteElementCollection *fec_native(flowSolver->getFEC());
   species_densities_native_fes_ =
       new mfem::ParFiniteElementSpace(pmesh, fec_native, nspecies_, mfem::Ordering::byNODES);
   efield_native_fes_ = new mfem::ParFiniteElementSpace(pmesh, fec_native, nEfieldComps_, mfem::Ordering::byNODES);

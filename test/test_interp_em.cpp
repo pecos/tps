@@ -128,8 +128,8 @@ int main (int argc, char *argv[])
   solver->parseSolverOptions();
   solver->initialize();
 
-  ParFiniteElementSpace *vfes = solver->getFlowSolver()->GetFESpace();
-  ParGridFunction *flow_pc = solver->getFlowSolver()->GetPlasmaConductivityGF();
+  ParFiniteElementSpace *vfes = solver->getFlowSolver()->getFESpace();
+  ParGridFunction *flow_pc = solver->getFlowSolver()->getPlasmaConductivityGF();
 
   // Set fields to known function
   set_flow_plasma_conductivity(vfes, flow_pc);
