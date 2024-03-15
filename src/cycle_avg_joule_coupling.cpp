@@ -130,7 +130,7 @@ void CycleAvgJouleCoupling::initializeInterpolationData() {
   if (verbose) grvy_printf(ginfo, "Initializing interpolation data.\n");
 
 #ifdef HAVE_GSLIB
-  ParMesh *flow_mesh = flow_solver_->GetMesh();
+  ParMesh *flow_mesh = flow_solver_->getMesh();
   ParMesh *em_mesh = qmsa_solver_->getMesh();
   assert(flow_mesh != NULL);
   assert(em_mesh != NULL);
@@ -442,10 +442,10 @@ void CycleAvgJouleCoupling::initInterface(TPS::Tps2Boltzmann &interface) {
   if (efieldFES_) delete efieldFES_;
   efield_ncomp_ = interface.NeFieldComps() / 2;
   efieldFES_ =
-      new mfem::ParFiniteElementSpace(flow_solver_->GetMesh(), efieldFEC_, efield_ncomp_ * 2, mfem::Ordering::byNODES);
+      new mfem::ParFiniteElementSpace(flow_solver_->getMesh(), efieldFEC_, efield_ncomp_ * 2, mfem::Ordering::byNODES);
   if (efieldFES1_) delete efieldFES1_;
   efieldFES1_ =
-      new mfem::ParFiniteElementSpace(flow_solver_->GetMesh(), efieldFEC_, efield_ncomp_, mfem::Ordering::byNODES);
+      new mfem::ParFiniteElementSpace(flow_solver_->getMesh(), efieldFEC_, efield_ncomp_, mfem::Ordering::byNODES);
   if (efield_) delete efield_;
   efield_ = new mfem::ParGridFunction(efieldFES_);
   if (efieldR_) delete efieldR_;

@@ -24,7 +24,7 @@ int main (int argc, char *argv[])
   int num_equation = mixture->GetNumEquations();
 
   // Get meshes
-  ParMesh* mesh_1 = srcField1->GetMesh();
+  ParMesh* mesh_1 = srcField1->getMesh();
 
   const int dim = mesh_1->Dimension();
 

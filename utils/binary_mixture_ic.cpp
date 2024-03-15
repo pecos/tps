@@ -27,7 +27,7 @@ int main (int argc, char *argv[])
   ArgonMinimalTransport transport = ArgonMinimalTransport(mixture, srcConfig);
 
   // Get meshes
-  ParMesh* mesh_1 = srcField->GetMesh();
+  ParMesh* mesh_1 = srcField->getMesh();
 
   const int dim = mesh_1->Dimension();
 

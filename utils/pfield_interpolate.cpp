@@ -50,7 +50,7 @@ int main (int argc, char *argv[])
 
   tps.closeInputFile();
 
-  ParMesh* mesh_1 = srcField.GetMesh();
+  ParMesh* mesh_1 = srcField.getMesh();
   const int dim = mesh_1->Dimension();
 
 
@@ -67,7 +67,7 @@ int main (int argc, char *argv[])
   tps.closeInputFile();
 
   // Get meshes
-  ParMesh* mesh_2 = tarField.GetMesh();
+  ParMesh* mesh_2 = tarField.getMesh();
 
   //const int dim = mesh_1->Dimension();
 

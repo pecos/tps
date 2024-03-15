@@ -34,6 +34,8 @@
 
 #include "utils.hpp"
 
+#include "tps_mfem_wrap.hpp"
+
 using namespace std;
 
 namespace TPS {
@@ -94,6 +96,13 @@ class Solver {
   virtual void fetch(Tps2Boltzmann& interface) {
     cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
     exit(1);
+  }
+
+  /// Get the mesh used by this Solver
+  virtual mfem::ParMesh *getMesh() const {
+    cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
+    exit(1);
+    return nullptr;
   }
 };
 

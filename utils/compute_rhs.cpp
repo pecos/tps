@@ -32,7 +32,7 @@ int main (int argc, char *argv[])
   int num_equation = mixture->GetNumEquations();
 
   // Get meshes
-  ParMesh* mesh = srcField->GetMesh();
+  ParMesh* mesh = srcField->getMesh();
 
   const int dim = mesh->Dimension();
   int numVariables = num_equation - dim + 1;

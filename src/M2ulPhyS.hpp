@@ -410,11 +410,12 @@ class M2ulPhyS : public TPS::Solver {
   void solveBegin() override;
   void solveEnd() override;
   void visualization() override;
+  ParMesh *getMesh() const override { return mesh; }
+
   void updateVisualizationVariables();
 
   // Accessors
   RHSoperator *getRHSoperator() { return rhsOperator; }
-  ParMesh *GetMesh() { return mesh; }
   FiniteElementCollection *GetFEC() { return fec; }
   ParFiniteElementSpace *GetFESpace() { return vfes; }
   ParFiniteElementSpace *GetScalarFES() { return fes; }

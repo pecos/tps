@@ -105,7 +105,7 @@ int main (int argc, char *argv[])
   M2ulPhyS *srcField = new M2ulPhyS(tps.getInputFilename(), &tps);
   RunConfiguration& srcConfig = srcField->GetConfig();
   // Get meshes
-  ParMesh* mesh = srcField->GetMesh();
+  ParMesh* mesh = srcField->getMesh();
   const int dim = mesh->Dimension();
 
   assert(srcConfig.GetWorkingFluid()==WorkingFluid::USER_DEFINED);
