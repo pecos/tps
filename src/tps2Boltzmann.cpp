@@ -92,7 +92,7 @@ Tps2Boltzmann::Tps2Boltzmann(Tps *tps) : NIndexes(7), tps_(tps), all_fes_(nullpt
   ncomps.SetSize(NIndexes + 1);
 }
 
-void Tps2Boltzmann::init(TPS::FlowSolver *flowSolver) {
+void Tps2Boltzmann::init(TPS::PlasmaSolver *flowSolver) {
   std::cout << "Tps2Boltzmann::init is called" << std::endl;
   mfem::ParMesh *pmesh(flowSolver->getMesh());
   fec_ = new mfem::L2_FECollection(order_, pmesh->Dimension(), basis_type_);

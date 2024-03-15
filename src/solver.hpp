@@ -119,9 +119,9 @@ class Solver {
 };
 
 // Base class for flow solver implementations
-class FlowSolver : public Solver {
+class PlasmaSolver : public Solver {
  public:
-  virtual ~FlowSolver() {}
+  virtual ~PlasmaSolver() {}
 
   /// Fetch the plasma electrical conductivity grid function
   virtual mfem::ParGridFunction *getPlasmaConductivityGF() {

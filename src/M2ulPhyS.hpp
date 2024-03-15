@@ -90,7 +90,7 @@ namespace TPS {
 class Tps2Boltzmann;
 }
 
-class M2ulPhyS : public TPS::FlowSolver {
+class M2ulPhyS : public TPS::PlasmaSolver {
  private:
   MPI_Groups *groupsMPI;
   int nprocs_;  // total number of MPI procs
