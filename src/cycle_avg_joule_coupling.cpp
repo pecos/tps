@@ -297,10 +297,32 @@ void CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow() {
   Vector interp_vals(n_flow_interp_nodes_);
 
   const ParGridFunction *joule_heating_gf = qmsa_solver_->getJouleHeatingGF();
+  assert(joule_heating_gf != NULL);
+
   interp_em_to_flow_->Interpolate(vxyz, *joule_heating_gf, interp_vals);
 
   ParGridFunction *joule_heating_flow = flow_solver_->getJouleHeatingGF();
-  joule_heating_flow->SetFromTrueDofs(interp_vals);
+  if (flow_fespace->IsDGSpace()) {
+    joule_heating_flow->SetFromTrueDofs(interp_vals);
+  } else {
+    Array<int> vdofs;
+    Vector elem_dof_vals;
+    int n0 = 0;
+    const int NE = flow_solver_->getMesh()->GetNE();
+    for (int i = 0; i < NE; i++) {
+      flow_fespace->GetElementDofs(i, vdofs);
+      const int nsp = flow_fespace->GetFE(i)->GetNodes().GetNPoints();
+      assert(nsp == vdofs.Size());
+      elem_dof_vals.SetSize(nsp);
+      for (int j = 0; j < nsp; j++) {
+        elem_dof_vals(j) = interp_vals(n0 + j);
+      }
+      joule_heating_flow->SetSubVector(vdofs, elem_dof_vals);
+      n0 += nsp;
+    }
+    joule_heating_flow->SetTrueVector();
+    joule_heating_flow->SetFromTrueVector();
+  }
 #else
   mfem_error("Cannot interpolate without GSLIB support.");
 #endif
@@ -321,12 +343,22 @@ void CycleAvgJouleCoupling::interpElectricFieldFromEMToFlow() {
 
   const ParGridFunction *efield_real_gf = qmsa_solver_->getElectricFieldreal();
   interp_em_to_flow_->Interpolate(vxyz, *efield_real_gf, interp_vals);
-  efieldR_->SetFromTrueDofs(interp_vals);
+
+  const ParFiniteElementSpace *flow_fespace = flow_solver_->getFESpace();
+  if (flow_fespace->IsDGSpace()) {
+    efieldR_->SetFromTrueDofs(interp_vals);
+  } else {
+    assert(false);
+  }
   efieldR_->HostRead();
 
   const ParGridFunction *efield_imag_gf = qmsa_solver_->getElectricFieldimag();
   interp_em_to_flow_->Interpolate(vxyz, *efield_imag_gf, interp_vals);
-  efieldI_->SetFromTrueDofs(interp_vals);
+  if (flow_fespace->IsDGSpace()) {
+    efieldI_->SetFromTrueDofs(interp_vals);
+  } else {
+    assert(false);
+  }
   efieldI_->HostRead();
 #else
   mfem_error("Cannot interpolate without GSLIB support.");
