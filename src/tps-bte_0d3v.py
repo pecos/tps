@@ -13,6 +13,7 @@ import enum
 import pandas as pd
 import scipy.interpolate
 import scipy.cluster
+import threading
 
 class profile_t:
     def __init__(self,name):
@@ -463,6 +464,7 @@ class Boltzmann0D2VBactchedSolver:
                 std_obs[std_obs == 0.0] = 1.0
                 return obs/std_obs, std_obs
 
+            thread_pool = list()
             for grid_idx in self.active_grid_idx:
                 def t1():
                     dev_id                       = self.gidx_to_device_map(grid_idx, n_grids)
@@ -539,9 +541,16 @@ class Boltzmann0D2VBactchedSolver:
                     # cp.save(self.param.out_fname + "_E_%02d.npy"%(grid_idx)   , EMag  , grid_idx)
                     
                     return
-                t1()
+                
+                thread = threading.Thread(target=t1)
+                thread_pool.append(thread)
+                thread.start()
+            
+            for thread in thread_pool:
+                thread.join()
             
         else:
+            thread_pool = list()
             for grid_idx in self.active_grid_idx:
                 def t1():
                     bte_idx           = gidx_to_pidx[grid_idx]
@@ -605,10 +614,25 @@ class Boltzmann0D2VBactchedSolver:
                     # cp.save(self.param.out_fname + "_E_%02d.npy"%(grid_idx)   , EMag  , grid_idx)
                     
                     return
-                t1()
+                
+                thread = threading.Thread(target=t1)
+                thread_pool.append(thread)
+                thread.start()
+            
+            for thread in thread_pool:
+                thread.join()
         return        
 
     async def fetch_asnyc(self, interface):
+        ts = TaskSpace("T")
+        for grid_idx in self.active_grid_idx:
+            @spawn(ts[grid_idx], placement=[cpu], vcus=0.0)
+            def t1():
+                print("rank [%d/%d] hello from parla task %d"%(self.rankG, self.npesG, grid_idx), flush=True)
+                return
+        await ts
+        return
+        
         use_interp              = self.param.use_clstr_inp
         gidx_to_pidx            = self.grid_idx_to_spatial_idx_map
         heavy_temp              = np.array(interface.HostRead(libtps.t2bIndex.HeavyTemperature), copy=False)
@@ -1239,8 +1263,8 @@ def driver_w_parla(comm):
                 
                 # ########################## BTE solve ##################################################
                 profile_tt[pp.BTE_FETCH].start()
-                #await boltzmann.fetch_asnyc(interface)
-                boltzmann.fetch(interface)
+                await boltzmann.fetch_asnyc(interface)
+                #boltzmann.fetch(interface)
                 profile_tt[pp.BTE_FETCH].stop()
                 
                 """
