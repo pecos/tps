@@ -159,6 +159,7 @@ class LteThermoChem final : public ThermoChemModelBase {
   GridFunctionCoefficient *Cp_coeff_ = nullptr;
   ProductCoefficient *rho_Cp_over_dt_coeff_ = nullptr;
   ProductCoefficient *rho_Cp_coeff_ = nullptr;
+  GridFunctionCoefficient *jh_coeff_ = nullptr;
 
   // operators and solvers
   ParBilinearForm *At_form_ = nullptr;
@@ -168,6 +169,8 @@ class LteThermoChem final : public ThermoChemModelBase {
 
   ParBilinearForm *M_rho_form_ = nullptr;
   ParBilinearForm *A_rho_form_ = nullptr;
+
+  ParLinearForm *jh_form_ = nullptr;
 
 
   OperatorHandle At_;
@@ -198,6 +201,7 @@ class LteThermoChem final : public ThermoChemModelBase {
   Vector sigma_;
   Vector Rgas_;
   Vector Cp_;
+  Vector jh_;
 
   // Parameters and objects used in filter-based stabilization
   bool filter_temperature_ = false;

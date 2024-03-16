@@ -225,6 +225,10 @@ void LteThermoChem::initializeSelf() {
   Cp_gf_.SetSpace(sfes_);
   Cp_gf_ = 0.0;
 
+  jh_.SetSize(sfes_truevsize);
+  jh_ = 0.0;
+
+
   tmpR0_.SetSize(sfes_truevsize);
   tmpR0b_.SetSize(sfes_truevsize);
 
@@ -441,6 +445,8 @@ void LteThermoChem::initializeOperators() {
 
   rho_Cp_u_coeff_ = new ScalarVectorProductCoefficient(*rho_Cp_coeff_, *un_next_coeff_);
 
+  jh_coeff_ = new GridFunctionCoefficient(&jh_gf_);
+
   // Convection: Atemperature(i,j) = \int_{\Omega} \phi_i \rho Cp u \cdot \nabla \phi_j
   At_form_ = new ParBilinearForm(sfes_);
   auto *at_blfi = new ConvectionIntegrator(*rho_Cp_u_coeff_);
@@ -563,6 +569,15 @@ void LteThermoChem::initializeOperators() {
   HtInv_->SetMaxIter(max_iter_);
   if (rank0_) std::cout << "Temperature operators set" << endl;
 
+  jh_form_ = new ParLinearForm(sfes_);
+  DomainLFIntegrator *jh_dlfi;
+  jh_dlfi = new DomainLFIntegrator(*jh_coeff_);
+  if (numerical_integ_) {
+    jh_dlfi->SetIntRule(&ir_i);
+  }
+  jh_form_->AddDomainIntegrator(jh_dlfi);
+
+
   // Qt .....................................
 
   // Convection (for rho): Arho(i,j) = \int_{\Omega} \phi_i u \cdot \nabla \phi_j
@@ -668,6 +683,14 @@ void LteThermoChem::step() {
   // dPo/dt
   tmpR0_ = dtP_;
   Ms_->AddMult(tmpR0_, resT_);
+
+  // Joule heating
+  jh_form_->Update();
+  jh_form_->Assemble();
+  jh_form_->ParallelAssemble(jh_);
+  resT_ += jh_;
+
+  // TODO(trevilo): radiation heat sink
 
   // Update Helmholtz operator to account for changing dt, rho, and kappa
   bd0_over_dt.constant = (time_coeff_.bd0 / dt_);
