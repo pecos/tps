@@ -216,6 +216,9 @@ void LteThermoChem::initializeSelf() {
   sigma_gf_.SetSpace(sfes_);
   sigma_gf_ = 0.0;
 
+  jh_gf_.SetSpace(sfes_);
+  jh_gf_ = 0.0;
+
   Rgas_gf_.SetSpace(sfes_);
   Rgas_gf_ = 0.0;
 
@@ -236,6 +239,7 @@ void LteThermoChem::initializeSelf() {
   toTurbModel_interface_.density = &rn_gf_;
 
   plasma_conductivity_gf_ = &sigma_gf_;
+  joule_heating_gf_ = &jh_gf_;
 
   //-----------------------------------------------------
   // 2) Set the initial condition
@@ -259,6 +263,8 @@ void LteThermoChem::initializeSelf() {
   Tn_gf_.ProjectCoefficient(t_ic_coef);
 
   Tn_gf_.GetTrueDofs(Tn_);
+  Tn_next_ = Tn_;
+
   Tnm1_gf_.SetFromTrueDofs(Tn_);
   Tnm2_gf_.SetFromTrueDofs(Tn_);
   Tnm1_gf_.GetTrueDofs(Tnm1_);

@@ -134,6 +134,7 @@ class LteThermoChem final : public ThermoChemModelBase {
   ParGridFunction mu_gf_;
   ParGridFunction kappa_gf_;
   ParGridFunction sigma_gf_;
+  ParGridFunction jh_gf_;
   ParGridFunction Rgas_gf_;
   ParGridFunction Cp_gf_;
 

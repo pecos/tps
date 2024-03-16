@@ -185,7 +185,7 @@ class LoMachSolver : public TPS::PlasmaSolver {
   double tlast_;
 
   // I/O helpers
-  ParaViewDataCollection *pvdc_;  // visualization
+  ParaViewDataCollection *pvdc_ = nullptr;  // visualization
   IODataOrganizer ioData;         // restart
 
   /// Update the EXTk/BDF time integration coefficient.
