@@ -51,6 +51,22 @@ using namespace mfem::common;
 static double radius(const Vector &pos) { return pos[0]; }
 static FunctionCoefficient radius_coeff(radius);
 
+static double sigmaTorchStartUp(const Vector &pos) {
+  const double x = pos[0]; // radial location
+  const double y = pos[1]; // axial location
+
+  const double r0 = 0.005;
+  const double y0 = 0.135;
+  const double ysig = 0.015;
+
+  const double sigma = 2000. * std::exp(-0.5 * (x / r0) * (x / r0)) * std::exp(-0.5 * ((y - y0) / ysig) * ((y - y0) / ysig));
+
+  return sigma;
+}
+
+static FunctionCoefficient sigma_start_up(sigmaTorchStartUp);
+
+
 LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &time_coeff,
                              TPS::Tps *tps)
     : tpsP_(tps), pmesh_(pmesh), time_coeff_(time_coeff) {
@@ -484,6 +500,9 @@ void LteThermoChem::initializeSelf() {
 void LteThermoChem::initializeOperators() {
   const double dt_ = time_coeff_.dt;
 
+  // TODO(trevilo): Put a flag for this!!!!
+  sigma_gf_.ProjectCoefficient(sigma_start_up);
+
   Array<int> empty;
 
   // GLL integration rule (Numerical Integration)
@@ -908,6 +927,7 @@ void LteThermoChem::initializeViz(ParaViewDataCollection &pvdc) {
   pvdc.RegisterField("temperature", &Tn_gf_);
   pvdc.RegisterField("density", &rn_gf_);
   pvdc.RegisterField("kappa", &kappa_gf_);
+  pvdc.RegisterField("sigma", &sigma_gf_);
   pvdc.RegisterField("kappaT", &thermal_diff_total_gf_);
   pvdc.RegisterField("Qt", &Qt_gf_);
   pvdc.RegisterField("Rgas", &Rgas_gf_);
@@ -989,7 +1009,7 @@ void LteThermoChem::evaluatePlasmaConductivityGF() {
     double *d_sigma = sigma_.Write();
     MFEM_FORALL(i, Tn_.Size(), { d_sigma[i] = sigma_table_->eval(d_T[i]); });
   }
-  sigma_gf_.SetFromTrueDofs(Rgas_);
+  sigma_gf_.SetFromTrueDofs(sigma_);
 }
 
 void LteThermoChem::updateDensity() {
