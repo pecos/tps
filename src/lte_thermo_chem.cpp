@@ -505,7 +505,9 @@ void LteThermoChem::initializeOperators() {
 
   thermal_diff_coeff_ = new GridFunctionCoefficient(&kappa_gf_);
   mut_coeff_ = new GridFunctionCoefficient(turbModel_interface_->eddy_viscosity);
-  thermal_diff_sum_coeff_ = new SumCoefficient(*mut_coeff_, *thermal_diff_coeff_, invPrt_, 1.0);
+
+  kapt_coeff_ = new ProductCoefficient(*Cp_coeff_, *mut_coeff_);
+  thermal_diff_sum_coeff_ = new SumCoefficient(*kapt_coeff_, *thermal_diff_coeff_, invPrt_, 1.0);
   mult_coeff_ = new GridFunctionCoefficient(sponge_interface_->diff_multiplier);
   thermal_diff_total_coeff_ = new ProductCoefficient(*mult_coeff_, *thermal_diff_sum_coeff_);
 
@@ -975,6 +977,7 @@ void LteThermoChem::updateProperties() {
   Cp_gf_.SetFromTrueDofs(Cp_);
 
   thermal_diff_total_gf_.Set(invPrt_, *turbModel_interface_->eddy_viscosity);
+  thermal_diff_total_gf_ *= Cp_gf_;
   thermal_diff_total_gf_.Add(1.0, kappa_gf_);
   thermal_diff_total_gf_ *= (*sponge_interface_->diff_multiplier);
 }
@@ -1104,4 +1107,6 @@ void LteThermoChem::computeQt() {
   M_rho_form_->RecoverFEMSolution(Xqt, resT_gf_, Qt_gf_);
 
   Qt_gf_.GetTrueDofs(Qt_);
+  // Qt_ = 0.0;
+  // Qt_gf_.SetFromTrueDofs(Qt_);
 }
