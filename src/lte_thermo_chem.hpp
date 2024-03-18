@@ -84,7 +84,7 @@ class LteThermoChem final : public ThermoChemModelBase {
   // Flags
   bool rank0_;                    /**< true if this is rank 0 */
   bool partial_assembly_ = false; /**< Enable/disable partial assembly of forms. */
-  bool numerical_integ_ = true;   /**< Enable/disable numerical integration rules of forms. */
+  bool numerical_integ_ = false;   /**< Enable/disable numerical integration rules of forms. */
   bool domain_is_open_ = false;   /**< true if domain is open */
 
   // Linear-solver-related options
