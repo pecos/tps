@@ -41,6 +41,7 @@
 #include "loMach.hpp"
 #include "loMach_options.hpp"
 #include "logger.hpp"
+#include "radiation.hpp"
 #include "tps.hpp"
 #include "utils.hpp"
 
@@ -76,6 +77,50 @@ LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, t
   sigma_table_ = new LinearTable(thermo_tables[2]);
   Rgas_table_ = new LinearTable(thermo_tables[3]);
   Cp_table_ = new LinearTable(thermo_tables[4]);
+
+  // Initialize NEC model
+  std::string type;
+  std::string basepath("plasma_models/radiation_model");
+
+  tpsP_->getInput(basepath.c_str(), type, std::string("none"));
+  std::string model_input_path(basepath + "/" + type);
+
+  RadiationInput rad_model_input;
+  if (type == "net_emission") {
+    rad_model_input.model = NET_EMISSION;
+
+    std::string coefficient_type;
+    tpsP_->getRequiredInput((model_input_path + "/coefficient").c_str(), coefficient_type);
+    if (coefficient_type == "tabulated") {
+      rad_model_input.necModel = TABULATED_NEC;
+      std::string table_input_path(model_input_path + "/tabulated");
+
+      std::vector<TableInput> rad_tables(1);
+      for (size_t i = 0; i < rad_tables.size(); i++) {
+        rad_tables[i].order = 1;
+        rad_tables[i].xLogScale = false;
+        rad_tables[i].fLogScale = false;
+      }
+
+      // Read data from hdf5 file containing 4 columns: T, energy, gas constant, speed of sound
+      DenseMatrix rad_data;
+      success = h5ReadBcastMultiColumnTable(table_input_path, std::string("table"), pmesh_->GetComm(), rad_data, rad_tables);
+
+      rad_model_input.necTableInput.Ndata = rad_tables[0].Ndata;
+      rad_model_input.necTableInput.xdata = rad_tables[0].xdata;
+      rad_model_input.necTableInput.fdata = rad_tables[0].fdata;
+
+      radiation_ = new NetEmission(rad_model_input);
+    } else {
+      grvy_printf(GRVY_ERROR, "\nUnknown net emission coefficient type -> %s\n", coefficient_type.c_str());
+      exit(ERROR);
+    }
+  } else if (type == "none") {
+    radiation_ = nullptr;
+  } else {
+    grvy_printf(GRVY_ERROR, "\nUnknown radiation model -> %s\n", type.c_str());
+    exit(ERROR);
+  }
 
   tpsP_->getInput("loMach/ambientPressure", ambient_pressure_, 101325.0);
   thermo_pressure_ = ambient_pressure_;
@@ -219,6 +264,9 @@ void LteThermoChem::initializeSelf() {
   jh_gf_.SetSpace(sfes_);
   jh_gf_ = 0.0;
 
+  radiation_sink_gf_.SetSpace(sfes_);
+  radiation_sink_gf_ = 0.0;
+
   Rgas_gf_.SetSpace(sfes_);
   Rgas_gf_ = 0.0;
 
@@ -228,6 +276,8 @@ void LteThermoChem::initializeSelf() {
   jh_.SetSize(sfes_truevsize);
   jh_ = 0.0;
 
+  radiation_sink_.SetSize(sfes_truevsize);
+  radiation_sink_ = 0.0;
 
   tmpR0_.SetSize(sfes_truevsize);
   tmpR0b_.SetSize(sfes_truevsize);
@@ -446,6 +496,7 @@ void LteThermoChem::initializeOperators() {
   rho_Cp_u_coeff_ = new ScalarVectorProductCoefficient(*rho_Cp_coeff_, *un_next_coeff_);
 
   jh_coeff_ = new GridFunctionCoefficient(&jh_gf_);
+  radiation_sink_coeff_ = new GridFunctionCoefficient(&radiation_sink_gf_);
 
   // Convection: Atemperature(i,j) = \int_{\Omega} \phi_i \rho Cp u \cdot \nabla \phi_j
   At_form_ = new ParBilinearForm(sfes_);
@@ -572,10 +623,15 @@ void LteThermoChem::initializeOperators() {
   jh_form_ = new ParLinearForm(sfes_);
   DomainLFIntegrator *jh_dlfi;
   jh_dlfi = new DomainLFIntegrator(*jh_coeff_);
+
+  DomainLFIntegrator *rad_dlfi;
+  rad_dlfi = new DomainLFIntegrator(*radiation_sink_coeff_);
   if (numerical_integ_) {
     jh_dlfi->SetIntRule(&ir_i);
+    rad_dlfi->SetIntRule(&ir_i);
   }
   jh_form_->AddDomainIntegrator(jh_dlfi);
+  jh_form_->AddDomainIntegrator(rad_dlfi);
 
 
   // Qt .....................................
@@ -666,6 +722,15 @@ void LteThermoChem::step() {
   updateProperties();
   updateDensity();
 
+  // Update radiation sink
+  if (radiation_ != nullptr) {
+    const double *d_T = Tn_next_.Read();
+    double *d_rad = radiation_sink_.Write();
+    Radiation *rmodel = radiation_;
+    MFEM_FORALL(i, Tn_next_.Size(), { d_rad[i] = rmodel->computeEnergySink(d_T[i]); });
+  }
+  radiation_sink_gf_.SetFromTrueDofs(radiation_sink_);
+
   // Build the right-hand-side
   resT_ = 0.0;
 
@@ -684,13 +749,11 @@ void LteThermoChem::step() {
   tmpR0_ = dtP_;
   Ms_->AddMult(tmpR0_, resT_);
 
-  // Joule heating
+  // Joule heating (and radiation sink)
   jh_form_->Update();
   jh_form_->Assemble();
   jh_form_->ParallelAssemble(jh_);
   resT_ += jh_;
-
-  // TODO(trevilo): radiation heat sink
 
   // Update Helmholtz operator to account for changing dt, rho, and kappa
   bd0_over_dt.constant = (time_coeff_.bd0 / dt_);

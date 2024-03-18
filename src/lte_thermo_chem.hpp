@@ -43,6 +43,7 @@ class Tps;
 
 #include <iostream>
 
+#include "dataStructures.hpp"
 #include "dirichlet_bc_helper.hpp"
 #include "io.hpp"
 #include "table.hpp"
@@ -54,6 +55,7 @@ using ScalarFuncT = double(const Vector &x, double t);
 
 class LoMachOptions;
 struct temporalSchemeCoefficients;
+class Radiation;
 
 /**
  * @brief Implementation of "local thermodynamic equilibrium"
@@ -108,6 +110,8 @@ class LteThermoChem final : public ThermoChemModelBase {
   LinearTable *Rgas_table_;   // specific gas constant
   LinearTable *Cp_table_;     // specific heat at constant pressure
 
+  Radiation *radiation_ = nullptr;
+
   /// pressure-related, closed-system thermo pressure changes
   double ambient_pressure_, thermo_pressure_, system_mass_;
   double dtP_;
@@ -137,6 +141,7 @@ class LteThermoChem final : public ThermoChemModelBase {
   ParGridFunction jh_gf_;
   ParGridFunction Rgas_gf_;
   ParGridFunction Cp_gf_;
+  ParGridFunction radiation_sink_gf_;
 
   ParGridFunction R0PM0_gf_;
   ParGridFunction Qt_gf_;
@@ -160,6 +165,7 @@ class LteThermoChem final : public ThermoChemModelBase {
   ProductCoefficient *rho_Cp_over_dt_coeff_ = nullptr;
   ProductCoefficient *rho_Cp_coeff_ = nullptr;
   GridFunctionCoefficient *jh_coeff_ = nullptr;
+  GridFunctionCoefficient *radiation_sink_coeff_ = nullptr;
 
   // operators and solvers
   ParBilinearForm *At_form_ = nullptr;
@@ -202,6 +208,7 @@ class LteThermoChem final : public ThermoChemModelBase {
   Vector Rgas_;
   Vector Cp_;
   Vector jh_;
+  Vector radiation_sink_;
 
   // Parameters and objects used in filter-based stabilization
   bool filter_temperature_ = false;
