@@ -146,6 +146,51 @@ class TPSINDEX():
     EX3_IDX  = 2
     
     MOLE_FRAC_IDX = {0: NEU_IDX, 1: EX1_IDX , 2: EX2_IDX , 3: EX3_IDX} 
+
+def k_means(x, num_clusters, xi=None, max_iter=1000, thresh=1e-12, rand_seed=0, xp=np):
+    assert x.ndim == 2, "observations must me 2d array"
+    if xi is None:
+        xp.random.seed(rand_seed)
+        xi = x[xp.random.choice(x.shape[0], num_clusters, replace=False)]
+
+    distortion_0 = xp.zeros(num_clusters)
+    idx          = xp.arange(num_clusters)
+    for iter in range(max_iter):
+        distance     = xp.linalg.norm(x[:, None, :] - xi[None, :, :], axis=2)
+        pred         = xp.argmin(distance, axis=1)
+        mask         = pred == idx[:, None]
+        # print(mask)
+        # print(xp.where(mask[:, :, None], x, 0))
+        # print(xp.where(mask[:, :, None], x, 0).sum(axis=1))
+        # print(xp.where(mask[:, :, None], x, 0).shape)
+        sums         = xp.where(mask[:, :, None], x, 0).sum(axis=1)
+        counts       = xp.count_nonzero(mask, axis=1)
+        counts[counts==0] = 1
+        # print(distance)
+        # print(mask)
+        # print(xp.where(mask.T, distance, 0))
+        # print(xp.where(mask.T, distance, 0).sum(axis=0).shape)
+        # print(counts)
+        distortion_1 = xp.where(mask.T, distance, 0).sum(axis=0)/counts[:,None]
+        rel_error    = xp.linalg.norm(distortion_0-distortion_1)/xp.linalg.norm(distortion_1)
+        #print(iter, rel_error, distortion_1, xi)
+        #print(iter, rel_error, xi[0:3])
+        if rel_error < thresh:
+            break
+        
+        xi_new       = sums / counts[:,None]
+        distortion_0 = distortion_1
+        # rel_error = xp.max(xp.linalg.norm(xi_new-xi, axis=1)/xp.linalg.norm(xi, axis=1))
+        # if rel_error < thresh:
+        #     # print(iter, rel_error)
+        #     # print("xi_new", xi_new[0:10,:], "xi", xi[0:10,:])
+        #     break
+        
+        xi = xi_new
+        
+        
+    return xi, pred
+    
     
 class Boltzmann0D2VBactchedSolver:
     
@@ -161,9 +206,11 @@ class Boltzmann0D2VBactchedSolver:
         self.__parse_config_file__(sys.argv[2])
         self.xp_module          = np
         boltzmann_dir           = self.param.output_dir
-        isExist = os.path.exists(boltzmann_dir)
-        if not isExist:
-           os.makedirs(boltzmann_dir)
+        
+        if (self.rankG==0):
+            isExist = os.path.exists(boltzmann_dir)
+            if not isExist:
+                os.makedirs(boltzmann_dir)
            
         num_gpus_per_node = 1 
         if self.param.use_gpu==1:
@@ -623,16 +670,100 @@ class Boltzmann0D2VBactchedSolver:
                 thread.join()
         return        
 
-    async def fetch_asnyc(self, interface):
-        ts = TaskSpace("T")
-        for grid_idx in self.active_grid_idx:
-            @spawn(ts[grid_idx], placement=[cpu], vcus=0.0)
-            def t1():
-                print("rank [%d/%d] hello from parla task %d"%(self.rankG, self.npesG, grid_idx), flush=True)
-                return
-        await ts
-        return
+    def solve_init(self):
+        rank                    = self.comm.Get_rank()
+        npes                    = self.comm.Get_size()
+        n_grids                 = self.param.n_grids
+        gidx_to_device_map      = self.gidx_to_device_map
         
+        thread_pool = list()
+        for grid_idx in range(self.param.n_grids):
+            def t1():
+                dev_id = gidx_to_device_map(grid_idx, n_grids)
+                print("rank [%d/%d] setting grid %d to device %d"%(rank, npes, grid_idx, dev_id), flush=True)
+                with cp.cuda.Device(dev_id):
+                    s1 = cp.cuda.Stream(non_blocking=True)
+                    with s1:
+                        self.bte_solver.host_to_device_setup(dev_id, grid_idx)
+                    s1.synchronize()
+        
+                thread = threading.Thread(target=t1)
+                thread_pool.append(thread)
+                thread.start()
+        
+        for thread in thread_pool:
+            thread.join()
+        
+        def ts_op_setup(grid_idx):
+            xp                                      = self.xp_module 
+            f_mw                                    = self.bte_solver.get_boltzmann_parameter(grid_idx, "f_mw")
+            n_pts                                   = f_mw.shape[1]
+            Qmat                                    = self.bte_solver._op_qmat[grid_idx]
+            INr                                     = xp.eye(Qmat.shape[1])
+            self.bte_solver._op_imat_vx[grid_idx]   = xp.einsum("i,jk->ijk",xp.ones(n_pts), INr)
+            
+            if self.param.use_clstr_inp==True:
+                assert n_pts == self.param.n_sub_clusters
+            
+        if(self.param.use_gpu==1):
+            self.xp_module = cp
+            
+            thread_pool = list()
+            for grid_idx in self.active_grid_idx:
+                dev_id = gidx_to_device_map(grid_idx, n_grids)
+                def t1():
+                    with cp.cuda.Device(dev_id):
+                        s1 = cp.cuda.Stream(non_blocking=True)
+                        with s1:
+                            ts_op_setup(grid_idx)
+                            vth          = self.bte_solver._par_vth[grid_idx]
+                            qA           = self.bte_solver._op_diag_dg[grid_idx]
+                            mw           = bte_utils.get_maxwellian_3d(vth, 1)
+                            mm_op        = self.bte_solver._op_mass[grid_idx] * mw(0) * vth**3
+                            f_mw         = self.bte_solver.get_boltzmann_parameter(grid_idx, "f_mw")
+                            f_mw         = f_mw/cp.dot(mm_op, f_mw)
+                            f_mw         = cp.dot(qA.T, f_mw)
+                            self.bte_solver.set_boltzmann_parameter(grid_idx, "u0", cp.copy(f_mw))
+                        
+                        s1.synchronize()
+                
+                thread = threading.Thread(target=t1)
+                thread_pool.append(thread)
+                thread.start()
+                
+            for thread in thread_pool:
+                thread.join()
+            
+        else:
+            self.xp_module = np
+            thread_pool = list()
+            
+            for grid_idx in self.active_grid_idx:
+                def t1():
+                    ts_op_setup(grid_idx)
+                    
+                    vth          = self.bte_solver._par_vth[grid_idx]
+                    qA           = self.bte_solver._op_diag_dg[grid_idx]
+                    mw           = bte_utils.get_maxwellian_3d(vth, 1)
+                    mm_op        = self.bte_solver._op_mass[grid_idx] * mw(0) * vth**3
+                    f_mw         = self.bte_solver.get_boltzmann_parameter(grid_idx, "f_mw")
+                    f_mw         = f_mw/np.dot(mm_op, f_mw)
+                    f_mw         = np.dot(qA.T, f_mw)
+                    self.bte_solver.set_boltzmann_parameter(grid_idx, "u0", np.copy(f_mw))
+                
+                thread = threading.Thread(target=t1)
+                thread_pool.append(thread)
+                thread.start()
+            
+            for thread in thread_pool:
+                thread.join()
+                    
+            
+        
+        return
+    
+    async def fetch_asnyc(self, interface):
+        xp                      = self.xp_module
         use_interp              = self.param.use_clstr_inp
         gidx_to_pidx            = self.grid_idx_to_spatial_idx_map
         heavy_temp              = np.array(interface.HostRead(libtps.t2bIndex.HeavyTemperature), copy=False)
@@ -667,70 +798,70 @@ class Boltzmann0D2VBactchedSolver:
         ns_by_n0[ns_by_n0<=0]   = 0
         m_bte                   = np.concatenate([ExbyN.reshape((-1, 1)), EybyN.reshape((-1, 1)), Tg.reshape((-1, 1)), ion_deg.reshape((-1, 1))] + [ ns_by_n0[i].reshape((-1, 1)) for i in range(ns_by_n0.shape[0])], axis=1)
         
-        self.sub_cluster_idx_to_pidx = None
-        self.sub_cluster_c           = None          
-        gidx_to_device_map           = self.gidx_to_device_map
+        self.m_bte              = m_bte
+        self.sub_cluster_c      = None
+        self.sub_cluster_c_lbl  = None
+        gidx_to_device_map      = self.gidx_to_device_map
         
         if (use_interp == True):
             n_sub_clusters               = self.param.n_sub_clusters
-            self.sub_cluster_idx_to_pidx = [[None for i in range(n_sub_clusters)] for i in range(self.param.n_grids)]
             self.sub_cluster_c           = [None for i in range(self.param.n_grids)]
+            self.sub_cluster_c_lbl       = [None for i in range(self.param.n_grids)]
             
-            def normalize(obs):
-                std_obs   = np.std(obs, axis=0)
+            def normalize(obs, xp):
+                std_obs   = xp.std(obs, axis=0)
                 std_obs[std_obs == 0.0] = 1.0
                 return obs/std_obs, std_obs
 
             ts = TaskSpace("T")
             for grid_idx in self.active_grid_idx:
-                @spawn(ts[grid_idx], placement=[cpu], vcus=0.0)
+                dev_id    = self.gidx_to_device_map(grid_idx, n_grids)
+                @spawn(ts[grid_idx], placement=[gpu(dev_id)], vcus=0.0)
                 def t1():
-                    dev_id                       = self.gidx_to_device_map(grid_idx, n_grids)
-                    m                            = m_bte[gidx_to_pidx[grid_idx]]
-                    mw , mw_std                  = normalize(m)
+                    # xp                           = cp
+                    # m                            = xp.array(m_bte[gidx_to_pidx[grid_idx]])
+                    # mw , mw_std                  = normalize(m, xp)
+                    # mcw, membership_m            = k_means(mw, num_clusters=self.param.n_sub_clusters, max_iter=1000, thresh=1e-8, rand_seed=self.param.rand_seed, xp=xp)
                     
                     # to repoduce clusters
+                    xp                           = np
                     np.random.seed(self.param.rand_seed)
-                    
+                    m                            = m_bte[gidx_to_pidx[grid_idx]]
+                    mw , mw_std                  = normalize(m, xp)
                     mcw0                         = mw[np.random.choice(mw.shape[0], self.param.n_sub_clusters, replace=False)]
                     mcw                          = scipy.cluster.vq.kmeans(mw, mcw0, iter=1000, thresh=1e-8, check_finite=False)[0]
                     mcw0[0:mcw.shape[0], :]      = mcw[:,:]
                     mcw                          = mcw0
+                    dist_mat                     = xp.linalg.norm(mw[:, None, :] - mcw[None, : , :], axis=2)
+                    membership_m                 = xp.argmin(dist_mat, axis=1)
                     
-                    assert mcw.shape[0] == self.param.n_sub_clusters
+                    assert mcw.shape[0]               == self.param.n_sub_clusters
+                    mc                                = mcw * mw_std
+                    self.sub_cluster_c[grid_idx]      = mc
+                    self.sub_cluster_c_lbl[grid_idx]  = membership_m
                     
-                    mc                           = mcw * mw_std
-                    dist_mat                     = np.array([np.linalg.norm(mw - mcw[i], axis=1) for i in range(n_sub_clusters)]).T
-                    membership_m                 = np.argmin(dist_mat, axis=1)
-                    self.sub_cluster_c[grid_idx] = mc
-                    
-                    for c_idx in range(n_sub_clusters):
-                        self.sub_cluster_idx_to_pidx[grid_idx][c_idx] = np.argwhere(membership_m==c_idx)[:,0]
-                    
-                    
-                        
-                    n0       = np.ones(mc.shape[0]) * self.param.n0
+                    n0       = xp.ones(mc.shape[0]) * self.param.n0
                     Ex       = mc[: , 0] * self.param.n0 * self.param.Td_fac
                     Ey       = mc[: , 1] * self.param.n0 * self.param.Td_fac
                     Tg       = mc[: , 2]
                     ne       = mc[: , 3] * self.param.n0
                     ni       = mc[: , 3] * self.param.n0
-                    ns_by_n0 = np.transpose(mc[: , 4:])
-                    EMag     = np.sqrt(Ex**2 + Ey**2)
+                    ns_by_n0 = xp.transpose(mc[: , 4:])
+                    EMag     = xp.sqrt(Ex**2 + Ey**2)
                     
                     if self.param.verbose == 1 :
                         print("rank [%d/%d] Boltzmann solver inputs for v-space grid id %d"%(self.rankG, self.npesG, grid_idx), flush=True)
                         print("Efreq = %.4E [1/s]" %(self.param.Efreq)      , flush=True)
                         print("n_pts = %d" % self.grid_idx_to_npts[grid_idx], flush=True)
                         
-                        print("n0    (min)               = %.12E [1/m^3]      \t n0   (max) = %.12E [1/m^3] "%(np.min(n0)       , np.max(n0))   , flush=True)
-                        print("Ex/n0 (min)               = %.12E [Td]         \t Ex/n0(max) = %.12E [Td]    "%(np.min(ExbyN)    , np.max(ExbyN)), flush=True)
-                        print("Ey/n0 (min)               = %.12E [Td]         \t Ey/n0(max) = %.12E [Td]    "%(np.min(EybyN)    , np.max(EybyN)), flush=True)
-                        print("Tg    (min)               = %.12E [K]          \t Tg   (max) = %.12E [K]     "%(np.min(Tg)       , np.max(Tg))   , flush=True)
-                        print("ne    (min)               = %.12E [1/m^3]      \t ne   (max) = %.12E [1/m^3] "%(np.min(ne)       , np.max(ne))   , flush=True)
+                        print("n0    (min)               = %.12E [1/m^3]      \t n0   (max) = %.12E [1/m^3] "%(xp.min(n0)       , xp.max(n0))   , flush=True)
+                        print("Ex/n0 (min)               = %.12E [Td]         \t Ex/n0(max) = %.12E [Td]    "%(xp.min(ExbyN)    , xp.max(ExbyN)), flush=True)
+                        print("Ey/n0 (min)               = %.12E [Td]         \t Ey/n0(max) = %.12E [Td]    "%(xp.min(EybyN)    , xp.max(EybyN)), flush=True)
+                        print("Tg    (min)               = %.12E [K]          \t Tg   (max) = %.12E [K]     "%(xp.min(Tg)       , xp.max(Tg))   , flush=True)
+                        print("ne    (min)               = %.12E [1/m^3]      \t ne   (max) = %.12E [1/m^3] "%(xp.min(ne)       , xp.max(ne))   , flush=True)
                         
                         for i in range(ns_by_n0.shape[0]):
-                            print("[%d] ns/n0 (min)               = %.12E              \t ns/n0(max) = %.12E         "%(i, np.min(ns_by_n0[i]) , np.max(ns_by_n0[i])), flush=True)
+                            print("[%d] ns/n0 (min)               = %.12E              \t ns/n0(max) = %.12E         "%(i, xp.min(ns_by_n0[i]) , xp.max(ns_by_n0[i])), flush=True)
                                             
                     if (use_gpu==1):
                         with cp.cuda.Device(dev_id):
@@ -769,48 +900,46 @@ class Boltzmann0D2VBactchedSolver:
         else:
             ts = TaskSpace("T")
             for grid_idx in self.active_grid_idx:
-                @spawn(ts[grid_idx], placement=[cpu], vcus=0.0)
+                dev_id            = self.gidx_to_device_map(grid_idx, n_grids)
+                @spawn(ts[grid_idx], placement=[gpu(dev_id)], vcus=0.0)
                 def t1():
                     bte_idx           = gidx_to_pidx[grid_idx]
-                    dev_id            = self.gidx_to_device_map(grid_idx, n_grids)
+                    mc                = xp.array(m_bte[bte_idx])
                     
-                    mc                = m_bte[bte_idx]
-                    
-                    n0                = np.ones(mc.shape[0]) * self.param.n0
+                    n0                = xp.ones(mc.shape[0]) * self.param.n0
                     Ex                = mc[: , 0] * self.param.n0 * self.param.Td_fac
                     Ey                = mc[: , 1] * self.param.n0 * self.param.Td_fac
                     
                     Tg                = mc[: , 2]
                     ne                = mc[: , 3] * self.param.n0
                     ni                = mc[: , 3] * self.param.n0
-                    ns_by_n0          = np.transpose(mc[: , 4:])
-                    
-                    EMag              = np.sqrt(Ex**2 + Ey**2)
+                    ns_by_n0          = xp.transpose(mc[: , 4:])
+                    EMag              = xp.sqrt(Ex**2 + Ey**2)
                 
                     if self.param.verbose == 1 :
                         print("rank [%d/%d] Boltzmann solver inputs for v-space grid id %d"%(self.rankG, self.npesG, grid_idx), flush=True)
                         print("Efreq = %.4E [1/s]" %(self.param.Efreq)      , flush=True)
                         print("n_pts = %d" % self.grid_idx_to_npts[grid_idx], flush=True)
                         
-                        print("Ex/n0 (min)               = %.12E [Td]         \t Ex/n0(max) = %.12E [Td]    "%(np.min(ExbyN), np.max(ExbyN)), flush=True)
-                        print("Ey/n0 (min)               = %.12E [Td]         \t Ey/n0(max) = %.12E [Td]    "%(np.min(EybyN), np.max(EybyN)), flush=True)
-                        print("Tg    (min)               = %.12E [K]          \t Tg   (max) = %.12E [K]     "%(np.min(Tg)   , np.max(Tg))   , flush=True)
-                        print("ne    (min)               = %.12E [1/m^3]      \t ne   (max) = %.12E [1/m^3] "%(np.min(ne)   , np.max(ne))   , flush=True)
+                        print("Ex/n0 (min)               = %.12E [Td]         \t Ex/n0(max) = %.12E [Td]    "%(xp.min(ExbyN), xp.max(ExbyN)), flush=True)
+                        print("Ey/n0 (min)               = %.12E [Td]         \t Ey/n0(max) = %.12E [Td]    "%(xp.min(EybyN), xp.max(EybyN)), flush=True)
+                        print("Tg    (min)               = %.12E [K]          \t Tg   (max) = %.12E [K]     "%(xp.min(Tg)   , xp.max(Tg))   , flush=True)
+                        print("ne    (min)               = %.12E [1/m^3]      \t ne   (max) = %.12E [1/m^3] "%(xp.min(ne)   , xp.max(ne))   , flush=True)
                         
                         for i in range(ns_by_n0.shape[0]):
-                            print("ns/n0 (min)               = %.12E              \t ns/n0(max) = %.12E         "%(np.min(ns_by_n0[i]) , np.max(ns_by_n0[i])), flush=True)
+                            print("ns/n0 (min)               = %.12E              \t ns/n0(max) = %.12E         "%(xp.min(ns_by_n0[i]) , xp.max(ns_by_n0[i])), flush=True)
             
             
-                    if (use_gpu == 1):
-                        with cp.cuda.Device(dev_id):
-                            n0   = cp.array(n0) 
-                            ne   = cp.array(ne)
-                            ni   = cp.array(ni)
-                            Ex   = cp.array(Ex)
-                            Ey   = cp.array(Ey)
-                            Tg   = cp.array(Tg)
-                            EMag = cp.sqrt(Ex**2 + Ey**2)
-                            ns_by_n0 = cp.array(ns_by_n0)
+                    # if (use_gpu == 1):
+                    #     with cp.cuda.Device(dev_id):
+                    #         n0   = cp.array(n0) 
+                    #         ne   = cp.array(ne)
+                    #         ni   = cp.array(ni)
+                    #         Ex   = cp.array(Ex)
+                    #         Ey   = cp.array(Ey)
+                    #         Tg   = cp.array(Tg)
+                    #         EMag = cp.sqrt(Ex**2 + Ey**2)
+                    #         ns_by_n0 = cp.array(ns_by_n0)
                     
                     self.bte_solver.set_boltzmann_parameter(grid_idx, "ns_by_n0", ns_by_n0)
                     self.bte_solver.set_boltzmann_parameter(grid_idx, "n0" , n0)
@@ -1005,14 +1134,17 @@ class Boltzmann0D2VBactchedSolver:
                         h_curr    = self.bte_solver.normalized_distribution(grid_idx, u0)
                         qoi       = self.bte_solver.compute_QoIs(grid_idx, h_curr, effective_mobility=False)
                         rr_cpu    = xp.asnumpy(qoi["rates"])
+                        inp_mask  = xp.asnumpy(self.sub_cluster_c_lbl[grid_idx]) == np.arange(self.param.n_sub_clusters)[:, None]
                         
-                        rr_interp = np.zeros(len(gidx_to_pidx_map[grid_idx]))
-                        for r_idx in range(n_reactions):
-                            for c_idx in range(self.param.n_sub_clusters):
-                                rr_interp[self.sub_cluster_idx_to_pidx[grid_idx][c_idx]] = rr_cpu[TPSINDEX.RR_IDX[r_idx]][c_idx] * self.param.N_Avo
+                        rr_interp = np.zeros((n_reactions, len(gidx_to_pidx_map[grid_idx])))
                         
-                            rates[r_idx][gidx_to_pidx_map[grid_idx]] = rr_interp
-                        
+                        for c_idx in range(self.param.n_sub_clusters):
+                            inp_idx = inp_mask[c_idx]
+                            for r_idx in range(n_reactions):
+                                rr_interp[r_idx, inp_idx] = rr_cpu[TPSINDEX.RR_IDX[r_idx]][c_idx] * self.param.N_Avo
+
+                        for r_idx in range(n_reactions):                            
+                            rates[r_idx][gidx_to_pidx_map[grid_idx]] = rr_interp[r_idx, :]
                 await ts
                 rates = rates.reshape((-1))
                 rates[rates<0] = 0.0
@@ -1151,6 +1283,9 @@ profile_tt     = [profile_t(profile_nn[i]) for i in range(int(pp.LAST))]
 
 def profile_stats(boltzmann:Boltzmann0D2VBactchedSolver, p_tt: profile_t, p_nn, fname, comm):
     
+    rank = comm.Get_rank()
+    npes = comm.Get_size()
+    
     Nx = boltzmann.param.n_grids * boltzmann.param.n_sub_clusters
     Nv = (boltzmann.param.Nr + 1) * (boltzmann.param.l_max + 1)
     
@@ -1182,14 +1317,16 @@ def profile_stats(boltzmann:Boltzmann0D2VBactchedSolver, p_tt: profile_t, p_nn, 
                 tt[pp.TPS_PUSH][0] , tt[pp.TPS_PUSH][1] , tt[pp.TPS_PUSH][2] ]
     
     data_str= ["%.4E"%d for d in data]
-    if fname!="":
-        with open(fname, "a") as f:
-            f.write(",".join(header)+"\n")
-            f.write(",".join(data_str)+"\n")
-            f.close()
-    else:
-        print(",".join(header))
-        print(",".join(data_str))
+    
+    if rank ==0 :
+        if fname!="":
+            with open(fname, "a") as f:
+                f.write(",".join(header)+"\n")
+                f.write(",".join(data_str)+"\n")
+                f.close()
+        else:
+            print(",".join(header))
+            print(",".join(data_str))
 
 
 def driver_w_parla(comm):
@@ -1197,12 +1334,10 @@ def driver_w_parla(comm):
     rank = comm.Get_rank()
     npes = comm.Get_size()
     
-    dev  = rank % 3
-    
     with Parla():
-        @spawn(placement=cpu, vcus=0)
+        dev_id = rank % len(gpu)
+        @spawn(placement=[gpu(dev_id)], vcus=0)
         async def __main__():
-            
             # TPS solver
             profile_tt[pp.TPS_SETUP].start()
             tps = libtps.Tps(comm)
@@ -1220,10 +1355,6 @@ def driver_w_parla(comm):
             tps.solveStep()
             tps.push(interface)
             
-            # with cp.cuda.Device(dev):
-            #     cp.cuda.runtime.deviceSynchronize()
-            # comm.Barrier()
-            
             boltzmann = Boltzmann0D2VBactchedSolver(tps, comm)
             rank      = boltzmann.comm.Get_rank()
             npes      = boltzmann.comm.Get_size()
@@ -1232,10 +1363,9 @@ def driver_w_parla(comm):
             boltzmann.grid_setup(interface)
             profile_tt[pp.BTE_SETUP].stop()
             
-            # await boltzmann.solve_init_async()
-            # xp        = boltzmann.bte_solver.xp_module
-            xp        = cp
-            max_iters = 1#boltzmann.param.tps_bte_max_iter
+            await boltzmann.solve_init_async()
+            xp        = boltzmann.bte_solver.xp_module
+            max_iters = boltzmann.param.tps_bte_max_iter
             iter      = 0
             tt        = 0
             tau       = (1/boltzmann.param.Efreq)
@@ -1257,26 +1387,19 @@ def driver_w_parla(comm):
                 print("tps steps per cycle : ", tps_sper_cycle, "bte_steps per cycle", bte_sper_cycle, flush=True)
                 
             while (iter<max_iters):
-                
                 if (iter%cycle_freq==0):
                     interface.saveDataCollection(cycle=(iter//cycle_freq), time=iter)
                 
                 # ########################## BTE solve ##################################################
                 profile_tt[pp.BTE_FETCH].start()
                 await boltzmann.fetch_asnyc(interface)
-                #boltzmann.fetch(interface)
                 profile_tt[pp.BTE_FETCH].stop()
                 
-                """
                 if (boltzmann.param.solver_type=="steady-state"):
                     
                     profile_tt[pp.BTE_SOLVE].start()
                     await boltzmann.solve_async()
                     profile_tt[pp.BTE_SOLVE].stop()
-                    
-                    with cp.cuda.Device(dev):
-                        cp.cuda.runtime.deviceSynchronize()
-                    comm.Barrier()
                     
                     profile_tt[pp.BTE_PUSH].start()
                     ts = TaskSpace("T")
@@ -1383,12 +1506,6 @@ def driver_w_parla(comm):
                                 u_vec   = boltzmann.bte_solver.get_boltzmann_parameter(grid_idx, "u_avg")
                                 boltzmann.io_output_data(grid_idx, u_vec, plot_data=True, export_csv=True, fname=boltzmann.param.out_fname+"_grid_%02d_rank_%d_npes_%d"%(grid_idx, rank, npes))
                 
-                with cp.cuda.Device(dev):
-                    cp.cuda.runtime.deviceSynchronize()
-                comm.Barrier()
-                """
-                
-                
                 ################### tps solve ######################################
                 profile_tt[pp.TPS_FETCH].start()
                 tps.fetch(interface)
@@ -1433,9 +1550,8 @@ def driver_w_parla(comm):
                 
                 tt += dt_tps * tps_idx
                 iter+=1
-                comm.Barrier()
-                
-            #profile_stats(boltzmann, profile_tt, profile_nn, boltzmann.param.out_fname+"_profile.csv" , comm)
+            
+            profile_stats(boltzmann, profile_tt, profile_nn, boltzmann.param.out_fname+"_profile.csv" , comm)
             tps.solveEnd()
             comm.Barrier()
             return tps.getStatus()
