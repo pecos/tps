@@ -44,15 +44,15 @@
 
 using namespace mfem;
 
-double radius(const Vector &pos) { return pos[0]; }
-FunctionCoefficient radius_coeff(radius);
-
-double negativeRadius(const Vector &pos) { return -pos[0]; }
-FunctionCoefficient negative_radius_coeff(negativeRadius);
-
 /// forward declarations
 void vel_exact_tgv2d(const Vector &x, double t, Vector &u);
 void vel_exact_pipe(const Vector &x, double t, Vector &u);
+
+static double radius(const Vector &pos) { return pos[0]; }
+FunctionCoefficient radius_coeff(radius);
+
+static double negativeRadius(const Vector &pos) { return -pos[0]; }
+FunctionCoefficient negative_radius_coeff(negativeRadius);
 
 /**
  * @brief Helper function to remove mean from a vector

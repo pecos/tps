@@ -48,11 +48,16 @@
 using namespace mfem;
 using namespace mfem::common;
 
+static double radius(const Vector &pos) { return pos[0]; }
+static FunctionCoefficient radius_coeff(radius);
+
 LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &time_coeff,
                              TPS::Tps *tps)
     : tpsP_(tps), pmesh_(pmesh), time_coeff_(time_coeff) {
   rank0_ = (pmesh_->GetMyRank() == 0);
   order_ = loMach_opts->order;
+
+  tps->getInput("loMach/axisymmetric", axisym_, false);
 
   // Initialize thermo TableInput (data read below)
   std::vector<TableInput> thermo_tables(5);
@@ -144,6 +149,15 @@ LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, t
 
 LteThermoChem::~LteThermoChem() {
   // allocated in initializeOperators
+  delete rad_radiation_sink_coeff_;
+  delete rad_jh_coeff_;
+  delete rad_un_next_coeff_;
+  delete rad_thermal_diff_total_coeff_;
+  delete rad_rho_Cp_over_dt_coeff_;
+  delete rad_rho_Cp_u_coeff_;
+  delete rad_rho_Cp_coeff_;
+  delete rad_rho_coeff_;
+
   delete sfes_filter_;
   delete sfec_filter_;
   delete HtInv_;
@@ -498,9 +512,27 @@ void LteThermoChem::initializeOperators() {
   jh_coeff_ = new GridFunctionCoefficient(&jh_gf_);
   radiation_sink_coeff_ = new GridFunctionCoefficient(&radiation_sink_gf_);
 
+  if (axisym_) {
+    assert(!numerical_integ_);
+    // mult by r
+    rad_rho_coeff_ = new ProductCoefficient(radius_coeff, *rho_coeff_);
+    rad_rho_Cp_coeff_ = new ProductCoefficient(radius_coeff, *rho_Cp_coeff_);
+    rad_rho_Cp_u_coeff_ = new ScalarVectorProductCoefficient(radius_coeff, *rho_Cp_u_coeff_);
+    rad_rho_Cp_over_dt_coeff_ = new ProductCoefficient(radius_coeff, *rho_Cp_over_dt_coeff_);
+    rad_thermal_diff_total_coeff_ = new ProductCoefficient(radius_coeff, *thermal_diff_total_coeff_);
+    rad_un_next_coeff_ = new ScalarVectorProductCoefficient(radius_coeff, *un_next_coeff_);
+    rad_jh_coeff_ = new ProductCoefficient(radius_coeff, *jh_coeff_);
+    rad_radiation_sink_coeff_ = new ProductCoefficient(radius_coeff, *radiation_sink_coeff_);
+  }
+
   // Convection: Atemperature(i,j) = \int_{\Omega} \phi_i \rho Cp u \cdot \nabla \phi_j
   At_form_ = new ParBilinearForm(sfes_);
-  auto *at_blfi = new ConvectionIntegrator(*rho_Cp_u_coeff_);
+  ConvectionIntegrator *at_blfi;
+  if (axisym_) {
+    at_blfi = new ConvectionIntegrator(*rad_rho_Cp_u_coeff_);
+  } else {
+    at_blfi = new ConvectionIntegrator(*rho_Cp_u_coeff_);
+  }
   if (numerical_integ_) {
     at_blfi->SetIntRule(&ir_nli);
   }
@@ -514,7 +546,12 @@ void LteThermoChem::initializeOperators() {
 
   // mass matrix
   Ms_form_ = new ParBilinearForm(sfes_);
-  auto *ms_blfi = new MassIntegrator;
+  MassIntegrator *ms_blfi;
+  if (axisym_) {
+    ms_blfi = new MassIntegrator(radius_coeff);
+  } else {
+    ms_blfi = new MassIntegrator;
+  }
   if (numerical_integ_) {
     ms_blfi->SetIntRule(&ir_i);
   }
@@ -527,7 +564,12 @@ void LteThermoChem::initializeOperators() {
 
   // mass matrix with rho * Cp weight
   M_rho_Cp_form_ = new ParBilinearForm(sfes_);
-  auto *mrc_blfi = new MassIntegrator(*rho_Cp_coeff_);
+  MassIntegrator *mrc_blfi;
+  if (axisym_) {
+    mrc_blfi = new MassIntegrator(*rad_rho_Cp_coeff_);
+  } else {
+    mrc_blfi = new MassIntegrator(*rho_Cp_coeff_);
+  }
   if (numerical_integ_) {
     mrc_blfi->SetIntRule(&ir_i);
   }
@@ -540,7 +582,12 @@ void LteThermoChem::initializeOperators() {
 
   // mass matrix with rho weight (used in Qt solve)
   M_rho_form_ = new ParBilinearForm(sfes_);
-  auto *msrho_blfi = new MassIntegrator(*rho_Cp_coeff_);
+  MassIntegrator *msrho_blfi;
+  if (axisym_) {
+    msrho_blfi = new MassIntegrator(*rad_rho_coeff_);
+  } else {
+    msrho_blfi = new MassIntegrator(*rho_coeff_);
+  }
   if (numerical_integ_) {
     msrho_blfi->SetIntRule(&ir_i);
   }
@@ -553,9 +600,15 @@ void LteThermoChem::initializeOperators() {
 
   // helmholtz
   Ht_form_ = new ParBilinearForm(sfes_);
-  auto *hmt_blfi = new MassIntegrator(*rho_Cp_over_dt_coeff_);
-  auto *hdt_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
-
+  MassIntegrator *hmt_blfi;
+  DiffusionIntegrator *hdt_blfi;
+  if (axisym_) {
+    hmt_blfi = new MassIntegrator(*rad_rho_Cp_over_dt_coeff_);
+    hdt_blfi = new DiffusionIntegrator(*rad_thermal_diff_total_coeff_);
+  } else {
+    hmt_blfi = new MassIntegrator(*rho_Cp_over_dt_coeff_);
+    hdt_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
+  }
   if (numerical_integ_) {
     hmt_blfi->SetIntRule(&ir_di);
     hdt_blfi->SetIntRule(&ir_di);
@@ -622,10 +675,14 @@ void LteThermoChem::initializeOperators() {
 
   jh_form_ = new ParLinearForm(sfes_);
   DomainLFIntegrator *jh_dlfi;
-  jh_dlfi = new DomainLFIntegrator(*jh_coeff_);
-
   DomainLFIntegrator *rad_dlfi;
-  rad_dlfi = new DomainLFIntegrator(*radiation_sink_coeff_);
+  if (axisym_) {
+    jh_dlfi = new DomainLFIntegrator(*rad_jh_coeff_);
+    rad_dlfi = new DomainLFIntegrator(*rad_radiation_sink_coeff_);
+  } else {
+    jh_dlfi = new DomainLFIntegrator(*jh_coeff_);
+    rad_dlfi = new DomainLFIntegrator(*radiation_sink_coeff_);
+  }
   if (numerical_integ_) {
     jh_dlfi->SetIntRule(&ir_i);
     rad_dlfi->SetIntRule(&ir_i);
@@ -638,7 +695,12 @@ void LteThermoChem::initializeOperators() {
 
   // Convection (for rho): Arho(i,j) = \int_{\Omega} \phi_i u \cdot \nabla \phi_j
   A_rho_form_ = new ParBilinearForm(sfes_);
-  auto *ar_blfi = new ConvectionIntegrator(*un_next_coeff_);
+  ConvectionIntegrator *ar_blfi;
+  if (axisym_) {
+    ar_blfi = new ConvectionIntegrator(*rad_un_next_coeff_);
+  } else {
+    ar_blfi = new ConvectionIntegrator(*un_next_coeff_);
+  }
   if (numerical_integ_) {
     ar_blfi->SetIntRule(&ir_nli);
   }
