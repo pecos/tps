@@ -99,6 +99,8 @@ LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, t
     if (coefficient_type == "tabulated") {
       rad_model_input.necModel = TABULATED_NEC;
       std::string table_input_path(model_input_path + "/tabulated");
+      std::string filename;
+      tpsP_->getRequiredInput((table_input_path + "/filename").c_str(), filename);
 
       std::vector<TableInput> rad_tables(1);
       for (size_t i = 0; i < rad_tables.size(); i++) {
@@ -109,8 +111,11 @@ LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, t
 
       // Read data from hdf5 file containing 4 columns: T, energy, gas constant, speed of sound
       DenseMatrix rad_data;
-      success = h5ReadBcastMultiColumnTable(table_input_path, std::string("table"), pmesh_->GetComm(), rad_data, rad_tables);
+      success = h5ReadBcastMultiColumnTable(filename, std::string("table"), pmesh_->GetComm(), rad_data, rad_tables);
 
+      rad_model_input.necTableInput.order = 1;
+      rad_model_input.necTableInput.xLogScale = false;
+      rad_model_input.necTableInput.fLogScale = false;
       rad_model_input.necTableInput.Ndata = rad_tables[0].Ndata;
       rad_model_input.necTableInput.xdata = rad_tables[0].xdata;
       rad_model_input.necTableInput.fdata = rad_tables[0].fdata;
@@ -271,6 +276,9 @@ void LteThermoChem::initializeSelf() {
 
   kappa_gf_.SetSpace(sfes_);
   kappa_gf_ = 0.0;
+
+  thermal_diff_total_gf_.SetSpace(sfes_);
+  thermal_diff_total_gf_ = 0.0;
 
   sigma_gf_.SetSpace(sfes_);
   sigma_gf_ = 0.0;
@@ -898,9 +906,12 @@ void LteThermoChem::initializeViz(ParaViewDataCollection &pvdc) {
   pvdc.RegisterField("temperature", &Tn_gf_);
   pvdc.RegisterField("density", &rn_gf_);
   pvdc.RegisterField("kappa", &kappa_gf_);
+  pvdc.RegisterField("kappaT", &thermal_diff_total_gf_);
   pvdc.RegisterField("Qt", &Qt_gf_);
   pvdc.RegisterField("Rgas", &Rgas_gf_);
   pvdc.RegisterField("Cp", &Cp_gf_);
+  pvdc.RegisterField("Sjoule", &jh_gf_);
+  pvdc.RegisterField("epsilon_rad", &radiation_sink_gf_);
 }
 
 void LteThermoChem::extrapolateTemperature() {
@@ -962,6 +973,10 @@ void LteThermoChem::updateProperties() {
   }
   Rgas_gf_.SetFromTrueDofs(Rgas_);
   Cp_gf_.SetFromTrueDofs(Cp_);
+
+  thermal_diff_total_gf_.Set(invPrt_, *turbModel_interface_->eddy_viscosity);
+  thermal_diff_total_gf_.Add(1.0, kappa_gf_);
+  thermal_diff_total_gf_ *= (*sponge_interface_->diff_multiplier);
 }
 
 void LteThermoChem::evaluatePlasmaConductivityGF() {
