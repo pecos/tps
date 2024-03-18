@@ -157,6 +157,7 @@ class LteThermoChem final : public ThermoChemModelBase {
   ScalarVectorProductCoefficient *rho_Cp_u_coeff_ = nullptr;
   GridFunctionCoefficient *thermal_diff_coeff_ = nullptr;
   GridFunctionCoefficient *mut_coeff_ = nullptr;
+  ProductCoefficient *kapt_coeff_ = nullptr;
   GridFunctionCoefficient *mult_coeff_ = nullptr;
   SumCoefficient *thermal_diff_sum_coeff_ = nullptr;
   ProductCoefficient *thermal_diff_total_coeff_ = nullptr;
