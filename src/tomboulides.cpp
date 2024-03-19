@@ -1432,7 +1432,7 @@ void Tomboulides::step() {
     resp_vec_.Neg();
 
     // Convection contribution to the rhs (NB: utheta_next_vec_ contains extrapolated utheta at this point)
-    As_op_->Mult(utheta_next_vec_, resp_vec_);
+    As_op_->AddMult(utheta_next_vec_, resp_vec_);
 
     // Unsteady contribution to RHS (overwrites extrapolated utheta b/c no longer necessary)
     {
