@@ -14,6 +14,9 @@ import pandas as pd
 import scipy.interpolate
 import scipy.cluster
 import threading
+import datetime
+# Use asynchronous stream ordered memory
+#cp.cuda.set_allocator(cp.cuda.MemoryAsyncPool().malloc)
 
 class profile_t:
     def __init__(self,name):
@@ -1205,11 +1208,13 @@ class Boltzmann0D2VBactchedSolver:
             @spawn(ts[grid_idx], placement=[parla_placement[grid_idx]], vcus=0.0)
             def t1():
                 try:
+                    cp.cuda.nvtx.RangePush("bte_solve")
                     print("rank [%d/%d] BTE launching grid %d on %s"%(rank, npes, grid_idx, parla_placement[grid_idx]), flush=True)
                     f0 = self.bte_solver.get_boltzmann_parameter(grid_idx, "u0")
                     ff , qoi = self.bte_solver.solve(grid_idx, f0, self.param.atol, self.param.rtol, self.param.max_iter, self.param.solver_type)
                     self.ff[grid_idx]  = ff
                     self.qoi[grid_idx] = qoi
+                    cp.cuda.nvtx.RangePop()
                 except:
                     print("rank [%d/%d] solver failed for v-space gird no %d"%(self.rankG, self.npesG, grid_idx), flush=True)
                     sys.exit(-1)
@@ -1375,6 +1380,42 @@ class Boltzmann0D2VBactchedSolver:
             
         return        
 
+    def params_dump(self):
+        params_dict = dict()
+        params_dict["sp_order"]         = self.param.sp_order
+        params_dict["spline_qpts"]      = self.param.spline_qpts
+        params_dict["Nr"]               = self.param.Nr
+        params_dict["l_max"]            = self.param.l_max
+        params_dict["ev_max"]           = self.param.ev_max
+        params_dict["n_grids"]          = self.param.n_grids
+        params_dict["n_sub_clusters"]   = self.param.n_sub_clusters
+        params_dict["dt"]               = self.param.dt
+        params_dict["cycles"]           = self.param.cycles
+        params_dict["solver_type"]      = self.param.solver_type
+        params_dict["atol"]             = self.param.atol
+        params_dict["rtol"]             = self.param.rtol
+        params_dict["max_iter"]         = self.param.max_iter
+        params_dict["tps_bte_max_iter"] = self.param.tps_bte_max_iter
+        params_dict["bte_solve_freq"]   = self.param.bte_solve_freq
+        params_dict["ee_collisions"]    = self.param.ee_collisions
+        params_dict["use_gpu"]          = self.param.use_gpu
+        params_dict["dev_id"]           = self.param.dev_id
+        params_dict["collisions"]       = self.param.collisions
+        params_dict["export_csv"]       = self.param.export_csv
+        params_dict["plot_data"]        = self.param.plot_data
+        params_dict["Efreq"]            = self.param.Efreq
+        params_dict["verbose"]          = self.param.verbose
+        params_dict["Te"]               = self.param.Te
+        params_dict["threads"]          = self.param.threads
+        params_dict["grid_idx"]         = self.param.grid_idx
+        params_dict["output_dir"]       = self.param.output_dir
+        params_dict["out_fname"]        = self.param.out_fname
+        params_dict["rand_seed"]        = self.param.rand_seed
+        params_dict["use_clstr_inp"]    = self.param.use_clstr_inp
+        
+        return params_dict
+        
+    
 class pp(enum.IntEnum):
     BTE_SETUP     = 0
     BTE_FETCH     = 1
@@ -1429,8 +1470,11 @@ def profile_stats(boltzmann:Boltzmann0D2VBactchedSolver, p_tt: profile_t, p_nn, 
     if rank ==0 :
         if fname!="":
             with open(fname, "a") as f:
+                f.write(datetime.datetime.now().strftime("%m/%d/%Y, %H:%M:%S")+"\n")
+                f.write(""+str(boltzmann.params_dump())+"\n")
                 f.write(",".join(header)+"\n")
                 f.write(",".join(data_str)+"\n")
+                f.write("---" + "\n")
                 f.close()
         else:
             print(",".join(header))
@@ -1903,6 +1947,10 @@ def driver_wo_parla(comm):
 
 if __name__=="__main__":
     comm = MPI.COMM_WORLD
+    # print("running without parla")
+    # driver_wo_parla(comm)
+    
+    print("running with parla")
     driver_w_parla(comm)
     
             
