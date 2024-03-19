@@ -101,6 +101,7 @@ void AlgebraicSubgridModels::initializeSelf() {
   subgridVisc_.SetSize(sfes_truevsize);
   subgridVisc_gf_.SetSpace(sfes_);
   delta_.SetSize(sfes_truevsize);
+  // delta_gf_.SetSpace(sfes_);
 
   gradU_.SetSize(vfes_truevsize);
   gradV_.SetSize(vfes_truevsize);
@@ -212,7 +213,8 @@ void AlgebraicSubgridModels::setup() {
     // bufferGridScaleZ->GetTrueDofs(gridScaleZSml);
   }
 
-  resolution_gf_ = *bufferGridScale_;
+  // resolution_gf_ = *bufferGridScale_;
+  resolution_gf_.SetFromTrueDofs(gridScale_);
 }
 
 void AlgebraicSubgridModels::step() {

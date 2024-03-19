@@ -53,6 +53,7 @@ FunctionCoefficient negative_radius_coeff(negativeRadius);
 /// forward declarations
 void vel_exact_tgv2d(const Vector &x, double t, Vector &u);
 void vel_exact_pipe(const Vector &x, double t, Vector &u);
+void vel_channel(const Vector &x, double t, Vector &u);
 
 /**
  * @brief Helper function to remove mean from a vector
@@ -546,6 +547,11 @@ void Tomboulides::initializeSelf() {
     if (ic_string_ == "tgv2d") {
       if(rank0_) std::cout << "Setting tgv2d IC..." << std::endl;
       VectorFunctionCoefficient u_excoeff(2, vel_exact_tgv2d);
+      u_excoeff.SetTime(0.0);
+      u_curr_gf_->ProjectCoefficient(u_excoeff);
+    } else if (ic_string_ == "channel") {
+      if(rank0_) std::cout << "Setting channel IC..." << std::endl;
+      VectorFunctionCoefficient u_excoeff(3, vel_channel);
       u_excoeff.SetTime(0.0);
       u_curr_gf_->ProjectCoefficient(u_excoeff);
     }
@@ -1599,4 +1605,58 @@ void vel_exact_tgv2d(const Vector &x, double t, Vector &u) {
 void vel_exact_pipe(const Vector &x, double t, Vector &u) {
   u(0) = 0.0;
   u(1) = 2.0 * (1 - x[0] * x[0]);
+}
+
+void vel_channel(const Vector &coords, double t, Vector &u)
+{
+  
+   double yp;
+   double x = coords(0);
+   double y = coords(1);
+   double z = coords(2);
+
+   double pi = 3.14159265359;
+   double A = -1.0;
+   double B = -1.0;
+   double C = +2.0;
+   double aL = 4.0;
+   double bL = 2.0 * pi;
+   double cL = 4.0;
+   double M = 1.0;
+   double L = 0.05;
+   double scl;
+
+   u(0) = M;
+   u(1) = 0.0;
+   u(2) = 0.0;
+
+   u(0) += L * M * A * cos(aL*x) * sin(bL*y) * sin(cL*z);
+   u(1) += L * M * B * sin(aL*x) * cos(bL*y) * sin(cL*z);
+   u(2) += L * M * C * sin(aL*x) * sin(bL*y) * cos(cL*z);
+
+   u(0) -= 0.5 * L * M * A * cos(2.0*aL*x) * sin(2.0*bL*y) * sin(2.0*cL*z);
+   u(1) -= 0.5 * L * M * B * sin(2.0*aL*x) * cos(2.0*bL*y) * sin(2.0*cL*z);
+   u(2) -= 0.5 * L * M * C * sin(2.0*aL*x) * sin(2.0*bL*y) * cos(2.0*cL*z);
+
+   u(0) += 0.25 * L * M * A * cos(4.0*aL*x) * sin(4.0*bL*y) * sin(4.0*cL*z);
+   u(1) += 0.25 * L * M * B * sin(4.0*aL*x) * cos(4.0*bL*y) * sin(4.0*cL*z);
+   u(2) += 0.25 * L * M * C * sin(4.0*aL*x) * sin(4.0*bL*y) * cos(4.0*cL*z);
+
+   /*
+   scl = std::max(1.0-std::pow((y-0.0)/0.2,8),0.0);
+   if (y > 0) {
+     scl = scl + 0.1 * std::pow(y/0.2,4.0);
+   }
+   */
+
+   scl = std::max(1.0-std::pow((y-0.0)/1.0,4),0.0);
+   //if (y > 0) {
+   //  scl = scl + 0.001 * std::pow((y-1.0)/1.0,4.0);
+   //}   
+   //scl = 1.0;
+   
+   u(0) = u(0) * scl;
+   u(1) = u(1) * scl;
+   u(2) = u(2) * scl;
+   
 }

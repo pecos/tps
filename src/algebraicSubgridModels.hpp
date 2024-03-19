@@ -154,7 +154,7 @@ class AlgebraicSubgridModels : public TurbModelBase {
   ParGridFunction *getCurrentEddyViscosity() { return &subgridVisc_gf_; }
 
   /// Return a pointer to the scalar grid size measure ParGridFunction.
-  ParGridFunction *getGridScale() { return &resolution_gf_; }
+  ParGridFunction *getGridScale() final { return bufferGridScale_; }
 
   // subgrid scale models => move to turb model class
   void sgsSmag(const DenseMatrix &gradUp, double delta, double &nu_sgs);

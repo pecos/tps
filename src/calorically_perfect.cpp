@@ -116,7 +116,7 @@ CaloricallyPerfectThermoChem::CaloricallyPerfectThermoChem(mfem::ParMesh *pmesh,
   tpsP_->getInput("loMach/openSystem", domain_is_open_, false);
 
   tpsP_->getInput("loMach/calperfect/linear-solver-rtol", rtol_, 1e-12);
-  tpsP_->getInput("loMach/calperfect/linear-solver-max-iter", max_iter_, 1000);
+  tpsP_->getInput("loMach/calperfect/linear-solver-max-iter", max_iter_, 2000);
   tpsP_->getInput("loMach/calperfect/linear-solver-verbosity", pl_solve_, 0);
 }
 
@@ -288,7 +288,7 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
   tpsP_->getInput("boundaryConditions/numWalls", numWalls, 0);
   tpsP_->getInput("boundaryConditions/numInlets", numInlets, 0);
   tpsP_->getInput("boundaryConditions/numOutlets", numOutlets, 0);
-
+  
   // inlet bc
   {
     Array<int> attr_inlet(pmesh_->bdr_attributes.Max());
@@ -361,7 +361,8 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
   t_bc_coeff2_ = new ConstantCoefficient(300.0);    
   {
     if(rank0_) std::cout << "There are " << pmesh_->bdr_attributes.Max() << " boundary attributes" << std::endl;
-    Array<int> attr_wall(pmesh_->bdr_attributes.Max());
+    // Array<int> attr_wall(pmesh_->bdr_attributes.Max());
+    Array<int> attr_wall(pmesh_->bdr_attributes.Max()+1);
     attr_wall = 0;
 
     for (int i = 1; i <= numWalls; i++) {
@@ -372,6 +373,7 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
       tpsP_->getRequiredInput((basepath + "/patch").c_str(), patch);
       tpsP_->getRequiredInput((basepath + "/type").c_str(), type);
 
+      // Note: nothing needs to be done for viscous_adiabatic
       if (type == "viscous_isothermal") {
 
         attr_wall = 0;
@@ -821,6 +823,10 @@ void CaloricallyPerfectThermoChem::updateThermoP() {
     // if( rank0_ == true ) std::cout << " New (closed) system mass: " << allMass << " [kg]" << endl;
     // if( rank0_ == true ) std::cout << " ThermoP: " << thermo_pressure_ << " dtP_: " << dtP_ << endl;
   }
+}
+
+double CaloricallyPerfectThermoChem::GetCurrentThermodynamicPressure() const {
+  return thermo_pressure_;
 }
 
 void CaloricallyPerfectThermoChem::updateDiffusivity() {

@@ -159,6 +159,8 @@ class ThermoChemModelBase {
 
   void initializeFromExtData(extDataToThermoChem *extData) { extData_interface_ = extData; }
   const extDataToThermoChem *getExtDataInterface() const { return extData_interface_; }
+
+  virtual double GetCurrentThermodynamicPressure() const { return -1.0; }  
 };
 
 /**

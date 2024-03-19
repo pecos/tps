@@ -463,6 +463,9 @@ void LoMachSolver::initialTimeStep() {
   // TODO(trevilo): Compute initial dt from CFL
   // This calc was broken here, so it was removed temporarily.
 
+  const double dt_initial = loMach_opts_.ts_opts_.initial_dt_;  
+  temporal_coeff_.dt = dt_initial;
+  
   // dt_fixed is initialized to -1, so if it is positive, then the
   // user requested a fixed dt run
   const double dt_fixed = loMach_opts_.ts_opts_.constant_dt_;
@@ -576,6 +579,9 @@ void LoMachSolver::solveEnd() {
     if (rank0_) std::cout << "At time = " << temporal_coeff_.time << ", flow L2 error = " << flow_err << std::endl;
   }
 
+  const double thermoP = thermo_->GetCurrentThermodynamicPressure();
+  if (rank0_ == true) std::cout << " Thermodynamic Pressure: " << thermoP << endl;  
+
   // paraview
   pvdc_->SetCycle(iter);
   pvdc_->SetTime(temporal_coeff_.time);
@@ -597,7 +603,8 @@ void LoMachSolver::solve() {
 
 void LoMachSolver::updateTimestep() {
   // minimum timestep to not waste comp time
-  double dtMin = 1.0e-9;
+  double dtMin = loMach_opts_.ts_opts_.minimum_dt_;
+  double dtMax = loMach_opts_.ts_opts_.maximum_dt_;      
 
   double Umax_lcl = 1.0e-12;
   double max_speed = Umax_lcl;
@@ -659,7 +666,6 @@ void LoMachSolver::updateTimestep() {
   // double dtInst = max(dtInst_conv, dtInst_visc);
 
   double dtInst = dtInst_conv;
-
   double &dt = temporal_coeff_.dt;
   if (dtInst > dt) {
     dt = dt * (1.0 + dtFactor);
@@ -668,6 +674,10 @@ void LoMachSolver::updateTimestep() {
     dt = dtInst;
   }
 
+  if (dt > dtMax) {
+    dt = dtMax;
+  }
+  
   if (dt < dtMin) {
     if (rank0_) {
       std::cout << " => Timestep running away!!!" << endl;
@@ -754,6 +764,9 @@ void LoMachSolver::setTimestep() {
   if (dt_fixed > 0) {
     temporal_coeff_.dt = dt_fixed;
   } else {
+    const double dt_initial = loMach_opts_.ts_opts_.initial_dt_;
+    temporal_coeff_.dt = dt_initial;    
+    /*
     // auto dataU = flowClass->un_gf.HostRead();
     auto dataU = flow_->getCurrentVelocity()->HostRead();
     for (int n = 0; n < Sdof; n++) {
@@ -767,7 +780,9 @@ void LoMachSolver::setTimestep() {
     MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, pmesh_->GetComm());
     double dtInst = CFL * hmin / (max_speed * (double)order);
     temporal_coeff_.dt = dtInst;
-    if(rank0_) std::cout << "dt from setTimestep: " << temporal_coeff_.dt << " max_speed: " << max_speed << endl;
+    if(rank0_) std::cout << "dt from setTimestep: " << temporal_coeff_.dt << " max_speed: " << max_speed << endl;    
+    */
+    if(rank0_) std::cout << "dt from setTimestep: " << temporal_coeff_.dt << endl;
   }
 }
 

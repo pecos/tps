@@ -247,6 +247,9 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   /// Return a pointer to the current total thermal diffusivity ParGridFunction.
   ParGridFunction *GetCurrentThermalDiv() { return &Qt_gf_; }
 
+  /// Return thermodynamic pressure
+  double GetCurrentThermodynamicPressure() const final;
+  
   /// Rotate entries in the time step and solution history arrays.
   void UpdateTimestepHistory(double dt);
 

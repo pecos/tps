@@ -38,6 +38,7 @@ ZeroTurbModel::ZeroTurbModel(ParMesh *pmesh, int sorder) : pmesh_(pmesh), sorder
 
 ZeroTurbModel::~ZeroTurbModel() {
   delete eddy_viscosity_;
+  delete bufferGridScale_;
   delete fes_;
   delete fec_;
 }
@@ -52,4 +53,82 @@ void ZeroTurbModel::initializeSelf() {
 
   toFlow_interface_.eddy_viscosity = eddy_viscosity_;
   toThermoChem_interface_.eddy_viscosity = eddy_viscosity_;
+}
+
+void ZeroTurbModel::setup() {
+  /// Grid-related ///
+
+  // Build grid size vector and grid function
+  bufferGridScale_ = new ParGridFunction(fes_);
+  ParGridFunction dofCount(fes_);
+  {
+    int elndofs;
+    Array<int> vdofs;
+    Vector vals;
+    Vector loc_data;
+    int nSize = bufferGridScale_->Size();
+    Array<int> zones_per_vdof;
+    zones_per_vdof.SetSize(fes_->GetVSize());
+    zones_per_vdof = 0;
+    Array<int> zones_per_vdofALL;
+    zones_per_vdofALL.SetSize(fes_->GetVSize());
+    zones_per_vdofALL = 0;
+
+    double *data = bufferGridScale_->HostReadWrite();
+    double *count = dofCount.HostReadWrite();
+
+    for (int i = 0; i < fes_->GetNDofs(); i++) {
+      data[i] = 0.0;
+      count[i] = 0.0;
+    }
+
+    // element loop
+    for (int e = 0; e < fes_->GetNE(); ++e) {
+      fes_->GetElementVDofs(e, vdofs);
+      vals.SetSize(vdofs.Size());
+      ElementTransformation *tr = fes_->GetElementTransformation(e);
+      const FiniteElement *el = fes_->GetFE(e);
+      elndofs = el->GetDof();
+      double delta;
+
+      // element dof
+      for (int dof = 0; dof < elndofs; ++dof) {
+        const IntegrationPoint &ip = el->GetNodes().IntPoint(dof);
+        tr->SetIntPoint(&ip);
+        delta = pmesh_->GetElementSize(tr->ElementNo, 1);
+        delta = delta / ((double)sorder_);
+        vals(dof) = delta;
+      }
+
+      // Accumulate values in all dofs, count the zones.
+      for (int j = 0; j < vdofs.Size(); j++) {
+        int ldof = vdofs[j];
+        data[ldof + 0 * nSize] += vals[j];
+      }
+
+      for (int j = 0; j < vdofs.Size(); j++) {
+        int ldof = vdofs[j];
+        zones_per_vdof[ldof]++;
+      }
+    }
+
+    // Count the zones globally.
+    GroupCommunicator &gcomm = bufferGridScale_->ParFESpace()->GroupComm();
+    gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
+    gcomm.Bcast(zones_per_vdof);
+
+    // Accumulate for all vdofs.
+    gcomm.Reduce<double>(bufferGridScale_->GetData(), GroupCommunicator::Sum);
+    gcomm.Bcast<double>(bufferGridScale_->GetData());
+
+    // Compute means.
+    for (int i = 0; i < nSize; i++) {
+      const int nz = zones_per_vdof[i];
+      if (nz) {
+        data[i] /= nz;
+      }
+    }
+    
+  }
+
 }

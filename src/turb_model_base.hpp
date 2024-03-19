@@ -137,7 +137,7 @@ class TurbModelBase {
   turbModelToThermoChem toThermoChem_interface_;
 
   virtual mfem::ParGridFunction *getCurrentEddyViscosity() { return nullptr; }
-  virtual mfem::ParGridFunction *getGridScale() { return nullptr; }
+  virtual mfem::ParGridFunction *getGridScale() = 0;
 };
 
 /**
@@ -153,6 +153,7 @@ class ZeroTurbModel final : public TurbModelBase {
   mfem::ParFiniteElementSpace *fes_ = nullptr;
 
   mfem::ParGridFunction *eddy_viscosity_ = nullptr;
+  mfem::ParGridFunction *bufferGridScale_ = nullptr;  
 
  public:
   /**
@@ -173,8 +174,10 @@ class ZeroTurbModel final : public TurbModelBase {
   void initializeSelf() final;
 
   /// Since everything is constant, step and setup are a no-op
-  void setup() final {}
+  void setup() final;
   void step() final {}
+
+  mfem::ParGridFunction *getGridScale() final { return bufferGridScale_; }  
 };
 
 #endif  // TURB_MODEL_BASE_HPP_

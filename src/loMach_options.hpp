@@ -72,6 +72,9 @@ class LoMachTemporalOptions {
   bool enable_constant_dt_;
 
   double cfl_;
+  double initial_dt_;
+  double minimum_dt_;
+  double maximum_dt_;      
   double constant_dt_;
 
   int bdf_order_;
