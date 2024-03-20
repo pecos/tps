@@ -354,6 +354,18 @@ class Tomboulides final : public FlowBase {
   /// Advance
   void step() final;
 
+  void screenHeader(std::vector<std::string> &header) const final {
+    int nprint = 1;
+    header.resize(nprint);
+    header[0] = std::string("Max vel.");
+  }
+
+  void screenValues(std::vector<double> &values) final {
+    int nprint = 1;
+    values.resize(nprint);
+    values[0] = maxVelocityMagnitude();
+  }
+
   mfem::ParGridFunction *getCurrentVelocity() final { return u_curr_gf_; }
 
   /// Evaluate error (only when exact solution is known)
@@ -369,6 +381,9 @@ class Tomboulides final : public FlowBase {
 
   /// Add constant swirl
   void addSwirlDirichletBC(double ut, mfem::Array<int> &attr);
+
+  /// Compute maximum velocity magnitude anywhere in the domain
+  double maxVelocityMagnitude();
 };
 
 #endif  // TOMBOULIDES_HPP_

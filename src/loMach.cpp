@@ -486,6 +486,14 @@ void LoMachSolver::solveBegin() {
     std::cout << "Starting main loop, from " << iter_start_ << " to " << loMach_opts_.max_steps_ << endl;
   }
 
+  std::vector<std::string> flow_header;
+  flow_->screenHeader(flow_header);
+
+  // NB: Called on all ranks, but only rank 0 prints.  We assume any
+  // necessary communication is handled by the flow class
+  std::vector<double> flow_screen_values;
+  flow_->screenValues(flow_screen_values);
+
   if (rank0_) {
     // TODO(trevilo): Add state summary
     std::cout << std::endl;
@@ -493,6 +501,10 @@ void LoMachSolver::solveBegin() {
     std::cout << std::setw(13) << "Time ";
     std::cout << std::setw(13) << "dt ";
     std::cout << std::setw(13) << "Wtime/Step ";
+    for (size_t i = 0; i < flow_header.size(); i++) {
+      std::cout << std::setw(12) << flow_header[i] << " ";
+    }
+
     std::cout << std::endl;
     std::cout << "#==================================================================" << std::endl;
 
@@ -500,6 +512,9 @@ void LoMachSolver::solveBegin() {
     std::cout << std::setw(10) << std::scientific << temporal_coeff_.time << " ";
     std::cout << std::setw(10) << std::scientific << temporal_coeff_.dt << " ";
     std::cout << std::setw(10) << std::scientific << 0.0 << " ";
+    for (size_t i = 0; i < flow_screen_values.size(); i++) {
+      std::cout << std::setw(10) << std::scientific << flow_screen_values[i] << " ";
+    }
     std::cout << std::endl;
   }
 }
@@ -528,12 +543,20 @@ void LoMachSolver::solveStep() {
     double max_time_per_step = 0.0;
     MPI_Reduce(&time_per_step, &max_time_per_step, 1, MPI_DOUBLE, MPI_MAX, 0, groupsMPI->getTPSCommWorld());
 
+    // NB: Called on all ranks, but only rank 0 prints.  We assume any
+    // necessary communication is handled by the flow class
+    std::vector<double> flow_screen_values;
+    flow_->screenValues(flow_screen_values);
+
     if (rank0_) {
       // TODO(trevilo): Add state summary
       std::cout << std::setw(10) << iter << " ";
       std::cout << std::setw(10) << std::scientific << temporal_coeff_.time << " ";
       std::cout << std::setw(10) << std::scientific << temporal_coeff_.dt << " ";
       std::cout << std::setw(10) << std::scientific << max_time_per_step << " ";
+      for (size_t i = 0; i < flow_screen_values.size(); i++) {
+        std::cout << std::setw(10) << std::scientific << flow_screen_values[i] << " ";
+      }
       std::cout << std::endl;
     }
   }

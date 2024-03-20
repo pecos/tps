@@ -1574,6 +1574,34 @@ void Tomboulides::addSwirlDirichletBC(double ut, mfem::Array<int> &attr) {
   }
 }
 
+double Tomboulides::maxVelocityMagnitude() {
+  double local_max_vel_magnitude = 0.0;
+  double global_max_vel_magnitude = 0.0;
+
+  u_curr_gf_->GetTrueDofs(u_vec_);
+
+  int n_scalar_dof = u_vec_.Size() / dim_;
+
+  const double *vel = u_vec_.HostRead();
+
+  for (int i = 0; i < n_scalar_dof; i++) {
+    const double ux = vel[i];
+    const double uy = vel[n_scalar_dof + i];
+    double uz = 0.0;
+    if (dim_ == 3) {
+      uz = vel[2 * n_scalar_dof + i];
+    }
+    const double vmag = sqrt(ux * ux + uy * uy + uz * uz);
+    if (vmag > local_max_vel_magnitude) {
+      local_max_vel_magnitude = vmag;
+    }
+  }
+
+  MPI_Reduce(&local_max_vel_magnitude, &global_max_vel_magnitude, 1, MPI_DOUBLE, MPI_MAX, 0, pfes_->GetComm());
+
+  return global_max_vel_magnitude;
+}
+
 // Non-class functions that are only used in this file below here
 
 /// Used to set the velocity IC (and to check error)
