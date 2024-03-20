@@ -486,11 +486,17 @@ void LoMachSolver::solveBegin() {
     std::cout << "Starting main loop, from " << iter_start_ << " to " << loMach_opts_.max_steps_ << endl;
   }
 
+  std::vector<std::string> thermo_header;
+  thermo_->screenHeader(thermo_header);
+
   std::vector<std::string> flow_header;
   flow_->screenHeader(flow_header);
 
   // NB: Called on all ranks, but only rank 0 prints.  We assume any
   // necessary communication is handled by the flow class
+  std::vector<double> thermo_screen_values;
+  thermo_->screenValues(thermo_screen_values);
+
   std::vector<double> flow_screen_values;
   flow_->screenValues(flow_screen_values);
 
@@ -501,6 +507,9 @@ void LoMachSolver::solveBegin() {
     std::cout << std::setw(13) << "Time ";
     std::cout << std::setw(13) << "dt ";
     std::cout << std::setw(13) << "Wtime/Step ";
+    for (size_t i = 0; i < thermo_header.size(); i++) {
+      std::cout << std::setw(12) << thermo_header[i] << " ";
+    }
     for (size_t i = 0; i < flow_header.size(); i++) {
       std::cout << std::setw(12) << flow_header[i] << " ";
     }
@@ -512,6 +521,9 @@ void LoMachSolver::solveBegin() {
     std::cout << std::setw(10) << std::scientific << temporal_coeff_.time << " ";
     std::cout << std::setw(10) << std::scientific << temporal_coeff_.dt << " ";
     std::cout << std::setw(10) << std::scientific << 0.0 << " ";
+    for (size_t i = 0; i < thermo_screen_values.size(); i++) {
+      std::cout << std::setw(10) << std::scientific << thermo_screen_values[i] << " ";
+    }
     for (size_t i = 0; i < flow_screen_values.size(); i++) {
       std::cout << std::setw(10) << std::scientific << flow_screen_values[i] << " ";
     }
@@ -545,6 +557,9 @@ void LoMachSolver::solveStep() {
 
     // NB: Called on all ranks, but only rank 0 prints.  We assume any
     // necessary communication is handled by the flow class
+    std::vector<double> thermo_screen_values;
+    thermo_->screenValues(thermo_screen_values);
+
     std::vector<double> flow_screen_values;
     flow_->screenValues(flow_screen_values);
 
@@ -554,6 +569,9 @@ void LoMachSolver::solveStep() {
       std::cout << std::setw(10) << std::scientific << temporal_coeff_.time << " ";
       std::cout << std::setw(10) << std::scientific << temporal_coeff_.dt << " ";
       std::cout << std::setw(10) << std::scientific << max_time_per_step << " ";
+      for (size_t i = 0; i < thermo_screen_values.size(); i++) {
+        std::cout << std::setw(10) << std::scientific << thermo_screen_values[i] << " ";
+      }
       for (size_t i = 0; i < flow_screen_values.size(); i++) {
         std::cout << std::setw(10) << std::scientific << flow_screen_values[i] << " ";
       }

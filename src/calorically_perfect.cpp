@@ -983,6 +983,16 @@ void CaloricallyPerfectThermoChem::computeQtTO() {
   Qt_gf_.SetFromTrueDofs(Qt_);
 }
 
+void CaloricallyPerfectThermoChem::screenHeader(std::vector<std::string> &header) const {
+  header.resize(1);
+  header[0] = "P/P0";
+}
+
+void CaloricallyPerfectThermoChem::screenValues(std::vector<double> &values) {
+  values.resize(1);
+  values[0] = thermo_pressure_ / ambient_pressure_;
+}
+
 #if 0
 // Temporarily remove viscous sponge capability.  This sould be housed
 // in a separate class that we just instantiate and call, rather than

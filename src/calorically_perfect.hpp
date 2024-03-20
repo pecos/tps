@@ -215,6 +215,9 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   void initializeIO(IODataOrganizer &io) final;
   void initializeViz(ParaViewDataCollection &pvdc) final;
 
+  void screenHeader(std::vector<std::string> &header) const final;
+  void screenValues(std::vector<double> &values) final;
+
   // Functions added here
   void updateThermoP();
   void extrapolateState();

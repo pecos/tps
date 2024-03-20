@@ -119,6 +119,22 @@ class ThermoChemModelBase {
   virtual void initializeViz(mfem::ParaViewDataCollection &pvdc) {}
 
   /**
+   * @brief Header strings for screen dump
+   *
+   * Provides a hook for derived classes to pass a set of header
+   * strings that will be printed to the screen
+   */
+  virtual void screenHeader(std::vector<std::string> &header) const { header.resize(0); }
+
+  /**
+   * @brief Values for screen dump
+   *
+   * Provides values that will be printed to the screen at user requested
+   * frequency (as often as each iteration).
+   */
+  virtual void screenValues(std::vector<double> &values) { values.resize(0); }
+
+  /**
    * @brief Initialize data from the flow class
    *
    * Initialize fields that the thermochemistry model needs from the
