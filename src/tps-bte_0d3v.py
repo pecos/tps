@@ -63,7 +63,7 @@ import libtps
 from   bte_0d3v_batched import bte_0d3v_batched as BoltzmannSolver
 import utils as bte_utils
 
-WITH_PARLA = 1
+WITH_PARLA = 0
 if WITH_PARLA:
     try:
         from parla import Parla
@@ -1208,15 +1208,15 @@ class Boltzmann0D2VBactchedSolver:
             @spawn(ts[grid_idx], placement=[parla_placement[grid_idx]], vcus=0.0)
             def t1():
                 try:
-                    cp.cuda.nvtx.RangePush("bte_solve")
+                    #cp.cuda.nvtx.RangePush("bte_solve")
                     print("rank [%d/%d] BTE launching grid %d on %s"%(rank, npes, grid_idx, parla_placement[grid_idx]), flush=True)
                     f0 = self.bte_solver.get_boltzmann_parameter(grid_idx, "u0")
                     ff , qoi = self.bte_solver.solve(grid_idx, f0, self.param.atol, self.param.rtol, self.param.max_iter, self.param.solver_type)
                     self.ff[grid_idx]  = ff
                     self.qoi[grid_idx] = qoi
-                    cp.cuda.nvtx.RangePop()
-                except:
-                    print("rank [%d/%d] solver failed for v-space gird no %d"%(self.rankG, self.npesG, grid_idx), flush=True)
+                    #cp.cuda.nvtx.RangePop()
+                except Exception as e:
+                    print("rank [%d/%d] solver failed for v-space gird no %d with error = %s"%(self.rankG, self.npesG, grid_idx, str(e)), flush=True)
                     sys.exit(-1)
                     
         await ts
@@ -1947,11 +1947,11 @@ def driver_wo_parla(comm):
 
 if __name__=="__main__":
     comm = MPI.COMM_WORLD
-    # print("running without parla")
-    # driver_wo_parla(comm)
+    print("running without parla")
+    driver_wo_parla(comm)
     
-    print("running with parla")
-    driver_w_parla(comm)
+    # print("running with parla")
+    # driver_w_parla(comm)
     
             
             
