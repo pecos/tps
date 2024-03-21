@@ -121,8 +121,10 @@ class BoltzmannSolverParams():
     
     n0            = 3.22e22 #[m^{-3}]
     
-    rand_seed     = 0
-    use_clstr_inp = True
+    rand_seed       = 0
+    use_clstr_inp   = True
+    clstr_maxiter   = 10
+    clstr_threshold = 1e-3
     
 class TPSINDEX():
     """
@@ -525,7 +527,7 @@ class Boltzmann0D2VBactchedSolver:
                     # xp                           = cp
                     # m                            = xp.array(m_bte[gidx_to_pidx[grid_idx]])
                     # mw , mw_std                  = normalize(m, xp)
-                    # mcw, membership_m            = k_means(mw, num_clusters=self.param.n_sub_clusters, max_iter=1000, thresh=1e-8, rand_seed=self.param.rand_seed, xp=xp)
+                    # mcw, membership_m            = k_means(mw, num_clusters=self.param.n_sub_clusters, max_iter=self.param.clstr_maxiter, thresh=self.param.clstr_threshold, rand_seed=self.param.rand_seed, xp=xp)
                     
                     # to repoduce clusters
                     xp                           = np
@@ -533,7 +535,7 @@ class Boltzmann0D2VBactchedSolver:
                     m                            = m_bte[gidx_to_pidx[grid_idx]]
                     mw , mw_std                  = normalize(m, xp)
                     mcw0                         = mw[np.random.choice(mw.shape[0], self.param.n_sub_clusters, replace=False)]
-                    mcw                          = scipy.cluster.vq.kmeans(mw, mcw0, iter=1000, thresh=1e-8, check_finite=False)[0]
+                    mcw                          = scipy.cluster.vq.kmeans(mw, mcw0, iter=self.param.clstr_maxiter, thresh=self.param.clstr_threshold, check_finite=False)[0]
                     mcw0[0:mcw.shape[0], :]      = mcw[:,:]
                     mcw                          = mcw0
                     dist_mat                     = xp.linalg.norm(mw[:, None, :] - mcw[None, : , :], axis=2)
@@ -635,16 +637,16 @@ class Boltzmann0D2VBactchedSolver:
                             print("ns/n0 (min)               = %.12E              \t ns/n0(max) = %.12E         "%(xp.min(ns_by_n0[i]) , xp.max(ns_by_n0[i])), flush=True)
             
             
-                    # if (use_gpu == 1):
-                    #     with cp.cuda.Device(dev_id):
-                    #         n0   = cp.array(n0) 
-                    #         ne   = cp.array(ne)
-                    #         ni   = cp.array(ni)
-                    #         Ex   = cp.array(Ex)
-                    #         Ey   = cp.array(Ey)
-                    #         Tg   = cp.array(Tg)
-                    #         EMag = cp.sqrt(Ex**2 + Ey**2)
-                    #         ns_by_n0 = cp.array(ns_by_n0)
+                    if (use_gpu == 1):
+                        with cp.cuda.Device(dev_id):
+                            n0   = cp.array(n0) 
+                            ne   = cp.array(ne)
+                            ni   = cp.array(ni)
+                            Ex   = cp.array(Ex)
+                            Ey   = cp.array(Ey)
+                            Tg   = cp.array(Tg)
+                            EMag = cp.sqrt(Ex**2 + Ey**2)
+                            ns_by_n0 = cp.array(ns_by_n0)
                     
                     self.bte_solver.set_boltzmann_parameter(grid_idx, "ns_by_n0", ns_by_n0)
                     self.bte_solver.set_boltzmann_parameter(grid_idx, "n0" , n0)
@@ -932,7 +934,7 @@ class Boltzmann0D2VBactchedSolver:
                     # xp                           = cp
                     # m                            = xp.array(m_bte[gidx_to_pidx[grid_idx]])
                     # mw , mw_std                  = normalize(m, xp)
-                    # mcw, membership_m            = k_means(mw, num_clusters=self.param.n_sub_clusters, max_iter=1000, thresh=1e-8, rand_seed=self.param.rand_seed, xp=xp)
+                    # mcw, membership_m            = k_means(mw, num_clusters=self.param.n_sub_clusters, max_iter=self.param.clstr_maxiter, thresh=1e-8, rand_seed=self.param.rand_seed, xp=xp)
                     
                     # to repoduce clusters
                     xp                           = np
@@ -940,7 +942,7 @@ class Boltzmann0D2VBactchedSolver:
                     m                            = m_bte[gidx_to_pidx[grid_idx]]
                     mw , mw_std                  = normalize(m, xp)
                     mcw0                         = mw[np.random.choice(mw.shape[0], self.param.n_sub_clusters, replace=False)]
-                    mcw                          = scipy.cluster.vq.kmeans(mw, mcw0, iter=1000, thresh=1e-8, check_finite=False)[0]
+                    mcw                          = scipy.cluster.vq.kmeans(mw, mcw0, iter=self.param.clstr_maxiter, thresh=self.param.clstr_threshold, check_finite=False)[0]
                     mcw0[0:mcw.shape[0], :]      = mcw[:,:]
                     mcw                          = mcw0
                     dist_mat                     = xp.linalg.norm(mw[:, None, :] - mcw[None, : , :], axis=2)
@@ -1041,16 +1043,16 @@ class Boltzmann0D2VBactchedSolver:
                             print("ns/n0 (min)               = %.12E              \t ns/n0(max) = %.12E         "%(xp.min(ns_by_n0[i]) , xp.max(ns_by_n0[i])), flush=True)
             
             
-                    # if (use_gpu == 1):
-                    #     with cp.cuda.Device(dev_id):
-                    #         n0   = cp.array(n0) 
-                    #         ne   = cp.array(ne)
-                    #         ni   = cp.array(ni)
-                    #         Ex   = cp.array(Ex)
-                    #         Ey   = cp.array(Ey)
-                    #         Tg   = cp.array(Tg)
-                    #         EMag = cp.sqrt(Ex**2 + Ey**2)
-                    #         ns_by_n0 = cp.array(ns_by_n0)
+                    if (use_gpu == 1):
+                        with cp.cuda.Device(dev_id):
+                            n0   = cp.array(n0) 
+                            ne   = cp.array(ne)
+                            ni   = cp.array(ni)
+                            Ex   = cp.array(Ex)
+                            Ey   = cp.array(Ey)
+                            Tg   = cp.array(Tg)
+                            EMag = cp.sqrt(Ex**2 + Ey**2)
+                            ns_by_n0 = cp.array(ns_by_n0)
                     
                     self.bte_solver.set_boltzmann_parameter(grid_idx, "ns_by_n0", ns_by_n0)
                     self.bte_solver.set_boltzmann_parameter(grid_idx, "n0" , n0)
@@ -1470,7 +1472,7 @@ def profile_stats(boltzmann:Boltzmann0D2VBactchedSolver, p_tt: profile_t, p_nn, 
     if rank ==0 :
         if fname!="":
             with open(fname, "a") as f:
-                f.write(datetime.datetime.now().strftime("%m/%d/%Y, %H:%M:%S")+"\n")
+                f.write("nprocs: %d timestamp %s \n"%(npes, datetime.datetime.now().strftime("%m/%d/%Y, %H:%M:%S")))
                 f.write(""+str(boltzmann.params_dump())+"\n")
                 f.write(",".join(header)+"\n")
                 f.write(",".join(data_str)+"\n")
