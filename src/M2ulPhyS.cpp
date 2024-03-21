@@ -405,7 +405,14 @@ void M2ulPhyS::initVariables() {
     serial_mesh->GetNodes(coordinates);
 
     // Evaluate the distance function
-    evaluateDistanceSerial(*serial_mesh, wall_patch_list, coordinates, *serial_distance);
+    if (!config.read_distance || !config.GetRestartCycle()) {
+      if (rank0_) grvy_printf(ginfo, "Computing distance function\n");
+      evaluateDistanceSerial(*serial_mesh, wall_patch_list, coordinates, *serial_distance);
+    } else {
+      // If distance function is read from restart, this will be overwritten later
+      if (rank0_) grvy_printf(ginfo, "Distance function to be read from restart\n");
+      *serial_distance = 0.0;
+    }
     delete tmp_dfes;
   }
 
@@ -616,6 +623,11 @@ void M2ulPhyS::initVariables() {
   initIndirectionArrays();
 #endif
   initSolutionAndVisualizationVectors();
+
+  if (distance_ != NULL) {
+    ioData.registerIOFamily("Distance function", "/distance", distance_, false, config.read_distance);
+    ioData.registerIOVar("/distance", "distance", 0, config.read_distance);
+  }
 
   average = new Averaging(Up, mesh, fec, fes, dfes, vfes, eqSystem, d_mixture, num_equation, dim, config, groupsMPI);
   average->read_meanANDrms_restart_files();
@@ -2657,6 +2669,7 @@ void M2ulPhyS::parseFlowOptions() {
   }
   tpsP->getInput("flow/refinement_levels", config.ref_levels, 0);
   tpsP->getInput("flow/computeDistance", config.compute_distance, false);
+  tpsP->getInput("flow/readDistance", config.read_distance, false);
 
   std::string type;
   tpsP->getInput("flow/sgsModel", type, std::string("none"));
