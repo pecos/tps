@@ -534,7 +534,12 @@ class Boltzmann0D2VBactchedSolver:
                     np.random.seed(self.param.rand_seed)
                     m                            = m_bte[gidx_to_pidx[grid_idx]]
                     mw , mw_std                  = normalize(m, xp)
-                    mcw0                         = mw[np.random.choice(mw.shape[0], self.param.n_sub_clusters, replace=False)]
+                    
+                    if mw.shape[0] >= self.param.n_sub_clusters:
+                        mcw0                         = mw[np.random.choice(mw.shape[0], self.param.n_sub_clusters, replace=False)]
+                    else:
+                        mcw0                         = mw[np.random.choice(mw.shape[0], self.param.n_sub_clusters, replace=True)]
+                    
                     mcw                          = scipy.cluster.vq.kmeans(mw, mcw0, iter=self.param.clstr_maxiter, thresh=self.param.clstr_threshold, check_finite=False)[0]
                     mcw0[0:mcw.shape[0], :]      = mcw[:,:]
                     mcw                          = mcw0
@@ -941,7 +946,12 @@ class Boltzmann0D2VBactchedSolver:
                     np.random.seed(self.param.rand_seed)
                     m                            = m_bte[gidx_to_pidx[grid_idx]]
                     mw , mw_std                  = normalize(m, xp)
-                    mcw0                         = mw[np.random.choice(mw.shape[0], self.param.n_sub_clusters, replace=False)]
+                    
+                    if mw.shape[0] >= self.param.n_sub_clusters:
+                        mcw0                         = mw[np.random.choice(mw.shape[0], self.param.n_sub_clusters, replace=False)]
+                    else:
+                        mcw0                         = mw[np.random.choice(mw.shape[0], self.param.n_sub_clusters, replace=True)]
+                        
                     mcw                          = scipy.cluster.vq.kmeans(mw, mcw0, iter=self.param.clstr_maxiter, thresh=self.param.clstr_threshold, check_finite=False)[0]
                     mcw0[0:mcw.shape[0], :]      = mcw[:,:]
                     mcw                          = mcw0
