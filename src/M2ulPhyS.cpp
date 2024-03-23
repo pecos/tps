@@ -1077,6 +1077,12 @@ void M2ulPhyS::initIndirectionArrays() {
   // See #199 for more info.
   const int NumBCelems = fes->GetNBE();
 
+  // NB: *Must* call this here, as otherwise some faces are
+  // erroneously included as boundary faces and asserts below may
+  // fail
+  mesh->ExchangeFaceNbrNodes();
+  mesh->ExchangeFaceNbrData();
+
   if (NumBCelems > 0) {
     bdry_face_data.shape.UseDevice(true);
     bdry_face_data.shape.SetSize(NumBCelems * maxIntPoints * maxDofs);
@@ -1119,12 +1125,6 @@ void M2ulPhyS::initIndirectionArrays() {
     const FiniteElement *fe;
     FaceElementTransformations *tr;
     // Mesh *mesh = fes->GetMesh();
-
-    // NB: *Must* call this here, as otherwise some faces are
-    // erroneously included as boundary faces and asserts below may
-    // fail
-    mesh->ExchangeFaceNbrNodes();
-    mesh->ExchangeFaceNbrData();
 
     std::vector<int> uniqueElems;
     uniqueElems.clear();
