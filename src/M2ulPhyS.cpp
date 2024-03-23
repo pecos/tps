@@ -1942,6 +1942,10 @@ void M2ulPhyS::projectInitialSolution() {
 
   initGradUp();
 
+  // Exchange before computing primitives
+  U->ParFESpace()->ExchangeFaceNbrData();
+  U->ExchangeFaceNbrData();
+
   updatePrimitives();
 
   // update pressure grid function
