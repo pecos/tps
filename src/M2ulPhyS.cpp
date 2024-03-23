@@ -4019,8 +4019,7 @@ void M2ulPhyS::checkSolverOptions() const {
 }
 
 void M2ulPhyS::updatePrimitives() {
-  // U.V.: should this be U->HostRead() instead? U->HostWrite() does not sync memory before returning the pointer.
-  double *data = U->HostWrite();
+  const double *data = U->HostRead();
   double *dataUp = Up->HostWrite();
   int dof = vfes->GetNDofs();
 
