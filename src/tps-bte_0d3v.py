@@ -126,6 +126,8 @@ class BoltzmannSolverParams():
     clstr_maxiter   = 10
     clstr_threshold = 1e-3
     
+    EMag_threshold  = 1e-10
+    
 class TPSINDEX():
     """
     simple index map to differnt fields, from the TPS arrays
@@ -493,9 +495,15 @@ class Boltzmann0D2VBactchedSolver:
         
         Ex                      = efield[0]
         Ey                      = efield[1]
-    
+        
+        EMag                    = np.sqrt(Ex**2 + Ey**2)
+        e_idx                   = EMag<self.param.EMag_threshold
+        
         ExbyN                   = Ex/n0/self.param.Td_fac
         EybyN                   = Ey/n0/self.param.Td_fac
+        
+        ExbyN[e_idx]            = (self.param.EMag_threshold/np.sqrt(2)) / n0[e_idx] / self.param.Td_fac
+        EybyN[e_idx]            = (self.param.EMag_threshold/np.sqrt(2)) / n0[e_idx] / self.param.Td_fac
         
         Ex                      = ExbyN * self.param.n0 * self.param.Td_fac
         Ey                      = EybyN * self.param.n0 * self.param.Td_fac
@@ -904,13 +912,19 @@ class Boltzmann0D2VBactchedSolver:
         
         Ex                      = efield[0]
         Ey                      = efield[1]
-    
+        
+        EMag                    = np.sqrt(Ex**2 + Ey**2)
+        e_idx                   = EMag<self.param.EMag_threshold
+        
         ExbyN                   = Ex/n0/self.param.Td_fac
         EybyN                   = Ey/n0/self.param.Td_fac
         
+        ExbyN[e_idx]            = (self.param.EMag_threshold/np.sqrt(2)) / n0[e_idx] / self.param.Td_fac
+        EybyN[e_idx]            = (self.param.EMag_threshold/np.sqrt(2)) / n0[e_idx] / self.param.Td_fac
+        
         Ex                      = ExbyN * self.param.n0 * self.param.Td_fac
         Ey                      = EybyN * self.param.n0 * self.param.Td_fac
-        
+    
         ion_deg                 = species_densities[TPSINDEX.ELE_IDX]/n0
         ion_deg[ion_deg<=0]     = 1e-16
         ns_by_n0[ns_by_n0<=0]   = 0
@@ -1377,7 +1391,7 @@ class Boltzmann0D2VBactchedSolver:
                 for ii in range(0, n_pts, n_pts_step):
                     fr     = np.abs(ff_r[ii, lm_idx, :])
                     mf_str = " ".join([r"$%s/n0$=%.2E"%(s, ns_by_n0[ii, s_idx]) for s_idx, s in enumerate(cs_species)])
-                    plt.semilogy(ev, fr, label=r"$T_g$=%.2E [K], $E/n_0$=%.2E [Td]"%(Tg[ii], eMag[ii]/n0[ii]/1e-21) + " " +mf_str)
+                    plt.semilogy(ev, fr, label=r"$T_g$=%.2E [K], $E/n_0$=%.2E [Td] $n_e/n_0$=%.2E "%(Tg[ii], eMag[ii]/n0[ii]/1e-21, ne[ii]/n0[ii]) + " " +mf_str)
                 
                 plt.xlabel(r"energy (eV)")
                 plt.ylabel(r"$f_%d$"%(lm[0]))
