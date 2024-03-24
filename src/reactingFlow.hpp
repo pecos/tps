@@ -47,6 +47,11 @@ class Tps;
 #include "io.hpp"
 #include "thermo_chem_base.hpp"
 #include "tps_mfem_wrap.hpp"
+#include "dataStructures.hpp"
+#include "equation_of_state.hpp"
+#include "argon_transport.hpp"
+#include "chemistry.hpp"
+
 
 using VecFuncT = void(const Vector &x, double t, Vector &u);
 using ScalarFuncT = double(const Vector &x, double t);
@@ -64,6 +69,7 @@ class ReactingFlow : public ThermoChemModelBase {
 
   // Mesh and discretization scheme info
   ParMesh *pmesh_ = nullptr;
+  int dim_;
   int order_;
   IntegrationRules gll_rules_;
   const temporalSchemeCoefficients &time_coeff_;
@@ -71,9 +77,29 @@ class ReactingFlow : public ThermoChemModelBase {
   double time_;
 
   // number of species and dofs
-  int nSpecies_;
+  int nSpecies_, nReactions_, nAtoms_;  
   int sDof_, sDofInt_;
 
+  WorkingFluid workFluid_;
+  GasModel gasModel_;
+  TransportModel transportModel_;
+  ChemistryModel chemistryModel_;
+  
+  // packaged inputs
+  PerfectMixtureInput mixtureInput_;
+  ArgonTransportInput argonInput_;
+  ChemistryInput chemistryInput_;
+  
+  GasMixture *mixture_ = NULL;
+  TransportProperties *transport_ = NULL;
+  Chemistry *chemistry_ = NULL;
+
+  std::vector<std::string> speciesNames_;
+  std::map<std::string, int> atomMap_;
+  DenseMatrix speciesComposition_;
+  DenseMatrix gasParams_;  
+  double const_plasma_conductivity_;
+  
   // Flags
   bool rank0_;                      /**< true if this is rank 0 */
   bool partial_assembly_ = false;   /**< Enable/disable partial assembly of forms. */
@@ -256,6 +282,10 @@ class ReactingFlow : public ThermoChemModelBase {
   void speciesProduction();
   void heatOfFormation();
 
+  /// for creation of structs to interface with old plasma/chem stuff
+  void identifySpeciesType(Array<ArgonSpcs> &speciesType);
+  void identifyCollisionType(const Array<ArgonSpcs> &speciesType, ArgonColl *collisionIndex);
+  
   /// Return a pointer to the current temperature ParGridFunction.
   ParGridFunction *GetCurrentTemperature() { return &Tn_gf_; }
 
