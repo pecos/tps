@@ -7,6 +7,13 @@ RUNFILE="inputs/mms.ternary_plasma.2d.inout.ini"
 setup() {
     SOLN_FILE=restart_argon_output.sol.h5
     MESH_FILE=beam-quad-o3-s1-r1-yp.mesh
+
+    SKIP="ASPEED"  
+    NUM_GPUS=`./count_gpus.sh`
+    MPIRUN=`./sniff_mpirun.sh`
+
+    echo Number of GPUS: $NUM_GPUS
+    echo mpirun: $MPIRUN
 }
 
 @test "[$TEST] check for input file $RUNFILE" {
@@ -20,10 +27,16 @@ setup() {
 }
 
 @test "[$TEST] run tps with input -> $RUNFILE" {
-    mpirun -np 2 ../src/tps --runFile $RUNFILE >& plasma_ternary_mms.inout.log
+
+    [ "x$MPIRUN" != "x" ] || skip "Cannot launch parallel job"
+
+    $MPIRUN -n 2 ../src/tps --runFile $RUNFILE >& plasma_ternary_mms.inout.log
 }
 
 @test "[$TEST] check if the relative error is similar to the reported value" {
+
+    [ "x$MPIRUN" != "x" ] || skip "Cannot launch parallel job"
+
     while IFS=$'\t' read -r nx e0 e1 e2 e3 e4 e5;
     do
       test $nx -eq 100

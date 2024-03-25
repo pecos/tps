@@ -7,6 +7,8 @@ RUNFILE="inputs/mms.ternary_plasma.2d.wall.ini"
 setup() {
     SOLN_FILE=restart_argon_output.sol.h5
     MESH_FILE=beam-quad-o3-s1-r1-xp.mesh
+
+    MPIRUN=`./sniff_mpirun.sh`
 }
 
 @test "[$TEST] check for input file $RUNFILE" {
@@ -20,7 +22,7 @@ setup() {
 }
 
 @test "[$TEST] run tps with input -> $RUNFILE" {
-    mpirun -np 2 ../src/tps --runFile $RUNFILE >& plasma_ternary_mms.wall.log
+    $MPIRUN -n 2 ../src/tps --runFile $RUNFILE >& plasma_ternary_mms.wall.log
 }
 
 @test "[$TEST] check if the relative error is similar to the reported value" {
