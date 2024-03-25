@@ -178,6 +178,7 @@ class LteThermoChem final : public ThermoChemModelBase {
   ScalarVectorProductCoefficient *rad_un_next_coeff_ = nullptr;
   ProductCoefficient *rad_jh_coeff_ = nullptr;
   ProductCoefficient *rad_radiation_sink_coeff_ = nullptr;
+  ScalarVectorProductCoefficient *rad_kap_gradT_coeff_ = nullptr;
 
 
   // operators and solvers
@@ -191,16 +192,23 @@ class LteThermoChem final : public ThermoChemModelBase {
 
   ParLinearForm *jh_form_ = nullptr;
 
+  ParBilinearForm *Mq_form_ = nullptr;
+  ParBilinearForm *LQ_form_ = nullptr;
+  ParLinearForm *LQ_bdry_ = nullptr;
 
   OperatorHandle At_;
   OperatorHandle Ht_;
   OperatorHandle Ms_;
+  OperatorHandle Mq_;
+  OperatorHandle LQ_;
   OperatorHandle M_rho_Cp_;
   OperatorHandle M_rho_;
   OperatorHandle A_rho_;
 
   mfem::Solver *MsInvPC_ = nullptr;
   mfem::CGSolver *MsInv_ = nullptr;
+  mfem::Solver *MqInvPC_ = nullptr;
+  mfem::CGSolver *MqInv_ = nullptr;
   mfem::Solver *MrhoInvPC_ = nullptr;
   mfem::CGSolver *MrhoInv_ = nullptr;
   mfem::Solver *HtInvPC_ = nullptr;
