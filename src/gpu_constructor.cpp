@@ -122,7 +122,7 @@ __global__ void freeDeviceRadiation(Radiation *radiation) {
 }
 
 //---------------------------------------------------
-// And finally devise setters
+// And finally device setters
 //---------------------------------------------------
 __global__ void deviceSetGridFunctionReactionData(const double * data, int size, GridFunctionReaction * reaction) {
   reaction->setData(data, size);
