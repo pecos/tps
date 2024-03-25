@@ -552,6 +552,7 @@ void LteThermoChem::initializeOperators() {
     rad_un_next_coeff_ = new ScalarVectorProductCoefficient(radius_coeff, *un_next_coeff_);
     rad_jh_coeff_ = new ProductCoefficient(radius_coeff, *jh_coeff_);
     rad_radiation_sink_coeff_ = new ProductCoefficient(radius_coeff, *radiation_sink_coeff_);
+    rad_kap_gradT_coeff_ = new ScalarVectorProductCoefficient(radius_coeff, *kap_gradT_coeff_);
   }
 
   // Convection: Atemperature(i,j) = \int_{\Omega} \phi_i \rho Cp u \cdot \nabla \phi_j
@@ -739,6 +740,72 @@ void LteThermoChem::initializeOperators() {
   }
   A_rho_form_->Assemble();
   A_rho_form_->FormSystemMatrix(empty, A_rho_);
+
+  Mq_form_ = new ParBilinearForm(sfes_);
+  MassIntegrator *mq_blfi;
+  if (axisym_) {
+    mq_blfi = new MassIntegrator(radius_coeff);
+  } else {
+    mq_blfi = new MassIntegrator;
+  }
+  if (numerical_integ_) {
+    mq_blfi->SetIntRule(&ir_i);
+  }
+  Mq_form_->AddDomainIntegrator(mq_blfi);
+  if (partial_assembly_) {
+    Mq_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+  }
+  Mq_form_->Assemble();
+  Mq_form_->FormSystemMatrix(Qt_ess_tdof_, Mq_);
+
+  if (partial_assembly_) {
+    Vector diag_pa(sfes_->GetTrueVSize());
+    Mq_form_->AssembleDiagonal(diag_pa);
+    MqInvPC_ = new OperatorJacobiSmoother(diag_pa, empty);
+  } else {
+    MqInvPC_ = new HypreSmoother(*Mq_.As<HypreParMatrix>());
+    dynamic_cast<HypreSmoother *>(MqInvPC_)->SetType(HypreSmoother::Jacobi, 1);
+  }
+  MqInv_ = new CGSolver(sfes_->GetComm());
+  MqInv_->iterative_mode = false;
+  MqInv_->SetOperator(*Mq_);
+  MqInv_->SetPreconditioner(*MqInvPC_);
+  MqInv_->SetPrintLevel(pl_solve_);
+  MqInv_->SetRelTol(rtol_);
+  MqInv_->SetMaxIter(max_iter_);
+
+  LQ_form_ = new ParBilinearForm(sfes_);
+  DiffusionIntegrator *lqd_blfi;
+  if (axisym_) {
+    lqd_blfi = new DiffusionIntegrator(*rad_thermal_diff_total_coeff_);
+  } else {
+    lqd_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
+  }
+  if (numerical_integ_) {
+    lqd_blfi->SetIntRule(&ir_di);
+  }
+  LQ_form_->AddDomainIntegrator(lqd_blfi);
+  if (partial_assembly_) {
+    LQ_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+  }
+  LQ_form_->Assemble();
+  LQ_form_->FormSystemMatrix(empty, LQ_);
+
+  LQ_bdry_ = new ParLinearForm(sfes_);
+  // auto *lq_bdry_lfi = new BoundaryNormalLFIntegrator(*kap_gradT_coeff_, 2, -1);
+  BoundaryNormalLFIntegrator *lq_bdry_lfi;
+  if (axisym_) {
+    lq_bdry_lfi = new BoundaryNormalLFIntegrator(*rad_kap_gradT_coeff_, 2, -1);
+  } else {
+    lq_bdry_lfi = new BoundaryNormalLFIntegrator(*kap_gradT_coeff_, 2, -1);
+  }
+
+  if (numerical_integ_) {
+    lq_bdry_lfi->SetIntRule(&ir_di);
+  }
+  LQ_bdry_->AddBoundaryIntegrator(lq_bdry_lfi, temp_ess_attr_);
+  if (rank0_) std::cout << "CaloricallyPerfectThermoChem LQ operator set" << endl;
+
 
   // copy IC to other temp containers
   Tn_gf_.GetTrueDofs(Tn_);
@@ -1091,42 +1158,73 @@ void LteThermoChem::computeQt() {
   Qt_ = 0.0;
   Qt_gf_.SetFromTrueDofs(Qt_);
 
+  // Array<int> empty;
+
+  // // Update rho weighted mass matrix and solver
+  // M_rho_form_->Update();
+  // M_rho_form_->Assemble();
+  // M_rho_form_->FormSystemMatrix(empty, M_rho_);
+  // MrhoInv_->SetOperator(*M_rho_);
+
+  // // Convection contribution
+  // A_rho_form_->Update();
+  // A_rho_form_->Assemble();
+  // A_rho_form_->FormSystemMatrix(empty, A_rho_);
+  // A_rho_->Mult(rn_, resT_);
+
+  // // Unsteady contribution
+  // const double dt = time_coeff_.dt;
+  // tmpR0_.Set(time_coeff_.bd0 / dt, rn_);
+  // tmpR0_.Add(time_coeff_.bd1 / dt, rnm1_);
+  // tmpR0_.Add(time_coeff_.bd2 / dt, rnm2_);
+  // tmpR0_.Add(time_coeff_.bd3 / dt, rnm3_);
+  // Ms_->AddMult(tmpR0_, resT_);
+
+  // // rho Qt = -D\rho/Dt (this .Neg() handles - on rhs)
+  // resT_.Neg();
+
+  // // Prep for solve
+  // sfes_->GetRestrictionMatrix()->MultTranspose(resT_, resT_gf_);
+
+  // Vector Xqt, Bqt;
+  // M_rho_form_->FormLinearSystem(empty, Qt_gf_, resT_gf_, M_rho_, Xqt, Bqt, 1);
+
+  // // Solve
+  // MrhoInv_->Mult(Bqt, Xqt);
+  // M_rho_form_->RecoverFEMSolution(Xqt, resT_gf_, Qt_gf_);
+
+  // Qt_gf_.GetTrueDofs(Qt_);
+  // // Qt_ = 0.0;
+  // // Qt_gf_.SetFromTrueDofs(Qt_);
+
+
+  tmpR0_ = 0.0;
+  LQ_bdry_->Update();
+  LQ_bdry_->Assemble();
+  LQ_bdry_->ParallelAssemble(tmpR0_);
+  tmpR0_.Neg();
+
   Array<int> empty;
+  LQ_form_->Update();
+  LQ_form_->Assemble();
+  LQ_form_->FormSystemMatrix(empty, LQ_);
+  LQ_->AddMult(Tn_next_, tmpR0_);  // tmpR0_ += LQ{Tn_next}
 
-  // Update rho weighted mass matrix and solver
-  M_rho_form_->Update();
-  M_rho_form_->Assemble();
-  M_rho_form_->FormSystemMatrix(empty, M_rho_);
-  MrhoInv_->SetOperator(*M_rho_);
+  sfes_->GetRestrictionMatrix()->MultTranspose(tmpR0_, resT_gf_);
 
-  // Convection contribution
-  A_rho_form_->Update();
-  A_rho_form_->Assemble();
-  A_rho_form_->FormSystemMatrix(empty, A_rho_);
-  A_rho_->Mult(rn_, resT_);
-
-  // Unsteady contribution
-  const double dt = time_coeff_.dt;
-  tmpR0_.Set(time_coeff_.bd0 / dt, rn_);
-  tmpR0_.Add(time_coeff_.bd1 / dt, rnm1_);
-  tmpR0_.Add(time_coeff_.bd2 / dt, rnm2_);
-  tmpR0_.Add(time_coeff_.bd3 / dt, rnm3_);
-  Ms_->AddMult(tmpR0_, resT_);
-
-  // rho Qt = -D\rho/Dt (this .Neg() handles - on rhs)
-  resT_.Neg();
-
-  // Prep for solve
-  sfes_->GetRestrictionMatrix()->MultTranspose(resT_, resT_gf_);
+  Qt_ = 0.0;
+  Qt_gf_.SetFromTrueDofs(tmpR0_);
 
   Vector Xqt, Bqt;
-  M_rho_form_->FormLinearSystem(Qt_ess_tdof_, Qt_gf_, resT_gf_, M_rho_, Xqt, Bqt, 1);
+  Mq_form_->FormLinearSystem(Qt_ess_tdof_, Qt_gf_, resT_gf_, Mq_, Xqt, Bqt, 1);
 
-  // Solve
-  MrhoInv_->Mult(Bqt, Xqt);
-  M_rho_form_->RecoverFEMSolution(Xqt, resT_gf_, Qt_gf_);
+  MqInv_->Mult(Bqt, Xqt);
+  Mq_form_->RecoverFEMSolution(Xqt, resT_gf_, Qt_gf_);
 
   Qt_gf_.GetTrueDofs(Qt_);
-  // Qt_ = 0.0;
-  // Qt_gf_.SetFromTrueDofs(Qt_);
+  Qt_ *= Rgas_;
+  Qt_ /= Cp_;
+  Qt_ /= thermo_pressure_;
+  Qt_.Neg();
+  Qt_gf_.SetFromTrueDofs(Qt_);
 }
