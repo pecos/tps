@@ -1210,6 +1210,12 @@ void LteThermoChem::computeQt() {
   LQ_form_->FormSystemMatrix(empty, LQ_);
   LQ_->AddMult(Tn_next_, tmpR0_);  // tmpR0_ += LQ{Tn_next}
 
+  // Joule heating (and radiation sink)
+  jh_form_->Update();
+  jh_form_->Assemble();
+  jh_form_->ParallelAssemble(jh_);
+  tmpR0_ -= jh_;
+
   sfes_->GetRestrictionMatrix()->MultTranspose(tmpR0_, resT_gf_);
 
   Qt_ = 0.0;
