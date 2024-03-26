@@ -120,4 +120,5 @@ setup() {
     [[ ${status} -eq 0 ]]
     test -s restart_output-tc.sol.h5
     h5diff -r --delta=1e-16 restart_output-tc.sol.h5 $REF_SOLN_TC /velocity
+    h5diff -r --delta=1e-16 restart_output-tc.sol.h5 $REF_SOLN_TC /swirl
 }
