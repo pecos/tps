@@ -77,7 +77,13 @@ class MixingLengthTransport : public TransportProperties {
   MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) final;
   MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, const double *gradUp,
                                        double radius, double distance, double *visc) final;
+
+  // MFEM_HOST_DEVICE void computeMixtureAverageDiffusivity(const double *state, double *diffusivity) final;
+
+  // MFEM_HOST_DEVICE void GetThermalConductivities(const double *conserved, const double *primitive, double *kappa) final;          
+  
 };
+
 
 MFEM_HOST_DEVICE inline void MixingLengthTransport::GetViscosities(const double *conserved, const double *primitive,
                                                                    double *visc) {

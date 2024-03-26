@@ -91,7 +91,8 @@ class ReactingFlow : public ThermoChemModelBase {
   ChemistryInput chemistryInput_;
   
   GasMixture *mixture_ = NULL;
-  TransportProperties *transport_ = NULL;
+  // TransportProperties *transport_ = NULL;
+  ArgonMixtureTransport *transport_ = NULL;
   Chemistry *chemistry_ = NULL;
 
   std::vector<std::string> speciesNames_;

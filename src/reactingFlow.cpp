@@ -83,8 +83,8 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts,
   // plasma conditions. ???
   workFluid_ = USER_DEFINED;
   gasModel_ = PERFECT_MIXTURE;
-  transportModel_ = ARGON_MINIMAL;
-  // transportModel_ = ARGON_MIXTURE;  
+  //transportModel_ = ARGON_MINIMAL;
+  transportModel_ = ARGON_MIXTURE;  
   chemistryModel_ = NUM_CHEMISTRYMODEL;
 
   
@@ -235,7 +235,8 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts,
   identifySpeciesType(speciesType);  
   identifyCollisionType(speciesType, argonInput_.collisionIndex);  
 
-  transport_ = new ArgonMinimalTransport(mixture_, argonInput_);
+  // transport_ = new ArgonMinimalTransport(mixture_, argonInput_);
+  transport_ = new ArgonMixtureTransport(mixture_, argonInput_);  
   
   
   /// Minimal amount of info for chemistry input struct  
@@ -480,7 +481,7 @@ void ReactingFlow::initializeSelf() {
 
   hw_.SetSize(yDofInt_);
   hw_ = 0.0;
-
+  
   // only YnFull for plotting
   YnFull_gf_.SetSpace(yfes_);  
 
@@ -1152,11 +1153,41 @@ void ReactingFlow::speciesStep(int iSpec) {
 }
 
 void ReactingFlow::speciesProduction() {
-  for (int n = 0; n < nSpecies_; n++) {
-    for (int i = 0; i < sDofInt_; i++) {
-      prodY_[i + n * sDofInt_] = 0.0;
+  (flow_interface_->velocity)->GetTrueDofs(tmpR0_);
+  const double *dataT = Tn_.HostRead();
+  const double *dataY = Yn_.HostRead();
+  const double *dataRho = rn_.HostRead();
+  // const double *dataU = (flow_interface_->velocity)->HostRead();
+  const double *dataU = tmpR0_.HostRead();  
+  double *dataProd = prodY_.HostReadWrite();    
+  for (int i = 0; i < sDofInt_; i++) {
+    // prodY_[i + n * sDofInt_] = 0.0;
+    Vector kfwd; // set to size nReactions_ in computeForwardRareCoeffs
+    Vector keq; // set to size nReactions_ in computeEquilibriumConstants
+    Vector progressRate; // set to size nReactions_ in computeProgressRate
+    Vector creationRate; // set to size nSpecies_ in computeCreationRate
+    double Th = dataT[i]; 
+    double Te;
+    Te = Th; // hack    
+
+    int nEq = dim_ + 2;
+    Vector state(nEq);
+    state[0] = dataRho[i];
+    for (int eq = 0; eq < dim_; eq++) {state[eq+1] = dataU[i + eq*sDofInt_];}
+    state[dim_ + 1] = dataT[i];	     
+    Vector n_sp(gpudata::MAXSPECIES);
+    mixture_->computeNumberDensities(state, n_sp);
+    double nsp[gpudata::MAXSPECIES];
+    for (int sp = 0; sp < n_sp.Size(); sp++) {nsp[sp] = n_sp[sp];}
+    
+    chemistry_->computeForwardRateCoeffs(Th, Te, kfwd);
+    chemistry_->computeEquilibriumConstants(Th, Te, keq);
+    chemistry_->computeProgressRate(nsp, kfwd, keq, progressRate);
+    chemistry_->computeCreationRate(progressRate, creationRate);
+    for (int sp = 0; sp < nSpecies_; sp++) {	
+      dataProd[i + sp * sDofInt_] = creationRate[sp];
     }
-  }
+  }  
 }
 
 void ReactingFlow::heatOfFormation() {
@@ -1164,7 +1195,8 @@ void ReactingFlow::heatOfFormation() {
   double *dw = prodY_.HostReadWrite();
   double ho;
   for (int n = 0; n < nSpecies_; n++) {
-    ho = 0.0; // replace with each species enth of formation
+    // ho = 0.0;
+    ho = gasParams_(n - 1, GasParams::FORMATION_ENERGY);
     for (int i = 0; i < sDofInt_; i++) {
       hw_[i + n * sDofInt_] = ho * dw[i + n * sDofInt_];
     }
@@ -1297,96 +1329,70 @@ void ReactingFlow::updateThermoP() {
 }
 
 void ReactingFlow::updateDiffusivity() {
-
-  /*
-  double vel[gpudata::MAXDIM];
-  double vtmp[gpudata::MAXDIM];
-  double stress[gpudata::MAXDIM * gpudata::MAXDIM];
-
-  // TODO(kevin): update E-field with EM coupling.
-  double Efield[gpudata::MAXDIM];
-  for (int v = 0; v < nvel; v++) Efield[v] = 0.0;
-
-  double speciesEnthalpies[gpudata::MAXSPECIES];
-  mixture->computeSpeciesEnthalpies(state, speciesEnthalpies);
-
-  double transportBuffer[FluxTrns::NUM_FLUX_TRANS];
-  // NOTE(kevin): in flux, only dim-components of diffusionVelocity will be used.
-  double diffusionVelocity[gpudata::MAXSPECIES * gpudata::MAXDIM];
-
-  transport->ComputeFluxTransportProperties(state, gradUp, Efield, radius, distance, transportBuffer,
-                                            diffusionVelocity);
-  double visc = transportBuffer[FluxTrns::VISCOSITY];
-  double bulkViscosity = transportBuffer[FluxTrns::BULK_VISCOSITY];
-  bulkViscosity -= 2. / 3. * visc;
-  double k = transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY];
-  double ke = transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY];
-  double Pr_Cp = visc / k;
-
-  if (twoTemperature) {
-    for (int d = 0; d < dim; d++) {
-      double qeFlux = ke * gradUp[num_equation - 1 + d * num_equation];
-      flux[1 + nvel + d * num_equation] += qeFlux;
-      flux[num_equation - 1 + d * num_equation] += qeFlux;
-      flux[num_equation - 1 + d * num_equation] -=
-          speciesEnthalpies[numSpecies - 2] * diffusionVelocity[numSpecies - 2 + d * numSpecies];
-    }
-  } else {
-    k += ke;
-  }
-
-  // make sure density visc. flux is 0
-  for (int d = 0; d < dim; d++) flux[0 + d * num_equation] = 0.;
-
-  for (int d = 0; d < dim; d++) {
-    flux[(1 + nvel) + d * num_equation] += vtmp[d];
-    flux[(1 + nvel) + d * num_equation] += k * gradUp[(1 + nvel) + d * num_equation];
-    // compute diffusive enthalpy flux.
-    for (int sp = 0; sp < numSpecies; sp++) {
-      flux[(1 + nvel) + d * num_equation] -= speciesEnthalpies[sp] * diffusionVelocity[sp + d * numSpecies];
-    }
-  }
-
-  // if (eqSystem == NS_PASSIVE) {
-  //   double Sc = mixture->GetSchmidtNum();
-  //   for (int d = 0; d < dim; d++) flux(num_equation - 1, d) = visc / Sc * gradUp(num_equation - 1, d);
-  // }
-  // NOTE: NS_PASSIVE will not be needed (automatically incorporated).
-  for (int sp = 0; sp < numActiveSpecies; sp++) {
-    // NOTE: diffusionVelocity is set to be (numSpecies,nvel)-matrix.
-    // however only dim-components are used for flux.
-    for (int d = 0; d < dim; d++)
-      flux[(nvel + 2 + sp) + d * num_equation] = -state[nvel + 2 + sp] * diffusionVelocity[sp + d * numSpecies];
-  }
-  */
-
-
-  // >>> OLD
+  (flow_interface_->velocity)->GetTrueDofs(tmpR0_);
   
+  // species diffusivities
+  {
+    const double *dataTemp = Tn_.HostRead();
+    const double *dataRho = rn_.HostRead();
+    // const double *dataU = un_->HostRead();
+    const double *dataU = tmpR0_.HostRead();
+    double *dataDiff = diffY_.HostReadWrite();      
+    for (int i = 0; i < sDofInt_; i++) {
+      int nEq = dim_ + 2;
+      double state[nEq];
+      double diffSp[nSpecies_];
+      state[0] = dataRho[i];
+      for (int eq = 0; eq < dim_; eq++) {state[eq+1] = dataU[i + eq*sDofInt_];}
+      state[dim_ + 1] = dataTemp[i];	 
+      transport_->computeMixtureAverageDiffusivity(state, diffSp);
+      for (int sp = 0; sp < nSpecies_; sp++) {    
+        dataDiff[i + sp * sDofInt_] = diffSp[sp];
+      }
+    }
+  }
+
   // viscosity
-  if (!constant_viscosity_) {
-    double *d_visc = visc_.Write();
-    const double *d_T = Tn_.Read();
-    const double mu_star = mu0_;
-    const double T_star = sutherland_T0_;
-    const double S_star = sutherland_S0_;
-    MFEM_FORALL(i, Tn_.Size(), { d_visc[i] = Sutherland_lcl(d_T[i], mu_star, T_star, S_star); });
-  } else {
-    visc_ = mu0_;
+  { 
+    const double *dataTemp = Tn_.HostRead();
+    const double *dataRho = rn_.HostRead();
+    // const double *dataU = un_.HostRead();
+    const double *dataU = tmpR0_.HostRead();    
+    double *dataVisc = visc_.HostReadWrite();    
+    for (int i = 0; i < sDofInt_; i++) {
+      int nEq = dim_ + 2;
+      double state[nEq];
+      double conservedState[nEq];      
+      double visc[2];
+      state[0] = dataRho[i];
+      for (int eq = 0; eq < dim_; eq++) {state[eq+1] = dataU[i + eq*sDofInt_];}
+      state[dim_ + 1] = dataTemp[i];	 
+      mixture_->GetConservativesFromPrimitives(state, conservedState);
+      transport_->GetViscosities(conservedState, state, visc);
+      dataVisc[i] = visc[0];
+    }   
   }
 
-  visc_gf_.SetFromTrueDofs(visc_);
-
-  // NB: Here "kappa" is kappa/Cp = mu/Pr
-  kappa_ = visc_;
-  kappa_ /= Pr_;
-  kappa_gf_.SetFromTrueDofs(kappa_);
-
-  // temporary
-  for (int n = 0; n < nSpecies_; n++) {
-    setVectorFromScalar(visc_, n, &diffY_);    
-  }
-  diffY_ /= Sc_;      
+  // thermal conductivity (kappa = alpha*rho*Cp = (nu/Pr)*(rho*Cp))
+  { 
+    const double *dataTemp = Tn_.HostRead();
+    const double *dataRho = rn_.HostRead();
+    // const double *dataU = un_.HostRead();
+    const double *dataU = tmpR0_.HostRead();    
+    double *dataKappa = kappa_.HostReadWrite();
+    for (int i = 0; i < sDofInt_; i++) {
+      int nEq = dim_ + 2;
+      double state[nEq];
+      double conservedState[nEq];      
+      double kappa[2];
+      state[0] = dataRho[i];
+      for (int eq = 0; eq < dim_; eq++) {state[eq+1] = dataU[i + eq*sDofInt_];}
+      state[dim_ + 1] = dataTemp[i];	 
+      mixture_->GetConservativesFromPrimitives(state, conservedState);
+      transport_->GetThermalConductivities(conservedState, state, kappa);
+      dataKappa[i] = kappa[0];
+    }
+  }    
   
 }
 
