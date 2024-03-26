@@ -89,7 +89,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts,
 
   
   /// Minimal amount of info for mixture input struct
-  Vector inputCV;
+  // Vector inputCV;
   mixtureInput_.f = workFluid_;  
   tpsP_->getInput("plasma_models/species_number", nSpecies_, 3);
   mixtureInput_.numSpecies = nSpecies_;
@@ -99,7 +99,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts,
   tpsP_->getInput("plasma_models/const_plasma_conductivity", const_plasma_conductivity_, 0.0);
   
   gasParams_.SetSize(nSpecies_, GasParams::NUM_GASPARAMS);  
-  inputCV.SetSize(nSpecies_);
+  inputCV_.SetSize(nSpecies_);
 
   for (int i = 1; i <= nSpecies_; i++) {
     double formEnergy, levelDegeneracy;
@@ -107,7 +107,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts,
 
     tpsP_->getRequiredInput((basepath + "/formation_energy").c_str(), formEnergy);
     tpsP_->getInput((basepath + "/level_degeneracy").c_str(), levelDegeneracy, 1.0);
-    tpsP_->getRequiredInput((basepath + "/perfect_mixture/constant_molar_cv").c_str(), inputCV(i - 1));
+    tpsP_->getRequiredInput((basepath + "/perfect_mixture/constant_molar_cv").c_str(), inputCV_(i - 1));
 
     gasParams_(i - 1, GasParams::FORMATION_ENERGY) = formEnergy;
     gasParams_(i - 1, GasParams::SPECIES_DEGENERACY) = levelDegeneracy;        
@@ -534,6 +534,10 @@ void ReactingFlow::initializeSelf() {
 
   rhoDt.SetSpace(sfes_);
 
+  // CpY_gf_.SetSpace(sfes_);
+  // CpY_.SetSize(yDofInt_);
+  SDFT_.SetSize(sDofInt_);
+
   if (rank0_) grvy_printf(ginfo, "ReactingFlow vectors and gf initialized...\n");
 
   // exports
@@ -722,6 +726,11 @@ void ReactingFlow::initializeOperators() {
   species_diff_coeff_ = new GridFunctionCoefficient(&diffY_gf_);
   species_diff_sum_coeff_ = new SumCoefficient(*mut_coeff_, *species_diff_coeff_, invSc_, 1.0); // is this correct?
   species_diff_total_coeff_ = new ProductCoefficient(*mult_coeff_, *species_diff_sum_coeff_);
+
+  // for explicit source term in energy
+  // species_Cp_coeff_ = new GridFunctionCoefficient(&CpY_gf_);
+  species_Cp_coeff_->constant = 1.0;  
+  species_diff_Cp_coeff_ = new ProductCoefficient(*species_Cp_coeff_, *species_diff_total_coeff_);  
   
   // Convection: Atemperature(i,j) = \int_{\Omega} \phi_i \rho u \cdot \nabla \phi_j
   un_next_coeff_ = new VectorGridFunctionCoefficient(flow_interface_->velocity);
@@ -887,9 +896,9 @@ void ReactingFlow::initializeOperators() {
   MqInv_->SetPrintLevel(pl_solve_);
   MqInv_->SetRelTol(rtol_);
   MqInv_->SetMaxIter(max_iter_);
-
+  
   LQ_form_ = new ParBilinearForm(sfes_);
-  auto *lqd_blfi = new DiffusionIntegrator(*thermal_diff_coeff_);
+  auto *lqd_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
   if (numerical_integ_) {
     lqd_blfi->SetIntRule(&ir_di);
   }
@@ -908,6 +917,20 @@ void ReactingFlow::initializeOperators() {
   LQ_bdry_->AddBoundaryIntegrator(lq_bdry_lfi, temp_ess_attr_);
   if (rank0_) std::cout << "ReactingFlow LQ operator set" << endl;
 
+  // for explicit species-diff source term in energy (inv not needed)
+  LY_form_ = new ParBilinearForm(sfes_);
+  auto *lyd_blfi = new DiffusionIntegrator(*species_diff_Cp_coeff_);
+  if (numerical_integ_) {
+    lyd_blfi->SetIntRule(&ir_di);
+  }
+  LY_form_->AddDomainIntegrator(lyd_blfi);
+  if (partial_assembly_) {
+    LY_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+  }
+  LY_form_->Assemble();
+  LY_form_->FormSystemMatrix(empty, LY_);
+
+  
   // // remaining initialization
   // if (config_->resetTemp == true) {
   //   double *data = Tn_gf_.HostReadWrite();
@@ -976,6 +999,7 @@ void ReactingFlow::step() {
   speciesOneStep();
   YnFull_gf_.SetFromTrueDofs(Yn_next_);
   heatOfFormation();
+  diffusionForTemperature();
 
   // advance temperature
   temperatureStep();
@@ -1022,7 +1046,10 @@ void ReactingFlow::temperatureStep() {
   Ms_->AddMult(tmpR0_, resT_);
 
   // heat of formation
-  Ms_->AddMult(hw_, resT_);  
+  Ms_->AddMult(hw_, resT_);
+
+  // species diffusion term, already in int-weak form
+  resT_.Add(1.0, SDFT_);
 
   // Add natural boundary terms here later
   // NB: adiabatic natural BC is handled, but don't have ability to impose non-zero heat flux yet
@@ -1201,6 +1228,22 @@ void ReactingFlow::heatOfFormation() {
       hw_[i + n * sDofInt_] = ho * dw[i + n * sDofInt_];
     }
   }
+}
+
+void ReactingFlow::diffusionForTemperature() {
+  Array<int> empty;
+  SDFT_ = 0.0;
+  for (int i = 0; i < nSpecies_; i++) {
+    setScalarFromVector(Yn_next_, i, &tmpR0_);    
+    species_Cp_coeff_->constant = Rgas_ + inputCV_(i); // HERE: is Rgas correct here?
+    LY_form_->Update();
+    LY_form_->Assemble();
+    LY_form_->FormSystemMatrix(empty, LY_);
+    LY_->Mult(tmpR0_, tmpR0a_);    
+    SDFT_.Add(1.0,tmpR0a_);
+  }
+  SDFT_ *= (thermo_pressure_ / Rgas_);  
+  
 }
 
 void ReactingFlow::computeExplicitTempConvectionOP(bool extrap) {

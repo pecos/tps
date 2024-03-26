@@ -168,6 +168,7 @@ class ReactingFlow : public ThermoChemModelBase {
   ParGridFunction Yn_gf_, Yn_next_gf_, Yext_gf_, resY_gf_;
   ParGridFunction prodY_gf_;  
   ParGridFunction YnFull_gf_;
+  // ParGridFunction CpY_gf_;  
 
   ParGridFunction visc_gf_;
   ParGridFunction kappa_gf_;
@@ -193,7 +194,10 @@ class ReactingFlow : public ThermoChemModelBase {
 
   GridFunctionCoefficient *species_diff_coeff_ = nullptr;
   SumCoefficient *species_diff_sum_coeff_ = nullptr;
-  ProductCoefficient *species_diff_total_coeff_ = nullptr;  
+  ProductCoefficient *species_diff_total_coeff_ = nullptr;
+
+  ConstantCoefficient *species_Cp_coeff_ = nullptr;    
+  ProductCoefficient *species_diff_Cp_coeff_ = nullptr;    
 
   // operators and solvers
   ParBilinearForm *At_form_ = nullptr;
@@ -204,8 +208,10 @@ class ReactingFlow : public ThermoChemModelBase {
   ParBilinearForm *Mq_form_ = nullptr;
   ParBilinearForm *LQ_form_ = nullptr;
   ParLinearForm *LQ_bdry_ = nullptr;
+  ParBilinearForm *LY_form_ = nullptr;  
 
   OperatorHandle LQ_;
+  OperatorHandle LY_;  
   OperatorHandle At_;
   OperatorHandle Ht_;
   OperatorHandle Hy_;  
@@ -237,6 +243,9 @@ class ReactingFlow : public ThermoChemModelBase {
   Vector resY_;
   Vector prodY_;
   Vector hw_;
+  // Vector CpY_;
+  Vector SDFT_;  
+  Vector inputCV_;
 
   Vector Qt_;
   Vector rn_;
@@ -282,6 +291,7 @@ class ReactingFlow : public ThermoChemModelBase {
   void computeQtTO();
   void speciesProduction();
   void heatOfFormation();
+  void diffusionForTemperature();
 
   /// for creation of structs to interface with old plasma/chem stuff
   void identifySpeciesType(Array<ArgonSpcs> &speciesType);
