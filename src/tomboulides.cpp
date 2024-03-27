@@ -1000,13 +1000,13 @@ void Tomboulides::initializeOperators() {
 }
 
 void Tomboulides::initializeIO(IODataOrganizer &io) const {
-  io.registerIOFamily("Velocity", "/velocity", u_curr_gf_, false);
+  io.registerIOFamily("Velocity", "/velocity", u_curr_gf_, true, true, vfec_);
   io.registerIOVar("/velocity", "x-comp", 0);
   if (dim_ >= 2) io.registerIOVar("/velocity", "y-comp", 1);
   if (dim_ == 3) io.registerIOVar("/velocity", "z-comp", 2);
 
   if (axisym_) {
-    io.registerIOFamily("Velocity azimuthal", "/swirl", utheta_gf_, false);
+    io.registerIOFamily("Velocity azimuthal", "/swirl", utheta_gf_, true, true, pfec_);
     io.registerIOVar("/swirl", "swirl", 0);
   }
 }
