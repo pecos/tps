@@ -998,7 +998,11 @@ void ReactingFlow::step() {
   }
   speciesOneStep();
   YnFull_gf_.SetFromTrueDofs(Yn_next_);
+
+  // ho_i*w_i
   heatOfFormation();
+
+  // TODO(swh): this is a bad name
   diffusionForTemperature();
 
   // advance temperature
@@ -1242,8 +1246,7 @@ void ReactingFlow::diffusionForTemperature() {
     LY_->Mult(tmpR0_, tmpR0a_);    
     SDFT_.Add(1.0,tmpR0a_);
   }
-  SDFT_ *= (thermo_pressure_ / Rgas_);  
-  
+  SDFT_ *= (thermo_pressure_ / Rgas_);    
 }
 
 void ReactingFlow::computeExplicitTempConvectionOP(bool extrap) {
@@ -1373,13 +1376,12 @@ void ReactingFlow::updateThermoP() {
 
 void ReactingFlow::updateDiffusivity() {
   (flow_interface_->velocity)->GetTrueDofs(tmpR0_);
+  const double *dataTemp = Tn_.HostRead();
+  const double *dataRho = rn_.HostRead();
+  const double *dataU = tmpR0_.HostRead();  
   
   // species diffusivities
   {
-    const double *dataTemp = Tn_.HostRead();
-    const double *dataRho = rn_.HostRead();
-    // const double *dataU = un_->HostRead();
-    const double *dataU = tmpR0_.HostRead();
     double *dataDiff = diffY_.HostReadWrite();      
     for (int i = 0; i < sDofInt_; i++) {
       int nEq = dim_ + 2;
@@ -1397,10 +1399,6 @@ void ReactingFlow::updateDiffusivity() {
 
   // viscosity
   { 
-    const double *dataTemp = Tn_.HostRead();
-    const double *dataRho = rn_.HostRead();
-    // const double *dataU = un_.HostRead();
-    const double *dataU = tmpR0_.HostRead();    
     double *dataVisc = visc_.HostReadWrite();    
     for (int i = 0; i < sDofInt_; i++) {
       int nEq = dim_ + 2;
@@ -1418,10 +1416,6 @@ void ReactingFlow::updateDiffusivity() {
 
   // thermal conductivity (kappa = alpha*rho*Cp = (nu/Pr)*(rho*Cp))
   { 
-    const double *dataTemp = Tn_.HostRead();
-    const double *dataRho = rn_.HostRead();
-    // const double *dataU = un_.HostRead();
-    const double *dataU = tmpR0_.HostRead();    
     double *dataKappa = kappa_.HostReadWrite();
     for (int i = 0; i < sDofInt_; i++) {
       int nEq = dim_ + 2;
