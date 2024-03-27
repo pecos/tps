@@ -722,7 +722,7 @@ void CaloricallyPerfectThermoChem::computeExplicitTempConvectionOP(bool extrap) 
 }
 
 void CaloricallyPerfectThermoChem::initializeIO(IODataOrganizer &io) {
-  io.registerIOFamily("Temperature", "/temperature", &Tn_gf_, false);
+  io.registerIOFamily("Temperature", "/temperature", &Tn_gf_, true, true, sfec_);
   io.registerIOVar("/temperature", "temperature", 0);
 }
 
