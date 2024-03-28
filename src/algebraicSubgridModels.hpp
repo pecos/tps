@@ -128,11 +128,12 @@ class AlgebraicSubgridModels : public TurbModelBase {
   Vector subgridVisc_;
 
   // for plotting
-  ParGridFunction resolution_gf_;
-  Vector gridScale_;
+  // ParGridFunction resolution_gf_;
+  // Vector gridScale_;
 
   // grid information
-  ParGridFunction *bufferGridScale_ = nullptr;
+  ParGridFunction *gridScale_ = nullptr;
+  // ParGridFunction *bufferGridScale_ = nullptr;
   // ParGridFunction *bufferGridScaleX = nullptr;
   // ParGridFunction *bufferGridScaleY = nullptr;
   // ParGridFunction *bufferGridScaleZ = nullptr;
@@ -140,7 +141,7 @@ class AlgebraicSubgridModels : public TurbModelBase {
   double sgs_model_const_;
 
  public:
-  AlgebraicSubgridModels(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, TPS::Tps *tps, int sModel);
+  AlgebraicSubgridModels(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, TPS::Tps *tps, ParGridFunction *gridScale, int sModel);
   virtual ~AlgebraicSubgridModels();
 
   // Functions overriden from base class
@@ -154,7 +155,7 @@ class AlgebraicSubgridModels : public TurbModelBase {
   ParGridFunction *getCurrentEddyViscosity() { return &subgridVisc_gf_; }
 
   /// Return a pointer to the scalar grid size measure ParGridFunction.
-  ParGridFunction *getGridScale() { return &resolution_gf_; }
+  // ParGridFunction *getGridScale() { return &resolution_gf_; }
 
   // subgrid scale models => move to turb model class
   void sgsSmag(const DenseMatrix &gradUp, double delta, double &nu_sgs);

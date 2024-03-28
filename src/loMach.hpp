@@ -65,6 +65,7 @@ class Tps;
 #include "io.hpp"
 #include "loMach_options.hpp"
 #include "solver.hpp"
+#include "mesh_base.hpp"
 #include "split_flow_base.hpp"
 #include "sponge_base.hpp"
 #include "thermo_chem_base.hpp"
@@ -117,6 +118,7 @@ class LoMachSolver : public TPS::Solver {
   bool loadFromAuxSol;  // load restart of different polynomial order
 
   // Model classes
+  MeshBase *meshData_ = nullptr;
   TurbModelBase *turbModel_ = nullptr;
   ThermoChemModelBase *thermo_ = nullptr;
   FlowBase *flow_ = nullptr;

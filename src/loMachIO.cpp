@@ -81,7 +81,8 @@ void LoMachSolver::write_restart_files_hdf5(hid_t file, bool serialized_write) {
 
   // included total dofs for partitioned files
   if (!serialized_write) {
-    int ldofs = sfes_->GetNDofs();
+    // int ldofs = sfes_->GetNDofs();
+    int ldofs = meshData_->getDofSize();    
     int gdofs;
     MPI_Allreduce(&ldofs, &gdofs, 1, MPI_INT, MPI_SUM, TPSCommWorld);
     h5_save_attribute(file, "dofs_global", gdofs);

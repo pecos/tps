@@ -84,15 +84,11 @@ LoMachSolver::LoMachSolver(TPS::Tps *tps)
 LoMachSolver::~LoMachSolver() {
   // allocated in initialize()
   delete pvdc_;
-  delete sfes_;
-  delete sfec_;
   delete extData_;
   delete flow_;
   delete thermo_;
   delete sponge_;
   delete turbModel_;
-  delete pmesh_;
-  delete serial_mesh_;
 
   // allocated in constructor
   delete groupsMPI;
@@ -105,236 +101,44 @@ void LoMachSolver::initialize() {
   // Stash the order, just for convenience
   order = loMach_opts_.order;
 
+  // When starting from scratch time = 0 and iter = 0  
+  if (!loMach_opts_.io_opts_.enable_restart_) {
+    temporal_coeff_.time = 0.;
+    iter = 0;
+  }  
+
   //-----------------------------------------------------
   // 1) Prepare the mesh
   //-----------------------------------------------------
+  meshData_ = new MeshBase(tpsP_, &loMach_opts_, order);  
+  meshData_->initializeMesh();
 
-  // Determine domain bounding box size
-  {
-    Mesh temp_mesh = Mesh(loMach_opts_.mesh_file.c_str());
-    int dim = temp_mesh.Dimension();
-    H1_FECollection fec(order, dim);
-    FiniteElementSpace fes(&temp_mesh, &fec);
-    GridFunction coordsVert(&fes);
-    temp_mesh.GetVertices(coordsVert);
-    int nVert = coordsVert.Size() / dim;
-    {
-      double local_xmin = 1.0e18;
-      double local_ymin = 1.0e18;
-      double local_zmin = 1.0e18;
-      double local_xmax = -1.0e18;
-      double local_ymax = -1.0e18;
-      double local_zmax = -1.0e18;
-
-      double coords[3];
-      for (int d = 0; d < 3; d++) {
-        coords[d] = 0.0;
-      }
-
-      for (int n = 0; n < nVert; n++) {
-        auto hcoords = coordsVert.HostRead();
-        for (int d = 0; d < dim; d++) {
-          coords[d] = hcoords[n + d * nVert];
-        }
-        local_xmin = min(coords[0], local_xmin);
-        local_ymin = min(coords[1], local_ymin);
-        if (dim == 3) {
-          local_zmin = min(coords[2], local_zmin);
-        }
-        local_xmax = max(coords[0], local_xmax);
-        local_ymax = max(coords[1], local_ymax);
-        if (dim == 3) {
-          local_zmax = max(coords[2], local_zmax);
-        }
-      }
-      xmin_ = local_xmin;
-      xmax_ = local_xmax;
-      ymin_ = local_ymin;
-      ymax_ = local_ymax;
-      zmin_ = local_zmin;
-      zmax_ = local_zmax;
-    }
-
-    if (loMach_opts_.periodicX) {
-      loMach_opts_.x_trans = xmax_ - xmin_;
-    }
-    if (loMach_opts_.periodicY) {
-      loMach_opts_.y_trans = ymax_ - ymin_;
-    }
-    if (loMach_opts_.periodicZ) {
-      loMach_opts_.z_trans = zmax_ - zmin_;
-    }
-    if (loMach_opts_.periodicX || loMach_opts_.periodicY || loMach_opts_.periodicZ) {
-      loMach_opts_.periodic = true;
-    }
-  }
-
-  // Generate serial mesh, making it periodic if requested
-  if (loMach_opts_.periodic) {
-    Mesh temp_mesh = Mesh(loMach_opts_.mesh_file.c_str());
-    Vector x_translation({loMach_opts_.x_trans, 0.0, 0.0});
-    Vector y_translation({0.0, loMach_opts_.y_trans, 0.0});
-    Vector z_translation({0.0, 0.0, loMach_opts_.z_trans});
-    std::vector<Vector> translations = {x_translation, y_translation, z_translation};
-
-    if (rank0_) {
-      std::cout << " Making the mesh periodic using the following offsets:" << std::endl;
-      std::cout << "   xTrans: " << loMach_opts_.x_trans << std::endl;
-      std::cout << "   yTrans: " << loMach_opts_.y_trans << std::endl;
-      std::cout << "   zTrans: " << loMach_opts_.z_trans << std::endl;
-    }
-
-    serial_mesh_ =
-        new Mesh(std::move(Mesh::MakePeriodic(temp_mesh, temp_mesh.CreatePeriodicVertexMapping(translations))));
-  } else {
-    serial_mesh_ = new Mesh(loMach_opts_.mesh_file.c_str());
-  }
-  if (verbose) grvy_printf(ginfo, "Mesh read...\n");
-
-  // Scale domain (NB: after periodicity applied)
-  if (loMach_opts_.scale_mesh != 1) {
-    if (verbose) grvy_printf(ginfo, "Scaling mesh factor of scale_mesh = %.6e\n", loMach_opts_.scale_mesh);
-    serial_mesh_->EnsureNodes();
-    GridFunction *nodes = serial_mesh_->GetNodes();
-    *nodes *= loMach_opts_.scale_mesh;
-  }
-
+  // local pointers
+  serial_mesh_ = meshData_->getSerialMesh();  
+  pmesh_ = meshData_->getMesh();
+  partitioning_ = meshData_->getPartition();
+  
   // Stash mesh dimension (convenience)
   dim_ = serial_mesh_->Dimension();
 
   // Only support number of velocity components = spatial dimension for now
   nvel_ = dim_;
 
-  // check if a simulation is being restarted
-  if (loMach_opts_.io_opts_.enable_restart_) {
-    // uniform refinement, user-specified number of times
-    for (int l = 0; l < loMach_opts_.ref_levels; l++) {
-      if (rank0_) {
-        std::cout << "Uniform refinement number " << l << std::endl;
-      }
-      serial_mesh_->UniformRefinement();
-    }
-
-    // read partitioning info from original decomposition (unless restarting from serial soln)
-    nelemGlobal_ = serial_mesh_->GetNE();
-    // nelemGlobal_ = mesh->GetNE();
-    if (rank0_) grvy_printf(ginfo, "Total # of mesh elements = %i\n", nelemGlobal_);
-
-    if (nprocs_ > 1) {
-      assert(!loMach_opts_.io_opts_.restart_serial_read_);
-      // TODO(trevilo): Add support for serial read/write
-      partitioning_file_hdf5("read", groupsMPI, nelemGlobal_, partitioning_);
-    }
-
-  } else {
-    // remove previous solution
-    if (rank0_) {
-      string command = "rm -r ";
-      command.append(loMach_opts_.io_opts_.output_dir_);
-      int err = system(command.c_str());
-      if (err != 0) {
-        cout << "Error deleting previous data in " << loMach_opts_.io_opts_.output_dir_ << endl;
-      }
-    }
-
-    // uniform refinement, user-specified number of times
-    for (int l = 0; l < loMach_opts_.ref_levels; l++) {
-      if (rank0_) {
-        std::cout << "Uniform refinement number " << l << std::endl;
-      }
-      serial_mesh_->UniformRefinement();
-    }
-
-    // generate partitioning file (we assume conforming meshes)
-    nelemGlobal_ = serial_mesh_->GetNE();
-    if (nprocs_ > 1) {
-      assert(serial_mesh_->Conforming());
-      partitioning_ = Array<int>(serial_mesh_->GeneratePartitioning(nprocs_, defaultPartMethod), nelemGlobal_);
-      if (rank0_) partitioning_file_hdf5("write", groupsMPI, nelemGlobal_, partitioning_);
-    }
-
-    // When starting from scratch time = 0 and iter = 0
-    temporal_coeff_.time = 0.;
-    iter = 0;
-  }
-
-  // Partition the mesh
-  pmesh_ = new ParMesh(groupsMPI->getTPSCommWorld(), *serial_mesh_, partitioning_);
-  if (verbose) grvy_printf(ginfo, "Mesh partitioned...\n");
-
   //-----------------------------------------------------
-  // 2) Prepare the required finite elements (for resolution info)
-  //    and other mesh related data
-  //-----------------------------------------------------
-
-  // TODO(trevilo): This code is necessary here b/c LoMachSolver owns
-  // the grid resolution objects.  We should refactor them into a
-  // "MeshHelper" class or some such thing.
-  sfec_ = new H1_FECollection(order);
-  sfes_ = new ParFiniteElementSpace(pmesh_, sfec_);
-
-  if (verbose) grvy_printf(ginfo, "Spaces constructed...\n");
-
-  // int sfes_truevsize = sfes_->GetTrueVSize();
-  // if (verbose) grvy_printf(ginfo, "Got sizes...\n");
-
-  /*
-  gridScaleSml.SetSize(sfes_truevsize);
-  gridScaleSml = 0.0;
-  gridScaleXSml.SetSize(sfes_truevsize);
-  gridScaleXSml = 0.0;
-  gridScaleYSml.SetSize(sfes_truevsize);
-  gridScaleYSml = 0.0;
-  gridScaleZSml.SetSize(sfes_truevsize);
-  gridScaleZSml = 0.0;
-
-  // for paraview
-  resolution_gf.SetSpace(sfes);
-  resolution_gf = 0.0;
-  */
-
-  if (verbose) grvy_printf(ginfo, "vectors and gf initialized...\n");
-
-  // TODO(swh): not sure where this shoudl go but until dt calcs are
-  // farmed out, leaving in loMach for time being
-  // Determine the minimum element size.
-  {
-    double local_hmin = 1.0e18;
-    for (int i = 0; i < pmesh_->GetNE(); i++) {
-      local_hmin = min(pmesh_->GetElementSize(i, 1), local_hmin);
-    }
-    MPI_Allreduce(&local_hmin, &hmin, 1, MPI_DOUBLE, MPI_MIN, pmesh_->GetComm());
-  }
-  // if (verbose) grvy_printf(ginfo, "Min element size found...\n");
-
-  // maximum size
-  {
-    double local_hmax = 1.0e-15;
-    for (int i = 0; i < pmesh_->GetNE(); i++) {
-      local_hmax = max(pmesh_->GetElementSize(i, 1), local_hmax);
-    }
-    MPI_Allreduce(&local_hmax, &hmax, 1, MPI_DOUBLE, MPI_MAX, pmesh_->GetComm());
-  }
-  // if (verbose) grvy_printf(ginfo, "Max element size found...\n");
-
-  if (rank0_) cout << "Maximum element size: " << hmax << "m" << endl;
-  if (rank0_) cout << "Minimum element size: " << hmin << "m" << endl;
-
-  //-----------------------------------------------------
-  // 3) Prepare the sub-physics models/solvers
+  // 2) Prepare the sub-physics models/solvers
   //-----------------------------------------------------
 
   // Instantiate sponge
   sponge_ = new GeometricSponge(pmesh_, &loMach_opts_, tpsP_);
-
+  
   // Instantiate external data
   extData_ = new GaussianInterpExtData(pmesh_, &loMach_opts_, tpsP_);
 
   // Instantiate turbulence model
   if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::SMAGORINSKY) {
-    turbModel_ = new AlgebraicSubgridModels(pmesh_, &loMach_opts_, tpsP_, 1);
+    turbModel_ = new AlgebraicSubgridModels(pmesh_, &loMach_opts_, tpsP_, (meshData_->getGridScale()), 1);
   } else if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::SIGMA) {
-    turbModel_ = new AlgebraicSubgridModels(pmesh_, &loMach_opts_, tpsP_, 2);
+    turbModel_ = new AlgebraicSubgridModels(pmesh_, &loMach_opts_, tpsP_, (meshData_->getGridScale()), 2);
   } else if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::ALGEBRAIC_RANS) {
     turbModel_ = new AlgebraicRans(serial_mesh_, pmesh_, partitioning_, loMach_opts_.order, tpsP_);
   } else if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::NONE) {
@@ -406,7 +210,7 @@ void LoMachSolver::initialize() {
   const bool restart_serial =
       (loMach_opts_.io_opts_.restart_serial_read_ || loMach_opts_.io_opts_.restart_serial_write_);
   ioData.initializeSerial(rank0_, restart_serial, serial_mesh_, locToGlobElem, &partitioning_);
-  MPI_Barrier(groupsMPI->getTPSCommWorld());
+  // MPI_Barrier(groupsMPI->getTPSCommWorld());
   if (verbose) grvy_printf(ginfo, "ioData.init thingy...\n");
 
   // If restarting, read restart files
@@ -442,6 +246,7 @@ void LoMachSolver::initialize() {
   pvdc_->SetHighOrderOutput(true);
   pvdc_->SetLevelsOfDetail(order);
 
+  meshData_->initializeViz(*pvdc_);
   turbModel_->initializeViz(*pvdc_);
   flow_->initializeViz(*pvdc_);
   thermo_->initializeViz(*pvdc_);
@@ -506,6 +311,7 @@ void LoMachSolver::solveBegin() {
 
 void LoMachSolver::solveStep() {
   sw_step.Start();
+  
   if (loMach_opts_.ts_opts_.integrator_type_ == LoMachTemporalOptions::CURL_CURL) {
     SetTimeIntegrationCoefficients(iter - iter_start_);
     thermo_->step();
@@ -603,14 +409,18 @@ void LoMachSolver::updateTimestep() {
   double Umax_lcl = 1.0e-12;
   double max_speed = Umax_lcl;
   double Umag;
-  int Sdof = sfes_->GetNDofs();
+  // int Sdof = sfes_->GetNDofs();
+  // int Sdof = (turbModel_->getGridScale())->Size();  
   // TODO(trevilo): Let user set dtFactor
   double dtFactor = 1.0;
   auto dataU = flow_->getCurrentVelocity()->HostRead();
 
   // come in divided by order
   // const double *dataD = bufferGridScale->HostRead();
-  const double *dataD = (turbModel_->getGridScale())->HostRead();
+  // const double *dataD = (turbModel_->getGridScale())->HostRead();
+  const double *dataD = (meshData_->getGridScale())->HostRead();
+  //int Sdof = dataD->Size();
+  int Sdof = meshData_->getDofSize();
 
   for (int n = 0; n < Sdof; n++) {
     Umag = 0.0;
@@ -683,13 +493,17 @@ double LoMachSolver::computeCFL() {
   double Umax_lcl = 1.0e-12;
   double max_speed = Umax_lcl;
   double Umag;
-  int Sdof = sfes_->GetNDofs();
+  // int Sdof = sfes_->GetNDofs();
+  // int Sdof = (turbModel_->getGridScale())->Size();  
 
   // come in divided by order
   // double *dataD = bufferGridScale->HostReadWrite();
-  double *dataD = (turbModel_->getGridScale())->HostReadWrite();
+  // double *dataD = (turbModel_->getGridScale())->HostReadWrite();
   auto dataU = flow_->getCurrentVelocity()->HostRead();
-
+  const double *dataD = (meshData_->getGridScale())->HostRead();
+  // int Sdof = dataD->Size();
+  int Sdof = meshData_->getDofSize();
+  
   for (int n = 0; n < Sdof; n++) {
     Umag = 0.0;
     // Vector delta({dataX[n], dataY[n], dataZ[n]});
@@ -745,7 +559,11 @@ void LoMachSolver::setTimestep() {
   double Umax_lcl = 1.0e-12;
   double max_speed = Umax_lcl;
   double Umag;
-  int Sdof = sfes_->GetNDofs();
+  // int Sdof = sfes_->GetNDofs();
+  // int Sdof = (turbModel_->getGridScale())->Size();
+  const double *dataD = (meshData_->getGridScale())->HostRead();
+  // int Sdof = dataD->Size();
+  int Sdof = meshData_->getDofSize();  
 
   CFL = loMach_opts_.ts_opts_.cfl_;
 
