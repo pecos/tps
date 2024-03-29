@@ -856,7 +856,9 @@ void LoMachSolver::parseSolverOptions() {
   assert(loMach_opts_.flow_solver == "zero-flow" || loMach_opts_.flow_solver == "tomboulides");
 
   tpsP_->getInput("loMach/thermo-solver", loMach_opts_.thermo_solver, string("constant-property"));
-  assert(loMach_opts_.thermo_solver == "constant-property" || loMach_opts_.thermo_solver == "calorically-perfect");
+  assert( loMach_opts_.thermo_solver == "constant-property"
+	 || loMach_opts_.thermo_solver == "calorically-perfect"
+	 || loMach_opts_.thermo_solver == "reacting-flow" );
 
   tpsP_->getInput("loMach/order", loMach_opts_.order, 1);
   assert(loMach_opts_.order >= 1);
