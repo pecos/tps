@@ -330,8 +330,8 @@ void MeshBase::computeGridScale() {
   }
 }
 
+/// Evaluate distance to wall function
 void MeshBase::computeWallDistance() {
-  // Evaluate distance function
   FiniteElementSpace serial_fes(serial_mesh_, fec_);
   GridFunction serial_distance(&serial_fes);
 
