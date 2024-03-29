@@ -217,6 +217,9 @@ void LoMachSolver::initialize() {
   // If restarting, read restart files
   if (loMach_opts_.io_opts_.enable_restart_) {
     restart_files_hdf5("read");
+    if (thermoPressure_ > 0.0) {
+      thermo_->SetThermoPressure(thermoPressure_);
+    }
   }
 
   // Exchange interface information
@@ -347,6 +350,8 @@ void LoMachSolver::solveStep() {
 
   // restart files
   if (iter % loMach_opts_.output_frequency_ == 0 && iter != 0) {
+    thermoPressure_ = thermo_->GetThermoPressure();
+
     // Write restart file!
     restart_files_hdf5("write");
 
@@ -405,15 +410,15 @@ void LoMachSolver::solve() {
 
 void LoMachSolver::updateTimestep() {
   // minimum timestep to not waste comp time
-  double dtMin = 1.0e-9;
+  double dtMin = loMach_opts_.ts_opts_.minimum_dt_;
+  double dtMax = loMach_opts_.ts_opts_.maximum_dt_;
+  double dtFactor = loMach_opts_.ts_opts_.factor_dt_;
 
   double Umax_lcl = 1.0e-12;
   double max_speed = Umax_lcl;
   double Umag;
   // int Sdof = sfes_->GetNDofs();
   // int Sdof = (turbModel_->getGridScale())->Size();
-  // TODO(trevilo): Let user set dtFactor
-  double dtFactor = 1.0;
   auto dataU = flow_->getCurrentVelocity()->HostRead();
 
   // come in divided by order
@@ -471,13 +476,16 @@ void LoMachSolver::updateTimestep() {
   // double dtInst = max(dtInst_conv, dtInst_visc);
 
   double dtInst = dtInst_conv;
-
   double &dt = temporal_coeff_.dt;
   if (dtInst > dt) {
     dt = dt * (1.0 + dtFactor);
     dt = std::min(dt, dtInst);
   } else if (dtInst < dt) {
     dt = dtInst;
+  }
+
+  if (dt > dtMax) {
+    dt = dtMax;
   }
 
   if (dt < dtMin) {
@@ -587,6 +595,12 @@ void LoMachSolver::setTimestep() {
     MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, pmesh_->GetComm());
     double dtInst = CFL * hmin / (max_speed * (double)order);
     temporal_coeff_.dt = dtInst;
+
+    const double dt_initial = loMach_opts_.ts_opts_.initial_dt_;
+    if ((dt_initial < dtInst) && !(loMach_opts_.io_opts_.enable_restart_)) {
+      temporal_coeff_.dt = dt_initial;
+    }
+
     std::cout << "dt from setTimestep: " << temporal_coeff_.dt << " max_speed: " << max_speed << endl;
   }
 }

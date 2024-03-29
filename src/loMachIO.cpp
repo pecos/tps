@@ -58,6 +58,8 @@ void LoMachSolver::write_restart_files_hdf5(hid_t file, bool serialized_write) {
     h5_save_attribute(file, "order", order);
     // spatial dimension
     h5_save_attribute(file, "dimension", dim_);
+    // thermodynamic pressure
+    h5_save_attribute(file, "Po", thermoPressure_);
 
     // code revision
 #ifdef BUILD_VERSION
@@ -111,6 +113,7 @@ void LoMachSolver::read_restart_files_hdf5(hid_t file, bool serialized_read) {
     h5_read_attribute(file, "time", temporal_coeff_.time);
     h5_read_attribute(file, "dt", temporal_coeff_.dt);
     h5_read_attribute(file, "order", read_order);
+    h5_read_attribute(file, "Po", thermoPressure_);
   }
 
   if (serialized_read) {

@@ -145,6 +145,9 @@ class LoMachSolver : public TPS::Solver {
   // min/max element size
   double hmin, hmax;
 
+  // for restarts
+  double thermoPressure_ = -1.0;
+
   // domain extent
   double xmin_, ymin_, zmin_;
   double xmax_, ymax_, zmax_;

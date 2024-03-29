@@ -101,6 +101,9 @@ void LoMachTemporalOptions::read(TPS::Tps *tps, std::string prefix) {
 
   tps->getInput((basename + "/enableConstantTimestep").c_str(), enable_constant_dt_, false);
   tps->getInput((basename + "/dt_fixed").c_str(), constant_dt_, -1.0);
-
+  tps->getInput((basename + "/dt_initial").c_str(), initial_dt_, 1.0e-8);
+  tps->getInput((basename + "/dt_min").c_str(), minimum_dt_, 1.0e-12);
+  tps->getInput((basename + "/dt_max").c_str(), maximum_dt_, 1.0);
   tps->getInput((basename + "/bdfOrder").c_str(), bdf_order_, 3);
+  tps->getInput((basename + "/dtFactor").c_str(), factor_dt_, 0.01);
 }

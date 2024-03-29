@@ -102,7 +102,8 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   double static_rho_;
 
   /// pressure-related, closed-system thermo pressure changes
-  double ambient_pressure_, thermo_pressure_, system_mass_;
+  double ambient_pressure_, system_mass_;
+  // double thermo_pressure_;
   double dtP_;
 
   // Initial temperature value (if constant IC)
@@ -240,6 +241,10 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
 
   /// Return a pointer to the current total thermal diffusivity ParGridFunction.
   ParGridFunction *GetCurrentThermalDiv() { return &Qt_gf_; }
+
+  /// Return thermodynamic pressure for restarts
+  // double GetCurrentThermoPressure() { return thermo_pressure_; }
+  // double SetCurrentThermoPressure(double Po) { thermo_pressure_ = Po;}
 
   /// Rotate entries in the time step and solution history arrays.
   void UpdateTimestepHistory(double dt);
