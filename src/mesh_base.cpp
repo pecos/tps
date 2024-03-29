@@ -65,10 +65,8 @@ MeshBase::~MeshBase() {
   delete serial_mesh_;
 }
 
+/// Prepare the mesh and compute secondary mesh-related data
 void MeshBase::initializeMesh() {
-  //-----------------------------------------------------
-  // 1) Prepare the mesh
-  //-----------------------------------------------------
 
   // Determine domain bounding box size
   {
@@ -130,7 +128,7 @@ void MeshBase::initializeMesh() {
     }
   }
 
-  // Generate serial mesh, making it periodic if requested
+  // Generate serial mesh, making periodic if requested
   if (loMach_opts_->periodic) {
     Mesh temp_mesh = Mesh(loMach_opts_->mesh_file.c_str());
     Vector x_translation({loMach_opts_->x_trans, 0.0, 0.0});
