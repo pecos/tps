@@ -540,7 +540,6 @@ SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_or
   ParFiniteElementSpace fes(mesh, fec);
 
   sigma = new ParGridFunction(&fes);
-  *sigma = 0.;
   double *hSigma = sigma->HostWrite();
 
   ParGridFunction coords(&dfes);
@@ -560,6 +559,7 @@ SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_or
     Vector Xn(dim);
     for (int d = 0; d < dim; d++) Xn[d] = coords[n + d * ndofs];
 
+    hSigma[n] = 0.0;
     if (szData.szType == SpongeZoneType::PLANAR) {
       // distance to the mix-out plane
       double distInit = 0.;
