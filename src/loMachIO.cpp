@@ -113,7 +113,9 @@ void LoMachSolver::read_restart_files_hdf5(hid_t file, bool serialized_read) {
     h5_read_attribute(file, "time", temporal_coeff_.time);
     h5_read_attribute(file, "dt", temporal_coeff_.dt);
     h5_read_attribute(file, "order", read_order);
-    h5_read_attribute(file, "Po", thermoPressure_);
+    if (H5Aexists(file, "Po")) {
+      h5_read_attribute(file, "Po", thermoPressure_);
+    }
   }
 
   if (serialized_read) {
