@@ -570,8 +570,9 @@ void LoMachSolver::setTimestep() {
   double Umag;
   // int Sdof = sfes_->GetNDofs();
   // int Sdof = (turbModel_->getGridScale())->Size();
-  const double *dataD = (meshData_->getGridScale())->HostRead();
+  // const double *dataD = (meshData_->getGridScale())->HostRead();
   // int Sdof = dataD->Size();
+  hmin = meshData_->getMinGridScale();  
   int Sdof = meshData_->getDofSize();
 
   CFL = loMach_opts_.ts_opts_.cfl_;
@@ -604,6 +605,7 @@ void LoMachSolver::setTimestep() {
     std::cout << "dt from setTimestep: " << temporal_coeff_.dt << " max_speed: " << max_speed << endl;
   }
 }
+
 
 void LoMachSolver::SetTimeIntegrationCoefficients(int step) {
   // Maximum BDF order to use at current time step

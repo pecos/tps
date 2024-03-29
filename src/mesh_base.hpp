@@ -93,12 +93,13 @@ class MeshBase {
   virtual void computeWallDistance();
   virtual void initializeViz(mfem::ParaViewDataCollection &pvdc);
 
-  virtual ParMesh *getMesh() final { return pmesh_; }
-  virtual Mesh *getSerialMesh() final { return serial_mesh_; }
-  virtual ParGridFunction *getGridScale() final { return gridScale_; }
-  virtual ParGridFunction *getWallDistance() final { return distance_; }
-  virtual int getDofSize() final { return sDof_; }
-  virtual Array<int> getPartition() final { return partitioning_; }
+  virtual ParMesh *getMesh() { return pmesh_; }
+  virtual Mesh *getSerialMesh() { return serial_mesh_; }
+  virtual ParGridFunction *getGridScale() { return gridScale_; }
+  virtual ParGridFunction *getWallDistance() { return distance_; }
+  virtual int getDofSize() { return sDof_; }
+  virtual double getMinGridScale() { return hmin; }  
+  virtual Array<int> getPartition() { return partitioning_; }
   // virtual int getDim() final { return dim_; }
 };
 #endif  // MESH_BASE_HPP_
