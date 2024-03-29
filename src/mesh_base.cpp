@@ -31,39 +31,41 @@
 // -----------------------------------------------------------------------------------el-
 
 #include "mesh_base.hpp"
+
 #include <fstream>
 #include <iomanip>
+
 #include "../utils/mfem_extras/pfem_extras.hpp"
+#include "io.hpp"
 #include "loMach.hpp"
 #include "loMach_options.hpp"
 #include "logger.hpp"
 #include "mfem/general/forall.hpp"
 #include "mfem/linalg/solvers.hpp"
-#include "io.hpp"
 #include "tps.hpp"
 #include "utils.hpp"
 
 using namespace mfem;
 
 MeshBase::MeshBase(TPS::Tps *tps, LoMachOptions *loMach_opts, int order)
-  : tpsP_(tps),
-    groupsMPI(new MPI_Groups(tps->getTPSCommWorld())),
-    rank0_(groupsMPI->isWorldRoot()),
-    nprocs_(groupsMPI->getTPSWorldSize()),
-    rank_(groupsMPI->getTPSWorldRank()),    
-    loMach_opts_(loMach_opts),
-    order_(order) {}
+    : tpsP_(tps),
+      groupsMPI(new MPI_Groups(tps->getTPSCommWorld())),
+      rank0_(groupsMPI->isWorldRoot()),
+      nprocs_(groupsMPI->getTPSWorldSize()),
+      rank_(groupsMPI->getTPSWorldRank()),
+      loMach_opts_(loMach_opts),
+      order_(order) {}
 
 MeshBase::~MeshBase() {
   delete gridScale_;
+  delete distance_;
   delete fes_;
   delete fec_;
   delete pmesh_;
-  delete serial_mesh_;  
+  delete serial_mesh_;
 }
 
 void MeshBase::initializeMesh() {
-
   //-----------------------------------------------------
   // 1) Prepare the mesh
   //-----------------------------------------------------
@@ -205,7 +207,6 @@ void MeshBase::initializeMesh() {
       partitioning_ = Array<int>(serial_mesh_->GeneratePartitioning(nprocs_, defaultPartMethod), nelemGlobal_);
       if (rank0_) partitioning_file_hdf5("write", groupsMPI, nelemGlobal_, partitioning_);
     }
-
   }
 
   // Partition the mesh
@@ -221,7 +222,7 @@ void MeshBase::initializeMesh() {
     }
     MPI_Allreduce(&local_hmin, &hmin, 1, MPI_DOUBLE, MPI_MIN, pmesh_->GetComm());
   }
-  if (rank0_) cout << "Minimum element size: " << hmin << "m" << endl;  
+  if (rank0_) cout << "Minimum element size: " << hmin << "m" << endl;
 
   // maximum size
   {
@@ -232,26 +233,30 @@ void MeshBase::initializeMesh() {
     MPI_Allreduce(&local_hmax, &hmax, 1, MPI_DOUBLE, MPI_MAX, pmesh_->GetComm());
   }
   if (rank0_) cout << "Maximum element size: " << hmax << "m" << endl;
-    
+
   fec_ = new H1_FECollection(order_);
   fes_ = new ParFiniteElementSpace(pmesh_, fec_);
 
-  // used in loMach to remove need to create local sfes  
-  sDof_ = fes_->GetNDofs(); 
+  // used in loMach to remove need to create local sfes
+  sDof_ = fes_->GetNDofs();
 
   // scalar measure of mesh size
   computeGridScale();
 
-  // TODO(swh): add wall distance calc
-  // computeWallDistance();
+  // wall distance calc
+  if (loMach_opts_->compute_wallDistance) {
+    computeWallDistance();
+  }
 }
 
 void MeshBase::initializeViz(ParaViewDataCollection &pvdc) {
   pvdc.RegisterField("resolution", gridScale_);
-  // pvdc.RegisterField("wall_dist", wallDist_);  
+  if (loMach_opts_->compute_wallDistance) {
+    pvdc.RegisterField("wall_dist", distance_);
+  }
 }
 
-/// Build grid size gf
+/// Build grid scale grid function
 void MeshBase::computeGridScale() {
   gridScale_ = new ParGridFunction(fes_);
   ParGridFunction dofCount(fes_);
@@ -322,9 +327,50 @@ void MeshBase::computeGridScale() {
         data[i] /= nz;
       }
     }
-    
   }
-
 }
 
-// void MeshBase::computeWallDistance() {}
+void MeshBase::computeWallDistance() {
+  // Evaluate distance function
+  FiniteElementSpace serial_fes(serial_mesh_, fec_);
+  GridFunction serial_distance(&serial_fes);
+
+  // Get coordinates from serial mesh
+  if (serial_mesh_->GetNodes() == NULL) {
+    serial_mesh_->SetCurvature(1);
+  }
+
+  FiniteElementSpace tmp_dfes(serial_mesh_, fec_, dim_, Ordering::byNODES);
+  GridFunction coordinates(&tmp_dfes);
+  serial_mesh_->GetNodes(coordinates);
+
+  // Build a list of wall patches based on BCs
+  Array<int> wall_patch_list;
+
+  int num_walls;
+  tpsP_->getInput("boundaryConditions/numWalls", num_walls, 0);
+
+  // Wall Bcs
+  for (int i = 1; i <= num_walls; i++) {
+    int patch;
+    std::string type;
+    std::string basepath("boundaryConditions/wall" + std::to_string(i));
+
+    tpsP_->getRequiredInput((basepath + "/patch").c_str(), patch);
+    tpsP_->getRequiredInput((basepath + "/type").c_str(), type);
+
+    // NB: Only catch "no-slip" type walls here
+    if (type == "viscous_isothermal" || type == "viscous_adiabatic" || type == "viscous" || type == "no-slip") {
+      wall_patch_list.Append(patch);
+    }
+  }
+
+  // Evaluate the (serial) distance function
+  evaluateDistanceSerial(*serial_mesh_, wall_patch_list, coordinates, serial_distance);
+
+  // If necessary, parallelize distance function
+  distance_ = new ParGridFunction(pmesh_, &serial_distance, partitioning_.HostRead());
+  if (partitioning_.HostRead() == nullptr) {
+    *distance_ = serial_distance;
+  }
+}

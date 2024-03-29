@@ -127,6 +127,9 @@ class LoMachOptions {
   bool thermalDiv;  // turn on/off Qt
   bool realDiv;     // use actual divergence
 
+  // compute wall distance function or not
+  bool compute_wallDistance;
+
   int nFilter;
   double filterWeight;
   bool filterTemp, filterVel;

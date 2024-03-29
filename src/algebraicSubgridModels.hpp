@@ -141,7 +141,8 @@ class AlgebraicSubgridModels : public TurbModelBase {
   double sgs_model_const_;
 
  public:
-  AlgebraicSubgridModels(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, TPS::Tps *tps, ParGridFunction *gridScale, int sModel);
+  AlgebraicSubgridModels(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, TPS::Tps *tps, ParGridFunction *gridScale,
+                         int sModel);
   virtual ~AlgebraicSubgridModels();
 
   // Functions overriden from base class

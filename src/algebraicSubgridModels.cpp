@@ -48,7 +48,8 @@
 using namespace mfem;
 using namespace mfem::common;
 
-AlgebraicSubgridModels::AlgebraicSubgridModels(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, TPS::Tps *tps, ParGridFunction *gridScale, int sModel)
+AlgebraicSubgridModels::AlgebraicSubgridModels(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, TPS::Tps *tps,
+                                               ParGridFunction *gridScale, int sModel)
     : tpsP_(tps), loMach_opts_(loMach_opts), pmesh_(pmesh) {
   rank_ = pmesh_->GetMyRank();
   rank0_ = (pmesh_->GetMyRank() == 0);
@@ -130,8 +131,7 @@ void AlgebraicSubgridModels::initializeViz(ParaViewDataCollection &pvdc) {
 }
 
 void AlgebraicSubgridModels::setup() {
-
-  /*  
+  /*
   /// Grid-related ///
 
   // Build grid size vector and grid function
@@ -235,7 +235,7 @@ void AlgebraicSubgridModels::step() {
   const double *dGradU = gradU_.HostRead();
   const double *dGradV = gradV_.HostRead();
   const double *dGradW = gradW_.HostRead();
-  const double *rho = rn_.HostRead();  
+  const double *rho = rn_.HostRead();
   const double *del = gridScale_->HostRead();
   double *data = subgridVisc_.HostReadWrite();
 

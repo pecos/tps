@@ -67,7 +67,7 @@ void TurbulenceModelOptions::read(TPS::Tps *tps, std::string prefix) {
   // Set default constant based on model type
   double default_turb_const = 0.;
   if (turb_model_type_ == SMAGORINSKY) {
-    default_turb_const = 0.12;
+    default_turb_const = 0.09;
   } else if (turb_model_type_ == SIGMA) {
     default_turb_const = 0.135;
   }

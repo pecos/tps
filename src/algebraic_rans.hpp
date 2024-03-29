@@ -69,8 +69,10 @@ class AlgebraicRans : public TurbModelBase {
 
  public:
   /// Constructor
-  AlgebraicRans(mfem::Mesh *smesh, mfem::ParMesh *pmesh, const mfem::Array<int> &partitioning, int order,
-                TPS::Tps *tps);
+  //  AlgebraicRans(mfem::Mesh *smesh, mfem::ParMesh *pmesh, const mfem::Array<int> &partitioning, int order, TPS::Tps
+  //  *tps);
+  AlgebraicRans(mfem::ParMesh *pmesh, const mfem::Array<int> &partitioning, int order, TPS::Tps *tps,
+                mfem::ParGridFunction *distance);
 
   /// Destructor
   virtual ~AlgebraicRans();

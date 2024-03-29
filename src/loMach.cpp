@@ -101,23 +101,23 @@ void LoMachSolver::initialize() {
   // Stash the order, just for convenience
   order = loMach_opts_.order;
 
-  // When starting from scratch time = 0 and iter = 0  
+  // When starting from scratch time = 0 and iter = 0
   if (!loMach_opts_.io_opts_.enable_restart_) {
     temporal_coeff_.time = 0.;
     iter = 0;
-  }  
+  }
 
   //-----------------------------------------------------
   // 1) Prepare the mesh
   //-----------------------------------------------------
-  meshData_ = new MeshBase(tpsP_, &loMach_opts_, order);  
+  meshData_ = new MeshBase(tpsP_, &loMach_opts_, order);
   meshData_->initializeMesh();
 
   // local pointers
-  serial_mesh_ = meshData_->getSerialMesh();  
+  serial_mesh_ = meshData_->getSerialMesh();
   pmesh_ = meshData_->getMesh();
   partitioning_ = meshData_->getPartition();
-  
+
   // Stash mesh dimension (convenience)
   dim_ = serial_mesh_->Dimension();
 
@@ -130,7 +130,7 @@ void LoMachSolver::initialize() {
 
   // Instantiate sponge
   sponge_ = new GeometricSponge(pmesh_, &loMach_opts_, tpsP_);
-  
+
   // Instantiate external data
   extData_ = new GaussianInterpExtData(pmesh_, &loMach_opts_, tpsP_);
 
@@ -140,7 +140,8 @@ void LoMachSolver::initialize() {
   } else if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::SIGMA) {
     turbModel_ = new AlgebraicSubgridModels(pmesh_, &loMach_opts_, tpsP_, (meshData_->getGridScale()), 2);
   } else if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::ALGEBRAIC_RANS) {
-    turbModel_ = new AlgebraicRans(serial_mesh_, pmesh_, partitioning_, loMach_opts_.order, tpsP_);
+    //    turbModel_ = new AlgebraicRans(serial_mesh_, pmesh_, partitioning_, loMach_opts_.order, tpsP_);
+    turbModel_ = new AlgebraicRans(pmesh_, partitioning_, loMach_opts_.order, tpsP_, (meshData_->getWallDistance()));
   } else if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::NONE) {
     // default
     turbModel_ = new ZeroTurbModel(pmesh_, loMach_opts_.order);
@@ -311,7 +312,7 @@ void LoMachSolver::solveBegin() {
 
 void LoMachSolver::solveStep() {
   sw_step.Start();
-  
+
   if (loMach_opts_.ts_opts_.integrator_type_ == LoMachTemporalOptions::CURL_CURL) {
     SetTimeIntegrationCoefficients(iter - iter_start_);
     thermo_->step();
@@ -410,7 +411,7 @@ void LoMachSolver::updateTimestep() {
   double max_speed = Umax_lcl;
   double Umag;
   // int Sdof = sfes_->GetNDofs();
-  // int Sdof = (turbModel_->getGridScale())->Size();  
+  // int Sdof = (turbModel_->getGridScale())->Size();
   // TODO(trevilo): Let user set dtFactor
   double dtFactor = 1.0;
   auto dataU = flow_->getCurrentVelocity()->HostRead();
@@ -419,7 +420,7 @@ void LoMachSolver::updateTimestep() {
   // const double *dataD = bufferGridScale->HostRead();
   // const double *dataD = (turbModel_->getGridScale())->HostRead();
   const double *dataD = (meshData_->getGridScale())->HostRead();
-  //int Sdof = dataD->Size();
+  // int Sdof = dataD->Size();
   int Sdof = meshData_->getDofSize();
 
   for (int n = 0; n < Sdof; n++) {
@@ -494,7 +495,7 @@ double LoMachSolver::computeCFL() {
   double max_speed = Umax_lcl;
   double Umag;
   // int Sdof = sfes_->GetNDofs();
-  // int Sdof = (turbModel_->getGridScale())->Size();  
+  // int Sdof = (turbModel_->getGridScale())->Size();
 
   // come in divided by order
   // double *dataD = bufferGridScale->HostReadWrite();
@@ -503,7 +504,7 @@ double LoMachSolver::computeCFL() {
   const double *dataD = (meshData_->getGridScale())->HostRead();
   // int Sdof = dataD->Size();
   int Sdof = meshData_->getDofSize();
-  
+
   for (int n = 0; n < Sdof; n++) {
     Umag = 0.0;
     // Vector delta({dataX[n], dataY[n], dataZ[n]});
@@ -563,7 +564,7 @@ void LoMachSolver::setTimestep() {
   // int Sdof = (turbModel_->getGridScale())->Size();
   const double *dataD = (meshData_->getGridScale())->HostRead();
   // int Sdof = dataD->Size();
-  int Sdof = meshData_->getDofSize();  
+  int Sdof = meshData_->getDofSize();
 
   CFL = loMach_opts_.ts_opts_.cfl_;
 
@@ -717,4 +718,12 @@ void LoMachSolver::parseSolverOptions() {
   tpsP_->getInput("periodicity/periodicX", loMach_opts_.periodicX, false);
   tpsP_->getInput("periodicity/periodicY", loMach_opts_.periodicY, false);
   tpsP_->getInput("periodicity/periodicZ", loMach_opts_.periodicZ, false);
+
+  // compute wall distance
+  tpsP_->getInput("loMach/computeWallDistance", loMach_opts_.compute_wallDistance, false);
+
+  // add all models here which require wall dist, eg: SA, k-e, etc...
+  if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::ALGEBRAIC_RANS) {
+    loMach_opts_.compute_wallDistance = true;
+  }
 }

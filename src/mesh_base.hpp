@@ -37,47 +37,49 @@
  */
 
 #include <tps_config.h>
-#include "tps_mfem_wrap.hpp"
+
 #include "loMach_options.hpp"
+#include "tps_mfem_wrap.hpp"
 
 class LoMachOptions;
 
 class MeshBase {
  private:
-  TPS::Tps *tpsP_ = nullptr;  
+  TPS::Tps *tpsP_ = nullptr;
 
   MPI_Groups *groupsMPI = nullptr;
   int nprocs_;  // total number of MPI procs
-  int rank_;    // local MPI rank  
+  int rank_;    // local MPI rank
   bool rank0_;
 
-  LoMachOptions *loMach_opts_ = nullptr;    
+  LoMachOptions *loMach_opts_ = nullptr;
   const int order_;
-  int dim_;  
-  
+  int dim_;
+
   ParMesh *pmesh_ = nullptr;
   Mesh *serial_mesh_ = nullptr;
 
   // mapping from local to global element index
   // int *locToGlobElem = nullptr;
-  
+
   // total number of mesh elements (serial)
   int nelemGlobal_;
 
   // original mesh partition info (stored on rank 0)
   Array<int> partitioning_;
   const int defaultPartMethod = 1;
-  
+
   // min/max element size
   double hmin, hmax;
 
   // domain extent
   double xmin_, ymin_, zmin_;
-  double xmax_, ymax_, zmax_;  
-  
+  double xmax_, ymax_, zmax_;
+
   mfem::FiniteElementCollection *fec_ = nullptr;
   mfem::ParFiniteElementSpace *fes_ = nullptr;
   mfem::ParGridFunction *gridScale_ = nullptr;
+  mfem::ParGridFunction *distance_ = nullptr;
 
   // used in loMach
   int sDof_;
@@ -85,17 +87,18 @@ class MeshBase {
  public:
   MeshBase(TPS::Tps *tps, LoMachOptions *loMach_opts, int order);
   ~MeshBase();
-  
+
   virtual void initializeMesh();
   virtual void computeGridScale();
-  // virtual void computeWallDistance();  
+  virtual void computeWallDistance();
   virtual void initializeViz(mfem::ParaViewDataCollection &pvdc);
 
   virtual ParMesh *getMesh() final { return pmesh_; }
-  virtual Mesh *getSerialMesh() final { return serial_mesh_; }  
+  virtual Mesh *getSerialMesh() final { return serial_mesh_; }
   virtual ParGridFunction *getGridScale() final { return gridScale_; }
+  virtual ParGridFunction *getWallDistance() final { return distance_; }
   virtual int getDofSize() final { return sDof_; }
   virtual Array<int> getPartition() final { return partitioning_; }
-  // virtual int getDim() final { return dim_; }  
+  // virtual int getDim() final { return dim_; }
 };
 #endif  // MESH_BASE_HPP_

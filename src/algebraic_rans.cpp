@@ -40,8 +40,10 @@
 
 using namespace mfem;
 
-AlgebraicRans::AlgebraicRans(Mesh *smesh, ParMesh *pmesh, const Array<int> &partitioning, int order, TPS::Tps *tps)
-    : pmesh_(pmesh), order_(order) {
+// AlgebraicRans::AlgebraicRans(Mesh *smesh, ParMesh *pmesh, const Array<int> &partitioning, int order, TPS::Tps *tps)
+AlgebraicRans::AlgebraicRans(ParMesh *pmesh, const Array<int> &partitioning, int order, TPS::Tps *tps,
+                             ParGridFunction *distance)
+    : pmesh_(pmesh), order_(order), distance_(distance) {
   dim_ = pmesh_->Dimension();
 
   // Check for axisymmetric flag
@@ -54,6 +56,7 @@ AlgebraicRans::AlgebraicRans(Mesh *smesh, ParMesh *pmesh, const Array<int> &part
   sfec_ = new H1_FECollection(order_);
   sfes_ = new ParFiniteElementSpace(pmesh_, sfec_);
 
+  /*
   // Evaluate distance function
   FiniteElementSpace serial_fes(smesh, sfec_);
   GridFunction serial_distance(&serial_fes);
@@ -96,6 +99,7 @@ AlgebraicRans::AlgebraicRans(Mesh *smesh, ParMesh *pmesh, const Array<int> &part
   if (partitioning.HostRead() == nullptr) {
     *distance_ = serial_distance;
   }
+  */
 
   // Necessary?
   // distance_->ParFESpace()->ExchangeFaceNbrData();
@@ -112,7 +116,7 @@ AlgebraicRans::~AlgebraicRans() {
   delete mut_;
 
   // Alloced in ctor
-  delete distance_;
+  // delete distance_;
   delete sfes_;
   delete sfec_;
 }
