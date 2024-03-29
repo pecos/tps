@@ -67,7 +67,6 @@ MeshBase::~MeshBase() {
 
 /// Prepare the mesh and compute secondary mesh-related data
 void MeshBase::initializeMesh() {
-
   // Determine domain bounding box size
   {
     Mesh temp_mesh = Mesh(loMach_opts_->mesh_file.c_str());

@@ -48,9 +48,9 @@ class MeshBase {
   TPS::Tps *tpsP_ = nullptr;
 
   MPI_Groups *groupsMPI = nullptr;
+  bool rank0_;
   int nprocs_;  // total number of MPI procs
   int rank_;    // local MPI rank
-  bool rank0_;
 
   LoMachOptions *loMach_opts_ = nullptr;
   const int order_;
@@ -98,7 +98,7 @@ class MeshBase {
   virtual ParGridFunction *getGridScale() { return gridScale_; }
   virtual ParGridFunction *getWallDistance() { return distance_; }
   virtual int getDofSize() { return sDof_; }
-  virtual double getMinGridScale() { return hmin; }  
+  virtual double getMinGridScale() { return hmin; }
   virtual Array<int> getPartition() { return partitioning_; }
   // virtual int getDim() final { return dim_; }
 };

@@ -572,7 +572,7 @@ void LoMachSolver::setTimestep() {
   // int Sdof = (turbModel_->getGridScale())->Size();
   // const double *dataD = (meshData_->getGridScale())->HostRead();
   // int Sdof = dataD->Size();
-  hmin = meshData_->getMinGridScale();  
+  hmin = meshData_->getMinGridScale();
   int Sdof = meshData_->getDofSize();
 
   CFL = loMach_opts_.ts_opts_.cfl_;
@@ -606,7 +606,6 @@ void LoMachSolver::setTimestep() {
   }
 }
 
-
 void LoMachSolver::SetTimeIntegrationCoefficients(int step) {
   // Maximum BDF order to use at current time step
   // step + 1 <= order <= max_bdf_order
@@ -616,7 +615,6 @@ void LoMachSolver::SetTimeIntegrationCoefficients(int step) {
   if (step == 0) {
     // set dt2 and dt3 to nan, so that we'll get nan everywhere if they're used inappropriately
     temporal_coeff_.dt2 = temporal_coeff_.dt3 = std::numeric_limits<double>::signaling_NaN();
-
     temporal_coeff_.dt1 = temporal_coeff_.dt;
   }
 
