@@ -86,7 +86,7 @@ class MeshBase {
 
  public:
   MeshBase(TPS::Tps *tps, LoMachOptions *loMach_opts, int order);
-  ~MeshBase();
+  virtual ~MeshBase();
 
   virtual void initializeMesh();
   virtual void computeGridScale();

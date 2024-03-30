@@ -123,7 +123,7 @@ void LoMachSolver::read_restart_files_hdf5(hid_t file, bool serialized_read) {
     MPI_Bcast(&(temporal_coeff_.time), 1, MPI_DOUBLE, 0, TPSCommWorld);
     MPI_Bcast(&(temporal_coeff_.dt), 1, MPI_DOUBLE, 0, TPSCommWorld);
     MPI_Bcast(&read_order, 1, MPI_INT, 0, TPSCommWorld);
-    MPI_Bcast(&thermoPressure_, 1, MPI_DOUBLE, 0, TPSCommWorld);    
+    MPI_Bcast(&thermoPressure_, 1, MPI_DOUBLE, 0, TPSCommWorld);
   }
 
   if (rank0_) {
