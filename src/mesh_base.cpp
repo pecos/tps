@@ -63,6 +63,7 @@ MeshBase::~MeshBase() {
   delete fec_;
   delete pmesh_;
   delete serial_mesh_;
+  delete groupsMPI;
 }
 
 /// Prepare the mesh and compute secondary mesh-related data
