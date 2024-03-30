@@ -89,6 +89,7 @@ LoMachSolver::~LoMachSolver() {
   delete thermo_;
   delete sponge_;
   delete turbModel_;
+  delete meshData_;
 
   // allocated in constructor
   delete groupsMPI;
