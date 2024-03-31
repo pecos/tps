@@ -72,6 +72,10 @@ class LoMachTemporalOptions {
   bool enable_constant_dt_;
 
   double cfl_;
+  double initial_dt_;
+  double minimum_dt_;
+  double maximum_dt_;
+  double factor_dt_;
   double constant_dt_;
 
   int bdf_order_;
@@ -126,6 +130,9 @@ class LoMachOptions {
 
   bool thermalDiv;  // turn on/off Qt
   bool realDiv;     // use actual divergence
+
+  // compute wall distance function or not
+  bool compute_wallDistance;
 
   int nFilter;
   double filterWeight;

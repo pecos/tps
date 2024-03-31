@@ -58,6 +58,8 @@ void LoMachSolver::write_restart_files_hdf5(hid_t file, bool serialized_write) {
     h5_save_attribute(file, "order", order);
     // spatial dimension
     h5_save_attribute(file, "dimension", dim_);
+    // thermodynamic pressure
+    h5_save_attribute(file, "Po", thermoPressure_);
 
     // code revision
 #ifdef BUILD_VERSION
@@ -81,7 +83,8 @@ void LoMachSolver::write_restart_files_hdf5(hid_t file, bool serialized_write) {
 
   // included total dofs for partitioned files
   if (!serialized_write) {
-    int ldofs = sfes_->GetNDofs();
+    // int ldofs = sfes_->GetNDofs();
+    int ldofs = meshData_->getDofSize();
     int gdofs;
     MPI_Allreduce(&ldofs, &gdofs, 1, MPI_INT, MPI_SUM, TPSCommWorld);
     h5_save_attribute(file, "dofs_global", gdofs);
@@ -110,6 +113,9 @@ void LoMachSolver::read_restart_files_hdf5(hid_t file, bool serialized_read) {
     h5_read_attribute(file, "time", temporal_coeff_.time);
     h5_read_attribute(file, "dt", temporal_coeff_.dt);
     h5_read_attribute(file, "order", read_order);
+    if (H5Aexists(file, "Po")) {
+      h5_read_attribute(file, "Po", thermoPressure_);
+    }
   }
 
   if (serialized_read) {
@@ -117,6 +123,7 @@ void LoMachSolver::read_restart_files_hdf5(hid_t file, bool serialized_read) {
     MPI_Bcast(&(temporal_coeff_.time), 1, MPI_DOUBLE, 0, TPSCommWorld);
     MPI_Bcast(&(temporal_coeff_.dt), 1, MPI_DOUBLE, 0, TPSCommWorld);
     MPI_Bcast(&read_order, 1, MPI_INT, 0, TPSCommWorld);
+    MPI_Bcast(&thermoPressure_, 1, MPI_DOUBLE, 0, TPSCommWorld);
   }
 
   if (rank0_) {

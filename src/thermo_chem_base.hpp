@@ -77,6 +77,8 @@ class ThermoChemModelBase {
   const spongeToThermoChem *sponge_interface_;
   const extDataToThermoChem *extData_interface_;
 
+  double thermo_pressure_;
+
  public:
   /// Destructor
   virtual ~ThermoChemModelBase() {}
@@ -175,6 +177,10 @@ class ThermoChemModelBase {
 
   void initializeFromExtData(extDataToThermoChem *extData) { extData_interface_ = extData; }
   const extDataToThermoChem *getExtDataInterface() const { return extData_interface_; }
+
+  /// Return thermodynamic pressure for restarts
+  double GetThermoPressure() { return thermo_pressure_; }
+  void SetThermoPressure(double &Po) { thermo_pressure_ = Po; }
 };
 
 /**
