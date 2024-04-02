@@ -1364,6 +1364,8 @@ void Tomboulides::step() {
 
   // Add axisymmetric "forcing" term to rhs
   if (axisym_) {
+    pp_div_gf_->HostRead();
+    pp_div_rad_comp_gf_->HostRead();
     Faxi_poisson_form_->Update();
     Faxi_poisson_form_->Assemble();
     Faxi_poisson_form_->ParallelAssemble(Faxi_poisson_vec_);
