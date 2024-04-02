@@ -338,6 +338,7 @@ void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state
   diffusivity.SetSize(3);
   diffusivity = 0.0;
   computeMixtureAverageDiffusivity(&state[0], &diffusivity[0]);
+  
   // Vector primitiveState(num_equation);
   // mixture->GetPrimitivesFromConservatives(state, primitiveState);
   //
@@ -395,6 +396,7 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::computeMixtureAverageDiffusivity(co
 
   double nondimTe = debyeLength * 4.0 * PI_ * debyeFactor_ * Te;
   // double nondimTh = debyeLength * 4.0 * PI_ * debyeFactor_ * Th;
+  std::cout << "... okay 3" << endl;    
 
   double binaryDiff[3 * 3];
   for (int i = 0; i < 3 * 3; i++) binaryDiff[i] = 0.0;
@@ -408,10 +410,12 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::computeMixtureAverageDiffusivity(co
                                                         sqrt(Te / getMuw(ionIndex_, electronIndex_)) / nTotal /
                                                         (collision::charged::att11(nondimTe) * debyeCircle);
   binaryDiff[ionIndex_ + electronIndex_ * numSpecies] = binaryDiff[electronIndex_ + ionIndex_ * numSpecies];
+  std::cout << "... okay 4" << endl;    
 
   // diffusivity.SetSize(3);
   for (int sp = 0; sp < 3; sp++) diffusivity[sp] = 0.0;
   CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
+  std::cout << "... okay 5" << endl;    
 }
 
 MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeSourceMolecularTransport(const double *state, const double *Up,
@@ -1104,11 +1108,15 @@ void ArgonMixtureTransport::computeMixtureAverageDiffusivity(const Vector &state
 
 MFEM_HOST_DEVICE void ArgonMixtureTransport::computeMixtureAverageDiffusivity(const double *state,
                                                                               double *diffusivity) {
+  std::cout << "In ArgonMixtureTransport::computeMixtureAverageDiffusivity..." << endl;
   double primitiveState[gpudata::MAXEQUATIONS];
   mixture->GetPrimitivesFromConservatives(state, primitiveState);
+  std::cout << " okay 1" << endl;  
 
   double n_sp[3], X_sp[3], Y_sp[3];
   mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
+  std::cout << " okay 2" << endl;  
+  
   double nTotal = 0.0;
   for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp[sp];
 
@@ -1122,22 +1130,30 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::computeMixtureAverageDiffusivity(co
 
   double nondimTe = debyeLength * 4.0 * PI_ * debyeFactor_ * Te;
   // double nondimTh = debyeLength * 4.0 * PI_ * debyeFactor_ * Th;
+  std::cout << " okay 3" << endl;    
 
   double binaryDiff[3 * 3];
   for (int i = 0; i < 3 * 3; i++) binaryDiff[i] = 0.0;
   binaryDiff[electronIndex_ + neutralIndex_ * numSpecies] =
       diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / collision::argon::eAr11(Te);
+  std::cout << " okay 4" << endl;    
   binaryDiff[neutralIndex_ + electronIndex_ * numSpecies] = binaryDiff[electronIndex_ + neutralIndex_ * numSpecies];
+  std::cout << " okay 5" << endl;    
   binaryDiff[neutralIndex_ + ionIndex_ * numSpecies] =
       diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
+  std::cout << " okay 6" << endl;    
   binaryDiff[ionIndex_ + neutralIndex_ * numSpecies] = binaryDiff[neutralIndex_ + ionIndex_ * numSpecies];
+  std::cout << " okay 7" << endl;    
   binaryDiff[electronIndex_ + ionIndex_ * numSpecies] = diffusivityFactor_ *
                                                         sqrt(Te / getMuw(ionIndex_, electronIndex_)) / nTotal /
                                                         (collision::charged::att11(nondimTe) * debyeCircle);
+  std::cout << " okay 8" << endl;    
   binaryDiff[ionIndex_ + electronIndex_ * numSpecies] = binaryDiff[electronIndex_ + ionIndex_ * numSpecies];
+  std::cout << " okay 9" << endl;    
 
   // diffusivity.SetSize(3);
   for (int sp = 0; sp < 3; sp++) diffusivity[sp] = 0.0;
   CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
+  std::cout << " okay 10" << endl;    
 }
 

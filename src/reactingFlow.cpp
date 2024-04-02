@@ -63,6 +63,8 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts,
   rank0_ = (pmesh_->GetMyRank() == 0);
   order_ = loMach_opts->order;
 
+  std::cout << "Constructing ReactingFlow!" << endl;
+  
   /// Basic input information
   tpsP_->getInput("loMach/ambientPressure", ambient_pressure_, 101325.0);
   thermo_pressure_ = ambient_pressure_;
@@ -97,34 +99,59 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts,
   tpsP_->getInput("plasma_models/includeElectron", mixtureInput_.isElectronIncluded, true);
   tpsP_->getInput("plasma_models/two_temperature", mixtureInput_.twoTemperature, false);
   tpsP_->getInput("plasma_models/const_plasma_conductivity", const_plasma_conductivity_, 0.0);
-  
-  gasParams_.SetSize(nSpecies_, GasParams::NUM_GASPARAMS);  
-  inputCV_.SetSize(nSpecies_);
 
+  /*
+enum GasParams {
+  SPECIES_MW,
+  SPECIES_CHARGES,
+  FORMATION_ENERGY,
+  SPECIES_DEGENERACY,
+  NUM_GASPARAMS
+};
+*/
+  
+  gasParams_.SetSize(nSpecies_, GasParams::NUM_GASPARAMS);
+  gasParams_ = 0.0;
+  inputCV_.SetSize(nSpecies_);
+  initialMassFraction_.SetSize(nSpecies_);  
+
+  for (int i = 0; i < nSpecies_*GasParams::NUM_GASPARAMS; i++) {
+    mixtureInput_.gasParams[i] = 0.0;
+  }
+  for (int i = 0; i < nSpecies_; i++) {  
+    mixtureInput_.molarCV[i] = 0.0;
+  }
+  
   for (int i = 1; i <= nSpecies_; i++) {
     double formEnergy, levelDegeneracy;
     std::string basepath("species/species" + std::to_string(i));
 
     tpsP_->getRequiredInput((basepath + "/formation_energy").c_str(), formEnergy);
     tpsP_->getInput((basepath + "/level_degeneracy").c_str(), levelDegeneracy, 1.0);
-    tpsP_->getRequiredInput((basepath + "/perfect_mixture/constant_molar_cv").c_str(), inputCV_(i - 1));
+    tpsP_->getRequiredInput((basepath + "/perfect_mixture/constant_molar_cv").c_str(), inputCV_[i - 1]);
 
-    gasParams_(i - 1, GasParams::FORMATION_ENERGY) = formEnergy;
-    gasParams_(i - 1, GasParams::SPECIES_DEGENERACY) = levelDegeneracy;        
+    std::cout << "(" << (i-1) + nSpecies_*GasParams::FORMATION_ENERGY << ")" << "+Species: " << i << " GSFE: " << GasParams::FORMATION_ENERGY << " FE: " << formEnergy << endl;
+    gasParams_((i - 1), GasParams::FORMATION_ENERGY) = formEnergy;
+    gasParams_((i - 1), GasParams::SPECIES_DEGENERACY) = levelDegeneracy;
+
+    mixtureInput_.gasParams[(i-1) + nSpecies_*GasParams::FORMATION_ENERGY] = formEnergy;
+    mixtureInput_.gasParams[(i-1) + nSpecies_*GasParams::SPECIES_DEGENERACY] = levelDegeneracy;
+    tpsP_->getRequiredInput((basepath + "/perfect_mixture/constant_molar_cv").c_str(), mixtureInput_.molarCV[i - 1]);
+    tpsP_->getRequiredInput((basepath + "/initialMassFraction").c_str(), initialMassFraction_(i - 1));
+
+    // mixtureInput_.gasParams = gasParams_;    
   }
-      
-  mixture_ = new PerfectMixture(mixtureInput_, dim_, dim_, const_plasma_conductivity_);
-
+  
   
   /// Minimal amount of info for transport input struct
   std::vector<std::string> InputSpeciesNames;
   InputSpeciesNames.resize(nSpecies_);
   std::map<std::string, int> speciesMapping;
   // speciesMapping.resize(nSpecies_);  
-  Vector speciesMass(nSpecies_);
-  Vector speciesCharge(nSpecies_);
+  // Vector speciesMass(nSpecies_);
+  // Vector speciesCharge(nSpecies_);
   Vector mixtureToInputMap(nSpecies_);
-  Vector atomMW;
+  // Vector atomMW;
   int backgroundIndex;
   int paramIdx = 0;  
   int targetIdx;
@@ -132,13 +159,14 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts,
   tpsP_->getRequiredInput("atoms/numAtoms", nAtoms_);
   if (nSpecies_ > 1) {
     tpsP_->getRequiredInput("species/background_index", backgroundIndex);
-    atomMW.SetSize(nAtoms_);
+    atomMW_.SetSize(nAtoms_);
     for (int a = 1; a <= nAtoms_; a++) {
       std::string basepath("atoms/atom" + std::to_string(a));
       std::string atomName;
       tpsP_->getRequiredInput((basepath + "/name").c_str(), atomName);
-      tpsP_->getRequiredInput((basepath + "/mass").c_str(), atomMW(a - 1));
+      tpsP_->getRequiredInput((basepath + "/mass").c_str(), atomMW_(a - 1));
       atomMap_[atomName] = a - 1;
+      if(rank0_) {std::cout << " Atom: " << a << " is named " << atomName << " and has mass " << atomMW_(a-1) << endl;}
     }
   }  
   
@@ -202,15 +230,54 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts,
       }
     }
   }
+
+  Vector speciesCharge(nSpecies_);
+  for (int sp = 0; sp < nSpecies_; sp++) {
+    std::cout << "(" << sp << ") " << speciesNames_[sp] << endl;
+    // if (sp == speciesMapping["Ar.+1"] ) {
+    if (speciesNames_[sp] == "Ar.+1" ) {
+      std::cout << "caught Ar+1" << endl;
+      speciesCharge[sp] = +1.0;
+    // } else if (sp == speciesMapping["E"] ) {
+    } else if (speciesNames_[sp] == "E" ) {
+      std::cout << "caught E" << endl;      
+      speciesCharge[sp] = -1.0;
+    } else {
+      std::cout << "caught Ar" << endl;      
+      speciesCharge[sp] = 0.0;      
+    }
+    if(rank0_) {std::cout << " Species: " << sp << " has " << speciesCharge[sp] << " charge" << endl;}
+  }
+  gasParams_.SetCol(GasParams::SPECIES_CHARGES, speciesCharge);
+
+  for (int sp = 0; sp < nSpecies_; sp++) {  
+    mixtureInput_.gasParams[sp + nSpecies_*GasParams::SPECIES_CHARGES] = speciesCharge[sp];
+  }
   
   for (int sp = 0; sp < nSpecies_; sp++) {
     int inputIdx = mixtureToInputMap[sp];
-    // initialMassFractions(sp) = inputInitialMassFraction(inputIdx);
-    // constantMolarCV(sp) = inputCV(inputIdx);
+    if(rank0_) {std::cout << " Species: " << sp << " has composition ";}
     for (int a = 0; a < nAtoms_; a++) {
       speciesComposition_(sp, a) = inputSpeciesComposition(inputIdx, a);
+      if(rank0_) {std::cout << speciesComposition_(sp, a) << " ";}
     }
+      if(rank0_) {std::cout << endl;}    
   }
+
+  Vector speciesMass(nSpecies_);
+  speciesMass = 0.0;
+  for (int sp = 0; sp < nSpecies_; sp++) {
+    for (int a = 0; a < nAtoms_; a++) {      
+      speciesMass[sp] += speciesComposition_(sp, a) * atomMW_[a];
+      std::cout << "sp: " << sp << " atom: " << a << " comp: " << speciesComposition_(sp, a) << " weight: " <<  atomMW_[a] << endl;
+    }
+    if(rank0_) {std::cout << " Species: " << sp << " has " << speciesMass[sp] << " molecular weight" << endl;}
+  }  
+  gasParams_.SetCol(GasParams::SPECIES_MW, speciesMass);
+
+  for (int sp = 0; sp < nSpecies_; sp++) {  
+    mixtureInput_.gasParams[sp + nSpecies_*GasParams::SPECIES_MW] = speciesMass[sp];
+  }  
   
   if (speciesMapping.count("Ar")) {
     argonInput_.neutralIndex = speciesMapping["Ar"];
@@ -235,6 +302,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts,
   identifySpeciesType(speciesType);  
   identifyCollisionType(speciesType, argonInput_.collisionIndex);  
 
+  mixture_ = new PerfectMixture(mixtureInput_, dim_, dim_, const_plasma_conductivity_);  
   // transport_ = new ArgonMinimalTransport(mixture_, argonInput_);
   transport_ = new ArgonMixtureTransport(mixture_, argonInput_);  
   
@@ -356,7 +424,11 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts,
     }
   }   
   
-  chemistry_ = new Chemistry(mixture_, chemistryInput_);  
+  chemistry_ = new Chemistry(mixture_, chemistryInput_);
+
+  // for convience
+  Rgas_ = UNIVERSALGASCONSTANT;
+  
 }
 
 ReactingFlow::~ReactingFlow() {
@@ -430,10 +502,12 @@ void ReactingFlow::initializeSelf() {
     spec_ess_attr_.SetSize(pmesh_->bdr_attributes.Max());
     spec_ess_attr_ = 0;    
   }
-  if (rank0_) grvy_printf(ginfo, "ReactingFlow paces constructed...\n");
+  if (rank0_) grvy_printf(ginfo, "ReactingFlow spaces constructed...\n");
 
-  int sDofInt_ = sfes_->GetTrueVSize();
-  int yDofInt_ = yfes_->GetTrueVSize();  
+  sDof_ = sfes_->GetVSize();
+  yDof_ = yfes_->GetVSize();    
+  sDofInt_ = sfes_->GetTrueVSize();
+  yDofInt_ = yfes_->GetTrueVSize();  
 
   Qt_.SetSize(sDofInt_);
   Qt_ = 0.0;
@@ -475,6 +549,17 @@ void ReactingFlow::initializeSelf() {
   Yn_ = 0.0;
   Ynm1_ = 0.0;
   Ynm2_ = 0.0;
+
+  NYn_.SetSize(yDofInt_);
+  NYnm1_.SetSize(yDofInt_);
+  NYnm2_.SetSize(yDofInt_);
+  NYn_ = 0.0;
+  NYnm1_ = 0.0;
+  NYnm2_ = 0.0;
+  
+  // number density
+  Xn_.SetSize(yDofInt_);  
+  Xn_ = 0.0;
   
   resY_.SetSize(sDofInt_);  
   resY_ = 0.0;
@@ -534,9 +619,14 @@ void ReactingFlow::initializeSelf() {
 
   rhoDt.SetSpace(sfes_);
 
-  // CpY_gf_.SetSpace(sfes_);
-  // CpY_.SetSize(yDofInt_);
+  // this is only needed to form the op-coeff
+  CpY_gf_.SetSpace(sfes_);
+  CpY_gf_ = 1.0;
+  
   SDFT_.SetSize(sDofInt_);
+
+  Mmix_gf_.SetSpace(sfes_);    
+  Rmix_gf_.SetSpace(sfes_);  
 
   if (rank0_) grvy_printf(ginfo, "ReactingFlow vectors and gf initialized...\n");
 
@@ -545,9 +635,7 @@ void ReactingFlow::initializeSelf() {
   toFlow_interface_.viscosity = &visc_gf_;
   toFlow_interface_.thermal_divergence = &Qt_gf_;
   toTurbModel_interface_.density = &rn_gf_;
-  if (rank0_) {
-    std::cout << "exports set..." << endl;
-  }
+  if (rank0_) { std::cout << "exports set..." << endl; }
 
   //-----------------------------------------------------
   // 2) Set the initial condition
@@ -566,6 +654,14 @@ void ReactingFlow::initializeSelf() {
   // 2) For restarts, this IC is overwritten by the restart field,
   // which is read later.
 
+  ConstantCoefficient Yn_ic_coef;  
+  for(int sp = 0; sp < nSpecies_; sp++) {
+    Yn_ic_coef.constant = initialMassFraction_[sp];
+    Yn_gf_.ProjectCoefficient(Yn_ic_coef);
+    Yn_gf_.GetTrueDofs(tmpR0_);
+    setVectorFromScalar(tmpR0_, sp, &Yn_);
+  }
+  
   ConstantCoefficient t_ic_coef;
   t_ic_coef.constant = T_ic_;
   Tn_gf_.ProjectCoefficient(t_ic_coef);
@@ -575,6 +671,7 @@ void ReactingFlow::initializeSelf() {
   Tnm2_gf_.SetFromTrueDofs(Tn_);
   Tnm1_gf_.GetTrueDofs(Tnm1_);
   Tnm2_gf_.GetTrueDofs(Tnm2_);
+  if (rank0_) { std::cout << "okay 1..." << endl; }  
 
   //-----------------------------------------------------
   // 3) Set the boundary conditions
@@ -583,12 +680,16 @@ void ReactingFlow::initializeSelf() {
   tpsP_->getInput("boundaryConditions/numWalls", numWalls, 0);
   tpsP_->getInput("boundaryConditions/numInlets", numInlets, 0);
   tpsP_->getInput("boundaryConditions/numOutlets", numOutlets, 0);
+  if (rank0_) { std::cout << "okay 2..." << numWalls << " " << numInlets << " " << numOutlets << endl; }    
 
   // inlet bc
-  {
+  if (!(pmesh_->bdr_attributes.Size() == 0)) {
+    if (rank0_) { std::cout << "what is going on?" << endl; }    
     Array<int> attr_inlet(pmesh_->bdr_attributes.Max());
+    if (rank0_) { std::cout << "who knows?" << endl; }        
     attr_inlet = 0;
     for (int i = 1; i <= numInlets; i++) {
+      if (rank0_) { std::cout << "why am i here?" << endl; }
       int patch;
       std::string type;
       std::string basepath("boundaryConditions/inlet" + std::to_string(i));
@@ -603,7 +704,7 @@ void ReactingFlow::initializeSelf() {
         double temperature_value;
         tpsP_->getRequiredInput((basepath + "/temperature").c_str(), temperature_value);
         if (rank0_) {
-          std::cout << "Calorically Perfect: Setting uniform Dirichlet temperature on patch = " << patch << std::endl;
+          std::cout << "Rx Flow: Setting uniform Dirichlet temperature on patch = " << patch << std::endl;
         }
         AddTempDirichletBC(temperature_value, inlet_attr);
 
@@ -613,7 +714,7 @@ void ReactingFlow::initializeSelf() {
         inlet_attr[patch - 1] = 1;
         temperature_bc_field_ = new GridFunctionCoefficient(extData_interface_->Tdata);
         if (rank0_) {
-          std::cout << "Calorically Perfect: Setting interpolated Dirichlet temperature on patch = " << patch
+          std::cout << "Rx Flow: Setting interpolated Dirichlet temperature on patch = " << patch
                     << std::endl;
         }
         AddTempDirichletBC(temperature_bc_field_, inlet_attr);
@@ -628,19 +729,18 @@ void ReactingFlow::initializeSelf() {
         Tn_gf_.ProjectBdrCoefficient(*temperature_bc_field_, inlet_attr);
       } else {
         if (rank0_) {
-          std::cout << "ERROR: Calorically Perfect inlet type = " << type << " not supported." << std::endl;
+          std::cout << "ERROR: Rx Flow inlet type = " << type << " not supported." << std::endl;
         }
         assert(false);
         exit(1);
       }
     }
+    if (rank0_) { std::cout << "inlet bc set..." << endl; }    
   }
-  if (rank0_) {
-    std::cout << "inlet bc set..." << endl;
-  }
-
+  if (rank0_) { std::cout << "okay 3..." << endl; }    
+  
   // outlet bc
-  {
+  if (!(pmesh_->bdr_attributes.Size() == 0)) {
     Array<int> attr_outlet(pmesh_->bdr_attributes.Max());
     attr_outlet = 0;
 
@@ -652,7 +752,7 @@ void ReactingFlow::initializeSelf() {
   }
 
   // Wall BCs
-  {
+  if (!(pmesh_->bdr_attributes.Size() == 0)) {
     std::cout << "There are " << pmesh_->bdr_attributes.Max() << " boundary attributes!" << std::endl;
     Array<int> attr_wall(pmesh_->bdr_attributes.Max());
     attr_wall = 0;
@@ -690,6 +790,10 @@ void ReactingFlow::initializeSelf() {
   sfes_->GetEssentialTrueDofs(temp_ess_attr_, temp_ess_tdof_);
   sfes_->GetEssentialTrueDofs(Qt_ess_attr_, Qt_ess_tdof_);
   if (rank0_) std::cout << "ReactingFlow Essential true dof step" << endl;
+
+  // with ic set, update Rmix
+  updateMixture();
+  if (rank0_) { std::cout << "okay 4..." << endl; }      
 }
 
 void ReactingFlow::initializeOperators() {
@@ -712,6 +816,7 @@ void ReactingFlow::initializeOperators() {
   rhoDt = rn_gf_;
   rhoDt /= dt_;
   rho_over_dt_coeff_ = new GridFunctionCoefficient(&rhoDt);
+  if (rank0_) std::cout << "coeff1 set..." << endl;  
 
   // thermal_diff_coeff.constant = thermal_diff;
   thermal_diff_coeff_ = new GridFunctionCoefficient(&kappa_gf_);
@@ -721,21 +826,26 @@ void ReactingFlow::initializeOperators() {
   thermal_diff_total_coeff_ = new ProductCoefficient(*mult_coeff_, *thermal_diff_sum_coeff_);
   gradT_coeff_ = new GradientGridFunctionCoefficient(&Tn_next_gf_);
   kap_gradT_coeff_ = new ScalarVectorProductCoefficient(*thermal_diff_total_coeff_, *gradT_coeff_);
+  if (rank0_) std::cout << "coeff2 set..." << endl;    
 
   // species diff coeff, diffY_gf gets filled with correct species diffusivity before its solve
   species_diff_coeff_ = new GridFunctionCoefficient(&diffY_gf_);
   species_diff_sum_coeff_ = new SumCoefficient(*mut_coeff_, *species_diff_coeff_, invSc_, 1.0); // is this correct?
   species_diff_total_coeff_ = new ProductCoefficient(*mult_coeff_, *species_diff_sum_coeff_);
+  if (rank0_) std::cout << "coeff3 set..." << endl;    
 
   // for explicit source term in energy
-  // species_Cp_coeff_ = new GridFunctionCoefficient(&CpY_gf_);
-  species_Cp_coeff_->constant = 1.0;  
-  species_diff_Cp_coeff_ = new ProductCoefficient(*species_Cp_coeff_, *species_diff_total_coeff_);  
+  species_Cp_coeff_ = new GridFunctionCoefficient(&CpY_gf_);
+  // species_Cp_coeff_->constant = 1.0;
+  if (rank0_) std::cout << "coeff4a set..." << endl;      
+  species_diff_Cp_coeff_ = new ProductCoefficient(*species_Cp_coeff_, *species_diff_total_coeff_);
+  if (rank0_) std::cout << "coeff4 set..." << endl;    
   
   // Convection: Atemperature(i,j) = \int_{\Omega} \phi_i \rho u \cdot \nabla \phi_j
   un_next_coeff_ = new VectorGridFunctionCoefficient(flow_interface_->velocity);
   rhon_next_coeff_ = new GridFunctionCoefficient(&rn_gf_);
   rhou_coeff_ = new ScalarVectorProductCoefficient(*rhon_next_coeff_, *un_next_coeff_);
+  if (rank0_) std::cout << "Operator coefficients set" << endl;  
 
   At_form_ = new ParBilinearForm(sfes_);
   auto *at_blfi = new ConvectionIntegrator(*rhou_coeff_);
@@ -958,6 +1068,7 @@ void ReactingFlow::initializeOperators() {
   }
 
   // and initialize system mass
+  updateMixture();  
   computeSystemMass();
 }
 
@@ -985,25 +1096,38 @@ void ReactingFlow::step() {
   }
 
   // Prepare for residual calc
+  updateMixture();
+  if (rank0_) { std::cout << "okay 9..." << endl; }        
   extrapolateState();
+  if (rank0_) { std::cout << "okay 10..." << endl; }        
   updateBC(0);  // NB: can't ramp right now
+  if (rank0_) { std::cout << "okay 11..." << endl; }        
   updateThermoP();
+  if (rank0_) { std::cout << "okay 12..." << endl; }        
   updateDensity(1.0);
+  if (rank0_) { std::cout << "okay 13..." << endl; }        
   updateDiffusivity();
+  if (rank0_) { std::cout << "okay 14..." << endl; }        
   speciesProduction();
+  if (rank0_) { std::cout << "okay 15..." << endl; }        
 
   // advance species, zero slot is from calculated sum of others
   for (int iSpecies = 1; iSpecies < nSpecies_; iSpecies++) {
     speciesStep(iSpecies);
+    if (rank0_) { std::cout << iSpecies << ") okay 15a..." << endl; }
   }
   speciesOneStep();
+  if (rank0_) { std::cout << "okay 15b..." << endl; }    
   YnFull_gf_.SetFromTrueDofs(Yn_next_);
+  if (rank0_) { std::cout << "okay 16..." << endl; }  
 
   // ho_i*w_i
   heatOfFormation();
+  if (rank0_) { std::cout << "okay 17..." << endl; }    
 
   // TODO(swh): this is a bad name
   diffusionForTemperature();
+  if (rank0_) { std::cout << "okay 18..." << endl; }    
 
   // advance temperature
   temperatureStep();
@@ -1115,8 +1239,11 @@ void ReactingFlow::speciesOneStep() {
 void ReactingFlow::speciesStep(int iSpec) {
 
   // copy relevant species properties from full Vector to particular case
-  setScalarFromVector(diffY_, iSpec, &tmpR0_);  
-  diffY_gf_.SetFromTrueDofs(tmpR0_);  
+  if (rank0_) { std::cout << "check 1..." << endl; }    
+  setScalarFromVector(diffY_, iSpec, &tmpR0_);
+  if (rank0_) { std::cout << "check 2..." << endl; }    
+  diffY_gf_.SetFromTrueDofs(tmpR0_);
+  if (rank0_) { std::cout << "check 3..." << endl; }  
   
   // Build the right-hand-side  
   resY_ = 0.0;
@@ -1124,6 +1251,7 @@ void ReactingFlow::speciesStep(int iSpec) {
   // convection
   computeExplicitSpecConvectionOP(iSpec, true);  // ->tmpR0_
   resY_.Set(-1.0, tmpR0_);
+  if (rank0_) { std::cout << "check 4..." << endl; }    
 
   // for unsteady term, compute and add known part of BDF unsteady term
   setScalarFromVector(Yn_,   iSpec, &tmpR0a_);
@@ -1132,12 +1260,15 @@ void ReactingFlow::speciesStep(int iSpec) {
   tmpR0_.Set(time_coeff_.bd1 / dt_, tmpR0a_);
   tmpR0_.Add(time_coeff_.bd2 / dt_, tmpR0b_);
   tmpR0_.Add(time_coeff_.bd3 / dt_, tmpR0c_);
+  if (rank0_) { std::cout << "check 5..." << endl; }    
 
   MsRho_->AddMult(tmpR0_, resY_, -1.0);
+  if (rank0_) { std::cout << "check 6..." << endl; }    
 
   // production of iSpec
   setScalarFromVector(prodY_, iSpec, &tmpR0_);
   Ms_->AddMult(tmpR0_, resT_);
+  if (rank0_) { std::cout << "check 7..." << endl; }    
 
   // Add natural boundary terms here later
   // NB: adiabatic natural BC is handled, but don't have ability to impose non-zero heat flux yet
@@ -1145,10 +1276,12 @@ void ReactingFlow::speciesStep(int iSpec) {
   // Update Helmholtz operator to account for changing dt, rho, and kappa
   rhoDt = rn_gf_;
   rhoDt *= (time_coeff_.bd0 / dt_);
+  if (rank0_) { std::cout << "check 8..." << endl; }    
 
   Hy_form_->Update();
   Hy_form_->Assemble();
   Hy_form_->FormSystemMatrix(spec_ess_tdof_, Hy_);
+  if (rank0_) { std::cout << "check 9..." << endl; }    
 
   HyInv_->SetOperator(*Hy_);
   if (partial_assembly_) {
@@ -1158,12 +1291,14 @@ void ReactingFlow::speciesStep(int iSpec) {
     HyInvPC_ = new OperatorJacobiSmoother(diag_pa, spec_ess_tdof_);
     HyInv_->SetPreconditioner(*HyInvPC_);
   }
-
+  if (rank0_) { std::cout << "check 10..." << endl; }  
+  
   // Prepare for the solve
   for (auto &spec_dbc : spec_dbcs_) {
     Yn_next_gf_.ProjectBdrCoefficient(*spec_dbc.coeff, spec_dbc.attr);
   }
   sfes_->GetRestrictionMatrix()->MultTranspose(resY_, resY_gf_);
+  if (rank0_) { std::cout << "check 11..." << endl; }    
 
   Vector Xt2, Bt2;
   if (partial_assembly_) {
@@ -1172,6 +1307,7 @@ void ReactingFlow::speciesStep(int iSpec) {
   } else {
     Hy_form_->FormLinearSystem(spec_ess_tdof_, Yn_next_gf_, resY_gf_, Hy_, Xt2, Bt2, 1);
   }
+  if (rank0_) { std::cout << "check 12..." << endl; }    
 
   // solve helmholtz eq for iSpec
   HyInv_->Mult(Bt2, Xt2);
@@ -1185,12 +1321,15 @@ void ReactingFlow::speciesStep(int iSpec) {
 
 void ReactingFlow::speciesProduction() {
   (flow_interface_->velocity)->GetTrueDofs(tmpR0_);
+  if (rank0_) { std::cout << "okay 14a..." << endl; }
+  
   const double *dataT = Tn_.HostRead();
-  const double *dataY = Yn_.HostRead();
   const double *dataRho = rn_.HostRead();
-  // const double *dataU = (flow_interface_->velocity)->HostRead();
-  const double *dataU = tmpR0_.HostRead();  
-  double *dataProd = prodY_.HostReadWrite();    
+  const double *dataU = tmpR0_.HostRead();
+  const double *dataX = Xn_.HostRead();    
+  double *dataProd = prodY_.HostReadWrite();  
+  if (rank0_) { std::cout << "okay 14b..." << endl; }
+    
   for (int i = 0; i < sDofInt_; i++) {
     // prodY_[i + n * sDofInt_] = 0.0;
     Vector kfwd; // set to size nReactions_ in computeForwardRareCoeffs
@@ -1199,23 +1338,60 @@ void ReactingFlow::speciesProduction() {
     Vector creationRate; // set to size nSpecies_ in computeCreationRate
     double Th = dataT[i]; 
     double Te;
-    Te = Th; // hack    
-
-    int nEq = dim_ + 2;
+    Te = Th; // hack for one-temp
+    
+    int nEq = dim_ + 2 + nSpecies_;
     Vector state(nEq);
+    Vector conservedState(nEq);    
+    //double state[nEq];
+    //double conservedState[nEq];          
     state[0] = dataRho[i];
     for (int eq = 0; eq < dim_; eq++) {state[eq+1] = dataU[i + eq*sDofInt_];}
-    state[dim_ + 1] = dataT[i];	     
-    Vector n_sp(gpudata::MAXSPECIES);
-    mixture_->computeNumberDensities(state, n_sp);
-    double nsp[gpudata::MAXSPECIES];
-    for (int sp = 0; sp < n_sp.Size(); sp++) {nsp[sp] = n_sp[sp];}
+    state[dim_ + 1] = dataT[i];
+    for (int sp = 0; sp < nSpecies_; sp++) {
+      state[dim_ + 1 + sp + 1] = Yn_[i + sp * sDofInt_];
+    }
+    mixture_->GetConservativesFromPrimitives(state, conservedState);
     
+    std::cout << "state: ";    
+    for (int st = 0; st < nEq; st++) {
+      std::cout << " " << state[st];
+    }
+    std::cout << endl;
+
+    std::cout << "conserved state: ";    
+    for (int st = 0; st < nEq; st++) {
+      std::cout << " " << conservedState[st];
+    }
+    std::cout << endl;    
+    
+    Vector n_sp(gpudata::MAXSPECIES);
+    mixture_->computeNumberDensities(conservedState, n_sp);
+    double nsp[gpudata::MAXSPECIES];
+    for (int sp = 0; sp < n_sp.Size(); sp++) {
+      nsp[sp] = n_sp[sp];
+      // std::cout << sp << "): " << n_sp[sp] << " " << nsp[sp] << endl; 
+    }
+    if (rank0_) { std::cout << "okay 14c..." << endl; }
+    
+    /*
+    double nsp[gpudata::MAXSPECIES];
+    for(int sp = 0; sp < nSpecies_; sp++) {
+      nsp[sp] = dataX[i + sp * sDofInt_];
+    }
+    */
+      
     chemistry_->computeForwardRateCoeffs(Th, Te, kfwd);
+    if (rank0_) { std::cout << "okay 14d..." << endl; }        
     chemistry_->computeEquilibriumConstants(Th, Te, keq);
+    if (rank0_) { std::cout << "okay 14e..." << endl; }
+    progressRate.SetSize(nReactions_); // this is commented in computeProgressRate, no idea why this is the only one in the series
     chemistry_->computeProgressRate(nsp, kfwd, keq, progressRate);
+    if (rank0_) { std::cout << "okay 14f..." << endl; }        
     chemistry_->computeCreationRate(progressRate, creationRate);
-    for (int sp = 0; sp < nSpecies_; sp++) {	
+    if (rank0_) { std::cout << "okay 14g..." << endl; }
+
+    for(int sp = 0; sp <nSpecies_; sp++) {      
       dataProd[i + sp * sDofInt_] = creationRate[sp];
     }
   }  
@@ -1239,21 +1415,26 @@ void ReactingFlow::diffusionForTemperature() {
   SDFT_ = 0.0;
   for (int i = 0; i < nSpecies_; i++) {
     setScalarFromVector(Yn_next_, i, &tmpR0_);    
-    species_Cp_coeff_->constant = Rgas_ + inputCV_(i); // HERE: is Rgas correct here?
+    // species_Cp_coeff_->constant = Rgas_ + inputCV_(i); // HERE: is Rgas correct here?
+    CpY_gf_ = (Rgas_ / gasParams_(i, GasParams::SPECIES_MW)) + inputCV_(i);
     LY_form_->Update();
     LY_form_->Assemble();
     LY_form_->FormSystemMatrix(empty, LY_);
     LY_->Mult(tmpR0_, tmpR0a_);    
     SDFT_.Add(1.0,tmpR0a_);
   }
-  SDFT_ *= (thermo_pressure_ / Rgas_);    
+  Rmix_gf_.GetTrueDofs(tmpR0b_);
+  SDFT_ *= thermo_pressure_;
+  SDFT_ /= tmpR0b_;      
 }
 
 void ReactingFlow::computeExplicitTempConvectionOP(bool extrap) {
   Array<int> empty;
+
   At_form_->Update();
   At_form_->Assemble();
   At_form_->FormSystemMatrix(empty, At_);
+
   if (extrap == true) {
     At_->Mult(Tn_, NTn_);
   } else {
@@ -1271,29 +1452,39 @@ void ReactingFlow::computeExplicitTempConvectionOP(bool extrap) {
 }
 
 void ReactingFlow::computeExplicitSpecConvectionOP(int iSpec, bool extrap) {
-
   Array<int> empty;
+  if (rank0_) { std::cout << "check a..." << endl; }
+  
   At_form_->Update();
   At_form_->Assemble();
   At_form_->FormSystemMatrix(empty, At_);
+  if (rank0_) { std::cout << "check b..." << endl; }      
+  
   if (extrap == true) {
     setScalarFromVector(Yn_, iSpec, &tmpR0_);
   } else {
     setScalarFromVector(Yext_, iSpec, &tmpR0_);
   }
+  if (rank0_) { std::cout << "check c..." << endl; }
+  
   At_->Mult(tmpR0_, tmpR0a_);
+  if (rank0_) { std::cout << "check d..." << endl; }  
 
   // ab predictor
   if (extrap == true) {
     setScalarFromVector(NYnm1_, iSpec, &tmpR0b_);
-    setScalarFromVector(NYnm2_, iSpec, &tmpR0c_);         
+    if (rank0_) { std::cout << "check e..." << endl; }      
+    setScalarFromVector(NYnm2_, iSpec, &tmpR0c_);
+    if (rank0_) { std::cout << "check f..." << endl; }
     tmpR0_.Set(time_coeff_.ab1, tmpR0a_);
     tmpR0_.Add(time_coeff_.ab2, tmpR0b_);
     tmpR0_.Add(time_coeff_.ab3, tmpR0c_);
+    if (rank0_) { std::cout << "check g..." << endl; }      
   } else {
     tmpR0_.Set(1.0, tmpR0a_);
   }
-  setVectorFromScalar(tmpR0a_, iSpec, &NYn_);   
+  setVectorFromScalar(tmpR0a_, iSpec, &NYn_);
+
 }
 
 void ReactingFlow::initializeIO(IODataOrganizer &io) {
@@ -1354,14 +1545,63 @@ void ReactingFlow::extrapolateState() {
   Yext_.Add(time_coeff_.ab3, Ynm2_);  
 }
 
+void ReactingFlow::updateMixture() {
+  
+  double *dataR = Rmix_gf_.HostReadWrite();        
+  double *dataM = Mmix_gf_.HostReadWrite();  
+  Mmix_gf_ = 0.0;
+  if (rank0_) { std::cout << "okay 5..." << endl; }        
+  
+  for (int sp = 0; sp < nSpecies_; sp++) {
+    setScalarFromVector(Yn_, sp, &tmpR0_);
+    if (rank0_) { std::cout << sp << ") okay 5a..." << endl; } 
+    Yn_gf_.SetFromTrueDofs(tmpR0_);
+    if (rank0_) { std::cout << sp << ") okay 5b..." << endl; }     
+    double *dataY = Yn_gf_.HostReadWrite();
+    if (rank0_) { std::cout << sp << ") okay 5c..." << endl; }     
+    for (int i = 0; i < sDof_; i++) {
+      // if (rank0_) { std::cout << "sp: " << sp << " i: " << i << " " << gasParams_(sp, GasParams::SPECIES_MW) << endl; }
+      dataM[i] += dataY[i] / gasParams_(sp, GasParams::SPECIES_MW);
+      // std::cout << "# " << dataY[i] << " " << gasParams_(sp, GasParams::SPECIES_MW) << " " << dataM[i] << endl;      
+    }
+  }
+  if (rank0_) { std::cout << "okay 6..." << endl; }
+  
+  for (int i = 0; i < sDof_; i++) {
+    dataM[i] = 1.0 / dataM[i];
+  }
+  if (rank0_) { std::cout << "okay 7..." << endl; }        
+
+  for (int i = 0; i < sDof_; i++) {
+    dataR[i] = UNIVERSALGASCONSTANT / dataM[i];
+    // std::cout << "$ " << UNIVERSALGASCONSTANT << " " <<  dataM[i] << endl;
+  }
+  if (rank0_) { std::cout << "okay 8..." << endl; }
+
+  for (int sp = 0; sp < nSpecies_; sp++) {
+    setScalarFromVector(Yn_, sp, &tmpR0a_);
+    setScalarFromVector(Xn_, sp, &tmpR0b_);
+    Mmix_gf_.GetTrueDofs(tmpR0c_);
+    double *d_Y = tmpR0a_.HostReadWrite();
+    double *d_X = tmpR0b_.HostReadWrite();
+    double *d_M = tmpR0c_.HostReadWrite();        
+    for (int i = 0; i < sDofInt_; i++) {
+      d_X[i] = d_Y[i] * d_M[i] / gasParams_(sp, GasParams::SPECIES_MW);
+    }
+  }
+  
+}
+
 // update thermodynamic pressure
 void ReactingFlow::updateThermoP() {
+  Rmix_gf_.GetTrueDofs(tmpR0a_);
   if (!domain_is_open_) {
     double allMass, PNM1;
     double myMass = 0.0;
     tmpR0_ = 1.0;
     tmpR0_ /= Tn_;
-    tmpR0_ *= (thermo_pressure_ / Rgas_);
+    tmpR0_ *= thermo_pressure_;
+    tmpR0_ /= tmpR0a_;
     Ms_->Mult(tmpR0_, tmpR0b_);
     myMass = tmpR0b_.Sum();
     MPI_Allreduce(&myMass, &allMass, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
@@ -1384,77 +1624,98 @@ void ReactingFlow::updateDiffusivity() {
   {
     double *dataDiff = diffY_.HostReadWrite();      
     for (int i = 0; i < sDofInt_; i++) {
-      int nEq = dim_ + 2;
+      int nEq = dim_ + 2 + nSpecies_;
       double state[nEq];
+      double conservedState[nEq];      
       double diffSp[nSpecies_];
       state[0] = dataRho[i];
       for (int eq = 0; eq < dim_; eq++) {state[eq+1] = dataU[i + eq*sDofInt_];}
-      state[dim_ + 1] = dataTemp[i];	 
-      transport_->computeMixtureAverageDiffusivity(state, diffSp);
+      state[dim_ + 1] = dataTemp[i];
+      for (int sp = 0; sp < nSpecies_; sp++) {
+	state[dim_ + 1 + sp + 1] = Yn_[i + sp * sDofInt_];
+      }
+      std::cout << " +state: ";
+      for (int n = 0; n < nEq; n++) {
+	std::cout << " " << state[n];
+      }
+      std::cout << endl;      
+      mixture_->GetConservativesFromPrimitives(state, conservedState);
+      if (rank0_) { std::cout << "13) transport..." << endl; }              
+      transport_->computeMixtureAverageDiffusivity(conservedState, diffSp);
       for (int sp = 0; sp < nSpecies_; sp++) {    
         dataDiff[i + sp * sDofInt_] = diffSp[sp];
       }
     }
   }
+  if (rank0_) { std::cout << "okay 13a..." << endl; }  
 
   // viscosity
   { 
     double *dataVisc = visc_.HostReadWrite();    
     for (int i = 0; i < sDofInt_; i++) {
-      int nEq = dim_ + 2;
+      int nEq = dim_ + 2 + nSpecies_;
       double state[nEq];
       double conservedState[nEq];      
       double visc[2];
       state[0] = dataRho[i];
       for (int eq = 0; eq < dim_; eq++) {state[eq+1] = dataU[i + eq*sDofInt_];}
-      state[dim_ + 1] = dataTemp[i];	 
+      state[dim_ + 1] = dataTemp[i];
+      for (int sp = 0; sp < nSpecies_; sp++) {
+	state[dim_ + 1 + sp + 1] = Yn_[i + sp * sDofInt_];
+      }      
       mixture_->GetConservativesFromPrimitives(state, conservedState);
       transport_->GetViscosities(conservedState, state, visc);
       dataVisc[i] = visc[0];
     }   
   }
+  if (rank0_) { std::cout << "okay 13b..." << endl; }    
 
   // thermal conductivity (kappa = alpha*rho*Cp = (nu/Pr)*(rho*Cp))
   { 
     double *dataKappa = kappa_.HostReadWrite();
     for (int i = 0; i < sDofInt_; i++) {
-      int nEq = dim_ + 2;
+      int nEq = dim_ + 2 + nSpecies_;
       double state[nEq];
       double conservedState[nEq];      
       double kappa[2];
       state[0] = dataRho[i];
       for (int eq = 0; eq < dim_; eq++) {state[eq+1] = dataU[i + eq*sDofInt_];}
-      state[dim_ + 1] = dataTemp[i];	 
+      state[dim_ + 1] = dataTemp[i];
+      for (int sp = 0; sp < nSpecies_; sp++) {
+	state[dim_ + 1 + sp + 1] = Yn_[i + sp * sDofInt_];
+      }      
       mixture_->GetConservativesFromPrimitives(state, conservedState);
       transport_->GetThermalConductivities(conservedState, state, kappa);
       dataKappa[i] = kappa[0];
     }
-  }    
+  }
+  if (rank0_) { std::cout << "okay 13c..." << endl; }    
   
 }
 
 void ReactingFlow::updateDensity(double tStep) {
   Array<int> empty;
+  Rmix_gf_.GetTrueDofs(tmpR0a_);
 
   // set rn
   if (constant_density_ != true) {
     if (tStep == 1.0) {
-      rn_ = (thermo_pressure_ / Rgas_);
+      rn_ = thermo_pressure_;
+      rn_ /= tmpR0a_;
       rn_ /= Tn_next_;
     } else if (tStep == 0.5) {
-      // multConstScalarInv((thermo_pressure_ / Rgas_), Tn_next_, &tmpR0a);
-      // multConstScalarInv((thermo_pressure_ / Rgas_), Tn_, &tmpR0b);
-      // rn_.Set(0.5, tmpR0a);
-      // rn_.Add(0.5, tmpR0b);
-      rn_ = (thermo_pressure_ / Rgas_);
+      rn_ = thermo_pressure_;
+      rn_ /= tmpR0a_;
       rn_ /= Tn_next_;
       rn_ *= 0.5;
-
-      tmpR0_ = (thermo_pressure_ / Rgas_);
+      tmpR0_ = thermo_pressure_;
+      tmpR0_ /= tmpR0a_;    
       tmpR0_ /= Tn_;
       rn_.Add(0.5, tmpR0_);
     } else {
-      multConstScalarInv((thermo_pressure_ / Rgas_), Tn_, &rn_);
+     // multConstScalarInv((thermo_pressure_ / Rgas_), Tn_, &rn_);
+      multConstScalarInv(thermo_pressure_, tmpR0a_, &tmpR0b_);
+      multScalarScalarInv(tmpR0b_, Tn_, &rn_);      
     }
   } else {
     rn_ = static_rho_;
@@ -1471,12 +1732,18 @@ void ReactingFlow::updateDensity(double tStep) {
 }
 
 void ReactingFlow::computeSystemMass() {
+  Rmix_gf_.GetTrueDofs(tmpR0_);
   system_mass_ = 0.0;
   double myMass = 0.0;
-  rn_ = (thermo_pressure_ / Rgas_);
+  rn_ = thermo_pressure_;
+  rn_ /= tmpR0_;  
   rn_ /= Tn_;
+  //for (int i = 0; i < sDofInt_; i++) {
+  //  std::cout << "@ " << Tn_[i] << " " << tmpR0_[i] << endl;
+  //}  
   Ms_->Mult(rn_, tmpR0_);
-  myMass = tmpR0_.Sum();
+  myMass = tmpR0_.Sum();  
+  // if (rank0_ == true) std::cout << " Po: " << thermo_pressure_ << " Rgas_: " << Rgas_ << " myMass: " << myMass << endl;  
   MPI_Allreduce(&myMass, &system_mass_, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
   if (rank0_ == true) std::cout << " Closed system mass: " << system_mass_ << " [kg]" << endl;
 }
@@ -1660,8 +1927,9 @@ void ReactingFlow::identifyCollisionType(const Array<ArgonSpcs> &speciesType, Ar
       // If not initialized, will raise an error.
       collisionIndex[spI + spJ * nSpecies_] = NONE_ARGCOLL;
 
-      const double pairType =
-          gasParams_(spI, GasParams::SPECIES_CHARGES) * gasParams_(spJ, GasParams::SPECIES_CHARGES);
+      const double pairType = gasParams_(spI, GasParams::SPECIES_CHARGES) * gasParams_(spJ, GasParams::SPECIES_CHARGES);
+      std::cout << "sp pair: (" << spI << ", " << spJ << ") " << collisionIndex[spI + spJ * nSpecies_] << endl;
+      std::cout << "pair type: (" << gasParams_(spI, GasParams::SPECIES_CHARGES) << ", " << gasParams_(spJ, GasParams::SPECIES_CHARGES) << ")" << endl;
       if (pairType > 0.0) {  // Repulsive screened Coulomb potential
         collisionIndex[spI + spJ * nSpecies_] = CLMB_REP;
       } else if (pairType < 0.0) {  // Attractive screened Coulomb potential
@@ -1680,7 +1948,7 @@ void ReactingFlow::identifyCollisionType(const Array<ArgonSpcs> &speciesType, Ar
           // std::string name2 = speciesNames_[(*mixtureToInputMap_)[spJ]];
           std::string name1 = speciesNames_[spI];
           std::string name2 = speciesNames_[spJ];
-          grvy_printf(GRVY_ERROR, "%s-%s is not supported in ArgonMixtureTransport! \n", name1.c_str(), name2.c_str());
+          grvy_printf(GRVY_ERROR, "1. %s - %s is not supported in ArgonMixtureTransport! \n", name1.c_str(), name2.c_str());
           exit(-1);
         }
       }
@@ -1695,7 +1963,7 @@ void ReactingFlow::identifyCollisionType(const Array<ArgonSpcs> &speciesType, Ar
         // std::string name2 = speciesNames_[(*mixtureToInputMap_)[spJ]];
         std::string name1 = speciesNames_[spI];
         std::string name2 = speciesNames_[spJ];
-        grvy_printf(GRVY_ERROR, "%s-%s is not initialized in ArgonMixtureTransport! \n", name1.c_str(), name2.c_str());
+        grvy_printf(GRVY_ERROR, "2. %s - %s is not initialized in ArgonMixtureTransport! \n", name1.c_str(), name2.c_str());
         exit(-1);
       }
     }
