@@ -542,7 +542,6 @@ MFEM_HOST_DEVICE PerfectMixture::PerfectMixture(PerfectMixtureInput inputs, int 
 
   SetNumActiveSpecies();
   SetNumEquations();
-
   SetSpeciesStateIndices();
 
   // We assume the background species is neutral.

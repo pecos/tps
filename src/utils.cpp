@@ -565,6 +565,13 @@ void multScalarScalar(Vector A, Vector B, Vector *C) {
   MFEM_FORALL(i, A.Size(), { dataC[i] = dataA[i] * dataB[i]; });
 }
 
+void multScalarScalarInv(Vector A, Vector B, Vector *C) {
+  double *dataA = A.HostReadWrite();
+  double *dataB = B.HostReadWrite();
+  double *dataC = C->HostReadWrite();
+  MFEM_FORALL(i, A.Size(), { dataC[i] = dataA[i] / dataB[i]; });
+}
+
 void multScalarVector(Vector A, Vector B, Vector *C, int dim) {
   int Ndof = A.Size();
   double *dataA = A.HostReadWrite();

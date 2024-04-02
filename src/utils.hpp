@@ -149,6 +149,7 @@ void multConstScalarIP(double A, Vector *C);
 void multConstScalarInvIP(double A, Vector *C);
 void multConstVectorIP(double A, Vector *C);
 void multScalarScalar(Vector A, Vector B, Vector *C);
+void multScalarScalarInv(Vector A, Vector B, Vector *C);
 void multScalarVector(Vector A, Vector B, Vector *C, int dim = 3);
 void multScalarInvVector(Vector A, Vector B, Vector *C, int dim = 3);
 void multScalarInvVectorIP(Vector A, Vector *C, int dim = 3);

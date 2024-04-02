@@ -79,6 +79,7 @@ class ReactingFlow : public ThermoChemModelBase {
   // number of species and dofs
   int nSpecies_, nReactions_, nAtoms_;  
   int sDof_, sDofInt_;
+  int yDof_, yDofInt_;  
 
   WorkingFluid workFluid_;
   GasModel gasModel_;
@@ -98,7 +99,8 @@ class ReactingFlow : public ThermoChemModelBase {
   std::vector<std::string> speciesNames_;
   std::map<std::string, int> atomMap_;
   DenseMatrix speciesComposition_;
-  DenseMatrix gasParams_;  
+  DenseMatrix gasParams_;
+  //double gasParams_[gpudata::MAXSPECIES * GasParams::NUM_GASPARAMS];  
   double const_plasma_conductivity_;
   
   // Flags
@@ -168,7 +170,9 @@ class ReactingFlow : public ThermoChemModelBase {
   ParGridFunction Yn_gf_, Yn_next_gf_, Yext_gf_, resY_gf_;
   ParGridFunction prodY_gf_;  
   ParGridFunction YnFull_gf_;
-  // ParGridFunction CpY_gf_;  
+  ParGridFunction CpY_gf_;
+  ParGridFunction Rmix_gf_;
+  ParGridFunction Mmix_gf_;  
 
   ParGridFunction visc_gf_;
   ParGridFunction kappa_gf_;
@@ -196,7 +200,8 @@ class ReactingFlow : public ThermoChemModelBase {
   SumCoefficient *species_diff_sum_coeff_ = nullptr;
   ProductCoefficient *species_diff_total_coeff_ = nullptr;
 
-  ConstantCoefficient *species_Cp_coeff_ = nullptr;    
+  // ConstantCoefficient *species_Cp_coeff_ = nullptr;
+  GridFunctionCoefficient *species_Cp_coeff_ = nullptr;      
   ProductCoefficient *species_diff_Cp_coeff_ = nullptr;    
 
   // operators and solvers
@@ -240,12 +245,15 @@ class ReactingFlow : public ThermoChemModelBase {
   Vector Yn_, Yn_next_, Ynm1_, Ynm2_;
   Vector NYn_, NYnm1_, NYnm2_;
   Vector Yext_;
+  Vector Xn_;  
   Vector resY_;
   Vector prodY_;
   Vector hw_;
   // Vector CpY_;
   Vector SDFT_;  
   Vector inputCV_;
+  Vector initialMassFraction_;
+  Vector atomMW_;   
 
   Vector Qt_;
   Vector rn_;
@@ -279,6 +287,7 @@ class ReactingFlow : public ThermoChemModelBase {
   void speciesOneStep();  
   void speciesStep(int iSpec);
   void temperatureStep();
+  void updateMixture();  
   void updateThermoP();
   void extrapolateState();
   void updateDensity(double tStep);
