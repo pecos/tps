@@ -691,7 +691,12 @@ void ComputeCurl3D(const ParGridFunction &u, ParGridFunction &cu) {
   zones_per_vdof.SetSize(fes->GetVSize());
   zones_per_vdof = 0;
 
-  cu = 0.0;
+  // Force data copy to host (b/c host data used below)
+  u.HostRead();
+
+  // Initialize curl
+  cu = 0.0;            // On device (if present)
+  cu.HostReadWrite();  // Copy to host and invalidate device data (b/c host written to below)
 
   // Local interpolation.
   int elndofs;
@@ -906,7 +911,12 @@ void ComputeCurl2D(const ParGridFunction &u, ParGridFunction &cu, bool assume_sc
   zones_per_vdof.SetSize(fes->GetVSize());
   zones_per_vdof = 0;
 
-  cu = 0.0;
+  // Force data copy to host (b/c host data used below)
+  u.HostRead();
+
+  // Initialize curl
+  cu = 0.0;            // On device (if present)
+  cu.HostReadWrite();  // Copy to host and invalidate device data (b/c host written to below)
 
   // Local interpolation.
   int elndofs;
@@ -996,7 +1006,12 @@ void ComputeCurlAxi(const ParGridFunction &u, ParGridFunction &cu, bool assume_s
   zones_per_vdof.SetSize(cfes->GetVSize());
   zones_per_vdof = 0;
 
-  cu = 0.0;
+  // Force data copy to host (b/c host data used below)
+  u.HostRead();
+
+  // Initialize curl
+  cu = 0.0;            // On device (if present)
+  cu.HostReadWrite();  // Copy to host and invalidate device data (b/c host written to below)
 
   // Local interpolation.
   int elndofs;
