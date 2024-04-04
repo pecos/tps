@@ -199,31 +199,23 @@ void Chemistry::computeProgressRate(const mfem::Vector &ns, const mfem::Vector &
 
 MFEM_HOST_DEVICE void Chemistry::computeProgressRate(const double *ns, const double *kfwd, const double *keq,
                                                      double *progressRate) {
-
-  std::cout << " In Chemistry::computeProgressRate... " << numReactions_ << endl;
   // progressRate.SetSize(numReactions_);
   for (int r = 0; r < numReactions_; r++) {
     
     // forward reaction rate
     double rate = 1.;
 
-    std::cout << r << "): " << endl;    
     for (int sp = 0; sp < numSpecies_; sp++) {
       rate *= pow(ns[sp], reactantStoich_[sp + r * numSpecies_]);
-      std::cout << " ns: " << ns[sp] << " Stoich: " << reactantStoich_[sp + r * numSpecies_] << " rate: " << rate << endl;
     }
     
     if (detailedBalance_[r]) {
       double rateBWD = 1.;
       for (int sp = 0; sp < numSpecies_; sp++) rateBWD *= pow(ns[sp], productStoich_[sp + r * numSpecies_]);
       rate -= rateBWD / keq[r];
-      std::cout << " rateD: " << rate << endl;
     }
-    std::cout << " kfwd: " << kfwd[r] << endl;    
-    std::cout << " progress rate: : " << progressRate[r] << endl;    
     
     progressRate[r] = kfwd[r] * rate;
-    std::cout << r << ") kfwd " << kfwd[r] << " progRate " << progressRate[r] << endl;    
   }
   
 }

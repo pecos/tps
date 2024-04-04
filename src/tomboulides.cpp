@@ -46,6 +46,8 @@ using namespace mfem;
 
 /// forward declarations
 void vel_exact_tgv2d(const Vector &x, double t, Vector &u);
+void vel_zero2d(const Vector &x, double t, Vector &u);
+void vel_zero3d(const Vector &x, double t, Vector &u);
 
 /**
  * @brief Helper function to remove mean from a vector
@@ -367,6 +369,17 @@ void Tomboulides::initializeSelf() {
       u_excoeff.SetTime(0.0);
       u_curr_gf_->ProjectCoefficient(u_excoeff);
     }
+  } else {
+    std::cout << "Setting zero IC..." << std::endl;
+    if (dim_ == 2) {
+      VectorFunctionCoefficient u_excoeff(2, vel_zero2d);
+      u_excoeff.SetTime(0.0);
+      u_curr_gf_->ProjectCoefficient(u_excoeff);          
+    } else {
+      VectorFunctionCoefficient u_excoeff(3, vel_zero3d);
+      u_excoeff.SetTime(0.0);
+      u_curr_gf_->ProjectCoefficient(u_excoeff);          
+    }
   }
 }
 
@@ -682,6 +695,14 @@ void Tomboulides::step() {
   // Ensure u_vec_ consistent with u_curr_gf_
   u_curr_gf_->GetTrueDofs(u_vec_);
 
+  /*
+  std::cout << " ___vel dump___ " << endl;
+  for (int i = 0; i < (sfes_->GetTrueVSize()); i++) {
+    std::cout << u_vec_[i + 0*(sfes_->GetTrueVSize())] << " " << u_vec_[i + 1*(sfes_->GetTrueVSize())] << " "<< u_vec_[i + 2*(sfes_->GetTrueVSize())] << endl;
+  }
+  std::cout << " ______________ " << endl;
+  */
+  
   // TODO(trevilo): Have to implement some BC infrastructure
   Array<int> empty;
 
@@ -982,6 +1003,22 @@ void Tomboulides::step() {
   u_vec_ = u_next_vec_;
   u_curr_gf_->SetFromTrueDofs(u_vec_);
 
+  // testing
+  /*
+  {
+    const double *dataU = u_curr_gf_->HostRead();
+    int sDof_= sfes_->GetVSize();  
+    for (int i = 0; i < sDof_; i++) {
+      std::cout << "Vel in Tomb: ";
+      for (int eq = 0; eq < dim_; eq++) {
+        std::cout << " " << dataU[i+eq*sDof_];
+      }
+      std::cout << endl;    
+    }
+  }
+  */
+  
+
   // update gradients for turbulence model
   // TODO(swh): move when full viscous terms are added
   setScalarFromVector(u_next_vec_, 0, &tmpR0_);
@@ -1070,4 +1107,15 @@ void vel_exact_tgv2d(const Vector &x, double t, Vector &u) {
 
   u(0) = F * std::sin(x[0]) * std::cos(x[1]);
   u(1) = -F * std::cos(x[0]) * std::sin(x[1]);
+}
+
+void vel_zero2d(const Vector &x, double t, Vector &u) {
+  u(0) = 0.0;
+  u(1) = 0.0;
+}
+
+void vel_zero3d(const Vector &x, double t, Vector &u) {
+  u(0) = 0.0;
+  u(1) = 0.0;
+  u(2) = 0.0;
 }

@@ -68,7 +68,8 @@ class ArgonMinimalTransport : public MolecularTransport {
   const double eps0_ = VACUUMPERMITTIVITY;
   const double qe_ = ELECTRONCHARGE;
   const double R_ = UNIVERSALGASCONSTANT;
-  const double debyeFactor_ = kB_ * eps0_ / qe_ / qe_;
+  //const double debyeFactor_ = kB_ * eps0_ / qe_ / qe_;
+  const double debyeFactor_ = BOLTZMANNCONSTANT * VACUUMPERMITTIVITY / ELECTRONCHARGE / ELECTRONCHARGE;
   // const double PI_ = 4.0 * atan(1.0);
   const double PI_ = PI;
   const double qeOverkB_ = qe_ / kB_;

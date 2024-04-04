@@ -544,24 +544,13 @@ MFEM_HOST_DEVICE PerfectMixture::PerfectMixture(PerfectMixtureInput inputs, int 
   SetNumEquations();
   SetSpeciesStateIndices();
 
-  std::cout << "(" << (iBackground) + GasParams::SPECIES_CHARGES * numSpecies << ")" << "*iBackground: " << iBackground << " slot: " << GasParams::SPECIES_CHARGES * numSpecies << " GPSC:" << GasParams::SPECIES_CHARGES << " nS: " << numSpecies << " val: " << gasParams[(iBackground) + GasParams::SPECIES_CHARGES * numSpecies] << endl;
-
-  std::cout << "(" << (iElectron) + GasParams::FORMATION_ENERGY * numSpecies << ")" << "*iElectron: " << iElectron << " slot: " << GasParams::FORMATION_ENERGY * numSpecies << " GPFE:" << GasParams::FORMATION_ENERGY << " nS: " << numSpecies << " val: " << gasParams[(iElectron) + GasParams::FORMATION_ENERGY * numSpecies] <<endl;
-
-  std::cout << "(" << (iBackground) + GasParams::FORMATION_ENERGY * numSpecies << ")" <<  "*iBackground: " << iBackground << " slot: " << GasParams::FORMATION_ENERGY * numSpecies << " GPFE:" << GasParams::FORMATION_ENERGY << " nS: " << numSpecies << " val: " << gasParams[(iBackground) + GasParams::FORMATION_ENERGY * numSpecies] <<endl;      
-  
   // We assume the background species is neutral.
-  std::cout << "starting asserts..." << endl;  
   assert(gasParams[(iBackground) + GasParams::SPECIES_CHARGES * numSpecies] == 0.0);
-  std::cout << "assert 1 okay..." << endl;
   // TODO(kevin): release electron species enforcing.
   assert(inputs.isElectronIncluded);
-  std::cout << "assert 2 okay..." << endl;  
   // We assume the background species and electron have zero formation energy.
   assert(gasParams[(iElectron) + GasParams::FORMATION_ENERGY * numSpecies] == 0.0);
-  std::cout << "assert 3 okay..." << endl;  
   assert(gasParams[(iBackground) + GasParams::FORMATION_ENERGY * numSpecies] == 0.0);
-  std::cout << "assert 4 okay..." << endl;  
 
   for (int sp = 0; sp < gpudata::MAXSPECIES; sp++) {
     molarCV_[sp] = -1.0;
@@ -892,20 +881,17 @@ void PerfectMixture::computeNumberDensities(const Vector &conservedState, Vector
 }
 
 MFEM_HOST_DEVICE void PerfectMixture::computeNumberDensities(const double *conservedState, double *n_sp) const {
-  std::cout << " In PerfectMixture::computeNumberDensities... " << numActiveSpecies << endl;
   for (int sp = 0; sp < numSpecies; sp++) n_sp[sp] = 0.0;
 
   double n_e = 0.0;
   for (int sp = 0; sp < numActiveSpecies; sp++) {
     n_sp[sp] = conservedState[nvel_ + 2 + sp] / GetGasParams(sp, GasParams::SPECIES_MW);
-    std::cout << sp << "): " << conservedState[nvel_ + 2 + sp] << " " << GetGasParams(sp, GasParams::SPECIES_MW) << endl;
   }
   if (ambipolar) {
     n_e = computeAmbipolarElectronNumberDensity(&n_sp[0]);
     n_sp[iElectron] = n_e;  // Electron species is assumed be to the second to last species.
   }
   double rhoB = computeBackgroundMassDensity(conservedState[0], &n_sp[0], n_e, true);
-  std::cout << " rhoB: " << rhoB << endl;  
 
   n_sp[iBackground] = rhoB / GetGasParams(iBackground, GasParams::SPECIES_MW);
 }

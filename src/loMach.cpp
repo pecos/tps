@@ -354,7 +354,7 @@ void LoMachSolver::initialize() {
   } else if (loMach_opts_.thermo_solver == "calorically-perfect") {
     thermo_ = new CaloricallyPerfectThermoChem(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_);
   } else if (loMach_opts_.thermo_solver == "reacting-flow") {
-    std::cout << "Attempting to construct ReactingFlow..." << endl;
+    std::cout << "and done!" << endl;        
     thermo_ = new ReactingFlow(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_);
     std::cout << "and done!" << endl;    
   } else {
@@ -394,28 +394,24 @@ void LoMachSolver::initialize() {
   // read-in external data if requested in bc setting
   extData_->initializeSelf();
   extData_->setup();
+  thermo_->initializeFromExtData(&extData_->toThermoChem_interface_);  
   flow_->initializeFromExtData(&extData_->toFlow_interface_);
-  thermo_->initializeFromExtData(&extData_->toThermoChem_interface_);
-  std::cout << "check 1..." << endl;      
 
   // Initialize model-owned data
   sponge_->initializeSelf();
   turbModel_->initializeSelf();
+  thermo_->initializeSelf();  
   flow_->initializeSelf();
-  thermo_->initializeSelf();
-  std::cout << "check 2..." << endl;        
 
   // Initialize restart read/write capability
+  thermo_->initializeIO(ioData);  
   flow_->initializeIO(ioData);
-  thermo_->initializeIO(ioData);
-  std::cout << "check 3..." << endl;        
 
   const bool restart_serial =
       (loMach_opts_.io_opts_.restart_serial_read_ || loMach_opts_.io_opts_.restart_serial_write_);
   ioData.initializeSerial(rank0_, restart_serial, serial_mesh_, locToGlobElem, &partitioning_);
   MPI_Barrier(groupsMPI->getTPSCommWorld());
   if (verbose) grvy_printf(ginfo, "ioData.init thingy...\n");
-  std::cout << "check 4..." << endl;        
 
   // If restarting, read restart files
   if (loMach_opts_.io_opts_.enable_restart_) {
@@ -425,13 +421,12 @@ void LoMachSolver::initialize() {
   // Exchange interface information
   turbModel_->initializeFromThermoChem(&thermo_->toTurbModel_interface_);
   turbModel_->initializeFromFlow(&flow_->toTurbModel_interface_);
-  flow_->initializeFromTurbModel(&turbModel_->toFlow_interface_);
   thermo_->initializeFromTurbModel(&turbModel_->toThermoChem_interface_);
-  flow_->initializeFromThermoChem(&thermo_->toFlow_interface_);
   thermo_->initializeFromFlow(&flow_->toThermoChem_interface_);
+  thermo_->initializeFromSponge(&sponge_->toThermoChem_interface_);  
+  flow_->initializeFromTurbModel(&turbModel_->toFlow_interface_);
+  flow_->initializeFromThermoChem(&thermo_->toFlow_interface_);
   flow_->initializeFromSponge(&sponge_->toFlow_interface_);
-  thermo_->initializeFromSponge(&sponge_->toThermoChem_interface_);
-  std::cout << "check 5..." << endl;        
 
   // static sponge
   sponge_->setup();
@@ -439,9 +434,8 @@ void LoMachSolver::initialize() {
   // Finish initializing operators
   turbModel_->setup();
   turbModel_->initializeOperators();
+  thermo_->initializeOperators();  
   flow_->initializeOperators();
-  thermo_->initializeOperators();
-  std::cout << "check 6..." << endl;        
   // if(rank0_) {std::cout << "check: ops set..." << endl;}
 
   // TODO(trevilo): Enable averaging.  See note in loMach.hpp
@@ -452,12 +446,11 @@ void LoMachSolver::initialize() {
   pvdc_->SetHighOrderOutput(true);
   pvdc_->SetLevelsOfDetail(order);
 
-  turbModel_->initializeViz(*pvdc_);
-  flow_->initializeViz(*pvdc_);
-  thermo_->initializeViz(*pvdc_);
   sponge_->initializeViz(*pvdc_);
   extData_->initializeViz(*pvdc_);
-  std::cout << "check 7..." << endl;   
+  turbModel_->initializeViz(*pvdc_);  
+  thermo_->initializeViz(*pvdc_);  
+  flow_->initializeViz(*pvdc_);  
 }
 
 void LoMachSolver::UpdateTimestepHistory(double dt) {
