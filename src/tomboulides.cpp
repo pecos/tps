@@ -1229,7 +1229,7 @@ void Tomboulides::step() {
   // Multiply pp_div_vec_ by nu
   // TODO(trevilo): This is ugly.  Find a better way.
   thermo_interface_->density->GetTrueDofs(rho_vec_);
-  thermo_interface_->viscosity->GetTrueDofs(mu_vec_);
+  mu_total_gf_->GetTrueDofs(mu_vec_);
   if (dim_ == 2) {
     auto d_pp_div_vec = pp_div_vec_.ReadWrite();
     auto d_rho = rho_vec_.Read();
