@@ -292,7 +292,7 @@ enum GasParams {
   identifySpeciesType(speciesType);  
   identifyCollisionType(speciesType, argonInput_.collisionIndex);  
 
-  mixture_ = new PerfectMixture(mixtureInput_, dim_, dim_, const_plasma_conductivity_);  
+  mixture_ = new PerfectMixture(mixtureInput_, dim_, dim_, const_plasma_conductivity_);
   // transport_ = new ArgonMinimalTransport(mixture_, argonInput_);
   transport_ = new ArgonMixtureTransport(mixture_, argonInput_);  
   
@@ -472,6 +472,8 @@ ReactingFlow::~ReactingFlow() {
 void ReactingFlow::initializeSelf() {
   if (rank0_) grvy_printf(ginfo, "Initializing ReactingFlow solver.\n");
 
+  nActiveSpecies_ = mixture_->GetNumActiveSpecies();  
+  
   //-----------------------------------------------------
   // 1) Prepare the required finite element objects
   //-----------------------------------------------------
@@ -558,7 +560,7 @@ void ReactingFlow::initializeSelf() {
   hw_ = 0.0;
   
   // only YnFull for plotting
-  //??? YnFull_gf_.SetSpace(yfes_);  
+  YnFull_gf_.SetSpace(yfes_);  
 
   // rest can just be sfes
   Yn_gf_.SetSpace(sfes_);  
@@ -1082,12 +1084,12 @@ void ReactingFlow::step() {
   updateDiffusivity();
   speciesProduction();
 
-  // advance species, zero slot is from calculated sum of others
-  for (int iSpecies = 1; iSpecies < nSpecies_; iSpecies++) {
+  // advance species, last slot is from calculated sum of others
+  for (int iSpecies = 0; iSpecies < nSpecies_-1; iSpecies++) {
     speciesStep(iSpecies);
   }
-  speciesOneStep();
-  //??? YnFull_gf_.SetFromTrueDofs(Yn_next_);
+  speciesLastStep();
+  YnFull_gf_.SetFromTrueDofs(Yn_next_);
 
   // ho_i*w_i
   heatOfFormation();
@@ -1189,17 +1191,17 @@ void ReactingFlow::temperatureStep() {
 
 }
 
-void ReactingFlow::speciesOneStep() {
+void ReactingFlow::speciesLastStep() {
   tmpR0_ = 0.0;
   double *dataYn = Yn_next_.HostReadWrite();
-  double *dataY0 = tmpR0_.HostReadWrite();    
-  for (int n = 1; n < nSpecies_; n++) {
+  double *dataYsum = tmpR0_.HostReadWrite();
+  for (int n = 0; n < nSpecies_-1; n++) {
     for (int i = 0; i < sDofInt_; i++) {
-      dataY0[i] += dataYn[i + n * sDofInt_];
+      dataYsum[i] += dataYn[i + n * sDofInt_];
     }
   }
   for (int i = 0; i < sDofInt_; i++) {
-    dataYn[i + 0 * sDofInt_] = 1.0 - dataY0[i];
+    dataYn[i + (nSpecies_-1) * sDofInt_] = 1.0 - dataYsum[i];
   }  
 }
 
@@ -1293,7 +1295,7 @@ void ReactingFlow::speciesProduction() {
     double Te;
     Te = Th; // hack for one-temp
     
-    int nEq = dim_ + 1 + nSpecies_;
+    int nEq = dim_ + 2 + nActiveSpecies_;
     Vector state(nEq);
     Vector conservedState(nEq);    
     //double state[nEq];
@@ -1418,6 +1420,10 @@ void ReactingFlow::initializeIO(IODataOrganizer &io) {
   io.registerIOFamily("Temperature", "/temperature", &Tn_gf_, false);
   io.registerIOVar("/temperature", "temperature", 0);
 
+  // not sure if this will automatically take the full size(all Yn) via the sapce
+  io.registerIOFamily("Species", "/species", &YnFull_gf_, false);
+  io.registerIOVar("/species", "speciesAll", 0);
+  
   // TODO(swh): must be a better way to do this...
   //???
   /*
@@ -1439,7 +1445,7 @@ void ReactingFlow::initializeViz(ParaViewDataCollection &pvdc) {
   pvdc.RegisterField("Qt", &Qt_gf_);
 
   // this method is broken in that it assumes 3 entries
-  //??? pvdc.RegisterField("species", &YnFull_gf_);
+  pvdc.RegisterField("species", &YnFull_gf_);
   //pvdc.RegisterField("species-1", (&YnFull_gf_ + 0*sDof_));
   //pvdc.RegisterField("species-2", (&YnFull_gf_ + 1*sDof_));
   //pvdc.RegisterField("species-3", (&YnFull_gf_ + 2*sDof_));
@@ -1546,13 +1552,14 @@ void ReactingFlow::updateDiffusivity() {
   (flow_interface_->velocity)->GetTrueDofs(tmpR0_);
   const double *dataTemp = Tn_.HostRead();
   const double *dataRho = rn_.HostRead();
-  const double *dataU = tmpR0_.HostRead();  
+  const double *dataU = tmpR0_.HostRead();
+  double diffY_min = 1.0e-12; // make readable
   
   // species diffusivities
   {
     double *dataDiff = diffY_.HostReadWrite();      
     for (int i = 0; i < sDofInt_; i++) {
-      int nEq = dim_ + 1 + nSpecies_;
+      int nEq = dim_ + 2 + nActiveSpecies_; // last Yn not included, i guess...
       double state[nEq];
       double conservedState[nEq];      
       double diffSp[nSpecies_];
@@ -1564,8 +1571,10 @@ void ReactingFlow::updateDiffusivity() {
       }      
       mixture_->GetConservativesFromPrimitives(state, conservedState);      
       transport_->computeMixtureAverageDiffusivity(conservedState, diffSp);
-      for (int sp = 0; sp < nSpecies_; sp++) {    
+      for (int sp = 0; sp < nSpecies_; sp++) {
+	diffSp[sp] = std::max(diffSp[sp],diffY_min);
         dataDiff[i + sp * sDofInt_] = diffSp[sp];
+	std::cout << sp << "): " << diffSp[sp] << endl;
       }
     }
   }
@@ -1574,7 +1583,7 @@ void ReactingFlow::updateDiffusivity() {
   { 
     double *dataVisc = visc_.HostReadWrite();    
     for (int i = 0; i < sDofInt_; i++) {
-      int nEq = dim_ + 1 + nSpecies_;
+      int nEq = dim_ + 2 + nActiveSpecies_;      
       double state[nEq];
       double conservedState[nEq];      
       double visc[2];
@@ -1595,7 +1604,7 @@ void ReactingFlow::updateDiffusivity() {
   { 
     double *dataKappa = kappa_.HostReadWrite();
     for (int i = 0; i < sDofInt_; i++) {
-      int nEq = dim_ + 1 + nSpecies_;
+      int nEq = dim_ + 2 + nActiveSpecies_;            
       double state[nEq];
       double conservedState[nEq];      
       double kappa[2];
