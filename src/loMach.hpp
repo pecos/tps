@@ -228,8 +228,21 @@ class LoMachSolver : public TPS::PlasmaSolver {
   // Functions necessary for coupled EM+plasma simulations
   // These are overriden from TPS::Solver or TPS::PlasmaSolver
   mfem::ParMesh *getMesh() const override { return pmesh_; }
-  mfem::FiniteElementCollection *getFEC() const override { return sfec_; }
-  mfem::ParFiniteElementSpace *getFESpace() const override { return sfes_; }
+  const mfem::FiniteElementCollection *getFEC() const override {
+    if (thermo_->getJouleHeatingGF() != nullptr) {
+      return thermo_->getJouleHeatingGF()->ParFESpace()->FEColl();
+    } else {
+      return nullptr;
+    }
+  }
+
+  mfem::ParFiniteElementSpace *getFESpace() const override {
+    if (thermo_->getJouleHeatingGF() != nullptr) {
+      return thermo_->getJouleHeatingGF()->ParFESpace();
+    } else {
+      return nullptr;
+    }
+  }
 
   mfem::ParGridFunction *getPlasmaConductivityGF() override { return thermo_->getPlasmaConductivityGF(); }
 

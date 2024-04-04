@@ -143,7 +143,7 @@ void Tps2Boltzmann::init(TPS::PlasmaSolver *flowSolver) {
   fields_[Index::All] = all;
 
   // Native spaces
-  mfem::FiniteElementCollection *fec_native(flowSolver->getFEC());
+  const mfem::FiniteElementCollection *fec_native(flowSolver->getFEC());
   species_densities_native_fes_ =
       new mfem::ParFiniteElementSpace(pmesh, fec_native, nspecies_, mfem::Ordering::byNODES);
   efield_native_fes_ = new mfem::ParFiniteElementSpace(pmesh, fec_native, nEfieldComps_, mfem::Ordering::byNODES);

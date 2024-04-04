@@ -412,7 +412,7 @@ class M2ulPhyS : public TPS::PlasmaSolver {
   void visualization() override;
   ParMesh *getMesh() const override { return mesh; }
   ParFiniteElementSpace *getFESpace() const override { return vfes; }
-  FiniteElementCollection *getFEC() const override { return fec; }
+  const FiniteElementCollection *getFEC() const override { return fec; }
 
   ParGridFunction *getPlasmaConductivityGF() override { return plasma_conductivity_; }
   ParGridFunction *getJouleHeatingGF() override { return joule_heating_; }
@@ -437,7 +437,6 @@ class M2ulPhyS : public TPS::PlasmaSolver {
   const ParGridFunction *getDistanceFcn() { return distance_; }
 
   void updatePrimitives();
-
 
   static int Check_NaN_GPU(ParGridFunction *U, int lengthU, Array<int> &loc_print);
   void Check_Undershoot();

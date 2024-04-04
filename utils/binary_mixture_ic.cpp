@@ -41,7 +41,7 @@ int main (int argc, char *argv[])
        << mesh_1->GetNodes()->OwnFEC()->Name() << endl;
 
   // 2) Set up source field
-  FiniteElementCollection *src_fec = NULL;
+  const FiniteElementCollection *src_fec = NULL;
   ParFiniteElementSpace *src_fes = NULL;
   ParGridFunction *src_state = NULL;
 

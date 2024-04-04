@@ -54,7 +54,7 @@ class CycleAvgJouleCoupling : public TPS::Solver {
 
   // Only needed for Boltzmann interface
   int efield_ncomp_;
-  mfem::FiniteElementCollection *efieldFEC_;
+  const mfem::FiniteElementCollection *efieldFEC_;
   mfem::ParFiniteElementSpace *efieldFES_;
   mfem::ParFiniteElementSpace *efieldFES1_;
   mfem::ParGridFunction *efield_;

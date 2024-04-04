@@ -46,7 +46,7 @@ int main (int argc, char *argv[])
   srcField->updatePrimitives();
 
   // 2) Set up source field
-  FiniteElementCollection *src_fec = srcField->getFEC();
+  const FiniteElementCollection *src_fec = srcField->getFEC();
   ParFiniteElementSpace *src_fes = srcField->getFESpace();
   ParFiniteElementSpace *scalar_fes = srcField->GetScalarFES();
   ParFiniteElementSpace *vector_fes = srcField->GetVectorFES();

@@ -85,7 +85,7 @@ int main (int argc, char *argv[])
        << mesh_2->GetNodes()->OwnFEC()->Name() << endl;
 
   // 2) Set up source field
-  FiniteElementCollection *src_fec = NULL;
+  const FiniteElementCollection *src_fec = NULL;
   ParGridFunction *func_source = NULL;
 
   src_fec = srcField.getFEC();
@@ -101,7 +101,7 @@ int main (int argc, char *argv[])
   std::cout << "Source FE collection: " << src_fec->Name() << std::endl;
 
   // Setup the FiniteElementSpace and GridFunction on the target mesh.
-  FiniteElementCollection* tar_fec = tarField.getFEC();
+  const FiniteElementCollection* tar_fec = tarField.getFEC();
   ParFiniteElementSpace* tar_fes = tarField.getFESpace();
   ParGridFunction* func_target = tarField.GetSolutionGF();
   std::cout << "Target FE collection: " << tar_fec->Name() << std::endl;

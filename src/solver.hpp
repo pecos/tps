@@ -32,9 +32,8 @@
 #ifndef SOLVER_HPP_
 #define SOLVER_HPP_
 
-#include "utils.hpp"
-
 #include "tps_mfem_wrap.hpp"
+#include "utils.hpp"
 
 using namespace std;
 
@@ -81,19 +80,19 @@ class Solver {
   }
 
   /// Initialize the interface
-  virtual void initInterface(Tps2Boltzmann& interface) {
+  virtual void initInterface(Tps2Boltzmann &interface) {
     cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
     exit(1);
   }
 
   /// Push solver variables to interface
-  virtual void push(Tps2Boltzmann& interface) {
+  virtual void push(Tps2Boltzmann &interface) {
     cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
     exit(1);
   }
 
   /// Fetch solver variables from interface
-  virtual void fetch(Tps2Boltzmann& interface) {
+  virtual void fetch(Tps2Boltzmann &interface) {
     cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
     exit(1);
   }
@@ -105,7 +104,7 @@ class Solver {
     return nullptr;
   }
 
-  virtual mfem::FiniteElementCollection *getFEC() const {
+  virtual const mfem::FiniteElementCollection *getFEC() const {
     cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
     exit(1);
     return nullptr;

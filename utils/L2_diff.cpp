@@ -50,7 +50,7 @@ int main (int argc, char *argv[])
   srcField2->updatePrimitives();
 
   // 2) Set up source field
-  FiniteElementCollection *src_fec = NULL;
+  const FiniteElementCollection *src_fec = NULL;
   ParFiniteElementSpace *src_fes = NULL;
   ParGridFunction *src_state1 = NULL;
   ParGridFunction *src_state2 = NULL;
