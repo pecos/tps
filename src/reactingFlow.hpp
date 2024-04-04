@@ -77,7 +77,7 @@ class ReactingFlow : public ThermoChemModelBase {
   double time_;
 
   // number of species and dofs
-  int nSpecies_, nReactions_, nAtoms_;  
+  int nSpecies_, nActiveSpecies_, nReactions_, nAtoms_;  
   int sDof_, sDofInt_;
   int yDof_, yDofInt_;  
 

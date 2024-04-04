@@ -292,7 +292,7 @@ enum GasParams {
   identifySpeciesType(speciesType);  
   identifyCollisionType(speciesType, argonInput_.collisionIndex);  
 
-  mixture_ = new PerfectMixture(mixtureInput_, dim_, dim_, const_plasma_conductivity_);  
+  mixture_ = new PerfectMixture(mixtureInput_, dim_, dim_, const_plasma_conductivity_);
   // transport_ = new ArgonMinimalTransport(mixture_, argonInput_);
   transport_ = new ArgonMixtureTransport(mixture_, argonInput_);  
   
@@ -472,6 +472,8 @@ ReactingFlow::~ReactingFlow() {
 void ReactingFlow::initializeSelf() {
   if (rank0_) grvy_printf(ginfo, "Initializing ReactingFlow solver.\n");
 
+  nActiveSpecies_ = mixture_->GetNumActiveSpecies();  
+  
   //-----------------------------------------------------
   // 1) Prepare the required finite element objects
   //-----------------------------------------------------
@@ -558,7 +560,7 @@ void ReactingFlow::initializeSelf() {
   hw_ = 0.0;
   
   // only YnFull for plotting
-  //??? YnFull_gf_.SetSpace(yfes_);  
+  YnFull_gf_.SetSpace(yfes_);  
 
   // rest can just be sfes
   Yn_gf_.SetSpace(sfes_);  
@@ -1087,7 +1089,7 @@ void ReactingFlow::step() {
     speciesStep(iSpecies);
   }
   speciesLastStep();
-  //??? YnFull_gf_.SetFromTrueDofs(Yn_next_);
+  YnFull_gf_.SetFromTrueDofs(Yn_next_);
 
   // ho_i*w_i
   heatOfFormation();
@@ -1293,7 +1295,7 @@ void ReactingFlow::speciesProduction() {
     double Te;
     Te = Th; // hack for one-temp
     
-    int nEq = dim_ + 1 + nSpecies_;
+    int nEq = dim_ + 2 + nActiveSpecies_;
     Vector state(nEq);
     Vector conservedState(nEq);    
     //double state[nEq];
@@ -1418,6 +1420,10 @@ void ReactingFlow::initializeIO(IODataOrganizer &io) {
   io.registerIOFamily("Temperature", "/temperature", &Tn_gf_, false);
   io.registerIOVar("/temperature", "temperature", 0);
 
+  // not sure if this will automatically take the full size(all Yn) via the sapce
+  io.registerIOFamily("Species", "/species", &YnFull_gf_, false);
+  io.registerIOVar("/species", "speciesAll", 0);
+  
   // TODO(swh): must be a better way to do this...
   //???
   /*
@@ -1439,7 +1445,7 @@ void ReactingFlow::initializeViz(ParaViewDataCollection &pvdc) {
   pvdc.RegisterField("Qt", &Qt_gf_);
 
   // this method is broken in that it assumes 3 entries
-  //??? pvdc.RegisterField("species", &YnFull_gf_);
+  pvdc.RegisterField("species", &YnFull_gf_);
   //pvdc.RegisterField("species-1", (&YnFull_gf_ + 0*sDof_));
   //pvdc.RegisterField("species-2", (&YnFull_gf_ + 1*sDof_));
   //pvdc.RegisterField("species-3", (&YnFull_gf_ + 2*sDof_));
@@ -1553,7 +1559,7 @@ void ReactingFlow::updateDiffusivity() {
   {
     double *dataDiff = diffY_.HostReadWrite();      
     for (int i = 0; i < sDofInt_; i++) {
-      int nEq = dim_ + 1 + nSpecies_; // last Yn not included, i guess...
+      int nEq = dim_ + 2 + nActiveSpecies_; // last Yn not included, i guess...
       double state[nEq];
       double conservedState[nEq];      
       double diffSp[nSpecies_];
@@ -1577,7 +1583,7 @@ void ReactingFlow::updateDiffusivity() {
   { 
     double *dataVisc = visc_.HostReadWrite();    
     for (int i = 0; i < sDofInt_; i++) {
-      int nEq = dim_ + 1 + nSpecies_;
+      int nEq = dim_ + 2 + nActiveSpecies_;      
       double state[nEq];
       double conservedState[nEq];      
       double visc[2];
@@ -1598,7 +1604,7 @@ void ReactingFlow::updateDiffusivity() {
   { 
     double *dataKappa = kappa_.HostReadWrite();
     for (int i = 0; i < sDofInt_; i++) {
-      int nEq = dim_ + 1 + nSpecies_;
+      int nEq = dim_ + 2 + nActiveSpecies_;            
       double state[nEq];
       double conservedState[nEq];      
       double kappa[2];
