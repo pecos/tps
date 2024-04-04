@@ -284,7 +284,7 @@ class ReactingFlow : public ThermoChemModelBase {
   void initializeViz(ParaViewDataCollection &pvdc) final;
 
   // Functions added here
-  void speciesOneStep();  
+  void speciesLastStep();  
   void speciesStep(int iSpec);
   void temperatureStep();
   void updateMixture();  

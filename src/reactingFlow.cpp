@@ -1082,11 +1082,11 @@ void ReactingFlow::step() {
   updateDiffusivity();
   speciesProduction();
 
-  // advance species, zero slot is from calculated sum of others
-  for (int iSpecies = 1; iSpecies < nSpecies_; iSpecies++) {
+  // advance species, last slot is from calculated sum of others
+  for (int iSpecies = 0; iSpecies < nSpecies_-1; iSpecies++) {
     speciesStep(iSpecies);
   }
-  speciesOneStep();
+  speciesLastStep();
   //??? YnFull_gf_.SetFromTrueDofs(Yn_next_);
 
   // ho_i*w_i
@@ -1189,17 +1189,17 @@ void ReactingFlow::temperatureStep() {
 
 }
 
-void ReactingFlow::speciesOneStep() {
+void ReactingFlow::speciesLastStep() {
   tmpR0_ = 0.0;
   double *dataYn = Yn_next_.HostReadWrite();
-  double *dataY0 = tmpR0_.HostReadWrite();    
-  for (int n = 1; n < nSpecies_; n++) {
+  double *dataYsum = tmpR0_.HostReadWrite();
+  for (int n = 0; n < nSpecies_-1; n++) {
     for (int i = 0; i < sDofInt_; i++) {
-      dataY0[i] += dataYn[i + n * sDofInt_];
+      dataYsum[i] += dataYn[i + n * sDofInt_];
     }
   }
   for (int i = 0; i < sDofInt_; i++) {
-    dataYn[i + 0 * sDofInt_] = 1.0 - dataY0[i];
+    dataYn[i + (nSpecies_-1) * sDofInt_] = 1.0 - dataYsum[i];
   }  
 }
 
@@ -1546,13 +1546,14 @@ void ReactingFlow::updateDiffusivity() {
   (flow_interface_->velocity)->GetTrueDofs(tmpR0_);
   const double *dataTemp = Tn_.HostRead();
   const double *dataRho = rn_.HostRead();
-  const double *dataU = tmpR0_.HostRead();  
+  const double *dataU = tmpR0_.HostRead();
+  double diffY_min = 1.0e-12; // make readable
   
   // species diffusivities
   {
     double *dataDiff = diffY_.HostReadWrite();      
     for (int i = 0; i < sDofInt_; i++) {
-      int nEq = dim_ + 1 + nSpecies_;
+      int nEq = dim_ + 1 + nSpecies_; // last Yn not included, i guess...
       double state[nEq];
       double conservedState[nEq];      
       double diffSp[nSpecies_];
@@ -1564,8 +1565,10 @@ void ReactingFlow::updateDiffusivity() {
       }      
       mixture_->GetConservativesFromPrimitives(state, conservedState);      
       transport_->computeMixtureAverageDiffusivity(conservedState, diffSp);
-      for (int sp = 0; sp < nSpecies_; sp++) {    
+      for (int sp = 0; sp < nSpecies_; sp++) {
+	diffSp[sp] = std::max(diffSp[sp],diffY_min);
         dataDiff[i + sp * sDofInt_] = diffSp[sp];
+	std::cout << sp << "): " << diffSp[sp] << endl;
       }
     }
   }
