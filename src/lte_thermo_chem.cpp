@@ -52,20 +52,20 @@ static double radius(const Vector &pos) { return pos[0]; }
 static FunctionCoefficient radius_coeff(radius);
 
 static double sigmaTorchStartUp(const Vector &pos) {
-  const double x = pos[0]; // radial location
-  const double y = pos[1]; // axial location
+  const double x = pos[0];  // radial location
+  const double y = pos[1];  // axial location
 
   const double r0 = 0.005;
   const double y0 = 0.135;
   const double ysig = 0.015;
 
-  const double sigma = 2000. * std::exp(-0.5 * (x / r0) * (x / r0)) * std::exp(-0.5 * ((y - y0) / ysig) * ((y - y0) / ysig));
+  const double sigma =
+      2000. * std::exp(-0.5 * (x / r0) * (x / r0)) * std::exp(-0.5 * ((y - y0) / ysig) * ((y - y0) / ysig));
 
   return sigma;
 }
 
 static FunctionCoefficient sigma_start_up(sigmaTorchStartUp);
-
 
 LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &time_coeff,
                              TPS::Tps *tps)
@@ -720,7 +720,6 @@ void LteThermoChem::initializeOperators() {
   jh_form_->AddDomainIntegrator(jh_dlfi);
   jh_form_->AddDomainIntegrator(rad_dlfi);
 
-
   // Qt .....................................
 
   // Convection (for rho): Arho(i,j) = \int_{\Omega} \phi_i u \cdot \nabla \phi_j
@@ -805,7 +804,6 @@ void LteThermoChem::initializeOperators() {
   }
   LQ_bdry_->AddBoundaryIntegrator(lq_bdry_lfi, temp_ess_attr_);
   if (rank0_) std::cout << "CaloricallyPerfectThermoChem LQ operator set" << endl;
-
 
   // copy IC to other temp containers
   Tn_gf_.GetTrueDofs(Tn_);
@@ -1196,7 +1194,6 @@ void LteThermoChem::computeQt() {
   // Qt_gf_.GetTrueDofs(Qt_);
   // // Qt_ = 0.0;
   // // Qt_gf_.SetFromTrueDofs(Qt_);
-
 
   tmpR0_ = 0.0;
   LQ_bdry_->Update();

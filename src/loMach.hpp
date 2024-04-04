@@ -188,7 +188,7 @@ class LoMachSolver : public TPS::PlasmaSolver {
 
   // I/O helpers
   ParaViewDataCollection *pvdc_ = nullptr;  // visualization
-  IODataOrganizer ioData;         // restart
+  IODataOrganizer ioData;                   // restart
 
   /// Update the EXTk/BDF time integration coefficient.
   void SetTimeIntegrationCoefficients(int step);
@@ -231,17 +231,11 @@ class LoMachSolver : public TPS::PlasmaSolver {
   mfem::FiniteElementCollection *getFEC() const override { return sfec_; }
   mfem::ParFiniteElementSpace *getFESpace() const override { return sfes_; }
 
-  mfem::ParGridFunction *getPlasmaConductivityGF() override {
-    return thermo_->getPlasmaConductivityGF();
-  }
+  mfem::ParGridFunction *getPlasmaConductivityGF() override { return thermo_->getPlasmaConductivityGF(); }
 
-  void evaluatePlasmaConductivityGF() override {
-    thermo_->evaluatePlasmaConductivityGF();
-  }
+  void evaluatePlasmaConductivityGF() override { thermo_->evaluatePlasmaConductivityGF(); }
 
-  virtual mfem::ParGridFunction *getJouleHeatingGF() override {
-    return thermo_->getJouleHeatingGF();
-  }
+  mfem::ParGridFunction *getJouleHeatingGF() override { return thermo_->getJouleHeatingGF(); }
 };
 
 #endif  // LOMACH_HPP_

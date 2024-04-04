@@ -86,7 +86,7 @@ class LteThermoChem final : public ThermoChemModelBase {
   // Flags
   bool rank0_;                    /**< true if this is rank 0 */
   bool partial_assembly_ = false; /**< Enable/disable partial assembly of forms. */
-  bool numerical_integ_ = false;   /**< Enable/disable numerical integration rules of forms. */
+  bool numerical_integ_ = false;  /**< Enable/disable numerical integration rules of forms. */
   bool domain_is_open_ = false;   /**< true if domain is open */
   bool axisym_ = false;
 
@@ -179,7 +179,6 @@ class LteThermoChem final : public ThermoChemModelBase {
   ProductCoefficient *rad_jh_coeff_ = nullptr;
   ProductCoefficient *rad_radiation_sink_coeff_ = nullptr;
   ScalarVectorProductCoefficient *rad_kap_gradT_coeff_ = nullptr;
-
 
   // operators and solvers
   ParBilinearForm *At_form_ = nullptr;

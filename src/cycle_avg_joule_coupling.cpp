@@ -31,9 +31,9 @@
 // -----------------------------------------------------------------------------------el-
 #include "cycle_avg_joule_coupling.hpp"
 
-#include "loMach.hpp"
 #include "M2ulPhyS.hpp"
 #include "em_options.hpp"
+#include "loMach.hpp"
 #include "quasimagnetostatic.hpp"
 
 CycleAvgJouleCoupling::CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tps)
@@ -114,7 +114,7 @@ CycleAvgJouleCoupling::CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tp
   }
   flow_solver_ = new M2ulPhyS(inputFileName, tps);
 
-  tps->getRequiredInput("cycle-avg-joule-coupled/solve-em-every-n", solve_em_every_n_); //  solve_em_every_n_ = flow_solver_->getMaximumIterations();
+  tps->getRequiredInput("cycle-avg-joule-coupled/solve-em-every-n", solve_em_every_n_);
   max_iters_ = max_out * solve_em_every_n_;
 #ifdef HAVE_GSLIB
   interp_flow_to_em_ = new FindPointsGSLIB(tps->getTPSCommWorld());
