@@ -1139,7 +1139,8 @@ void ReactingFlow::temperatureStep() {
   MsRho_->AddMult(tmpR0_, resT_, -1.0);
 
   // dPo/dt
-  tmpR0_ = (dtP_ / Cp_);
+  tmpR0_ = dtP_ / 1000.6; // FIX Cp for temp eq
+  //tmpR0_ = (dtP_ / Cp_); <- what is cp?
   Ms_->AddMult(tmpR0_, resT_);
 
   // heat of formation
@@ -1512,6 +1513,7 @@ void ReactingFlow::updateMixture() {
     dataR[i] = UNIVERSALGASCONSTANT / dataM[i];
   }
 
+  // can use micture calls directly for this
   for (int sp = 0; sp < nSpecies_; sp++) {
     setScalarFromVector(Yn_, sp, &tmpR0a_);
     setScalarFromVector(Xn_, sp, &tmpR0b_);
@@ -1574,7 +1576,7 @@ void ReactingFlow::updateDiffusivity() {
       for (int sp = 0; sp < nSpecies_; sp++) {
 	diffSp[sp] = std::max(diffSp[sp],diffY_min);
         dataDiff[i + sp * sDofInt_] = diffSp[sp];
-	std::cout << sp << "): " << diffSp[sp] << endl;
+	// std::cout << sp << "): " << diffSp[sp] << endl;
       }
     }
   }
