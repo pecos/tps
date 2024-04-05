@@ -449,8 +449,12 @@ ReactingFlow::~ReactingFlow() {
   delete thermal_diff_sum_coeff_;
   delete thermal_diff_total_coeff_;
   delete rho_over_dt_coeff_;
-  delete rho_coeff_;
+  delete rhoCp_over_dt_coeff_;  
+  // delete rho_coeff_;
+  delete cpMix_coeff_;
+  delete rhoCp_coeff_;
 
+  delete Ay_form_;  
   delete HyInv_;
   delete HyInvPC_;
   delete Hy_form_;  
@@ -609,11 +613,16 @@ void ReactingFlow::initializeSelf() {
 
   R0PM0_gf_.SetSpace(sfes_);
 
-  rhoDt.SetSpace(sfes_);
+  rhoDt_.SetSpace(sfes_);
 
   // this is only needed to form the op-coeff
   CpY_gf_.SetSpace(sfes_);
-  CpY_gf_ = 1.0;
+  CpY_gf_ = 1000.6;
+  CpY_.SetSize(yDofInt_);
+  CpY_ = 1000.6;
+
+  CpMix_gf_.SetSpace(sfes_);
+  CpMix_gf_ = 1000.6;  
   
   SDFT_.SetSize(sDofInt_);
 
@@ -794,19 +803,25 @@ void ReactingFlow::initializeOperators() {
   const IntegrationRule &ir_nli = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 4 * order_);
   const IntegrationRule &ir_di = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 3 * order_ - 1);
   if (rank0_) std::cout << "Integration rules set" << endl;
-
+  
   // coefficients for operators
-  rho_coeff_ = new GridFunctionCoefficient(&rn_gf_);
+  cpMix_coeff_ = new GridFunctionCoefficient(&CpMix_gf_);      
+  // rho_coeff_ = new GridFunctionCoefficient(&rn_gf_);
+  rhon_next_coeff_ = new GridFunctionCoefficient(&rn_gf_);  
+  species_Cp_coeff_ = new GridFunctionCoefficient(&CpY_gf_);
+  mut_coeff_ = new GridFunctionCoefficient(turbModel_interface_->eddy_viscosity);
+  mult_coeff_ = new GridFunctionCoefficient(sponge_interface_->diff_multiplier);
+  un_next_coeff_ = new VectorGridFunctionCoefficient(flow_interface_->velocity);  
 
-  rhoDt = rn_gf_;
-  rhoDt /= dt_;
-  rho_over_dt_coeff_ = new GridFunctionCoefficient(&rhoDt);
+  // for unsteady terms
+  rhoDt_ = rn_gf_;
+  rhoDt_ /= dt_;
+  rho_over_dt_coeff_ = new GridFunctionCoefficient(&rhoDt_);
+  rhoCp_over_dt_coeff_ = new ProductCoefficient(*cpMix_coeff_, *rho_over_dt_coeff_);  
 
   // thermal_diff_coeff.constant = thermal_diff;
   thermal_diff_coeff_ = new GridFunctionCoefficient(&kappa_gf_);
-  mut_coeff_ = new GridFunctionCoefficient(turbModel_interface_->eddy_viscosity);
   thermal_diff_sum_coeff_ = new SumCoefficient(*mut_coeff_, *thermal_diff_coeff_, invPr_, 1.0);
-  mult_coeff_ = new GridFunctionCoefficient(sponge_interface_->diff_multiplier);
   thermal_diff_total_coeff_ = new ProductCoefficient(*mult_coeff_, *thermal_diff_sum_coeff_);
   gradT_coeff_ = new GradientGridFunctionCoefficient(&Tn_next_gf_);
   kap_gradT_coeff_ = new ScalarVectorProductCoefficient(*thermal_diff_total_coeff_, *gradT_coeff_);
@@ -815,20 +830,16 @@ void ReactingFlow::initializeOperators() {
   species_diff_coeff_ = new GridFunctionCoefficient(&diffY_gf_);
   species_diff_sum_coeff_ = new SumCoefficient(*mut_coeff_, *species_diff_coeff_, invSc_, 1.0); // is this correct?
   species_diff_total_coeff_ = new ProductCoefficient(*mult_coeff_, *species_diff_sum_coeff_);
-
-  // for explicit source term in energy
-  species_Cp_coeff_ = new GridFunctionCoefficient(&CpY_gf_);
-  // species_Cp_coeff_->constant = 1.0;
-  species_diff_Cp_coeff_ = new ProductCoefficient(*species_Cp_coeff_, *species_diff_total_coeff_);
+  species_diff_Cp_coeff_ = new ProductCoefficient(*species_Cp_coeff_, *species_diff_total_coeff_);    
   
   // Convection: Atemperature(i,j) = \int_{\Omega} \phi_i \rho u \cdot \nabla \phi_j
-  un_next_coeff_ = new VectorGridFunctionCoefficient(flow_interface_->velocity);
-  rhon_next_coeff_ = new GridFunctionCoefficient(&rn_gf_);
-  rhou_coeff_ = new ScalarVectorProductCoefficient(*rhon_next_coeff_, *un_next_coeff_);
+  rhoCp_coeff_ = new ProductCoefficient(*cpMix_coeff_, *rhon_next_coeff_);  
+  rhouCp_coeff_ = new ScalarVectorProductCoefficient(*rhoCp_coeff_, *un_next_coeff_);
+  rhou_coeff_ = new ScalarVectorProductCoefficient(*rhon_next_coeff_, *un_next_coeff_);  
   if (rank0_) std::cout << "Operator coefficients set" << endl;  
 
   At_form_ = new ParBilinearForm(sfes_);
-  auto *at_blfi = new ConvectionIntegrator(*rhou_coeff_);
+  auto *at_blfi = new ConvectionIntegrator(*rhouCp_coeff_);
   if (numerical_integ_) {
     at_blfi->SetIntRule(&ir_nli);
   }
@@ -838,6 +849,18 @@ void ReactingFlow::initializeOperators() {
   }
   At_form_->Assemble();
   At_form_->FormSystemMatrix(empty, At_);
+
+  Ay_form_ = new ParBilinearForm(sfes_);
+  auto *ay_blfi = new ConvectionIntegrator(*rhou_coeff_);
+  if (numerical_integ_) {
+    ay_blfi->SetIntRule(&ir_nli);
+  }
+  Ay_form_->AddDomainIntegrator(ay_blfi);
+  if (partial_assembly_) {
+    Ay_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+  }
+  Ay_form_->Assemble();
+  Ay_form_->FormSystemMatrix(empty, Ay_);  
   if (rank0_) std::cout << "ReactingFlow At operator set" << endl;
 
   // mass matrix
@@ -855,7 +878,7 @@ void ReactingFlow::initializeOperators() {
 
   // mass matrix with rho
   MsRho_form_ = new ParBilinearForm(sfes_);
-  auto *msrho_blfi = new MassIntegrator(*rho_coeff_);
+  auto *msrho_blfi = new MassIntegrator(*rhon_next_coeff_);
   if (numerical_integ_) {
     msrho_blfi->SetIntRule(&ir_i);
     // msrho_blfi->SetIntRule(&ir_di);
@@ -870,7 +893,7 @@ void ReactingFlow::initializeOperators() {
 
   // temperature Helmholtz
   Ht_form_ = new ParBilinearForm(sfes_);
-  auto *hmt_blfi = new MassIntegrator(*rho_over_dt_coeff_);
+  auto *hmt_blfi = new MassIntegrator(*rhoCp_over_dt_coeff_);
   auto *hdt_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
 
   if (numerical_integ_) {
@@ -1075,7 +1098,7 @@ void ReactingFlow::step() {
     temp_dbc.coeff->SetTime(time_ + dt_);
   }
 
-  // Prepare for residual calc
+  // Prepare for residual calc  
   updateMixture();
   extrapolateState();
   updateBC(0);  // NB: can't ramp right now
@@ -1128,7 +1151,7 @@ void ReactingFlow::temperatureStep() {
 
   // convection
   computeExplicitTempConvectionOP(true);  // ->tmpR0_
-  tmpR0_ = 0.0; // testing...  
+  // tmpR0_ = 0.0; // testing...  
   resT_.Set(-1.0, tmpR0_);
 
   // for unsteady term, compute and add known part of BDF unsteady term
@@ -1139,7 +1162,8 @@ void ReactingFlow::temperatureStep() {
   MsRho_->AddMult(tmpR0_, resT_, -1.0);
 
   // dPo/dt
-  tmpR0_ = dtP_ / 1000.6; // FIX Cp for temp eq
+  tmpR0_ = dtP_; // with rho*Cp on LHS, no Cp on this term
+  //tmpR0_ = dtP_ / 1000.6; // FIX Cp for temp eq
   //tmpR0_ = (dtP_ / Cp_); <- what is cp?
   Ms_->AddMult(tmpR0_, resT_);
 
@@ -1152,9 +1176,10 @@ void ReactingFlow::temperatureStep() {
   // Add natural boundary terms here later
   // NB: adiabatic natural BC is handled, but don't have ability to impose non-zero heat flux yet
 
-  // Update Helmholtz operator to account for changing dt, rho, and kappa
-  rhoDt = rn_gf_;
-  rhoDt *= (time_coeff_.bd0 / dt_);
+  // Update Helmholtz operator to account for changing dt, rho, Cp, and kappa
+  // NOTE:  rhoDt is not used directly but is used in rhoCp_over_dt_coeff_
+  rhoDt_ = rn_gf_;
+  rhoDt_ *= (time_coeff_.bd0 / dt_);
 
   Ht_form_->Update();
   Ht_form_->Assemble();
@@ -1237,8 +1262,8 @@ void ReactingFlow::speciesStep(int iSpec) {
   // NB: adiabatic natural BC is handled, but don't have ability to impose non-zero heat flux yet
 
   // Update Helmholtz operator to account for changing dt, rho, and kappa
-  rhoDt = rn_gf_;
-  rhoDt *= (time_coeff_.bd0 / dt_);
+  rhoDt_ = rn_gf_;
+  rhoDt_ *= (time_coeff_.bd0 / dt_);
 
   Hy_form_->Update();
   Hy_form_->Assemble();
@@ -1354,16 +1379,19 @@ void ReactingFlow::diffusionForTemperature() {
   for (int i = 0; i < nSpecies_; i++) {
     setScalarFromVector(Yn_next_, i, &tmpR0_);    
     // species_Cp_coeff_->constant = Rgas_ + inputCV_(i); // HERE: is Rgas correct here?
-    CpY_gf_ = (Rgas_ / gasParams_(i, GasParams::SPECIES_MW)) + inputCV_(i);
+    CpY_gf_ = (Rgas_ / gasParams_(i, GasParams::SPECIES_MW)) + inputCV_(i); // is input CV usage correct here? would mean a full gf for cp/cv not necessary
     LY_form_->Update();
     LY_form_->Assemble();
     LY_form_->FormSystemMatrix(empty, LY_);
     LY_->Mult(tmpR0_, tmpR0a_);    
     SDFT_.Add(1.0,tmpR0a_);
+    CpY_gf_.GetTrueDofs(tmpR0c_);
+    setVectorFromScalar(tmpR0c_,i,&CpY_);
   }
   Rmix_gf_.GetTrueDofs(tmpR0b_);
   SDFT_ *= thermo_pressure_;
-  SDFT_ /= tmpR0b_;      
+  SDFT_ /= tmpR0b_;
+  // CpY_gf_.GetTrueDofs(CpY_);
 }
 
 void ReactingFlow::computeExplicitTempConvectionOP(bool extrap) {
@@ -1392,16 +1420,16 @@ void ReactingFlow::computeExplicitTempConvectionOP(bool extrap) {
 void ReactingFlow::computeExplicitSpecConvectionOP(int iSpec, bool extrap) {
   Array<int> empty;
   
-  At_form_->Update();
-  At_form_->Assemble();
-  At_form_->FormSystemMatrix(empty, At_);
+  Ay_form_->Update();
+  Ay_form_->Assemble();
+  Ay_form_->FormSystemMatrix(empty, Ay_);
   
   if (extrap == true) {
     setScalarFromVector(Yn_, iSpec, &tmpR0_);
   } else {
     setScalarFromVector(Yext_, iSpec, &tmpR0_);
   }  
-  At_->Mult(tmpR0_, tmpR0a_);
+  Ay_->Mult(tmpR0_, tmpR0a_);
 
   // ab predictor
   if (extrap == true) {
@@ -1493,7 +1521,7 @@ void ReactingFlow::extrapolateState() {
 void ReactingFlow::updateMixture() {
   
   double *dataR = Rmix_gf_.HostReadWrite();        
-  double *dataM = Mmix_gf_.HostReadWrite();  
+  double *dataM = Mmix_gf_.HostReadWrite();
   Mmix_gf_ = 0.0;
   
   for (int sp = 0; sp < nSpecies_; sp++) {
@@ -1524,7 +1552,24 @@ void ReactingFlow::updateMixture() {
     for (int i = 0; i < sDofInt_; i++) {
       d_X[i] = d_Y[i] * d_M[i] / gasParams_(sp, GasParams::SPECIES_MW);
     }
+    setVectorFromScalar(tmpR0b_, sp, &Xn_);
   }
+
+  // mixture Cp
+  CpY_gf_.GetTrueDofs(CpY_); // dont need both a gf and Vector for CpY...
+  tmpR0c_ = 0.0;  
+  for (int sp = 0; sp < nSpecies_; sp++) {
+    setScalarFromVector(Yn_, sp, &tmpR0a_);
+    setScalarFromVector(CpY_, sp, &tmpR0b_);
+    double *d_Yn = tmpR0a_.HostReadWrite();
+    double *d_CYn = tmpR0b_.HostReadWrite();
+    double *d_CMix = tmpR0c_.HostReadWrite();        
+    for (int i = 0; i < sDofInt_; i++) {
+      d_CMix[i] += d_Yn[i] * d_CYn[i];
+      //d_CMix[i] = 1000.6; // testing...
+    }    
+  }
+  CpMix_gf_.SetFromTrueDofs(tmpR0c_);      
   
 }
 
@@ -1555,7 +1600,7 @@ void ReactingFlow::updateDiffusivity() {
   const double *dataTemp = Tn_.HostRead();
   const double *dataRho = rn_.HostRead();
   const double *dataU = tmpR0_.HostRead();
-  double diffY_min = 1.0e-12; // make readable
+  double diffY_min = 1.0e-8; // make readable
   
   // species diffusivities
   {
