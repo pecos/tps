@@ -211,7 +211,8 @@ void LoMachSolver::initialize() {
 
   const bool restart_serial =
       (loMach_opts_.io_opts_.restart_serial_read_ || loMach_opts_.io_opts_.restart_serial_write_);
-  ioData.initializeSerial(rank0_, restart_serial, serial_mesh_, locToGlobElem, &partitioning_);
+  ioData.initializeSerial(rank0_, restart_serial, serial_mesh_, meshData_->getLocalToGlobalElementMap(),
+                          &partitioning_);
   // MPI_Barrier(groupsMPI->getTPSCommWorld());
   if (verbose) grvy_printf(ginfo, "ioData.init thingy...\n");
 

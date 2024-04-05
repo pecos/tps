@@ -69,6 +69,9 @@ class MeshBase {
   Array<int> partitioning_;
   const int defaultPartMethod = 1;
 
+  // mapping from local to global element index
+  int *local_to_global_element_ = nullptr;
+
   // min/max element size
   double hmin, hmax;
 
@@ -101,5 +104,7 @@ class MeshBase {
   virtual double getMinGridScale() { return hmin; }
   virtual Array<int> getPartition() { return partitioning_; }
   // virtual int getDim() final { return dim_; }
+
+  int *getLocalToGlobalElementMap() const { return local_to_global_element_; }
 };
 #endif  // MESH_BASE_HPP_

@@ -132,9 +132,6 @@ class LoMachSolver : public TPS::Solver {
   int dim_;
   int nvel_;
 
-  // mapping from local to global element index
-  int *locToGlobElem = nullptr;
-
   // total number of mesh elements (serial)
   int nelemGlobal_;
 

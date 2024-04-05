@@ -61,6 +61,7 @@ MeshBase::~MeshBase() {
   delete distance_;
   delete fes_;
   delete fec_;
+  delete[] local_to_global_element_;
   delete pmesh_;
   delete serial_mesh_;
   delete groupsMPI;
@@ -210,6 +211,19 @@ void MeshBase::initializeMesh() {
   // Partition the mesh
   pmesh_ = new ParMesh(groupsMPI->getTPSCommWorld(), *serial_mesh_, partitioning_);
   if (rank0_) grvy_printf(ginfo, "Mesh partitioned...\n");
+
+  // Build local->global element numbering map
+  if (nprocs_ > 1) {
+    assert(partitioning_.Size() == nelemGlobal_);
+    local_to_global_element_ = new int[pmesh_->GetNE()];
+    int lelem = 0;
+    for (int gelem = 0; gelem < nelemGlobal_; gelem++) {
+      if (rank_ == partitioning_[gelem]) {
+        local_to_global_element_[lelem] = gelem;
+        lelem += 1;
+      }
+    }
+  }
 
   // Determine the minimum element size.
   double hmin, hmax;
