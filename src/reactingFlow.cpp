@@ -40,9 +40,9 @@
 
 #include "loMach.hpp"
 #include "loMach_options.hpp"
-#include "logger.hpp"
-#include "tps.hpp"
-#include "utils.hpp"
+//#include "logger.hpp"
+//#include "tps.hpp"
+//#include "utils.hpp"
 
 using namespace mfem;
 using namespace mfem::common;
@@ -112,7 +112,8 @@ enum GasParams {
   
   gasParams_.SetSize(nSpecies_, GasParams::NUM_GASPARAMS);
   gasParams_ = 0.0;
-  inputCV_.SetSize(nSpecies_);
+  speciesCv_.SetSize(nSpecies_);
+  speciesCp_.SetSize(nSpecies_);  
   initialMassFraction_.SetSize(nSpecies_);  
 
   for (int i = 0; i < nSpecies_*GasParams::NUM_GASPARAMS; i++) {
@@ -128,8 +129,8 @@ enum GasParams {
 
     tpsP_->getRequiredInput((basepath + "/formation_energy").c_str(), formEnergy);
     tpsP_->getInput((basepath + "/level_degeneracy").c_str(), levelDegeneracy, 1.0);
-    tpsP_->getRequiredInput((basepath + "/perfect_mixture/constant_molar_cv").c_str(), inputCV_[i - 1]);
-
+    tpsP_->getRequiredInput((basepath + "/perfect_mixture/constant_molar_cv").c_str(), speciesCv_[i - 1]);
+    
     gasParams_((i - 1), GasParams::FORMATION_ENERGY) = formEnergy;
     gasParams_((i - 1), GasParams::SPECIES_DEGENERACY) = levelDegeneracy;
 
@@ -219,7 +220,10 @@ enum GasParams {
     std::string basepath("species/species" + std::to_string(i));
 
     tpsP_->getRequiredInput((basepath + "/name").c_str(), speciesName);
+
+    // valgrind is mad at this line...
     tpsP_->getRequiredPairs((basepath + "/composition").c_str(), composition);
+    
     for (size_t c = 0; c < composition.size(); c++) {
       if (atomMap_.count(composition[c].first)) {
         int atomIdx = atomMap_[composition[c].first];
@@ -264,9 +268,14 @@ enum GasParams {
     }
   }  
   gasParams_.SetCol(GasParams::SPECIES_MW, speciesMass);
-
+  
   for (int sp = 0; sp < nSpecies_; sp++) {  
     mixtureInput_.gasParams[sp + nSpecies_*GasParams::SPECIES_MW] = speciesMass[sp];
+  }
+
+  for (int sp = 0; sp < nSpecies_; sp++) {  
+    // is input CV usage correct here? would mean a full gf for cp/cv not necessary
+    speciesCp_[sp] = (Rgas_ / gasParams_(sp, GasParams::SPECIES_MW)) + speciesCv_[sp];
   }  
   
   if (speciesMapping.count("Ar")) {
@@ -619,13 +628,13 @@ void ReactingFlow::initializeSelf() {
 
   R0PM0_gf_.SetSpace(sfes_);
 
-  rhoDt_.SetSpace(sfes_);
+  rhoDt_gf_.SetSpace(sfes_);
 
   // this is only needed to form the op-coeff
   CpY_gf_.SetSpace(sfes_);
   CpY_gf_ = 1000.6;
-  CpY_.SetSize(yDofInt_);
-  CpY_ = 1000.6;
+  // CpY_.SetSize(yDofInt_);
+  // CpY_ = 1000.6;
 
   CpMix_gf_.SetSpace(sfes_);
   CpMix_gf_ = 1000.6;  
@@ -668,6 +677,9 @@ void ReactingFlow::initializeSelf() {
     Yn_gf_.GetTrueDofs(tmpR0_);
     setVectorFromScalar(tmpR0_, sp, &Yn_);
   }
+  Ynm1_ = Yn_;
+  Ynm2_ = Yn_;  
+  Yn_next_gf_ = Yn_gf_;
   
   ConstantCoefficient t_ic_coef;
   t_ic_coef.constant = T_ic_;
@@ -820,9 +832,9 @@ void ReactingFlow::initializeOperators() {
   un_next_coeff_ = new VectorGridFunctionCoefficient(flow_interface_->velocity);  
 
   // for unsteady terms
-  rhoDt_ = rn_gf_;
-  rhoDt_ /= dt_;
-  rho_over_dt_coeff_ = new GridFunctionCoefficient(&rhoDt_);
+  rhoDt_gf_ = rn_gf_;
+  rhoDt_gf_ /= dt_;
+  rho_over_dt_coeff_ = new GridFunctionCoefficient(&rhoDt_gf_);
   rhoCp_over_dt_coeff_ = new ProductCoefficient(*cpMix_coeff_, *rho_over_dt_coeff_);  
 
   // thermal_diff_coeff.constant = thermal_diff;
@@ -846,6 +858,7 @@ void ReactingFlow::initializeOperators() {
 
   At_form_ = new ParBilinearForm(sfes_);
   auto *at_blfi = new ConvectionIntegrator(*rhouCp_coeff_);
+  // auto *at_blfi = new ConvectionIntegrator(*rhou_coeff_);
   if (numerical_integ_) {
     at_blfi->SetIntRule(&ir_nli);
   }
@@ -901,6 +914,7 @@ void ReactingFlow::initializeOperators() {
   // temperature Helmholtz
   Ht_form_ = new ParBilinearForm(sfes_);
   auto *hmt_blfi = new MassIntegrator(*rhoCp_over_dt_coeff_);
+  // auto *hmt_blfi = new MassIntegrator(*rho_over_dt_coeff_);
   auto *hdt_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
 
   if (numerical_integ_) {
@@ -1094,6 +1108,12 @@ void ReactingFlow::UpdateTimestepHistory(double dt) {
   Tn_next_gf_.GetTrueDofs(Tn_next_);
   Tn_ = Tn_next_;
   Tn_gf_.SetFromTrueDofs(Tn_);
+
+  Yn_ = Yn_next_;
+  NYnm2_ = NYnm1_;
+  NYnm1_ = NYn_;
+  Ynm2_ = Ynm1_;
+  Ynm1_ = Yn_;  
 }
 
 void ReactingFlow::step() {
@@ -1106,39 +1126,29 @@ void ReactingFlow::step() {
   }
 
   // Prepare for residual calc
-  std::cout << "check 1" << tmpR0_.Size() << endl;
   updateMixture();
-  std::cout << "check 2" << tmpR0_.Size() << endl;  
   extrapolateState();
   updateBC(0);  // NB: can't ramp right now
   updateThermoP();
-  std::cout << "check 3" << tmpR0_.Size() << endl;  
   updateDensity(1.0);  
   updateDiffusivity();
-  std::cout << "check 4" << tmpR0_.Size() << endl;    
   speciesProduction();
-  std::cout << "check 5" << tmpR0_.Size() << endl;    
 
   // advance species, last slot is from calculated sum of others
   for (int iSpecies = 0; iSpecies < nSpecies_-1; iSpecies++) {
     speciesStep(iSpecies);
-    std::cout << "okay sp: " << iSpecies << endl;      
   }
   speciesLastStep();
   YnFull_gf_.SetFromTrueDofs(Yn_next_);
-  std::cout << "check 6" << tmpR0_.Size() << endl;      
 
   // ho_i*w_i
   heatOfFormation();
-  std::cout << "check 7" << tmpR0_.Size() << endl;     
 
   // TODO(swh): this is a bad name
   diffusionForTemperature();
-  std::cout << "check 8" << tmpR0_.Size() << endl;   
 
   // advance temperature
   temperatureStep();
-  std::cout << "check 9" << tmpR0_.Size() << endl;   
 
   // explicit filter temperature
   if (filter_temperature_) {
@@ -1158,7 +1168,6 @@ void ReactingFlow::step() {
   updateDensity(1.0);
   // computeQt();
   computeQtTO();
-  std::cout << "check 10" << tmpR0_.Size() << endl;     
 
   UpdateTimestepHistory(dt_);
 }
@@ -1183,7 +1192,7 @@ void ReactingFlow::temperatureStep() {
   tmpR0_ = dtP_; // with rho*Cp on LHS, no Cp on this term
   //tmpR0_ = dtP_ / 1000.6; // FIX Cp for temp eq
   //tmpR0_ = (dtP_ / Cp_); <- what is cp?
-  Ms_->AddMult(tmpR0_, resT_);
+  // Ms_->AddMult(tmpR0_, resT_);
 
   // heat of formation
   Ms_->AddMult(hw_, resT_);
@@ -1196,8 +1205,8 @@ void ReactingFlow::temperatureStep() {
 
   // Update Helmholtz operator to account for changing dt, rho, Cp, and kappa
   // NOTE:  rhoDt is not used directly but is used in rhoCp_over_dt_coeff_
-  rhoDt_ = rn_gf_;
-  rhoDt_ *= (time_coeff_.bd0 / dt_);
+  rhoDt_gf_ = rn_gf_;
+  rhoDt_gf_ *= (time_coeff_.bd0 / dt_);
 
   Ht_form_->Update();
   Ht_form_->Assemble();
@@ -1280,9 +1289,8 @@ void ReactingFlow::speciesStep(int iSpec) {
   // NB: adiabatic natural BC is handled, but don't have ability to impose non-zero heat flux yet
 
   // Update Helmholtz operator to account for changing dt, rho, and kappa
-  rhoDt_ = rn_gf_;
-  rhoDt_ *= (time_coeff_.bd0 / dt_);
-
+  rhoDt_gf_ = rn_gf_;
+  rhoDt_gf_ *= (time_coeff_.bd0 / dt_);
   Hy_form_->Update();
   Hy_form_->Assemble();
   Hy_form_->FormSystemMatrix(spec_ess_tdof_, Hy_);
@@ -1395,21 +1403,19 @@ void ReactingFlow::diffusionForTemperature() {
   Array<int> empty;
   SDFT_ = 0.0;
   for (int i = 0; i < nSpecies_; i++) {
-    setScalarFromVector(Yn_next_, i, &tmpR0_);    
-    // species_Cp_coeff_->constant = Rgas_ + inputCV_(i); // HERE: is Rgas correct here?
-    CpY_gf_ = (Rgas_ / gasParams_(i, GasParams::SPECIES_MW)) + inputCV_(i); // is input CV usage correct here? would mean a full gf for cp/cv not necessary
+    setScalarFromVector(Yn_next_, i, &tmpR0_);
+    CpY_gf_ = speciesCp_[i];
     LY_form_->Update();
     LY_form_->Assemble();
     LY_form_->FormSystemMatrix(empty, LY_);
     LY_->Mult(tmpR0_, tmpR0a_);    
     SDFT_.Add(1.0,tmpR0a_);
-    CpY_gf_.GetTrueDofs(tmpR0c_);
-    setVectorFromScalar(tmpR0c_,i,&CpY_);
+    //CpY_gf_.GetTrueDofs(tmpR0c_);
+    //setVectorFromScalar(tmpR0c_,i,&CpY_);
   }
   Rmix_gf_.GetTrueDofs(tmpR0b_);
   SDFT_ *= thermo_pressure_;
   SDFT_ /= tmpR0b_;
-  // CpY_gf_.GetTrueDofs(CpY_);
 }
 
 void ReactingFlow::computeExplicitTempConvectionOP(bool extrap) {
@@ -1574,17 +1580,19 @@ void ReactingFlow::updateMixture() {
   }
 
   // mixture Cp
-  CpY_gf_.GetTrueDofs(CpY_); // dont need both a gf and Vector for CpY...
+  // CpY_gf_.GetTrueDofs(CpY_); // dont need both a gf and Vector for CpY...      
   tmpR0c_ = 0.0;  
   for (int sp = 0; sp < nSpecies_; sp++) {
     setScalarFromVector(Yn_, sp, &tmpR0a_);
-    setScalarFromVector(CpY_, sp, &tmpR0b_);
+    //setScalarFromVector(CpY_, sp, &tmpR0b_);
     double *d_Yn = tmpR0a_.HostReadWrite();
-    double *d_CYn = tmpR0b_.HostReadWrite();
+    //double *d_CYn = tmpR0b_.HostReadWrite();
     double *d_CMix = tmpR0c_.HostReadWrite();        
     for (int i = 0; i < sDofInt_; i++) {
-      d_CMix[i] += d_Yn[i] * d_CYn[i];
-      //d_CMix[i] = 1000.6; // testing...
+      //d_CMix[i] += d_Yn[i] * speciesCp_[sp];
+      //d_CMix[i] += d_Yn[i] * d_CYn[i];
+      // d_CMix[i] = 1000.6; // testing...
+      d_CMix[i] = 1.0; // testing...
     }    
   }
   CpMix_gf_.SetFromTrueDofs(tmpR0c_);      
