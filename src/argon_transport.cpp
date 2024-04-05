@@ -1096,12 +1096,14 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::GetThermalConductivities(const doub
   }
 }
 
-void ArgonMixtureTransport::computeMixtureAverageDiffusivity(const Vector &state, Vector &diffusivity) {
+void ArgonMixtureTransport::computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield,
+                                                             Vector &diffusivity) {
   diffusivity.SetSize(3);
   diffusivity = 0.0;
-  computeMixtureAverageDiffusivity(&state[0], &diffusivity[0]);
+  computeMixtureAverageDiffusivity(&state[0], &Efield[0], &diffusivity[0]);
 }
 
+/*
 MFEM_HOST_DEVICE void ArgonMixtureTransport::computeMixtureAverageDiffusivity(const double *state, double *diffusivity) {
   double primitiveState[gpudata::MAXEQUATIONS];
   mixture->GetPrimitivesFromConservatives(state, primitiveState);
@@ -1146,4 +1148,62 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::computeMixtureAverageDiffusivity(co
   CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
   for (int sp = 0; sp < 3; sp++) {
   }
+}
+*/
+
+void ArgonMixtureTransport::computeMixtureAverageDiffusivity(const double *state, const double *Efield,
+                                                             double *diffusivity) {
+  double transportBuffer[FluxTrns::NUM_FLUX_TRANS];
+  for (int p = 0; p < FluxTrns::NUM_FLUX_TRANS; p++) transportBuffer[p] = 0.0;
+
+  double primitiveState[gpudata::MAXEQUATIONS];
+  mixture->GetPrimitivesFromConservatives(state, primitiveState);
+
+  double n_sp[gpudata::MAXSPECIES], X_sp[gpudata::MAXSPECIES], Y_sp[gpudata::MAXSPECIES];
+  mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
+  double nTotal = 0.0;
+  for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp[sp];
+
+  collisionInputs collInputs = computeCollisionInputs(primitiveState, n_sp);
+
+  double speciesViscosity[gpudata::MAXSPECIES], speciesHvyThrmCnd[gpudata::MAXSPECIES];
+  for (int sp = 0; sp < numSpecies; sp++) {
+    if (sp == electronIndex_) {
+      speciesViscosity[sp] = 0.0;
+      speciesHvyThrmCnd[sp] = 0.0;
+      continue;
+    }
+    speciesViscosity[sp] =
+        viscosityFactor_ * sqrt(mw_[sp] * collInputs.Th) / collisionIntegral(sp, sp, 2, 2, collInputs);
+    speciesHvyThrmCnd[sp] = speciesViscosity[sp] * kOverEtaFactor_ / mw_[sp];
+  }
+  transportBuffer[FluxTrns::VISCOSITY] = linearAverage(X_sp, speciesViscosity);
+  transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = linearAverage(X_sp, speciesHvyThrmCnd);
+  transportBuffer[FluxTrns::BULK_VISCOSITY] = 0.0;
+
+  if (thirdOrderkElectron_) {
+    transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] =
+        computeThirdOrderElectronThermalConductivity(X_sp, collInputs);
+  } else {
+    transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] =
+        viscosityFactor_ * kOverEtaFactor_ * sqrt(collInputs.Te / mw_[electronIndex_]) * X_sp[electronIndex_] /
+        collisionIntegral(electronIndex_, electronIndex_, 2, 2, collInputs);
+  }
+
+  double binaryDiff[gpudata::MAXSPECIES * gpudata::MAXSPECIES];
+  // binaryDiff = 0.0;
+  for (int spI = 0; spI < numSpecies - 1; spI++) {
+    for (int spJ = spI + 1; spJ < numSpecies; spJ++) {
+      double temp = ((spI == electronIndex_) || (spJ == electronIndex_)) ? collInputs.Te : collInputs.Th;
+      binaryDiff[spI + spJ * numSpecies] =
+          diffusivityFactor_ * sqrt(temp / getMuw(spI, spJ)) / nTotal / collisionIntegral(spI, spJ, 1, 1, collInputs);
+      binaryDiff[spJ + spI * numSpecies] = binaryDiff[spI + spJ * numSpecies];
+    }
+  }
+
+  // double diffusivity[gpudata::MAXSPECIES], mobility[gpudata::MAXSPECIES];
+  // CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
+
+  for (int sp = 0; sp < 3; sp++) diffusivity[sp] = 0.0;
+  CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
 }

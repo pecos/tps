@@ -1614,9 +1614,9 @@ void ReactingFlow::updateMixture() {
     //double *d_CYn = tmpR0b_.HostReadWrite();
     double *d_CMix = tmpR0c_.HostReadWrite();        
     for (int i = 0; i < sDofInt_; i++) {
-      //d_CMix[i] += d_Yn[i] * speciesCp_[sp];
+      d_CMix[i] += d_Yn[i] * speciesCp_[sp];
       //d_CMix[i] += d_Yn[i] * d_CYn[i];
-      d_CMix[i] = 1000.6; // testing...
+      //d_CMix[i] = 1000.6; // testing...
       //d_CMix[i] = 1.0; // testing...
     }    
   }
@@ -1657,6 +1657,10 @@ void ReactingFlow::updateDiffusivity() {
   {
     double *dataDiff = diffY_.HostReadWrite();      
     for (int i = 0; i < sDofInt_; i++) {
+
+      double Efield[gpudata::MAXDIM];
+      for (int v = 0; v < dim_; v++) Efield[v] = 0.0;
+      
       int nEq = dim_ + 2 + nActiveSpecies_; // last Yn not included, i guess...
       double state[nEq];
       double conservedState[nEq];      
@@ -1668,7 +1672,7 @@ void ReactingFlow::updateDiffusivity() {
 	state[dim_ + 1 + sp] = Yn_[i + (sp-1) * sDofInt_];
       }      
       mixture_->GetConservativesFromPrimitives(state, conservedState);      
-      //transport_->computeMixtureAverageDiffusivity(conservedState, diffSp);
+      transport_->computeMixtureAverageDiffusivity(conservedState, Efield, diffSp);
       for (int sp = 0; sp < nSpecies_; sp++) {
 	diffSp[sp] = std::max(diffSp[sp],diffY_min);
         //dataDiff[i + sp * sDofInt_] = diffSp[sp];
