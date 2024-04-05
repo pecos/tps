@@ -42,8 +42,10 @@ class Tps;
 #include <tps_config.h>
 
 #include <iostream>
+#include <fstream>
 
 #include "dirichlet_bc_helper.hpp"
+#include "gpu_constructor.hpp"
 #include "io.hpp"
 #include "thermo_chem_base.hpp"
 #include "tps_mfem_wrap.hpp"
@@ -51,7 +53,10 @@ class Tps;
 #include "equation_of_state.hpp"
 #include "argon_transport.hpp"
 #include "chemistry.hpp"
-
+#include "mpi_groups.hpp"
+#include "tps.hpp"
+#include "tps_mfem_wrap.hpp"
+#include "utils.hpp"
 
 using VecFuncT = void(const Vector &x, double t, Vector &u);
 using ScalarFuncT = double(const Vector &x, double t);
@@ -163,7 +168,7 @@ class ReactingFlow : public ThermoChemModelBase {
   ParGridFunction Tnm1_gf_, Tnm2_gf_;
   ParGridFunction Tn_gf_, Tn_next_gf_, Text_gf_, resT_gf_;
   ParGridFunction rn_gf_;
-  ParGridFunction rhoDt_;
+  ParGridFunction rhoDt_gf_;
 
   // additions for species
   ParGridFunction Ynm1_gf_, Ynm2_gf_;
@@ -259,7 +264,8 @@ class ReactingFlow : public ThermoChemModelBase {
   Vector hw_;
   Vector CpY_;
   Vector SDFT_;  
-  Vector inputCV_;
+  Vector speciesCv_;
+  Vector speciesCp_;  
   Vector initialMassFraction_;
   Vector atomMW_;   
 
