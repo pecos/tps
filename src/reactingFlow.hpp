@@ -219,6 +219,7 @@ class ReactingFlow : public ThermoChemModelBase {
   ParBilinearForm *Ay_form_ = nullptr;  
   ParBilinearForm *Ms_form_ = nullptr;
   ParBilinearForm *MsRho_form_ = nullptr;
+  ParBilinearForm *MsRhoCp_form_ = nullptr;  
   ParBilinearForm *Ht_form_ = nullptr;
   ParBilinearForm *Hy_form_ = nullptr;  
   ParBilinearForm *Mq_form_ = nullptr;
@@ -234,6 +235,7 @@ class ReactingFlow : public ThermoChemModelBase {
   OperatorHandle Hy_;  
   OperatorHandle Ms_;
   OperatorHandle MsRho_;
+  OperatorHandle MsRhoCp_;  
   OperatorHandle Mq_;
 
   mfem::Solver *MsInvPC_ = nullptr;

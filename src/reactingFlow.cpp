@@ -273,6 +273,9 @@ enum GasParams {
     mixtureInput_.gasParams[sp + nSpecies_*GasParams::SPECIES_MW] = speciesMass[sp];
   }
 
+  // for convience
+  Rgas_ = UNIVERSALGASCONSTANT;  
+  
   for (int sp = 0; sp < nSpecies_; sp++) {  
     // is input CV usage correct here? would mean a full gf for cp/cv not necessary
     speciesCp_[sp] = (Rgas_ / gasParams_(sp, GasParams::SPECIES_MW)) + speciesCv_[sp];
@@ -424,9 +427,6 @@ enum GasParams {
   }   
   
   chemistry_ = new Chemistry(mixture_, chemistryInput_);
-
-  // for convience
-  Rgas_ = UNIVERSALGASCONSTANT;
   
 }
 
@@ -445,6 +445,7 @@ ReactingFlow::~ReactingFlow() {
   delete MsInvPC_;
   delete Ht_form_;
   delete MsRho_form_;
+  delete MsRhoCp_form_;  
   delete Ms_form_;
   delete At_form_;
   delete rhou_coeff_;
@@ -829,7 +830,7 @@ void ReactingFlow::initializeOperators() {
   species_Cp_coeff_ = new GridFunctionCoefficient(&CpY_gf_);
   mut_coeff_ = new GridFunctionCoefficient(turbModel_interface_->eddy_viscosity);
   mult_coeff_ = new GridFunctionCoefficient(sponge_interface_->diff_multiplier);
-  un_next_coeff_ = new VectorGridFunctionCoefficient(flow_interface_->velocity);  
+  un_next_coeff_ = new VectorGridFunctionCoefficient(flow_interface_->velocity);
 
   // for unsteady terms
   rhoDt_gf_ = rn_gf_;
@@ -908,8 +909,22 @@ void ReactingFlow::initializeOperators() {
     MsRho_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   }
   MsRho_form_->Assemble();
-  MsRho_form_->FormSystemMatrix(empty, MsRho_);
+  MsRho_form_->FormSystemMatrix(empty, MsRho_);  
   if (rank0_) std::cout << "ReactingFlow MsRho operator set" << endl;
+
+  // mass matrix with rho and Cp
+  MsRhoCp_form_ = new ParBilinearForm(sfes_);
+  auto *msrhocp_blfi = new MassIntegrator(*rhoCp_coeff_);
+  if (numerical_integ_) {
+    msrhocp_blfi->SetIntRule(&ir_i);
+  }
+  MsRhoCp_form_->AddDomainIntegrator(msrhocp_blfi);
+  if (partial_assembly_) {
+    MsRhoCp_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+  }
+  MsRhoCp_form_->Assemble();
+  MsRhoCp_form_->FormSystemMatrix(empty, MsRhoCp_);  
+  if (rank0_) std::cout << "ReactingFlow MsRhoCp operator set" << endl;  
 
   // temperature Helmholtz
   Ht_form_ = new ParBilinearForm(sfes_);
@@ -1185,14 +1200,13 @@ void ReactingFlow::temperatureStep() {
   tmpR0_.Set(time_coeff_.bd1 / dt_, Tn_);
   tmpR0_.Add(time_coeff_.bd2 / dt_, Tnm1_);
   tmpR0_.Add(time_coeff_.bd3 / dt_, Tnm2_);
-
-  MsRho_->AddMult(tmpR0_, resT_, -1.0);
+  MsRhoCp_->AddMult(tmpR0_, resT_, -1.0);
 
   // dPo/dt
   tmpR0_ = dtP_; // with rho*Cp on LHS, no Cp on this term
-  //tmpR0_ = dtP_ / 1000.6; // FIX Cp for temp eq
+  // tmpR0_ = dtP_ / 1000.6; // FIX Cp for temp eq
   //tmpR0_ = (dtP_ / Cp_); <- what is cp?
-  // Ms_->AddMult(tmpR0_, resT_);
+  Ms_->AddMult(tmpR0_, resT_);
 
   // heat of formation
   Ms_->AddMult(hw_, resT_);
@@ -1283,7 +1297,7 @@ void ReactingFlow::speciesStep(int iSpec) {
 
   // production of iSpec
   setScalarFromVector(prodY_, iSpec, &tmpR0_);
-  Ms_->AddMult(tmpR0_, resT_);
+  Ms_->AddMult(tmpR0_, resY_);
 
   // Add natural boundary terms here later
   // NB: adiabatic natural BC is handled, but don't have ability to impose non-zero heat flux yet
@@ -1562,7 +1576,7 @@ void ReactingFlow::updateMixture() {
   }
 
   for (int i = 0; i < sDof_; i++) {
-    dataR[i] = UNIVERSALGASCONSTANT / dataM[i];
+    dataR[i] = Rgas_ / dataM[i];
   }
 
   // can use micture calls directly for this
@@ -1591,8 +1605,8 @@ void ReactingFlow::updateMixture() {
     for (int i = 0; i < sDofInt_; i++) {
       //d_CMix[i] += d_Yn[i] * speciesCp_[sp];
       //d_CMix[i] += d_Yn[i] * d_CYn[i];
-      // d_CMix[i] = 1000.6; // testing...
-      d_CMix[i] = 1.0; // testing...
+      d_CMix[i] = 1000.6; // testing...
+      //d_CMix[i] = 1.0; // testing...
     }    
   }
   CpMix_gf_.SetFromTrueDofs(tmpR0c_);      
@@ -1692,6 +1706,7 @@ void ReactingFlow::updateDiffusivity() {
       mixture_->GetConservativesFromPrimitives(state, conservedState);
       transport_->GetThermalConductivities(conservedState, state, kappa);
       dataKappa[i] = kappa[0];
+      // dataKappa[i] = kappa[0] / 1000.6; // testing...
     }
   }
   kappa_gf_.SetFromTrueDofs(visc_);    
