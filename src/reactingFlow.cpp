@@ -476,7 +476,11 @@ ReactingFlow::~ReactingFlow() {
 void ReactingFlow::initializeSelf() {
   if (rank0_) grvy_printf(ginfo, "Initializing ReactingFlow solver.\n");
 
-  nActiveSpecies_ = mixture_->GetNumActiveSpecies();  
+  nActiveSpecies_ = mixture_->GetNumActiveSpecies();
+  Pr_ = 0.72;
+  Sc_ = 1.0;
+  invPr_ = 1/Pr_;
+  invSc_ = 1/Sc_;  
   
   //-----------------------------------------------------
   // 1) Prepare the required finite element objects
@@ -564,7 +568,8 @@ void ReactingFlow::initializeSelf() {
   hw_ = 0.0;
   
   // only YnFull for plotting
-  YnFull_gf_.SetSpace(yfes_);  
+  YnFull_gf_.SetSpace(yfes_);
+  YnFull_gf_ = 0.0;
 
   // rest can just be sfes
   Yn_gf_.SetSpace(sfes_);  
@@ -606,6 +611,7 @@ void ReactingFlow::initializeSelf() {
   prodY_gf_.SetSpace(sfes_);
   prodY_gf_ = 0.0;    
 
+  tmpR0_.SetSize(dim_*sDofInt_);  
   tmpR0_.SetSize(sDofInt_);
   tmpR0a_.SetSize(sDofInt_);  
   tmpR0b_.SetSize(sDofInt_);
@@ -849,6 +855,7 @@ void ReactingFlow::initializeOperators() {
   }
   At_form_->Assemble();
   At_form_->FormSystemMatrix(empty, At_);
+  if (rank0_) std::cout << "ReactingFlow At operator set" << endl;  
 
   Ay_form_ = new ParBilinearForm(sfes_);
   auto *ay_blfi = new ConvectionIntegrator(*rhou_coeff_);
@@ -861,7 +868,7 @@ void ReactingFlow::initializeOperators() {
   }
   Ay_form_->Assemble();
   Ay_form_->FormSystemMatrix(empty, Ay_);  
-  if (rank0_) std::cout << "ReactingFlow At operator set" << endl;
+  if (rank0_) std::cout << "ReactingFlow Ay operator set" << endl;
 
   // mass matrix
   Ms_form_ = new ParBilinearForm(sfes_);
@@ -1098,30 +1105,40 @@ void ReactingFlow::step() {
     temp_dbc.coeff->SetTime(time_ + dt_);
   }
 
-  // Prepare for residual calc  
+  // Prepare for residual calc
+  std::cout << "check 1" << tmpR0_.Size() << endl;
   updateMixture();
+  std::cout << "check 2" << tmpR0_.Size() << endl;  
   extrapolateState();
   updateBC(0);  // NB: can't ramp right now
   updateThermoP();
-  updateDensity(1.0);
+  std::cout << "check 3" << tmpR0_.Size() << endl;  
+  updateDensity(1.0);  
   updateDiffusivity();
+  std::cout << "check 4" << tmpR0_.Size() << endl;    
   speciesProduction();
+  std::cout << "check 5" << tmpR0_.Size() << endl;    
 
   // advance species, last slot is from calculated sum of others
   for (int iSpecies = 0; iSpecies < nSpecies_-1; iSpecies++) {
     speciesStep(iSpecies);
+    std::cout << "okay sp: " << iSpecies << endl;      
   }
   speciesLastStep();
   YnFull_gf_.SetFromTrueDofs(Yn_next_);
+  std::cout << "check 6" << tmpR0_.Size() << endl;      
 
   // ho_i*w_i
   heatOfFormation();
+  std::cout << "check 7" << tmpR0_.Size() << endl;     
 
   // TODO(swh): this is a bad name
   diffusionForTemperature();
+  std::cout << "check 8" << tmpR0_.Size() << endl;   
 
   // advance temperature
   temperatureStep();
+  std::cout << "check 9" << tmpR0_.Size() << endl;   
 
   // explicit filter temperature
   if (filter_temperature_) {
@@ -1141,6 +1158,7 @@ void ReactingFlow::step() {
   updateDensity(1.0);
   // computeQt();
   computeQtTO();
+  std::cout << "check 10" << tmpR0_.Size() << endl;     
 
   UpdateTimestepHistory(dt_);
 }
@@ -1303,11 +1321,11 @@ void ReactingFlow::speciesStep(int iSpec) {
 }
 
 void ReactingFlow::speciesProduction() {
-  (flow_interface_->velocity)->GetTrueDofs(tmpR0_);
+  (flow_interface_->velocity)->GetTrueDofs(tmpR1_);
   
   const double *dataT = Tn_.HostRead();
   const double *dataRho = rn_.HostRead();
-  const double *dataU = tmpR0_.HostRead();
+  const double *dataU = tmpR1_.HostRead();
   const double *dataX = Xn_.HostRead();    
   double *dataProd = prodY_.HostReadWrite();  
     
@@ -1596,10 +1614,10 @@ void ReactingFlow::updateThermoP() {
 }
 
 void ReactingFlow::updateDiffusivity() {
-  (flow_interface_->velocity)->GetTrueDofs(tmpR0_);
+  (flow_interface_->velocity)->GetTrueDofs(tmpR1_);
   const double *dataTemp = Tn_.HostRead();
   const double *dataRho = rn_.HostRead();
-  const double *dataU = tmpR0_.HostRead();
+  const double *dataU = tmpR1_.HostRead();
   double diffY_min = 1.0e-8; // make readable
   
   // species diffusivities
@@ -1617,10 +1635,11 @@ void ReactingFlow::updateDiffusivity() {
 	state[dim_ + 1 + sp] = Yn_[i + (sp-1) * sDofInt_];
       }      
       mixture_->GetConservativesFromPrimitives(state, conservedState);      
-      transport_->computeMixtureAverageDiffusivity(conservedState, diffSp);
+      //transport_->computeMixtureAverageDiffusivity(conservedState, diffSp);
       for (int sp = 0; sp < nSpecies_; sp++) {
 	diffSp[sp] = std::max(diffSp[sp],diffY_min);
-        dataDiff[i + sp * sDofInt_] = diffSp[sp];
+        //dataDiff[i + sp * sDofInt_] = diffSp[sp];
+        dataDiff[i + sp * sDofInt_] = 0.1;
 	// std::cout << sp << "): " << diffSp[sp] << endl;
       }
     }
@@ -1643,6 +1662,7 @@ void ReactingFlow::updateDiffusivity() {
       mixture_->GetConservativesFromPrimitives(state, conservedState);
       transport_->GetViscosities(conservedState, state, visc);
       dataVisc[i] = visc[0];
+      // std::cout << "visc: " << visc[0] << endl;  
     }   
   }
   visc_gf_.SetFromTrueDofs(visc_);
