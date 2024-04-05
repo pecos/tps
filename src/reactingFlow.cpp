@@ -1188,6 +1188,8 @@ void ReactingFlow::step() {
 }
 
 void ReactingFlow::temperatureStep() {
+  Array<int> empty;
+  
   // Build the right-hand-side
   resT_ = 0.0;
 
@@ -1200,6 +1202,10 @@ void ReactingFlow::temperatureStep() {
   tmpR0_.Set(time_coeff_.bd1 / dt_, Tn_);
   tmpR0_.Add(time_coeff_.bd2 / dt_, Tnm1_);
   tmpR0_.Add(time_coeff_.bd3 / dt_, Tnm2_);
+
+  MsRhoCp_form_->Update();
+  MsRhoCp_form_->Assemble();
+  MsRhoCp_form_->FormSystemMatrix(empty, MsRhoCp_);  
   MsRhoCp_->AddMult(tmpR0_, resT_, -1.0);
 
   // dPo/dt
@@ -1273,6 +1279,7 @@ void ReactingFlow::speciesLastStep() {
 }
 
 void ReactingFlow::speciesStep(int iSpec) {
+  Array<int> empty;  
 
   // copy relevant species properties from full Vector to particular case
   setScalarFromVector(diffY_, iSpec, &tmpR0_);
@@ -1293,6 +1300,10 @@ void ReactingFlow::speciesStep(int iSpec) {
   tmpR0_.Set(time_coeff_.bd1 / dt_, tmpR0a_);
   tmpR0_.Add(time_coeff_.bd2 / dt_, tmpR0b_);
   tmpR0_.Add(time_coeff_.bd3 / dt_, tmpR0c_);
+
+  MsRho_form_->Update();
+  MsRho_form_->Assemble();
+  MsRho_form_->FormSystemMatrix(empty, MsRho_);  
   MsRho_->AddMult(tmpR0_, resY_, -1.0);
 
   // production of iSpec
