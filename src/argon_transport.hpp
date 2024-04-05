@@ -191,8 +191,8 @@ class ArgonMixtureTransport : public ArgonMinimalTransport {
   MFEM_HOST_DEVICE double computeThirdOrderElectronThermalConductivity(const double *X_sp,
                                                                        const collisionInputs &collInputs);
   
-  virtual void computeMixtureAverageDiffusivity(const Vector &state, Vector &diffusivity);
-  MFEM_HOST_DEVICE void computeMixtureAverageDiffusivity(const double *state, double *diffusivity);
+  virtual void computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield, Vector &diffusivity);
+  MFEM_HOST_DEVICE void computeMixtureAverageDiffusivity(const double *state, const double *Efield, double *diffusivity);
 
   MFEM_HOST_DEVICE void GetThermalConductivities(const double *conserved, const double *primitive, double *kappa);      
   
