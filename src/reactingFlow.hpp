@@ -244,7 +244,8 @@ class ReactingFlow : public ThermoChemModelBase {
   Vector Tn_, Tn_next_, Tnm1_, Tnm2_;
   Vector NTn_, NTnm1_, NTnm2_;
   Vector Text_;
-  Vector resT_;
+  Vector resT_; 
+  Vector tmpR1_; 
   Vector tmpR0_;
   Vector tmpR0a_, tmpR0b_, tmpR0c_;
 
