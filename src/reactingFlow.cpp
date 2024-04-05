@@ -64,7 +64,10 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts,
   order_ = loMach_opts->order;
 
   std::cout << "Constructing ReactingFlow!" << endl;
-  
+
+  // for convience
+  Rgas_ = UNIVERSALGASCONSTANT;
+
   /// Basic input information
   tpsP_->getInput("loMach/ambientPressure", ambient_pressure_, 101325.0);
   thermo_pressure_ = ambient_pressure_;
@@ -425,9 +428,6 @@ enum GasParams {
   
   chemistry_ = new Chemistry(mixture_, chemistryInput_);
 
-  // for convience
-  Rgas_ = UNIVERSALGASCONSTANT;
-  
 }
 
 ReactingFlow::~ReactingFlow() {
@@ -445,6 +445,7 @@ ReactingFlow::~ReactingFlow() {
   delete MsInvPC_;
   delete Ht_form_;
   delete MsRho_form_;
+  delete MsRhoCp_form_;
   delete Ms_form_;
   delete At_form_;
   delete rhou_coeff_;
@@ -911,6 +912,19 @@ void ReactingFlow::initializeOperators() {
   MsRho_form_->FormSystemMatrix(empty, MsRho_);
   if (rank0_) std::cout << "ReactingFlow MsRho operator set" << endl;
 
+  MsRhoCp_form_ = new ParBilinearForm(sfes_);
+  auto *msrhocp_blfi = new MassIntegrator(*rhoCp_coeff_);
+  if (numerical_integ_) {
+    msrhocp_blfi->SetIntRule(&ir_i);
+  }
+  MsRhoCp_form_->AddDomainIntegrator(msrhocp_blfi);
+  if (partial_assembly_) {
+    MsRhoCp_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+  }
+  MsRhoCp_form_->Assemble();
+  MsRhoCp_form_->FormSystemMatrix(empty, MsRhoCp_);
+  if (rank0_) std::cout << "ReactingFlow MsRhoCp operator set" << endl;
+
   // temperature Helmholtz
   Ht_form_ = new ParBilinearForm(sfes_);
   auto *hmt_blfi = new MassIntegrator(*rhoCp_over_dt_coeff_);
@@ -1186,7 +1200,7 @@ void ReactingFlow::temperatureStep() {
   tmpR0_.Add(time_coeff_.bd2 / dt_, Tnm1_);
   tmpR0_.Add(time_coeff_.bd3 / dt_, Tnm2_);
 
-  MsRho_->AddMult(tmpR0_, resT_, -1.0);
+  MsRhoCp_->AddMult(tmpR0_, resT_, -1.0);
 
   // dPo/dt
   tmpR0_ = dtP_; // with rho*Cp on LHS, no Cp on this term
@@ -1283,7 +1297,7 @@ void ReactingFlow::speciesStep(int iSpec) {
 
   // production of iSpec
   setScalarFromVector(prodY_, iSpec, &tmpR0_);
-  Ms_->AddMult(tmpR0_, resT_);
+  Ms_->AddMult(tmpR0_, resY_);
 
   // Add natural boundary terms here later
   // NB: adiabatic natural BC is handled, but don't have ability to impose non-zero heat flux yet
@@ -1591,9 +1605,9 @@ void ReactingFlow::updateMixture() {
     for (int i = 0; i < sDofInt_; i++) {
       //d_CMix[i] += d_Yn[i] * speciesCp_[sp];
       //d_CMix[i] += d_Yn[i] * d_CYn[i];
-      // d_CMix[i] = 1000.6; // testing...
-      d_CMix[i] = 1.0; // testing...
-    }    
+      d_CMix[i] = 1000.6; // testing...
+      // d_CMix[i] = 1.0; // testing...
+    }
   }
   CpMix_gf_.SetFromTrueDofs(tmpR0c_);      
   
@@ -1729,6 +1743,10 @@ void ReactingFlow::updateDensity(double tStep) {
   MsRho_form_->Update();
   MsRho_form_->Assemble();
   MsRho_form_->FormSystemMatrix(empty, MsRho_);
+
+  MsRhoCp_form_->Update();
+  MsRhoCp_form_->Assemble();
+  MsRhoCp_form_->FormSystemMatrix(empty, MsRhoCp_);
 
   // project to p-space in case not same as vel-temp
   R0PM0_gf_.SetFromTrueDofs(rn_);
