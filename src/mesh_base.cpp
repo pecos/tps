@@ -175,9 +175,13 @@ void MeshBase::initializeMesh() {
     if (rank0_) grvy_printf(ginfo, "Total # of mesh elements = %i\n", nelemGlobal_);
 
     if (nprocs_ > 1) {
-      assert(!loMach_opts_->io_opts_.restart_serial_read_);
-      // TODO(trevilo): Add support for serial read/write
-      partitioning_file_hdf5("read", groupsMPI, nelemGlobal_, partitioning_);
+      if (loMach_opts_->io_opts_.restart_serial_read_) {
+        assert(serial_mesh_->Conforming());
+        partitioning_ = Array<int>(serial_mesh_->GeneratePartitioning(nprocs_, defaultPartMethod), nelemGlobal_);
+        partitioning_file_hdf5("write", groupsMPI, nelemGlobal_, partitioning_);
+      } else {
+        partitioning_file_hdf5("read", groupsMPI, nelemGlobal_, partitioning_);
+      }
     }
 
   } else {
