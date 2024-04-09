@@ -1361,66 +1361,49 @@ void ReactingFlow::speciesStep(int iSpec) {
 }
 
 void ReactingFlow::speciesProduction() {
-  (flow_interface_->velocity)->GetTrueDofs(tmpR1_);
-  
   const double *dataT = Tn_.HostRead();
   const double *dataRho = rn_.HostRead();
-  const double *dataU = tmpR1_.HostRead();
-  const double *dataX = Xn_.HostRead();    
-  double *dataProd = prodY_.HostReadWrite();  
-    
+  const double *dataY = Yn_.HostRead();
+  double *dataProd = prodY_.HostWrite();
+
+  const int nEq = dim_ + 2 + nActiveSpecies_;
+  Vector state(nEq);
+  state = 0.0;
+
+  // Vectors used in computing chemical sources at each point
+  Vector n_sp;          // set to size nSpecies_ in computeNumberDensities
+  Vector kfwd;          // set to size nReactions_ in computeForwardRareCoeffs
+  Vector keq;           // set to size nReactions_ in computeEquilibriumConstants
+  Vector progressRate;  // set to size nReactions_ in computeProgressRate
+  Vector creationRate;  // set to size nSpecies_ in computeCreationRate
+
   for (int i = 0; i < sDofInt_; i++) {
-    
-    Vector kfwd; // set to size nReactions_ in computeForwardRareCoeffs
-    Vector keq; // set to size nReactions_ in computeEquilibriumConstants
-    Vector progressRate; // set to size nReactions_ in computeProgressRate
-    Vector creationRate; // set to size nSpecies_ in computeCreationRate
-    double Th = dataT[i]; 
-    double Te;
-    Te = Th; // hack for one-temp
-    
-    int nEq = dim_ + 2 + nActiveSpecies_;
-    Vector state(nEq);
-    Vector conservedState(nEq);    
-    //double state[nEq];
-    //double conservedState[nEq];          
+    // Get temperature
+    const double Th = dataT[i];
+    const double Te = Th; // single temperature model
+
+    // Set the conserved state.  This is only used here to evaluate
+    // the molar density, so only the mixture (mass) density and
+    // species (mass) densities are used and need to be filled
     state[0] = dataRho[i];
-    for (int eq = 0; eq < dim_; eq++) {state[eq+1] = dataU[i + eq*sDofInt_];}
-    state[dim_ + 1] = dataT[i];
-    for (int sp = 0; sp < nSpecies_-1; sp++) {
-      state[dim_ + 1 + sp + 1] = Yn_[i + sp * sDofInt_];
+    for (int sp = 0; sp < nActiveSpecies_; sp++) {
+      state[dim_ + 1 + sp + 1] = dataRho[i] * dataY[i + sp * sDofInt_];
     }
-    mixture_->GetConservativesFromPrimitives(state, conservedState);
-    
-    Vector n_sp(gpudata::MAXSPECIES);
-    mixture_->computeNumberDensities(conservedState, n_sp);
-    //double nsp[gpudata::MAXSPECIES];
-    //for (int sp = 0; sp < n_sp.Size(); sp++) { nsp[sp] = n_sp[sp]; }
-    
-    /*
-    double nsp[gpudata::MAXSPECIES];
-    for(int sp = 0; sp < nSpecies_; sp++) {
-      nsp[sp] = dataX[i + sp * sDofInt_];
-    }
-    */
-      
-    chemistry_->computeForwardRateCoeffs(Th, Te, kfwd);    
+
+    // Evaluate the mole densities (from mass densities)
+    mixture_->computeNumberDensities(state, n_sp);
+
+    // Evaluate the chemical source terms
+    chemistry_->computeForwardRateCoeffs(Th, Te, kfwd);
     chemistry_->computeEquilibriumConstants(Th, Te, keq);
     chemistry_->computeProgressRate(n_sp, kfwd, keq, progressRate);
     chemistry_->computeCreationRate(progressRate, creationRate);
 
-    /*
-    for (int nr = 0; nr < nReactions_; nr++) {
-      std::cout << "*" <<  i << "/" << nr << "): " << kfwd[nr] << " " << keq[nr] << " " << progressRate[nr] << endl;   
-    }
-    */
-
-    for(int sp = 0; sp < nSpecies_; sp++) {      
+    // Place sources into storage for use in speciesStep
+    for(int sp = 0; sp < nSpecies_; sp++) {
       dataProd[i + sp * sDofInt_] = creationRate[sp];
-      //std::cout <<  i << "/" << sp << "): " << creationRate[sp] << endl;
-      // dataProd[i + sp * sDofInt_] = 0.0; // testing...      
     }
-  }  
+  }
 }
 
 void ReactingFlow::heatOfFormation() {
