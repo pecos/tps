@@ -1125,11 +1125,13 @@ void ReactingFlow::UpdateTimestepHistory(double dt) {
   Tn_ = Tn_next_;
   Tn_gf_.SetFromTrueDofs(Tn_);
 
-  Yn_ = Yn_next_;
+  // species
   NYnm2_ = NYnm1_;
   NYnm1_ = NYn_;
+
   Ynm2_ = Ynm1_;
-  Ynm1_ = Yn_;  
+  Ynm1_ = Yn_;
+  Yn_ = Yn_next_;
 }
 
 void ReactingFlow::step() {
