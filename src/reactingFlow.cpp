@@ -68,6 +68,9 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts,
   /// Basic input information
   tpsP_->getInput("loMach/ambientPressure", ambient_pressure_, 101325.0);
   thermo_pressure_ = ambient_pressure_;
+  Pnm1_ = thermo_pressure_;
+  Pnm2_ = Pnm1_;
+  Pnm3_ = Pnm1_;  
   dtP_ = 0.0;
 
   tpsP_->getInput("initialConditions/temperature", T_ic_, 300.0);
@@ -112,8 +115,9 @@ enum GasParams {
   
   gasParams_.SetSize(nSpecies_, GasParams::NUM_GASPARAMS);
   gasParams_ = 0.0;
-  speciesCv_.SetSize(nSpecies_);
-  speciesCp_.SetSize(nSpecies_);  
+  speciesMolarCv_.SetSize(nSpecies_);
+  speciesMolarCp_.SetSize(nSpecies_);
+  specificHeatRatios_.SetSize(nSpecies_);
   initialMassFraction_.SetSize(nSpecies_);  
 
   for (int i = 0; i < nSpecies_*GasParams::NUM_GASPARAMS; i++) {
@@ -129,7 +133,7 @@ enum GasParams {
 
     tpsP_->getRequiredInput((basepath + "/formation_energy").c_str(), formEnergy);
     tpsP_->getInput((basepath + "/level_degeneracy").c_str(), levelDegeneracy, 1.0);
-    tpsP_->getRequiredInput((basepath + "/perfect_mixture/constant_molar_cv").c_str(), speciesCv_[i - 1]);
+    tpsP_->getRequiredInput((basepath + "/perfect_mixture/constant_molar_cv").c_str(), speciesMolarCv_[i - 1]);
     
     gasParams_((i - 1), GasParams::FORMATION_ENERGY) = formEnergy;
     gasParams_((i - 1), GasParams::SPECIES_DEGENERACY) = levelDegeneracy;
@@ -276,9 +280,9 @@ enum GasParams {
   // for convience
   Rgas_ = UNIVERSALGASCONSTANT;  
   
-  for (int sp = 0; sp < nSpecies_; sp++) {  
-    // is input CV usage correct here? would mean a full gf for cp/cv not necessary
-    speciesCp_[sp] = (Rgas_ / gasParams_(sp, GasParams::SPECIES_MW)) + speciesCv_[sp];
+  for (int sp = 0; sp < nSpecies_; sp++) {
+    specificHeatRatios_[sp] = (speciesMolarCv_[sp] + 1.0)  / speciesMolarCv_[sp];
+    speciesMolarCp_[sp] = specificHeatRatios_[sp] * speciesMolarCv_[sp];
   }  
   
   if (speciesMapping.count("Ar")) {
@@ -634,8 +638,8 @@ void ReactingFlow::initializeSelf() {
   // this is only needed to form the op-coeff
   CpY_gf_.SetSpace(sfes_);
   CpY_gf_ = 1000.6;
-  // CpY_.SetSize(yDofInt_);
-  // CpY_ = 1000.6;
+  CpY_.SetSize(yDofInt_);
+  CpY_ = 1000.6;
 
   CpMix_gf_.SetSpace(sfes_);
   CpMix_gf_ = 1000.6;  
@@ -1407,6 +1411,7 @@ void ReactingFlow::speciesProduction() {
 
     for(int sp = 0; sp < nSpecies_; sp++) {      
       dataProd[i + sp * sDofInt_] = creationRate[sp];
+      //dataProd[i + sp * sDofInt_] = 0.0; // testing...      
     }
   }  
 }
@@ -1416,7 +1421,6 @@ void ReactingFlow::heatOfFormation() {
   double *dw = prodY_.HostReadWrite();
   double ho;
   for (int n = 0; n < nSpecies_; n++) {
-    // ho = 0.0;
     ho = gasParams_(n - 1, GasParams::FORMATION_ENERGY);
     for (int i = 0; i < sDofInt_; i++) {
       hw_[i + n * sDofInt_] = ho * dw[i + n * sDofInt_];
@@ -1429,14 +1433,13 @@ void ReactingFlow::diffusionForTemperature() {
   SDFT_ = 0.0;
   for (int i = 0; i < nSpecies_; i++) {
     setScalarFromVector(Yn_next_, i, &tmpR0_);
-    CpY_gf_ = speciesCp_[i];
+    setScalarFromVector(CpY_,i,&tmpR0c_);
+    CpY_gf_.SetFromTrueDofs(tmpR0c_);
     LY_form_->Update();
     LY_form_->Assemble();
     LY_form_->FormSystemMatrix(empty, LY_);
     LY_->Mult(tmpR0_, tmpR0a_);    
     SDFT_.Add(1.0,tmpR0a_);
-    //CpY_gf_.GetTrueDofs(tmpR0c_);
-    //setVectorFromScalar(tmpR0c_,i,&CpY_);
   }
   Rmix_gf_.GetTrueDofs(tmpR0b_);
   SDFT_ *= thermo_pressure_;
@@ -1568,7 +1571,11 @@ void ReactingFlow::extrapolateState() {
 }
 
 void ReactingFlow::updateMixture() {
-  
+
+  // (flow_interface_->velocity)->GetTrueDofs(tmpR1_);  
+  // const double *dataU = tmpR1_.HostRead();
+  double *dataT = Tn_gf_.HostReadWrite();
+  double *dataRho = rn_gf_.HostReadWrite();    
   double *dataR = Rmix_gf_.HostReadWrite();        
   double *dataM = Mmix_gf_.HostReadWrite();
   Mmix_gf_ = 0.0;
@@ -1590,7 +1597,7 @@ void ReactingFlow::updateMixture() {
     dataR[i] = Rgas_ / dataM[i];
   }
 
-  // can use micture calls directly for this
+  // can use mixture calls directly for this
   for (int sp = 0; sp < nSpecies_; sp++) {
     setScalarFromVector(Yn_, sp, &tmpR0a_);
     setScalarFromVector(Xn_, sp, &tmpR0b_);
@@ -1605,22 +1612,61 @@ void ReactingFlow::updateMixture() {
   }
 
   // mixture Cp
-  // CpY_gf_.GetTrueDofs(CpY_); // dont need both a gf and Vector for CpY...      
+  // CpY_gf_.GetTrueDofs(CpY_); // dont need both a gf and Vector for CpY...
+  {
+    double *d_CMix = tmpR0c_.HostReadWrite();    
+    for (int i = 0; i < sDofInt_; i++) {
+      double cpMix;
+      int nEq = dim_ + 2 + nActiveSpecies_;
+      Vector state(nEq);
+      state[0] = dataRho[i];
+      for (int eq = 0; eq < dim_; eq++) {state[eq+1] = 0.0;} // doesnt matter for Cp call
+      state[dim_ + 1] = dataT[i];
+      for (int sp = 0; sp < nSpecies_-1; sp++) {
+        state[dim_ + 1 + sp + 1] = Yn_[i + sp * sDofInt_];
+	// std::cout << i << " " << sp << ") Yn: " << Yn_[i + sp * sDofInt_] << endl;	
+      }
+      // std::cout << " Calling getMixtureCp..." << endl;      
+      mixture_->GetMixtureCp(state, cpMix);
+      d_CMix[i] = cpMix;
+      //std::cout << i << ") CpMix: " << cpMix << endl;
+    }
+  }
+  CpMix_gf_.SetFromTrueDofs(tmpR0c_);  
+
+  // species Cp, not the best place for this
+  {
+    double *d_Cp = CpY_.HostReadWrite();    
+    for (int i = 0; i < sDofInt_; i++) {
+      double cpY[nSpecies_];
+      int nEq = dim_ + 2 + nActiveSpecies_;
+      Vector state(nEq);
+      state[0] = dataRho[i];
+      for (int eq = 0; eq < dim_; eq++) {state[eq+1] = 0.0;}
+      state[dim_ + 1] = dataT[i];
+      for (int sp = 0; sp < nSpecies_-1; sp++) {
+        state[dim_ + 1 + sp + 1] = Yn_[i + sp * sDofInt_];
+      }
+      mixture_->GetSpeciesCp(state, cpY);
+      for (int sp = 0; sp < nSpecies_; sp++) {      
+        d_Cp[i + sp * sDofInt_] = cpY[sp];
+	//std::cout << i << ", " << sp << ") CpY: " << cpY[sp] << endl;	
+      }
+    }
+  }
+  
+  /*
   tmpR0c_ = 0.0;  
   for (int sp = 0; sp < nSpecies_; sp++) {
     setScalarFromVector(Yn_, sp, &tmpR0a_);
-    //setScalarFromVector(CpY_, sp, &tmpR0b_);
     double *d_Yn = tmpR0a_.HostReadWrite();
-    //double *d_CYn = tmpR0b_.HostReadWrite();
-    double *d_CMix = tmpR0c_.HostReadWrite();        
+    double *d_CMix = tmpR0c_.HostReadWrite();
     for (int i = 0; i < sDofInt_; i++) {
-      d_CMix[i] += d_Yn[i] * speciesCp_[sp];
-      //d_CMix[i] += d_Yn[i] * d_CYn[i];
-      //d_CMix[i] = 1000.6; // testing...
-      //d_CMix[i] = 1.0; // testing...
+      d_CMix[i] += d_Yn[i] * speciesMolarCp_[sp];
     }    
   }
-  CpMix_gf_.SetFromTrueDofs(tmpR0c_);      
+  CpMix_gf_.SetFromTrueDofs(tmpR0c_);
+  */
   
 }
 
@@ -1628,21 +1674,45 @@ void ReactingFlow::updateMixture() {
 void ReactingFlow::updateThermoP() {
   Rmix_gf_.GetTrueDofs(tmpR0a_);
   if (!domain_is_open_) {
-    double allMass, PNM1;
+    double allMass;
     double myMass = 0.0;
+
+    // rotate Po stores
+    Pnm3_ = Pnm2_;
+    Pnm2_ = Pnm1_;
+    Pnm1_ = thermo_pressure_;
+
+    // calculate total mass given previous Po
+    tmpR0_ = thermo_pressure_;
+    tmpR0_ /= Tn_;
+    tmpR0_ /= tmpR0a_;
+    Ms_->Mult(tmpR0_, tmpR0b_);
+    myMass = tmpR0b_.Sum();
+    MPI_Allreduce(&myMass, &allMass, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    
+    // update Po so mass is conserved given the new temperature    
+    thermo_pressure_ = system_mass_ / allMass * Pnm1_;
+    //dtP_ = (thermo_pressure_ - Pnm1_) / dt_;
+    dtP_ = time_coeff_.bd0 * thermo_pressure_
+         + time_coeff_.bd1 * Pnm1_
+         + time_coeff_.bd2 * Pnm2_
+         + time_coeff_.bd3 * Pnm3_;
+    dtP_ *= 1.0/dt_;
+    
+    // testing...
+    /*
+    myMass = 0.0;
     tmpR0_ = 1.0;
     tmpR0_ /= Tn_;
     tmpR0_ *= thermo_pressure_;
     tmpR0_ /= tmpR0a_;
     Ms_->Mult(tmpR0_, tmpR0b_);
     myMass = tmpR0b_.Sum();
-    MPI_Allreduce(&myMass, &allMass, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-    PNM1 = thermo_pressure_;
-    thermo_pressure_ = system_mass_ / allMass * PNM1;
-    dtP_ = (thermo_pressure_ - PNM1) / dt_;
-    // if( rank0_ == true ) std::cout << " Original closed system mass: " << system_mass_ << " [kg]" << endl;
-    // if( rank0_ == true ) std::cout << " New (closed) system mass: " << allMass << " [kg]" << endl;
-    // if( rank0_ == true ) std::cout << " ThermoP: " << thermo_pressure_ << " dtP_: " << dtP_ << endl;
+    MPI_Allreduce(&myMass, &allMass, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);    
+    if( rank0_ == true ) std::cout << " Original closed system mass: " << system_mass_ << " [kg]" << endl;
+    if( rank0_ == true ) std::cout << " New (closed) system mass: " << allMass << " [kg]" << endl;
+    if( rank0_ == true ) std::cout << " ThermoP: " << thermo_pressure_ << " dtP_: " << dtP_ << endl;
+    */
   }
 }
 
@@ -1675,8 +1745,8 @@ void ReactingFlow::updateDiffusivity() {
       transport_->computeMixtureAverageDiffusivity(conservedState, Efield, diffSp);
       for (int sp = 0; sp < nSpecies_; sp++) {
 	diffSp[sp] = std::max(diffSp[sp],diffY_min);
-        //dataDiff[i + sp * sDofInt_] = diffSp[sp];
-        dataDiff[i + sp * sDofInt_] = 0.1;
+        dataDiff[i + sp * sDofInt_] = diffSp[sp];
+        //dataDiff[i + sp * sDofInt_] = 0.1;
 	// std::cout << sp << "): " << diffSp[sp] << endl;
       }
     }

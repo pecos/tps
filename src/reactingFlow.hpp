@@ -96,7 +96,8 @@ class ReactingFlow : public ThermoChemModelBase {
   ArgonTransportInput argonInput_;
   ChemistryInput chemistryInput_;
   
-  GasMixture *mixture_ = NULL;
+  //GasMixture *mixture_ = NULL;
+  PerfectMixture *mixture_ = NULL;  
   // TransportProperties *transport_ = NULL;
   ArgonMixtureTransport *transport_ = NULL;
   Chemistry *chemistry_ = NULL;
@@ -266,8 +267,9 @@ class ReactingFlow : public ThermoChemModelBase {
   Vector hw_;
   Vector CpY_;
   Vector SDFT_;  
-  Vector speciesCv_;
-  Vector speciesCp_;  
+  Vector speciesMolarCv_;
+  Vector speciesMolarCp_;
+  Vector specificHeatRatios_;
   Vector initialMassFraction_;
   Vector atomMW_;   
 
@@ -286,6 +288,8 @@ class ReactingFlow : public ThermoChemModelBase {
   ParFiniteElementSpace *sfes_filter_ = nullptr;
   ParGridFunction Tn_NM1_gf_;
   ParGridFunction Tn_filtered_gf_;
+
+  double Pnm1_, Pnm2_, Pnm3_;
 
  public:
   ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff,
