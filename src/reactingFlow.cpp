@@ -1408,12 +1408,25 @@ void ReactingFlow::speciesProduction() {
 void ReactingFlow::heatOfFormation() {
   hw_ = 0.0;
   double *h_hw = hw_.HostReadWrite();
+
+  const double *dataT = Tn_.HostRead();
   const double *h_prodY = prodY_.HostRead();
-  double ho;
-  for (int n = 0; n < nSpecies_; n++) {
-    ho = gasParams_(n, GasParams::FORMATION_ENERGY) / gasParams_(n, GasParams::SPECIES_MW);
-    for (int i = 0; i < sDofInt_; i++) {
-      h_hw[i] -= ho * h_prodY[i + n * sDofInt_];
+
+  double hspecies;
+  for (int i = 0; i < sDofInt_; i++) {
+    const double T = dataT[i];
+
+    // Sum over species to get enthalpy term
+    for (int n = 0; n < nSpecies_; n++) {
+      // HACK: Hardcode Cv for now
+      // TODO(trevilo): Generalize this
+      double molarCV = 2.49996;
+      molarCV *= UNIVERSALGASCONSTANT;
+      double molarCP = molarCV + UNIVERSALGASCONSTANT;
+
+      hspecies = (molarCP * T + gasParams_(n, GasParams::FORMATION_ENERGY)) / gasParams_(n, GasParams::SPECIES_MW);
+      // hspecies = (gasParams_(n, GasParams::FORMATION_ENERGY)) / gasParams_(n, GasParams::SPECIES_MW);
+      h_hw[i] -= hspecies * h_prodY[i + n * sDofInt_];
     }
   }
 }
@@ -1688,7 +1701,7 @@ void ReactingFlow::updateThermoP() {
          + time_coeff_.bd2 * Pnm2_
          + time_coeff_.bd3 * Pnm3_;
     dtP_ *= 1.0/dt_;
-    
+
     // testing...
     /*
     myMass = 0.0;
