@@ -1198,11 +1198,12 @@ void ArgonMixtureTransport::computeMixtureAverageDiffusivity(const double *state
       binaryDiff[spI + spJ * numSpecies] =
           diffusivityFactor_ * sqrt(temp / getMuw(spI, spJ)) / nTotal / collisionIntegral(spI, spJ, 1, 1, collInputs);
       binaryDiff[spJ + spI * numSpecies] = binaryDiff[spI + spJ * numSpecies];
+      // std::cout << " " << spI << " " << spJ << " : " << binaryDiff[spI + spJ * numSpecies] << " ... " << diffusivityFactor_ << " " << temp << " " << getMuw(spI, spJ) << " " << nTotal << " " << collisionIntegral(spI, spJ, 1, 1, collInputs) << endl;
     }
   }
 
-  // double diffusivity[gpudata::MAXSPECIES], mobility[gpudata::MAXSPECIES];
-  // CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
+  //double diffusivity[gpudata::MAXSPECIES]; //, mobility[gpudata::MAXSPECIES];
+  //CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
 
   for (int sp = 0; sp < 3; sp++) diffusivity[sp] = 0.0;
   CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
