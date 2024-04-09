@@ -1615,27 +1615,48 @@ void ReactingFlow::updateMixture() {
   }
 
   // mixture Cp
-  // CpY_gf_.GetTrueDofs(CpY_); // dont need both a gf and Vector for CpY...
   {
-    double *d_CMix = tmpR0c_.HostReadWrite();    
+    double *d_CMix = tmpR0c_.HostReadWrite();
+
+    int nEq = dim_ + 2 + nActiveSpecies_;
+    Vector state(nEq);
+    state = 0.0;
+
+    Vector n_sp;
+
     for (int i = 0; i < sDofInt_; i++) {
       double cpMix;
-      int nEq = dim_ + 2 + nActiveSpecies_;
-      Vector state(nEq);
+
+      // Set up conserved state (just the mass densities, which is all we need here)
       state[0] = dataRho[i];
-      for (int eq = 0; eq < dim_; eq++) {state[eq+1] = 0.0;} // doesnt matter for Cp call
-      state[dim_ + 1] = dataT[i];
-      for (int sp = 0; sp < nSpecies_-1; sp++) {
-        state[dim_ + 1 + sp + 1] = Yn_[i + sp * sDofInt_];
-	// std::cout << i << " " << sp << ") Yn: " << Yn_[i + sp * sDofInt_] << endl;	
+      for (int sp = 0; sp < nActiveSpecies_; sp++) {
+        state[dim_ + 1 + sp + 1] = dataRho[i] * Yn_[i + sp * sDofInt_];
       }
-      // std::cout << " Calling getMixtureCp..." << endl;      
+
+      // Evaluate the mole densities (from mass densities)
+      mixture_->computeNumberDensities(state, n_sp);
+
+      // Set up primitive state
+      state[dim_ + 1] = dataT[i];
+      state[0] = dataRho[i];
+      for (int sp = 0; sp < nActiveSpecies_; sp++) {
+        state[dim_ + 1 + sp + 1] = n_sp[sp];
+      }
+
+      // GetMixtureCp returns cpMix = sum_s X_s Cp_s, where X_s is
+      // mole density of species s and Cp_s is molar specific heat
+      // (constant pressure) of species s, so cpMix at this point
+      // (units J/m^3), which is rho*Cp, where rho is the mixture
+      // density (kg/m^3) and Cp is the is the mixture mass specific
+      // heat (units J/(kg*K).
       mixture_->GetMixtureCp(state, cpMix);
-      d_CMix[i] = cpMix;
-      //std::cout << i << ") CpMix: " << cpMix << endl;
+
+      // Everything else expects CpMix_gf_ to be the mixture mass Cp
+      // (with units J/(kg*K)), so divide by mixture density
+      d_CMix[i] = cpMix / dataRho[i];
     }
   }
-  CpMix_gf_.SetFromTrueDofs(tmpR0c_);  
+  CpMix_gf_.SetFromTrueDofs(tmpR0c_);
 
   // species Cp, not the best place for this
   {
