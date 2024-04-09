@@ -1349,6 +1349,9 @@ void ReactingFlow::speciesStep(int iSpec) {
 
   // solve helmholtz eq for iSpec
   HyInv_->Mult(Bt2, Xt2);
+  if (!(HyInv_->GetConverged())) {
+    if(rank0_) std::cout << " Species " << iSpec << " is not converging..." << endl;
+  }
   assert(HyInv_->GetConverged());
 
   // copy into full species vector & gf
@@ -1367,7 +1370,7 @@ void ReactingFlow::speciesProduction() {
   double *dataProd = prodY_.HostReadWrite();  
     
   for (int i = 0; i < sDofInt_; i++) {
-    // prodY_[i + n * sDofInt_] = 0.0;
+    
     Vector kfwd; // set to size nReactions_ in computeForwardRareCoeffs
     Vector keq; // set to size nReactions_ in computeEquilibriumConstants
     Vector progressRate; // set to size nReactions_ in computeProgressRate
@@ -1391,10 +1394,8 @@ void ReactingFlow::speciesProduction() {
     
     Vector n_sp(gpudata::MAXSPECIES);
     mixture_->computeNumberDensities(conservedState, n_sp);
-    double nsp[gpudata::MAXSPECIES];
-    for (int sp = 0; sp < n_sp.Size(); sp++) {
-      nsp[sp] = n_sp[sp];
-    }
+    //double nsp[gpudata::MAXSPECIES];
+    //for (int sp = 0; sp < n_sp.Size(); sp++) { nsp[sp] = n_sp[sp]; }
     
     /*
     double nsp[gpudata::MAXSPECIES];
@@ -1403,15 +1404,21 @@ void ReactingFlow::speciesProduction() {
     }
     */
       
-    chemistry_->computeForwardRateCoeffs(Th, Te, kfwd);
+    chemistry_->computeForwardRateCoeffs(Th, Te, kfwd);    
     chemistry_->computeEquilibriumConstants(Th, Te, keq);
-    progressRate.SetSize(nReactions_); // this is commented in computeProgressRate, no idea why this is the only one in the series
-    chemistry_->computeProgressRate(nsp, kfwd, keq, progressRate);      
+    chemistry_->computeProgressRate(n_sp, kfwd, keq, progressRate);
     chemistry_->computeCreationRate(progressRate, creationRate);
+
+    /*
+    for (int nr = 0; nr < nReactions_; nr++) {
+      std::cout << "*" <<  i << "/" << nr << "): " << kfwd[nr] << " " << keq[nr] << " " << progressRate[nr] << endl;   
+    }
+    */
 
     for(int sp = 0; sp < nSpecies_; sp++) {      
       dataProd[i + sp * sDofInt_] = creationRate[sp];
-      //dataProd[i + sp * sDofInt_] = 0.0; // testing...      
+      //std::cout <<  i << "/" << sp << "): " << creationRate[sp] << endl;
+      // dataProd[i + sp * sDofInt_] = 0.0; // testing...      
     }
   }  
 }
@@ -1746,8 +1753,8 @@ void ReactingFlow::updateDiffusivity() {
       for (int sp = 0; sp < nSpecies_; sp++) {
 	diffSp[sp] = std::max(diffSp[sp],diffY_min);
         dataDiff[i + sp * sDofInt_] = diffSp[sp];
-        //dataDiff[i + sp * sDofInt_] = 0.1;
-	// std::cout << sp << "): " << diffSp[sp] << endl;
+        // dataDiff[i + sp * sDofInt_] = 0.1;
+        // std::cout <<  " DiffY: (" <<i << "/" << sp << "): " << diffSp[sp] << endl;	
       }
     }
   }

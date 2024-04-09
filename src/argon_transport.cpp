@@ -1201,9 +1201,6 @@ void ArgonMixtureTransport::computeMixtureAverageDiffusivity(const double *state
     }
   }
 
-  // double diffusivity[gpudata::MAXSPECIES], mobility[gpudata::MAXSPECIES];
-  // CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
-
   for (int sp = 0; sp < 3; sp++) diffusivity[sp] = 0.0;
   CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
 }
