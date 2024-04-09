@@ -578,7 +578,7 @@ void ReactingFlow::initializeSelf() {
   resY_.SetSize(sDofInt_);  
   resY_ = 0.0;
 
-  hw_.SetSize(yDofInt_);
+  hw_.SetSize(sDofInt_);
   hw_ = 0.0;
   
   // only YnFull for plotting
@@ -619,9 +619,6 @@ void ReactingFlow::initializeSelf() {
   prodY_.SetSize(yDofInt_);
   prodY_ = 1.0e-12;
 
-  hw_.SetSize(yDofInt_);
-  hw_ = 0.0;
-  
   prodY_gf_.SetSpace(sfes_);
   prodY_gf_ = 0.0;    
 
@@ -1407,13 +1404,14 @@ void ReactingFlow::speciesProduction() {
 }
 
 void ReactingFlow::heatOfFormation() {
-  double *data = hw_.HostReadWrite();
-  double *dw = prodY_.HostReadWrite();
+  hw_ = 0.0;
+  double *h_hw = hw_.HostReadWrite();
+  const double *h_prodY = prodY_.HostRead();
   double ho;
   for (int n = 0; n < nSpecies_; n++) {
-    ho = gasParams_(n - 1, GasParams::FORMATION_ENERGY);
+    ho = gasParams_(n, GasParams::FORMATION_ENERGY) / gasParams_(n, GasParams::SPECIES_MW);
     for (int i = 0; i < sDofInt_; i++) {
-      hw_[i + n * sDofInt_] = ho * dw[i + n * sDofInt_];
+      h_hw[i] -= ho * h_prodY[i + n * sDofInt_];
     }
   }
 }
