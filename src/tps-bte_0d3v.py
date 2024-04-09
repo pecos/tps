@@ -122,7 +122,7 @@ class BoltzmannSolverParams():
     n0            = 3.22e22 #[m^{-3}]
     
     rand_seed       = 0
-    use_clstr_inp   = True
+    use_clstr_inp   = False
     clstr_maxiter   = 10
     clstr_threshold = 1e-3
     
@@ -344,7 +344,7 @@ class Boltzmann0D2VBactchedSolver:
         #         active_grid_idx.append(grid_idx)
         
         # self.active_grid_idx  = active_grid_idx #[i for i in range(self.param.n_grids)]
-        self.active_grid_idx  = [i for i in range(self.param.n_grids)]
+        self.active_grid_idx  = [2,3]#[i for i in range(self.param.n_grids)]
         self.sub_clusters_run = False
         return
 
@@ -496,6 +496,29 @@ class Boltzmann0D2VBactchedSolver:
         Ex                      = efield[0]
         Ey                      = efield[1]
         
+        ne                      = species_densities[TPSINDEX.ELE_IDX]
+        coll_list               = self.bte_solver.get_collision_list()
+        coll_names              = self.bte_solver.get_collision_names()
+        cs_data                 = self.bte_solver.get_cross_section_data()
+        
+        cs_species              = list()
+        for col_idx, (k,v) in enumerate(cs_data.items()):
+            cs_species.append(v["species"])
+        
+        cs_species = list(sorted(set(cs_species), key=cs_species.index))
+        data_csv   = np.concatenate([(Ex).reshape((-1, 1)),
+                                     (Ey).reshape((-1, 1)),
+                                     (Tg).reshape((-1, 1)),
+                                     (ne/n0).reshape((-1, 1))] + [ns_by_n0[i].reshape((-1, 1)) for i in range(ns_by_n0.shape[0])] + [n0.reshape(-1, 1)], axis=1)
+        
+        for grid_idx in self.active_grid_idx:
+            with open("%s/%s.csv"%(self.param.output_dir, "tps_fetch_grid_%02d_rank_%02d_npes_%02d"%(grid_idx, self.rankG, self.npesG)), 'w', encoding='UTF8') as f:
+                writer = csv.writer(f,delimiter=',')
+                # write the header
+                header = ["eRe", "eIm", "Tg", "ne/n0"] + ["(%s)/n0"%(s) for s in cs_species] + ["n0"]
+                writer.writerow(header)
+                writer.writerows(data_csv[gidx_to_pidx[grid_idx]])
+                
         EMag                    = np.sqrt(Ex**2 + Ey**2)
         e_idx                   = EMag<self.param.EMag_threshold
         
@@ -618,7 +641,6 @@ class Boltzmann0D2VBactchedSolver:
                     t1()
             
         else:
-            ts = TaskSpace("T")
             for grid_idx in self.active_grid_idx:
                 dev_id            = self.gidx_to_device_map(grid_idx, n_grids)
                 
@@ -1348,7 +1370,7 @@ class Boltzmann0D2VBactchedSolver:
         eIm      = asnumpy(self.bte_solver.get_boltzmann_parameter(grid_idx, "eIm"))
         eMag     = np.sqrt(eRe**2 + eIm**2)
         
-        data_csv = np.zeros((ne.shape[0], 7 + ns_by_n0.shape[1] + len((coll_list))))    
+        data_csv = np.zeros((ne.shape[0], 7 + ns_by_n0.shape[1] + len((coll_list)) + 2))    
 
         if export_csv:
             data_csv[: , 0]    = n0
@@ -1357,19 +1379,20 @@ class Boltzmann0D2VBactchedSolver:
             data_csv[: ,2:idx] = ns_by_n0[:,:]
             
             data_csv[: , idx]      = Tg
-            data_csv[: , idx+1]    = eMag
-            data_csv[: , idx+2]    = asnumpy(qoi["energy"])
-            data_csv[: , idx+3]    = asnumpy(qoi["mobility"])
-            data_csv[: , idx+4]    = asnumpy(qoi["diffusion"])
+            data_csv[: , idx+1]    = eRe
+            data_csv[: , idx+2]    = eIm
+            data_csv[: , idx+3]    = eMag
+            data_csv[: , idx+4]    = asnumpy(qoi["energy"])
+            data_csv[: , idx+5]    = asnumpy(qoi["mobility"])
+            data_csv[: , idx+6]    = asnumpy(qoi["diffusion"])
                 
             for col_idx, g in enumerate(coll_list):
-                data_csv[: , idx+5 + col_idx]    = asnumpy(qoi["rates"][col_idx])
+                data_csv[: , idx + 7 + col_idx]    = asnumpy(qoi["rates"][col_idx])
                 
-            
             with open("%s_qoi.csv"%(fname), 'w', encoding='UTF8') as f:
                 writer = csv.writer(f,delimiter=',')
                 # write the header
-                header = ["n0", "ne/n0"] + ["(%s)/n0"%(s) for s in cs_species] + ["Tg", "E",  "energy", "mobility", "diffusion"]
+                header = ["n0", "ne/n0"] + ["(%s)/n0"%(s) for s in cs_species] + ["Tg", "eRe", "eIm", "E",  "energy", "mobility", "diffusion"]
                 for col_idx, g in enumerate(coll_list):
                     header.append(str(coll_names[col_idx]))
                 
