@@ -138,7 +138,9 @@ void Tps::parseCommandLineArgs(int argc, char *argv[]) {
   args.AddOption(&debugMode, "-d", "--debug", "", "--no-debug", "Launch in debug mode for gdb attach.");
   args.AddOption(&visualMode, "-visual", "--visualization", "", "--no-visualization",
                  "Launch post-process visualization.");
-
+  gpu_aware_mpi_=false;
+  args.AddOption(&gpu_aware_mpi_, "-ga", "--gpu-aware-mpi", "", "--no-gpu-aware-mpi",
+		 "Set GPU-aware MPI."); 
   args.Parse();
 
   if (!args.Good()) {
@@ -193,11 +195,25 @@ void Tps::chooseDevices() {
 
   int mpi_gpu_aware = 0;  // false;
 #if _CUDA_ && defined(MPIX_CUDA_AWARE_SUPPORT)
-  // check for cuda-aware mpi (if possible)
+  // check for cuda-aware mpi (if possible) and overwrite flag if needed
+  // Trust the command line flag if  MPIX_Query_cuda_support is not available
   mpi_gpu_aware = MPIX_Query_cuda_support();
+
+  if (mpi_gpu_aware == 1 && gpu_aware_mpi_ == false) {
+    if (isRank0_) {
+      grvy_printf(GRVY_WARNING, "Cuda-aware MPI detected, but flag is false")
+    }
+    gpu_aware_mpi_=true;
+  } else if (mpi_gpu_aware == 0 && gpu_aware_mpi_ == true) {
+    if (isRank0_) {
+      grvy_printf(GRVY_WARNING, "No cuda-aware MPI detected, but flag is true")
+    }
+    gpu_aware_mpi_=false;
+  }
+
 #endif
 
-  device_.SetGPUAwareMPI(mpi_gpu_aware);
+  device_.SetGPUAwareMPI(gpu_aware_mpi_);
 #endif
 
   if (isRank0_) {
@@ -209,7 +225,7 @@ void Tps::chooseDevices() {
 
 #ifdef _GPU_
   if (isRank0_) {
-    if (mpi_gpu_aware) {
+    if (gpu_aware_mpi_) {
       grvy_printf(GRVY_INFO, "\nTPS is using GPU-aware MPI.\n");
     } else {
       grvy_printf(GRVY_INFO, "\nTPS is using non-GPU-aware MPI.\n");

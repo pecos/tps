@@ -81,6 +81,7 @@ class Tps {
   std::string iFile_;              // name of runtime input file (new ini format)
   std::string input_solver_type_;  // choice of desired solver
   int numGpusPerRank_;             // number of GPUs to use per MPI rank
+  bool gpu_aware_mpi_;             // whether MPI is gpu-aware (default: false)
 
   // execution device controls
   std::string deviceConfig_;
