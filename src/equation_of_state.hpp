@@ -680,11 +680,11 @@ class PerfectMixture : public GasMixture {
   MFEM_HOST_DEVICE virtual void GetPrimitivesFromConservatives(const double *conserv, double *primit);
   MFEM_HOST_DEVICE virtual void GetConservativesFromPrimitives(const double *primit, double *conserv);
 
-  virtual void GetMixtureCp(const Vector &primit, double &CpMix);
-  MFEM_HOST_DEVICE virtual void GetMixtureCp(const double *primit, double *CpMix);
+  virtual void GetMixtureCp(const Vector &ns, const double &rho, double &CpMix);
+  MFEM_HOST_DEVICE virtual void GetMixtureCp(const double *ns, const double *rho, double *CpMix);
 
-  virtual void GetSpeciesCp(const Vector &primit, double &CpY);
-  MFEM_HOST_DEVICE virtual void GetSpeciesCp(const double *primit, double *CpY);
+  virtual void GetSpeciesCp(const Vector &ns, const double &rho, int sp, double &CpY);
+  MFEM_HOST_DEVICE virtual void GetSpeciesCp(const double *ns, const double *rho, int sp, double *CpY);
 
   virtual void computeSpeciesPrimitives(const Vector &conservedState, Vector &X_sp, Vector &Y_sp, Vector &n_sp);
   MFEM_HOST_DEVICE virtual void computeSpeciesPrimitives(const double *conservedState, double *X_sp, double *Y_sp,

@@ -1420,7 +1420,7 @@ void ReactingFlow::heatOfFormation() {
     for (int n = 0; n < nSpecies_; n++) {
       // HACK: Hardcode Cv for now
       // TODO(trevilo): Generalize this
-      double molarCV = 2.49996;
+      double molarCV = speciesMolarCv_[n]; // 2.49996;
       molarCV *= UNIVERSALGASCONSTANT;
       double molarCP = molarCV + UNIVERSALGASCONSTANT;
 
@@ -1574,30 +1574,23 @@ void ReactingFlow::extrapolateState() {
 }
 
 void ReactingFlow::updateMixture() {
-
-  // (flow_interface_->velocity)->GetTrueDofs(tmpR1_);  
-  // const double *dataU = tmpR1_.HostRead();
-  double *dataT = Tn_gf_.HostReadWrite();
-  double *dataRho = rn_gf_.HostReadWrite();    
-  double *dataR = Rmix_gf_.HostReadWrite();        
-  double *dataM = Mmix_gf_.HostReadWrite();
-  Mmix_gf_ = 0.0;
   
-  for (int sp = 0; sp < nSpecies_; sp++) {
-    setScalarFromVector(Yn_, sp, &tmpR0_);
-    Yn_gf_.SetFromTrueDofs(tmpR0_);
-    double *dataY = Yn_gf_.HostReadWrite();
-    for (int i = 0; i < sDof_; i++) {
-      dataM[i] += dataY[i] / gasParams_(sp, GasParams::SPECIES_MW);
+  {
+    double *dataY = Yn_gf_.HostReadWrite();  
+    double *dataR = Rmix_gf_.HostReadWrite();        
+    double *dataM = Mmix_gf_.HostReadWrite();  
+    Mmix_gf_ = 0.0;
+  
+    for (int sp = 0; sp < nSpecies_; sp++) {
+      setScalarFromVector(Yn_, sp, &tmpR0_);
+      Yn_gf_.SetFromTrueDofs(tmpR0_);
+      for (int i = 0; i < sDof_; i++) {
+        dataM[i] += dataY[i] / gasParams_(sp, GasParams::SPECIES_MW);
+      }
     }
-  }
   
-  for (int i = 0; i < sDof_; i++) {
-    dataM[i] = 1.0 / dataM[i];
-  }
-
-  for (int i = 0; i < sDof_; i++) {
-    dataR[i] = Rgas_ / dataM[i];
+    for (int i = 0; i < sDof_; i++) { dataM[i] = 1.0 / dataM[i]; }
+    for (int i = 0; i < sDof_; i++) { dataR[i] = Rgas_ / dataM[i]; }
   }
 
   // can use mixture calls directly for this
@@ -1617,6 +1610,9 @@ void ReactingFlow::updateMixture() {
   // mixture Cp
   {
     double *d_CMix = tmpR0c_.HostReadWrite();
+    double *d_Yn = Yn_.HostReadWrite();
+    double *d_Rho = rn_.HostReadWrite();        
+    double *d_Cp = CpY_.HostReadWrite();        
 
     int nEq = dim_ + 2 + nActiveSpecies_;
     Vector state(nEq);
@@ -1626,22 +1622,16 @@ void ReactingFlow::updateMixture() {
 
     for (int i = 0; i < sDofInt_; i++) {
       double cpMix;
+      double cpY;
 
       // Set up conserved state (just the mass densities, which is all we need here)
-      state[0] = dataRho[i];
+      state[0] = d_Rho[i];
       for (int sp = 0; sp < nActiveSpecies_; sp++) {
-        state[dim_ + 1 + sp + 1] = dataRho[i] * Yn_[i + sp * sDofInt_];
+        state[dim_ + 1 + sp + 1] = d_Rho[i] * d_Yn[i + sp * sDofInt_];
       }
 
       // Evaluate the mole densities (from mass densities)
       mixture_->computeNumberDensities(state, n_sp);
-
-      // Set up primitive state
-      state[dim_ + 1] = dataT[i];
-      state[0] = dataRho[i];
-      for (int sp = 0; sp < nActiveSpecies_; sp++) {
-        state[dim_ + 1 + sp + 1] = n_sp[sp];
-      }
 
       // GetMixtureCp returns cpMix = sum_s X_s Cp_s, where X_s is
       // mole density of species s and Cp_s is molar specific heat
@@ -1649,49 +1639,20 @@ void ReactingFlow::updateMixture() {
       // (units J/m^3), which is rho*Cp, where rho is the mixture
       // density (kg/m^3) and Cp is the is the mixture mass specific
       // heat (units J/(kg*K).
-      mixture_->GetMixtureCp(state, cpMix);
+      mixture_->GetMixtureCp(n_sp, d_Rho[i], cpMix);
 
       // Everything else expects CpMix_gf_ to be the mixture mass Cp
       // (with units J/(kg*K)), so divide by mixture density
-      d_CMix[i] = cpMix / dataRho[i];
-    }
-  }
-  CpMix_gf_.SetFromTrueDofs(tmpR0c_);
+      d_CMix[i] = cpMix / d_Rho[i];
 
-  // species Cp, not the best place for this
-  {
-    double *d_Cp = CpY_.HostReadWrite();    
-    for (int i = 0; i < sDofInt_; i++) {
-      double cpY[nSpecies_];
-      int nEq = dim_ + 2 + nActiveSpecies_;
-      Vector state(nEq);
-      state[0] = dataRho[i];
-      for (int eq = 0; eq < dim_; eq++) {state[eq+1] = 0.0;}
-      state[dim_ + 1] = dataT[i];
-      for (int sp = 0; sp < nSpecies_-1; sp++) {
-        state[dim_ + 1 + sp + 1] = Yn_[i + sp * sDofInt_];
-      }
-      mixture_->GetSpeciesCp(state, cpY);
-      for (int sp = 0; sp < nSpecies_; sp++) {      
-        d_Cp[i + sp * sDofInt_] = cpY[sp];
-	//std::cout << i << ", " << sp << ") CpY: " << cpY[sp] << endl;	
-      }
+      for (int sp = 0; sp < nSpecies_; sp++) {
+        mixture_->GetSpeciesCp(n_sp, d_Rho[i], sp, cpY);	
+        d_Cp[i + sp * sDofInt_] = cpY / std::max( d_Rho[i] * d_Yn[i + sp * sDofInt_], 1.0e-14);
+	//std::cout << i << ", " << sp << ") CpY: " << cpY << " " << d_Cp[i + sp * sDofInt_] << endl;		
+      }            
     }
   }
-  
-  /*
-  tmpR0c_ = 0.0;  
-  for (int sp = 0; sp < nSpecies_; sp++) {
-    setScalarFromVector(Yn_, sp, &tmpR0a_);
-    double *d_Yn = tmpR0a_.HostReadWrite();
-    double *d_CMix = tmpR0c_.HostReadWrite();
-    for (int i = 0; i < sDofInt_; i++) {
-      d_CMix[i] += d_Yn[i] * speciesMolarCp_[sp];
-    }    
-  }
-  CpMix_gf_.SetFromTrueDofs(tmpR0c_);
-  */
-  
+  CpMix_gf_.SetFromTrueDofs(tmpR0c_);  
 }
 
 // update thermodynamic pressure
