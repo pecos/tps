@@ -782,49 +782,49 @@ MFEM_HOST_DEVICE void PerfectMixture::GetConservativesFromPrimitives(const doubl
   conserv[iTh] = totalEnergy;
 }
 
-void PerfectMixture::GetMixtureCp(const Vector &primit, double &CpMix) {
-  GetMixtureCp(&primit[0], &CpMix);
+void PerfectMixture::GetMixtureCp(const Vector &ns, const double &rho, double &CpMix) {
+  GetMixtureCp(&ns[0], &rho, &CpMix);
 }
 
-MFEM_HOST_DEVICE void PerfectMixture::GetMixtureCp(const double *primit, double *CpMix){
+MFEM_HOST_DEVICE void PerfectMixture::GetMixtureCp(const double *ns, const double *rho, double *CpMix){
   double n_e = 0.0;
   if (ambipolar) {
-    n_e = computeAmbipolarElectronNumberDensity(&primit[nvel_ + 2]);
+    n_e = computeAmbipolarElectronNumberDensity(ns);
   } else {
-    n_e = primit[nvel_ + 2 + iElectron];
+    n_e = ns[iElectron];
   }
-  double rhoB = computeBackgroundMassDensity(primit[0], &primit[nvel_ + 2], n_e, true);
+  double rhoB = computeBackgroundMassDensity(*rho, ns, n_e, true);
   double nB = rhoB / GetGasParams(iBackground, GasParams::SPECIES_MW);
 
   // compute mixture heat capacity.
-  double totalHeatCapacity = computeHeaviesCp(&primit[nvel_ + 2], nB);
+  double totalHeatCapacity = computeHeaviesCp(ns, nB);
   if (!twoTemperature_) totalHeatCapacity += n_e * molarCP_[iElectron];
   // std::cout << "CpMix: " << totalHeatCapacity << endl;
   *CpMix = totalHeatCapacity;
 }
 
-void PerfectMixture::GetSpeciesCp(const Vector &primit, double &CpY) {
-  GetSpeciesCp(&primit[0], &CpY);
+void PerfectMixture::GetSpeciesCp(const Vector &ns, const double &rho, int sp, double &CpY) {
+  GetSpeciesCp(&ns[0], &rho, sp, &CpY);
 }
 
-MFEM_HOST_DEVICE void PerfectMixture::GetSpeciesCp(const double *primit, double *CpY){
+MFEM_HOST_DEVICE void PerfectMixture::GetSpeciesCp(const double *ns, const double *rho, int sp, double *CpY){
   double n_e = 0.0;
   if (ambipolar) {
-    n_e = computeAmbipolarElectronNumberDensity(&primit[nvel_ + 2]);
+    n_e = computeAmbipolarElectronNumberDensity(ns);
   } else {
-    n_e = primit[nvel_ + 2 + iElectron];
+    n_e = ns[iElectron];
   }
-  double rhoB = computeBackgroundMassDensity(primit[0], &primit[nvel_ + 2], n_e, true);
+  double rhoB = computeBackgroundMassDensity(*rho, ns, n_e, true);
   double nB = rhoB / GetGasParams(iBackground, GasParams::SPECIES_MW);
-  double totalHeatCapacity[numSpecies];
-  for (int sp = 0; sp < numSpecies; sp++) {
-    totalHeatCapacity[sp] = computeSpeciesCp(&primit[nvel_ + 2], nB, sp);
+  //double spHeatCapacity;
+  //for (int sp = 0; sp < numSpecies; sp++) {
+  //spHeatCapacity = computeSpeciesCp(ns, nB, sp);
     //std::cout << sp << ") tHC: " << totalHeatCapacity[sp];
-  }
-  for (int sp = 0; sp < numSpecies; sp++) {
-    *(CpY+sp) = totalHeatCapacity[sp];
-    //std::cout << sp << ") CpY: " << totalHeatCapacity[sp];    
-  }
+    //}
+    //for (int sp = 0; sp < numSpecies; sp++) {
+    *CpY = computeSpeciesCp(ns, nB, sp); //spHeatCapacity;
+    //std::cout << sp << ") CpY: " << *CpY << endl;    
+    //}
 }
 
 
