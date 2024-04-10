@@ -81,6 +81,8 @@ class ReactingFlow : public ThermoChemModelBase {
   double dt_;
   double time_;
 
+  std::string ic_string_;
+  
   // number of species and dofs
   int nSpecies_, nActiveSpecies_, nReactions_, nAtoms_;  
   int sDof_, sDofInt_;

@@ -47,12 +47,10 @@
 using namespace mfem;
 using namespace mfem::common;
 
-MFEM_HOST_DEVICE double Sutherland_lcl(const double T, const double mu_star, const double T_star, const double S_star) {
-  const double T_rat = T / T_star;
-  const double T_rat_32 = T_rat * sqrt(T_rat);
-  const double S_rat = (T_star + S_star) / (T + S_star);
-  return mu_star * T_rat_32 * S_rat;
-}
+/// forward declarations
+double species_stepLeft(const Vector &coords, double t);
+double species_stepRight(const Vector &coords, double t);
+double species_uniform(const Vector &coords, double t);
 
 ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts,
                                                            temporalSchemeCoefficients &time_coeff, TPS::Tps *tps)
@@ -431,6 +429,8 @@ enum GasParams {
   }   
   
   chemistry_ = new Chemistry(mixture_, chemistryInput_);
+
+  tpsP_->getInput("loMach/reactingFlow/ic", ic_string_, std::string(""));
   
 }
 
@@ -672,12 +672,42 @@ void ReactingFlow::initializeSelf() {
   // 2) For restarts, this IC is overwritten by the restart field,
   // which is read later.
 
-  ConstantCoefficient Yn_ic_coef;  
-  for(int sp = 0; sp < nSpecies_; sp++) {
-    Yn_ic_coef.constant = initialMassFraction_[sp];
-    Yn_gf_.ProjectCoefficient(Yn_ic_coef);
-    Yn_gf_.GetTrueDofs(tmpR0_);
-    setVectorFromScalar(tmpR0_, sp, &Yn_);
+  if (!ic_string_.empty()) {
+    if (ic_string_ == "step") {
+      if(rank0_) std::cout << "Setting stepwise initial Yn condition." << endl;
+      
+      FunctionCoefficient y0_excoeff(species_stepLeft);
+      y0_excoeff.SetTime(0.0);
+      Yn_gf_.ProjectCoefficient(y0_excoeff);
+      Yn_gf_.GetTrueDofs(tmpR0_);
+      setVectorFromScalar(tmpR0_,0,&Yn_);
+            
+      FunctionCoefficient y1_excoeff(species_uniform);
+      y1_excoeff.SetTime(0.0);
+      Yn_gf_.ProjectCoefficient(y1_excoeff);
+      Yn_gf_.GetTrueDofs(tmpR0_);
+      setVectorFromScalar(tmpR0_,1,&Yn_);      
+      
+      FunctionCoefficient y2_excoeff(species_stepRight);
+      y2_excoeff.SetTime(0.0);                
+      Yn_gf_.ProjectCoefficient(y2_excoeff);
+      Yn_gf_.GetTrueDofs(tmpR0_);
+      setVectorFromScalar(tmpR0_,2,&Yn_);      
+    } else {
+      if(rank0_) std::cout << "Unknown reactingFlow ic name: " << ic_string_ << ". Exiting." << endl;
+      exit(1);
+    }
+    
+  } else {
+    if(rank0_) std::cout << "Setting uniform initial Yn condition from input file." << endl;
+      
+    ConstantCoefficient Yn_ic_coef;  
+    for (int sp = 0; sp < nSpecies_; sp++) {
+      Yn_ic_coef.constant = initialMassFraction_[sp];
+      Yn_gf_.ProjectCoefficient(Yn_ic_coef);
+      Yn_gf_.GetTrueDofs(tmpR0_);
+      setVectorFromScalar(tmpR0_, sp, &Yn_);
+    }
   }
   Ynm1_ = Yn_;
   Ynm2_ = Yn_;  
@@ -2053,6 +2083,40 @@ void ReactingFlow::identifyCollisionType(const Array<ArgonSpcs> &speciesType, Ar
   }
 
   return;
+}
+
+double species_stepLeft(const Vector &coords, double t) {
+  double x = coords(0);
+  double y = coords(1);
+  double z = coords(2);
+  double pi = 3.14159265359;  
+  double yn;
+  yn = 1.0e-12;
+  //if (x < 0.0) { yn = 1.0; }
+  yn = 0.01 * 0.5 * (cos(2.0*pi*x) + 1.0);  
+  return yn;
+}
+
+double species_stepRight(const Vector &coords, double t) {
+  double x = coords(0);
+  double y = coords(1);
+  double z = coords(2);
+  double pi = 3.14159265359;
+  double yn;
+  yn = 1.0e-12;
+  // if (x > 0.0) { yn = 1.0; }
+  yn = 0.01 * 0.5 * (sin(2.0*pi*x) + 1.0) + 0.99;
+  yn = 1.0;  
+  return yn;
+}
+
+double species_uniform(const Vector &coords, double t) {
+  double x = coords(0);
+  double y = coords(1);
+  double z = coords(2);
+  double yn;
+  yn = 1.0e-12;
+  return yn;
 }
 
 
