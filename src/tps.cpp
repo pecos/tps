@@ -194,11 +194,10 @@ void Tps::chooseDevices() {
 #ifdef _GPU_
   device_.Configure(deviceConfig_, rank_ % numGpusPerRank_);
 
-  int mpi_gpu_aware = 0;  // false;
 #if _CUDA_ && defined(MPIX_CUDA_AWARE_SUPPORT)
   // check for cuda-aware mpi (if possible) and overwrite flag if needed
   // Trust the command line flag if  MPIX_Query_cuda_support is not available
-  mpi_gpu_aware = MPIX_Query_cuda_support();
+  int mpi_gpu_aware = MPIX_Query_cuda_support();
 
   if (mpi_gpu_aware == 1 && gpu_aware_mpi_ == false) {
     if (isRank0_) {
