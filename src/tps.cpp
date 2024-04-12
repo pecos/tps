@@ -139,9 +139,9 @@ void Tps::parseCommandLineArgs(int argc, char *argv[]) {
   args.AddOption(&debugMode, "-d", "--debug", "", "--no-debug", "Launch in debug mode for gdb attach.");
   args.AddOption(&visualMode, "-visual", "--visualization", "", "--no-visualization",
                  "Launch post-process visualization.");
-  gpu_aware_mpi_=false;
+  gpu_aware_mpi_ = false;
   args.AddOption(&gpu_aware_mpi_, "-ga", "--gpu-aware-mpi", "", "--no-gpu-aware-mpi",
-		 "Set GPU-aware MPI."); 
+                 "Set GPU-aware MPI.");
   args.Parse();
 
   if (!args.Good()) {
@@ -204,12 +204,12 @@ void Tps::chooseDevices() {
     if (isRank0_) {
       grvy_printf(GRVY_WARNING, "Cuda-aware MPI detected, but flag is false")
     }
-    gpu_aware_mpi_=true;
+    gpu_aware_mpi_ = true;
   } else if (mpi_gpu_aware == 0 && gpu_aware_mpi_ == true) {
     if (isRank0_) {
       grvy_printf(GRVY_WARNING, "No cuda-aware MPI detected, but flag is true")
     }
-    gpu_aware_mpi_=false;
+    gpu_aware_mpi_ = false;
   }
 
 #endif
