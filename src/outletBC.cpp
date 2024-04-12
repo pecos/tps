@@ -75,7 +75,7 @@ OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_
   if (eqSystem == NS_PASSIVE) hmeanUp[num_equation_ - 1] = 0.;
 
   if (mixture->GetNumActiveSpecies() > 0) {
-    for (int sp = 0; sp < mixture->GetNumActiveSpecies() > 0; sp++) {
+    for (int sp = 0; sp < mixture->GetNumActiveSpecies(); sp++) {
       hmeanUp[nvel_ + 2 + sp] = 0.0;
     }
   }
