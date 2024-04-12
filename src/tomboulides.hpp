@@ -202,7 +202,6 @@ class Tomboulides final : public FlowBase {
 
   mfem::GridFunctionCoefficient *utheta_coeff_ = nullptr;
   mfem::ProductCoefficient *utheta2_coeff_ = nullptr;
-  mfem::ProductCoefficient *rho_utheta2_coeff_ = nullptr;
   mfem::VectorArrayCoefficient *ur_conv_forcing_coeff_ = nullptr;
   mfem::VectorGridFunctionCoefficient *u_next_coeff_ = nullptr;
   mfem::ScalarVectorProductCoefficient *rad_rhou_coeff_ = nullptr;

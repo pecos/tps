@@ -44,15 +44,15 @@
 
 using namespace mfem;
 
-double radius(const Vector &pos) { return pos[0]; }
-FunctionCoefficient radius_coeff(radius);
-
-double negativeRadius(const Vector &pos) { return -pos[0]; }
-FunctionCoefficient negative_radius_coeff(negativeRadius);
-
 /// forward declarations
 void vel_exact_tgv2d(const Vector &x, double t, Vector &u);
 void vel_exact_pipe(const Vector &x, double t, Vector &u);
+
+static double radius(const Vector &pos) { return pos[0]; }
+FunctionCoefficient radius_coeff(radius);
+
+static double negativeRadius(const Vector &pos) { return -pos[0]; }
+FunctionCoefficient negative_radius_coeff(negativeRadius);
 
 /**
  * @brief Helper function to remove mean from a vector
@@ -321,8 +321,6 @@ Tomboulides::~Tomboulides() {
   delete rad_rhou_coeff_;
   delete u_next_coeff_;
   delete ur_conv_forcing_coeff_;
-  delete utheta2_coeff_;
-  // delete utheta_coeff_;
 
   for (size_t i = 0; i < rad_vel_coeff_.size(); i++) delete rad_vel_coeff_[i];
 
@@ -586,11 +584,10 @@ void Tomboulides::initializeOperators() {
 
     utheta_coeff_ = new GridFunctionCoefficient(utheta_next_gf_);
     utheta2_coeff_ = new ProductCoefficient(*utheta_coeff_, *utheta_coeff_);
-    rho_utheta2_coeff_ = new ProductCoefficient(*rho_coeff_, *utheta2_coeff_);
 
-    // NB: Takes ownership of rho_utheta2_coeff_
+    // NB: Takes ownership of utheta2_coeff_
     ur_conv_forcing_coeff_ = new VectorArrayCoefficient(2);
-    ur_conv_forcing_coeff_->Set(0, rho_utheta2_coeff_);
+    ur_conv_forcing_coeff_->Set(0, utheta2_coeff_);
 
     u_next_coeff_ = new VectorGridFunctionCoefficient(u_next_gf_);
     rad_rhou_coeff_ = new ScalarVectorProductCoefficient(*rad_rho_coeff_, *u_next_coeff_);
@@ -1232,7 +1229,7 @@ void Tomboulides::step() {
   // Multiply pp_div_vec_ by nu
   // TODO(trevilo): This is ugly.  Find a better way.
   thermo_interface_->density->GetTrueDofs(rho_vec_);
-  thermo_interface_->viscosity->GetTrueDofs(mu_vec_);
+  mu_total_gf_->GetTrueDofs(mu_vec_);
   if (dim_ == 2) {
     auto d_pp_div_vec = pp_div_vec_.ReadWrite();
     auto d_rho = rho_vec_.Read();

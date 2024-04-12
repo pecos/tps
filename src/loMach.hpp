@@ -99,7 +99,7 @@ struct temporalSchemeCoefficients {
 /**
  * @brief Driver class for models based on low Mach, variable density formulation
  */
-class LoMachSolver : public TPS::Solver {
+class LoMachSolver : public TPS::PlasmaSolver {
  protected:
   // pointer to parent Tps class
   TPS::Tps *tpsP_ = nullptr;
@@ -187,8 +187,8 @@ class LoMachSolver : public TPS::Solver {
   double tlast_;
 
   // I/O helpers
-  ParaViewDataCollection *pvdc_;  // visualization
-  IODataOrganizer ioData;         // restart
+  ParaViewDataCollection *pvdc_ = nullptr;  // visualization
+  IODataOrganizer ioData;                   // restart
 
   /// Update the EXTk/BDF time integration coefficient.
   void SetTimeIntegrationCoefficients(int step);
@@ -224,6 +224,31 @@ class LoMachSolver : public TPS::Solver {
 
   /// Rotate entries in the time step and solution history arrays.
   void UpdateTimestepHistory(double dt);
+
+  // Functions necessary for coupled EM+plasma simulations
+  // These are overriden from TPS::Solver or TPS::PlasmaSolver
+  mfem::ParMesh *getMesh() const override { return pmesh_; }
+  const mfem::FiniteElementCollection *getFEC() const override {
+    if (thermo_->getJouleHeatingGF() != nullptr) {
+      return thermo_->getJouleHeatingGF()->ParFESpace()->FEColl();
+    } else {
+      return nullptr;
+    }
+  }
+
+  mfem::ParFiniteElementSpace *getFESpace() const override {
+    if (thermo_->getJouleHeatingGF() != nullptr) {
+      return thermo_->getJouleHeatingGF()->ParFESpace();
+    } else {
+      return nullptr;
+    }
+  }
+
+  mfem::ParGridFunction *getPlasmaConductivityGF() override { return thermo_->getPlasmaConductivityGF(); }
+
+  void evaluatePlasmaConductivityGF() override { thermo_->evaluatePlasmaConductivityGF(); }
+
+  mfem::ParGridFunction *getJouleHeatingGF() override { return thermo_->getJouleHeatingGF(); }
 };
 
 #endif  // LOMACH_HPP_

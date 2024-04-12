@@ -40,7 +40,6 @@
 
 using namespace mfem;
 
-// AlgebraicRans::AlgebraicRans(Mesh *smesh, ParMesh *pmesh, const Array<int> &partitioning, int order, TPS::Tps *tps)
 AlgebraicRans::AlgebraicRans(ParMesh *pmesh, const Array<int> &partitioning, int order, TPS::Tps *tps,
                              ParGridFunction *distance)
     : pmesh_(pmesh), order_(order), distance_(distance) {
@@ -56,54 +55,17 @@ AlgebraicRans::AlgebraicRans(ParMesh *pmesh, const Array<int> &partitioning, int
   sfec_ = new H1_FECollection(order_);
   sfes_ = new ParFiniteElementSpace(pmesh_, sfec_);
 
-  /*
-  // Evaluate distance function
-  FiniteElementSpace serial_fes(smesh, sfec_);
-  GridFunction serial_distance(&serial_fes);
+  // Filter
+  tps->getInput("loMach/algebraic-rans/filter", filter_mut_, false);
+  if (filter_mut_) {
+    tps->getInput("loMach/algebraic-rans/filter-order", filter_p_, 1);
 
-  // Get coordinates from serial mesh
-  if (smesh->GetNodes() == NULL) {
-    smesh->SetCurvature(1);
+    sfec_filter_ = new H1_FECollection(filter_p_);
+    sfes_filter_ = new ParFiniteElementSpace(pmesh_, sfec_filter_);
+
+    low_order_mut_ = new ParGridFunction(sfes_filter_);
+    *low_order_mut_ = 0.0;
   }
-
-  FiniteElementSpace tmp_dfes(smesh, sfec_, dim_, Ordering::byNODES);
-  GridFunction coordinates(&tmp_dfes);
-  smesh->GetNodes(coordinates);
-
-  // Build a list of wall patches based on BCs
-  Array<int> wall_patch_list;
-
-  int num_walls;
-  tps->getInput("boundaryConditions/numWalls", num_walls, 0);
-
-  // Wall Bcs
-  for (int i = 1; i <= num_walls; i++) {
-    int patch;
-    std::string type;
-    std::string basepath("boundaryConditions/wall" + std::to_string(i));
-
-    tps->getRequiredInput((basepath + "/patch").c_str(), patch);
-    tps->getRequiredInput((basepath + "/type").c_str(), type);
-
-    // NB: Only catch "no-slip" type walls here
-    if (type == "viscous_isothermal" || type == "viscous_adiabatic" || type == "viscous" || type == "no-slip") {
-      wall_patch_list.Append(patch);
-    }
-  }
-
-  // Evaluate the (serial) distance function
-  evaluateDistanceSerial(*smesh, wall_patch_list, coordinates, serial_distance);
-
-  // If necessary, parallelize distance function
-  distance_ = new ParGridFunction(pmesh, &serial_distance, partitioning.HostRead());
-  if (partitioning.HostRead() == nullptr) {
-    *distance_ = serial_distance;
-  }
-  */
-
-  // Necessary?
-  // distance_->ParFESpace()->ExchangeFaceNbrData();
-  // distance_->ExchangeFaceNbrData();
 }
 
 AlgebraicRans::~AlgebraicRans() {
@@ -116,7 +78,9 @@ AlgebraicRans::~AlgebraicRans() {
   delete mut_;
 
   // Alloced in ctor
-  // delete distance_;
+  delete sfec_filter_;
+  delete sfes_filter_;
+  delete low_order_mut_;
   delete sfes_;
   delete sfec_;
 }
@@ -218,4 +182,10 @@ void AlgebraicRans::step() {
   *mut_ *= (*ell_mix_gf_);
   *mut_ *= (*ell_mix_gf_);
   *mut_ *= *thermoChem_interface_->density;
+
+  // Filter
+  if (filter_mut_) {
+    low_order_mut_->ProjectGridFunction(*mut_);
+    mut_->ProjectGridFunction(*low_order_mut_);
+  }
 }

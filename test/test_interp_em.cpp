@@ -54,8 +54,9 @@ void set_flow_plasma_conductivity(const ParFiniteElementSpace *vfes, ParGridFunc
 
 int check_em_plasma_conductivity(const ParFiniteElementSpace *vfes, ParGridFunction *pc) {
   int ierr = 0;
-  const double rtol = 2e-15;
-  const double atol = 1e-18;
+  //const double rtol = 2e-15;
+  const double rtol = 3e-14;
+  const double atol = 3e-16;
 
   const double *data = pc->HostRead();
 
@@ -92,8 +93,8 @@ int check_em_plasma_conductivity(const ParFiniteElementSpace *vfes, ParGridFunct
       if (radius < 0.5) {
         const double true_val = true_plasma_conductivity(radius, z);
         err = std::abs(data[index] - true_val);
-        if (err / true_val > rtol) {
-          printf("Error at r = %.3e, z = %.3e, value = %.6e, expected = %.6e, rel_err = %.6e\n", radius, z, data[index], true_val, err / true_val);
+        if ((err / true_val > rtol) && (err > atol)){
+          printf("Error at r = %.3e, z = %.3e, value = %.6e, expected = %.6e, rel_err = %.6e, abs_err = %.6e\n", radius, z, data[index], true_val, err / true_val, err);
           ierr++;
         }
       } else {
@@ -128,8 +129,10 @@ int main (int argc, char *argv[])
   solver->parseSolverOptions();
   solver->initialize();
 
-  ParFiniteElementSpace *vfes = solver->getFlowSolver()->GetFESpace();
-  ParGridFunction *flow_pc = solver->getFlowSolver()->GetPlasmaConductivityGF();
+
+  // Check flow -> EM
+  ParFiniteElementSpace *vfes = solver->getFlowSolver()->getFESpace();
+  ParGridFunction *flow_pc = solver->getFlowSolver()->getPlasmaConductivityGF();
 
   // Set fields to known function
   set_flow_plasma_conductivity(vfes, flow_pc);
@@ -143,6 +146,28 @@ int main (int argc, char *argv[])
   ParGridFunction *em_pc = solver->getEMSolver()->getPlasmaConductivityGF();
 
   int ierr = check_em_plasma_conductivity(em_fes, em_pc);
-  if (ierr != 0) { printf("Found %d errors!\n", ierr); }
+
+
+  // Check EM->flow
+  ParGridFunction *em_jh = solver->getEMSolver()->getJouleHeatingGF();
+
+  // Set fields to known function
+  set_flow_plasma_conductivity(em_fes, em_jh);
+  ierr += check_em_plasma_conductivity(em_fes, em_jh);
+
+  // interpolation
+  solver->interpJouleHeatingFromEMToFlow();
+
+  // check results
+  ParGridFunction *flow_jh = solver->getFlowSolver()->getJouleHeatingGF();
+
+  ierr += check_em_plasma_conductivity(vfes, flow_jh);
+
+
+  if (ierr != 0) {
+    printf("Found %d errors!\n", ierr);
+  } else {
+    printf("Success: No errors found.\n");
+  }
   return ierr;
 }

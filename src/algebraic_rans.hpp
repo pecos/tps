@@ -67,6 +67,13 @@ class AlgebraicRans : public TurbModelBase {
   mfem::ParGridFunction *distance_ = nullptr;
   mfem::ParGridFunction *ell_mix_gf_ = nullptr;
 
+  // Only used by filter
+  bool filter_mut_ = false;
+  int filter_p_ = 1;
+  mfem::FiniteElementCollection *sfec_filter_ = nullptr;
+  mfem::ParFiniteElementSpace *sfes_filter_ = nullptr;
+  mfem::ParGridFunction *low_order_mut_ = nullptr;
+
  public:
   /// Constructor
   //  AlgebraicRans(mfem::Mesh *smesh, mfem::ParMesh *pmesh, const mfem::Array<int> &partitioning, int order, TPS::Tps

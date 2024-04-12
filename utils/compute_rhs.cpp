@@ -32,7 +32,7 @@ int main (int argc, char *argv[])
   int num_equation = mixture->GetNumEquations();
 
   // Get meshes
-  ParMesh* mesh = srcField->GetMesh();
+  ParMesh* mesh = srcField->getMesh();
 
   const int dim = mesh->Dimension();
   int numVariables = num_equation - dim + 1;
@@ -46,8 +46,8 @@ int main (int argc, char *argv[])
   srcField->updatePrimitives();
 
   // 2) Set up source field
-  FiniteElementCollection *src_fec = srcField->GetFEC();
-  ParFiniteElementSpace *src_fes = srcField->GetFESpace();
+  const FiniteElementCollection *src_fec = srcField->getFEC();
+  ParFiniteElementSpace *src_fes = srcField->getFESpace();
   ParFiniteElementSpace *scalar_fes = srcField->GetScalarFES();
   ParFiniteElementSpace *vector_fes = srcField->GetVectorFES();
   const int nDofs = scalar_fes->GetNDofs();

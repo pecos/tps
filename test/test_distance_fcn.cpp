@@ -42,7 +42,7 @@ int main (int argc, char *argv[]) {
   M2ulPhyS *flow = new M2ulPhyS(tps.getInputFilename(), &tps);
 
   // Get mesh coordinates
-  ParMesh *mesh = flow->GetMesh();
+  ParMesh *mesh = flow->getMesh();
   ParFiniteElementSpace *dfes = flow->GetVectorFES();
   ParGridFunction coordinates(dfes);
   mesh->GetNodes(coordinates);

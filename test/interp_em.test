@@ -5,6 +5,7 @@ TEST="interp_em"
 
 setup() {
     RUNFILE_AXISYM="inputs/interp-em-test.ini"
+    RUNFILE_LOMACH="inputs/interp-em-test-lomach.ini"
 }
 
 @test "[$TEST] flow/em interpolation: test 2d (axisymmetric) interpolation capability" {
@@ -17,5 +18,11 @@ setup() {
     test -s $RUNFILE_AXISYM
     test -e ./test_interp_em
     mpirun -np 2 ./test_interp_em -run $RUNFILE_AXISYM
+}
+
+@test "[$TEST] lomach-flow/em interpolation: test 2d (axisymmetric) interpolation capability (2 mpi ranks)" {
+    test -s $RUNFILE_LOMACH
+    test -e ./test_interp_em
+    mpirun -np 2 ./test_interp_em -run $RUNFILE_LOMACH
 }
 

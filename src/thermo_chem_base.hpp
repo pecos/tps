@@ -79,6 +79,9 @@ class ThermoChemModelBase {
 
   double thermo_pressure_;
 
+  mfem::ParGridFunction *plasma_conductivity_gf_ = nullptr;
+  mfem::ParGridFunction *joule_heating_gf_ = nullptr;
+
  public:
   /// Destructor
   virtual ~ThermoChemModelBase() {}
@@ -181,6 +184,13 @@ class ThermoChemModelBase {
   /// Return thermodynamic pressure for restarts
   double GetThermoPressure() { return thermo_pressure_; }
   void SetThermoPressure(double &Po) { thermo_pressure_ = Po; }
+
+  mfem::ParGridFunction *getPlasmaConductivityGF() { return plasma_conductivity_gf_; }
+  mfem::ParGridFunction *getJouleHeatingGF() { return joule_heating_gf_; }
+  virtual void evaluatePlasmaConductivityGF() {
+    std::cout << "ERROR: " << __func__ << " remains unimplemented" << std::endl;
+    exit(1);
+  }
 };
 
 /**

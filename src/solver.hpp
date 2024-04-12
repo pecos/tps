@@ -32,6 +32,7 @@
 #ifndef SOLVER_HPP_
 #define SOLVER_HPP_
 
+#include "tps_mfem_wrap.hpp"
 #include "utils.hpp"
 
 using namespace std;
@@ -79,21 +80,66 @@ class Solver {
   }
 
   /// Initialize the interface
-  virtual void initInterface(Tps2Boltzmann& interface) {
+  virtual void initInterface(Tps2Boltzmann &interface) {
     cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
     exit(1);
   }
 
   /// Push solver variables to interface
-  virtual void push(Tps2Boltzmann& interface) {
+  virtual void push(Tps2Boltzmann &interface) {
     cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
     exit(1);
   }
 
   /// Fetch solver variables from interface
-  virtual void fetch(Tps2Boltzmann& interface) {
+  virtual void fetch(Tps2Boltzmann &interface) {
     cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
     exit(1);
+  }
+
+  /// Get the mesh used by this Solver
+  virtual mfem::ParMesh *getMesh() const {
+    cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
+    exit(1);
+    return nullptr;
+  }
+
+  virtual const mfem::FiniteElementCollection *getFEC() const {
+    cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
+    exit(1);
+    return nullptr;
+  }
+
+  virtual mfem::ParFiniteElementSpace *getFESpace() const {
+    cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
+    exit(1);
+    return nullptr;
+  }
+};
+
+// Base class for flow solver implementations
+class PlasmaSolver : public Solver {
+ public:
+  virtual ~PlasmaSolver() {}
+
+  /// Fetch the plasma electrical conductivity grid function
+  virtual mfem::ParGridFunction *getPlasmaConductivityGF() {
+    cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
+    exit(1);
+    return nullptr;
+  }
+
+  /// Update the plasma conductivity
+  virtual void evaluatePlasmaConductivityGF() {
+    cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
+    exit(1);
+  }
+
+  /// Fetch the Joule heating grid function
+  virtual mfem::ParGridFunction *getJouleHeatingGF() {
+    cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
+    exit(1);
+    return nullptr;
   }
 };
 
