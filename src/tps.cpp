@@ -201,12 +201,12 @@ void Tps::chooseDevices() {
 
   if (mpi_gpu_aware == 1 && gpu_aware_mpi_ == false) {
     if (isRank0_) {
-      grvy_printf(GRVY_WARNING, "Cuda-aware MPI detected, but flag is false")
+      grvy_printf(GRVY_WARN, "Cuda-aware MPI detected, but flag is false");
     }
     gpu_aware_mpi_ = true;
   } else if (mpi_gpu_aware == 0 && gpu_aware_mpi_ == true) {
     if (isRank0_) {
-      grvy_printf(GRVY_WARNING, "No cuda-aware MPI detected, but flag is true")
+      grvy_printf(GRVY_WARN, "No cuda-aware MPI detected, but flag is true");
     }
     gpu_aware_mpi_ = false;
   }
