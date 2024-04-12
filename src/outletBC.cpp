@@ -319,6 +319,10 @@ void OutletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &grad
     case SUB_MF_NR_PW:
       subsonicNonRefPWMassFlow(normal, stateIn, gradState, bdrFlux);
       break;
+    case RESIST_IN:
+      std::cout << " OUTLET BC RESIST_IN NOT FULLY IMPLEMENTED IN computeBdrFlux" << endl;
+      exit(1);
+      break;
   }
 }
 
@@ -1225,6 +1229,11 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const elementIndexingData
           break;
         case OutletType::SUB_MF_NR_PW:
           printf("OUTLET SUB_MF_NR_PW BC NOT IMPLEMENTED");
+          // exit(1);
+          break;
+        case OutletType::RESIST_IN:
+          printf("OUTLET RESIST_IN BC NOT IMPLEMENTED");
+          // exit(1);
           break;
       }
 

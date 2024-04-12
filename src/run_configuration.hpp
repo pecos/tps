@@ -40,7 +40,9 @@
 #include <utility>
 #include <vector>
 
+#include "averaging.hpp"
 #include "dataStructures.hpp"
+#include "io.hpp"
 #include "tps_mfem_wrap.hpp"
 
 using namespace mfem;
@@ -51,15 +53,18 @@ using namespace std;
 // Lines begining with # are ignored
 class RunConfiguration {
  public:
+  // IO options
+  IOOptions io_opts_;
+
+  // Averaging options
+  AveragingOptions avg_opts_;
+
   // mesh file file
   string meshFile;
   int ref_levels;
 
   // partition file
   string partFile;
-
-  // output file name
-  string outputFile;
 
   // time integrator. Possible values
   //  1: ForwardEulerSolver
@@ -74,6 +79,9 @@ class RunConfiguration {
   //  1: Smagorinsky
   //  2: Sigma
   int sgsModelType;
+
+  // only include fluctuating vel in sgs model
+  bool sgsExcludeMean;
 
   // order of the solution. Defaults to 4
   int solOrder;
@@ -93,6 +101,12 @@ class RunConfiguration {
   // variable/constant time-step
   bool constantTimeStep;
   double dt_fixed;
+  double dt_initial;
+  double dt_factor;
+  int solver_iter;
+  double solver_tol;
+  int bdfOrder;
+  int abOrder;
 
   // num iterations. Defaults to 0
   int numIters;
@@ -107,22 +121,12 @@ class RunConfiguration {
   bool useRoe;
 
   // restart controls
-  bool restart;
-  bool restartFromLTE;
   bool restart_hdf5_conversion;  // read in older ascii format
-  std::string restart_serial;    // mode for serial restarts
   int restart_cycle;
 
   // Restart from different order solution on same mesh.  New order
   // set by POL_ORDER, old order determined from restart file.
-  bool restartFromAux;
   bool singleRestartFile;
-
-  // mean and RMS
-  int sampleInterval;
-  int startIter;
-  bool restartMean;
-  bool meanHistEnable;
 
   // working fluid. Options thus far
   // DRY_AIR
@@ -172,17 +176,43 @@ class RunConfiguration {
   // initial constant field
   double initRhoRhoVp[5];
 
-  bool isForcing;
+  // ic flag to use internal ic function definition
+  bool useICFunction;
+  bool useICBoxFunction;
+
+  // reset Temp field to IC
+  bool resetTemp;
+
+  // wall bc flag to use internal function definition
+  bool useWallFunction;
+  bool useWallBox;  // NEED A BETTER WAY TO DO THIS!
+
   // Imposed pressure gradient
+  bool isForcing;
   double gradPress[3];
+
+  // Boussinesq term
+  bool isGravity;
+  double gravity[3];
+
+  // closed or open system
+  bool isOpen;
+
+  // loMach specific additions
+  double amb_pres, const_visc, const_dens;
 
   // Inlet BC data
   Array<double> inletBC;
   std::vector<pair<int, InletType>> inletPatchType;
+  double velInlet[3];
+  double tempInlet;
+  double densInlet;
+  int rampStepsInlet;
 
   // Outlet BC data
   Array<double> outletBC;
   std::vector<pair<int, OutletType>> outletPatchType;
+  double outletPressure;
 
   // Wall BC data
   // Array<double> wallBC;
@@ -298,8 +328,8 @@ class RunConfiguration {
   double GetWallTemp() { return wallTemperature; }
 
   string GetMeshFileName() { return meshFile; }
-  string GetOutputName() { return outputFile; }
-  string GetPartitionBaseName() { return partFile; }
+  string GetOutputName() { return io_opts_.output_dir_; }
+  string GetPartitionBaseName() const { return partFile; }
   int GetUniformRefLevels() { return ref_levels; }
 
   int GetTimeIntegratorType() { return timeIntegratorType; }
@@ -316,10 +346,10 @@ class RunConfiguration {
   int GetNumItersOutput() { return itersOut; }
   bool RoeRiemannSolver() const { return useRoe; }
 
-  int GetMeanStartIter() { return startIter; }
-  int GetMeanSampleInterval() { return sampleInterval; }
-  bool GetRestartMean() { return restartMean; }
-  bool isMeanHistEnabled() { return meanHistEnable; }
+  int GetMeanStartIter() { return avg_opts_.step_start_mean_; }
+  int GetMeanSampleInterval() { return avg_opts_.sample_interval_; }
+  bool GetRestartMean() { return avg_opts_.enable_mean_continuation_; }
+  bool isMeanHistEnabled() { return avg_opts_.save_mean_history_; }
 
   WorkingFluid GetWorkingFluid() { return workFluid; }
   double GetViscMult() { return visc_mult; }
@@ -339,19 +369,18 @@ class RunConfiguration {
   int rm_threshold() { return rm_threshold_; }
   int rm_checkFreq() { return rm_checkFrequency_; }
 
-  int exit_checkFreq() { return exit_checkFrequency_; }
+  int exit_checkFreq() { return io_opts_.exit_check_frequency_; }
 
   bool thereIsForcing() { return isForcing; }
   double* GetImposedPressureGradient() { return &gradPress[0]; }
 
-  int GetRestartCycle() { return restart; }
+  int GetRestartCycle() { return io_opts_.enable_restart_; }
   void SetRestartCycle(int iter) {
     restart_cycle = iter;
     return;
   }
-  bool RestartFromAux() { return restartFromAux; }
+  bool RestartFromAux() { return io_opts_.restart_variable_order_; }
   bool RestartHDFConversion() { return restart_hdf5_conversion; }
-  std::string RestartSerial() { return restart_serial; }
   bool isRestartSerialized(string mode);
   bool isRestartPartitioned(string mode);
 

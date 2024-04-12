@@ -52,7 +52,7 @@ class Tps;
 
 #include "BCintegrator.hpp"
 #include "argon_transport.hpp"
-#include "averaging_and_rms.hpp"
+#include "averaging.hpp"
 #include "chemistry.hpp"
 #include "dataStructures.hpp"
 #include "dgNonlinearForm.hpp"
@@ -346,18 +346,10 @@ class M2ulPhyS : public TPS::Solver {
   void initGradUp();
   void initilizeSpeciesFromLTE();
 
-  // NOTE(kevin): this routine is currently obsolete.
-  // It computes `dof`-averaged state and time-derivative, which are useless at this point.
-  // This will not be supported.
-  void writeHistoryFile();
-
   // i/o routines
-  void read_partitioned_soln_data(hid_t file, string varName, size_t index, double *data);
-  void read_serialized_soln_data(hid_t file, string varName, int numDof, int varOffset, double *data, IOFamily &fam);
   void restart_files_hdf5(string mode, string inputFileName = std::string());
-  void partitioning_file_hdf5(string mode);
-  void serialize_soln_for_write(IOFamily &fam);
-  void write_soln_data(hid_t group, string varName, hid_t dataspace, double *data);
+  void write_restart_files_hdf5(hid_t file, bool serialized_write);
+  void read_restart_files_hdf5(hid_t file, bool serialized_read);
 
   void Check_NAN();
   bool Check_JobResubmit();

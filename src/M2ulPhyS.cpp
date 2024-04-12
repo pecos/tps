@@ -329,9 +329,9 @@ void M2ulPhyS::initVariables() {
       if (config.isRestartSerialized("read")) {
         assert(serial_mesh->Conforming());
         partitioning_ = Array<int>(serial_mesh->GeneratePartitioning(nprocs_, defaultPartMethod), nelemGlobal_);
-        partitioning_file_hdf5("write");
+        partitioning_file_hdf5("write", groupsMPI, nelemGlobal_, partitioning_);
       } else {
-        partitioning_file_hdf5("read");
+        partitioning_file_hdf5("read", groupsMPI, nelemGlobal_, partitioning_);
       }
     }
 
@@ -359,7 +359,7 @@ void M2ulPhyS::initVariables() {
     if (nprocs_ > 1) {
       assert(serial_mesh->Conforming());
       partitioning_ = Array<int>(serial_mesh->GeneratePartitioning(nprocs_, defaultPartMethod), nelemGlobal_);
-      if (rank0_) partitioning_file_hdf5("write");
+      if (rank0_) partitioning_file_hdf5("write", groupsMPI, nelemGlobal_, partitioning_);
       MPI_Barrier(groupsMPI->getTPSCommWorld());
     }
 
@@ -436,7 +436,7 @@ void M2ulPhyS::initVariables() {
   }
 
   // only need serial mesh if on rank 0 and using single restart file option
-  if (!rank0_ || (config.RestartSerial() == "no")) delete serial_mesh;
+  if (!rank0_ || (!config.isRestartSerialized("either"))) delete serial_mesh;
 
   // Paraview setup
   paraviewColl = new ParaViewDataCollection(config.GetOutputName(), mesh);
@@ -629,16 +629,17 @@ void M2ulPhyS::initVariables() {
     ioData.registerIOVar("/distance", "distance", 0, config.read_distance);
   }
 
-  average = new Averaging(Up, mesh, fec, fes, dfes, vfes, eqSystem, d_mixture, num_equation, dim, config, groupsMPI);
-  average->read_meanANDrms_restart_files();
+  average = new Averaging(config.avg_opts_, config.GetOutputName());
+  average->registerField(std::string("primitive_state"), Up, true, 1, nvel);
+  average->initializeVizForM2ulPhyS(fes, dfes, nvel);
 
   // NOTE: this should also be completed by the GasMixture class
   // Kevin: Do we need GasMixture class for this?
   // register rms and mean sol into ioData
   if (average->ComputeMean()) {
     // meanUp
-    ioData.registerIOFamily("Time-averaged primitive vars", "/meanSolution", average->GetMeanUp(), false,
-                            config.GetRestartMean());
+    ioData.registerIOFamily("Time-averaged primitive vars", "/meanSolution",
+                            average->GetMeanField(std::string("primitive_state")), false, config.GetRestartMean());
     ioData.registerIOVar("/meanSolution", "meanDens", 0);
     ioData.registerIOVar("/meanSolution", "mean-u", 1);
     ioData.registerIOVar("/meanSolution", "mean-v", 2);
@@ -658,16 +659,26 @@ void M2ulPhyS::initVariables() {
     }
 
     // rms
-    ioData.registerIOFamily("RMS velocity fluctuation", "/rmsData", average->GetRMS(), false, config.GetRestartMean());
-    ioData.registerIOVar("/rmsData", "uu", 0);
-    ioData.registerIOVar("/rmsData", "vv", 1);
-    ioData.registerIOVar("/rmsData", "ww", 2);
-    ioData.registerIOVar("/rmsData", "uv", 3);
-    ioData.registerIOVar("/rmsData", "uw", 4);
-    ioData.registerIOVar("/rmsData", "vw", 5);
+    ioData.registerIOFamily("RMS velocity fluctuation", "/rmsData",
+                            average->GetVariField(std::string("primitive_state")), false, config.GetRestartMean());
+    if (nvel == 3) {
+      ioData.registerIOVar("/rmsData", "uu", 0);
+      ioData.registerIOVar("/rmsData", "vv", 1);
+      ioData.registerIOVar("/rmsData", "ww", 2);
+      ioData.registerIOVar("/rmsData", "uv", 3);
+      ioData.registerIOVar("/rmsData", "uw", 4);
+      ioData.registerIOVar("/rmsData", "vw", 5);
+    } else if (nvel == 2) {
+      ioData.registerIOVar("/rmsData", "uu", 0);
+      ioData.registerIOVar("/rmsData", "vv", 1);
+      ioData.registerIOVar("/rmsData", "uv", 2);
+    } else {
+      // only nvel = 2 or 3 supported
+      assert(false);
+    }
   }
 
-  ioData.initializeSerial(rank0_, (config.RestartSerial() != "no"), serial_mesh);
+  ioData.initializeSerial(rank0_, config.isRestartSerialized("either"), serial_mesh, locToGlobElem, &partitioning_);
   projectInitialSolution();
 
   // Boundary attributes in present partition
@@ -1807,7 +1818,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   }
 
   // define solution parameters for i/o
-  ioData.registerIOFamily("Solution state variables", "/solution", U);
+  ioData.registerIOFamily("Solution state variables", "/solution", U, true, true, fec);
   ioData.registerIOVar("/solution", "density", 0);
   ioData.registerIOVar("/solution", "rho-u", 1);
   ioData.registerIOVar("/solution", "rho-v", 2);
@@ -1824,14 +1835,14 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
     if ((eqSystem == NS_PASSIVE) && (sp == 1)) break;
 
     std::string speciesName = config.speciesNames[sp];
-    if (config.restartFromLTE) {
+    if (config.io_opts_.enable_restart_from_lte_) {
       ioData.registerIOVar("/solution", "rho-Y_" + speciesName, sp + nvel + 2, false);
     } else {
       ioData.registerIOVar("/solution", "rho-Y_" + speciesName, sp + nvel + 2);
     }
   }
   if (config.twoTemperature) {
-    if (config.restartFromLTE) {
+    if (config.io_opts_.enable_restart_from_lte_) {
       ioData.registerIOVar("/solution", "rhoE_e", num_equation - 1, false);
     } else {
       ioData.registerIOVar("/solution", "rhoE_e", num_equation - 1);
@@ -1930,7 +1941,7 @@ void M2ulPhyS::projectInitialSolution() {
 
     restart_files_hdf5("read");
 
-    if (config.restartFromLTE) {
+    if (config.io_opts_.enable_restart_from_lte_) {
       initilizeSpeciesFromLTE();
       Check_Undershoot();
     }
@@ -1967,7 +1978,7 @@ void M2ulPhyS::projectInitialSolution() {
   }
 
   // if restarting from LTE, write paraview and restart h5 immediately
-  if (config.restartFromLTE && !tpsP->isVisualizationMode()) {
+  if (config.io_opts_.enable_restart_from_lte_ && !tpsP->isVisualizationMode()) {
     if (rank0_) std::cout << "Writing non-equilibrium restart files!" << std::endl;
     paraviewColl->Save();
     restart_files_hdf5("write");
@@ -2004,12 +2015,6 @@ void M2ulPhyS::solveStep() {
 
   const int vis_steps = config.GetNumItersOutput();
   if (iter % vis_steps == 0) {
-    // dump history
-    // NOTE(kevin): this routine is currently obsolete.
-    // It computes `dof`-averaged state and time-derivative, which are useless at this point.
-    // This will not be supported.
-    writeHistoryFile();
-
 #ifdef HAVE_MASA
     if (config.use_mms_) {
       if (config.mmsSaveDetails_) {
@@ -2037,7 +2042,7 @@ void M2ulPhyS::solveStep() {
       // auto dUp = Up->ReadWrite();  // sets memory to GPU
       Up->ReadWrite();  // sets memory to GPU
 
-      average->write_meanANDrms_restart_files(iter, time);
+      average->writeViz(iter, time, config.isMeanHistEnabled());
     }
 
     // make a separate routine! plane interp and dump here
@@ -2051,9 +2056,9 @@ void M2ulPhyS::solveStep() {
       } else if (config.planeDump.primitive == true) {
         u_gf = getPrimitiveGF();
       } else if (config.planeDump.mean == true) {
-        u_gf = average->GetMeanUp();
+        u_gf = average->GetMeanField(std::string("primitive_state"));
       } else if (config.planeDump.reynolds == true) {
-        u_gf = average->GetRMS();
+        u_gf = average->GetVariField(std::string("primitive_state"));
       } else {
         grvy_printf(GRVY_ERROR, "\nSpecified interpolation type not supported.\n");
         exit(ERROR);
@@ -2087,7 +2092,7 @@ void M2ulPhyS::solveStep() {
     }  // plane dump
   }    // step check
 
-  average->addSampleMean(iter);
+  average->addSample(iter, d_mixture);
 }
 
 void M2ulPhyS::solveEnd() {
@@ -2103,7 +2108,7 @@ void M2ulPhyS::solveEnd() {
     paraviewColl->SetTime(time);
     paraviewColl->Save();
 
-    average->write_meanANDrms_restart_files(iter, time);
+    average->writeViz(iter, time, config.isMeanHistEnabled());
 
 #ifndef HAVE_MASA
     // // If HAVE_MASA is defined, this is handled above
@@ -2727,35 +2732,9 @@ void M2ulPhyS::parseTimeIntegrationOptions() {
   }
 }
 
-void M2ulPhyS::parseStatOptions() {
-  tpsP->getInput("averaging/saveMeanHist", config.meanHistEnable, false);
-  tpsP->getInput("averaging/startIter", config.startIter, 0);
-  tpsP->getInput("averaging/sampleFreq", config.sampleInterval, 0);
-  tpsP->getInput("averaging/enableContinuation", config.restartMean, false);
-}
+void M2ulPhyS::parseStatOptions() { config.avg_opts_.read(tpsP); }
 
-void M2ulPhyS::parseIOSettings() {
-  tpsP->getInput("io/outdirBase", config.outputFile, std::string("output-default"));
-  tpsP->getInput("io/enableRestart", config.restart, false);
-  tpsP->getInput("io/restartFromLTE", config.restartFromLTE, false);
-  tpsP->getInput("io/exitCheckFreq", config.exit_checkFrequency_, 500);
-  assert(config.exit_checkFrequency_ > 0);
-
-  std::string restartMode;
-  tpsP->getInput("io/restartMode", restartMode, std::string("standard"));
-  if (restartMode == "variableP") {
-    config.restartFromAux = true;
-  } else if (restartMode == "singleFileWrite") {
-    config.restart_serial = "write";
-  } else if (restartMode == "singleFileRead") {
-    config.restart_serial = "read";
-  } else if (restartMode == "singleFileReadWrite") {
-    config.restart_serial = "readwrite";
-  } else if (restartMode != "standard") {
-    grvy_printf(GRVY_ERROR, "\nUnknown restart mode -> %s\n", restartMode.c_str());
-    exit(ERROR);
-  }
-}
+void M2ulPhyS::parseIOSettings() { config.io_opts_.read(tpsP); }
 
 void M2ulPhyS::parseRMSJobOptions() {
   tpsP->getInput("jobManagement/enableAutoRestart", config.rm_enableMonitor_, false);
@@ -4100,9 +4079,9 @@ void M2ulPhyS::visualization() {
     paraviewColl->SetTime(time);
     paraviewColl->Save();
 
-    average->write_meanANDrms_restart_files(iter, time);
+    average->writeViz(iter, time, config.isMeanHistEnabled());
 
-    average->addSampleMean(iter);
+    average->addSample(iter, d_mixture);
 
     // periodically check for DIE file which requests to terminate early
     if (Check_ExitEarly(fileIter)) {

@@ -447,6 +447,14 @@ void InletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradS
     case SUB_VEL_CONST_ENT:
       subsonicNonReflectingDensityVelocity(normal, stateIn, gradState, bdrFlux);
       break;
+    case UNI_DENS_VEL:
+      std::cout << "INLET BC UNI_DENS_VEL NOT FULLY IMPLEMENTED IN inletBC.cpp" << endl;
+      exit(1);
+      break;
+    case INTERPOLATE:
+      std::cout << "INLET BC INTERPOLATE NOT FULLY IMPLEMENTED IN inletBC.cpp" << endl;
+      exit(1);
+      break;
   }
 }
 
@@ -881,9 +889,19 @@ void InletBC::interpInlet_gpu(const mfem::Vector &x, const elementIndexingData &
           break;
         case InletType::SUB_DENS_VEL_NR:
           printf("INLET BC NOT IMPLEMENTED");
+          // exit(1);
           break;
         case InletType::SUB_VEL_CONST_ENT:
           printf("INLET BC NOT IMPLEMENTED");
+          // exit(1);
+          break;
+        case InletType::UNI_DENS_VEL:
+          printf("INLET BC NOT IMPLEMENTED");
+          // exit(1);
+          break;
+        case InletType::INTERPOLATE:
+          printf("INLET BC NOT IMPLEMENTED");
+          // exit(1);
           break;
       }
 

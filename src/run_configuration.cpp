@@ -53,18 +53,9 @@ RunConfiguration::RunConfiguration() {
   dt_fixed = -1.0;
   numIters = 10;
   useRoe = false;
-  restart = false;
-  restartFromLTE = false;
   restart_hdf5_conversion = false;
-  restart_serial = "no";
   restart_cycle = 0;
-  restartFromAux = false;
   singleRestartFile = false;
-
-  sampleInterval = 0;
-  startIter = 0;
-  restartMean = false;
-  meanHistEnable = false;
 
   itersOut = 50;
   workFluid = DRY_AIR;
@@ -77,14 +68,17 @@ RunConfiguration::RunConfiguration() {
 
   linViscData.normal.UseDevice(true);
   linViscData.point0.UseDevice(true);
+  linViscData.pointA.UseDevice(true);
   linViscData.pointInit.UseDevice(true);
 
   linViscData.normal.SetSize(3);
   linViscData.point0.SetSize(3);
+  linViscData.pointA.SetSize(3);
   linViscData.pointInit.SetSize(3);
 
   linViscData.normal = 0.;
   linViscData.point0 = 0.;
+  linViscData.pointA = 0.;
   linViscData.pointInit = 0.;
   linViscData.viscRatio = 0.;
 
@@ -107,13 +101,15 @@ RunConfiguration::RunConfiguration() {
   isForcing = false;
   for (int ii = 0; ii < 3; ii++) gradPress[ii] = 0.;
 
+  isGravity = false;
+  for (int ii = 0; ii < 3; ii++) gravity[ii] = 0.;
+
   arrayPassiveScalar.DeleteAll();
 
   // Resource manager monitoring
   rm_enableMonitor_ = false;
-  rm_threshold_ = 15 * 60;     // 15 minutes
-  rm_checkFrequency_ = 25;     // 25 iterations
-  exit_checkFrequency_ = 500;  // 500 iterations
+  rm_threshold_ = 15 * 60;  // 15 minutes
+  rm_checkFrequency_ = 25;  // 25 iterations
 
   initialElectronTemperature = 0.;
 
@@ -134,14 +130,21 @@ RunConfiguration::~RunConfiguration() {
 // convenience function to determine whether a restart is serialized (using a
 // single HDF5 file)
 bool RunConfiguration::isRestartSerialized(string mode) {
-  if (restart_serial == "readwrite") {
+  if (io_opts_.restart_serial_read_ && io_opts_.restart_serial_write_) {
     return true;
   } else if (mode == "read") {
-    if (restart_serial == "read") return true;
+    return io_opts_.restart_serial_read_;
   } else if (mode == "write") {
-    if (restart_serial == "write") return true;
+    return io_opts_.restart_serial_write_;
+  } else if (mode == "either") {
+    return (io_opts_.restart_serial_read_ || io_opts_.restart_serial_write_);
+  } else if (mode == "both") {
+    return (io_opts_.restart_serial_read_ && io_opts_.restart_serial_write_);
+  } else {
+    // should never get here
+    assert(false);
   }
-
+  // should never get here, but have to return to avoid "missing return statement" error
   return false;
 }
 

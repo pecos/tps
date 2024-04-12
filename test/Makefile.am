@@ -26,10 +26,15 @@ EXTRA_DIST  = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes lte-
 	          ref_solns/*.h5 ref_solns/collisions/*.h5 ref_solns/transport/*.h5 \
 			  ref_solns/reaction/*.h5 ref_solns/noSGM1K/*.h5 ref_solns/smag1K_1/*.h5 \
 			  ref_solns/sigma1K_1/*.h5 ref_solns/plate150K/*.h5 ref_solns/plate150K_1step/*.h5 \
+              ref_solns/heatedBox/*.h5 ref_solns/spongeBox/*.h5 ref_solns/interpInlet/*.h5 \
+              ref_solns/sgsLoMach/*.h5 \
+	      ref_solns/lequere-varmu/*.h5 \
+	      ref_solns/taylor-couette/*.h5 \
+	      ref_solns/pipe/*.h5 \
 		      vpath.sh die.sh count_gpus.sh sniff_mpirun.sh \
 		      cyl3d.gpu.test cyl3d.mflow.gpu.test wedge.gpu.test \
-	          averages.gpu.test cyl3d.test cyl3d.gpu.python.test cyl3d.mflow.test cyl3d.dtconst.test \
-		      die.test averages.test wedge.test cyl3d.interp.test qms.rings.test qms.axisym.test \
+	          averaging.gpu.test cyl3d.test cyl3d.gpu.python.test cyl3d.mflow.test cyl3d.dtconst.test \
+		      die.test averaging.test wedge.test cyl3d.interp.test qms.rings.test qms.axisym.test \
 		      sponge_zone.test annulus.test pipe.test valgrind.test valgrind.suppressions \
 		      mms.euler.test reaction.test perfect_gas.test collision_integrals.test \
 	 	      argon_minimal.test argon_minimal.binary.test diffusion_wall.test \
@@ -38,8 +43,9 @@ EXTRA_DIST  = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes lte-
 		      independent_coupling.test interp_em.test mms.euler_2d.test mms.cns_2d.test \
 		      gradient.test coupled-3d.test coupled-3d.splitcomm.test coupled-3d.py-loop.test \
 		      tabulated.test lte_mixture.test distance_fcn.test \
-              sgsSmag.test sgsSigma.test plate.test pipe.mix.test lte2noneq-restart.test \
-              coupled-3d.interface.test plasma.axisym.test plasma.axisym.lte1d.test
+              sgsSmag.test sgsSigma.test heatEq.test sponge.test plate.test pipe.mix.test lte2noneq-restart.test \
+              coupled-3d.interface.test plasma.axisym.test plasma.axisym.lte1d.test \
+	      lomach-flow.test lomach-lequere.test interpInlet.test sgsLoMach.test autoPeriodic.test
 
 TESTS = vpath.sh
 XFAIL_TESTS =
@@ -48,7 +54,7 @@ if GPU_ENABLED
 TESTS += cyl3d.gpu.test \
 	 cyl3d.mflow.gpu.test \
 	 wedge.gpu.test \
-	 averages.gpu.test \
+	 averaging.gpu.test \
 	 argon_minimal.binary.test \
 	 diffusion_wall.test \
 	 reaction.test \
@@ -56,6 +62,7 @@ TESTS += cyl3d.gpu.test \
 	 pipe.test \
 	 sgsSmag.test \
 	 sgsSigma.test \
+	 heatEq.test \
          plate.test \
 	 pipe.mix.test \
 	 plasma.axisym.lte1d.test
@@ -68,7 +75,7 @@ else
 TESTS += cyl3d.test \
 	 cyl3d.mflow.test \
 	 cyl3d.dtconst.test \
-	 averages.test \
+	 averaging.test \
 	 wedge.test \
 	 qms.rings.test \
 	 qms.axisym.test \
@@ -91,12 +98,19 @@ TESTS += cyl3d.test \
 	 lte_mixture.test \
          sgsSmag.test \
          sgsSigma.test \
+         heatEq.test \
+	 sponge.test \
+         sgsLoMach.test \
          plate.test \
          pipe.mix.test \
 	 lte2noneq-restart.test \
 	 coupled-3d.interface.test \
 	 plasma.axisym.test \
-	 plasma.axisym.lte1d.test
+	 plasma.axisym.lte1d.test \
+	 lomach-flow.test \
+	 lomach-lequere.test \
+         interpInlet.test \
+         autoPeriodic.test
 
 if PYTHON_ENABLED
 TESTS += cyl3d.python.test \
@@ -149,6 +163,19 @@ tps_interface_test_SOURCES  = test_tps_interface.cpp
 tps_interface_test_LDADD    = ../src/libtps.la
 tps_interface_test_LDADD   += $(HDF5_LIBS)
 tps_interface_test_LDADD   += $(GRVY_LIBS)
+
+check_PROGRAMS += split_interface_test
+split_interface_test_SOURCES  = test_split_interface.cpp
+split_interface_test_LDADD    = ../src/libtps.la
+split_interface_test_LDADD   += $(HDF5_LIBS)
+split_interface_test_LDADD   += $(GRVY_LIBS)
+
+check_PROGRAMS += tomboulides_test
+tomboulides_test_SOURCES  = test_tomboulides.cpp
+tomboulides_test_LDADD    = ../src/libtps.la
+tomboulides_test_LDADD   += $(HDF5_LIBS)
+tomboulides_test_LDADD   += $(GRVY_LIBS)
+
 
 if !GPU_ENABLED
 

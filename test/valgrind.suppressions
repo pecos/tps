@@ -8,3 +8,89 @@
    fun:_ZN3TPS3TpsD1Ev
    fun:main
 }
+
+{
+   <mpi-finalize-skip-2>
+   Memcheck:Cond
+   fun:MPIDI_OFI_mpi_finalize_hook
+   fun:MPID_Finalize
+   fun:PMPI_Finalize
+   fun:_ZN4mfem3Mpi8FinalizeEv
+   fun:_ZN4mfem3MpiD1Ev
+   fun:__run_exit_handlers
+   fun:exit
+   fun:(below main)
+}
+
+{
+   <mpi-finalize-skip-3>
+   Memcheck:Cond
+   fun:MPIDI_OFI_mpi_finalize_hook
+   fun:MPID_Finalize
+   fun:PMPI_Finalize
+   fun:_ZN4mfem3Mpi8FinalizeEv
+   fun:_ZN4mfem3MpiD1Ev
+   fun:__run_exit_handlers
+   fun:exit
+   fun:(below main)
+}
+
+{
+   <mpi-finalize-skip-4realz>
+   Memcheck:Cond
+   fun:MPIDI_OFI_mpi_finalize_hook
+   fun:MPID_Finalize
+   fun:PMPI_Finalize
+   fun:Finalize
+   fun:Finalize
+   fun:_ZN4mfem3MpiD1Ev
+   fun:__run_exit_handlers
+   fun:exit
+   fun:(below main)
+}
+
+
+{
+   <grvy-parse-leak>
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:_Znwm
+   fun:_ZN4GRVY16GRVY_Input_Class4LoadERNSt7__cxx1118basic_stringstreamIcSt11char_traitsIcESaIcEEE
+   fun:_ZN3TPS3Tps10parseInputEv
+   fun:main
+}
+
+{
+   <ibv-get-device-list-leak>
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:calloc
+   fun:ibv_get_device_list
+   fun:efa_device_init
+   fun:init_lower_efa_prov
+   fun:fi_efa_ini
+   fun:fi_ini
+   fun:fi_getinfo@@FABRIC_1.3
+   fun:MPIDI_OFI_mpi_init_hook
+   fun:MPID_Init
+   fun:MPIR_Init_thread
+   fun:PMPI_Init
+   fun:_ZN4mfem3Mpi5Init_EPiPPPc
+}
+
+{
+   <ibv-get-device-list-leak-2>
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:calloc
+   fun:ibv_get_device_list@@IBVERBS_1.1
+   fun:efa_device_init
+   fun:init_lower_efa_prov
+   fun:fi_efa_ini
+   fun:fi_ini
+   fun:fi_getinfo@@FABRIC_1.3
+   fun:MPIDI_OFI_mpi_init_hook
+   fun:MPID_Init
+   fun:MPIR_Init_thread
+   fun:PMPI_Init
+}

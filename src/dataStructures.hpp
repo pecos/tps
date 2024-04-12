@@ -128,6 +128,8 @@ enum SpeciesPrimitiveType { MASS_FRACTION, MOLE_FRACTION, NUMBER_DENSITY, NUM_SP
 enum boundaryCategory { INLET, OUTLET, WALL, NUM_BC_CATEGORIES };
 
 enum InletType {
+  UNI_DENS_VEL,      // uniform inlet with density and vel specified
+  INTERPOLATE,       // from an external data file
   SUB_DENS_VEL,      // Subsonic inlet specified by the density and velocity components
   SUB_DENS_VEL_NR,   // Non-reflecting subsonic inlet specified by the density and velocity components
   SUB_VEL_CONST_ENT  // Subsonic non-reflecting. Specified vel, keeps entropy constant
@@ -135,6 +137,7 @@ enum InletType {
 
 enum OutletType {
   SUB_P,        // subsonic outlet specified with pressure
+  RESIST_IN,    // subsonic outlet specified with pressure which REDUCES with inflow
   SUB_P_NR,     // non-reflecting subsonic outlet specified with pressure
   SUB_MF_NR,    // Mass-flow non-reflecting
   SUB_MF_NR_PW  // point-based non-reflecting massflow BC
@@ -177,7 +180,13 @@ struct linearlyVaryingVisc {
   Vector pointInit;
   double viscRatio;
   double width;
+  double uniformMult;
+  double cylXradius, cylYradius, cylZradius;
   bool isEnabled;
+  Vector pointA;
+  double viscRatioAnnulus;
+  double annulusRadius;
+  double annulusThickness;
 };
 
 struct planeDumpData {

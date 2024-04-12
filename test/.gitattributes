@@ -47,3 +47,9 @@ ref_solns/restart_non-lte-restart-test.noneq.h5 filter=lfs diff=lfs merge=lfs -t
 ref_solns/plasma.lte1d.final.h5 filter=lfs diff=lfs merge=lfs -text
 lte-data/argon_thermo_1atm.h5 filter=lfs diff=lfs merge=lfs -text
 lte-data/argon_transport_1atm.h5 filter=lfs diff=lfs merge=lfs -text
+ref_solns/heatedBox filter=lfs diff=lfs merge=lfs -text
+ref_solns/heatedBox/restart_output.sol.h5 filter=lfs diff=lfs merge=lfs -text
+ref_solns/spongeBox/restart_output.sol.h5 filter=lfs diff=lfs merge=lfs -text
+meshes/spongeBox.msh filter=lfs diff=lfs merge=lfs -text
+ref_solns/lequere-varmu/restart_output-lequere-varmu.sol.h5 filter=lfs diff=lfs merge=lfs -text
+ref_solns/lequere-varmu/reference-lequere-varmu.sol.h5 filter=lfs diff=lfs merge=lfs -text
