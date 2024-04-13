@@ -100,6 +100,15 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
     // 3) "constant", TODO(trevilo) implement options to read constant
     tps->getInput("loMach/tomboulides/ic", ic_string_, std::string(""));
 
+    // because we lose tsp, must save any necessary info 
+    if (ic_string_ == "uniform") {
+      Vector zero(dim_);
+      zero = 0.0;
+      velocity_ic_.SetSize(dim_);
+      std::string basepath("loMach/tomboulides");
+      tps->getVec("loMach/tomboulides/velocity", velocity_ic_, dim_, zero);
+    }
+    
     // Boundary conditions
     // number of BC regions defined
     int numWalls, numInlets, numOutlets;
@@ -368,6 +377,10 @@ void Tomboulides::initializeSelf() {
       VectorFunctionCoefficient u_excoeff(2, vel_exact_tgv2d);
       u_excoeff.SetTime(0.0);
       u_curr_gf_->ProjectCoefficient(u_excoeff);
+    } else if (ic_string_ == "uniform") {
+      std::cout << "Setting uniform IC..." << std::endl;
+      VectorConstantCoefficient u_excoeff(velocity_ic_);
+      u_curr_gf_->ProjectCoefficient(u_excoeff);      
     }
   } else {
     std::cout << "Setting zero IC..." << std::endl;

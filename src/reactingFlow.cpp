@@ -51,6 +51,7 @@ using namespace mfem::common;
 double species_stepLeft(const Vector &coords, double t);
 double species_stepRight(const Vector &coords, double t);
 double species_uniform(const Vector &coords, double t);
+double binaryTest(const Vector &coords, double t);
 
 ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts,
                                                            temporalSchemeCoefficients &time_coeff, TPS::Tps *tps)
@@ -692,7 +693,27 @@ void ReactingFlow::initializeSelf() {
       y2_excoeff.SetTime(0.0);                
       Yn_gf_.ProjectCoefficient(y2_excoeff);
       Yn_gf_.GetTrueDofs(tmpR0_);
-      setVectorFromScalar(tmpR0_,2,&Yn_);      
+      setVectorFromScalar(tmpR0_,2,&Yn_);
+      
+    } else if (ic_string_ == "binaryTest") {
+      if(rank0_) std::cout << "Setting binary diffusion test Yn condition." << endl;
+      
+      FunctionCoefficient y0_excoeff(binaryTest);
+      y0_excoeff.SetTime(0.0);
+      Yn_gf_.ProjectCoefficient(y0_excoeff);
+      Yn_gf_.GetTrueDofs(tmpR0_);
+      setVectorFromScalar(tmpR0_,0,&Yn_);
+
+      for (int i = 0; i < sDofInt_; i++) {
+	tmpR0a_[i] = 0.0;
+      }
+      setVectorFromScalar(tmpR0a_,1,&Yn_);      
+      
+      for (int i = 0; i < sDofInt_; i++) {
+	tmpR0a_[i] = 1.0 - tmpR0_[i];
+      }
+      setVectorFromScalar(tmpR0a_,2,&Yn_);      
+      
     } else {
       if(rank0_) std::cout << "Unknown reactingFlow ic name: " << ic_string_ << ". Exiting." << endl;
       exit(1);
@@ -712,6 +733,7 @@ void ReactingFlow::initializeSelf() {
   Ynm1_ = Yn_;
   Ynm2_ = Yn_;  
   Yn_next_gf_ = Yn_gf_;
+  YnFull_gf_.SetFromTrueDofs(Yn_);  
   
   ConstantCoefficient t_ic_coef;
   t_ic_coef.constant = T_ic_;
@@ -1140,6 +1162,9 @@ void ReactingFlow::initializeOperators() {
   // and initialize system mass
   updateMixture();  
   computeSystemMass();
+
+  // for initial plot
+  updateDiffusivity();  
 }
 
 /**
@@ -1228,7 +1253,7 @@ void ReactingFlow::temperatureStep() {
 
   // convection
   computeExplicitTempConvectionOP(true);  // ->tmpR0_
-  // tmpR0_ = 0.0; // testing...  
+  tmpR0_ = 0.0; // testing...  
   resT_.Set(-1.0, tmpR0_);
 
   // for unsteady term, compute and add known part of BDF unsteady term
@@ -2084,6 +2109,27 @@ void ReactingFlow::identifyCollisionType(const Array<ArgonSpcs> &speciesType, Ar
 
   return;
 }
+
+double binaryTest(const Vector &coords, double t) {
+  double x = coords(0);
+  double y = coords(1);
+  double z = coords(2);
+  double pi = 3.14159265359;
+  double kx, ky;
+  double Lx, Ly;
+  double yn;
+
+  kx = 2.0;
+  ky = 0.0;
+  Lx = 5.0;
+  Ly = 1.0;
+  
+  yn = 0.5 + 0.45 * cos( 2.0 * pi * kx * x / Lx )
+                  * cos( 2.0 * pi * ky * y / Ly );
+  
+  return yn;
+}
+
 
 double species_stepLeft(const Vector &coords, double t) {
   double x = coords(0);

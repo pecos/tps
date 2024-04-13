@@ -117,6 +117,9 @@ class Tomboulides final : public FlowBase {
   mfem::VectorConstantCoefficient *gravity_vec_;
   std::vector<ForcingTerm_T> forcing_terms_;
 
+  // initial condition holders
+  mfem::Vector velocity_ic_;
+
   // BCs holders
   std::vector<DirichletBC_T<mfem::VectorCoefficient>> vel_dbcs_;
   std::vector<DirichletBC_T<mfem::Coefficient>> pres_dbcs_;
