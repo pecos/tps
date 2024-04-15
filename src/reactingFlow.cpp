@@ -1386,8 +1386,11 @@ void ReactingFlow::speciesStep(int iSpec) {
     HyInvPC_ = new OperatorJacobiSmoother(diag_pa, spec_ess_tdof_);
     HyInv_->SetPreconditioner(*HyInvPC_);
   }
-  
+
   // Prepare for the solve
+  setScalarFromVector(Yn_, iSpec, &tmpR0a_);
+  Yn_next_gf_.SetFromTrueDofs(tmpR0a_);
+
   for (auto &spec_dbc : spec_dbcs_) {
     Yn_next_gf_.ProjectBdrCoefficient(*spec_dbc.coeff, spec_dbc.attr);
   }
@@ -1775,19 +1778,20 @@ void ReactingFlow::updateDiffusivity() {
       double state[nEq];
       double conservedState[nEq];      
       double diffSp[nSpecies_];
+
+      // Populate *primitive* state vector = [rho, velocity, temperature, species mole densities]
       state[0] = dataRho[i];
       for (int eq = 0; eq < dim_; eq++) {state[eq+1] = dataU[i + eq*sDofInt_];}
       state[dim_ + 1] = dataTemp[i];
-      for (int sp = 1; sp < nSpecies_; sp++) {
-	state[dim_ + 1 + sp] = Yn_[i + (sp-1) * sDofInt_];
-      }      
-      mixture_->GetConservativesFromPrimitives(state, conservedState);      
+      for (int sp = 0; sp < nActiveSpecies_; sp++) {
+        state[dim_ + 2 + sp] = dataRho[i] * Yn_[i + sp * sDofInt_] / mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
+      }
+
+      mixture_->GetConservativesFromPrimitives(state, conservedState);
       transport_->computeMixtureAverageDiffusivity(conservedState, Efield, diffSp);
       for (int sp = 0; sp < nSpecies_; sp++) {
 	diffSp[sp] = std::max(diffSp[sp],diffY_min);
-        dataDiff[i + sp * sDofInt_] = diffSp[sp];
-        // dataDiff[i + sp * sDofInt_] = 0.1;
-        // std::cout <<  " DiffY: (" <<i << "/" << sp << "): " << diffSp[sp] << endl;	
+        dataDiff[i + sp * sDofInt_] = dataRho[i] * diffSp[sp];
       }
     }
   }
@@ -1800,17 +1804,19 @@ void ReactingFlow::updateDiffusivity() {
       double state[nEq];
       double conservedState[nEq];      
       double visc[2];
+
+      // Populate *primitive* state vector = [rho, velocity, temperature, species mole densities]
       state[0] = dataRho[i];
       for (int eq = 0; eq < dim_; eq++) {state[eq+1] = dataU[i + eq*sDofInt_];}
       state[dim_ + 1] = dataTemp[i];
-      for (int sp = 0; sp < nSpecies_-1; sp++) {
-	state[dim_ + 1 + sp + 1] = Yn_[i + sp * sDofInt_];
-      }      
+      for (int sp = 0; sp < nActiveSpecies_; sp++) {
+        state[dim_ + 2 + sp] = dataRho[i] * Yn_[i + sp * sDofInt_] / mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
+      }
+
       mixture_->GetConservativesFromPrimitives(state, conservedState);
       transport_->GetViscosities(conservedState, state, visc);
       dataVisc[i] = visc[0];
-      // std::cout << "visc: " << visc[0] << endl;  
-    }   
+    }
   }
   visc_gf_.SetFromTrueDofs(visc_);
 
@@ -1822,16 +1828,18 @@ void ReactingFlow::updateDiffusivity() {
       double state[nEq];
       double conservedState[nEq];      
       double kappa[2];
+
+      // Populate *primitive* state vector = [rho, velocity, temperature, species mole densities]
       state[0] = dataRho[i];
       for (int eq = 0; eq < dim_; eq++) {state[eq+1] = dataU[i + eq*sDofInt_];}
       state[dim_ + 1] = dataTemp[i];
-      for (int sp = 0; sp < nSpecies_-1; sp++) {
-	state[dim_ + 1 + sp + 1] = Yn_[i + sp * sDofInt_];
-      }      
+      for (int sp = 0; sp < nActiveSpecies_; sp++) {
+        state[dim_ + 2 + sp] = dataRho[i] * Yn_[i + sp * sDofInt_] / mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
+      }
+
       mixture_->GetConservativesFromPrimitives(state, conservedState);
       transport_->GetThermalConductivities(conservedState, state, kappa);
       dataKappa[i] = kappa[0];
-      // dataKappa[i] = kappa[0] / 1000.6; // testing...
     }
   }
   kappa_gf_.SetFromTrueDofs(visc_);    
