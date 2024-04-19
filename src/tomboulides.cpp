@@ -242,10 +242,13 @@ void Tomboulides::initializeSelf() {
 
   mu_total_gf_ = new ParGridFunction(pfes_);
 
-  pp_div_rad_comp_gf_ = new ParGridFunction(pfes_, *pp_div_gf_);
-  u_next_rad_comp_gf_ = new ParGridFunction(pfes_, *u_next_gf_);
+  // pp_div_rad_comp_gf_ = new ParGridFunction(pfes_, *pp_div_gf_);
+  // u_next_rad_comp_gf_ = new ParGridFunction(pfes_, *u_next_gf_);
 
   if (axisym_) {
+    pp_div_rad_comp_gf_ = new ParGridFunction(pfes_);
+    u_next_rad_comp_gf_ = new ParGridFunction(pfes_);
+
     utheta_gf_ = new ParGridFunction(pfes_);
     utheta_next_gf_ = new ParGridFunction(pfes_);
   }
@@ -1287,7 +1290,19 @@ void Tomboulides::step() {
   // Add axisymmetric "forcing" term to rhs
   if (axisym_) {
     pp_div_gf_->HostRead();
+    {
+      // Copy radial components of pp_div_gf_.  We should be able to
+      // just make pp_div_rad_comp_gf_ wrap pp_div_gf_, but that is
+      // causing problems (that aren't understood) on some gpu
+      // systems.  As a workaround, we copy instead.
+      auto d_pp_div_rad = pp_div_rad_comp_gf_->Write();
+      auto d_pp_div = pp_div_gf_->Read();
+      MFEM_FORALL(i, pp_div_rad_comp_gf_->Size(), {
+          d_pp_div_rad[i] = d_pp_div[i];
+        });
+    }
     pp_div_rad_comp_gf_->HostRead();
+
     Faxi_poisson_form_->Update();
     Faxi_poisson_form_->Assemble();
     Faxi_poisson_form_->ParallelAssemble(Faxi_poisson_vec_);
@@ -1405,6 +1420,18 @@ void Tomboulides::step() {
   evaluateVelocityGradient();
 
   if (axisym_) {
+    u_next_gf_->HostRead();
+    {
+      // Copy radial components of u_next_gf_.  Same comments here
+      // about pp_div_rad_comp_gf_ above.
+      auto d_u_next_rad = u_next_rad_comp_gf_->Write();
+      auto d_u_next = u_next_gf_->Read();
+      MFEM_FORALL(i, u_next_rad_comp_gf_->Size(), {
+          d_u_next_rad[i] = d_u_next[i];
+        });
+    }
+    u_next_rad_comp_gf_->HostRead();
+
     // Update the Helmholtz operator and inverse
     Hv_bdfcoeff_.constant = coeff_.bd0 / dt;
     Hs_form_->Update();
