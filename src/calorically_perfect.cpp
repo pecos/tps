@@ -306,6 +306,7 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
           std::cout << "Calorically Perfect: Setting interpolated Dirichlet temperature on patch = " << patch
                     << std::endl;
         }
+
         AddTempDirichletBC(temperature_bc_field_, inlet_attr);
 
         // Force the IC to agree with the interpolated inlet BC
@@ -316,6 +317,7 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
         // this BC, there will be a discrepancy (which will be
         // eliminated after the first step).
         Tn_gf_.ProjectBdrCoefficient(*temperature_bc_field_, inlet_attr);
+	
       } else {
         if (rank0_) {
           std::cout << "ERROR: Calorically Perfect inlet type = " << type << " not supported." << std::endl;
@@ -335,7 +337,7 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
     attr_outlet = 0;
 
     // No code for this yet, so die if detected
-    assert(numOutlets == 0);
+    //assert(numOutlets == 0);
 
     // But... outlets will just get homogeneous Neumann on T, so
     // basically need to do nothing.

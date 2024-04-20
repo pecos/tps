@@ -61,7 +61,8 @@ class Tps;
 
 #include <tps_config.h>
 
-#include "externalData_base.hpp"
+//#include "externalData_base.hpp"
+#include "gaussianInterpExtData.hpp"
 #include "io.hpp"
 #include "loMach_options.hpp"
 #include "mesh_base.hpp"
@@ -76,6 +77,9 @@ struct temporalSchemeCoefficients {
   // Current time
   double time;
 
+  // Current step
+  int nStep;
+  
   // Time step
   double dt;
 
@@ -123,7 +127,8 @@ class LoMachSolver : public TPS::PlasmaSolver {
   ThermoChemModelBase *thermo_ = nullptr;
   FlowBase *flow_ = nullptr;
   SpongeBase *sponge_ = nullptr;
-  ExternalDataBase *extData_ = nullptr;
+  // ExternalDataBase *extData_ = nullptr;
+  GaussianInterpExtData *extData_ = nullptr;
 
   // Mesh and geometry related
   ParMesh *pmesh_ = nullptr;

@@ -73,7 +73,7 @@ class MeshBase {
   int *local_to_global_element_ = nullptr;
 
   // min/max element size
-  double hmin, hmax;
+  double hmin_, hmax_;
 
   // domain extent
   double xmin_, ymin_, zmin_;
@@ -101,7 +101,7 @@ class MeshBase {
   virtual ParGridFunction *getGridScale() { return gridScale_; }
   virtual ParGridFunction *getWallDistance() { return distance_; }
   virtual int getDofSize() { return sDof_; }
-  virtual double getMinGridScale() { return hmin; }
+  virtual double getMinGridScale() { return hmin_; }
   virtual Array<int> getPartition() { return partitioning_; }
   // virtual int getDim() final { return dim_; }
 

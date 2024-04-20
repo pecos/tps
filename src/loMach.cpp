@@ -119,6 +119,7 @@ void LoMachSolver::initialize() {
   serial_mesh_ = meshData_->getSerialMesh();
   pmesh_ = meshData_->getMesh();
   partitioning_ = meshData_->getPartition();
+  if (verbose) grvy_printf(ginfo, "Mesh constructed.\n");  
 
   // Stash mesh dimension (convenience)
   dim_ = serial_mesh_->Dimension();
@@ -134,8 +135,18 @@ void LoMachSolver::initialize() {
   sponge_ = new GeometricSponge(pmesh_, &loMach_opts_, tpsP_);
 
   // Instantiate external data
-  extData_ = new GaussianInterpExtData(pmesh_, &loMach_opts_, tpsP_);
+  extData_ = new GaussianInterpExtData(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_);
+  
+  // read-in external data if requested in bc setting
+  extData_->initializeSelf();
+  MPI_Barrier(groupsMPI->getTPSCommWorld());
+  if (verbose) grvy_printf(ginfo, "External Data self init done.\n");      
+  extData_->setup();
+  MPI_Barrier(groupsMPI->getTPSCommWorld());
+  if (verbose) grvy_printf(ginfo, "External Data setup done.\n");        
 
+  // testin... ParGridFunction* vtest = extData_->GetExternalInterpolatedVelocity();
+  
   // Instantiate turbulence model
   if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::SMAGORINSKY) {
     turbModel_ = new AlgebraicSubgridModels(pmesh_, &loMach_opts_, tpsP_, (meshData_->getGridScale()), 1);
@@ -154,6 +165,8 @@ void LoMachSolver::initialize() {
     }
     exit(ERROR);
   }
+  MPI_Barrier(groupsMPI->getTPSCommWorld());
+  if (verbose) grvy_printf(ginfo, "Turb Model instantiated.\n");    
 
   // Instantiate thermochemical model
   if (loMach_opts_.thermo_solver == "constant-property") {
@@ -169,6 +182,8 @@ void LoMachSolver::initialize() {
     }
     exit(ERROR);
   }
+  MPI_Barrier(groupsMPI->getTPSCommWorld());  
+  if (verbose) grvy_printf(ginfo, "ThermoChem instantiated.\n");      
 
   // Instantiate flow solver
   if (loMach_opts_.flow_solver == "zero-flow") {
@@ -184,6 +199,8 @@ void LoMachSolver::initialize() {
     }
     exit(ERROR);
   }
+  MPI_Barrier(groupsMPI->getTPSCommWorld());  
+  if (verbose) grvy_printf(ginfo, "Flow instantiated.\n");      
 
   // Initialize time marching coefficients.  NB: dt will be reset
   // prior to time step, but must be initialized here in order to
@@ -196,17 +213,25 @@ void LoMachSolver::initialize() {
   CFL = loMach_opts_.ts_opts_.cfl_;
   if (verbose) grvy_printf(ginfo, "got CFL...\n");
 
-  // read-in external data if requested in bc setting
-  extData_->initializeSelf();
-  extData_->setup();
+  // setup external data to physics
   flow_->initializeFromExtData(&extData_->toFlow_interface_);
   thermo_->initializeFromExtData(&extData_->toThermoChem_interface_);
+  MPI_Barrier(groupsMPI->getTPSCommWorld());  
+  if (verbose) grvy_printf(ginfo, "external data exchange setup.\n");        
 
   // Initialize model-owned data
   sponge_->initializeSelf();
+  MPI_Barrier(groupsMPI->getTPSCommWorld());  
+  if (verbose) grvy_printf(ginfo, "sponge setup.\n");   
   turbModel_->initializeSelf();
+  MPI_Barrier(groupsMPI->getTPSCommWorld());  
+  if (verbose) grvy_printf(ginfo, "turb model setup.\n");     
   flow_->initializeSelf();
+  MPI_Barrier(groupsMPI->getTPSCommWorld());  
+  if (verbose) grvy_printf(ginfo, "flow setup.\n");     
   thermo_->initializeSelf();
+  MPI_Barrier(groupsMPI->getTPSCommWorld());  
+  if (verbose) grvy_printf(ginfo, "thermo setup.\n");     
 
   // Initialize restart read/write capability
   flow_->initializeIO(ioData);
@@ -350,6 +375,7 @@ void LoMachSolver::solveStep() {
 
   if (loMach_opts_.ts_opts_.integrator_type_ == LoMachTemporalOptions::CURL_CURL) {
     SetTimeIntegrationCoefficients(iter - iter_start_);
+    extData_->step();
     thermo_->step();
     flow_->step();
     turbModel_->step();
@@ -361,6 +387,7 @@ void LoMachSolver::solveStep() {
 
   UpdateTimestepHistory(temporal_coeff_.dt);
   temporal_coeff_.time += temporal_coeff_.dt;
+  temporal_coeff_.nStep = iter;    
   iter++;
 
   if ((iter % loMach_opts_.timing_frequency_) == 0) {
@@ -648,7 +675,7 @@ void LoMachSolver::setTimestep() {
       temporal_coeff_.dt = dt_initial;
     }
 
-    std::cout << "dt from setTimestep: " << temporal_coeff_.dt << " max_speed: " << max_speed << endl;
+    if (rank0_) std::cout << "dt from setTimestep: " << temporal_coeff_.dt << " max_speed: " << max_speed << " and hmin: " << hmin << endl;
   }
 }
 

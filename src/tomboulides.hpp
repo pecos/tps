@@ -81,7 +81,7 @@ class Tomboulides final : public FlowBase {
 
   // Options
   // TODO(trevilo): hardcoded for testing.  Need to set based on input file.
-  bool numerical_integ_ = true;
+  bool numerical_integ_ = false;
   bool partial_assembly_ = false;
 
   int pressure_solve_pl_ = 0;
@@ -96,10 +96,13 @@ class Tomboulides final : public FlowBase {
   int hsolve_pl_ = 0;
   int hsolve_max_iter_ = 200;
   double hsolve_rtol_ = 1e-12;
-
+  
   // To use "numerical integration", quadrature rule must persist
   mfem::IntegrationRules gll_rules;
 
+  // Options-related structures
+  TPS::Tps *tpsP_ = nullptr;
+  
   // Basic info needed to create fem spaces
   mfem::ParMesh *pmesh_;
   const int vorder_;
@@ -383,6 +386,9 @@ class Tomboulides final : public FlowBase {
 
   /// Compute maximum velocity magnitude anywhere in the domain
   double maxVelocityMagnitude();
+
+  /// Update non-trivial BC's not handled via hard-coded functions
+  void updateBC(int timestep);
 };
 
 #endif  // TOMBOULIDES_HPP_
