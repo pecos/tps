@@ -49,8 +49,9 @@
 using namespace mfem;
 using namespace mfem::common;
 
-GaussianInterpExtData::GaussianInterpExtData(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, TPS::Tps *tps)
-    : tpsP_(tps), loMach_opts_(loMach_opts), pmesh_(pmesh) {
+GaussianInterpExtData::GaussianInterpExtData(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &coeff, TPS::Tps *tps)
+  : tpsP_(tps), loMach_opts_(loMach_opts), pmesh_(pmesh), coeff_(coeff) {
+  nprocs_ = pmesh_->GetNRanks();  
   rank_ = pmesh_->GetMyRank();
   rank0_ = (pmesh_->GetMyRank() == 0);
   order_ = loMach_opts->order;
@@ -61,11 +62,14 @@ GaussianInterpExtData::GaussianInterpExtData(mfem::ParMesh *pmesh, LoMachOptions
   int numInlets;
   tpsP_->getInput("boundaryConditions/numInlets", numInlets, 0);
 
+  if (rank0_) std::cout << "Checking for requested interpolated inlet data over " << numInlets << " inlet(s)..." << endl;  
   for (int i = 1; i <= numInlets; i++) {
     std::string type;
     std::string basepath("boundaryConditions/inlet" + std::to_string(i));
     tpsP_->getRequiredInput((basepath + "/type").c_str(), type);
     if (type == "interpolate") {
+      if (rank0_) std::cout << "...interpolation specified" << endl;
+      tpsP_->getInput((basepath + "/rampSteps").c_str(), rampSteps_, 1);      
       if (isInterpInlet_) {
         // If we've already set isInterpInlet_, then user requested
         // multiple interpolation BCs, which is not supported
@@ -111,7 +115,9 @@ void GaussianInterpExtData::initializeSelf() {
   temperature_gf_ = 0.0;
   velocity_gf_.SetSpace(vfes_);
   velocity_gf_ = 0.0;
-
+  vel0_gf_.SetSpace(vfes_);
+  vel0_gf_ = 0.0;
+  
   // exports
   toThermoChem_interface_.Tdata = &temperature_gf_;
   toFlow_interface_.Udata = &velocity_gf_;
@@ -139,6 +145,7 @@ void GaussianInterpExtData::setup() {
 
   double *Tdata = temperature_gf_.HostReadWrite();
   double *Udata = velocity_gf_.HostReadWrite();
+  double *U0 = vel0_gf_.HostReadWrite();  
   double *hcoords = coordsDof.HostReadWrite();
 
   struct inlet_profile {
@@ -254,13 +261,26 @@ void GaussianInterpExtData::setup() {
 
   // TODO(swh): dont need to fill entire gf, just appropriate face
   // NB: be careful with GetNBE (see comments in mfem/mesh/mesh.hpp)
+  // MPI_Barrier(vfes_->GetComm());
+  //std::cout << " starting actual interp..." << endl;
+
+  //for (int np = 0; np < nprocs_; np++) {
+  //  MPI_Barrier(vfes_->GetComm());
+  //  if (rank_ != np) { continue; }
+  //  std::cout << "Working on rank " << np+1 << " of " << nprocs_ << "..." << endl;
+  
+  //for (int n = 0; n < Sdof_; n++) {  
   for (int be = 0; be < pmesh_->GetNBE(); be++) {
     Array<int> vdofs;
     sfes_->GetBdrElementVDofs(be, vdofs);
     for (int i = 0; i < vdofs.Size(); i++) {
+      
       // index in gf of bndry element
       int n = vdofs[i];
-
+      if (n >= Sdof_) {
+         std::cout << " BAD: " << n << " of " << Sdof_ << " dofs" <<endl;	
+      }
+  
       double xp[3];
       for (int d = 0; d < dim_; d++) {
         xp[d] = hcoords[n + d * Sdof_];
@@ -312,8 +332,9 @@ void GaussianInterpExtData::setup() {
           continue;
         }
 
-        dist = sqrt((xp[0] - inlet[j].x) * (xp[0] - inlet[j].x) + (xp[1] - inlet[j].y) * (xp[1] - inlet[j].y) +
-                    (xp[2] - inlet[j].z) * (xp[2] - inlet[j].z));
+        dist = sqrt( (xp[0] - inlet[j].x) * (xp[0] - inlet[j].x)
+		   + (xp[1] - inlet[j].y) * (xp[1] - inlet[j].y)
+                   + (xp[2] - inlet[j].z) * (xp[2] - inlet[j].z) );
 
         // gaussian interpolation
         if (dist <= 1.5 * radius) {
@@ -342,17 +363,43 @@ void GaussianInterpExtData::setup() {
         Udata[n + 1 * Sdof_] = val_v / wt_tot;
         Udata[n + 2 * Sdof_] = val_w / wt_tot;
         Tdata[n] = val_T / wt_tot;
+	//std::cout << n << ") interpolated data: " << Udata[n + 0 * Sdof_] << " " << Udata[n + 1 * Sdof_] << " " << Udata[n + 2 * Sdof_] << endl;
       } else {
         Udata[n + 0 * Sdof_] = 0.0;
         Udata[n + 1 * Sdof_] = 0.0;
         Udata[n + 2 * Sdof_] = 0.0;
         Tdata[n] = 0.0;
       }
+
+      // store initial interpolated field to ramp from
+      U0[n + 0 * Sdof_] = Udata[n + 0 * Sdof_];
+      U0[n + 1 * Sdof_] = Udata[n + 1 * Sdof_];
+      U0[n + 2 * Sdof_] = Udata[n + 2 * Sdof_];
+      
     }
   }
+  //MPI_Barrier(vfes_->GetComm());
+  //std::cout << " done with interpolation!" << endl;
+
+  //}
+  
 }
 
 void GaussianInterpExtData::step() {
   // empty for now, use for any updates/modifications
   // during simulation e.g. ramping up with time
+  //double *Tdata = temperature_gf_.HostReadWrite();
+
+  if (!isInterpInlet_) { return; }
+    
+  double *Udata = velocity_gf_.HostReadWrite();
+  double *U0 = vel0_gf_.HostReadWrite();  
+
+  // only addressing velocity for now and assume ic is zero
+  for (int eq = 0; eq < dim_; eq++) {  
+    for (int i = 0; i < Sdof_; i++) {
+      Udata[i + eq * Sdof_] = U0[i + eq * Sdof_] * std::min(double(coeff_.nStep)/double(rampSteps_), 1.0);
+    }
+  }
+  
 }

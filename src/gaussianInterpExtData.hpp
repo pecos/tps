@@ -38,6 +38,9 @@ namespace TPS {
 class Tps;
 }
 
+// forward-declaration of struct hold temporal coefficients (loMach.hpp)
+struct temporalSchemeCoefficients;
+
 #include <tps_config.h>
 
 #include <iostream>
@@ -84,8 +87,14 @@ class GaussianInterpExtData : public ExternalDataBase {
   // The order of the scalar spaces
   int order_;
 
+  // dimension of mesh
   int dim_;
 
+  // Coefficients necessary to take a time step (including dt).
+  // Assumed to be externally managed and determined, so just get a
+  // reference here.
+  const temporalSchemeCoefficients &coeff_;
+  
   // to-be used fro time or timestep dep bc
   // double dt;
   // double time;
@@ -107,9 +116,13 @@ class GaussianInterpExtData : public ExternalDataBase {
 
   ParGridFunction temperature_gf_;
   ParGridFunction velocity_gf_;
+  ParGridFunction vel0_gf_;  
+
+  // gradual increase of external bc over multiple steps
+  int rampSteps_;
 
  public:
-  GaussianInterpExtData(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, TPS::Tps *tps);
+  GaussianInterpExtData(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &coeff, TPS::Tps *tps);
   virtual ~GaussianInterpExtData();
 
   void initializeSelf();
