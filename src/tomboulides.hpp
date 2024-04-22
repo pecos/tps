@@ -81,7 +81,7 @@ class Tomboulides final : public FlowBase {
 
   // Options
   // TODO(trevilo): hardcoded for testing.  Need to set based on input file.
-  bool numerical_integ_ = true;
+  bool numerical_integ_ = false;
   bool partial_assembly_ = false;
 
   int pressure_solve_pl_ = 0;
@@ -99,6 +99,9 @@ class Tomboulides final : public FlowBase {
 
   // To use "numerical integration", quadrature rule must persist
   mfem::IntegrationRules gll_rules;
+
+  // Options-related structures
+  TPS::Tps *tpsP_ = nullptr;
 
   // Basic info needed to create fem spaces
   mfem::ParMesh *pmesh_;

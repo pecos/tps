@@ -335,7 +335,7 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
     attr_outlet = 0;
 
     // No code for this yet, so die if detected
-    assert(numOutlets == 0);
+    // assert(numOutlets == 0);
 
     // But... outlets will just get homogeneous Neumann on T, so
     // basically need to do nothing.
