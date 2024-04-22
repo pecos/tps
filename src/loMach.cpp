@@ -107,7 +107,7 @@ void LoMachSolver::initialize() {
   if (!loMach_opts_.io_opts_.enable_restart_) {
     temporal_coeff_.time = 0.;
     iter = 0;
-    temporal_coeff_.nStep = iter;    
+    temporal_coeff_.nStep = iter;
   }
 
   //-----------------------------------------------------
@@ -351,7 +351,7 @@ void LoMachSolver::solveStep() {
 
   if (loMach_opts_.ts_opts_.integrator_type_ == LoMachTemporalOptions::CURL_CURL) {
     SetTimeIntegrationCoefficients(iter - iter_start_);
-    extData_->step();    
+    extData_->step();
     thermo_->step();
     flow_->step();
     turbModel_->step();
@@ -363,7 +363,7 @@ void LoMachSolver::solveStep() {
 
   UpdateTimestepHistory(temporal_coeff_.dt);
   temporal_coeff_.time += temporal_coeff_.dt;
-  temporal_coeff_.nStep = iter;      
+  temporal_coeff_.nStep = iter;
   iter++;
 
   if ((iter % loMach_opts_.timing_frequency_) == 0) {

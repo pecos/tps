@@ -78,7 +78,7 @@ struct temporalSchemeCoefficients {
 
   // Current step
   int nStep;
-  
+
   // Time step
   double dt;
 

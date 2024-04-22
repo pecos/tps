@@ -94,7 +94,7 @@ class GaussianInterpExtData : public ExternalDataBase {
   // Assumed to be externally managed and determined, so just get a
   // reference here.
   const temporalSchemeCoefficients &coeff_;
-  
+
   // to-be used fro time or timestep dep bc
   // double dt;
   // double time;
@@ -116,13 +116,14 @@ class GaussianInterpExtData : public ExternalDataBase {
 
   ParGridFunction temperature_gf_;
   ParGridFunction velocity_gf_;
-  ParGridFunction vel0_gf_;  
+  ParGridFunction vel0_gf_;
 
   // gradual increase of external bc over multiple steps
   int rampSteps_;
 
  public:
-  GaussianInterpExtData(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &coeff, TPS::Tps *tps);
+  GaussianInterpExtData(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &coeff,
+                        TPS::Tps *tps);
   virtual ~GaussianInterpExtData();
 
   void initializeSelf();
