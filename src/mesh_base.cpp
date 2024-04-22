@@ -230,15 +230,14 @@ void MeshBase::initializeMesh() {
   }
 
   // Determine the minimum element size.
-  double hmin, hmax;
   {
     double local_hmin = 1.0e18;
     for (int i = 0; i < pmesh_->GetNE(); i++) {
       local_hmin = min(pmesh_->GetElementSize(i, 1), local_hmin);
     }
-    MPI_Allreduce(&local_hmin, &hmin, 1, MPI_DOUBLE, MPI_MIN, pmesh_->GetComm());
+    MPI_Allreduce(&local_hmin, &hmin_, 1, MPI_DOUBLE, MPI_MIN, pmesh_->GetComm());
   }
-  if (rank0_) cout << "Minimum element size: " << hmin << "m" << endl;
+  if (rank0_) cout << "Minimum element size: " << hmin_ << "m" << endl;
 
   // maximum size
   {
@@ -246,9 +245,9 @@ void MeshBase::initializeMesh() {
     for (int i = 0; i < pmesh_->GetNE(); i++) {
       local_hmax = max(pmesh_->GetElementSize(i, 1), local_hmax);
     }
-    MPI_Allreduce(&local_hmax, &hmax, 1, MPI_DOUBLE, MPI_MAX, pmesh_->GetComm());
+    MPI_Allreduce(&local_hmax, &hmax_, 1, MPI_DOUBLE, MPI_MAX, pmesh_->GetComm());
   }
-  if (rank0_) cout << "Maximum element size: " << hmax << "m" << endl;
+  if (rank0_) cout << "Maximum element size: " << hmax_ << "m" << endl;
 
   fec_ = new H1_FECollection(order_);
   fes_ = new ParFiniteElementSpace(pmesh_, fec_);
