@@ -654,9 +654,15 @@ void Tomboulides::initializeOperators() {
   L_iorho_form_->FormSystemMatrix(pres_ess_tdof_, L_iorho_op_);
 
   // Variable coefficient Laplacian inverse
-  L_iorho_lor_ = new ParLORDiscretization(*L_iorho_form_, pres_ess_tdof_);
-  L_iorho_inv_pc_ = new HypreBoomerAMG(L_iorho_lor_->GetAssembledMatrix());
-  L_iorho_inv_pc_->SetPrintLevel(0);
+  if (partial_assembly_) {
+    Vector diag_pa(pfes_->GetTrueVSize());
+    L_iorho_form_->AssembleDiagonal(diag_pa);
+    L_iorho_inv_pc_ = new OperatorJacobiSmoother(diag_pa, pres_ess_tdof_);
+  } else {
+    L_iorho_lor_ = new ParLORDiscretization(*L_iorho_form_, pres_ess_tdof_);
+    L_iorho_inv_pc_ = new HypreBoomerAMG(L_iorho_lor_->GetAssembledMatrix());
+  }
+  // L_iorho_inv_pc_->SetPrintLevel(0);
   L_iorho_inv_ortho_pc_ = new OrthoSolver(pfes_->GetComm());
   L_iorho_inv_ortho_pc_->SetSolver(*L_iorho_inv_pc_);
 
@@ -1085,9 +1091,15 @@ void Tomboulides::step() {
   delete L_iorho_inv_pc_;
   delete L_iorho_lor_;
 
-  L_iorho_lor_ = new ParLORDiscretization(*L_iorho_form_, pres_ess_tdof_);
-  L_iorho_inv_pc_ = new HypreBoomerAMG(L_iorho_lor_->GetAssembledMatrix());
-  L_iorho_inv_pc_->SetPrintLevel(0);
+  if (partial_assembly_) {
+    Vector diag_pa(pfes_->GetTrueVSize());
+    L_iorho_form_->AssembleDiagonal(diag_pa);
+    L_iorho_inv_pc_ = new OperatorJacobiSmoother(diag_pa, pres_ess_tdof_);
+  } else {
+    L_iorho_lor_ = new ParLORDiscretization(*L_iorho_form_, pres_ess_tdof_);
+    L_iorho_inv_pc_ = new HypreBoomerAMG(L_iorho_lor_->GetAssembledMatrix());
+  }
+  // L_iorho_inv_pc_->SetPrintLevel(0);
   L_iorho_inv_ortho_pc_ = new OrthoSolver(pfes_->GetComm());
   L_iorho_inv_ortho_pc_->SetSolver(*L_iorho_inv_pc_);
 

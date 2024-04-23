@@ -256,7 +256,8 @@ class Tomboulides final : public FlowBase {
 
   // solver objects
   mfem::ParLORDiscretization *L_iorho_lor_ = nullptr;
-  mfem::HypreBoomerAMG *L_iorho_inv_pc_ = nullptr;
+  // mfem::HypreBoomerAMG *L_iorho_inv_pc_ = nullptr;
+  mfem::Solver *L_iorho_inv_pc_ = nullptr;
   mfem::OrthoSolver *L_iorho_inv_ortho_pc_ = nullptr;
   mfem::CGSolver *L_iorho_inv_ = nullptr;
 
