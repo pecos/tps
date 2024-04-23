@@ -241,9 +241,9 @@ void LoMachSolver::initialize() {
   sponge_->setup();
 
   // Finish initializing operators
+  flow_->initializeOperators();
   turbModel_->setup();
   turbModel_->initializeOperators();
-  flow_->initializeOperators();
   thermo_->initializeOperators();
   // if(rank0_) {std::cout << "check: ops set..." << endl;}
 

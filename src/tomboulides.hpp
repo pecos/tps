@@ -383,6 +383,9 @@ class Tomboulides final : public FlowBase {
 
   /// Compute maximum velocity magnitude anywhere in the domain
   double maxVelocityMagnitude();
+
+  /// Compute Galerkin projection of velocity gradient
+  void evaluateVelocityGradient();
 };
 
 #endif  // TOMBOULIDES_HPP_

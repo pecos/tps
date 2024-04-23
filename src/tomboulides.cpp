@@ -410,6 +410,11 @@ void Tomboulides::initializeSelf() {
   *curl_gf_ = 0.0;
   *curlcurl_gf_ = 0.0;
   *resu_gf_ = 0.0;
+
+  *gradU_gf_ = 0.0;
+  *gradV_gf_ = 0.0;
+  *gradW_gf_ = 0.0;
+
   *p_gf_ = 0.0;
   *resp_gf_ = 0.0;
   *mu_total_gf_ = 0.0;
@@ -994,6 +999,11 @@ void Tomboulides::initializeOperators() {
   if (axisym_) {
     utheta_gf_->GetTrueDofs(utheta_vec_);
   }
+
+  *u_next_gf_ = *u_curr_gf_;
+  u_next_gf_->GetTrueDofs(u_next_vec_);
+
+  evaluateVelocityGradient();
 }
 
 void Tomboulides::initializeIO(IODataOrganizer &io) const {
@@ -1384,21 +1394,7 @@ void Tomboulides::step() {
   u_curr_gf_->SetFromTrueDofs(u_vec_);
 
   // update gradients for turbulence model
-  // TODO(swh): move when full viscous terms are added
-  setScalarFromVector(u_next_vec_, 0, &tmpR0_);
-  G_op_->Mult(tmpR0_, tmpR1_);
-  Mv_inv_->Mult(tmpR1_, gradU_);
-  setScalarFromVector(u_next_vec_, 1, &tmpR0_);
-  G_op_->Mult(tmpR0_, tmpR1_);
-  Mv_inv_->Mult(tmpR1_, gradV_);
-  if (dim_ == 3) {
-    setScalarFromVector(u_next_vec_, 2, &tmpR0_);
-    G_op_->Mult(tmpR0_, tmpR1_);
-    Mv_inv_->Mult(tmpR1_, gradW_);
-  }
-  gradU_gf_->SetFromTrueDofs(gradU_);
-  gradV_gf_->SetFromTrueDofs(gradV_);
-  gradW_gf_->SetFromTrueDofs(gradW_);
+  evaluateVelocityGradient();
 
   if (axisym_) {
     // Update the Helmholtz operator and inverse
@@ -1597,6 +1593,23 @@ double Tomboulides::maxVelocityMagnitude() {
   MPI_Reduce(&local_max_vel_magnitude, &global_max_vel_magnitude, 1, MPI_DOUBLE, MPI_MAX, 0, pfes_->GetComm());
 
   return global_max_vel_magnitude;
+}
+
+void Tomboulides::evaluateVelocityGradient() {
+  setScalarFromVector(u_next_vec_, 0, &tmpR0_);
+  G_op_->Mult(tmpR0_, tmpR1_);
+  Mv_inv_->Mult(tmpR1_, gradU_);
+  setScalarFromVector(u_next_vec_, 1, &tmpR0_);
+  G_op_->Mult(tmpR0_, tmpR1_);
+  Mv_inv_->Mult(tmpR1_, gradV_);
+  if (dim_ == 3) {
+    setScalarFromVector(u_next_vec_, 2, &tmpR0_);
+    G_op_->Mult(tmpR0_, tmpR1_);
+    Mv_inv_->Mult(tmpR1_, gradW_);
+  }
+  gradU_gf_->SetFromTrueDofs(gradU_);
+  gradV_gf_->SetFromTrueDofs(gradV_);
+  gradW_gf_->SetFromTrueDofs(gradW_);
 }
 
 // Non-class functions that are only used in this file below here
