@@ -119,6 +119,8 @@ class Tomboulides final : public FlowBase {
 
   std::string ic_string_;
 
+  StopWatch sw_setup_, sw_vstar_, sw_pp_, sw_helm_;
+
   // Object used to build forcing
   mfem::Vector gravity_;
   mfem::VectorConstantCoefficient *gravity_vec_;

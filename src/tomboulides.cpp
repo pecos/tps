@@ -1054,6 +1054,8 @@ void Tomboulides::step() {
   // generalized version of eqns (2.8) and (2.9) from Tomboulides.
   //------------------------------------------------------------------------
 
+  sw_setup_.Start();
+
   // For convenience, get time and dt
   const double time = coeff_.time;
   const double dt = coeff_.dt;
@@ -1132,10 +1134,13 @@ void Tomboulides::step() {
     Hv_inv_pc_ = new OperatorJacobiSmoother(diag_pa, vel_ess_tdof_);
     Hv_inv_->SetPreconditioner(*Hv_inv_pc_);
   }
+  sw_setup_.Stop();
 
   //------------------------------------------------------------------------
   // Step 2: Compute vstar / dt (as in eqn 2.3 from Tomboulides)
   // ------------------------------------------------------------------------
+
+  sw_vstar_.Start();
 
   // Evaluate the forcing at the end of the time step
   for (auto &force : forcing_terms_) {
@@ -1203,12 +1208,14 @@ void Tomboulides::step() {
   }
 
   // At this point ustar_vec_ holds vstar/dt!
+  sw_vstar_.Stop();
 
   // NB: axisymmetric (no swirl!) implemented to here
 
   //------------------------------------------------------------------------
   // Step 3: Poisson
   // ------------------------------------------------------------------------
+  sw_pp_.Start();
 
   // Extrapolate the velocity field (and store in u_next_gf_)
   {
@@ -1372,11 +1379,12 @@ void Tomboulides::step() {
     meanZero(*p_gf_);
   }
   p_gf_->GetTrueDofs(p_vec_);
+  sw_pp_.Stop();
 
   //------------------------------------------------------------------------
   // Step 4: Helmholtz solve for the velocity
   //------------------------------------------------------------------------
-
+  sw_helm_.Start();
   resu_vec_ = 0.0;
 
   // // Variable viscosity term
@@ -1429,6 +1437,12 @@ void Tomboulides::step() {
 
   // update gradients for turbulence model
   evaluateVelocityGradient();
+  sw_helm_.Stop();
+
+  std::cout << "Timings: " << sw_setup_.RealTime()
+            << " " << sw_vstar_.RealTime()
+            << " " << sw_pp_.RealTime()
+            << " " << sw_helm_.RealTime() << std::endl;
 
   if (axisym_) {
     u_next_gf_->HostRead();
