@@ -870,12 +870,9 @@ void Tomboulides::initializeOperators() {
     auto *hfv_blfi = new VectorMassIntegrator(*visc_forcing_coeff_);
     Hv_form_->AddDomainIntegrator(hfv_blfi);
   }
-  // if (partial_assembly_) {
-  //   // Partial assembly is not supported for variable coefficient
-  //   // VectorMassIntegrator (as of mfem 4.5.2 at least)
-  //   assert(false);
-  //   Hv_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
-  // }
+  if (partial_assembly_) {
+    Hv_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+  }
   Hv_form_->Assemble();
   Hv_form_->FormSystemMatrix(vel_ess_tdof_, Hv_op_);
 
@@ -883,8 +880,8 @@ void Tomboulides::initializeOperators() {
   if (partial_assembly_) {
     Vector diag_pa(vfes_->GetTrueVSize());
     Hv_form_->AssembleDiagonal(diag_pa);
-    Hv_inv_pc_ = new OperatorJacobiSmoother(diag_pa, vel_ess_tdof_); 
- } else {
+    Hv_inv_pc_ = new OperatorJacobiSmoother(diag_pa, vel_ess_tdof_);
+  } else {
     Hv_inv_pc_ = new HypreSmoother(*Hv_op_.As<HypreParMatrix>());
     dynamic_cast<HypreSmoother *>(Hv_inv_pc_)->SetType(HypreSmoother::Jacobi, 1);
   }
@@ -1068,8 +1065,6 @@ void Tomboulides::step() {
   // Step 1: Update any operators invalidated by changing data
   // external to this class
   // ------------------------------------------------------------------------
-  MFEM_DEVICE_SYNC;
-  printf("Step 1...\n"); fflush(stdout);
 
   // Update total viscosity field
   updateTotalViscosity();
@@ -1135,14 +1130,12 @@ void Tomboulides::step() {
     Vector diag_pa(vfes_->GetTrueVSize());
     Hv_form_->AssembleDiagonal(diag_pa);
     Hv_inv_pc_ = new OperatorJacobiSmoother(diag_pa, vel_ess_tdof_);
-    Hv_inv_->SetPreconditioner(*Hv_inv_);
+    Hv_inv_->SetPreconditioner(*Hv_inv_pc_);
   }
 
   //------------------------------------------------------------------------
   // Step 2: Compute vstar / dt (as in eqn 2.3 from Tomboulides)
   // ------------------------------------------------------------------------
-  MFEM_DEVICE_SYNC;
-  printf("Step 2...\n"); fflush(stdout);
 
   // Evaluate the forcing at the end of the time step
   for (auto &force : forcing_terms_) {
@@ -1216,8 +1209,6 @@ void Tomboulides::step() {
   //------------------------------------------------------------------------
   // Step 3: Poisson
   // ------------------------------------------------------------------------
-  MFEM_DEVICE_SYNC;
-  printf("Step 3...\n"); fflush(stdout);
 
   // Extrapolate the velocity field (and store in u_next_gf_)
   {
@@ -1385,8 +1376,6 @@ void Tomboulides::step() {
   //------------------------------------------------------------------------
   // Step 4: Helmholtz solve for the velocity
   //------------------------------------------------------------------------
-  MFEM_DEVICE_SYNC;
-  printf("Step 4...\n"); fflush(stdout);
 
   resu_vec_ = 0.0;
 
@@ -1410,9 +1399,6 @@ void Tomboulides::step() {
 
   vfes_->GetRestrictionMatrix()->MultTranspose(resu_vec_, *resu_gf_);
 
-  MFEM_DEVICE_SYNC;
-  printf("Step 4a...\n"); fflush(stdout);
-
   Vector X2, B2;
   if (partial_assembly_) {
     auto *HC = Hv_op_.As<ConstrainedOperator>();
@@ -1421,17 +1407,11 @@ void Tomboulides::step() {
     Hv_form_->FormLinearSystem(vel_ess_tdof_, *u_next_gf_, *resu_gf_, Hv_op_, X2, B2, 1);
   }
 
-  MFEM_DEVICE_SYNC;
-  printf("Step 4b...\n"); fflush(stdout);
-
   Hv_inv_->Mult(B2, X2);
   if (!Hv_inv_->GetConverged()) {
     if (rank0_) std::cout << "ERROR: Helmholtz solve did not converge." << std::endl;
     exit(1);
   }
-
-  MFEM_DEVICE_SYNC;
-  printf("Step 4c...\n"); fflush(stdout);
 
   // iter_hsolve = HInv->GetNumIterations();
   // res_hsolve = HInv->GetFinalNorm();
@@ -1447,15 +1427,8 @@ void Tomboulides::step() {
   u_vec_ = u_next_vec_;
   u_curr_gf_->SetFromTrueDofs(u_vec_);
 
-  MFEM_DEVICE_SYNC;
-  printf("Step 4d...\n"); fflush(stdout);
-
-
   // update gradients for turbulence model
   evaluateVelocityGradient();
-
-  MFEM_DEVICE_SYNC;
-  printf("Step 5... Done.\n"); fflush(stdout);
 
   if (axisym_) {
     u_next_gf_->HostRead();
