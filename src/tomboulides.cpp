@@ -551,6 +551,8 @@ void Tomboulides::initializeOperators() {
   assert(thermo_interface_ != NULL);
 
   // Create all the Coefficient objects we need
+  rho_const_coeff_ = new ConstantCoefficient(1.0);
+
   rho_coeff_ = new GridFunctionCoefficient(thermo_interface_->density);
 
   if (axisym_) {
@@ -763,7 +765,8 @@ void Tomboulides::initializeOperators() {
   if (axisym_) {
     mvr_blfi = new VectorMassIntegrator(*rad_rho_coeff_);
   } else {
-    mvr_blfi = new VectorMassIntegrator(*rho_coeff_);
+    // mvr_blfi = new VectorMassIntegrator(*rho_coeff_);
+    mvr_blfi = new VectorMassIntegrator(*rho_const_coeff_);
   }
   if (numerical_integ_) {
     mvr_blfi->SetIntRule(&ir_ni_v);
@@ -853,7 +856,8 @@ void Tomboulides::initializeOperators() {
     hmv_blfi = new VectorMassIntegrator(*rad_rho_over_dt_coeff_);
     hdv_blfi = new VectorDiffusionIntegrator(*rad_mu_coeff_);
   } else {
-    hmv_blfi = new VectorMassIntegrator(*rho_over_dt_coeff_);
+    // hmv_blfi = new VectorMassIntegrator(*rho_over_dt_coeff_);
+    hmv_blfi = new VectorMassIntegrator(Hv_bdfcoeff_);
     hdv_blfi = new VectorDiffusionIntegrator(*mu_coeff_);
   }
   if (numerical_integ_) {
@@ -866,12 +870,12 @@ void Tomboulides::initializeOperators() {
     auto *hfv_blfi = new VectorMassIntegrator(*visc_forcing_coeff_);
     Hv_form_->AddDomainIntegrator(hfv_blfi);
   }
-  if (partial_assembly_) {
-    // Partial assembly is not supported for variable coefficient
-    // VectorMassIntegrator (as of mfem 4.5.2 at least)
-    assert(false);
-    Hv_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
-  }
+  // if (partial_assembly_) {
+  //   // Partial assembly is not supported for variable coefficient
+  //   // VectorMassIntegrator (as of mfem 4.5.2 at least)
+  //   assert(false);
+  //   Hv_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+  // }
   Hv_form_->Assemble();
   Hv_form_->FormSystemMatrix(vel_ess_tdof_, Hv_op_);
 
@@ -879,8 +883,8 @@ void Tomboulides::initializeOperators() {
   if (partial_assembly_) {
     Vector diag_pa(vfes_->GetTrueVSize());
     Hv_form_->AssembleDiagonal(diag_pa);
-    Hv_inv_pc_ = new OperatorJacobiSmoother(diag_pa, vel_ess_tdof_);
-  } else {
+    Hv_inv_pc_ = new OperatorJacobiSmoother(diag_pa, vel_ess_tdof_); 
+ } else {
     Hv_inv_pc_ = new HypreSmoother(*Hv_op_.As<HypreParMatrix>());
     dynamic_cast<HypreSmoother *>(Hv_inv_pc_)->SetType(HypreSmoother::Jacobi, 1);
   }
@@ -1064,9 +1068,12 @@ void Tomboulides::step() {
   // Step 1: Update any operators invalidated by changing data
   // external to this class
   // ------------------------------------------------------------------------
+  MFEM_DEVICE_SYNC;
+  printf("Step 1...\n"); fflush(stdout);
 
   // Update total viscosity field
   updateTotalViscosity();
+  mu_total_gf_->HostRead();
 
   // Update the variable coefficient Laplacian to account for change
   // in density
@@ -1107,6 +1114,14 @@ void Tomboulides::step() {
   Mv_rho_form_->FormSystemMatrix(empty, Mv_rho_op_);
 
   Mv_rho_inv_->SetOperator(*Mv_rho_op_);
+  if (partial_assembly_) {
+    delete Mv_rho_inv_pc_;
+    Vector diag_pa(vfes_->GetTrueVSize());
+    Mv_rho_form_->AssembleDiagonal(diag_pa);
+    Mv_rho_inv_pc_ = new OperatorJacobiSmoother(diag_pa, empty);
+    Mv_rho_inv_->SetPreconditioner(*Mv_rho_inv_pc_);
+  }
+
 
   // Update the Helmholtz operator and inverse
   Hv_bdfcoeff_.constant = coeff_.bd0 / dt;
@@ -1116,13 +1131,18 @@ void Tomboulides::step() {
 
   Hv_inv_->SetOperator(*Hv_op_);
   if (partial_assembly_) {
-    // TODO(trevilo): Support partial assembly
-    assert(false);
+    delete Hv_inv_pc_;
+    Vector diag_pa(vfes_->GetTrueVSize());
+    Hv_form_->AssembleDiagonal(diag_pa);
+    Hv_inv_pc_ = new OperatorJacobiSmoother(diag_pa, vel_ess_tdof_);
+    Hv_inv_->SetPreconditioner(*Hv_inv_);
   }
 
   //------------------------------------------------------------------------
   // Step 2: Compute vstar / dt (as in eqn 2.3 from Tomboulides)
   // ------------------------------------------------------------------------
+  MFEM_DEVICE_SYNC;
+  printf("Step 2...\n"); fflush(stdout);
 
   // Evaluate the forcing at the end of the time step
   for (auto &force : forcing_terms_) {
@@ -1196,6 +1216,8 @@ void Tomboulides::step() {
   //------------------------------------------------------------------------
   // Step 3: Poisson
   // ------------------------------------------------------------------------
+  MFEM_DEVICE_SYNC;
+  printf("Step 3...\n"); fflush(stdout);
 
   // Extrapolate the velocity field (and store in u_next_gf_)
   {
@@ -1335,10 +1357,8 @@ void Tomboulides::step() {
 
   Vector X1, B1;
   if (partial_assembly_) {
-    // TODO(trevilo): Support partial assembly here
-    assert(false);
-    // auto *SpC = Sp.As<ConstrainedOperator>();
-    // EliminateRHS(*Sp_form, *SpC, pres_ess_tdof, pn_gf, resp_gf, X1, B1, 1);
+    auto *L_iorho_C = L_iorho_op_.As<ConstrainedOperator>();
+    EliminateRHS(*L_iorho_form_, *L_iorho_C, pres_ess_tdof_, *p_gf_, *resp_gf_, X1, B1, 1);
   } else {
     L_iorho_form_->FormLinearSystem(pres_ess_tdof_, *p_gf_, *resp_gf_, L_iorho_op_, X1, B1, 1);
   }
@@ -1365,11 +1385,14 @@ void Tomboulides::step() {
   //------------------------------------------------------------------------
   // Step 4: Helmholtz solve for the velocity
   //------------------------------------------------------------------------
+  MFEM_DEVICE_SYNC;
+  printf("Step 4...\n"); fflush(stdout);
+
   resu_vec_ = 0.0;
 
-  // Variable viscosity term
-  S_mom_form_->Assemble();
-  S_mom_form_->ParallelAssemble(resu_vec_);
+  // // Variable viscosity term
+  // S_mom_form_->Assemble();
+  // S_mom_form_->ParallelAssemble(resu_vec_);
 
   // -grad(p)
   G_op_->AddMult(p_vec_, resu_vec_, -1.0);
@@ -1387,21 +1410,29 @@ void Tomboulides::step() {
 
   vfes_->GetRestrictionMatrix()->MultTranspose(resu_vec_, *resu_gf_);
 
+  MFEM_DEVICE_SYNC;
+  printf("Step 4a...\n"); fflush(stdout);
+
   Vector X2, B2;
   if (partial_assembly_) {
-    // TODO(trevilo): Add partial assembly support
-    assert(false);
-    // auto *HC = H.As<ConstrainedOperator>();
-    // EliminateRHS(*Hv_form_, *HC, vel_ess_tdof, un_next_gf, resu_gf, X2, B2, 1);
+    auto *HC = Hv_op_.As<ConstrainedOperator>();
+    EliminateRHS(*Hv_form_, *HC, vel_ess_tdof_, *u_next_gf_, *resu_gf_, X2, B2, 1);
   } else {
     Hv_form_->FormLinearSystem(vel_ess_tdof_, *u_next_gf_, *resu_gf_, Hv_op_, X2, B2, 1);
   }
+
+  MFEM_DEVICE_SYNC;
+  printf("Step 4b...\n"); fflush(stdout);
 
   Hv_inv_->Mult(B2, X2);
   if (!Hv_inv_->GetConverged()) {
     if (rank0_) std::cout << "ERROR: Helmholtz solve did not converge." << std::endl;
     exit(1);
   }
+
+  MFEM_DEVICE_SYNC;
+  printf("Step 4c...\n"); fflush(stdout);
+
   // iter_hsolve = HInv->GetNumIterations();
   // res_hsolve = HInv->GetFinalNorm();
   Hv_form_->RecoverFEMSolution(X2, *resu_gf_, *u_next_gf_);
@@ -1416,8 +1447,15 @@ void Tomboulides::step() {
   u_vec_ = u_next_vec_;
   u_curr_gf_->SetFromTrueDofs(u_vec_);
 
+  MFEM_DEVICE_SYNC;
+  printf("Step 4d...\n"); fflush(stdout);
+
+
   // update gradients for turbulence model
   evaluateVelocityGradient();
+
+  MFEM_DEVICE_SYNC;
+  printf("Step 5... Done.\n"); fflush(stdout);
 
   if (axisym_) {
     u_next_gf_->HostRead();

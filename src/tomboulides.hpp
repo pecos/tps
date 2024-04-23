@@ -82,11 +82,13 @@ class Tomboulides final : public FlowBase {
   // Options
   // TODO(trevilo): hardcoded for testing.  Need to set based on input file.
   bool numerical_integ_ = false;
-  bool partial_assembly_ = false;
+  // bool partial_assembly_ = false;
+  bool partial_assembly_ = true;
 
   int pressure_solve_pl_ = 0;
   int pressure_solve_max_iter_ = 100;
   double pressure_solve_rtol_ = 1e-8;
+  // double pressure_solve_rtol_ = 1e-12;
   double pressure_solve_atol_ = 1e-18;
 
   int mass_inverse_pl_ = 0;
@@ -172,6 +174,7 @@ class Tomboulides final : public FlowBase {
 
   /// mfem::Coefficients used in forming necessary operators
   mfem::GridFunctionCoefficient *rho_coeff_ = nullptr;
+  mfem::ConstantCoefficient *rho_const_coeff_ = nullptr;
   mfem::RatioCoefficient *iorho_coeff_ = nullptr;
   mfem::ConstantCoefficient nlcoeff_;
   mfem::ConstantCoefficient one_coeff_;
