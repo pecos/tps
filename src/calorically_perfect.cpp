@@ -733,6 +733,24 @@ void CaloricallyPerfectThermoChem::initializeViz(ParaViewDataCollection &pvdc) {
   pvdc.RegisterField("Qt", &Qt_gf_);
 }
 
+void CaloricallyPerfectThermoChem::initializeStats(Averaging &average, ParaViewDataCollection &pvdc, IODataOrganizer &io) {
+  
+  if (average.ComputeMean()) {
+
+    // fields for averaging
+    average.registerField(std::string("temperature"), &Tn_gf_, false, 0, 1);
+
+    // viz init
+    pvdc.RegisterField("meanTemp", average.GetMeanField(std::string("temperature")));
+
+    // io init
+    io.registerIOFamily("Time-averaged temperature", "/meanTemp", average.GetMeanField(std::string("temperature")), false, true, sfec_);
+    io.registerIOVar("/meanTemp", "<T>", 0), true;
+
+  }
+  
+}
+
 /**
    Update boundary conditions for Temperature, useful for
    ramping a dirichlet condition over time
