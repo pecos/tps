@@ -71,6 +71,7 @@ class Tps;
 #include "thermo_chem_base.hpp"
 #include "tps_mfem_wrap.hpp"
 #include "turb_model_base.hpp"
+#include "averaging.hpp"
 
 struct temporalSchemeCoefficients {
   // Current time
@@ -127,6 +128,8 @@ class LoMachSolver : public TPS::PlasmaSolver {
   FlowBase *flow_ = nullptr;
   SpongeBase *sponge_ = nullptr;
   ExternalDataBase *extData_ = nullptr;
+  AveragingOptions *avg_opts_ = nullptr;
+  Averaging *average_ = nullptr;
 
   // Mesh and geometry related
   ParMesh *pmesh_ = nullptr;

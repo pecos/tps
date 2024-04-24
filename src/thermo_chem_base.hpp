@@ -42,6 +42,7 @@ class Tps;
 }
 
 class IODataOrganizer;
+class Averaging;
 struct flowToThermoChem;
 struct turbModelToThermoChem;
 struct spongeToThermoChem;
@@ -123,6 +124,11 @@ class ThermoChemModelBase {
    */
   virtual void initializeViz(mfem::ParaViewDataCollection &pvdc) {}
 
+  /**
+   * @brief Hook to let averaging register fields and related visualization fields with ParaViewDataCollection, and restart fields with the IODataOrganizer.
+   */  
+  virtual void initializeStats(Averaging &average, mfem::ParaViewDataCollection &pvdc, IODataOrganizer &io) {}
+  
   /**
    * @brief Header strings for screen dump
    *

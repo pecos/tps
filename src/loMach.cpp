@@ -90,6 +90,8 @@ LoMachSolver::~LoMachSolver() {
   delete thermo_;
   delete sponge_;
   delete turbModel_;
+  delete avg_opts_;    
+  delete average_;  
   delete meshData_;
 
   // allocated in constructor
@@ -262,6 +264,16 @@ void LoMachSolver::initialize() {
   thermo_->initializeViz(*pvdc_);
   sponge_->initializeViz(*pvdc_);
   extData_->initializeViz(*pvdc_);
+
+  // Instantiate averaging
+  avg_opts_ = new AveragingOptions();
+  avg_opts_->read(tpsP_);
+  average_ = new Averaging(*avg_opts_, loMach_opts_.io_opts_.output_dir_);
+  
+  // Initialize statistics
+  flow_->initializeStats(*average_, *pvdc_, ioData);
+  thermo_->initializeStats(*average_, *pvdc_, ioData);
+  
 }
 
 void LoMachSolver::UpdateTimestepHistory(double dt) {
@@ -397,6 +409,11 @@ void LoMachSolver::solveStep() {
     }
   }
 
+  // averages
+  if (iter % avg_opts_->sample_interval_ == 0 && iter != 0) {
+    average_->addSample(iter, nullptr);
+  }
+  
   // restart files
   if (iter % loMach_opts_.output_frequency_ == 0 && iter != 0) {
     thermoPressure_ = thermo_->GetThermoPressure();
@@ -409,7 +426,7 @@ void LoMachSolver::solveStep() {
     pvdc_->SetTime(temporal_coeff_.time);
     pvdc_->Save();
   }
-
+  
   // check for DIE
   if (iter % loMach_opts_.io_opts_.exit_check_frequency_ == 0) {
     int early_exit = 0;

@@ -1021,7 +1021,7 @@ void Tomboulides::initializeIO(IODataOrganizer &io) const {
   if (axisym_) {
     io.registerIOFamily("Velocity azimuthal", "/swirl", utheta_gf_, true, true, pfec_);
     io.registerIOVar("/swirl", "swirl", 0);
-  }
+  }  
 }
 
 void Tomboulides::initializeViz(mfem::ParaViewDataCollection &pvdc) const {
@@ -1029,7 +1029,50 @@ void Tomboulides::initializeViz(mfem::ParaViewDataCollection &pvdc) const {
   pvdc.RegisterField("pressure", p_gf_);
   if (axisym_) {
     pvdc.RegisterField("swirl", utheta_gf_);
+  }  
+}
+
+void Tomboulides::initializeStats(Averaging &average, mfem::ParaViewDataCollection &pvdc, IODataOrganizer &io) const {
+  
+  if (average.ComputeMean()) {
+
+    // fields for averaging
+    average.registerField(std::string("velocity"), u_curr_gf_, true, 0, nvel_);
+    average.registerField(std::string("pressure"), p_gf_, false, 0, 1);  
+
+    // viz init
+    pvdc.RegisterField("meanVel", average.GetMeanField(std::string("velocity")));
+    pvdc.RegisterField("meanPres", average.GetMeanField(std::string("pressure")));    
+
+    // io init
+    io.registerIOFamily("Time-averaged velocity", "/meanVel", average.GetMeanField(std::string("velocity")), false, true, vfec_);
+    io.registerIOVar("/meanVel", "<u>", 0, true);
+    if (dim_ >= 2) io.registerIOVar("/meanVel", "<v>", 1, true);
+    if (dim_ == 3) io.registerIOVar("/meanVel", "<w>", 2, true);
+    io.registerIOFamily("Time-averaged pressure", "/meanPres", average.GetMeanField(std::string("pressure")), false, true, pfec_);
+    io.registerIOVar("/meanPres", "<P>", 0, true);
+
+    // rms
+    io.registerIOFamily("RMS velocity fluctuation", "/rmsData",
+			average.GetVariField(std::string("velocity")), false, true,vfec_);
+    if (nvel_ == 3) {
+      io.registerIOVar("/rmsData", "uu", 0);
+      io.registerIOVar("/rmsData", "vv", 1);
+      io.registerIOVar("/rmsData", "ww", 2);
+      io.registerIOVar("/rmsData", "uv", 3);
+      io.registerIOVar("/rmsData", "uw", 4);
+      io.registerIOVar("/rmsData", "vw", 5);
+    } else if (nvel_ == 2) {
+      io.registerIOVar("/rmsData", "uu", 0);
+      io.registerIOVar("/rmsData", "vv", 1);
+      io.registerIOVar("/rmsData", "uv", 2);
+    } else {
+      // only nvel = 2 or 3 supported
+      assert(false);
+    }
+		       
   }
+  
 }
 
 void Tomboulides::step() {

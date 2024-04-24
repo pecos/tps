@@ -38,6 +38,7 @@
 #include "tps_mfem_wrap.hpp"
 
 class IODataOrganizer;
+class Averaging;
 struct thermoChemToFlow;
 struct turbModelToFlow;
 struct spongeToFlow;
@@ -90,7 +91,8 @@ class FlowBase {
 
   virtual void initializeIO(IODataOrganizer &io) const {}
   virtual void initializeViz(mfem::ParaViewDataCollection &pvdc) const {}
-
+  virtual void initializeStats(Averaging &average, mfem::ParaViewDataCollection &pvdc, IODataOrganizer &io) const {}
+  
   /**
    * @brief Header strings for screen dump
    *
