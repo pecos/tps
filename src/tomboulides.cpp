@@ -1152,8 +1152,6 @@ void Tomboulides::step() {
   // Step 2: Compute vstar / dt (as in eqn 2.3 from Tomboulides)
   // ------------------------------------------------------------------------
 
-  sw_vstar_.Start();
-
   // Evaluate the forcing at the end of the time step
   for (auto &force : forcing_terms_) {
     force.coeff->SetTime(time + dt);
@@ -1161,10 +1159,15 @@ void Tomboulides::step() {
   forcing_form_->Assemble();
   forcing_form_->ParallelAssemble(forcing_vec_);
 
+  sw_vstar_.Start();
+
   // Evaluate the nonlinear---i.e. convection---term in the velocity eqn
   Nconv_form_->Mult(u_vec_, N_vec_);
   Nconv_form_->Mult(um1_vec_, Nm1_vec_);
   Nconv_form_->Mult(um2_vec_, Nm2_vec_);
+
+  sw_vstar_.Stop();
+
 
   {
     const auto d_N = N_vec_.Read();
@@ -1207,6 +1210,7 @@ void Tomboulides::step() {
   // iter_mvsolve = MvInv->GetNumIterations();
   // res_mvsolve = MvInv->GetFinalNorm();
 
+
   // vstar / dt += BDF contribution
   {
     const double bd1idt = -coeff_.bd1 / dt;
@@ -1220,14 +1224,14 @@ void Tomboulides::step() {
   }
 
   // At this point ustar_vec_ holds vstar/dt!
-  sw_vstar_.Stop();
 
   // NB: axisymmetric (no swirl!) implemented to here
 
   //------------------------------------------------------------------------
   // Step 3: Poisson
   // ------------------------------------------------------------------------
-  sw_pp_.Start();
+
+  sw_curl_.Start();
 
   // Extrapolate the velocity field (and store in u_next_gf_)
   {
@@ -1243,6 +1247,7 @@ void Tomboulides::step() {
   u_next_gf_->SetFromTrueDofs(uext_vec_);
 
   // Evaluate the double curl of the extrapolated velocity field
+  // Computed on host!!!
   if (axisym_) {
     ComputeCurlAxi(*u_next_gf_, *curl_gf_, false);
     ComputeCurlAxi(*curl_gf_, *curlcurl_gf_, true);
@@ -1305,11 +1310,14 @@ void Tomboulides::step() {
   // Add ustar/dt contribution
   pp_div_vec_ += ustar_vec_;
 
-  // Evaluate and add variable viscosity terms
-  S_poisson_form_->Assemble();
-  S_poisson_form_->ParallelAssemble(ress_vec_);
-  Mv_rho_inv_->Mult(ress_vec_, S_poisson_vec_);
-  pp_div_vec_ += S_poisson_vec_;
+
+  // // Evaluate and add variable viscosity terms
+  // // Computed on host!!!
+  // S_poisson_form_->Assemble();
+  // S_poisson_form_->ParallelAssemble(ress_vec_);
+
+  // Mv_rho_inv_->Mult(ress_vec_, S_poisson_vec_);
+  // pp_div_vec_ += S_poisson_vec_;
 
   pp_div_gf_->SetFromTrueDofs(pp_div_vec_);
 
@@ -1345,10 +1353,12 @@ void Tomboulides::step() {
   resp_vec_.Neg();
 
   // Add boundary terms to residual
+  // Computed on host!!!
   pp_div_bdr_form_->Assemble();
   pp_div_bdr_form_->ParallelAssemble(pp_div_bdr_vec_);
   resp_vec_.Add(1.0, pp_div_bdr_vec_);
 
+  // Computed on host!!!
   u_bdr_form_->Assemble();
   u_bdr_form_->ParallelAssemble(u_bdr_vec_);
   resp_vec_.Add(-coeff_.bd0 / dt, u_bdr_vec_);
@@ -1364,6 +1374,7 @@ void Tomboulides::step() {
 
   // Isn't this the same as SetFromTrueDofs????
   pfes_->GetRestrictionMatrix()->MultTranspose(resp_vec_, *resp_gf_);
+  sw_curl_.Stop();
 
   Vector X1, B1;
   if (partial_assembly_) {
@@ -1372,6 +1383,8 @@ void Tomboulides::step() {
   } else {
     L_iorho_form_->FormLinearSystem(pres_ess_tdof_, *p_gf_, *resp_gf_, L_iorho_op_, X1, B1, 1);
   }
+
+  sw_pp_.Start();
 
   L_iorho_inv_->Mult(B1, X1);
   if (!L_iorho_inv_->GetConverged()) {
@@ -1453,6 +1466,7 @@ void Tomboulides::step() {
 
   std::cout << "Timings: " << sw_setup_.RealTime()
             << " " << sw_vstar_.RealTime()
+            << " " << sw_curl_.RealTime()
             << " " << sw_pp_.RealTime()
             << " " << sw_helm_.RealTime() << std::endl;
 
