@@ -1033,10 +1033,12 @@ void Tomboulides::initializeStats(Averaging &average, mfem::ParaViewDataCollecti
     io.registerIOVar("/meanVel", "<u>", 0, true);
     if (dim_ >= 2) io.registerIOVar("/meanVel", "<v>", 1, true);
     if (dim_ == 3) io.registerIOVar("/meanVel", "<w>", 2, true);
+    
     io.registerIOFamily("Time-averaged pressure", "/meanPres", average.GetMeanField(std::string("pressure")), false, true, pfec_);
     io.registerIOVar("/meanPres", "<P>", 0), true;
 
     // rms
+    /*
     io.registerIOFamily("RMS velocity fluctuation", "/rmsData",
 			average.GetVariField(std::string("velocity")), false, true,vfec_);
     if (nvel_ == 3) {
@@ -1054,6 +1056,7 @@ void Tomboulides::initializeStats(Averaging &average, mfem::ParaViewDataCollecti
       // only nvel = 2 or 3 supported
       assert(false);
     }
+    */
 		       
   }
   

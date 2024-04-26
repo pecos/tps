@@ -119,6 +119,7 @@ void Averaging::registerField(std::string name, const ParGridFunction *field_to_
 
   // and store those fields in an AveragingFamily object that gets appended to the avg_families_ vector
   avg_families_.emplace_back(AveragingFamily(name, field_to_average, mean, vari, vari_start_index, vari_components));
+  std::cout << "Fam size: " << avg_families_.size() << " with addition of " << name << endl;
 }
 
 void Averaging::initializeViz() {
@@ -206,10 +207,12 @@ void Averaging::addSample(const int &iter, GasMixture *mixture) {
       // or the variances have been restarted.  Either way, valid to
       // set variances to zero.
       for (size_t ifam = 0; ifam < avg_families_.size(); ifam++) {
-        *avg_families_[ifam].vari_fcn_ = 0.0;
+        if(avg_families_[ifam].vari_fcn_ != nullptr) {	
+          *avg_families_[ifam].vari_fcn_ = 0.0;
+	}
       }
     }
-
+    
     if (mixture != nullptr) {
       addSampleInternal(mixture);
     } else {
@@ -242,44 +245,69 @@ void Averaging::addSampleInternal() {
 
   // Loop through families that have been registered and compute means and variances
   for (size_t ifam = 0; ifam < avg_families_.size(); ifam++) {
+    //std::cout << "starting ifam loop... " << ifam+1 << " of " << avg_families_.size() << " " << avg_families_[ifam].name_ << endl;
     // Extract fields for use on device (when available)
     AveragingFamily &fam = avg_families_[ifam];
+    //std::cout << "okay a... " << endl;        
 
     const ParGridFunction *inst = fam.instantaneous_fcn_;
     ParGridFunction *mean = fam.mean_fcn_;
     ParGridFunction *vari = fam.vari_fcn_;
+    //std::cout << "okay b... " << endl;
+    if(fam.mean_fcn_ == nullptr) {
+      std::cout << "fam.mean_fcn_ is a nullptr " << endl; 
+    }
 
     const double *d_inst = inst->Read();
-    double *d_mean = mean->ReadWrite();
-    double *d_vari = vari->ReadWrite();
+    //std::cout << "okay b1... " << endl;    
+    double *d_mean = mean->ReadWrite();    
+    //std::cout << "okay b3... " << endl;        
+    double *d_vari;
+    //std::cout << "okay b4... " << endl;        
+    if(vari != nullptr) { d_vari = vari->ReadWrite(); }
+    //std::cout << "okay c... " << endl;            
 
     // Extract size information for use on device
     const int dof = mean->ParFESpace()->GetNDofs();  // dofs per scalar field
     const int neq = mean->ParFESpace()->GetVDim();   // number of scalar variables in mean field
+    //std::cout << "okay d... " << endl;            
 
-    const int d_vari_start = fam.vari_start_index_;
-    const int d_vari_components = fam.vari_components_;
+    int d_vari_start;
+    int d_vari_components;
+    if(vari != nullptr) {
+      d_vari_start = fam.vari_start_index_;
+      d_vari_components = fam.vari_components_;      
+    }
+    //std::cout << "okay e... " << endl;            
 
     // Extract sample size information for use on device
     double d_ns_mean = (double)ns_mean_;
-    double d_ns_vari = (double)ns_vari_;
+    double d_ns_vari;
+    if(vari != nullptr) {
+      d_ns_vari = (double)ns_vari_;      
+    }
 
+    //std::cout << "okay 0... " << dof << endl;    
     // "Loop" over all dofs and update statistics
     MFEM_FORALL(n, dof, {
       // Update mean
+      //std::cout << "okay 1..." << endl;
       for (int eq = 0; eq < neq; eq++) {
         const double uinst = d_inst[n + eq * dof];
         const double umean = d_mean[n + eq * dof];
         const double N_umean = d_ns_mean * umean;
         d_mean[n + eq * dof] = (N_umean + uinst) / (d_ns_mean + 1);
       }
+      //std::cout << "okay 2..." << endl;      
 
       // Update variances (only computed if we have a place to put them)
-      if (d_vari != nullptr) {
+      //if (d_vari != nullptr) {
+      if (vari != nullptr) {	
         double val = 0.;
         double delta_i = 0.;
         double delta_j = 0.;
         int vari_index = 0;
+        //std::cout << "okay 3..." << endl;      	
 
         // Variances first (i.e., diagonal of the covariance matrix)
         for (int i = d_vari_start; i < d_vari_start + d_vari_components; i++) {
@@ -290,25 +318,35 @@ void Averaging::addSampleInternal() {
           d_vari[n + vari_index * dof] = (val * d_ns_vari + delta_i * delta_i) / (d_ns_vari + 1);
           vari_index++;
         }
+        //std::cout << "okay 4... " << d_vari_start << " " << d_vari_components << endl;
 
         // Covariances second (i.e., off-diagonal components, if any)
         for (int i = d_vari_start; i < d_vari_start + d_vari_components - 1; i++) {
           const double uinst_i = d_inst[n + i * dof];
           const double umean_i = d_mean[n + i * dof];
           delta_i = uinst_i - umean_i;
+	  //std::cout << "okay 4a... " << endl;	  
           for (int j = d_vari_start + 1; j < d_vari_start + d_vari_components; j++) {
             const double uinst_j = d_inst[n + j * dof];
             const double umean_j = d_mean[n + j * dof];
             delta_j = uinst_j - umean_j;
+  	    //std::cout << "okay 4b... " << endl;	  	    
 
             val = d_vari[n + vari_index * dof];
+  	    //std::cout << "okay 4c... " << endl;	  	    	    
             d_vari[n + vari_index * dof] = (val * d_ns_vari + delta_i * delta_j) / (d_ns_vari + 1);
+  	    //std::cout << "okay 4d... " << endl;	  	    	    
             vari_index++;
+  	    //std::cout << "okay 4e... " << endl;	  	    	    
           }
         }
       }  // end variance
+      //std::cout << "okay 5..." << endl; 
+      
     });
+    //std::cout << "okay 6..." << endl;     
   }
+  //std::cout << "okay 7..." << endl;   
 }
 
 void Averaging::addSampleInternal(GasMixture *mixture) {

@@ -406,9 +406,11 @@ void LoMachSolver::solveStep() {
     }
   }
 
-  // averages
-  if (iter % avg_opts_->sample_interval_ == 0 && iter != 0) {
-    average_->addSample(iter, nullptr);
+  // averages 
+  if (avg_opts_->sample_interval_ != 0) {
+    if (iter % avg_opts_->sample_interval_ == 0 && iter != 0) {
+      average_->addSample(iter, nullptr);
+    }
   }
   
   // restart files
