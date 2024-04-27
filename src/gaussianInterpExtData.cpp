@@ -261,17 +261,7 @@ void GaussianInterpExtData::setup() {
   */
   double radius = 1.0;
 
-  // TODO(swh): dont need to fill entire gf, just appropriate face
   // NB: be careful with GetNBE (see comments in mfem/mesh/mesh.hpp)
-  // MPI_Barrier(vfes_->GetComm());
-  // std::cout << " starting actual interp..." << endl;
-
-  // for (int np = 0; np < nprocs_; np++) {
-  //   MPI_Barrier(vfes_->GetComm());
-  //   if (rank_ != np) { continue; }
-  //   std::cout << "Working on rank " << np+1 << " of " << nprocs_ << "..." << endl;
-
-  // for (int n = 0; n < Sdof_; n++) {
   for (int be = 0; be < pmesh_->GetNBE(); be++) {
     Array<int> vdofs;
     sfes_->GetBdrElementVDofs(be, vdofs);
@@ -279,7 +269,9 @@ void GaussianInterpExtData::setup() {
       // index in gf of bndry element
       int n = vdofs[i];
       if (n >= Sdof_) {
-        std::cout << " BAD: " << n << " of " << Sdof_ << " dofs" << endl;
+        std::cout << " ERROR: problem with GetNBE in external data interpolation " << n << " of " << Sdof_ << " dofs"
+                  << endl;
+        exit(1);
       }
 
       double xp[3];
@@ -347,15 +339,16 @@ void GaussianInterpExtData::setup() {
         }
 
         // nearest, just for testing
-        // if(dist <= distMin) {
-        //  wt_tot = 1.0;
-        //   val_rho = inlet[j].rho;
-        //   val_u = inlet[j].u;
-        //   val_v = inlet[j].v;
-        //   val_w = inlet[j].w;
-        //   val_T = inlet[j].temp;
-        //   iCount = 1;
-        // }
+        /*
+        if(dist <= distMin) {
+          wt_tot = 1.0;
+          val_u = inlet[j].u;
+          val_v = inlet[j].v;
+          val_w = inlet[j].w;
+          val_T = inlet[j].temp;
+          iCount = 1;
+        }
+        */
       }
 
       if (wt_tot > 0.0) {
@@ -363,8 +356,6 @@ void GaussianInterpExtData::setup() {
         Udata[n + 1 * Sdof_] = val_v / wt_tot;
         Udata[n + 2 * Sdof_] = val_w / wt_tot;
         Tdata[n] = val_T / wt_tot;
-        // std::cout << n << ") interpolated data: " << Udata[n + 0 * Sdof_] << " " << Udata[n + 1 * Sdof_] << " " <<
-        // Udata[n + 2 * Sdof_] << endl;
       } else {
         Udata[n + 0 * Sdof_] = 0.0;
         Udata[n + 1 * Sdof_] = 0.0;
@@ -378,10 +369,6 @@ void GaussianInterpExtData::setup() {
       U0[n + 2 * Sdof_] = Udata[n + 2 * Sdof_];
     }
   }
-  // MPI_Barrier(vfes_->GetComm());
-  // std::cout << " done with interpolation!" << endl;
-
-  //}
 }
 
 void GaussianInterpExtData::step() {
