@@ -177,6 +177,12 @@ class Averaging {
   /// Visualization directory (i.e., paraview dumped to mean_output_name_)
   std::string mean_output_name_;
 
+  /// flag to continue mean from restart
+  bool enable_mean_continuation_;
+
+  /// flag to restart variances  
+  bool zero_variances_;
+
   /// mfem paraview data collection, used to write viz files
   ParaViewDataCollection *pvdc_ = nullptr;
 
