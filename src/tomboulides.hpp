@@ -353,7 +353,7 @@ class Tomboulides final : public FlowBase {
   /**
    * @brief Initialize statistics outputs
    */  
-  void initializeStats(Averaging &average, mfem::ParaViewDataCollection &pvdc, IODataOrganizer &io) const final;
+  void initializeStats(Averaging &average, IODataOrganizer &io) const final;
   
   /// Advance
   void step() final;

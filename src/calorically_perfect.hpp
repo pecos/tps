@@ -71,6 +71,8 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   double dt_;
   double time_;
 
+  std::string ic_string_;
+  
   // Flags
   bool rank0_;                      /**< true if this is rank 0 */
   bool partial_assembly_ = false;   /**< Enable/disable partial assembly of forms. */
@@ -216,7 +218,7 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   void step() final;
   void initializeIO(IODataOrganizer &io) final;
   void initializeViz(ParaViewDataCollection &pvdc) final;
-  void initializeStats(Averaging &average, ParaViewDataCollection &pvdc, IODataOrganizer &io) final;
+  void initializeStats(Averaging &average, IODataOrganizer &io) final;
 
   void screenHeader(std::vector<std::string> &header) const final;
   void screenValues(std::vector<double> &values) final;

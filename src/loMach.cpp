@@ -187,6 +187,11 @@ void LoMachSolver::initialize() {
     exit(ERROR);
   }
 
+  // Instantiate averaging
+  avg_opts_ = new AveragingOptions();
+  avg_opts_->read(tpsP_);
+  average_ = new Averaging(*avg_opts_, loMach_opts_.io_opts_.output_dir_);
+  
   // Initialize time marching coefficients.  NB: dt will be reset
   // prior to time step, but must be initialized here in order to
   // avoid possible uninitialized usage when constructing operators in
@@ -210,25 +215,6 @@ void LoMachSolver::initialize() {
   flow_->initializeSelf();
   thermo_->initializeSelf();
 
-  // Initialize restart read/write capability
-  flow_->initializeIO(ioData);
-  thermo_->initializeIO(ioData);
-
-  const bool restart_serial =
-      (loMach_opts_.io_opts_.restart_serial_read_ || loMach_opts_.io_opts_.restart_serial_write_);
-  ioData.initializeSerial(rank0_, restart_serial, serial_mesh_, meshData_->getLocalToGlobalElementMap(),
-                          &partitioning_);
-  // MPI_Barrier(groupsMPI->getTPSCommWorld());
-  if (verbose) grvy_printf(ginfo, "ioData.init thingy...\n");
-
-  // If restarting, read restart files
-  if (loMach_opts_.io_opts_.enable_restart_) {
-    restart_files_hdf5("read");
-    if (thermoPressure_ > 0.0) {
-      thermo_->SetThermoPressure(thermoPressure_);
-    }
-  }
-
   // Exchange interface information
   turbModel_->initializeFromThermoChem(&thermo_->toTurbModel_interface_);
   turbModel_->initializeFromFlow(&flow_->toTurbModel_interface_);
@@ -247,10 +233,15 @@ void LoMachSolver::initialize() {
   turbModel_->initializeOperators();
   flow_->initializeOperators();
   thermo_->initializeOperators();
-  // if(rank0_) {std::cout << "check: ops set..." << endl;}
+  
+  // Initialize restart read/write capability
+  flow_->initializeIO(ioData);
+  thermo_->initializeIO(ioData);
 
-  // TODO(trevilo): Enable averaging.  See note in loMach.hpp
-
+  // Initialize statistics
+  flow_->initializeStats(*average_, ioData);
+  thermo_->initializeStats(*average_, ioData);  
+  
   // Initialize visualization
   pvdc_ = new ParaViewDataCollection(loMach_opts_.io_opts_.output_dir_, pmesh_);
   pvdc_->SetDataFormat(VTKFormat::BINARY32);
@@ -263,15 +254,20 @@ void LoMachSolver::initialize() {
   thermo_->initializeViz(*pvdc_);
   sponge_->initializeViz(*pvdc_);
   extData_->initializeViz(*pvdc_);
+  average_->initializeViz();  
 
-  // Instantiate averaging
-  avg_opts_ = new AveragingOptions();
-  avg_opts_->read(tpsP_);
-  average_ = new Averaging(*avg_opts_, loMach_opts_.io_opts_.output_dir_);
+  const bool restart_serial =
+      (loMach_opts_.io_opts_.restart_serial_read_ || loMach_opts_.io_opts_.restart_serial_write_);
+  ioData.initializeSerial(rank0_, restart_serial, serial_mesh_, meshData_->getLocalToGlobalElementMap(),
+                          &partitioning_);
   
-  // Initialize statistics
-  flow_->initializeStats(*average_, *pvdc_, ioData);
-  thermo_->initializeStats(*average_, *pvdc_, ioData);
+  // If restarting, read restart files
+  if (loMach_opts_.io_opts_.enable_restart_) {
+    restart_files_hdf5("read");
+    if (thermoPressure_ > 0.0) {
+      thermo_->SetThermoPressure(thermoPressure_);
+    }
+  }
   
 }
 
@@ -424,6 +420,7 @@ void LoMachSolver::solveStep() {
     pvdc_->SetCycle(iter);
     pvdc_->SetTime(temporal_coeff_.time);
     pvdc_->Save();
+    average_->writeViz(iter, temporal_coeff_.time, avg_opts_->save_mean_history_);    
   }
   
   // check for DIE
@@ -459,6 +456,7 @@ void LoMachSolver::solveEnd() {
   pvdc_->SetTime(temporal_coeff_.time);
   if (rank0_ == true) std::cout << " Saving final step to paraview: " << iter << "... " << endl;
   pvdc_->Save();
+  average_->writeViz(iter, temporal_coeff_.time, avg_opts_->save_mean_history_);  
   MPI_Barrier(groupsMPI->getTPSCommWorld());
   if (rank0_ == true) std::cout << " ...complete!" << endl;
 }

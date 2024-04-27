@@ -1016,17 +1016,13 @@ void Tomboulides::initializeViz(mfem::ParaViewDataCollection &pvdc) const {
   }  
 }
 
-void Tomboulides::initializeStats(Averaging &average, mfem::ParaViewDataCollection &pvdc, IODataOrganizer &io) const {
+void Tomboulides::initializeStats(Averaging &average, IODataOrganizer &io) const {
   
   if (average.ComputeMean()) {
 
     // fields for averaging
     average.registerField(std::string("velocity"), u_curr_gf_, true, 0, nvel_);
     average.registerField(std::string("pressure"), p_gf_, false, 0, 1);  
-
-    // viz init
-    pvdc.RegisterField("meanVel", average.GetMeanField(std::string("velocity")));
-    pvdc.RegisterField("meanPres", average.GetMeanField(std::string("pressure")));    
 
     // io init
     io.registerIOFamily("Time-averaged velocity", "/meanVel", average.GetMeanField(std::string("velocity")), false, true, vfec_);
@@ -1038,7 +1034,6 @@ void Tomboulides::initializeStats(Averaging &average, mfem::ParaViewDataCollecti
     io.registerIOVar("/meanPres", "<P>", 0), true;
 
     // rms
-    /*
     io.registerIOFamily("RMS velocity fluctuation", "/rmsData",
 			average.GetVariField(std::string("velocity")), false, true,vfec_);
     if (nvel_ == 3) {
@@ -1056,7 +1051,6 @@ void Tomboulides::initializeStats(Averaging &average, mfem::ParaViewDataCollecti
       // only nvel = 2 or 3 supported
       assert(false);
     }
-    */
 		       
   }
   
