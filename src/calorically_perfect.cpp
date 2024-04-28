@@ -242,6 +242,8 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
     std::cout << "exports set..." << endl;
   }
 
+  tpsP_->getInput("loMach/calperfect/numerical-integ", numerical_integ_, true);
+  
   //-----------------------------------------------------
   // 2) Set the initial condition
   //-----------------------------------------------------
