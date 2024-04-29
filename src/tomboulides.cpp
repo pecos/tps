@@ -1119,7 +1119,6 @@ void Tomboulides::step() {
   L_iorho_inv_->SetMaxIter(pressure_solve_max_iter_);
 
   // Update density weighted mass
-  Array<int> empty;
   Mv_rho_form_->Update();
   Mv_rho_form_->Assemble();
   Mv_rho_form_->FormSystemMatrix(empty, Mv_rho_op_);
