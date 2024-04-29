@@ -71,6 +71,7 @@ void Orthogonalize(Vector &v, const ParFiniteElementSpace *pfes) {
 
 Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalSchemeCoefficients &coeff, TPS::Tps *tps)
     : gll_rules(0, Quadrature1D::GaussLobatto),
+      tpsP_(tps),
       pmesh_(pmesh),
       vorder_(vorder),
       porder_(porder),
@@ -108,170 +109,14 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
     }
 
     // Use "numerical integration" (i.e., under-integrate so that mass matrix is diagonal)
+    // NOTE: this should default to false as it is generally not safe, but much of the
+    // test results rely on it being true
     tps->getInput("loMach/tomboulides/numerical-integ", numerical_integ_, true);
 
     // Can't use numerical integration with axisymmetric b/c it
     // locates quadrature points on the axis, which can lead to
     // singular mass matrices and evaluations of 1/r = 1/0.
     if (axisym_) assert(!numerical_integ_);
-
-    // Gravity
-    assert(dim_ >= 2);
-    Vector zerog(dim_);
-    zerog = 0.0;
-    gravity_.SetSize(dim_);
-    tps->getVec("loMach/gravity", gravity_, dim_, zerog);
-
-    // Initial condition function... options are
-    // 1) "" (Empty string), velocity initialized to zero
-    // 2) "tgv2d", velocity initialized using vel_exact_tgv2d function
-    // 3) "constant", TODO(trevilo) implement options to read constant
-    tps->getInput("loMach/tomboulides/ic", ic_string_, std::string(""));
-
-    // Boundary conditions
-    // number of BC regions defined
-    int numWalls, numInlets, numOutlets;
-    tps->getInput("boundaryConditions/numWalls", numWalls, 0);
-    tps->getInput("boundaryConditions/numInlets", numInlets, 0);
-    tps->getInput("boundaryConditions/numOutlets", numOutlets, 0);
-
-    // Inlet BCs (Dirichlet on velocity)
-    for (int i = 1; i <= numInlets; i++) {
-      int patch;
-      std::string type;
-      std::string basepath("boundaryConditions/inlet" + std::to_string(i));
-
-      tps->getRequiredInput((basepath + "/patch").c_str(), patch);
-      tps->getRequiredInput((basepath + "/type").c_str(), type);
-
-      if (type == "uniform") {
-        Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
-        inlet_attr = 0;
-        inlet_attr[patch - 1] = 1;
-
-        Vector zero(dim_);
-        zero = 0.0;
-
-        Vector velocity_value(dim_);
-        tps->getVec((basepath + "/velocity").c_str(), velocity_value, dim_, zero);
-
-        if (pmesh_->GetMyRank() == 0) {
-          std::cout << "Tomboulides: Setting uniform Dirichlet velocity on patch = " << patch << std::endl;
-        }
-        addVelDirichletBC(velocity_value, inlet_attr);
-
-        if (axisym_) {
-          double swirl;
-          tps->getInput((basepath + "/swirl").c_str(), swirl, 0.0);
-          addSwirlDirichletBC(swirl, inlet_attr);
-        }
-
-      } else if (type == "interpolate") {
-        Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
-        inlet_attr = 0;
-        inlet_attr[patch - 1] = 1;
-        velocity_field_ = new VectorGridFunctionCoefficient(extData_interface_->Udata);
-        if (pmesh_->GetMyRank() == 0) {
-          std::cout << "Tomboulides: Setting interpolated Dirichlet velocity on patch = " << patch << std::endl;
-        }
-        addVelDirichletBC(velocity_field_, inlet_attr);
-
-        // axisymmetric not testsed with interpolation BCs yet.  For now, just stop.
-        assert(!axisym_);
-
-      } else if (type == "fully-developed-pipe") {
-        Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
-        inlet_attr = 0;
-        inlet_attr[patch - 1] = 1;
-
-        if (pmesh_->GetMyRank() == 0) {
-          std::cout << "Tomboulides: Setting uniform inlet velocity on patch = " << patch << std::endl;
-        }
-        addVelDirichletBC(vel_exact_pipe, inlet_attr);
-
-        if (axisym_) {
-          addSwirlDirichletBC(0.0, inlet_attr);
-        }
-      } else {
-        if (pmesh_->GetMyRank() == 0) {
-          std::cout << "Tomboulides: When reading " << basepath << ", encountered inlet type = " << type << std::endl;
-          std::cout << "Tomboulides: Tomboulides flow solver does not support this type." << std::endl;
-        }
-        assert(false);
-        exit(1);
-      }
-    }
-
-    // Wall Bcs
-    for (int i = 1; i <= numWalls; i++) {
-      int patch;
-      std::string type;
-      std::string basepath("boundaryConditions/wall" + std::to_string(i));
-
-      tps->getRequiredInput((basepath + "/patch").c_str(), patch);
-      tps->getRequiredInput((basepath + "/type").c_str(), type);
-
-      if (type == "viscous_isothermal" || type == "viscous_adiabatic" || type == "viscous" || type == "no-slip") {
-        Array<int> wall_attr(pmesh_->bdr_attributes.Max());
-        wall_attr = 0;
-        wall_attr[patch - 1] = 1;
-
-        Vector zero(dim_);
-        zero = 0.0;
-
-        Vector velocity_value(dim_);
-        tps->getVec((basepath + "/velocity").c_str(), velocity_value, dim_, zero);
-
-        if (pmesh_->GetMyRank() == 0) {
-          std::cout << "Tomboulides: Setting Dirichlet velocity on patch = " << patch << std::endl;
-        }
-        addVelDirichletBC(velocity_value, wall_attr);
-
-        if (axisym_) {
-          double swirl;
-          tps->getInput((basepath + "/swirl").c_str(), swirl, 0.0);
-          addSwirlDirichletBC(swirl, wall_attr);
-        }
-      } else {
-        if (pmesh_->GetMyRank() == 0) {
-          std::cout << "Tomboulides: When reading " << basepath << ", encountered wall type = " << type << std::endl;
-          std::cout << "Tomboulides: Tomboulides flow solver does not support this type." << std::endl;
-        }
-        assert(false);
-        exit(1);
-      }
-    }
-
-    // Outlet BCs
-    for (int i = 1; i <= numOutlets; i++) {
-      int patch;
-      std::string type;
-      std::string basepath("boundaryConditions/outlet" + std::to_string(i));
-
-      tps->getRequiredInput((basepath + "/patch").c_str(), patch);
-      tps->getRequiredInput((basepath + "/type").c_str(), type);
-
-      if (type == "uniform") {
-        Array<int> outlet_attr(pmesh_->bdr_attributes.Max());
-        outlet_attr = 0;
-        outlet_attr[patch - 1] = 1;
-
-        double pback;
-        tps->getInput((basepath + "/pressure").c_str(), pback, 0.0);
-
-        if (pmesh_->GetMyRank() == 0) {
-          std::cout << "Tomboulides: Setting uniform outlet pressure on patch = " << patch << std::endl;
-        }
-        addPresDirichletBC(pback, outlet_attr);
-      } else {
-        if (pmesh_->GetMyRank() == 0) {
-          std::cout << "Tomboulides: When reading " << basepath << ", encountered outlet type = " << type << std::endl;
-          std::cout << "Tomboulides: Tomboulides flow solver does not support this type." << std::endl;
-        }
-        assert(false);
-        exit(1);
-      }
-    }
   }
 }
 
@@ -410,6 +255,11 @@ void Tomboulides::initializeSelf() {
   *curl_gf_ = 0.0;
   *curlcurl_gf_ = 0.0;
   *resu_gf_ = 0.0;
+
+  *gradU_gf_ = 0.0;
+  *gradV_gf_ = 0.0;
+  *gradW_gf_ = 0.0;
+
   *p_gf_ = 0.0;
   *resp_gf_ = 0.0;
   *mu_total_gf_ = 0.0;
@@ -435,6 +285,11 @@ void Tomboulides::initializeSelf() {
   toTurbModel_interface_.gradW = gradW_gf_;
 
   // Gravity
+  assert(dim_ >= 2);
+  Vector zerog(dim_);
+  zerog = 0.0;
+  gravity_.SetSize(dim_);
+  tpsP_->getVec("loMach/gravity", gravity_, dim_, zerog);
   gravity_vec_ = new VectorConstantCoefficient(gravity_);
   Array<int> domain_attr(pmesh_->attributes.Max());
   domain_attr = 1;
@@ -522,6 +377,12 @@ void Tomboulides::initializeSelf() {
     utheta_next_vec_ = 0.0;
   }
 
+  // Initial condition function... options are
+  // 1) "" (Empty string), velocity initialized to zero
+  // 2) "tgv2d", velocity initialized using vel_exact_tgv2d function
+  // 3) "constant", TODO(trevilo) implement options to read constant
+  tpsP_->getInput("loMach/tomboulides/ic", ic_string_, std::string(""));
+
   // set IC if we have one at this point
   if (!ic_string_.empty()) {
     if (ic_string_ == "tgv2d") {
@@ -529,6 +390,156 @@ void Tomboulides::initializeSelf() {
       VectorFunctionCoefficient u_excoeff(2, vel_exact_tgv2d);
       u_excoeff.SetTime(0.0);
       u_curr_gf_->ProjectCoefficient(u_excoeff);
+    }
+  }
+
+  // Boundary conditions
+  // number of BC regions defined
+  int numWalls, numInlets, numOutlets;
+  tpsP_->getInput("boundaryConditions/numWalls", numWalls, 0);
+  tpsP_->getInput("boundaryConditions/numInlets", numInlets, 0);
+  tpsP_->getInput("boundaryConditions/numOutlets", numOutlets, 0);
+
+  // Inlet BCs (Dirichlet on velocity)
+  for (int i = 1; i <= numInlets; i++) {
+    int patch;
+    std::string type;
+    std::string basepath("boundaryConditions/inlet" + std::to_string(i));
+
+    tpsP_->getRequiredInput((basepath + "/patch").c_str(), patch);
+    tpsP_->getRequiredInput((basepath + "/type").c_str(), type);
+
+    MPI_Barrier(vfes_->GetComm());
+    if (type == "uniform") {
+      if (pmesh_->GetMyRank() == 0) {
+        std::cout << "Tomboulides: Setting uniform Dirichlet velocity on patch = " << patch << std::endl;
+      }
+      Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
+      inlet_attr = 0;
+      inlet_attr[patch - 1] = 1;
+
+      Vector zero(dim_);
+      zero = 0.0;
+
+      Vector velocity_value(dim_);
+      tpsP_->getVec((basepath + "/velocity").c_str(), velocity_value, dim_, zero);
+
+      addVelDirichletBC(velocity_value, inlet_attr);
+
+      if (axisym_) {
+        double swirl;
+        tpsP_->getInput((basepath + "/swirl").c_str(), swirl, 0.0);
+        addSwirlDirichletBC(swirl, inlet_attr);
+      }
+
+    } else if (type == "interpolate") {
+      if (pmesh_->GetMyRank() == 0) {
+        std::cout << "Tomboulides: Setting interpolated Dirichlet velocity on patch = " << patch << std::endl;
+      }
+      Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
+      inlet_attr = 0;
+      inlet_attr[patch - 1] = 1;
+
+      velocity_field_ = new VectorGridFunctionCoefficient(extData_interface_->Udata);
+      addVelDirichletBC(velocity_field_, inlet_attr);
+
+      // axisymmetric not testsed with interpolation BCs yet.  For now, just stop.
+      assert(!axisym_);
+
+    } else if (type == "fully-developed-pipe") {
+      if (pmesh_->GetMyRank() == 0) {
+        std::cout << "Tomboulides: Setting uniform inlet velocity on patch = " << patch << std::endl;
+      }
+      Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
+      inlet_attr = 0;
+      inlet_attr[patch - 1] = 1;
+
+      addVelDirichletBC(vel_exact_pipe, inlet_attr);
+
+      if (axisym_) {
+        addSwirlDirichletBC(0.0, inlet_attr);
+      }
+    } else {
+      if (pmesh_->GetMyRank() == 0) {
+        std::cout << "Tomboulides: When reading " << basepath << ", encountered inlet type = " << type << std::endl;
+        std::cout << "Tomboulides: Tomboulides flow solver does not support this type." << std::endl;
+      }
+      assert(false);
+      exit(1);
+    }
+  }
+
+  // Wall Bcs
+  for (int i = 1; i <= numWalls; i++) {
+    int patch;
+    std::string type;
+    std::string basepath("boundaryConditions/wall" + std::to_string(i));
+
+    tpsP_->getRequiredInput((basepath + "/patch").c_str(), patch);
+    tpsP_->getRequiredInput((basepath + "/type").c_str(), type);
+
+    if (type == "viscous_isothermal" || type == "viscous_adiabatic" || type == "viscous" || type == "no-slip") {
+      if (pmesh_->GetMyRank() == 0) {
+        std::cout << "Tomboulides: Setting Dirichlet velocity on patch = " << patch << std::endl;
+      }
+
+      Array<int> wall_attr(pmesh_->bdr_attributes.Max());
+      wall_attr = 0;
+      wall_attr[patch - 1] = 1;
+
+      Vector zero(dim_);
+      zero = 0.0;
+
+      Vector velocity_value(dim_);
+      tpsP_->getVec((basepath + "/velocity").c_str(), velocity_value, dim_, zero);
+
+      addVelDirichletBC(velocity_value, wall_attr);
+
+      if (axisym_) {
+        double swirl;
+        tpsP_->getInput((basepath + "/swirl").c_str(), swirl, 0.0);
+        addSwirlDirichletBC(swirl, wall_attr);
+      }
+    } else {
+      if (pmesh_->GetMyRank() == 0) {
+        std::cout << "Tomboulides: When reading " << basepath << ", encountered wall type = " << type << std::endl;
+        std::cout << "Tomboulides: Tomboulides flow solver does not support this type." << std::endl;
+      }
+      assert(false);
+      exit(1);
+    }
+  }
+
+  // Outlet BCs
+  for (int i = 1; i <= numOutlets; i++) {
+    if (rank0_) std::cout << "Caught outlet" << std::endl;
+    int patch;
+    std::string type;
+    std::string basepath("boundaryConditions/outlet" + std::to_string(i));
+
+    tpsP_->getRequiredInput((basepath + "/patch").c_str(), patch);
+    tpsP_->getRequiredInput((basepath + "/type").c_str(), type);
+
+    if (type == "uniform") {
+      if (rank0_) std::cout << "attempting to apply uniform pressure outlet" << patch << std::endl;
+      Array<int> outlet_attr(pmesh_->bdr_attributes.Max());
+      outlet_attr = 0;
+      outlet_attr[patch - 1] = 1;
+
+      double pback;
+      tpsP_->getInput((basepath + "/pressure").c_str(), pback, 0.0);
+
+      if (pmesh_->GetMyRank() == 0) {
+        std::cout << "Tomboulides: Setting uniform outlet pressure on patch = " << patch << std::endl;
+      }
+      addPresDirichletBC(pback, outlet_attr);
+    } else {
+      if (pmesh_->GetMyRank() == 0) {
+        std::cout << "Tomboulides: When reading " << basepath << ", encountered outlet type = " << type << std::endl;
+        std::cout << "Tomboulides: Tomboulides flow solver does not support this type." << std::endl;
+      }
+      assert(false);
+      exit(1);
     }
   }
 }
@@ -994,6 +1005,11 @@ void Tomboulides::initializeOperators() {
   if (axisym_) {
     utheta_gf_->GetTrueDofs(utheta_vec_);
   }
+
+  *u_next_gf_ = *u_curr_gf_;
+  u_next_gf_->GetTrueDofs(u_next_vec_);
+
+  evaluateVelocityGradient();
 }
 
 void Tomboulides::initializeIO(IODataOrganizer &io) const {
@@ -1424,21 +1440,7 @@ void Tomboulides::step() {
   u_curr_gf_->SetFromTrueDofs(u_vec_);
 
   // update gradients for turbulence model
-  // TODO(swh): move when full viscous terms are added
-  setScalarFromVector(u_next_vec_, 0, &tmpR0_);
-  G_op_->Mult(tmpR0_, tmpR1_);
-  Mv_inv_->Mult(tmpR1_, gradU_);
-  setScalarFromVector(u_next_vec_, 1, &tmpR0_);
-  G_op_->Mult(tmpR0_, tmpR1_);
-  Mv_inv_->Mult(tmpR1_, gradV_);
-  if (dim_ == 3) {
-    setScalarFromVector(u_next_vec_, 2, &tmpR0_);
-    G_op_->Mult(tmpR0_, tmpR1_);
-    Mv_inv_->Mult(tmpR1_, gradW_);
-  }
-  gradU_gf_->SetFromTrueDofs(gradU_);
-  gradV_gf_->SetFromTrueDofs(gradV_);
-  gradW_gf_->SetFromTrueDofs(gradW_);
+  evaluateVelocityGradient();
 
   if (axisym_) {
     // Update the Helmholtz operator and inverse
@@ -1637,6 +1639,23 @@ double Tomboulides::maxVelocityMagnitude() {
   MPI_Reduce(&local_max_vel_magnitude, &global_max_vel_magnitude, 1, MPI_DOUBLE, MPI_MAX, 0, pfes_->GetComm());
 
   return global_max_vel_magnitude;
+}
+
+void Tomboulides::evaluateVelocityGradient() {
+  setScalarFromVector(u_next_vec_, 0, &tmpR0_);
+  G_op_->Mult(tmpR0_, tmpR1_);
+  Mv_inv_->Mult(tmpR1_, gradU_);
+  setScalarFromVector(u_next_vec_, 1, &tmpR0_);
+  G_op_->Mult(tmpR0_, tmpR1_);
+  Mv_inv_->Mult(tmpR1_, gradV_);
+  if (dim_ == 3) {
+    setScalarFromVector(u_next_vec_, 2, &tmpR0_);
+    G_op_->Mult(tmpR0_, tmpR1_);
+    Mv_inv_->Mult(tmpR1_, gradW_);
+  }
+  gradU_gf_->SetFromTrueDofs(gradU_);
+  gradV_gf_->SetFromTrueDofs(gradV_);
+  gradW_gf_->SetFromTrueDofs(gradW_);
 }
 
 // Non-class functions that are only used in this file below here

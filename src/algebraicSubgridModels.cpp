@@ -122,7 +122,9 @@ void AlgebraicSubgridModels::initializeSelf() {
 }
 
 void AlgebraicSubgridModels::initializeOperators() {
-  // empty for algebraic models
+  // By calling step here, we initialize the subgrid viscosity using
+  // the initial velocity gradient
+  this->step();
 }
 
 void AlgebraicSubgridModels::initializeViz(ParaViewDataCollection &pvdc) {

@@ -351,10 +351,7 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
     Array<int> attr_outlet(pmesh_->bdr_attributes.Max());
     attr_outlet = 0;
 
-    // No code for this yet, so die if detected
-    //assert(numOutlets == 0);
-
-    // But... outlets will just get homogeneous Neumann on T, so
+    // Outlets will just get homogeneous Neumann on T, so
     // basically need to do nothing.
   }
 

@@ -109,6 +109,7 @@ void LoMachSolver::initialize() {
   if (!loMach_opts_.io_opts_.enable_restart_) {
     temporal_coeff_.time = 0.;
     iter = 0;
+    temporal_coeff_.nStep = iter;
   }
 
   //-----------------------------------------------------
@@ -136,7 +137,7 @@ void LoMachSolver::initialize() {
   sponge_ = new GeometricSponge(pmesh_, &loMach_opts_, tpsP_);
 
   // Instantiate external data
-  extData_ = new GaussianInterpExtData(pmesh_, &loMach_opts_, tpsP_);
+  extData_ = new GaussianInterpExtData(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_);
 
   // Instantiate turbulence model
   if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::SMAGORINSKY) {
@@ -229,9 +230,9 @@ void LoMachSolver::initialize() {
   sponge_->setup();
 
   // Finish initializing operators
+  flow_->initializeOperators();
   turbModel_->setup();
   turbModel_->initializeOperators();
-  flow_->initializeOperators();
   thermo_->initializeOperators();
   
   // Initialize restart read/write capability
@@ -358,6 +359,7 @@ void LoMachSolver::solveStep() {
 
   if (loMach_opts_.ts_opts_.integrator_type_ == LoMachTemporalOptions::CURL_CURL) {
     SetTimeIntegrationCoefficients(iter - iter_start_);
+    extData_->step();
     thermo_->step();
     flow_->step();
     turbModel_->step();
@@ -369,6 +371,7 @@ void LoMachSolver::solveStep() {
 
   UpdateTimestepHistory(temporal_coeff_.dt);
   temporal_coeff_.time += temporal_coeff_.dt;
+  temporal_coeff_.nStep = iter;
   iter++;
 
   if ((iter % loMach_opts_.timing_frequency_) == 0) {
