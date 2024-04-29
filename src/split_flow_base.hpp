@@ -51,6 +51,11 @@ struct flowToThermoChem {
 };
 
 struct flowToTurbModel {
+  const mfem::ParGridFunction *velocity = nullptr;
+
+  bool swirl_supported = false;
+  const mfem::ParGridFunction *swirl = nullptr;
+
   const mfem::ParGridFunction *gradU = nullptr;
   const mfem::ParGridFunction *gradV = nullptr;
   const mfem::ParGridFunction *gradW = nullptr;
@@ -85,6 +90,22 @@ class FlowBase {
 
   virtual void initializeIO(IODataOrganizer &io) const {}
   virtual void initializeViz(mfem::ParaViewDataCollection &pvdc) const {}
+
+  /**
+   * @brief Header strings for screen dump
+   *
+   * Provides a hook for derived classes to pass a set of header
+   * strings that will be printed to the screen
+   */
+  virtual void screenHeader(std::vector<std::string> &header) const { header.resize(0); }
+
+  /**
+   * @brief Values for screen dump
+   *
+   * Provides values that will be printed to the screen at user requested
+   * frequency (as often as each iteration).
+   */
+  virtual void screenValues(std::vector<double> &values) { values.resize(0); }
 
   /// Interface object, provides fields necessary for the thermochemistry model
   flowToThermoChem toThermoChem_interface_;

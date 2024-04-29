@@ -37,6 +37,10 @@
 
 #include "tps_mfem_wrap.hpp"
 
+namespace TPS {
+class Tps;
+}
+
 class IODataOrganizer;
 struct flowToThermoChem;
 struct turbModelToThermoChem;
@@ -72,6 +76,11 @@ class ThermoChemModelBase {
   const turbModelToThermoChem *turbModel_interface_;
   const spongeToThermoChem *sponge_interface_;
   const extDataToThermoChem *extData_interface_;
+
+  double thermo_pressure_;
+
+  mfem::ParGridFunction *plasma_conductivity_gf_ = nullptr;
+  mfem::ParGridFunction *joule_heating_gf_ = nullptr;
 
  public:
   /// Destructor
@@ -115,6 +124,22 @@ class ThermoChemModelBase {
   virtual void initializeViz(mfem::ParaViewDataCollection &pvdc) {}
 
   /**
+   * @brief Header strings for screen dump
+   *
+   * Provides a hook for derived classes to pass a set of header
+   * strings that will be printed to the screen
+   */
+  virtual void screenHeader(std::vector<std::string> &header) const { header.resize(0); }
+
+  /**
+   * @brief Values for screen dump
+   *
+   * Provides values that will be printed to the screen at user requested
+   * frequency (as often as each iteration).
+   */
+  virtual void screenValues(std::vector<double> &values) { values.resize(0); }
+
+  /**
    * @brief Initialize data from the flow class
    *
    * Initialize fields that the thermochemistry model needs from the
@@ -155,6 +180,17 @@ class ThermoChemModelBase {
 
   void initializeFromExtData(extDataToThermoChem *extData) { extData_interface_ = extData; }
   const extDataToThermoChem *getExtDataInterface() const { return extData_interface_; }
+
+  /// Return thermodynamic pressure for restarts
+  double GetThermoPressure() { return thermo_pressure_; }
+  void SetThermoPressure(double &Po) { thermo_pressure_ = Po; }
+
+  mfem::ParGridFunction *getPlasmaConductivityGF() { return plasma_conductivity_gf_; }
+  mfem::ParGridFunction *getJouleHeatingGF() { return joule_heating_gf_; }
+  virtual void evaluatePlasmaConductivityGF() {
+    std::cout << "ERROR: " << __func__ << " remains unimplemented" << std::endl;
+    exit(1);
+  }
 };
 
 /**
@@ -165,8 +201,8 @@ class ConstantPropertyThermoChem final : public ThermoChemModelBase {
  protected:
   mfem::ParMesh *pmesh_;
   const int sorder_;
-  const double rho_;
-  const double mu_;
+  double rho_;
+  double mu_;
 
   mfem::FiniteElementCollection *fec_ = nullptr;
   mfem::ParFiniteElementSpace *fes_ = nullptr;
@@ -187,6 +223,15 @@ class ConstantPropertyThermoChem final : public ThermoChemModelBase {
    * @param mu The (constant) value to use for the viscosity
    */
   ConstantPropertyThermoChem(mfem::ParMesh *pmesh, int sorder, double rho, double mu);
+
+  /**
+   * @brief Constructor
+   *
+   * @param pmesh A pointer to the mesh
+   * @param sorder The polynomial order for scalar fields
+   * @param tps Pointer to Tps object so that rho and mu can be obtained from input file
+   */
+  ConstantPropertyThermoChem(mfem::ParMesh *pmesh, int sorder, TPS::Tps *tps);
 
   /// Free the interface fields and support objects
   ~ConstantPropertyThermoChem() final;

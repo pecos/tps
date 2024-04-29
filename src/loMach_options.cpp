@@ -34,15 +34,17 @@
 
 #include "tps.hpp"
 
-SubGridModelOptions::SubGridModelOptions() : sgs_model_string_("none"), sgs_model_constant_(0.0), exclude_mean_(false) {
-  sgs_model_map_["none"] = NONE;
-  sgs_model_map_["smagorinsky"] = SMAGORINSKY;
-  sgs_model_map_["sigma"] = SIGMA;
+TurbulenceModelOptions::TurbulenceModelOptions()
+    : turb_model_string_("none"), turb_model_constant_(0.0), exclude_mean_(false) {
+  turb_model_map_["none"] = NONE;
+  turb_model_map_["smagorinsky"] = SMAGORINSKY;
+  turb_model_map_["sigma"] = SIGMA;
+  turb_model_map_["algebraic-rans"] = ALGEBRAIC_RANS;
 
-  sgs_model_type_ = sgs_model_map_[sgs_model_string_];
+  turb_model_type_ = turb_model_map_[turb_model_string_];
 }
 
-void SubGridModelOptions::read(TPS::Tps *tps, std::string prefix) {
+void TurbulenceModelOptions::read(TPS::Tps *tps, std::string prefix) {
   // At the moment, SGS model options are under either "flow" or
   // "loMach", so we must have a prefix
   assert(!prefix.empty());
@@ -52,22 +54,26 @@ void SubGridModelOptions::read(TPS::Tps *tps, std::string prefix) {
     basename = prefix + "/";
   }
 
-  tps->getInput((basename + "sgsModel").c_str(), sgs_model_string_, std::string("none"));
+  // Accept either sgsModel or turb-model
+  tps->getInput((basename + "sgsModel").c_str(), turb_model_string_, std::string("none"));
+  if (turb_model_string_ == "none") {
+    tps->getInput((basename + "turb-model").c_str(), turb_model_string_, std::string("none"));
+  }
   tps->getInput((basename + "sgsExcludeMean").c_str(), exclude_mean_, false);
 
   // Set model type
-  sgs_model_type_ = sgs_model_map_[sgs_model_string_];
+  turb_model_type_ = turb_model_map_[turb_model_string_];
 
   // Set default constant based on model type
-  double default_sgs_const = 0.;
-  if (sgs_model_type_ == SMAGORINSKY) {
-    default_sgs_const = 0.12;
-  } else if (sgs_model_type_ == SIGMA) {
-    default_sgs_const = 0.135;
+  double default_turb_const = 0.;
+  if (turb_model_type_ == SMAGORINSKY) {
+    default_turb_const = 0.09;
+  } else if (turb_model_type_ == SIGMA) {
+    default_turb_const = 0.135;
   }
 
   // Get model constant (set to default if not present)
-  tps->getInput((basename + "sgsModelConstant").c_str(), sgs_model_constant_, default_sgs_const);
+  tps->getInput((basename + "sgsModelConstant").c_str(), turb_model_constant_, default_turb_const);
 }
 
 LoMachTemporalOptions::LoMachTemporalOptions()
@@ -95,6 +101,9 @@ void LoMachTemporalOptions::read(TPS::Tps *tps, std::string prefix) {
 
   tps->getInput((basename + "/enableConstantTimestep").c_str(), enable_constant_dt_, false);
   tps->getInput((basename + "/dt_fixed").c_str(), constant_dt_, -1.0);
-
+  tps->getInput((basename + "/dt_initial").c_str(), initial_dt_, 1.0e-8);
+  tps->getInput((basename + "/dt_min").c_str(), minimum_dt_, 1.0e-12);
+  tps->getInput((basename + "/dt_max").c_str(), maximum_dt_, 1.0);
   tps->getInput((basename + "/bdfOrder").c_str(), bdf_order_, 3);
+  tps->getInput((basename + "/dtFactor").c_str(), factor_dt_, 0.01);
 }

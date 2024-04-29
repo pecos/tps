@@ -64,6 +64,7 @@ class Tps;
 #include "externalData_base.hpp"
 #include "io.hpp"
 #include "loMach_options.hpp"
+#include "mesh_base.hpp"
 #include "solver.hpp"
 #include "split_flow_base.hpp"
 #include "sponge_base.hpp"
@@ -74,6 +75,9 @@ class Tps;
 struct temporalSchemeCoefficients {
   // Current time
   double time;
+
+  // Current step
+  int nStep;
 
   // Time step
   double dt;
@@ -98,7 +102,7 @@ struct temporalSchemeCoefficients {
 /**
  * @brief Driver class for models based on low Mach, variable density formulation
  */
-class LoMachSolver : public TPS::Solver {
+class LoMachSolver : public TPS::PlasmaSolver {
  protected:
   // pointer to parent Tps class
   TPS::Tps *tpsP_ = nullptr;
@@ -117,6 +121,7 @@ class LoMachSolver : public TPS::Solver {
   bool loadFromAuxSol;  // load restart of different polynomial order
 
   // Model classes
+  MeshBase *meshData_ = nullptr;
   TurbModelBase *turbModel_ = nullptr;
   ThermoChemModelBase *thermo_ = nullptr;
   FlowBase *flow_ = nullptr;
@@ -130,9 +135,6 @@ class LoMachSolver : public TPS::Solver {
   int dim_;
   int nvel_;
 
-  // mapping from local to global element index
-  int *locToGlobElem = nullptr;
-
   // total number of mesh elements (serial)
   int nelemGlobal_;
 
@@ -142,6 +144,9 @@ class LoMachSolver : public TPS::Solver {
 
   // min/max element size
   double hmin, hmax;
+
+  // for restarts
+  double thermoPressure_ = -1.0;
 
   // domain extent
   double xmin_, ymin_, zmin_;
@@ -185,8 +190,8 @@ class LoMachSolver : public TPS::Solver {
   double tlast_;
 
   // I/O helpers
-  ParaViewDataCollection *pvdc_;  // visualization
-  IODataOrganizer ioData;         // restart
+  ParaViewDataCollection *pvdc_ = nullptr;  // visualization
+  IODataOrganizer ioData;                   // restart
 
   /// Update the EXTk/BDF time integration coefficient.
   void SetTimeIntegrationCoefficients(int step);
@@ -222,6 +227,31 @@ class LoMachSolver : public TPS::Solver {
 
   /// Rotate entries in the time step and solution history arrays.
   void UpdateTimestepHistory(double dt);
+
+  // Functions necessary for coupled EM+plasma simulations
+  // These are overriden from TPS::Solver or TPS::PlasmaSolver
+  mfem::ParMesh *getMesh() const override { return pmesh_; }
+  const mfem::FiniteElementCollection *getFEC() const override {
+    if (thermo_->getJouleHeatingGF() != nullptr) {
+      return thermo_->getJouleHeatingGF()->ParFESpace()->FEColl();
+    } else {
+      return nullptr;
+    }
+  }
+
+  mfem::ParFiniteElementSpace *getFESpace() const override {
+    if (thermo_->getJouleHeatingGF() != nullptr) {
+      return thermo_->getJouleHeatingGF()->ParFESpace();
+    } else {
+      return nullptr;
+    }
+  }
+
+  mfem::ParGridFunction *getPlasmaConductivityGF() override { return thermo_->getPlasmaConductivityGF(); }
+
+  void evaluatePlasmaConductivityGF() override { thermo_->evaluatePlasmaConductivityGF(); }
+
+  mfem::ParGridFunction *getJouleHeatingGF() override { return thermo_->getJouleHeatingGF(); }
 };
 
 #endif  // LOMACH_HPP_

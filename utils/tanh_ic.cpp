@@ -25,7 +25,7 @@ int main (int argc, char *argv[])
   int num_equation = mixture->GetNumEquations();
 
   // Get meshes
-  ParMesh* mesh_1 = srcField->GetMesh();
+  ParMesh* mesh_1 = srcField->getMesh();
 
   const int dim = mesh_1->Dimension();
 
@@ -39,12 +39,12 @@ int main (int argc, char *argv[])
        << mesh_1->GetNodes()->OwnFEC()->Name() << endl;
 
   // 2) Set up source field
-  FiniteElementCollection *src_fec = NULL;
+  const FiniteElementCollection *src_fec = NULL;
   ParFiniteElementSpace *src_fes = NULL;
   ParGridFunction *src_state = NULL;
 
-  src_fec = srcField->GetFEC();
-  src_fes = srcField->GetFESpace();
+  src_fec = srcField->getFEC();
+  src_fes = srcField->getFESpace();
   src_state = srcField->GetSolutionGF();
 
   std::cout << "Source FE collection: " << src_fec->Name() << std::endl;

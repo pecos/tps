@@ -513,17 +513,45 @@ void IOFamily::readDistributeSerializedVariable(hid_t file, const IOVar &var, in
       MPI_Send(packedData.data(), packedData.size(), MPI_DOUBLE, rank, tag, comm);
     }
   } else {  // <-- end rank 0
-    int numlDofs = pfunc_->ParFESpace()->GetNDofs();
+    // Figure out how much data to expect from rank 0
+    Array<int> lvdofs;
+    int numlDofs = 0;
+    for (int lelem = 0; lelem < local_ne_; lelem++) {
+      pfunc_->ParFESpace()->GetElementVDofs(lelem, lvdofs);
+      int numDof_per_this_elem = lvdofs.Size() / numStateVars;
+      numlDofs += numDof_per_this_elem;
+    }
+
     grvy_printf(gdebug, "[%i]: local number of state vars to receive = %i (var=%s)\n", myrank, numlDofs,
                 varName.c_str());
+
+    if (pfunc_->ParFESpace()->IsDGSpace()) assert(numlDofs == pfunc_->ParFESpace()->GetNDofs());
 
     std::vector<double> packedData(numlDofs);
 
     // receive solution data from rank 0
     MPI_Recv(packedData.data(), numlDofs, MPI_DOUBLE, 0, tag, comm, MPI_STATUS_IGNORE);
 
-    // update local state vector
-    for (int i = 0; i < numlDofs; i++) data[i + varOffset * numlDofs] = packedData[i];
+    // NB: The unpack code below implicitly assumes that the global
+    // element index is a monotonically increasing fcn of the local
+    // element index.  This ensures that, in the unpack operation
+    // below, elements on this rank are accessed in the same order
+    // they are accessed by the pack operation on rank 0 above (where
+    // we loop over the global element index and check what rank that
+    // global element belongs to).  If this assumption were ever not
+    // true, the unpack would jumble the data.
+
+    // Unpack data received from rank 0
+    int count = 0;
+    for (int lelem = 0; lelem < local_ne_; lelem++) {
+      pfunc_->ParFESpace()->GetElementVDofs(lelem, lvdofs);
+      int numDof_per_this_elem = lvdofs.Size() / numStateVars;
+      int ldof_start_index = varOffset * numDof_per_this_elem;
+
+      for (int i = 0; i < numDof_per_this_elem; i++) data[lvdofs[i + ldof_start_index]] = packedData[i + count];
+      count += numDof_per_this_elem;
+    }
+    assert(count == numlDofs);
   }
 }
 
@@ -600,7 +628,7 @@ IOFamily::IOFamily(std::string desc, std::string grp, mfem::ParGridFunction *pf)
 
   // Set local and global number of dofs (per scalar field)
   local_ndofs_ = pfunc_->ParFESpace()->GetNDofs();
-  MPI_Allreduce(&local_ndofs_, &global_ndofs_, 1, MPI_INT, MPI_SUM, comm);
+  global_ndofs_ = pfunc_->ParFESpace()->GlobalTrueVSize() / pfunc_->ParFESpace()->GetVDim();
 }
 
 void IOFamily::serializeForWrite() {

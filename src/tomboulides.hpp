@@ -77,6 +77,7 @@ class Tomboulides final : public FlowBase {
  protected:
   // true if this is root rank
   bool rank0_;
+  bool axisym_;
 
   // Options
   // TODO(trevilo): hardcoded for testing.  Need to set based on input file.
@@ -99,11 +100,15 @@ class Tomboulides final : public FlowBase {
   // To use "numerical integration", quadrature rule must persist
   mfem::IntegrationRules gll_rules;
 
+  // Options-related structures
+  TPS::Tps *tpsP_ = nullptr;
+
   // Basic info needed to create fem spaces
   mfem::ParMesh *pmesh_;
   const int vorder_;
   const int porder_;
   const int dim_;
+  int nvel_;
 
   // Coefficients necessary to take a time step (including dt).
   // Assumed to be externally managed and determined, so just get a
@@ -115,6 +120,7 @@ class Tomboulides final : public FlowBase {
   // Object used to build forcing
   mfem::Vector gravity_;
   mfem::VectorConstantCoefficient *gravity_vec_;
+  mfem::ScalarVectorProductCoefficient *rad_gravity_vec_;
   std::vector<ForcingTerm_T> forcing_terms_;
 
   // initial condition holders
@@ -123,14 +129,17 @@ class Tomboulides final : public FlowBase {
   // BCs holders
   std::vector<DirichletBC_T<mfem::VectorCoefficient>> vel_dbcs_;
   std::vector<DirichletBC_T<mfem::Coefficient>> pres_dbcs_;
+  std::vector<DirichletBC_T<mfem::Coefficient>> swirl_dbcs_;
 
   // List of essential boundaries
   mfem::Array<int> vel_ess_attr_;
   mfem::Array<int> pres_ess_attr_;
+  mfem::Array<int> swirl_ess_attr_;
 
   // All essential true dofs.
   mfem::Array<int> vel_ess_tdof_;
   mfem::Array<int> pres_ess_tdof_;
+  mfem::Array<int> swirl_ess_tdof_;
 
   /// Velocity FEM objects and fields
   mfem::FiniteElementCollection *vfec_ = nullptr;
@@ -154,6 +163,15 @@ class Tomboulides final : public FlowBase {
   mfem::ParFiniteElementSpace *pfes_ = nullptr;
   mfem::ParGridFunction *p_gf_ = nullptr;
   mfem::ParGridFunction *resp_gf_ = nullptr;
+  mfem::ParGridFunction *pp_div_rad_comp_gf_ = nullptr;
+
+  /// Swirl
+  mfem::ParGridFunction *utheta_gf_ = nullptr;
+  mfem::ParGridFunction *utheta_next_gf_ = nullptr;
+  mfem::ParGridFunction *u_next_rad_comp_gf_ = nullptr;
+
+  /// "total" viscosity, including fluid, turbulence, sponge
+  mfem::ParGridFunction *mu_total_gf_ = nullptr;
 
   /// mfem::Coefficients used in forming necessary operators
   mfem::GridFunctionCoefficient *rho_coeff_ = nullptr;
@@ -163,10 +181,6 @@ class Tomboulides final : public FlowBase {
   mfem::ConstantCoefficient Hv_bdfcoeff_;
   mfem::ProductCoefficient *rho_over_dt_coeff_ = nullptr;
   mfem::GridFunctionCoefficient *mu_coeff_ = nullptr;
-  mfem::GridFunctionCoefficient *mut_coeff_ = nullptr;
-  mfem::GridFunctionCoefficient *mult_coeff_ = nullptr;
-  mfem::SumCoefficient *mu_sum_coeff_ = nullptr;
-  mfem::ProductCoefficient *mu_total_coeff_ = nullptr;
   mfem::VectorGridFunctionCoefficient *pp_div_coeff_ = nullptr;
 
   mfem::GradientGridFunctionCoefficient *grad_mu_coeff_ = nullptr;
@@ -179,6 +193,29 @@ class Tomboulides final : public FlowBase {
   mfem::ScalarVectorProductCoefficient *gradmu_Qt_coeff_ = nullptr;
   mfem::VectorSumCoefficient *S_poisson_coeff_ = nullptr;
   mfem::VectorSumCoefficient *S_mom_coeff_ = nullptr;
+
+  mfem::ProductCoefficient *rad_rho_coeff_ = nullptr;
+  mfem::ProductCoefficient *rad_rho_over_dt_coeff_ = nullptr;
+  mfem::ProductCoefficient *rad_mu_coeff_ = nullptr;
+  mfem::ScalarVectorProductCoefficient *rad_S_poisson_coeff_ = nullptr;
+  mfem::ScalarVectorProductCoefficient *rad_S_mom_coeff_ = nullptr;
+  mfem::RatioCoefficient *mu_over_rad_coeff_ = nullptr;
+  mfem::VectorArrayCoefficient *visc_forcing_coeff_ = nullptr;
+  mfem::GridFunctionCoefficient *pp_div_rad_comp_coeff_ = nullptr;
+
+  mfem::ScalarVectorProductCoefficient *rad_pp_div_coeff_ = nullptr;
+  std::vector<mfem::ScalarVectorProductCoefficient *> rad_vel_coeff_;
+
+  mfem::GridFunctionCoefficient *utheta_coeff_ = nullptr;
+  mfem::ProductCoefficient *utheta2_coeff_ = nullptr;
+  mfem::VectorArrayCoefficient *ur_conv_forcing_coeff_ = nullptr;
+  mfem::VectorGridFunctionCoefficient *u_next_coeff_ = nullptr;
+  mfem::ScalarVectorProductCoefficient *rad_rhou_coeff_ = nullptr;
+  mfem::GridFunctionCoefficient *u_next_rad_coeff_ = nullptr;
+  mfem::ProductCoefficient *ur_ut_coeff_ = nullptr;
+  mfem::ProductCoefficient *rho_ur_ut_coeff_ = nullptr;
+  mfem::VectorArrayCoefficient *utheta_vec_coeff_ = nullptr;
+  mfem::InnerProductCoefficient *swirl_var_viscosity_coeff_ = nullptr;
 
   // mfem "form" objects used to create operators
   mfem::ParBilinearForm *L_iorho_form_ = nullptr;  // \int (1/\rho) \nabla \phi_i \cdot \nabla \phi_j
@@ -194,6 +231,14 @@ class Tomboulides final : public FlowBase {
   mfem::ParLinearForm *u_bdr_form_ = nullptr;
   mfem::ParLinearForm *S_poisson_form_ = nullptr;
   mfem::ParLinearForm *S_mom_form_ = nullptr;
+  mfem::ParLinearForm *Faxi_poisson_form_ = nullptr;
+  mfem::ParLinearForm *ur_conv_axi_form_ = nullptr;
+
+  mfem::ParBilinearForm *Ms_rho_form_ = nullptr;
+  mfem::ParBilinearForm *Hs_form_ = nullptr;
+  mfem::ParBilinearForm *As_form_ = nullptr;
+  mfem::ParLinearForm *rho_ur_ut_form_ = nullptr;
+  mfem::ParLinearForm *swirl_var_viscosity_form_ = nullptr;
 
   // mfem operator objects
   mfem::OperatorHandle L_iorho_op_;
@@ -203,6 +248,9 @@ class Tomboulides final : public FlowBase {
   mfem::OperatorHandle D_op_;
   mfem::OperatorHandle G_op_;
   mfem::OperatorHandle Hv_op_;
+  mfem::OperatorHandle Ms_rho_op_;
+  mfem::OperatorHandle Hs_op_;
+  mfem::OperatorHandle As_op_;
 
   // solver objects
   mfem::ParLORDiscretization *L_iorho_lor_ = nullptr;
@@ -218,6 +266,9 @@ class Tomboulides final : public FlowBase {
 
   mfem::Solver *Hv_inv_pc_ = nullptr;
   mfem::CGSolver *Hv_inv_ = nullptr;
+
+  mfem::Solver *Hs_inv_pc_ = nullptr;
+  mfem::CGSolver *Hs_inv_ = nullptr;
 
   // Vectors
   mfem::Vector forcing_vec_;
@@ -247,6 +298,12 @@ class Tomboulides final : public FlowBase {
   mfem::Vector mu_vec_;
   mfem::Vector ress_vec_;
   mfem::Vector S_poisson_vec_;
+  mfem::Vector Faxi_poisson_vec_;
+  mfem::Vector ur_conv_forcing_vec_;
+  mfem::Vector utheta_vec_;
+  mfem::Vector utheta_m1_vec_;
+  mfem::Vector utheta_m2_vec_;
+  mfem::Vector utheta_next_vec_;
 
   // miscellaneous
   double volume_;
@@ -258,6 +315,11 @@ class Tomboulides final : public FlowBase {
    * @brief Zero the mean of the input function
    */
   void meanZero(mfem::ParGridFunction &v);
+
+  /**
+   * @brief Update total viscosity using latest inputs
+   */
+  void updateTotalViscosity();
 
  public:
   /// Constructor
@@ -297,6 +359,18 @@ class Tomboulides final : public FlowBase {
   /// Advance
   void step() final;
 
+  void screenHeader(std::vector<std::string> &header) const final {
+    int nprint = 1;
+    header.resize(nprint);
+    header[0] = std::string("Max vel.");
+  }
+
+  void screenValues(std::vector<double> &values) final {
+    int nprint = 1;
+    values.resize(nprint);
+    values[0] = maxVelocityMagnitude();
+  }
+
   mfem::ParGridFunction *getCurrentVelocity() final { return u_curr_gf_; }
 
   /// Evaluate error (only when exact solution is known)
@@ -305,9 +379,19 @@ class Tomboulides final : public FlowBase {
   /// Add a Dirichlet boundary condition to the velocity field
   void addVelDirichletBC(const mfem::Vector &u, mfem::Array<int> &attr);
   void addVelDirichletBC(mfem::VectorCoefficient *coeff, mfem::Array<int> &attr);
+  void addVelDirichletBC(void (*f)(const Vector &, double, Vector &), Array<int> &attr);
 
   /// Add a Dirichlet boundary condition to the pressure field.
   void addPresDirichletBC(double p, mfem::Array<int> &attr);
+
+  /// Add constant swirl
+  void addSwirlDirichletBC(double ut, mfem::Array<int> &attr);
+
+  /// Compute maximum velocity magnitude anywhere in the domain
+  double maxVelocityMagnitude();
+
+  /// Compute Galerkin projection of velocity gradient
+  void evaluateVelocityGradient();
 };
 
 #endif  // TOMBOULIDES_HPP_

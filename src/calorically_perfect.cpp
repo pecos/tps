@@ -335,7 +335,7 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
     attr_outlet = 0;
 
     // No code for this yet, so die if detected
-    assert(numOutlets == 0);
+    // assert(numOutlets == 0);
 
     // But... outlets will just get homogeneous Neumann on T, so
     // basically need to do nothing.
@@ -721,7 +721,7 @@ void CaloricallyPerfectThermoChem::computeExplicitTempConvectionOP(bool extrap) 
 }
 
 void CaloricallyPerfectThermoChem::initializeIO(IODataOrganizer &io) {
-  io.registerIOFamily("Temperature", "/temperature", &Tn_gf_, false);
+  io.registerIOFamily("Temperature", "/temperature", &Tn_gf_, true, true, sfec_);
   io.registerIOVar("/temperature", "temperature", 0);
 }
 
@@ -980,6 +980,20 @@ void CaloricallyPerfectThermoChem::computeQtTO() {
   Qt_gf_.GetTrueDofs(Qt_);
   Qt_ *= -Rgas_ / thermo_pressure_;
   Qt_gf_.SetFromTrueDofs(Qt_);
+}
+
+void CaloricallyPerfectThermoChem::screenHeader(std::vector<std::string> &header) const {
+  if (!domain_is_open_) {
+    header.resize(1);
+    header[0] = "P/P0";
+  }
+}
+
+void CaloricallyPerfectThermoChem::screenValues(std::vector<double> &values) {
+  if (!domain_is_open_) {
+    values.resize(1);
+    values[0] = thermo_pressure_ / ambient_pressure_;
+  }
 }
 
 #if 0

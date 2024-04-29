@@ -43,18 +43,18 @@ namespace TPS {
 class Tps;
 }
 
-class SubGridModelOptions {
+class TurbulenceModelOptions {
  public:
-  SubGridModelOptions();
+  TurbulenceModelOptions();
   void read(TPS::Tps *tps, std::string prefix = std::string(""));
 
-  enum SubGridModelType { NONE, SMAGORINSKY, SIGMA };
+  enum TurbulenceModelType { NONE, SMAGORINSKY, SIGMA, ALGEBRAIC_RANS };
 
-  std::string sgs_model_string_;
-  std::map<std::string, SubGridModelType> sgs_model_map_;
-  SubGridModelType sgs_model_type_;
+  std::string turb_model_string_;
+  std::map<std::string, TurbulenceModelType> turb_model_map_;
+  TurbulenceModelType turb_model_type_;
 
-  double sgs_model_constant_;
+  double turb_model_constant_;
   bool exclude_mean_;
 };
 
@@ -72,6 +72,10 @@ class LoMachTemporalOptions {
   bool enable_constant_dt_;
 
   double cfl_;
+  double initial_dt_;
+  double minimum_dt_;
+  double maximum_dt_;
+  double factor_dt_;
   double constant_dt_;
 
   int bdf_order_;
@@ -92,7 +96,7 @@ class LoMachOptions {
   LoMachTemporalOptions ts_opts_;
 
   // SGS-related options
-  SubGridModelOptions sgs_opts_;
+  TurbulenceModelOptions turb_opts_;
 
   // Mesh-related options
   std::string mesh_file; /**< Mesh filename */
@@ -126,6 +130,9 @@ class LoMachOptions {
 
   bool thermalDiv;  // turn on/off Qt
   bool realDiv;     // use actual divergence
+
+  // compute wall distance function or not
+  bool compute_wallDistance;
 
   int nFilter;
   double filterWeight;

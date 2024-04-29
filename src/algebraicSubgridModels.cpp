@@ -49,13 +49,14 @@ using namespace mfem;
 using namespace mfem::common;
 
 AlgebraicSubgridModels::AlgebraicSubgridModels(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, TPS::Tps *tps,
-                                               int sModel)
+                                               ParGridFunction *gridScale, int sModel)
     : tpsP_(tps), loMach_opts_(loMach_opts), pmesh_(pmesh) {
   rank_ = pmesh_->GetMyRank();
   rank0_ = (pmesh_->GetMyRank() == 0);
   dim_ = pmesh_->Dimension();
   nvel_ = dim_;
   order_ = loMach_opts_->order;
+  gridScale_ = gridScale;
   sModel_ = sModel;
 
   // read-ins
@@ -69,7 +70,7 @@ AlgebraicSubgridModels::AlgebraicSubgridModels(mfem::ParMesh *pmesh, LoMachOptio
 }
 
 AlgebraicSubgridModels::~AlgebraicSubgridModels() {
-  delete bufferGridScale_;
+  // delete bufferGridScale_;
   delete sfec_;
   delete sfes_;
   delete vfec_;
@@ -107,11 +108,11 @@ void AlgebraicSubgridModels::initializeSelf() {
   gradW_.SetSize(vfes_truevsize);
   rn_.SetSize(sfes_truevsize);
 
-  gridScale_.SetSize(sfes_truevsize);
+  // gridScale_.SetSize(sfes_truevsize);
   // gridScaleX_.SetSize(sfes_truevsize);
   // gridScaleY_.SetSize(sfes_truevsize);
   // gridScaleZ_.SetSize(sfes_truevsize);
-  resolution_gf_.SetSpace(sfes_);
+  // resolution_gf_.SetSpace(sfes_);
 
   if (verbose) grvy_printf(ginfo, "AlgebraicSubgridModels vectors and gf initialized...\n");
 
@@ -121,15 +122,18 @@ void AlgebraicSubgridModels::initializeSelf() {
 }
 
 void AlgebraicSubgridModels::initializeOperators() {
-  // empty for algebraic models
+  // By calling step here, we initialize the subgrid viscosity using
+  // the initial velocity gradient
+  this->step();
 }
 
 void AlgebraicSubgridModels::initializeViz(ParaViewDataCollection &pvdc) {
-  pvdc.RegisterField("resolution", &resolution_gf_);
+  // pvdc.RegisterField("resolution", &resolution_gf_);
   pvdc.RegisterField("muT", &subgridVisc_gf_);
 }
 
 void AlgebraicSubgridModels::setup() {
+  /*
   /// Grid-related ///
 
   // Build grid size vector and grid function
@@ -213,6 +217,7 @@ void AlgebraicSubgridModels::setup() {
   }
 
   resolution_gf_ = *bufferGridScale_;
+  */
 }
 
 void AlgebraicSubgridModels::step() {
@@ -229,11 +234,11 @@ void AlgebraicSubgridModels::step() {
   (thermoChem_interface_->density)->GetTrueDofs(rn_);
 
   subgridVisc_ = 0.0;
-  double *dGradU = gradU_.HostReadWrite();
-  double *dGradV = gradV_.HostReadWrite();
-  double *dGradW = gradW_.HostReadWrite();
-  double *del = gridScale_.HostReadWrite();
-  double *rho = rn_.HostReadWrite();
+  const double *dGradU = gradU_.HostRead();
+  const double *dGradV = gradV_.HostRead();
+  const double *dGradW = gradW_.HostRead();
+  const double *rho = rn_.HostRead();
+  const double *del = gridScale_->HostRead();
   double *data = subgridVisc_.HostReadWrite();
 
   if (sModel_ == 1) {

@@ -1,3 +1,4 @@
 argon_e_rev_table.dat filter=lfs diff=lfs merge=lfs -text
 argon_thermo_table.dat filter=lfs diff=lfs merge=lfs -text
 argon_transp_table.dat filter=lfs diff=lfs merge=lfs -text
+air_sutherland_lomach.h5 filter=lfs diff=lfs merge=lfs -text

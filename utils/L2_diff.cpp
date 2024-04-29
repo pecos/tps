@@ -24,7 +24,7 @@ int main (int argc, char *argv[])
   int num_equation = mixture->GetNumEquations();
 
   // Get meshes
-  ParMesh* mesh_1 = srcField1->GetMesh();
+  ParMesh* mesh_1 = srcField1->getMesh();
 
   const int dim = mesh_1->Dimension();
 
@@ -50,13 +50,13 @@ int main (int argc, char *argv[])
   srcField2->updatePrimitives();
 
   // 2) Set up source field
-  FiniteElementCollection *src_fec = NULL;
+  const FiniteElementCollection *src_fec = NULL;
   ParFiniteElementSpace *src_fes = NULL;
   ParGridFunction *src_state1 = NULL;
   ParGridFunction *src_state2 = NULL;
 
-  src_fec = srcField1->GetFEC();
-  src_fes = srcField1->GetFESpace();
+  src_fec = srcField1->getFEC();
+  src_fes = srcField1->getFESpace();
   src_state1 = srcField1->GetSolutionGF();
   src_state2 = srcField2->GetSolutionGF();
   ParGridFunction diff(*src_state1), zeros(*src_state1);

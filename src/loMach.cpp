@@ -44,12 +44,14 @@
 #include <limits>
 
 #include "algebraicSubgridModels.hpp"
+#include "algebraic_rans.hpp"
 #include "calorically_perfect.hpp"
 #include "reactingFlow.hpp"
 #include "gaussianInterpExtData.hpp"
 #include "geometricSponge.hpp"
 #include "io.hpp"
 #include "logger.hpp"
+#include "lte_thermo_chem.hpp"
 #include "tomboulides.hpp"
 #include "tps.hpp"
 #include "utils.hpp"
@@ -84,15 +86,12 @@ LoMachSolver::LoMachSolver(TPS::Tps *tps)
 LoMachSolver::~LoMachSolver() {
   // allocated in initialize()
   delete pvdc_;
-  delete sfes_;
-  delete sfec_;
   delete extData_;
   delete flow_;
   delete thermo_;
   delete sponge_;
   delete turbModel_;
-  delete pmesh_;
-  delete serial_mesh_;
+  delete meshData_;
 
   // allocated in constructor
   delete groupsMPI;
@@ -105,99 +104,23 @@ void LoMachSolver::initialize() {
   // Stash the order, just for convenience
   order = loMach_opts_.order;
 
+  // When starting from scratch time = 0 and iter = 0
+  if (!loMach_opts_.io_opts_.enable_restart_) {
+    temporal_coeff_.time = 0.;
+    iter = 0;
+    temporal_coeff_.nStep = iter;
+  }
+
   //-----------------------------------------------------
   // 1) Prepare the mesh
   //-----------------------------------------------------
+  meshData_ = new MeshBase(tpsP_, &loMach_opts_, order);
+  meshData_->initializeMesh();
 
-  // Determine domain bounding box size
-  {
-    Mesh temp_mesh = Mesh(loMach_opts_.mesh_file.c_str());
-    int dim = temp_mesh.Dimension();
-    H1_FECollection fec(order, dim);
-    FiniteElementSpace fes(&temp_mesh, &fec);
-    GridFunction coordsVert(&fes);
-    temp_mesh.GetVertices(coordsVert);
-    int nVert = coordsVert.Size() / dim;
-    {
-      double local_xmin = 1.0e18;
-      double local_ymin = 1.0e18;
-      double local_zmin = 1.0e18;
-      double local_xmax = -1.0e18;
-      double local_ymax = -1.0e18;
-      double local_zmax = -1.0e18;
-
-      double coords[3];
-      for (int d = 0; d < 3; d++) {
-        coords[d] = 0.0;
-      }
-
-      for (int n = 0; n < nVert; n++) {
-        auto hcoords = coordsVert.HostRead();
-        for (int d = 0; d < dim; d++) {
-          coords[d] = hcoords[n + d * nVert];
-        }
-        local_xmin = min(coords[0], local_xmin);
-        local_ymin = min(coords[1], local_ymin);
-        if (dim == 3) {
-          local_zmin = min(coords[2], local_zmin);
-        }
-        local_xmax = max(coords[0], local_xmax);
-        local_ymax = max(coords[1], local_ymax);
-        if (dim == 3) {
-          local_zmax = max(coords[2], local_zmax);
-        }
-      }
-      xmin_ = local_xmin;
-      xmax_ = local_xmax;
-      ymin_ = local_ymin;
-      ymax_ = local_ymax;
-      zmin_ = local_zmin;
-      zmax_ = local_zmax;
-    }
-
-    if (loMach_opts_.periodicX) {
-      loMach_opts_.x_trans = xmax_ - xmin_;
-    }
-    if (loMach_opts_.periodicY) {
-      loMach_opts_.y_trans = ymax_ - ymin_;
-    }
-    if (loMach_opts_.periodicZ) {
-      loMach_opts_.z_trans = zmax_ - zmin_;
-    }
-    if (loMach_opts_.periodicX || loMach_opts_.periodicY || loMach_opts_.periodicZ) {
-      loMach_opts_.periodic = true;
-    }
-  }
-
-  // Generate serial mesh, making it periodic if requested
-  if (loMach_opts_.periodic) {
-    Mesh temp_mesh = Mesh(loMach_opts_.mesh_file.c_str());
-    Vector x_translation({loMach_opts_.x_trans, 0.0, 0.0});
-    Vector y_translation({0.0, loMach_opts_.y_trans, 0.0});
-    Vector z_translation({0.0, 0.0, loMach_opts_.z_trans});
-    std::vector<Vector> translations = {x_translation, y_translation, z_translation};
-
-    if (rank0_) {
-      std::cout << " Making the mesh periodic using the following offsets:" << std::endl;
-      std::cout << "   xTrans: " << loMach_opts_.x_trans << std::endl;
-      std::cout << "   yTrans: " << loMach_opts_.y_trans << std::endl;
-      std::cout << "   zTrans: " << loMach_opts_.z_trans << std::endl;
-    }
-
-    serial_mesh_ =
-        new Mesh(std::move(Mesh::MakePeriodic(temp_mesh, temp_mesh.CreatePeriodicVertexMapping(translations))));
-  } else {
-    serial_mesh_ = new Mesh(loMach_opts_.mesh_file.c_str());
-  }
-  if (verbose) grvy_printf(ginfo, "Mesh read...\n");
-
-  // Scale domain (NB: after periodicity applied)
-  if (loMach_opts_.scale_mesh != 1) {
-    if (verbose) grvy_printf(ginfo, "Scaling mesh factor of scale_mesh = %.6e\n", loMach_opts_.scale_mesh);
-    serial_mesh_->EnsureNodes();
-    GridFunction *nodes = serial_mesh_->GetNodes();
-    *nodes *= loMach_opts_.scale_mesh;
-  }
+  // local pointers
+  serial_mesh_ = meshData_->getSerialMesh();
+  pmesh_ = meshData_->getMesh();
+  partitioning_ = meshData_->getPartition();
 
   // Stash mesh dimension (convenience)
   dim_ = serial_mesh_->Dimension();
@@ -205,137 +128,25 @@ void LoMachSolver::initialize() {
   // Only support number of velocity components = spatial dimension for now
   nvel_ = dim_;
 
-  // check if a simulation is being restarted
-  if (loMach_opts_.io_opts_.enable_restart_) {
-    // uniform refinement, user-specified number of times
-    for (int l = 0; l < loMach_opts_.ref_levels; l++) {
-      if (rank0_) {
-        std::cout << "Uniform refinement number " << l << std::endl;
-      }
-      serial_mesh_->UniformRefinement();
-    }
-
-    // read partitioning info from original decomposition (unless restarting from serial soln)
-    nelemGlobal_ = serial_mesh_->GetNE();
-    // nelemGlobal_ = mesh->GetNE();
-    if (rank0_) grvy_printf(ginfo, "Total # of mesh elements = %i\n", nelemGlobal_);
-
-    if (nprocs_ > 1) {
-      assert(!loMach_opts_.io_opts_.restart_serial_read_);
-      // TODO(trevilo): Add support for serial read/write
-      partitioning_file_hdf5("read", groupsMPI, nelemGlobal_, partitioning_);
-    }
-
-  } else {
-    // remove previous solution
-    if (rank0_) {
-      string command = "rm -r ";
-      command.append(loMach_opts_.io_opts_.output_dir_);
-      int err = system(command.c_str());
-      if (err != 0) {
-        cout << "Error deleting previous data in " << loMach_opts_.io_opts_.output_dir_ << endl;
-      }
-    }
-
-    // uniform refinement, user-specified number of times
-    for (int l = 0; l < loMach_opts_.ref_levels; l++) {
-      if (rank0_) {
-        std::cout << "Uniform refinement number " << l << std::endl;
-      }
-      serial_mesh_->UniformRefinement();
-    }
-
-    // generate partitioning file (we assume conforming meshes)
-    nelemGlobal_ = serial_mesh_->GetNE();
-    if (nprocs_ > 1) {
-      assert(serial_mesh_->Conforming());
-      partitioning_ = Array<int>(serial_mesh_->GeneratePartitioning(nprocs_, defaultPartMethod), nelemGlobal_);
-      if (rank0_) partitioning_file_hdf5("write", groupsMPI, nelemGlobal_, partitioning_);
-    }
-
-    // When starting from scratch time = 0 and iter = 0
-    temporal_coeff_.time = 0.;
-    iter = 0;
-  }
-
-  // Partition the mesh
-  pmesh_ = new ParMesh(groupsMPI->getTPSCommWorld(), *serial_mesh_, partitioning_);
-  if (verbose) grvy_printf(ginfo, "Mesh partitioned...\n");
-
   //-----------------------------------------------------
-  // 2) Prepare the required finite elements (for resolution info)
-  //    and other mesh related data
-  //-----------------------------------------------------
-
-  // TODO(trevilo): This code is necessary here b/c LoMachSolver owns
-  // the grid resolution objects.  We should refactor them into a
-  // "MeshHelper" class or some such thing.
-  sfec_ = new H1_FECollection(order);
-  sfes_ = new ParFiniteElementSpace(pmesh_, sfec_);
-
-  if (verbose) grvy_printf(ginfo, "Spaces constructed...\n");
-
-  // int sfes_truevsize = sfes_->GetTrueVSize();
-  // if (verbose) grvy_printf(ginfo, "Got sizes...\n");
-
-  /*
-  gridScaleSml.SetSize(sfes_truevsize);
-  gridScaleSml = 0.0;
-  gridScaleXSml.SetSize(sfes_truevsize);
-  gridScaleXSml = 0.0;
-  gridScaleYSml.SetSize(sfes_truevsize);
-  gridScaleYSml = 0.0;
-  gridScaleZSml.SetSize(sfes_truevsize);
-  gridScaleZSml = 0.0;
-
-  // for paraview
-  resolution_gf.SetSpace(sfes);
-  resolution_gf = 0.0;
-  */
-
-  if (verbose) grvy_printf(ginfo, "vectors and gf initialized...\n");
-
-  // TODO(swh): not sure where this shoudl go but until dt calcs are
-  // farmed out, leaving in loMach for time being
-  // Determine the minimum element size.
-  {
-    double local_hmin = 1.0e18;
-    for (int i = 0; i < pmesh_->GetNE(); i++) {
-      local_hmin = min(pmesh_->GetElementSize(i, 1), local_hmin);
-    }
-    MPI_Allreduce(&local_hmin, &hmin, 1, MPI_DOUBLE, MPI_MIN, pmesh_->GetComm());
-  }
-  // if (verbose) grvy_printf(ginfo, "Min element size found...\n");
-
-  // maximum size
-  {
-    double local_hmax = 1.0e-15;
-    for (int i = 0; i < pmesh_->GetNE(); i++) {
-      local_hmax = max(pmesh_->GetElementSize(i, 1), local_hmax);
-    }
-    MPI_Allreduce(&local_hmax, &hmax, 1, MPI_DOUBLE, MPI_MAX, pmesh_->GetComm());
-  }
-  // if (verbose) grvy_printf(ginfo, "Max element size found...\n");
-
-  if (rank0_) cout << "Maximum element size: " << hmax << "m" << endl;
-  if (rank0_) cout << "Minimum element size: " << hmin << "m" << endl;
-
-  //-----------------------------------------------------
-  // 3) Prepare the sub-physics models/solvers
+  // 2) Prepare the sub-physics models/solvers
   //-----------------------------------------------------
 
   // Instantiate sponge
   sponge_ = new GeometricSponge(pmesh_, &loMach_opts_, tpsP_);
 
   // Instantiate external data
-  extData_ = new GaussianInterpExtData(pmesh_, &loMach_opts_, tpsP_);
+  extData_ = new GaussianInterpExtData(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_);
 
-  // TODO(trevilo): Add support for turbulence modeling
-  if (loMach_opts_.sgs_opts_.sgs_model_type_ == SubGridModelOptions::SMAGORINSKY) {
-    turbModel_ = new AlgebraicSubgridModels(pmesh_, &loMach_opts_, tpsP_, 1);
-  } else if (loMach_opts_.sgs_opts_.sgs_model_type_ == SubGridModelOptions::SIGMA) {
-    turbModel_ = new AlgebraicSubgridModels(pmesh_, &loMach_opts_, tpsP_, 2);
-  } else if (loMach_opts_.sgs_opts_.sgs_model_type_ == SubGridModelOptions::NONE) {
+  // Instantiate turbulence model
+  if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::SMAGORINSKY) {
+    turbModel_ = new AlgebraicSubgridModels(pmesh_, &loMach_opts_, tpsP_, (meshData_->getGridScale()), 1);
+  } else if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::SIGMA) {
+    turbModel_ = new AlgebraicSubgridModels(pmesh_, &loMach_opts_, tpsP_, (meshData_->getGridScale()), 2);
+  } else if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::ALGEBRAIC_RANS) {
+    //    turbModel_ = new AlgebraicRans(serial_mesh_, pmesh_, partitioning_, loMach_opts_.order, tpsP_);
+    turbModel_ = new AlgebraicRans(pmesh_, partitioning_, loMach_opts_.order, tpsP_, (meshData_->getWallDistance()));
+  } else if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::NONE) {
     // default
     turbModel_ = new ZeroTurbModel(pmesh_, loMach_opts_.order);
   } else {
@@ -345,18 +156,16 @@ void LoMachSolver::initialize() {
     }
     exit(ERROR);
   }
-  // Turbulence modeling not supported yet
-  // assert(loMach_opts_.sgs_opts_.sgs_model_type_ == SubGridModelOptions::NONE);
 
   // Instantiate thermochemical model
   if (loMach_opts_.thermo_solver == "constant-property") {
-    thermo_ = new ConstantPropertyThermoChem(pmesh_, loMach_opts_.order, 1.0, 1.0);
+    thermo_ = new ConstantPropertyThermoChem(pmesh_, loMach_opts_.order, tpsP_);
   } else if (loMach_opts_.thermo_solver == "calorically-perfect") {
     thermo_ = new CaloricallyPerfectThermoChem(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_);
   } else if (loMach_opts_.thermo_solver == "reacting-flow") {
-    std::cout << "and done!" << endl;        
     thermo_ = new ReactingFlow(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_);
-    std::cout << "and done!" << endl;    
+  } else if (loMach_opts_.thermo_solver == "lte-thermo-chem") {
+    thermo_ = new LteThermoChem(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_);
   } else {
     // Unknown choice... die
     if (rank0_) {
@@ -409,13 +218,17 @@ void LoMachSolver::initialize() {
 
   const bool restart_serial =
       (loMach_opts_.io_opts_.restart_serial_read_ || loMach_opts_.io_opts_.restart_serial_write_);
-  ioData.initializeSerial(rank0_, restart_serial, serial_mesh_, locToGlobElem, &partitioning_);
-  MPI_Barrier(groupsMPI->getTPSCommWorld());
+  ioData.initializeSerial(rank0_, restart_serial, serial_mesh_, meshData_->getLocalToGlobalElementMap(),
+                          &partitioning_);
+  // MPI_Barrier(groupsMPI->getTPSCommWorld());
   if (verbose) grvy_printf(ginfo, "ioData.init thingy...\n");
 
   // If restarting, read restart files
   if (loMach_opts_.io_opts_.enable_restart_) {
     restart_files_hdf5("read");
+    if (thermoPressure_ > 0.0) {
+      thermo_->SetThermoPressure(thermoPressure_);
+    }
   }
 
   // Exchange interface information
@@ -436,7 +249,6 @@ void LoMachSolver::initialize() {
   turbModel_->initializeOperators();
   thermo_->initializeOperators();  
   flow_->initializeOperators();
-  // if(rank0_) {std::cout << "check: ops set..." << endl;}
 
   // TODO(trevilo): Enable averaging.  See note in loMach.hpp
 
@@ -446,11 +258,13 @@ void LoMachSolver::initialize() {
   pvdc_->SetHighOrderOutput(true);
   pvdc_->SetLevelsOfDetail(order);
 
+  meshData_->initializeViz(*pvdc_);
   sponge_->initializeViz(*pvdc_);
-  extData_->initializeViz(*pvdc_);
-  turbModel_->initializeViz(*pvdc_);  
-  thermo_->initializeViz(*pvdc_);  
-  flow_->initializeViz(*pvdc_);  
+  extData_->initializeViz(*pvdc_);  
+  turbModel_->initializeViz(*pvdc_);
+  flow_->initializeViz(*pvdc_);
+  thermo_->initializeViz(*pvdc_);
+
 }
 
 void LoMachSolver::UpdateTimestepHistory(double dt) {
@@ -490,6 +304,20 @@ void LoMachSolver::solveBegin() {
     std::cout << "Starting main loop, from " << iter_start_ << " to " << loMach_opts_.max_steps_ << endl;
   }
 
+  std::vector<std::string> thermo_header;
+  thermo_->screenHeader(thermo_header);
+
+  std::vector<std::string> flow_header;
+  flow_->screenHeader(flow_header);
+
+  // NB: Called on all ranks, but only rank 0 prints.  We assume any
+  // necessary communication is handled by the flow class
+  std::vector<double> thermo_screen_values;
+  thermo_->screenValues(thermo_screen_values);
+
+  std::vector<double> flow_screen_values;
+  flow_->screenValues(flow_screen_values);
+
   if (rank0_) {
     // TODO(trevilo): Add state summary
     std::cout << std::endl;
@@ -497,6 +325,13 @@ void LoMachSolver::solveBegin() {
     std::cout << std::setw(13) << "Time ";
     std::cout << std::setw(13) << "dt ";
     std::cout << std::setw(13) << "Wtime/Step ";
+    for (size_t i = 0; i < thermo_header.size(); i++) {
+      std::cout << std::setw(12) << thermo_header[i] << " ";
+    }
+    for (size_t i = 0; i < flow_header.size(); i++) {
+      std::cout << std::setw(12) << flow_header[i] << " ";
+    }
+
     std::cout << std::endl;
     std::cout << "#==================================================================" << std::endl;
 
@@ -504,14 +339,22 @@ void LoMachSolver::solveBegin() {
     std::cout << std::setw(10) << std::scientific << temporal_coeff_.time << " ";
     std::cout << std::setw(10) << std::scientific << temporal_coeff_.dt << " ";
     std::cout << std::setw(10) << std::scientific << 0.0 << " ";
+    for (size_t i = 0; i < thermo_screen_values.size(); i++) {
+      std::cout << std::setw(10) << std::scientific << thermo_screen_values[i] << " ";
+    }
+    for (size_t i = 0; i < flow_screen_values.size(); i++) {
+      std::cout << std::setw(10) << std::scientific << flow_screen_values[i] << " ";
+    }
     std::cout << std::endl;
   }
 }
 
 void LoMachSolver::solveStep() {
   sw_step.Start();
+
   if (loMach_opts_.ts_opts_.integrator_type_ == LoMachTemporalOptions::CURL_CURL) {
     SetTimeIntegrationCoefficients(iter - iter_start_);
+    extData_->step();
     thermo_->step();
     flow_->step();
     turbModel_->step();
@@ -523,6 +366,7 @@ void LoMachSolver::solveStep() {
 
   UpdateTimestepHistory(temporal_coeff_.dt);
   temporal_coeff_.time += temporal_coeff_.dt;
+  temporal_coeff_.nStep = iter;
   iter++;
 
   if ((iter % loMach_opts_.timing_frequency_) == 0) {
@@ -532,18 +376,34 @@ void LoMachSolver::solveStep() {
     double max_time_per_step = 0.0;
     MPI_Reduce(&time_per_step, &max_time_per_step, 1, MPI_DOUBLE, MPI_MAX, 0, groupsMPI->getTPSCommWorld());
 
+    // NB: Called on all ranks, but only rank 0 prints.  We assume any
+    // necessary communication is handled by the flow class
+    std::vector<double> thermo_screen_values;
+    thermo_->screenValues(thermo_screen_values);
+
+    std::vector<double> flow_screen_values;
+    flow_->screenValues(flow_screen_values);
+
     if (rank0_) {
       // TODO(trevilo): Add state summary
       std::cout << std::setw(10) << iter << " ";
       std::cout << std::setw(10) << std::scientific << temporal_coeff_.time << " ";
       std::cout << std::setw(10) << std::scientific << temporal_coeff_.dt << " ";
       std::cout << std::setw(10) << std::scientific << max_time_per_step << " ";
+      for (size_t i = 0; i < thermo_screen_values.size(); i++) {
+        std::cout << std::setw(10) << std::scientific << thermo_screen_values[i] << " ";
+      }
+      for (size_t i = 0; i < flow_screen_values.size(); i++) {
+        std::cout << std::setw(10) << std::scientific << flow_screen_values[i] << " ";
+      }
       std::cout << std::endl;
     }
   }
 
   // restart files
   if (iter % loMach_opts_.output_frequency_ == 0 && iter != 0) {
+    thermoPressure_ = thermo_->GetThermoPressure();
+
     // Write restart file!
     restart_files_hdf5("write");
 
@@ -602,19 +462,23 @@ void LoMachSolver::solve() {
 
 void LoMachSolver::updateTimestep() {
   // minimum timestep to not waste comp time
-  double dtMin = 1.0e-9;
+  double dtMin = loMach_opts_.ts_opts_.minimum_dt_;
+  double dtMax = loMach_opts_.ts_opts_.maximum_dt_;
+  double dtFactor = loMach_opts_.ts_opts_.factor_dt_;
 
   double Umax_lcl = 1.0e-12;
   double max_speed = Umax_lcl;
   double Umag;
-  int Sdof = sfes_->GetNDofs();
-  // TODO(trevilo): Let user set dtFactor
-  double dtFactor = 1.0;
+  // int Sdof = sfes_->GetNDofs();
+  // int Sdof = (turbModel_->getGridScale())->Size();
   auto dataU = flow_->getCurrentVelocity()->HostRead();
 
   // come in divided by order
   // const double *dataD = bufferGridScale->HostRead();
-  const double *dataD = (turbModel_->getGridScale())->HostRead();
+  // const double *dataD = (turbModel_->getGridScale())->HostRead();
+  const double *dataD = (meshData_->getGridScale())->HostRead();
+  // int Sdof = dataD->Size();
+  int Sdof = meshData_->getDofSize();
 
   for (int n = 0; n < Sdof; n++) {
     Umag = 0.0;
@@ -664,13 +528,16 @@ void LoMachSolver::updateTimestep() {
   // double dtInst = max(dtInst_conv, dtInst_visc);
 
   double dtInst = dtInst_conv;
-
   double &dt = temporal_coeff_.dt;
   if (dtInst > dt) {
     dt = dt * (1.0 + dtFactor);
     dt = std::min(dt, dtInst);
   } else if (dtInst < dt) {
     dt = dtInst;
+  }
+
+  if (dt > dtMax) {
+    dt = dtMax;
   }
 
   if (dt < dtMin) {
@@ -687,12 +554,16 @@ double LoMachSolver::computeCFL() {
   double Umax_lcl = 1.0e-12;
   double max_speed = Umax_lcl;
   double Umag;
-  int Sdof = sfes_->GetNDofs();
+  // int Sdof = sfes_->GetNDofs();
+  // int Sdof = (turbModel_->getGridScale())->Size();
 
   // come in divided by order
   // double *dataD = bufferGridScale->HostReadWrite();
-  double *dataD = (turbModel_->getGridScale())->HostReadWrite();
+  // double *dataD = (turbModel_->getGridScale())->HostReadWrite();
   auto dataU = flow_->getCurrentVelocity()->HostRead();
+  const double *dataD = (meshData_->getGridScale())->HostRead();
+  // int Sdof = dataD->Size();
+  int Sdof = meshData_->getDofSize();
 
   for (int n = 0; n < Sdof; n++) {
     Umag = 0.0;
@@ -749,7 +620,12 @@ void LoMachSolver::setTimestep() {
   double Umax_lcl = 1.0e-12;
   double max_speed = Umax_lcl;
   double Umag;
-  int Sdof = sfes_->GetNDofs();
+  // int Sdof = sfes_->GetNDofs();
+  // int Sdof = (turbModel_->getGridScale())->Size();
+  // const double *dataD = (meshData_->getGridScale())->HostRead();
+  // int Sdof = dataD->Size();
+  hmin = meshData_->getMinGridScale();
+  int Sdof = meshData_->getDofSize();
 
   CFL = loMach_opts_.ts_opts_.cfl_;
 
@@ -772,6 +648,12 @@ void LoMachSolver::setTimestep() {
     MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, pmesh_->GetComm());
     double dtInst = CFL * hmin / (max_speed * (double)order);
     temporal_coeff_.dt = dtInst;
+
+    const double dt_initial = loMach_opts_.ts_opts_.initial_dt_;
+    if ((dt_initial < dtInst) && !(loMach_opts_.io_opts_.enable_restart_)) {
+      temporal_coeff_.dt = dt_initial;
+    }
+
     std::cout << "dt from setTimestep: " << temporal_coeff_.dt << " max_speed: " << max_speed << endl;
   }
 }
@@ -785,7 +667,6 @@ void LoMachSolver::SetTimeIntegrationCoefficients(int step) {
   if (step == 0) {
     // set dt2 and dt3 to nan, so that we'll get nan everywhere if they're used inappropriately
     temporal_coeff_.dt2 = temporal_coeff_.dt3 = std::numeric_limits<double>::signaling_NaN();
-
     temporal_coeff_.dt1 = temporal_coeff_.dt;
   }
 
@@ -858,8 +739,10 @@ void LoMachSolver::parseSolverOptions() {
   assert(loMach_opts_.flow_solver == "zero-flow" || loMach_opts_.flow_solver == "tomboulides");
 
   tpsP_->getInput("loMach/thermo-solver", loMach_opts_.thermo_solver, string("constant-property"));
+  
   assert( loMach_opts_.thermo_solver == "constant-property"
 	 || loMach_opts_.thermo_solver == "calorically-perfect"
+         || loMach_opts_.thermo_solver == "lte-thermo-chem"	  
 	 || loMach_opts_.thermo_solver == "reacting-flow" );
 
   tpsP_->getInput("loMach/order", loMach_opts_.order, 1);
@@ -886,8 +769,8 @@ void LoMachSolver::parseSolverOptions() {
   tpsP_->getInput("loMach/outputFreq", loMach_opts_.output_frequency_, 50);
   tpsP_->getInput("loMach/timingFreq", loMach_opts_.timing_frequency_, 100);
 
-  // SGS model options
-  loMach_opts_.sgs_opts_.read(tpsP_, std::string("loMach"));
+  // Turbulence model options
+  loMach_opts_.turb_opts_.read(tpsP_, std::string("loMach"));
 
   // time integration controls
   loMach_opts_.ts_opts_.read(tpsP_);
@@ -905,4 +788,12 @@ void LoMachSolver::parseSolverOptions() {
   tpsP_->getInput("periodicity/periodicX", loMach_opts_.periodicX, false);
   tpsP_->getInput("periodicity/periodicY", loMach_opts_.periodicY, false);
   tpsP_->getInput("periodicity/periodicZ", loMach_opts_.periodicZ, false);
+
+  // compute wall distance
+  tpsP_->getInput("loMach/computeWallDistance", loMach_opts_.compute_wallDistance, false);
+
+  // add all models here which require wall dist, eg: SA, k-e, etc...
+  if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::ALGEBRAIC_RANS) {
+    loMach_opts_.compute_wallDistance = true;
+  }
 }

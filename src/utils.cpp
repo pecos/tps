@@ -697,8 +697,8 @@ void setVectorFromScalar(Vector A, int ind, Vector *C) {
   MFEM_FORALL(i, Ndof, { data[i + ind * Ndof] = dataA[i]; });
 }
 
-void ComputeCurl3D(ParGridFunction &u, ParGridFunction &cu) {
-  FiniteElementSpace *fes = u.FESpace();
+void ComputeCurl3D(const ParGridFunction &u, ParGridFunction &cu) {
+  const FiniteElementSpace *fes = u.FESpace();
 
   // AccumulateAndCountZones.
   Array<int> zones_per_vdof;
@@ -912,8 +912,8 @@ void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu) {
   }
 }
 
-void ComputeCurl2D(ParGridFunction &u, ParGridFunction &cu, bool assume_scalar) {
-  FiniteElementSpace *fes = u.FESpace();
+void ComputeCurl2D(const ParGridFunction &u, ParGridFunction &cu, bool assume_scalar) {
+  const FiniteElementSpace *fes = u.FESpace();
 
   // AccumulateAndCountZones.
   Array<int> zones_per_vdof;
@@ -976,6 +976,109 @@ void ComputeCurl2D(ParGridFunction &u, ParGridFunction &cu, bool assume_scalar) 
     // Accumulate values in all dofs, count the zones.
     for (int j = 0; j < vdofs.Size(); j++) {
       int ldof = vdofs[j];
+      cu(ldof) += vals[j];
+      zones_per_vdof[ldof]++;
+    }
+  }
+
+  // Communication.
+
+  // Count the zones globally.
+  GroupCommunicator &gcomm = u.ParFESpace()->GroupComm();
+  gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
+  gcomm.Bcast(zones_per_vdof);
+
+  // Accumulate for all vdofs.
+  gcomm.Reduce<double>(cu.GetData(), GroupCommunicator::Sum);
+  gcomm.Bcast<double>(cu.GetData());
+
+  // Compute means.
+  for (int i = 0; i < cu.Size(); i++) {
+    const int nz = zones_per_vdof[i];
+    if (nz) {
+      cu(i) /= nz;
+    }
+  }
+}
+
+void ComputeCurlAxi(const ParGridFunction &u, ParGridFunction &cu, bool assume_scalar) {
+  const FiniteElementSpace *fes = u.FESpace();
+  const FiniteElementSpace *cfes = cu.FESpace();
+
+  // AccumulateAndCountZones.
+  Array<int> zones_per_vdof;
+  zones_per_vdof.SetSize(cfes->GetVSize());
+  zones_per_vdof = 0;
+
+  cu = 0.0;
+
+  // Local interpolation.
+  int elndofs;
+  Array<int> vdofs;
+  Array<int> cvdofs;
+  Vector vals;
+  Vector loc_data;
+  int vdim = fes->GetVDim();
+  DenseMatrix grad_hat;
+  DenseMatrix dshape;
+  DenseMatrix grad;
+  Vector curl;
+  Vector spatial_location;
+
+  for (int e = 0; e < fes->GetNE(); ++e) {
+    fes->GetElementVDofs(e, vdofs);
+    cfes->GetElementVDofs(e, cvdofs);
+    u.GetSubVector(vdofs, loc_data);
+    vals.SetSize(cvdofs.Size());
+
+    ElementTransformation *tr = fes->GetElementTransformation(e);
+    const FiniteElement *el = fes->GetFE(e);
+    elndofs = el->GetDof();
+    int dim = el->GetDim();
+    dshape.SetSize(elndofs, dim);
+
+    for (int dof = 0; dof < elndofs; ++dof) {
+      // Project.
+      const IntegrationPoint &ip = el->GetNodes().IntPoint(dof);
+      tr->SetIntPoint(&ip);
+
+      tr->Transform(ip, spatial_location);
+      double radius = spatial_location[0];
+
+      // Eval and GetVectorGradientHat.
+      el->CalcDShape(tr->GetIntPoint(), dshape);
+      grad_hat.SetSize(vdim, dim);
+      DenseMatrix loc_data_mat(loc_data.GetData(), elndofs, vdim);
+      MultAtB(loc_data_mat, dshape, grad_hat);
+
+      const DenseMatrix &Jinv = tr->InverseJacobian();
+      grad.SetSize(grad_hat.Height(), Jinv.Width());
+      Mult(grad_hat, Jinv, grad);
+
+      if (assume_scalar) {
+        curl.SetSize(2);
+        curl(0) = -grad(0, 1);
+        curl(1) = grad(0, 0);
+        if (radius > 1e-12) {  // TODO(trevilo): deal with tolerance better
+          curl(1) += loc_data_mat(dof, 0) / radius;
+        } else {
+          curl(1) *= 2.0;  // From L'Hopital
+        }
+      } else {
+        // Compute the azimuthal component of the curl
+        curl.SetSize(2);
+        curl(0) = grad(0, 1) - grad(1, 0);
+        curl(1) = 0.0;
+      }
+
+      for (int j = 0; j < curl.Size(); ++j) {
+        vals(elndofs * j + dof) = curl(j);
+      }
+    }
+
+    // Accumulate values in all dofs, count the zones.
+    for (int j = 0; j < cvdofs.Size(); j++) {
+      int ldof = cvdofs[j];
       cu(ldof) += vals[j];
       zones_per_vdof[ldof]++;
     }
