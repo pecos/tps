@@ -56,7 +56,6 @@ FunctionCoefficient radius_coeff(radius);
 static double negativeRadius(const Vector &pos) { return -pos[0]; }
 FunctionCoefficient negative_radius_coeff(negativeRadius);
 
-
 /**
  * @brief Helper function to remove mean from a vector
  */
@@ -95,9 +94,8 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
     pres_ess_attr_ = 0;
   }
 
-  // if we have Tps object, use it to set other options...  
+  // if we have Tps object, use it to set other options...
   if (tps != nullptr) {
-
     // Axisymmetric simulation?
     tps->getInput("loMach/axisymmetric", axisym_, false);
 
@@ -396,18 +394,18 @@ void Tomboulides::initializeSelf() {
     } else if (ic_string_ == "uniform") {
       std::cout << "Setting uniform IC..." << std::endl;
       VectorConstantCoefficient u_excoeff(velocity_ic_);
-      u_curr_gf_->ProjectCoefficient(u_excoeff);      
+      u_curr_gf_->ProjectCoefficient(u_excoeff);
     }
   } else {
     std::cout << "Setting zero IC..." << std::endl;
     if (dim_ == 2) {
       VectorFunctionCoefficient u_excoeff(2, vel_zero2d);
       u_excoeff.SetTime(0.0);
-      u_curr_gf_->ProjectCoefficient(u_excoeff);          
+      u_curr_gf_->ProjectCoefficient(u_excoeff);
     } else {
       VectorFunctionCoefficient u_excoeff(3, vel_zero3d);
       u_excoeff.SetTime(0.0);
-      u_curr_gf_->ProjectCoefficient(u_excoeff);          
+      u_curr_gf_->ProjectCoefficient(u_excoeff);
     }
   }
 
@@ -1074,7 +1072,7 @@ void Tomboulides::step() {
 
   // Ensure u_vec_ consistent with u_curr_gf_
   u_curr_gf_->GetTrueDofs(u_vec_);
-  
+
   // TODO(trevilo): Have to implement some BC infrastructure
   Array<int> empty;
 
@@ -1423,17 +1421,16 @@ void Tomboulides::step() {
   /*
   {
     const double *dataU = u_curr_gf_->HostRead();
-    int sDof_= sfes_->GetVSize();  
+    int sDof_= sfes_->GetVSize();
     for (int i = 0; i < sDof_; i++) {
       std::cout << "Vel in Tomb: ";
       for (int eq = 0; eq < dim_; eq++) {
         std::cout << " " << dataU[i+eq*sDof_];
       }
-      std::cout << endl;    
+      std::cout << endl;
     }
   }
   */
-  
 
   // update gradients for turbulence model
   evaluateVelocityGradient();

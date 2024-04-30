@@ -693,7 +693,7 @@ void setScalarFromVector(Vector A, int ind, Vector *C) {
 void setVectorFromScalar(Vector A, int ind, Vector *C) {
   int Ndof = A.Size();
   const double *dataA = A.Read();
-  double *data = C->Write();  
+  double *data = C->Write();
   MFEM_FORALL(i, Ndof, { data[i + ind * Ndof] = dataA[i]; });
 }
 

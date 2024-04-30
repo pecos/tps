@@ -136,13 +136,14 @@ class TransportProperties {
   MFEM_HOST_DEVICE virtual void GetViscosities(const double *conserved, const double *primitive, const double *gradUp,
                                                double radius, double distance, double *visc) = 0;
 
-  //MFEM_HOST_DEVICE void computeMixtureAverageDiffusivity(const double *state, double *diffusivity);
-  //MFEM_HOST_DEVICE void GetThermalConductivities(const double *conserved, const double *primitive, double *kappa); 
-  
-  // MFEM_HOST_DEVICE virtual void GetThermalConductivities(const double *conserved, const double *primitive, double *kappa) = 0;
-  // MFEM_HOST_DEVICE virtual void GetThermalConductivities(const double *conserved, const double *primitive, const double *gradUp,
+  // MFEM_HOST_DEVICE void computeMixtureAverageDiffusivity(const double *state, double *diffusivity);
+  // MFEM_HOST_DEVICE void GetThermalConductivities(const double *conserved, const double *primitive, double *kappa);
+
+  // MFEM_HOST_DEVICE virtual void GetThermalConductivities(const double *conserved, const double *primitive, double
+  // *kappa) = 0; MFEM_HOST_DEVICE virtual void GetThermalConductivities(const double *conserved, const double
+  // *primitive, const double *gradUp,
   //                                              double radius, double distance, double *kappa) = 0;
-  
+
   // For mixture-averaged diffusion, correct for mass conservation.
   void correctMassDiffusionFlux(const Vector &Y_sp, DenseMatrix &diffusionVelocity);
   MFEM_HOST_DEVICE void correctMassDiffusionFlux(const double *Y_sp, double *diffusionVelocity);
@@ -228,8 +229,7 @@ class MolecularTransport : public TransportProperties {
 
   // MFEM_HOST_DEVICE virtual void computeMixtureAverageDiffusivity(const double *state, double *diffusivity);
 
-  // MFEM_HOST_DEVICE void GetThermalConductivities(const double *conserved, const double *primitive, double *kappa);        
-  
+  // MFEM_HOST_DEVICE void GetThermalConductivities(const double *conserved, const double *primitive, double *kappa);
 };
 
 //////////////////////////////////////////////////////
@@ -275,7 +275,7 @@ class DryAirTransport : public MolecularTransport {
 
 // MFEM_HOST_DEVICE void computeMixtureAverageDiffusivity(const double *state, double *diffusivity);
 
-// MFEM_HOST_DEVICE void GetThermalConductivities(const double *conserved, const double *primitive, double *kappa);      
+// MFEM_HOST_DEVICE void GetThermalConductivities(const double *conserved, const double *primitive, double *kappa);
 
 MFEM_HOST_DEVICE inline void DryAirTransport::GetViscosities(const double *conserved, const double *primitive,
                                                              double *visc) {
@@ -320,7 +320,7 @@ class ConstantTransport : public MolecularTransport {
 
 // MFEM_HOST_DEVICE void computeMixtureAverageDiffusivity(const double *state, double *diffusivity);
 
-// MFEM_HOST_DEVICE void GetThermalConductivities(const double *conserved, const double *primitive, double *kappa);      
+// MFEM_HOST_DEVICE void GetThermalConductivities(const double *conserved, const double *primitive, double *kappa);
 
 MFEM_HOST_DEVICE inline void ConstantTransport::GetViscosities(const double *conserved, const double *primitive,
                                                                double *visc) {

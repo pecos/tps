@@ -46,12 +46,12 @@
 #include "algebraicSubgridModels.hpp"
 #include "algebraic_rans.hpp"
 #include "calorically_perfect.hpp"
-#include "reactingFlow.hpp"
 #include "gaussianInterpExtData.hpp"
 #include "geometricSponge.hpp"
 #include "io.hpp"
 #include "logger.hpp"
 #include "lte_thermo_chem.hpp"
+#include "reactingFlow.hpp"
 #include "tomboulides.hpp"
 #include "tps.hpp"
 #include "utils.hpp"
@@ -203,17 +203,17 @@ void LoMachSolver::initialize() {
   // read-in external data if requested in bc setting
   extData_->initializeSelf();
   extData_->setup();
-  thermo_->initializeFromExtData(&extData_->toThermoChem_interface_);  
+  thermo_->initializeFromExtData(&extData_->toThermoChem_interface_);
   flow_->initializeFromExtData(&extData_->toFlow_interface_);
 
   // Initialize model-owned data
   sponge_->initializeSelf();
   turbModel_->initializeSelf();
-  thermo_->initializeSelf();  
+  thermo_->initializeSelf();
   flow_->initializeSelf();
 
   // Initialize restart read/write capability
-  thermo_->initializeIO(ioData);  
+  thermo_->initializeIO(ioData);
   flow_->initializeIO(ioData);
 
   const bool restart_serial =
@@ -236,7 +236,7 @@ void LoMachSolver::initialize() {
   turbModel_->initializeFromFlow(&flow_->toTurbModel_interface_);
   thermo_->initializeFromTurbModel(&turbModel_->toThermoChem_interface_);
   thermo_->initializeFromFlow(&flow_->toThermoChem_interface_);
-  thermo_->initializeFromSponge(&sponge_->toThermoChem_interface_);  
+  thermo_->initializeFromSponge(&sponge_->toThermoChem_interface_);
   flow_->initializeFromTurbModel(&turbModel_->toFlow_interface_);
   flow_->initializeFromThermoChem(&thermo_->toFlow_interface_);
   flow_->initializeFromSponge(&sponge_->toFlow_interface_);
@@ -247,7 +247,7 @@ void LoMachSolver::initialize() {
   // Finish initializing operators
   turbModel_->setup();
   turbModel_->initializeOperators();
-  thermo_->initializeOperators();  
+  thermo_->initializeOperators();
   flow_->initializeOperators();
 
   // TODO(trevilo): Enable averaging.  See note in loMach.hpp
@@ -260,11 +260,10 @@ void LoMachSolver::initialize() {
 
   meshData_->initializeViz(*pvdc_);
   sponge_->initializeViz(*pvdc_);
-  extData_->initializeViz(*pvdc_);  
+  extData_->initializeViz(*pvdc_);
   turbModel_->initializeViz(*pvdc_);
   flow_->initializeViz(*pvdc_);
   thermo_->initializeViz(*pvdc_);
-
 }
 
 void LoMachSolver::UpdateTimestepHistory(double dt) {
@@ -739,11 +738,9 @@ void LoMachSolver::parseSolverOptions() {
   assert(loMach_opts_.flow_solver == "zero-flow" || loMach_opts_.flow_solver == "tomboulides");
 
   tpsP_->getInput("loMach/thermo-solver", loMach_opts_.thermo_solver, string("constant-property"));
-  
-  assert( loMach_opts_.thermo_solver == "constant-property"
-	 || loMach_opts_.thermo_solver == "calorically-perfect"
-         || loMach_opts_.thermo_solver == "lte-thermo-chem"	  
-	 || loMach_opts_.thermo_solver == "reacting-flow" );
+
+  assert(loMach_opts_.thermo_solver == "constant-property" || loMach_opts_.thermo_solver == "calorically-perfect" ||
+         loMach_opts_.thermo_solver == "lte-thermo-chem" || loMach_opts_.thermo_solver == "reacting-flow");
 
   tpsP_->getInput("loMach/order", loMach_opts_.order, 1);
   assert(loMach_opts_.order >= 1);

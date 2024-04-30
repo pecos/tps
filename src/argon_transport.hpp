@@ -68,7 +68,7 @@ class ArgonMinimalTransport : public MolecularTransport {
   const double eps0_ = VACUUMPERMITTIVITY;
   const double qe_ = ELECTRONCHARGE;
   const double R_ = UNIVERSALGASCONSTANT;
-  //const double debyeFactor_ = kB_ * eps0_ / qe_ / qe_;
+  // const double debyeFactor_ = kB_ * eps0_ / qe_ / qe_;
   const double debyeFactor_ = BOLTZMANNCONSTANT * VACUUMPERMITTIVITY / ELECTRONCHARGE / ELECTRONCHARGE;
   // const double PI_ = 4.0 * atan(1.0);
   const double PI_ = PI;
@@ -117,8 +117,8 @@ class ArgonMinimalTransport : public MolecularTransport {
                                                         double *n_sp) override;
 
   // NOTE(kevin): only for AxisymmetricSource
-  using MolecularTransport::GetViscosities;  
-  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) override; 
+  using MolecularTransport::GetViscosities;
+  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) override;
 
   // virtual double computeThirdOrderElectronThermalConductivity(const Vector &X_sp, const double debyeLength,
   //                                                             const double Te, const double nondimTe);
@@ -126,8 +126,8 @@ class ArgonMinimalTransport : public MolecularTransport {
                                                                        const double Te, const double nondimTe);
 
   virtual void computeMixtureAverageDiffusivity(const Vector &state, Vector &diffusivity);
-  MFEM_HOST_DEVICE void computeMixtureAverageDiffusivity(const double *state, double *diffusivity);  
-  MFEM_HOST_DEVICE void GetThermalConductivities(const double *conserved, const double *primitive, double *kappa);    
+  MFEM_HOST_DEVICE void computeMixtureAverageDiffusivity(const double *state, double *diffusivity);
+  MFEM_HOST_DEVICE void GetThermalConductivities(const double *conserved, const double *primitive, double *kappa);
 
   // These are used to compute third-order electron thermal conductivity based on standard Chapman--Enskog method.
   MFEM_HOST_DEVICE double L11ee(const double *Q2) { return Q2[0]; }
@@ -190,12 +190,12 @@ class ArgonMixtureTransport : public ArgonMinimalTransport {
 
   MFEM_HOST_DEVICE double computeThirdOrderElectronThermalConductivity(const double *X_sp,
                                                                        const collisionInputs &collInputs);
-  
-  virtual void computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield, Vector &diffusivity);
-  MFEM_HOST_DEVICE void computeMixtureAverageDiffusivity(const double *state, const double *Efield, double *diffusivity);
 
-  MFEM_HOST_DEVICE void GetThermalConductivities(const double *conserved, const double *primitive, double *kappa);      
-  
+  virtual void computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield, Vector &diffusivity);
+  MFEM_HOST_DEVICE void computeMixtureAverageDiffusivity(const double *state, const double *Efield,
+                                                         double *diffusivity);
+
+  MFEM_HOST_DEVICE void GetThermalConductivities(const double *conserved, const double *primitive, double *kappa);
 };
 
 #endif  // ARGON_TRANSPORT_HPP_

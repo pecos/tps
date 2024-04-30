@@ -201,23 +201,21 @@ MFEM_HOST_DEVICE void Chemistry::computeProgressRate(const double *ns, const dou
                                                      double *progressRate) {
   // progressRate.SetSize(numReactions_);
   for (int r = 0; r < numReactions_; r++) {
-    
     // forward reaction rate
     double rate = 1.;
 
     for (int sp = 0; sp < numSpecies_; sp++) {
       rate *= pow(ns[sp], reactantStoich_[sp + r * numSpecies_]);
     }
-    
+
     if (detailedBalance_[r]) {
       double rateBWD = 1.;
       for (int sp = 0; sp < numSpecies_; sp++) rateBWD *= pow(ns[sp], productStoich_[sp + r * numSpecies_]);
       rate -= rateBWD / keq[r];
     }
-    
+
     progressRate[r] = kfwd[r] * rate;
   }
-  
 }
 
 // compute creation rate based on progress rates.
