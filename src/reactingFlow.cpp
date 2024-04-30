@@ -1431,8 +1431,8 @@ void ReactingFlow::speciesProduction() {
   const double *dataY = Yn_.HostRead();
   double *dataProd = prodY_.HostWrite();
 
-  const int nEq = dim_ + 2 + nActiveSpecies_;
-  Vector state(nEq);
+  // const int nEq = dim_ + 2 + nActiveSpecies_;
+  Vector state(gpudata::MAXEQUATIONS);
   state = 0.0;
 
   // Vectors used in computing chemical sources at each point
@@ -1681,8 +1681,8 @@ void ReactingFlow::updateMixture() {
     double *d_Rho = rn_.HostReadWrite();
     double *d_Cp = CpY_.HostReadWrite();
 
-    int nEq = dim_ + 2 + nActiveSpecies_;
-    Vector state(nEq);
+    // int nEq = dim_ + 2 + nActiveSpecies_;
+    Vector state(gpudata::MAXEQUATIONS);
     state = 0.0;
 
     Vector n_sp;
@@ -1780,10 +1780,11 @@ void ReactingFlow::updateDiffusivity() {
       double Efield[gpudata::MAXDIM];
       for (int v = 0; v < dim_; v++) Efield[v] = 0.0;
 
-      int nEq = dim_ + 2 + nActiveSpecies_;  // last Yn not included, i guess...
-      double state[nEq];
-      double conservedState[nEq];
-      double diffSp[nSpecies_];
+      // int nEq = dim_ + 2 + nActiveSpecies_;  // last Yn not included, i guess...
+      double state[gpudata::MAXEQUATIONS];
+      double conservedState[gpudata::MAXEQUATIONS];
+      // double diffSp[nSpecies_];
+      double diffSp[gpudata::MAXSPECIES];
 
       // Populate *primitive* state vector = [rho, velocity, temperature, species mole densities]
       state[0] = dataRho[i];
@@ -1808,9 +1809,9 @@ void ReactingFlow::updateDiffusivity() {
   {
     double *dataVisc = visc_.HostReadWrite();
     for (int i = 0; i < sDofInt_; i++) {
-      int nEq = dim_ + 2 + nActiveSpecies_;
-      double state[nEq];
-      double conservedState[nEq];
+      // int nEq = dim_ + 2 + nActiveSpecies_;
+      double state[gpudata::MAXEQUATIONS];
+      double conservedState[gpudata::MAXEQUATIONS];
       double visc[2];
 
       // Populate *primitive* state vector = [rho, velocity, temperature, species mole densities]
@@ -1834,9 +1835,9 @@ void ReactingFlow::updateDiffusivity() {
   {
     double *dataKappa = kappa_.HostReadWrite();
     for (int i = 0; i < sDofInt_; i++) {
-      int nEq = dim_ + 2 + nActiveSpecies_;
-      double state[nEq];
-      double conservedState[nEq];
+      // int nEq = dim_ + 2 + nActiveSpecies_;
+      double state[gpudata::MAXEQUATIONS];
+      double conservedState[gpudata::MAXEQUATIONS];
       double kappa[2];
 
       // Populate *primitive* state vector = [rho, velocity, temperature, species mole densities]
@@ -2135,7 +2136,7 @@ void ReactingFlow::identifyCollisionType(const Array<ArgonSpcs> &speciesType, Ar
 double binaryTest(const Vector &coords, double t) {
   double x = coords(0);
   double y = coords(1);
-  double z = coords(2);
+  // double z = coords(2);
   double pi = 3.14159265359;
   double kx, ky;
   double Lx, Ly;
@@ -2153,8 +2154,8 @@ double binaryTest(const Vector &coords, double t) {
 
 double species_stepLeft(const Vector &coords, double t) {
   double x = coords(0);
-  double y = coords(1);
-  double z = coords(2);
+  // douable y = coords(1);
+  // double z = coords(2);
   double pi = 3.14159265359;
   double yn;
   yn = 1.0e-12;
@@ -2165,8 +2166,8 @@ double species_stepLeft(const Vector &coords, double t) {
 
 double species_stepRight(const Vector &coords, double t) {
   double x = coords(0);
-  double y = coords(1);
-  double z = coords(2);
+  // double y = coords(1);
+  // double z = coords(2);
   double pi = 3.14159265359;
   double yn;
   yn = 1.0e-12;
@@ -2177,9 +2178,9 @@ double species_stepRight(const Vector &coords, double t) {
 }
 
 double species_uniform(const Vector &coords, double t) {
-  double x = coords(0);
-  double y = coords(1);
-  double z = coords(2);
+  // double x = coords(0);
+  // double y = coords(1);
+  // double z = coords(2);
   double yn;
   yn = 1.0e-12;
   return yn;
@@ -2216,9 +2217,9 @@ void ReactingFlow::uniformInlet() {
 double temp_ic(const Vector &coords, double t) {
   double Thi = 400.0;
   double Tlo = 200.0;
-  double x = coords(0);
+  // double x = coords(0);
   double y = coords(1);
-  double z = coords(2);
+  // double z = coords(2);
   double temp;
   temp = Tlo + 0.5 * (y + 1.0) * (Thi - Tlo);
   // temp = 0.5 * (Thi + Tlo);
@@ -2230,9 +2231,9 @@ double temp_wall(const Vector &coords, double t) {
   double Thi = 400.0;
   double Tlo = 200.0;
   double Tmean, tRamp, wt;
-  double x = coords(0);
-  double y = coords(1);
-  double z = coords(2);
+  // double x = coords(0);
+  // double y = coords(1);
+  // double z = coords(2);
   double temp;
 
   Tmean = 0.5 * (Thi + Tlo);
@@ -2256,8 +2257,8 @@ double temp_wallBox(const Vector &coords, double t) {
   double Tlo = 120.0;
   double Tmean, tRamp, wt;
   double x = coords(0);
-  double y = coords(1);
-  double z = coords(2);
+  // double y = coords(1);
+  // double z = coords(2);
   double temp;
 
   Tmean = 0.5 * (Thi + Tlo);
@@ -2278,9 +2279,9 @@ double temp_wallBox(const Vector &coords, double t) {
 double temp_inlet(const Vector &coords, double t) {
   double Thi = 400.0;
   double Tlo = 200.0;
-  double x = coords(0);
-  double y = coords(1);
-  double z = coords(2);
+  // double x = coords(0);
+  // double y = coords(1);
+  // double z = coords(2);
   double temp;
   temp = Tlo + (y + 0.5) * (Thi - Tlo);
   return temp;

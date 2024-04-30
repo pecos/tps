@@ -282,23 +282,6 @@ void Tomboulides::initializeSelf() {
   toTurbModel_interface_.gradV = gradV_gf_;
   toTurbModel_interface_.gradW = gradW_gf_;
 
-  // Gravity
-  assert(dim_ >= 2);
-  Vector zerog(dim_);
-  zerog = 0.0;
-  gravity_.SetSize(dim_);
-  tpsP_->getVec("loMach/gravity", gravity_, dim_, zerog);
-  gravity_vec_ = new VectorConstantCoefficient(gravity_);
-  Array<int> domain_attr(pmesh_->attributes.Max());
-  domain_attr = 1;
-
-  if (axisym_) {
-    rad_gravity_vec_ = new ScalarVectorProductCoefficient(radius_coeff, *gravity_vec_);
-    forcing_terms_.emplace_back(domain_attr, rad_gravity_vec_);
-  } else {
-    forcing_terms_.emplace_back(domain_attr, gravity_vec_);
-  }
-
   // Allocate Vector storage
   const int vfes_truevsize = vfes_->GetTrueVSize();
   const int sfes_truevsize = sfes_->GetTrueVSize();
@@ -375,10 +358,24 @@ void Tomboulides::initializeSelf() {
     utheta_next_vec_ = 0.0;
   }
 
+  // Gravity
+  assert(dim_ >= 2);
+  Vector zerog(dim_);
+  zerog = 0.0;
+  gravity_.SetSize(dim_);
+  tpsP_->getVec("loMach/gravity", gravity_, dim_, zerog);
+  gravity_vec_ = new VectorConstantCoefficient(gravity_);
+  Array<int> domain_attr(pmesh_->attributes.Max());
+  domain_attr = 1;
+
+  if (axisym_) {
+    rad_gravity_vec_ = new ScalarVectorProductCoefficient(radius_coeff, *gravity_vec_);
+    forcing_terms_.emplace_back(domain_attr, rad_gravity_vec_);
+  } else {
+    forcing_terms_.emplace_back(domain_attr, gravity_vec_);
+  }
+
   // Initial condition function.  For options, see cases.cpp
-  // 1) "" (Empty string), velocity initialized to zero
-  // 2) "tgv2d", velocity initialized using vel_exact_tgv2d function
-  // 3) "constant", TODO(trevilo) implement options to read constant
   tpsP_->getInput("loMach/tomboulides/ic", ic_string_, std::string(""));
 
   // set IC if we have one at this point

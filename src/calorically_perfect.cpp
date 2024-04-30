@@ -118,6 +118,7 @@ CaloricallyPerfectThermoChem::CaloricallyPerfectThermoChem(mfem::ParMesh *pmesh,
   tpsP_->getInput("loMach/calperfect/linear-solver-rtol", rtol_, 1e-12);
   tpsP_->getInput("loMach/calperfect/linear-solver-max-iter", max_iter_, 1000);
   tpsP_->getInput("loMach/calperfect/linear-solver-verbosity", pl_solve_, 0);
+  tpsP_->getInput("loMach/calperfect/numerical-integ", numerical_integ_, true);
 }
 
 CaloricallyPerfectThermoChem::~CaloricallyPerfectThermoChem() {

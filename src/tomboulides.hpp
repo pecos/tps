@@ -81,7 +81,7 @@ class Tomboulides final : public FlowBase {
 
   // Options
   // TODO(trevilo): hardcoded for testing.  Need to set based on input file.
-  bool numerical_integ_ = false;
+  bool numerical_integ_ = true;
   bool partial_assembly_ = false;
 
   int pressure_solve_pl_ = 0;

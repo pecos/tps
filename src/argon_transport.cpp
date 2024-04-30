@@ -1152,10 +1152,10 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::computeMixtureAverageDiffusivity(co
 }
 */
 
-void ArgonMixtureTransport::computeMixtureAverageDiffusivity(const double *state, const double *Efield,
-                                                             double *diffusivity) {
-  double transportBuffer[FluxTrns::NUM_FLUX_TRANS];
-  for (int p = 0; p < FluxTrns::NUM_FLUX_TRANS; p++) transportBuffer[p] = 0.0;
+MFEM_HOST_DEVICE void ArgonMixtureTransport::computeMixtureAverageDiffusivity(const double *state, const double *Efield,
+                                                                              double *diffusivity) {
+  // double transportBuffer[FluxTrns::NUM_FLUX_TRANS];
+  // for (int p = 0; p < FluxTrns::NUM_FLUX_TRANS; p++) transportBuffer[p] = 0.0;
 
   double primitiveState[gpudata::MAXEQUATIONS];
   mixture->GetPrimitivesFromConservatives(state, primitiveState);
@@ -1167,7 +1167,9 @@ void ArgonMixtureTransport::computeMixtureAverageDiffusivity(const double *state
 
   collisionInputs collInputs = computeCollisionInputs(primitiveState, n_sp);
 
-  double speciesViscosity[gpudata::MAXSPECIES], speciesHvyThrmCnd[gpudata::MAXSPECIES];
+  /*
+  double speciesViscosity[gpudata::MAXSPECIES];
+  double speciesHvyThrmCnd[gpudata::MAXSPECIES];
   for (int sp = 0; sp < numSpecies; sp++) {
     if (sp == electronIndex_) {
       speciesViscosity[sp] = 0.0;
@@ -1178,10 +1180,13 @@ void ArgonMixtureTransport::computeMixtureAverageDiffusivity(const double *state
         viscosityFactor_ * sqrt(mw_[sp] * collInputs.Th) / collisionIntegral(sp, sp, 2, 2, collInputs);
     speciesHvyThrmCnd[sp] = speciesViscosity[sp] * kOverEtaFactor_ / mw_[sp];
   }
-  transportBuffer[FluxTrns::VISCOSITY] = linearAverage(X_sp, speciesViscosity);
-  transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = linearAverage(X_sp, speciesHvyThrmCnd);
-  transportBuffer[FluxTrns::BULK_VISCOSITY] = 0.0;
+  */
 
+  // transportBuffer[FluxTrns::VISCOSITY] = linearAverage(X_sp, speciesViscosity);
+  // transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = linearAverage(X_sp, speciesHvyThrmCnd);
+  // transportBuffer[FluxTrns::BULK_VISCOSITY] = 0.0;
+
+  /*
   if (thirdOrderkElectron_) {
     transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] =
         computeThirdOrderElectronThermalConductivity(X_sp, collInputs);
@@ -1190,6 +1195,7 @@ void ArgonMixtureTransport::computeMixtureAverageDiffusivity(const double *state
         viscosityFactor_ * kOverEtaFactor_ * sqrt(collInputs.Te / mw_[electronIndex_]) * X_sp[electronIndex_] /
         collisionIntegral(electronIndex_, electronIndex_, 2, 2, collInputs);
   }
+  */
 
   double binaryDiff[gpudata::MAXSPECIES * gpudata::MAXSPECIES];
   // binaryDiff = 0.0;
