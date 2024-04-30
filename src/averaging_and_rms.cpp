@@ -56,6 +56,7 @@ Averaging::Averaging(ParGridFunction *_Up, ParMesh *_mesh, FiniteElementCollecti
 
   sampleInterval = config.GetMeanSampleInterval();
   samplesMean = 0;
+  samplesRMS = 0;  
   startMean = config.GetMeanStartIter();
   computeMean = false;
   if (sampleInterval != 0) computeMean = true;
@@ -133,6 +134,7 @@ void Averaging::addSampleMean(const int &iter) {
       addSample_cpu();
 #endif
       samplesMean++;
+      samplesRMS++;
     }
   }
 }
@@ -149,6 +151,14 @@ void Averaging::addSample_cpu() {
 
   //std::cout << "check 0" << endl;  
 
+  if (samplesRMS == 0) {
+    for (int n = 0; n < dof; n++) {   
+      for (int eq = 0; eq < 6; eq++) {
+        dataRMS[n + eq * dof] = 0.0;
+      }
+    }
+  }
+  
   for (int n = 0; n < dof; n++) {
     
     for (int eq = 0; eq < num_equation; eq++) {
@@ -193,27 +203,27 @@ void Averaging::addSample_cpu() {
     
     // xx
     double val = dataRMS[n];
-    dataRMS[n] = (val * double(samplesMean) + (vel[0] - meanVel[0]) * (vel[0] - meanVel[0])) / double(samplesMean + 1);
+    dataRMS[n] = (val * double(samplesRMS) + (vel[0] - meanVel[0]) * (vel[0] - meanVel[0])) / double(samplesRMS + 1);
     // yy
     val = dataRMS[n + dof];
     dataRMS[n + dof] =
-        (val * double(samplesMean) + (vel[1] - meanVel[1]) * (vel[1] - meanVel[1])) / double(samplesMean + 1);
+        (val * double(samplesRMS) + (vel[1] - meanVel[1]) * (vel[1] - meanVel[1])) / double(samplesRMS + 1);
     // zz
     val = dataRMS[n + 2 * dof];
     dataRMS[n + 2 * dof] =
-        (val * double(samplesMean) + (vel[2] - meanVel[2]) * (vel[2] - meanVel[2])) / double(samplesMean + 1);
+        (val * double(samplesRMS) + (vel[2] - meanVel[2]) * (vel[2] - meanVel[2])) / double(samplesRMS + 1);
     // xy
     val = dataRMS[n + 3 * dof];
     dataRMS[n + 3 * dof] =
-        (val * double(samplesMean) + (vel[0] - meanVel[0]) * (vel[1] - meanVel[1])) / double(samplesMean + 1);
+        (val * double(samplesRMS) + (vel[0] - meanVel[0]) * (vel[1] - meanVel[1])) / double(samplesRMS + 1);
     // xz
     val = dataRMS[n + 4 * dof];
     dataRMS[n + 4 * dof] =
-        (val * double(samplesMean) + (vel[0] - meanVel[0]) * (vel[2] - meanVel[2])) / double(samplesMean + 1);
+        (val * double(samplesRMS) + (vel[0] - meanVel[0]) * (vel[2] - meanVel[2])) / double(samplesRMS + 1);
     // yz
     val = dataRMS[n + 5 * dof];
     dataRMS[n + 5 * dof] =
-        (val * double(samplesMean) + (vel[1] - meanVel[1]) * (vel[2] - meanVel[2])) / double(samplesMean + 1);
+        (val * double(samplesRMS) + (vel[1] - meanVel[1]) * (vel[2] - meanVel[2])) / double(samplesRMS + 1);
 
     //std::cout << "check 5" << endl;  
     

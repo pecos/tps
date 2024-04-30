@@ -2085,11 +2085,14 @@ void LoMachSolver::UpdateTimestepHistory(double dt)
    // Shift values in nonlinear extrapolation history
    Nunm2 = Nunm1;
    Nunm1 = Nun;
-
+  
    // Shift values in solution history
    unm2 = unm1;
    unm1 = un;
 
+   //uBnm2 = uBnm1;
+   //uBnm1 = uBn;
+   
    // Update the current solution and corresponding GridFunction
    un_next_gf.GetTrueDofs(un_next);
    un = un_next;
@@ -3244,7 +3247,7 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    sw_extrap.Start();
 
    // project u to "padded" order space
-   /*   
+   /*
    un_gf.SetFromTrueDofs(un);         
    R1PX2_gf.ProjectGridFunction(un_gf);
    R1PX2_gf.GetTrueDofs(uBn);
@@ -3257,54 +3260,53 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    R1PX2_gf.ProjectGridFunction(unm2_gf);
    R1PX2_gf.GetTrueDofs(uBnm2);
    */
-
    
    // Nonlinear term at previous steps
-   /*
    N->Mult(un, Nun);
    N->Mult(unm1, Nunm1);
    N->Mult(unm2, Nunm2);
-   */   
 
+   /*
    un_gf.SetFromTrueDofs(Uext);         
    R1PX2_gf.ProjectGridFunction(un_gf);
    R1PX2_gf.GetTrueDofs(uBn);
+   */
 
    // nonlinear convection is in \int(u\cdot\nabla{}v,w) form, i.e. div-free
-   N->Mult(uBn, Nun);
+   // N->Mult(uBn, Nun);
 
-   /*
    // ab-predictor of nonliner term at {n+1}
    // comes out WITH A NEGATIVE
    {
       const auto d_Nun = Nun.Read();
       const auto d_Nunm1 = Nunm1.Read();
       const auto d_Nunm2 = Nunm2.Read();
-      auto d_Fext = FBext.Write();
-      //auto d_Fext = Fext.Write();      
+      //auto d_Fext = FBext.Write();      
+      auto d_Fext = Fext.Write();      
       const auto ab1_ = ab1;
       const auto ab2_ = ab2;
       const auto ab3_ = ab3;
       //mfem::forall(FBext.Size(), [=] MFEM_HOST_DEVICE (int i)
       //mfem::forall(Fext.Size(), [=] MFEM_HOST_DEVICE (int i)
-      //MFEM_FORALL(i, Fext.Size(),
-      MFEM_FORALL(i, FBext.Size(),
+      MFEM_FORALL(i, Fext.Size(),
+      //MFEM_FORALL(i, FBext.Size(),
       {
-	//d_Fext[i] = ab1_ * d_Nun[i]
-        //          + ab2_ * d_Nunm1[i]
-        //          + ab3_ * d_Nunm2[i];
+	d_Fext[i] = ab1_ * d_Nun[i]
+                  + ab2_ * d_Nunm1[i]
+                  + ab3_ * d_Nunm2[i];
 	
-	d_Fext[i] = d_Nun[i];
+	//d_Fext[i] = d_Nun[i];
 
       });
    }
-   */
 
    // project NL product back to v-space
    //R1PX2_gf.SetFromTrueDofs(FBext);
+   /*
    R1PX2_gf.SetFromTrueDofs(Nun);   
    R1PM0_gf.ProjectGridFunction(R1PX2_gf);  
    R1PM0_gf.GetTrueDofs(Fext);
+   */
 
    
    // add forcing/accel term to Fext   
@@ -3626,6 +3628,18 @@ void LoMachSolver::Step(double &time, double dt, const int current_step, const i
    
    g_bdr_form->Assemble();
    g_bdr_form->ParallelAssemble(g_bdr);
+   if (constantDensity != true) {
+     double *data = g_bdr.HostReadWrite();
+     double *d_rn = rn.HostReadWrite();             
+     for (int i = 0; i < TdofInt; i++) {     
+       data[i] *= d_rn[i];  
+     }
+   } else {
+     double *data = g_bdr.HostReadWrite();
+     for (int i = 0; i < TdofInt; i++) {     
+       data[i] *= static_rho;
+     }     
+   }      
    tmpR0.Add(-bd0 / dt, g_bdr);
       
    // project rhs to p-space
@@ -5267,6 +5281,7 @@ void LoMachSolver::parseStatOptions() {
   tpsP_->getInput("averaging/startIter", config.startIter, 0);
   tpsP_->getInput("averaging/sampleFreq", config.sampleInterval, 0);
   tpsP_->getInput("averaging/enableContinuation", config.restartMean, false);
+  tpsP_->getInput("averaging/restartRMS", config.restartRMS, false);  
 }
 
 void LoMachSolver::parseIOSettings() {  
@@ -6854,7 +6869,9 @@ void LoMachSolver::interpolateInlet() {
     Lmax = std::max(Lx,Ly);
     Lmax = std::max(Lmax,Lz);    
     //radius = 0.25 * Lmax;
-    radius = 0.01 * Lmax;
+    //radius = 0.01 * Lmax;
+    double torch_radius = 28.062/1000.0;
+    radius = 2.0 * torch_radius / 300.0; // 300 from nxn interp plane
  
     ParGridFunction coordsDof(vfes);
     pmesh->GetNodes(coordsDof);
@@ -6913,7 +6930,7 @@ void LoMachSolver::interpolateInlet() {
 	if (inlet[j].rho < 1.0e-8) { continue; }
 	
 	// gaussian
-	if(dist <= 4.0*radius) {
+	if(dist <= radius) {
           //std::cout << " Caught an interp point " << dist << endl; fflush(stdout);	  
           wt = exp(-(dist*dist)/(radius*radius));
           wt_tot = wt_tot + wt;	      
@@ -6925,16 +6942,21 @@ void LoMachSolver::interpolateInlet() {
    	  iCount++;
           //std::cout << "* " << n << " "  << iCount << " " << wt_tot << " " << val_T << endl; fflush(stdout);	  	  
 	}
-	    // nearest, just for testing
-	    //if(dist <= dmin) {
-	    //  dmin = dist;
-	    //  wt_tot = 1.0;
-           //   val_rho = inlet[j].rho;
-           //   val_u = inlet[j].u;
-           //   val_v = inlet[j].v;
-           //   val_w = inlet[j].w;
-	   //   iCount = 1;	     
-	   // }	    
+	
+	  // nearest
+	/*
+	  if(dist <= dmin) {
+	    dmin = dist;
+            wt_tot = 1.0;
+            val_rho = inlet[j].rho;
+            val_u = inlet[j].u;
+            val_v = inlet[j].v;
+            val_w = inlet[j].w;
+            val_T = inlet[j].temp;	    
+	    iCount = 1;	     
+	  }
+	*/
+	  
         }
 
         //if(rank0_) { std::cout << " attempting to record interpolated values in buffer" << endl; fflush(stdout); }      

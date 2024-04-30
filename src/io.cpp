@@ -132,6 +132,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
       if (average->ComputeMean()) {
         // samples meanUp
         h5_save_attribute(file, "samplesMean", average->GetSamplesMean());
+        h5_save_attribute(file, "samplesRMS", average->GetSamplesRMS());	
         h5_save_attribute(file, "samplesInterval", average->GetSamplesInterval());
       }
       // code revision
@@ -174,11 +175,25 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
       h5_read_attribute(file, "dt", dt);
       h5_read_attribute(file, "order", read_order);
       if (average->ComputeMean() && config.GetRestartMean()) {
-        int samplesMean, intervals;
+        int samplesMean, samplesRMS, intervals;
         h5_read_attribute(file, "samplesMean", samplesMean);
         h5_read_attribute(file, "samplesInterval", intervals);
         average->SetSamplesMean(samplesMean);
         average->SetSamplesInterval(intervals);
+
+	int istatus = H5Aexists(file,"samplesRMS");
+	if(istatus > 0) {
+          h5_read_attribute(file, "samplesRMS", samplesRMS);		
+	} else {
+	  samplesRMS = samplesMean;
+	}
+
+	if (config.restartRMS == true) {
+	  samplesRMS = 0;
+	}
+	
+        average->SetSamplesRMS(samplesRMS);
+	
       }
 
       std::cout << " " << endl;      
@@ -198,6 +213,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
       MPI_Bcast(&read_order, 1, MPI_INT, 0, MPI_COMM_WORLD);
       if (average->ComputeMean() && config.GetRestartMean()) {
         int sampMean = average->GetSamplesMean();
+	int sampRMS = average->GetSamplesRMS();
         int intervals = average->GetSamplesInterval();
         MPI_Bcast(&sampMean, 1, MPI_INT, 0, MPI_COMM_WORLD);
         MPI_Bcast(&intervals, 1, MPI_INT, 0, MPI_COMM_WORLD);
@@ -848,13 +864,14 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
       //std::cout << " okay 3a " << endl;                  
       //std::cout << " okay 3a " << average->ComputeMean() << endl;            
 
-      /*
+      /**/
       if (average->ComputeMean()) {
         // samples meanUp
         h5_save_attribute(file, "samplesMean", average->GetSamplesMean());
-        h5_save_attribute(file, "samplesInterval", average->GetSamplesInterval());
+        h5_save_attribute(file, "samplesRMS", average->GetSamplesRMS());	
+        h5_save_attribute(file, "samplesInterval", average->GetSamplesInterval());	
       }
-      */
+      /**/
       //std::cout << " okay 3aa " << endl;            
       
       // code revision
@@ -911,13 +928,27 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
       h5_read_attribute(file, "dt", dt);
       //std::cout << " okay 3ah3 " << endl;            
       h5_read_attribute(file, "order", read_order);
-      //if (average->ComputeMean() && config.GetRestartMean()) {
-      //  int samplesMean, intervals;
-      //  h5_read_attribute(file, "samplesMean", samplesMean);
-      //  h5_read_attribute(file, "samplesInterval", intervals);
-      //  average->SetSamplesMean(samplesMean);
-      //  average->SetSamplesInterval(intervals);
-      //}
+      if (average->ComputeMean() && config.GetRestartMean()) {
+        int samplesMean, samplesRMS, intervals;
+        h5_read_attribute(file, "samplesMean", samplesMean);
+        h5_read_attribute(file, "samplesInterval", intervals);
+        average->SetSamplesMean(samplesMean);
+        average->SetSamplesInterval(intervals);
+
+	int istatus = H5Aexists(file,"samplesRMS");
+	if(istatus > 0) {
+          h5_read_attribute(file, "samplesRMS", samplesRMS);		
+	} else {
+	  samplesRMS = samplesMean;
+	}
+
+	if (config.restartRMS == true) {
+	  samplesRMS = 0;
+	}
+	
+        average->SetSamplesRMS(samplesRMS);
+		
+      }
     }
     /**/
     //std::cout << " okay 3ai " << endl; 		

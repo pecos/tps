@@ -128,6 +128,7 @@ class RunConfiguration {
   int sampleInterval;
   int startIter;
   bool restartMean;
+  bool restartRMS;  
   bool meanHistEnable;
 
   // working fluid. Options thus far
@@ -339,6 +340,7 @@ class RunConfiguration {
   int GetMeanStartIter() { return startIter; }
   int GetMeanSampleInterval() { return sampleInterval; }
   bool GetRestartMean() { return restartMean; }
+  bool GetRestartRMS() { return restartRMS; }  
   bool isMeanHistEnabled() { return meanHistEnable; }
 
   WorkingFluid GetWorkingFluid() { return workFluid; }
