@@ -41,19 +41,18 @@ class Tps;
 #include <hdf5.h>
 #include <tps_config.h>
 
-#include <iostream>
 #include <fstream>
+#include <iostream>
 
-#include "dirichlet_bc_helper.hpp"
-#include "gpu_constructor.hpp"
-#include "io.hpp"
-#include "thermo_chem_base.hpp"
-#include "tps_mfem_wrap.hpp"
-#include "dataStructures.hpp"
-#include "equation_of_state.hpp"
 #include "argon_transport.hpp"
 #include "chemistry.hpp"
+#include "dataStructures.hpp"
+#include "dirichlet_bc_helper.hpp"
+#include "equation_of_state.hpp"
+#include "gpu_constructor.hpp"
+#include "io.hpp"
 #include "mpi_groups.hpp"
+#include "thermo_chem_base.hpp"
 #include "tps.hpp"
 #include "tps_mfem_wrap.hpp"
 #include "utils.hpp"
@@ -82,24 +81,24 @@ class ReactingFlow : public ThermoChemModelBase {
   double time_;
 
   std::string ic_string_;
-  
+
   // number of species and dofs
-  int nSpecies_, nActiveSpecies_, nReactions_, nAtoms_;  
+  int nSpecies_, nActiveSpecies_, nReactions_, nAtoms_;
   int sDof_, sDofInt_;
-  int yDof_, yDofInt_;  
+  int yDof_, yDofInt_;
 
   WorkingFluid workFluid_;
   GasModel gasModel_;
   TransportModel transportModel_;
   ChemistryModel chemistryModel_;
-  
+
   // packaged inputs
   PerfectMixtureInput mixtureInput_;
   ArgonTransportInput argonInput_;
   ChemistryInput chemistryInput_;
-  
-  //GasMixture *mixture_ = NULL;
-  PerfectMixture *mixture_ = NULL;  
+
+  // GasMixture *mixture_ = NULL;
+  PerfectMixture *mixture_ = NULL;
   // TransportProperties *transport_ = NULL;
   ArgonMixtureTransport *transport_ = NULL;
   Chemistry *chemistry_ = NULL;
@@ -108,9 +107,9 @@ class ReactingFlow : public ThermoChemModelBase {
   std::map<std::string, int> atomMap_;
   DenseMatrix speciesComposition_;
   DenseMatrix gasParams_;
-  //double gasParams_[gpudata::MAXSPECIES * GasParams::NUM_GASPARAMS];  
+  // double gasParams_[gpudata::MAXSPECIES * GasParams::NUM_GASPARAMS];
   double const_plasma_conductivity_;
-  
+
   // Flags
   bool rank0_;                      /**< true if this is rank 0 */
   bool partial_assembly_ = false;   /**< Enable/disable partial assembly of forms. */
@@ -127,15 +126,15 @@ class ReactingFlow : public ThermoChemModelBase {
   // Boundary condition info
   Array<int> temp_ess_attr_; /**< List of patches with Dirichlet BC on temperature */
   Array<int> Qt_ess_attr_;   /**< List of patches with Dirichlet BC on Q (thermal divergence) */
-  Array<int> spec_ess_attr_; /**< List of patches with Dirichlet BC on species */  
+  Array<int> spec_ess_attr_; /**< List of patches with Dirichlet BC on species */
 
   Array<int> temp_ess_tdof_; /**< List of true dofs with Dirichlet BC on temperature */
   Array<int> Qt_ess_tdof_;   /**< List of true dofs with Dirichlet BC on Q */
-  Array<int> spec_ess_tdof_; /**< List of true dofs with Dirichlet BC on species */  
+  Array<int> spec_ess_tdof_; /**< List of true dofs with Dirichlet BC on species */
 
   std::vector<DirichletBC_T<Coefficient>> temp_dbcs_; /**< vector of Dirichlet BC coefficients for T*/
   std::vector<DirichletBC_T<Coefficient>> Qt_dbcs_;   /**< vector of Dirichlet BC coefficients for Q*/
-  std::vector<DirichletBC_T<Coefficient>> spec_dbcs_; /**< vector of Dirichlet BC coefficients for Yn*/  
+  std::vector<DirichletBC_T<Coefficient>> spec_dbcs_; /**< vector of Dirichlet BC coefficients for Yn*/
 
   // Scalar modeling parameters
   double mu0_;           /**< Dynamic viscosity, either multiplier for Sutherland or constant */
@@ -165,7 +164,7 @@ class ReactingFlow : public ThermoChemModelBase {
   FiniteElementCollection *yfec_ = nullptr;
 
   // Species \f$H^1\f$ finite element space.
-  ParFiniteElementSpace *yfes_ = nullptr;  
+  ParFiniteElementSpace *yfes_ = nullptr;
 
   // Fields
   ParGridFunction Tnm1_gf_, Tnm2_gf_;
@@ -176,16 +175,16 @@ class ReactingFlow : public ThermoChemModelBase {
   // additions for species
   ParGridFunction Ynm1_gf_, Ynm2_gf_;
   ParGridFunction Yn_gf_, Yn_next_gf_, Yext_gf_, resY_gf_;
-  ParGridFunction prodY_gf_;  
+  ParGridFunction prodY_gf_;
   ParGridFunction YnFull_gf_;
   ParGridFunction CpY_gf_;
-  ParGridFunction CpMix_gf_;  
+  ParGridFunction CpMix_gf_;
   ParGridFunction Rmix_gf_;
-  ParGridFunction Mmix_gf_;  
+  ParGridFunction Mmix_gf_;
 
   ParGridFunction visc_gf_;
   ParGridFunction kappa_gf_;
-  ParGridFunction diffY_gf_;  
+  ParGridFunction diffY_gf_;
   ParGridFunction R0PM0_gf_;
   ParGridFunction Qt_gf_;
 
@@ -207,38 +206,38 @@ class ReactingFlow : public ThermoChemModelBase {
   GridFunctionCoefficient *cpMix_coeff_ = nullptr;
   ProductCoefficient *rhoCp_coeff_ = nullptr;
   ScalarVectorProductCoefficient *rhouCp_coeff_ = nullptr;
-  ProductCoefficient *rhoCp_over_dt_coeff_ = nullptr;  
+  ProductCoefficient *rhoCp_over_dt_coeff_ = nullptr;
 
   GridFunctionCoefficient *species_diff_coeff_ = nullptr;
   SumCoefficient *species_diff_sum_coeff_ = nullptr;
   ProductCoefficient *species_diff_total_coeff_ = nullptr;
 
   // ConstantCoefficient *species_Cp_coeff_ = nullptr;
-  GridFunctionCoefficient *species_Cp_coeff_ = nullptr;      
-  ProductCoefficient *species_diff_Cp_coeff_ = nullptr;    
+  GridFunctionCoefficient *species_Cp_coeff_ = nullptr;
+  ProductCoefficient *species_diff_Cp_coeff_ = nullptr;
 
   // operators and solvers
   ParBilinearForm *At_form_ = nullptr;
-  ParBilinearForm *Ay_form_ = nullptr;  
+  ParBilinearForm *Ay_form_ = nullptr;
   ParBilinearForm *Ms_form_ = nullptr;
   ParBilinearForm *MsRho_form_ = nullptr;
-  ParBilinearForm *MsRhoCp_form_ = nullptr;  
+  ParBilinearForm *MsRhoCp_form_ = nullptr;
   ParBilinearForm *Ht_form_ = nullptr;
-  ParBilinearForm *Hy_form_ = nullptr;  
+  ParBilinearForm *Hy_form_ = nullptr;
   ParBilinearForm *Mq_form_ = nullptr;
   ParBilinearForm *LQ_form_ = nullptr;
   ParLinearForm *LQ_bdry_ = nullptr;
-  ParBilinearForm *LY_form_ = nullptr;  
+  ParBilinearForm *LY_form_ = nullptr;
 
   OperatorHandle LQ_;
-  OperatorHandle LY_;  
+  OperatorHandle LY_;
   OperatorHandle At_;
-  OperatorHandle Ay_;  
+  OperatorHandle Ay_;
   OperatorHandle Ht_;
-  OperatorHandle Hy_;  
+  OperatorHandle Hy_;
   OperatorHandle Ms_;
   OperatorHandle MsRho_;
-  OperatorHandle MsRhoCp_;  
+  OperatorHandle MsRhoCp_;
   OperatorHandle Mq_;
 
   mfem::Solver *MsInvPC_ = nullptr;
@@ -249,13 +248,13 @@ class ReactingFlow : public ThermoChemModelBase {
   mfem::CGSolver *HtInv_ = nullptr;
   mfem::Solver *HyInvPC_ = nullptr;
   mfem::CGSolver *HyInv_ = nullptr;
-  
+
   // Vectors
   Vector Tn_, Tn_next_, Tnm1_, Tnm2_;
   Vector NTn_, NTnm1_, NTnm2_;
   Vector Text_;
-  Vector resT_; 
-  Vector tmpR1_; 
+  Vector resT_;
+  Vector tmpR1_;
   Vector tmpR0_;
   Vector tmpR0a_, tmpR0b_, tmpR0c_;
 
@@ -263,17 +262,17 @@ class ReactingFlow : public ThermoChemModelBase {
   Vector Yn_, Yn_next_, Ynm1_, Ynm2_;
   Vector NYn_, NYnm1_, NYnm2_;
   Vector Yext_;
-  Vector Xn_;  
+  Vector Xn_;
   Vector resY_;
   Vector prodY_;
   Vector hw_;
   Vector CpY_;
-  Vector SDFT_;  
+  Vector SDFT_;
   Vector speciesMolarCv_;
   Vector speciesMolarCp_;
   Vector specificHeatRatios_;
   Vector initialMassFraction_;
-  Vector atomMW_;   
+  Vector atomMW_;
 
   Vector Qt_;
   Vector rn_;
@@ -294,8 +293,7 @@ class ReactingFlow : public ThermoChemModelBase {
   double Pnm1_, Pnm2_, Pnm3_;
 
  public:
-  ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff,
-                               TPS::Tps *tps);
+  ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff, TPS::Tps *tps);
   virtual ~ReactingFlow();
 
   // Functions overriden from base class
@@ -306,10 +304,10 @@ class ReactingFlow : public ThermoChemModelBase {
   void initializeViz(ParaViewDataCollection &pvdc) final;
 
   // Functions added here
-  void speciesLastStep();  
+  void speciesLastStep();
   void speciesStep(int iSpec);
   void temperatureStep();
-  void updateMixture();  
+  void updateMixture();
   void updateThermoP();
   void extrapolateState();
   void updateDensity(double tStep);
@@ -317,7 +315,7 @@ class ReactingFlow : public ThermoChemModelBase {
   void updateDiffusivity();
   void computeSystemMass();
   void computeExplicitTempConvectionOP(bool extrap);
-  void computeExplicitSpecConvectionOP(int iSpec, bool extrap);  
+  void computeExplicitSpecConvectionOP(int iSpec, bool extrap);
   void computeQt();
   void computeQtTO();
   void speciesProduction();
@@ -327,7 +325,7 @@ class ReactingFlow : public ThermoChemModelBase {
   /// for creation of structs to interface with old plasma/chem stuff
   void identifySpeciesType(Array<ArgonSpcs> &speciesType);
   void identifyCollisionType(const Array<ArgonSpcs> &speciesType, ArgonColl *collisionIndex);
-  
+
   /// Return a pointer to the current temperature ParGridFunction.
   ParGridFunction *GetCurrentTemperature() { return &Tn_gf_; }
 
