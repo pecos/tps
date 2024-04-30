@@ -132,8 +132,11 @@ int main (int argc, char *argv[])
     conservedState(eq) = dataU[idx + eq * NDof];
   }
 
+  double Efield[gpudata::MAXDIM];
+  for (int v = 0; v < dim; v++) Efield[v] = 0.0;
+  
   Vector diffusivity;
-  transport.computeMixtureAverageDiffusivity(conservedState, diffusivity);
+  transport.computeMixtureAverageDiffusivity(conservedState, Efield, diffusivity);
   double Dia = diffusivity(transport.getIonIndex());
   grvy_printf(GRVY_INFO, "\n Ar-Ar+ binary diffusivity : %.8E\n", Dia);
 

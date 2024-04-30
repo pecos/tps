@@ -334,10 +334,11 @@ MFEM_HOST_DEVICE double ArgonMinimalTransport::computeThirdOrderElectronThermalC
          (L11 - L12 * L12 / L22);
 }
 
-void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state, Vector &diffusivity) {
+void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield,
+                                                             Vector &diffusivity) {
   diffusivity.SetSize(3);
   diffusivity = 0.0;
-  computeMixtureAverageDiffusivity(&state[0], &diffusivity[0]);
+  computeMixtureAverageDiffusivity(&state[0], &Efield[0], &diffusivity[0]);
 
   // Vector primitiveState(num_equation);
   // mixture->GetPrimitivesFromConservatives(state, primitiveState);
@@ -376,7 +377,7 @@ void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state
   // CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
 }
 
-MFEM_HOST_DEVICE void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const double *state,
+MFEM_HOST_DEVICE void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const double *state, const double *Efield,
                                                                               double *diffusivity) {
   double primitiveState[gpudata::MAXEQUATIONS];
   mixture->GetPrimitivesFromConservatives(state, primitiveState);
