@@ -1781,9 +1781,11 @@ void ReactingFlow::updateDiffusivity() {
       for (int v = 0; v < dim_; v++) Efield[v] = 0.0;
 
       int nEq = dim_ + 2 + nActiveSpecies_;  // last Yn not included, i guess...
-      double state[nEq];
-      double conservedState[nEq];
-      double diffSp[nSpecies_];
+      int nEqMax = gpudata::MAXDIM + 2 + gpudata::MAXSPECIES;
+      double state[nEqMax];
+      double conservedState[nEqMax];
+      // double diffSp[nSpecies_];
+      double diffSp[gpudata::MAXSPECIES];
 
       // Populate *primitive* state vector = [rho, velocity, temperature, species mole densities]
       state[0] = dataRho[i];
