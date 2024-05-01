@@ -180,7 +180,7 @@ class Averaging {
   /// flag to continue mean from restart
   bool enable_mean_continuation_;
 
-  /// flag to restart variances  
+  /// flag to restart variances
   bool zero_variances_;
 
   /// mfem paraview data collection, used to write viz files
@@ -288,7 +288,10 @@ class Averaging {
   int GetSamplesMean() { return ns_mean_; }
   int GetSamplesRMS() { return ns_vari_; }
   int GetSamplesInterval() { return sample_interval_; }
+
   bool ComputeMean() { return compute_mean_; }
+  bool ContinueMean() { return enable_mean_continuation_; }
+  bool RestartRMS() { return zero_variances_; }
 
   void SetSamplesMean(int &samples) { ns_mean_ = samples; }
   void SetSamplesRMS(int &samples) { ns_vari_ = samples; }

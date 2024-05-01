@@ -61,6 +61,13 @@ void LoMachSolver::write_restart_files_hdf5(hid_t file, bool serialized_write) {
     // thermodynamic pressure
     h5_save_attribute(file, "Po", thermoPressure_);
 
+    if (average_->ComputeMean()) {
+      // samples meanUp
+      h5_save_attribute(file, "samplesMean", average_->GetSamplesMean());
+      h5_save_attribute(file, "samplesRMS", average_->GetSamplesRMS());
+      h5_save_attribute(file, "samplesInterval", average_->GetSamplesInterval());
+    }
+
     // code revision
 #ifdef BUILD_VERSION
     {
@@ -115,6 +122,25 @@ void LoMachSolver::read_restart_files_hdf5(hid_t file, bool serialized_read) {
     h5_read_attribute(file, "order", read_order);
     if (H5Aexists(file, "Po")) {
       h5_read_attribute(file, "Po", thermoPressure_);
+    }
+    if (average_->ComputeMean() && average_->ContinueMean()) {
+      int samplesMean, samplesRMS, intervals;
+      h5_read_attribute(file, "samplesMean", samplesMean);
+      h5_read_attribute(file, "samplesInterval", intervals);
+      average_->SetSamplesMean(samplesMean);
+      average_->SetSamplesInterval(intervals);
+
+      int istatus = H5Aexists(file, "samplesRMS");
+      if (istatus > 0) {
+        h5_read_attribute(file, "samplesRMS", samplesRMS);
+      } else {
+        samplesRMS = samplesMean;
+      }
+
+      if (average_->RestartRMS() == true) {
+        samplesRMS = 0;
+      }
+      average_->SetSamplesRMS(samplesRMS);
     }
   }
 

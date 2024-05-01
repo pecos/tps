@@ -61,6 +61,7 @@ class Tps;
 
 #include <tps_config.h>
 
+#include "averaging.hpp"
 #include "externalData_base.hpp"
 #include "io.hpp"
 #include "loMach_options.hpp"
@@ -71,7 +72,6 @@ class Tps;
 #include "thermo_chem_base.hpp"
 #include "tps_mfem_wrap.hpp"
 #include "turb_model_base.hpp"
-#include "averaging.hpp"
 
 struct temporalSchemeCoefficients {
   // Current time
