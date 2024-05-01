@@ -1180,7 +1180,7 @@ void ArgonMixtureTransport::computeMixtureAverageDiffusivity(const double *state
     speciesHvyThrmCnd[sp] = speciesViscosity[sp] * kOverEtaFactor_ / mw_[sp];
   }
   */
-  
+
   // transportBuffer[FluxTrns::VISCOSITY] = linearAverage(X_sp, speciesViscosity);
   // transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = linearAverage(X_sp, speciesHvyThrmCnd);
   // transportBuffer[FluxTrns::BULK_VISCOSITY] = 0.0;
