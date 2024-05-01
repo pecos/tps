@@ -1781,9 +1781,8 @@ void ReactingFlow::updateDiffusivity() {
       for (int v = 0; v < dim_; v++) Efield[v] = 0.0;
 
       int nEq = dim_ + 2 + nActiveSpecies_;  // last Yn not included, i guess...
-      int nEqMax = gpudata::MAXDIM + 2 + gpudata::MAXSPECIES;
-      double state[nEqMax];
-      double conservedState[nEqMax];
+      double state[gpudata::MAXEQUATIONS];
+      double conservedState[gpudata::MAXEQUATIONS];
       // double diffSp[nSpecies_];
       double diffSp[gpudata::MAXSPECIES];
 
@@ -1811,8 +1810,8 @@ void ReactingFlow::updateDiffusivity() {
     double *dataVisc = visc_.HostReadWrite();
     for (int i = 0; i < sDofInt_; i++) {
       int nEq = dim_ + 2 + nActiveSpecies_;
-      double state[nEq];
-      double conservedState[nEq];
+      double state[gpudata::MAXEQUATIONS];
+      double conservedState[gpudata::MAXEQUATIONS];
       double visc[2];
 
       // Populate *primitive* state vector = [rho, velocity, temperature, species mole densities]
@@ -1837,8 +1836,8 @@ void ReactingFlow::updateDiffusivity() {
     double *dataKappa = kappa_.HostReadWrite();
     for (int i = 0; i < sDofInt_; i++) {
       int nEq = dim_ + 2 + nActiveSpecies_;
-      double state[nEq];
-      double conservedState[nEq];
+      double state[gpudata::MAXEQUATIONS];
+      double conservedState[gpudata::MAXEQUATIONS];
       double kappa[2];
 
       // Populate *primitive* state vector = [rho, velocity, temperature, species mole densities]

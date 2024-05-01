@@ -1166,16 +1166,17 @@ void ArgonMixtureTransport::computeMixtureAverageDiffusivity(const double *state
 
   collisionInputs collInputs = computeCollisionInputs(primitiveState, n_sp);
 
-  double speciesViscosity[gpudata::MAXSPECIES], speciesHvyThrmCnd[gpudata::MAXSPECIES];
+  double speciesViscosity[gpudata::MAXSPECIES];
+  // double speciesHvyThrmCnd[gpudata::MAXSPECIES];
   for (int sp = 0; sp < numSpecies; sp++) {
     if (sp == electronIndex_) {
       speciesViscosity[sp] = 0.0;
-      speciesHvyThrmCnd[sp] = 0.0;
+      // speciesHvyThrmCnd[sp] = 0.0;
       continue;
     }
     speciesViscosity[sp] =
         viscosityFactor_ * sqrt(mw_[sp] * collInputs.Th) / collisionIntegral(sp, sp, 2, 2, collInputs);
-    speciesHvyThrmCnd[sp] = speciesViscosity[sp] * kOverEtaFactor_ / mw_[sp];
+    // speciesHvyThrmCnd[sp] = speciesViscosity[sp] * kOverEtaFactor_ / mw_[sp];
   }
   // transportBuffer[FluxTrns::VISCOSITY] = linearAverage(X_sp, speciesViscosity);
   // transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = linearAverage(X_sp, speciesHvyThrmCnd);
