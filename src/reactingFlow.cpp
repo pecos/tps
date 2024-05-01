@@ -2136,7 +2136,7 @@ void ReactingFlow::identifyCollisionType(const Array<ArgonSpcs> &speciesType, Ar
 double binaryTest(const Vector &coords, double t) {
   double x = coords(0);
   double y = coords(1);
-  double z = coords(2);
+  // double z = coords(2);
   double pi = 3.14159265359;
   double kx, ky;
   double Lx, Ly;
@@ -2154,8 +2154,8 @@ double binaryTest(const Vector &coords, double t) {
 
 double species_stepLeft(const Vector &coords, double t) {
   double x = coords(0);
-  double y = coords(1);
-  double z = coords(2);
+  // douable y = coords(1);
+  // double z = coords(2);
   double pi = 3.14159265359;
   double yn;
   yn = 1.0e-12;
@@ -2166,8 +2166,8 @@ double species_stepLeft(const Vector &coords, double t) {
 
 double species_stepRight(const Vector &coords, double t) {
   double x = coords(0);
-  double y = coords(1);
-  double z = coords(2);
+  // double y = coords(1);
+  // double z = coords(2);
   double pi = 3.14159265359;
   double yn;
   yn = 1.0e-12;
@@ -2178,9 +2178,9 @@ double species_stepRight(const Vector &coords, double t) {
 }
 
 double species_uniform(const Vector &coords, double t) {
-  double x = coords(0);
-  double y = coords(1);
-  double z = coords(2);
+  // double x = coords(0);
+  // double y = coords(1);
+  // double z = coords(2);
   double yn;
   yn = 1.0e-12;
   return yn;
@@ -2217,9 +2217,9 @@ void ReactingFlow::uniformInlet() {
 double temp_ic(const Vector &coords, double t) {
   double Thi = 400.0;
   double Tlo = 200.0;
-  double x = coords(0);
+  // double x = coords(0);
   double y = coords(1);
-  double z = coords(2);
+  // double z = coords(2);
   double temp;
   temp = Tlo + 0.5 * (y + 1.0) * (Thi - Tlo);
   // temp = 0.5 * (Thi + Tlo);
@@ -2231,9 +2231,9 @@ double temp_wall(const Vector &coords, double t) {
   double Thi = 400.0;
   double Tlo = 200.0;
   double Tmean, tRamp, wt;
-  double x = coords(0);
-  double y = coords(1);
-  double z = coords(2);
+  // double x = coords(0);
+  // double y = coords(1);
+  // double z = coords(2);
   double temp;
 
   Tmean = 0.5 * (Thi + Tlo);
@@ -2257,8 +2257,8 @@ double temp_wallBox(const Vector &coords, double t) {
   double Tlo = 120.0;
   double Tmean, tRamp, wt;
   double x = coords(0);
-  double y = coords(1);
-  double z = coords(2);
+  // double y = coords(1);
+  // double z = coords(2);
   double temp;
 
   Tmean = 0.5 * (Thi + Tlo);
@@ -2279,9 +2279,9 @@ double temp_wallBox(const Vector &coords, double t) {
 double temp_inlet(const Vector &coords, double t) {
   double Thi = 400.0;
   double Tlo = 200.0;
-  double x = coords(0);
-  double y = coords(1);
-  double z = coords(2);
+  // double x = coords(0);
+  // double y = coords(1);
+  // double z = coords(2);
   double temp;
   temp = Tlo + (y + 0.5) * (Thi - Tlo);
   return temp;
