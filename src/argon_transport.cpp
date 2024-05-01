@@ -1152,7 +1152,7 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::computeMixtureAverageDiffusivity(co
 */
 
 MFEM_HOST_DEVICE void ArgonMixtureTransport::computeMixtureAverageDiffusivity(const double *state, const double *Efield,
-                                                             double *diffusivity) {
+                                                                              double *diffusivity) {
   // double transportBuffer[FluxTrns::NUM_FLUX_TRANS];
   // for (int p = 0; p < FluxTrns::NUM_FLUX_TRANS; p++) transportBuffer[p] = 0.0;
 
