@@ -78,7 +78,6 @@ Averaging::Averaging(AveragingOptions &opts, std::string output_name) {
 
   enable_mean_continuation_ = opts.enable_mean_continuation_;
   zero_variances_ = opts.zero_variances_;
-  
 }
 
 Averaging::~Averaging() {
@@ -203,6 +202,7 @@ void Averaging::addSample(const int &iter, GasMixture *mixture) {
 
   assert(avg_families_.size() >= 1);
 
+  /*
   if (!enable_mean_continuation_) {
     ns_mean_ = 0;
     enable_mean_continuation_ = true;
@@ -212,29 +212,30 @@ void Averaging::addSample(const int &iter, GasMixture *mixture) {
     ns_vari_ = 0;
     zero_variances_ = false;
   }
-  
+  */
+
   if (iter % sample_interval_ == 0 && iter >= step_start_mean_) {
     if (iter == step_start_mean_ && rank0_) cout << "Starting mean calculation at iter " << iter << endl;
 
     if (ns_mean_ == 0) {
       for (size_t ifam = 0; ifam < avg_families_.size(); ifam++) {
-        if(avg_families_[ifam].mean_fcn_ != nullptr) {	
+        if (avg_families_[ifam].mean_fcn_ != nullptr) {
           *avg_families_[ifam].mean_fcn_ = 0.0;
-	}
+        }
       }
     }
 
     // If we got here, then either this is our first time averaging
     // or the variances have been restarted.  Either way, valid to
-    // set variances to zero.    
+    // set variances to zero.
     if (ns_vari_ == 0) {
       for (size_t ifam = 0; ifam < avg_families_.size(); ifam++) {
-        if(avg_families_[ifam].vari_fcn_ != nullptr) {	
+        if (avg_families_[ifam].vari_fcn_ != nullptr) {
           *avg_families_[ifam].vari_fcn_ = 0.0;
-	}
+        }
       }
     }
-    
+
     if (mixture != nullptr) {
       addSampleInternal(mixture);
     } else {
@@ -275,9 +276,11 @@ void Averaging::addSampleInternal() {
     ParGridFunction *vari = fam.vari_fcn_;
 
     const double *d_inst = inst->Read();
-    double *d_mean = mean->ReadWrite();    
+    double *d_mean = mean->ReadWrite();
     double *d_vari = nullptr;
-    if(vari != nullptr) { d_vari = vari->ReadWrite(); }
+    if (vari != nullptr) {
+      d_vari = vari->ReadWrite();
+    }
 
     // Extract size information for use on device
     const int dof = mean->ParFESpace()->GetNDofs();  // dofs per scalar field
@@ -285,16 +288,16 @@ void Averaging::addSampleInternal() {
 
     int d_vari_start;
     int d_vari_components;
-    if(vari != nullptr) {
+    if (vari != nullptr) {
       d_vari_start = fam.vari_start_index_;
-      d_vari_components = fam.vari_components_;      
+      d_vari_components = fam.vari_components_;
     }
 
     // Extract sample size information for use on device
     double d_ns_mean = (double)ns_mean_;
     double d_ns_vari = 0;
     if (vari != nullptr) {
-      d_ns_vari = (double)ns_vari_;      
+      d_ns_vari = (double)ns_vari_;
     }
 
     // "Loop" over all dofs and update statistics
@@ -336,11 +339,11 @@ void Averaging::addSampleInternal() {
             delta_j = uinst_j - umean_j;
 
             val = d_vari[n + vari_index * dof];
-            d_vari[n + vari_index * dof] = (val * d_ns_vari + delta_i * delta_j) / (d_ns_vari + 1);	  	    	    
+            d_vari[n + vari_index * dof] = (val * d_ns_vari + delta_i * delta_j) / (d_ns_vari + 1);
             vari_index++;
           }
         }
-      }  // end variance      
+      }  // end variance
     });
   }
 }

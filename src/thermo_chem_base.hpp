@@ -126,9 +126,9 @@ class ThermoChemModelBase {
 
   /**
    * @brief Hook to let averaging register fields and restart fields with the IODataOrganizer.
-   */  
-  virtual void initializeStats(Averaging &average, IODataOrganizer &io) {}
-  
+   */
+  virtual void initializeStats(Averaging &average, IODataOrganizer &io, bool continuation) {}
+
   /**
    * @brief Header strings for screen dump
    *

@@ -243,7 +243,7 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
   }
 
   tpsP_->getInput("loMach/calperfect/numerical-integ", numerical_integ_, true);
-  
+
   //-----------------------------------------------------
   // 2) Set the initial condition
   //-----------------------------------------------------
@@ -262,21 +262,21 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
   // which is read later.
 
   tpsP_->getInput("loMach/calperfect/ic", ic_string_, std::string(""));
-  
+
   // set IC if we have one at this point
   if (!ic_string_.empty()) {
     if (ic_string_ == "rt3D") {
-      if(rank0_) std::cout << "Setting rt3D IC..." << std::endl;
+      if (rank0_) std::cout << "Setting rt3D IC..." << std::endl;
       FunctionCoefficient t_excoeff(temp_rt3d);
       t_excoeff.SetTime(0.0);
-      Tn_gf_.ProjectCoefficient(t_excoeff);      
+      Tn_gf_.ProjectCoefficient(t_excoeff);
     }
   } else {
     ConstantCoefficient t_ic_coef;
     t_ic_coef.constant = T_ic_;
-    Tn_gf_.ProjectCoefficient(t_ic_coef);    
+    Tn_gf_.ProjectCoefficient(t_ic_coef);
   }
-  
+
   Tn_gf_.GetTrueDofs(Tn_);
   Tnm1_gf_.SetFromTrueDofs(Tn_);
   Tnm2_gf_.SetFromTrueDofs(Tn_);
@@ -747,19 +747,16 @@ void CaloricallyPerfectThermoChem::initializeViz(ParaViewDataCollection &pvdc) {
   pvdc.RegisterField("Qt", &Qt_gf_);
 }
 
-void CaloricallyPerfectThermoChem::initializeStats(Averaging &average, IODataOrganizer &io) {
-  
+void CaloricallyPerfectThermoChem::initializeStats(Averaging &average, IODataOrganizer &io, bool continuation) {
   if (average.ComputeMean()) {
-
     // fields for averaging
     average.registerField(std::string("temperature"), &Tn_gf_, false, 0, 1);
 
     // io init
-    io.registerIOFamily("Time-averaged temperature", "/meanTemp", average.GetMeanField(std::string("temperature")), false, true, sfec_);
+    io.registerIOFamily("Time-averaged temperature", "/meanTemp", average.GetMeanField(std::string("temperature")),
+                        false, continuation, sfec_);
     io.registerIOVar("/meanTemp", "<T>", 0), true;
-
   }
-  
 }
 
 /**
@@ -1463,17 +1460,17 @@ double temp_rt3d(const Vector &x, double t) {
   double yInt, dy, wt;
   double temp, dT;
   double Tlo = 100.0;
-  double Thi = 1500.0;  
+  double Thi = 1500.0;
 
   yInt = std::cos(twoPi * x[0]) + std::cos(twoPi * x[2]);
   yInt *= CC;
   yInt += 4.0;
-  
+
   dy = x[1] - yInt;
   dT = Thi - Tlo;
 
-  wt = 0.5 * (tanh(-dy/yWidth) + 1.0);
-  temp = Tlo + wt*dT;
+  wt = 0.5 * (tanh(-dy / yWidth) + 1.0);
+  temp = Tlo + wt * dT;
 
   return temp;
 }

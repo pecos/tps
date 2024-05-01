@@ -1021,7 +1021,7 @@ void Tomboulides::initializeIO(IODataOrganizer &io) const {
   if (axisym_) {
     io.registerIOFamily("Velocity azimuthal", "/swirl", utheta_gf_, true, true, pfec_);
     io.registerIOVar("/swirl", "swirl", 0);
-  }  
+  }
 }
 
 void Tomboulides::initializeViz(mfem::ParaViewDataCollection &pvdc) const {
@@ -1029,29 +1029,29 @@ void Tomboulides::initializeViz(mfem::ParaViewDataCollection &pvdc) const {
   pvdc.RegisterField("pressure", p_gf_);
   if (axisym_) {
     pvdc.RegisterField("swirl", utheta_gf_);
-  }  
+  }
 }
 
-void Tomboulides::initializeStats(Averaging &average, IODataOrganizer &io) const {
-  
+void Tomboulides::initializeStats(Averaging &average, IODataOrganizer &io, bool continuation) const {
   if (average.ComputeMean()) {
-
     // fields for averaging
     average.registerField(std::string("velocity"), u_curr_gf_, true, 0, nvel_);
-    average.registerField(std::string("pressure"), p_gf_, false, 0, 1);  
+    average.registerField(std::string("pressure"), p_gf_, false, 0, 1);
 
     // io init
-    io.registerIOFamily("Time-averaged velocity", "/meanVel", average.GetMeanField(std::string("velocity")), false, true, vfec_);
+    io.registerIOFamily("Time-averaged velocity", "/meanVel", average.GetMeanField(std::string("velocity")), false,
+                        continuation, vfec_);
     io.registerIOVar("/meanVel", "<u>", 0, true);
     if (dim_ >= 2) io.registerIOVar("/meanVel", "<v>", 1, true);
     if (dim_ == 3) io.registerIOVar("/meanVel", "<w>", 2, true);
-    
-    io.registerIOFamily("Time-averaged pressure", "/meanPres", average.GetMeanField(std::string("pressure")), false, true, pfec_);
+
+    io.registerIOFamily("Time-averaged pressure", "/meanPres", average.GetMeanField(std::string("pressure")), false,
+                        continuation, pfec_);
     io.registerIOVar("/meanPres", "<P>", 0), true;
 
     // rms
-    io.registerIOFamily("RMS velocity fluctuation", "/rmsData",
-			average.GetVariField(std::string("velocity")), false, true,vfec_);
+    io.registerIOFamily("RMS velocity fluctuation", "/rmsData", average.GetVariField(std::string("velocity")), false,
+                        continuation, vfec_);
     if (nvel_ == 3) {
       io.registerIOVar("/rmsData", "uu", 0);
       io.registerIOVar("/rmsData", "vv", 1);
@@ -1067,9 +1067,7 @@ void Tomboulides::initializeStats(Averaging &average, IODataOrganizer &io) const
       // only nvel = 2 or 3 supported
       assert(false);
     }
-		       
   }
-  
 }
 
 void Tomboulides::step() {

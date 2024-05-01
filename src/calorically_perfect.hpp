@@ -43,9 +43,9 @@ class Tps;
 
 #include <iostream>
 
+#include "averaging.hpp"
 #include "dirichlet_bc_helper.hpp"
 #include "io.hpp"
-#include "averaging.hpp"
 #include "thermo_chem_base.hpp"
 #include "tps_mfem_wrap.hpp"
 
@@ -72,7 +72,7 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   double time_;
 
   std::string ic_string_;
-  
+
   // Flags
   bool rank0_;                      /**< true if this is rank 0 */
   bool partial_assembly_ = false;   /**< Enable/disable partial assembly of forms. */
@@ -218,7 +218,7 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   void step() final;
   void initializeIO(IODataOrganizer &io) final;
   void initializeViz(ParaViewDataCollection &pvdc) final;
-  void initializeStats(Averaging &average, IODataOrganizer &io) final;
+  void initializeStats(Averaging &average, IODataOrganizer &io, bool continuation) final;
 
   void screenHeader(std::vector<std::string> &header) const final;
   void screenValues(std::vector<double> &values) final;

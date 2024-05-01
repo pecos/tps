@@ -91,8 +91,8 @@ class FlowBase {
 
   virtual void initializeIO(IODataOrganizer &io) const {}
   virtual void initializeViz(mfem::ParaViewDataCollection &pvdc) const {}
-  virtual void initializeStats(Averaging &average, IODataOrganizer &io) const {}
-  
+  virtual void initializeStats(Averaging &average, IODataOrganizer &io, bool continuation) const {}
+
   /**
    * @brief Header strings for screen dump
    *
