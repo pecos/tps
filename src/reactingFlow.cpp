@@ -1431,8 +1431,8 @@ void ReactingFlow::speciesProduction() {
   const double *dataY = Yn_.HostRead();
   double *dataProd = prodY_.HostWrite();
 
-  const int nEq = dim_ + 2 + nActiveSpecies_;
-  Vector state(nEq);
+  // const int nEq = dim_ + 2 + nActiveSpecies_;
+  Vector state(gpudata::MAXEQUATIONS);
   state = 0.0;
 
   // Vectors used in computing chemical sources at each point
@@ -1681,8 +1681,8 @@ void ReactingFlow::updateMixture() {
     double *d_Rho = rn_.HostReadWrite();
     double *d_Cp = CpY_.HostReadWrite();
 
-    int nEq = dim_ + 2 + nActiveSpecies_;
-    Vector state(nEq);
+    // int nEq = dim_ + 2 + nActiveSpecies_;
+    Vector state(gpudata::MAXEQUATIONS);
     state = 0.0;
 
     Vector n_sp;
@@ -1780,7 +1780,7 @@ void ReactingFlow::updateDiffusivity() {
       double Efield[gpudata::MAXDIM];
       for (int v = 0; v < dim_; v++) Efield[v] = 0.0;
 
-      int nEq = dim_ + 2 + nActiveSpecies_;  // last Yn not included, i guess...
+      // int nEq = dim_ + 2 + nActiveSpecies_;  // last Yn not included, i guess...
       double state[gpudata::MAXEQUATIONS];
       double conservedState[gpudata::MAXEQUATIONS];
       // double diffSp[nSpecies_];
@@ -1809,7 +1809,7 @@ void ReactingFlow::updateDiffusivity() {
   {
     double *dataVisc = visc_.HostReadWrite();
     for (int i = 0; i < sDofInt_; i++) {
-      int nEq = dim_ + 2 + nActiveSpecies_;
+      // int nEq = dim_ + 2 + nActiveSpecies_;
       double state[gpudata::MAXEQUATIONS];
       double conservedState[gpudata::MAXEQUATIONS];
       double visc[2];
@@ -1835,7 +1835,7 @@ void ReactingFlow::updateDiffusivity() {
   {
     double *dataKappa = kappa_.HostReadWrite();
     for (int i = 0; i < sDofInt_; i++) {
-      int nEq = dim_ + 2 + nActiveSpecies_;
+      // int nEq = dim_ + 2 + nActiveSpecies_;
       double state[gpudata::MAXEQUATIONS];
       double conservedState[gpudata::MAXEQUATIONS];
       double kappa[2];
