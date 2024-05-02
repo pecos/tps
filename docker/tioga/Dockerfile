@@ -240,6 +240,9 @@ RUN ldconfig
 RUN echo /usr/local/cuda/lib64 > /etc/ld.so.conf.d/cuda.conf
 RUN ldconfig
 
+# include git sha in motd
+COPY motd.sh /etc/profile.d/motd.sh
+
 COPY extras/entry.sh /entry.sh
 RUN chmod a+rx /entry.sh
 ENTRYPOINT [ "/entry.sh" ]
