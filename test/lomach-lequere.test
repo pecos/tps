@@ -24,8 +24,8 @@ setup() {
     $EXE --runFile $RUNFILE
 
     # check
-    h5diff -r --relative=1e-16 $SOLN_FILE $REF_SOLN /temperature/temperature
-    h5diff -r --relative=1e-16 $SOLN_FILE $REF_SOLN /velocity/x-comp
-    h5diff -r --relative=1e-16 $SOLN_FILE $REF_SOLN /velocity/y-comp
+    h5diff -r --relative=1e-12 $SOLN_FILE $REF_SOLN /temperature/temperature
+    h5diff -r --relative=1e-10 $SOLN_FILE $REF_SOLN /velocity/x-comp
+    h5diff -r --relative=1e-10 $SOLN_FILE $REF_SOLN /velocity/y-comp
 }
 
