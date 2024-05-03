@@ -1053,16 +1053,16 @@ void Tomboulides::initializeStats(Averaging &average, IODataOrganizer &io, bool 
     io.registerIOFamily("RMS velocity fluctuation", "/rmsData", average.GetVariField(std::string("velocity")), false,
                         continuation, vfec_);
     if (nvel_ == 3) {
-      io.registerIOVar("/rmsData", "uu", 0);
-      io.registerIOVar("/rmsData", "vv", 1);
-      io.registerIOVar("/rmsData", "ww", 2);
-      io.registerIOVar("/rmsData", "uv", 3);
-      io.registerIOVar("/rmsData", "uw", 4);
-      io.registerIOVar("/rmsData", "vw", 5);
+      io.registerIOVar("/rmsData", "uu", 0, true);
+      io.registerIOVar("/rmsData", "vv", 1, true);
+      io.registerIOVar("/rmsData", "ww", 2, true);
+      io.registerIOVar("/rmsData", "uv", 3, true);
+      io.registerIOVar("/rmsData", "uw", 4, true);
+      io.registerIOVar("/rmsData", "vw", 5, true);
     } else if (nvel_ == 2) {
-      io.registerIOVar("/rmsData", "uu", 0);
-      io.registerIOVar("/rmsData", "vv", 1);
-      io.registerIOVar("/rmsData", "uv", 2);
+      io.registerIOVar("/rmsData", "uu", 0, true);
+      io.registerIOVar("/rmsData", "vv", 1, true);
+      io.registerIOVar("/rmsData", "uv", 2, true);
     } else {
       // only nvel = 2 or 3 supported
       assert(false);
