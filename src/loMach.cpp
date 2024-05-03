@@ -425,11 +425,7 @@ void LoMachSolver::solveStep() {
   }
 
   // averages
-  if (avg_opts_->sample_interval_ != 0) {
-    if (iter % avg_opts_->sample_interval_ == 0 && iter != 0) {
-      average_->addSample(iter, nullptr);
-    }
-  }
+  average_->addSample(iter);
 
   // restart files
   if (iter % loMach_opts_.output_frequency_ == 0 && iter != 0) {
