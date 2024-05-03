@@ -770,7 +770,7 @@ void CaloricallyPerfectThermoChem::initializeStats(Averaging &average, IODataOrg
     // io init
     io.registerIOFamily("Time-averaged temperature", "/meanTemp", average.GetMeanField(std::string("temperature")),
                         false, continuation, sfec_);
-    io.registerIOVar("/meanTemp", "<T>", 0);
+    io.registerIOVar("/meanTemp", "<T>", 0, true);
   }
 }
 

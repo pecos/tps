@@ -1070,7 +1070,7 @@ void Tomboulides::initializeStats(Averaging &average, IODataOrganizer &io, bool 
 
     io.registerIOFamily("Time-averaged pressure", "/meanPres", average.GetMeanField(std::string("pressure")), false,
                         continuation, pfec_);
-    io.registerIOVar("/meanPres", "<P>", 0), true;
+    io.registerIOVar("/meanPres", "<P>", 0, true);
 
     // rms
     io.registerIOFamily("RMS velocity fluctuation", "/rmsData", average.GetVariField(std::string("velocity")), false,
@@ -1703,7 +1703,7 @@ void vel_tgv2d_uniform(const Vector &x, double t, Vector &u) {
   const double PI = 3.14159265359;
   double twoPi = 2.0 * PI;
 
-  u(0) = 1.0;
+  u(0) = u0;
   u(1) = 0.0;
 
   u(0) += +F * std::sin(twoPi * x[0]) * std::cos(twoPi * x[1]);
