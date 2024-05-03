@@ -667,7 +667,7 @@ void LoMachSolver::setTimestep() {
       temporal_coeff_.dt = dt_initial;
     }
 
-    std::cout << "dt from setTimestep: " << temporal_coeff_.dt << " max_speed: " << max_speed << endl;
+    if (rank0_) std::cout << "dt from setTimestep: " << temporal_coeff_.dt << " max_speed: " << max_speed << endl;
   }
 }
 

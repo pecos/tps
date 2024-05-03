@@ -49,6 +49,7 @@ using namespace mfem::common;
 
 /// forward declarations
 double temp_rt3d(const Vector &x, double t);
+double temp_channel(const Vector &x, double t);
 
 MFEM_HOST_DEVICE double Sutherland(const double T, const double mu_star, const double T_star, const double S_star) {
   const double T_rat = T / T_star;
@@ -243,6 +244,7 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
   }
 
   tpsP_->getInput("loMach/calperfect/numerical-integ", numerical_integ_, true);
+  tpsP_->getInput("loMach/calperfect/over-integ", over_integrate_, false);
 
   //-----------------------------------------------------
   // 2) Set the initial condition
@@ -268,6 +270,11 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
     if (ic_string_ == "rt3D") {
       if (rank0_) std::cout << "Setting rt3D IC..." << std::endl;
       FunctionCoefficient t_excoeff(temp_rt3d);
+      t_excoeff.SetTime(0.0);
+      Tn_gf_.ProjectCoefficient(t_excoeff);
+    } else if (ic_string_ == "channel") {
+      if (rank0_) std::cout << "Setting channel IC..." << std::endl;
+      FunctionCoefficient t_excoeff(temp_channel);
       t_excoeff.SetTime(0.0);
       Tn_gf_.ProjectCoefficient(t_excoeff);
     }
@@ -357,7 +364,7 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
 
   // Wall BCs
   {
-    std::cout << "There are " << pmesh_->bdr_attributes.Max() << " boundary attributes!" << std::endl;
+    if (rank0_) std::cout << "There are " << pmesh_->bdr_attributes.Max() << " boundary attributes" << std::endl;
     Array<int> attr_wall(pmesh_->bdr_attributes.Max());
     attr_wall = 0;
 
@@ -370,7 +377,7 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
       tpsP_->getRequiredInput((basepath + "/type").c_str(), type);
 
       if (type == "viscous_isothermal") {
-        std::cout << "Adding patch = " << patch << " to isothermal wall list!" << std::endl;
+        if (rank0_) std::cout << "Adding patch = " << patch << " to isothermal wall list" << std::endl;
 
         attr_wall = 0;
         attr_wall[patch - 1] = 1;
@@ -405,9 +412,17 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   // unsteady: p+p [+p] = 2p [3p]
   // convection: p+p+(p-1) [+p] = 3p-1 [4p-1]
   // diffusion: (p-1)+(p-1) [+p] = 2p-2 [3p-2]
-  const IntegrationRule &ir_i = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 2 * order_ + 1);
-  const IntegrationRule &ir_nli = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 4 * order_);
-  const IntegrationRule &ir_di = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 3 * order_ - 1);
+  int nir_i = 2 * order_ - 1;
+  int nir_nli = 2 * order_ - 1;
+  int nir_di = 2 * order_ - 1;
+  if (over_integrate_) {
+    nir_i = 3 * order_ + 1;
+    nir_nli = 4 * order_;
+    nir_di = 3 * order_ - 1;
+  }
+  const IntegrationRule &ir_i = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), nir_i);
+  const IntegrationRule &ir_nli = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), nir_nli);
+  const IntegrationRule &ir_di = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), nir_di);
   if (rank0_) std::cout << "Integration rules set" << endl;
 
   // coefficients for operators
@@ -1471,6 +1486,18 @@ double temp_rt3d(const Vector &x, double t) {
 
   wt = 0.5 * (tanh(-dy / yWidth) + 1.0);
   temp = Tlo + wt * dT;
+
+  return temp;
+}
+
+/// Used to set the channel IC
+double temp_channel(const Vector &x, double t) {
+  double Thi = 400.0;
+  double Tlo = 200.0;
+  double temp = 300.0;
+
+  // expects channel height (-1,1)
+  temp = Tlo + (Thi - Tlo) * 0.5 * (x(1) + 1.0);
 
   return temp;
 }
