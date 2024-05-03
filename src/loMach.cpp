@@ -204,6 +204,26 @@ void LoMachSolver::initialize() {
   CFL = loMach_opts_.ts_opts_.cfl_;
   if (verbose) grvy_printf(ginfo, "got CFL...\n");
 
+  //-----------------------------------------------------------
+  // NOTE: Aspects of the ordering below are important.  Beware when
+  // adding to or editing this section.  Specifically, it is expected
+  // that
+  //
+  // 1) initializeSelf methods are called before initializeFrom*
+  // methods (b/c the initializeSelf methods allocate memory and
+  // initializes the interface pointers that are then "communicated"
+  // by the initializeFrom* methods.
+  //
+  // 2) initializeIO and initializeStats are called prior to the
+  // restart file read (b/c initializeIO and initializeStats register
+  // IO variables, which must be done prior to the read)
+  //
+  // 3) the restart files are read prior to the initializeOperators
+  // calls, b/c the initializeOperators methods are allowed to use
+  // information read from the restart files
+  //
+  //-----------------------------------------------------------
+
   // read-in external data if requested in bc setting
   extData_->initializeSelf();
   extData_->setup();
@@ -230,14 +250,9 @@ void LoMachSolver::initialize() {
   flow_->initializeIO(ioData);
   thermo_->initializeIO(ioData);
 
-  // // Initialize statistics
-  // flow_->initializeStats(*average_, ioData);
-  // thermo_->initializeStats(*average_, ioData);
-
   // Initialize statistics
   flow_->initializeStats(*average_, ioData, average_->ContinueMean());
   thermo_->initializeStats(*average_, ioData, average_->ContinueMean());
-
 
   const bool restart_serial =
       (loMach_opts_.io_opts_.restart_serial_read_ || loMach_opts_.io_opts_.restart_serial_write_);
