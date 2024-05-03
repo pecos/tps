@@ -347,7 +347,10 @@ void Averaging::addSampleInternal(GasMixture *mixture) {
 
     const double *d_inst = inst->Read();
     double *d_mean = mean->ReadWrite();
-    double *d_vari = vari->ReadWrite();
+    double *d_vari = nullptr;
+    if (vari != nullptr) {
+      d_vari = vari->ReadWrite();
+    }
 
     // Get mixture class pointer for use on device
     //
@@ -418,7 +421,7 @@ void Averaging::addSampleInternal(GasMixture *mixture) {
 
         // Covariances second (i.e., off-diagonal components, if any)
         for (int i = d_vari_start; i < d_vari_start + d_vari_components - 1; i++) {
-          for (int j = d_vari_start + 1; j < d_vari_start + d_vari_components; j++) {
+          for (int j = i + 1; j < d_vari_start + d_vari_components; j++) {
             val = d_vari[n + vari_index * dof];
             delta_i = (nUp[i] - mean_state[i]);
             delta_j = (nUp[j] - mean_state[j]);
