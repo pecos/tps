@@ -46,7 +46,9 @@ using namespace mfem;
 
 /// forward declarations
 void vel_exact_tgv2d(const Vector &x, double t, Vector &u);
+void vel_tgv2d_uniform(const Vector &x, double t, Vector &u);
 void vel_exact_pipe(const Vector &x, double t, Vector &u);
+void vel_channel(const Vector &x, double t, Vector &u);
 
 static double radius(const Vector &pos) { return pos[0]; }
 FunctionCoefficient radius_coeff(radius);
@@ -386,8 +388,18 @@ void Tomboulides::initializeSelf() {
   // set IC if we have one at this point
   if (!ic_string_.empty()) {
     if (ic_string_ == "tgv2d") {
-      std::cout << "Setting tgv2d IC..." << std::endl;
+      if (rank0_) std::cout << "Setting tgv2d IC..." << std::endl;
       VectorFunctionCoefficient u_excoeff(2, vel_exact_tgv2d);
+      u_excoeff.SetTime(0.0);
+      u_curr_gf_->ProjectCoefficient(u_excoeff);
+    } else if (ic_string_ == "tgv2d_uniform") {
+      if (rank0_) std::cout << "Setting tgv2d+uniform IC..." << std::endl;
+      VectorFunctionCoefficient u_excoeff(2, vel_tgv2d_uniform);
+      u_excoeff.SetTime(0.0);
+      u_curr_gf_->ProjectCoefficient(u_excoeff);
+    } else if (ic_string_ == "channel") {
+      if (rank0_) std::cout << "Setting channel IC..." << std::endl;
+      VectorFunctionCoefficient u_excoeff(3, vel_channel);
       u_excoeff.SetTime(0.0);
       u_curr_gf_->ProjectCoefficient(u_excoeff);
     }
@@ -1671,4 +1683,58 @@ void vel_exact_tgv2d(const Vector &x, double t, Vector &u) {
 void vel_exact_pipe(const Vector &x, double t, Vector &u) {
   u(0) = 0.0;
   u(1) = 2.0 * (1 - x[0] * x[0]);
+}
+
+/// Used to set the velocity IC with TG field and uniform
+void vel_tgv2d_uniform(const Vector &x, double t, Vector &u) {
+  const double u0 = 1.0;
+  const double F = 0.1;
+  const double PI = 3.14159265359;
+  double twoPi = 2.0 * PI;
+
+  u(0) = u0;
+  u(1) = 0.0;
+
+  u(0) += +F * std::sin(twoPi * x[0]) * std::cos(twoPi * x[1]);
+  u(1) += -F * std::cos(twoPi * x[0]) * std::sin(twoPi * x[1]);
+}
+
+/// Used to set the channel IC
+void vel_channel(const Vector &x, double t, Vector &u) {
+  double PI = 3.14159265359;
+  double Lx = 25.0;
+  double Ly = 2.0;
+  double Lz = 9.4;
+  double Umean = 1.0;
+  double uInt = 0.1;
+  int nModes = 4;
+  double uM;
+  double ax, by, cz;
+  double AA, BB, CC;
+  double wall;
+
+  // expects channel height (-1,1)
+  wall = (1.0 - std::pow(x(1), 8.0));
+  u(0) = Umean * wall;
+  u(1) = 0.0;
+  u(2) = 0.0;
+
+  for (int n = 1; n <= nModes; n++) {
+    ax = 4.0 * PI / Lx * (double)n;
+    by = 2.0 * PI / Ly * (double)n;
+    cz = 2.0 * PI / Lz * (double)n;
+
+    AA = 1.0;
+    BB = 1.0;
+    CC = -(AA * ax + BB * by) / cz;
+
+    uM = uInt / (double)n;
+
+    u(0) += uM * AA * cos(ax * (x(0) + (double)(n - 1) * Umean)) * sin(by * x(1)) *
+            sin(cz * (x(2) + 0.5 * (double)(n - 1) * Umean)) * wall;
+    u(1) += uM * BB * sin(ax * (x(0) + (double)(n - 1) * Umean)) * cos(by * x(1)) *
+            sin(cz * (x(2) + 0.5 * (double)(n - 1) * Umean)) * wall;
+    u(2) += uM * CC * sin(ax * (x(0) + (double)(n - 1) * Umean)) * sin(by * x(1)) *
+            cos(cz * (x(2) + 0.5 * (double)(n - 1) * Umean)) * wall;
+  }
 }
