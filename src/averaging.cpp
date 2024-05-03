@@ -122,7 +122,6 @@ void Averaging::registerField(std::string name, const ParGridFunction *field_to_
 
   // and store those fields in an AveragingFamily object that gets appended to the avg_families_ vector
   avg_families_.emplace_back(AveragingFamily(name, field_to_average, mean, vari, vari_start_index, vari_components));
-  std::cout << "Fam size: " << avg_families_.size() << " with addition of " << name << endl;
 }
 
 void Averaging::initializeViz() {
@@ -202,18 +201,6 @@ void Averaging::addSample(const int &iter, GasMixture *mixture) {
 
   assert(avg_families_.size() >= 1);
 
-  /*
-  if (!enable_mean_continuation_) {
-    ns_mean_ = 0;
-    enable_mean_continuation_ = true;
-  }
-
-  if (zero_variances_) {
-    ns_vari_ = 0;
-    zero_variances_ = false;
-  }
-  */
-
   if (iter % sample_interval_ == 0 && iter >= step_start_mean_) {
     if (iter == step_start_mean_ && rank0_) cout << "Starting mean calculation at iter " << iter << endl;
 
@@ -225,10 +212,10 @@ void Averaging::addSample(const int &iter, GasMixture *mixture) {
       }
     }
 
-    // If we got here, then either this is our first time averaging
-    // or the variances have been restarted.  Either way, valid to
-    // set variances to zero.
     if (ns_vari_ == 0) {
+      // If we got here, then either this is our first time averaging
+      // or the variances have been restarted.  Either way, valid to
+      // set variances to zero.
       for (size_t ifam = 0; ifam < avg_families_.size(); ifam++) {
         if (avg_families_[ifam].vari_fcn_ != nullptr) {
           *avg_families_[ifam].vari_fcn_ = 0.0;
@@ -286,19 +273,12 @@ void Averaging::addSampleInternal() {
     const int dof = mean->ParFESpace()->GetNDofs();  // dofs per scalar field
     const int neq = mean->ParFESpace()->GetVDim();   // number of scalar variables in mean field
 
-    int d_vari_start = 0;
-    int d_vari_components = 0;
-    if (vari != nullptr) {
-      d_vari_start = fam.vari_start_index_;
-      d_vari_components = fam.vari_components_;
-    }
+    const int d_vari_start = fam.vari_start_index_;
+    const int d_vari_components = fam.vari_components_;
 
     // Extract sample size information for use on device
     double d_ns_mean = (double)ns_mean_;
-    double d_ns_vari = 0;
-    if (vari != nullptr) {
-      d_ns_vari = (double)ns_vari_;
-    }
+    double d_ns_vari = (double)ns_vari_;
 
     // "Loop" over all dofs and update statistics
     MFEM_FORALL(n, dof, {
