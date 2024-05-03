@@ -286,8 +286,8 @@ void Averaging::addSampleInternal() {
     const int dof = mean->ParFESpace()->GetNDofs();  // dofs per scalar field
     const int neq = mean->ParFESpace()->GetVDim();   // number of scalar variables in mean field
 
-    int d_vari_start;
-    int d_vari_components;
+    int d_vari_start = 0;
+    int d_vari_components = 0;
     if (vari != nullptr) {
       d_vari_start = fam.vari_start_index_;
       d_vari_components = fam.vari_components_;
