@@ -114,6 +114,7 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
     // NOTE: this should default to false as it is generally not safe, but much of the
     // test results rely on it being true
     tps->getInput("loMach/tomboulides/numerical-integ", numerical_integ_, true);
+    tps->getInput("loMach/tomboulides/over-integ", over_integrate_, false);
 
     // Can't use numerical integration with axisymmetric b/c it
     // locates quadrature points on the axis, which can lead to
@@ -632,8 +633,18 @@ void Tomboulides::initializeOperators() {
   // Gauss-Lobatto quad pts correspond to the Gauss-Lobatto nodes.
   // For most terms this will result in an under-integration, but it
   // has the nice consequence that the mass matrix is diagonal.
-  const IntegrationRule &ir_ni_v = gll_rules.Get(vfes_->GetFE(0)->GetGeomType(), 2 * vorder_ - 1);
-  const IntegrationRule &ir_ni_p = gll_rules.Get(pfes_->GetFE(0)->GetGeomType(), 2 * porder_ - 1);
+  int nir_v = 2 * vorder_ - 1;
+  int nir_p = 2 * porder_ - 1;
+  if (over_integrate_) {
+    int nir_iv = 3 * vorder_ + 1;
+    int nir_nliv = 4 * vorder_;
+    int nir_ip = 3 * porder_ + 1;
+    int nir_nlip = 4 * porder_;
+    nir_v = std::max(nir_iv, nir_nliv);
+    nir_p = std::max(nir_ip, nir_nlip);
+  }
+  const IntegrationRule &ir_ni_v = gll_rules.Get(vfes_->GetFE(0)->GetGeomType(), nir_v);
+  const IntegrationRule &ir_ni_p = gll_rules.Get(pfes_->GetFE(0)->GetGeomType(), nir_p);
 
   // Empty array, use where we want operators without BCs
   Array<int> empty;
