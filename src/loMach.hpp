@@ -189,7 +189,7 @@ class LoMachSolver : public TPS::PlasmaSolver {
   int order;
 
   // Timers.
-  StopWatch sw_setup, sw_step;
+  StopWatch sw_setup_, sw_step_, sw_turb_, sw_thermChem_, sw_flow_, sw_press_;
   double tlast_;
 
   // I/O helpers

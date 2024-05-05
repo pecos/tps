@@ -1117,6 +1117,7 @@ void Tomboulides::step() {
 
   // Update the variable coefficient Laplacian to account for change
   // in density
+  sw_press_.Start();
   L_iorho_form_->Update();
   L_iorho_form_->Assemble();
   L_iorho_form_->FormSystemMatrix(pres_ess_tdof_, L_iorho_op_);
@@ -1146,6 +1147,7 @@ void Tomboulides::step() {
   L_iorho_inv_->SetRelTol(pressure_solve_rtol_);
   L_iorho_inv_->SetAbsTol(pressure_solve_atol_);
   L_iorho_inv_->SetMaxIter(pressure_solve_max_iter_);
+  sw_press_.Stop();
 
   // Update density weighted mass
   Array<int> empty;
@@ -1156,6 +1158,7 @@ void Tomboulides::step() {
   Mv_rho_inv_->SetOperator(*Mv_rho_op_);
 
   // Update the Helmholtz operator and inverse
+  sw_helm_.Start();
   Hv_bdfcoeff_.constant = coeff_.bd0 / dt;
   Hv_form_->Update();
   Hv_form_->Assemble();
@@ -1166,6 +1169,7 @@ void Tomboulides::step() {
     // TODO(trevilo): Support partial assembly
     assert(false);
   }
+  sw_helm_.Stop();
 
   //------------------------------------------------------------------------
   // Step 2: Compute vstar / dt (as in eqn 2.3 from Tomboulides)
@@ -1355,6 +1359,7 @@ void Tomboulides::step() {
   resp_vec_.Add(-coeff_.bd0 / dt, u_bdr_vec_);
 
   // Orthogonalize rhs if no Dirichlet BCs on pressure
+  sw_press_.Start();
   if (pres_dbcs_.empty()) {
     Orthogonalize(resp_vec_, pfes_);
   }
@@ -1381,6 +1386,7 @@ void Tomboulides::step() {
     if (rank0_) std::cout << "ERROR: Poisson solve did not converge." << std::endl;
     exit(1);
   }
+  sw_press_.Stop();
 
   // iter_spsolve = SpInv->GetNumIterations();
   // res_spsolve = SpInv->GetFinalNorm();
