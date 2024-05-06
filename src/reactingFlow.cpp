@@ -1797,7 +1797,7 @@ void ReactingFlow::updateDiffusivity() {
       }
 
       mixture_->GetConservativesFromPrimitives(state, conservedState);
-      transport_->computeMixtureAverageDiffusivity(conservedState, Efield, diffSp);
+      transport_->computeMixtureAverageDiffusivity(conservedState, Efield, diffSp, false);
       for (int sp = 0; sp < nSpecies_; sp++) {
         diffSp[sp] = std::max(diffSp[sp], diffY_min);
         dataDiff[i + sp * sDofInt_] = dataRho[i] * diffSp[sp];

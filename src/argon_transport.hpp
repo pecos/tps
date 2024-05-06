@@ -125,9 +125,9 @@ class ArgonMinimalTransport : public MolecularTransport {
   MFEM_HOST_DEVICE double computeThirdOrderElectronThermalConductivity(const double *X_sp, const double debyeLength,
                                                                        const double Te, const double nondimTe);
 
-  virtual void computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield, Vector &diffusivity);
+  virtual void computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield, Vector &diffusivity, bool unused);
   MFEM_HOST_DEVICE virtual void computeMixtureAverageDiffusivity(const double *state, const double *Efield,
-                                                                 double *diffusivity);
+                                                                 double *diffusivity, bool unused);
   MFEM_HOST_DEVICE void GetThermalConductivities(const double *conserved, const double *primitive, double *kappa);
 
   // These are used to compute third-order electron thermal conductivity based on standard Chapman--Enskog method.
@@ -192,9 +192,9 @@ class ArgonMixtureTransport : public ArgonMinimalTransport {
   MFEM_HOST_DEVICE double computeThirdOrderElectronThermalConductivity(const double *X_sp,
                                                                        const collisionInputs &collInputs);
 
-  virtual void computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield, Vector &diffusivity);
+  virtual void computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield, Vector &diffusivity, bool unused);
   MFEM_HOST_DEVICE virtual void computeMixtureAverageDiffusivity(const double *state, const double *Efield,
-                                                                 double *diffusivity);
+                                                                 double *diffusivity, bool unused);
 
   MFEM_HOST_DEVICE void GetThermalConductivities(const double *conserved, const double *primitive, double *kappa);
 };

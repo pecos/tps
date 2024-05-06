@@ -134,9 +134,9 @@ int main (int argc, char *argv[])
 
   Vector Efield(gpudata::MAXDIM);
   for (int v = 0; v < dim; v++) Efield(v) = 0.0;
-  
+
   Vector diffusivity;
-  transport.computeMixtureAverageDiffusivity(conservedState, Efield, diffusivity);
+  transport.computeMixtureAverageDiffusivity(conservedState, Efield, diffusivity, false);
   double Dia = diffusivity(transport.getIonIndex());
   grvy_printf(GRVY_INFO, "\n Ar-Ar+ binary diffusivity : %.8E\n", Dia);
 

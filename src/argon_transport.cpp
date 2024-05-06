@@ -335,10 +335,10 @@ MFEM_HOST_DEVICE double ArgonMinimalTransport::computeThirdOrderElectronThermalC
 }
 
 void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield,
-                                                             Vector &diffusivity) {
+                                                             Vector &diffusivity, bool unused) {
   diffusivity.SetSize(3);
   diffusivity = 0.0;
-  computeMixtureAverageDiffusivity(&state[0], &Efield[0], &diffusivity[0]);
+  computeMixtureAverageDiffusivity(&state[0], &Efield[0], &diffusivity[0], unused);
 
   // Vector primitiveState(num_equation);
   // mixture->GetPrimitivesFromConservatives(state, primitiveState);
@@ -378,7 +378,7 @@ void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state
 }
 
 MFEM_HOST_DEVICE void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const double *state, const double *Efield,
-                                                                              double *diffusivity) {
+                                                                              double *diffusivity, bool unused) {
   double primitiveState[gpudata::MAXEQUATIONS];
   mixture->GetPrimitivesFromConservatives(state, primitiveState);
 
@@ -1098,10 +1098,10 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::GetThermalConductivities(const doub
 }
 
 void ArgonMixtureTransport::computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield,
-                                                             Vector &diffusivity) {
+                                                             Vector &diffusivity, bool unused) {
   diffusivity.SetSize(3);
   diffusivity = 0.0;
-  computeMixtureAverageDiffusivity(&state[0], &Efield[0], &diffusivity[0]);
+  computeMixtureAverageDiffusivity(&state[0], &Efield[0], &diffusivity[0], unused);
 }
 
 /*
@@ -1153,7 +1153,7 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::computeMixtureAverageDiffusivity(co
 */
 
 MFEM_HOST_DEVICE void ArgonMixtureTransport::computeMixtureAverageDiffusivity(const double *state, const double *Efield,
-                                                                              double *diffusivity) {
+                                                                              double *diffusivity, bool unused) {
   // double transportBuffer[FluxTrns::NUM_FLUX_TRANS];
   // for (int p = 0; p < FluxTrns::NUM_FLUX_TRANS; p++) transportBuffer[p] = 0.0;
 
