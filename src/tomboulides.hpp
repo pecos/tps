@@ -115,6 +115,8 @@ class Tomboulides final : public FlowBase {
   // reference here.
   const temporalSchemeCoefficients &coeff_;
 
+  StopWatch sw_press_, sw_helm_;
+
   std::string ic_string_;
 
   // Object used to build forcing
@@ -377,6 +379,10 @@ class Tomboulides final : public FlowBase {
 
   /// Evaluate error (only when exact solution is known)
   double computeL2Error() const final;
+
+  /// Get timings
+  double getPressureSolveTimer() { return sw_press_.RealTime(); }
+  double getHelmholtzSolveTimer() { return sw_helm_.RealTime(); }
 
   /// Add a Dirichlet boundary condition to the velocity field
   void addVelDirichletBC(const mfem::Vector &u, mfem::Array<int> &attr);

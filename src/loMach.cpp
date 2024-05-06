@@ -102,6 +102,8 @@ void LoMachSolver::initialize() {
   bool verbose = rank0_;
   if (verbose) grvy_printf(ginfo, "Initializing loMach solver.\n");
 
+  sw_setup_.Start();
+
   // Stash the order, just for convenience
   order = loMach_opts_.order;
 
@@ -289,6 +291,8 @@ void LoMachSolver::initialize() {
   sponge_->initializeViz(*pvdc_);
   extData_->initializeViz(*pvdc_);
   average_->initializeViz();
+
+  sw_setup_.Stop();
 }
 
 void LoMachSolver::UpdateTimestepHistory(double dt) {
@@ -374,19 +378,25 @@ void LoMachSolver::solveBegin() {
 }
 
 void LoMachSolver::solveStep() {
-  sw_step.Start();
+  sw_step_.Start();
 
   if (loMach_opts_.ts_opts_.integrator_type_ == LoMachTemporalOptions::CURL_CURL) {
     SetTimeIntegrationCoefficients(iter - iter_start_);
     extData_->step();
+    sw_thermChem_.Start();
     thermo_->step();
+    sw_thermChem_.Stop();
+    sw_flow_.Start();
     flow_->step();
+    sw_flow_.Stop();
+    sw_turb_.Start();
     turbModel_->step();
+    sw_turb_.Stop();
   } else {
     if (rank0_) std::cout << "Time integration not updated." << endl;
     exit(1);
   }
-  sw_step.Stop();
+  sw_step_.Stop();
 
   UpdateTimestepHistory(temporal_coeff_.dt);
   temporal_coeff_.time += temporal_coeff_.dt;
@@ -394,8 +404,8 @@ void LoMachSolver::solveStep() {
   iter++;
 
   if ((iter % loMach_opts_.timing_frequency_) == 0) {
-    double time_per_step = (sw_step.RealTime() - tlast_) / loMach_opts_.timing_frequency_;
-    tlast_ = sw_step.RealTime();
+    double time_per_step = (sw_step_.RealTime() - tlast_) / loMach_opts_.timing_frequency_;
+    tlast_ = sw_step_.RealTime();
 
     double max_time_per_step = 0.0;
     MPI_Reduce(&time_per_step, &max_time_per_step, 1, MPI_DOUBLE, MPI_MAX, 0, groupsMPI->getTPSCommWorld());
@@ -477,6 +487,9 @@ void LoMachSolver::solveEnd() {
   average_->writeViz(iter, temporal_coeff_.time, avg_opts_->save_mean_history_);
   MPI_Barrier(groupsMPI->getTPSCommWorld());
   if (rank0_ == true) std::cout << " ...complete!" << endl;
+
+  // timing information
+  PrintTimingData();
 }
 
 void LoMachSolver::solve() {
@@ -739,24 +752,6 @@ void LoMachSolver::SetTimeIntegrationCoefficients(int step) {
   }
 }
 
-void LoMachSolver::PrintTimingData() {
-  double my_rt[2], rt_max[2];
-
-  my_rt[0] = sw_setup.RealTime();
-  my_rt[1] = sw_step.RealTime();
-
-  MPI_Reduce(my_rt, rt_max, 2, MPI_DOUBLE, MPI_MAX, 0, pmesh_->GetComm());
-
-  if (pmesh_->GetMyRank() == 0) {
-    mfem::out << std::setw(10) << "SETUP" << std::setw(10) << "STEP"
-              << "\n";
-
-    mfem::out << std::setprecision(3) << std::setw(10) << my_rt[0] << std::setw(10) << my_rt[1] << "\n";
-
-    mfem::out << std::setprecision(8);
-  }
-}
-
 // query solver-specific runtime controls
 void LoMachSolver::parseSolverOptions() {
   // if (verbose) grvy_printf(ginfo, "parsing solver options...\n");
@@ -821,5 +816,40 @@ void LoMachSolver::parseSolverOptions() {
   // add all models here which require wall dist, eg: SA, k-e, etc...
   if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::ALGEBRAIC_RANS) {
     loMach_opts_.compute_wallDistance = true;
+  }
+}
+
+void LoMachSolver::PrintTimingData() {
+  double my_rt[7], rt_max[7];
+  my_rt[0] = sw_setup_.RealTime();
+  my_rt[1] = sw_step_.RealTime();
+  my_rt[2] = sw_turb_.RealTime();
+  my_rt[3] = sw_thermChem_.RealTime();
+  my_rt[4] = sw_flow_.RealTime();
+  my_rt[5] = flow_->getPressureSolveTimer();
+  my_rt[6] = flow_->getHelmholtzSolveTimer();
+
+  double dIters;
+  dIters = (double)(loMach_opts_.max_steps_ - iter_start_);
+
+  MPI_Reduce(my_rt, rt_max, 7, MPI_DOUBLE, MPI_MAX, 0, pmesh_->GetComm());
+
+  if (rank0_) {
+    mfem::out << "\n";
+    mfem::out << "TIMING REPORT. (sec/step and fraction of step) \n";
+    mfem::out << std::setw(10) << "SETUP" << std::setw(10) << "STEP" << std::setw(15) << "TURB-MODEL" << std::setw(15)
+              << "THERM-CHEM" << std::setw(10) << "FLOW:" << std::setw(12) << "PSOLVE" << std::setw(12) << "HSOLVE"
+              << "\n";
+
+    mfem::out << std::setprecision(5) << std::setw(10) << my_rt[0] / dIters << std::setw(10) << my_rt[1] / dIters
+              << std::setw(15) << my_rt[2] / dIters << std::setw(15) << my_rt[3] / dIters << std::setw(10)
+              << my_rt[4] / dIters << std::setw(12) << my_rt[5] / dIters << std::setw(12) << my_rt[6] / dIters << "\n";
+
+    mfem::out << std::setprecision(5) << std::setw(10) << " " << std::setw(10) << my_rt[1] / my_rt[1] << std::setw(15)
+              << my_rt[2] / my_rt[1] << std::setw(15) << my_rt[3] / my_rt[1] << std::setw(10) << my_rt[4] / my_rt[1]
+              << std::setw(12) << my_rt[5] / my_rt[1] << std::setw(12) << my_rt[6] / my_rt[1] << "\n";
+
+    mfem::out << std::setprecision(8);
+    mfem::out << "\n";
   }
 }

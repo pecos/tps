@@ -134,6 +134,10 @@ class FlowBase {
    * cases where we have an exact solution.
    */
   virtual double computeL2Error() const { return -1.0; }
+
+  /// Get timing
+  virtual double getPressureSolveTimer() { return -1.0; }
+  virtual double getHelmholtzSolveTimer() { return -1.0; }
 };
 
 class ZeroFlow final : public FlowBase {
