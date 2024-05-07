@@ -441,6 +441,7 @@ ReactingFlow::~ReactingFlow() {
   delete MsRhoCp_form_;
   delete Ms_form_;
   delete At_form_;
+  delete G_form_;
   delete rhou_coeff_;
   delete rhon_next_coeff_;
   delete un_next_coeff_;
@@ -470,6 +471,8 @@ ReactingFlow::~ReactingFlow() {
   delete chemistry_;
 
   // allocated in initializeSelf
+  delete vfes_;
+  delete vfec_;
   delete sfes_;
   delete sfec_;
   delete yfes_;
@@ -493,6 +496,9 @@ void ReactingFlow::initializeSelf() {
 
   yfec_ = new H1_FECollection(order_, nSpecies_);
   yfes_ = new ParFiniteElementSpace(pmesh_, yfec_, nSpecies_);
+
+  vfec_ = new H1_FECollection(order_, dim_);
+  vfes_ = new ParFiniteElementSpace(pmesh_, vfec_);
 
   // Check if fully periodic mesh
   if (!(pmesh_->bdr_attributes.Size() == 0)) {
@@ -611,7 +617,11 @@ void ReactingFlow::initializeSelf() {
   prodY_gf_.SetSpace(sfes_);
   prodY_gf_ = 0.0;
 
-  tmpR0_.SetSize(dim_ * sDofInt_);
+  tmpR1_.SetSize(dim_ * sDofInt_);
+  tmpR1a_.SetSize(dim_ * sDofInt_);
+  tmpR1b_.SetSize(dim_ * sDofInt_);
+  tmpR1c_.SetSize(dim_ * sDofInt_);
+
   tmpR0_.SetSize(sDofInt_);
   tmpR0a_.SetSize(sDofInt_);
   tmpR0b_.SetSize(sDofInt_);
@@ -630,7 +640,7 @@ void ReactingFlow::initializeSelf() {
   CpMix_gf_.SetSpace(sfes_);
   CpMix_gf_ = 1000.6;
 
-  SDFT_.SetSize(sDofInt_);
+  crossDiff_.SetSize(sDofInt_);
 
   Mmix_gf_.SetSpace(sfes_);
   Rmix_gf_.SetSpace(sfes_);
@@ -1118,6 +1128,20 @@ void ReactingFlow::initializeOperators() {
   LY_form_->Assemble();
   LY_form_->FormSystemMatrix(empty, LY_);
 
+  // gradient of scalar
+  G_form_ = new ParMixedBilinearForm(sfes_, vfes_);
+  auto *g_mblfi = new GradientIntegrator();
+  if (numerical_integ_) {
+    g_mblfi->SetIntRule(&ir_i);
+  }
+  G_form_->AddDomainIntegrator(g_mblfi);
+  if (partial_assembly_) {
+    G_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+  }
+  G_form_->Assemble();
+  G_form_->FormRectangularSystemMatrix(empty, empty, G_);
+  if (rank0_) std::cout << "Gradient operator set" << endl;
+
   // copy IC to other temp containers
   Tn_gf_.GetTrueDofs(Tn_);
   Tn_next_gf_.SetFromTrueDofs(Tn_);
@@ -1194,7 +1218,7 @@ void ReactingFlow::step() {
   heatOfFormation();
 
   // TODO(swh): this is a bad name
-  diffusionForTemperature();
+  crossDiffusion();
 
   // advance temperature
   temperatureStep();
@@ -1248,8 +1272,8 @@ void ReactingFlow::temperatureStep() {
   // heat of formation
   Ms_->AddMult(hw_, resT_);
 
-  // species diffusion term, already in int-weak form
-  resT_.Add(1.0, SDFT_);
+  // species-temp diffusion term, already in int-weak form
+  resT_.Add(1.0, crossDiff_);
 
   // Add natural boundary terms here later
   // NB: adiabatic natural BC is handled, but don't have ability to impose non-zero heat flux yet
@@ -1457,7 +1481,8 @@ void ReactingFlow::heatOfFormation() {
   }
 }
 
-void ReactingFlow::diffusionForTemperature() {
+void ReactingFlow::crossDiffusion() {
+  /*
   Array<int> empty;
   SDFT_ = 0.0;
   for (int i = 0; i < nSpecies_; i++) {
@@ -1473,6 +1498,24 @@ void ReactingFlow::diffusionForTemperature() {
   Rmix_gf_.GetTrueDofs(tmpR0b_);
   SDFT_ *= thermo_pressure_;
   SDFT_ /= tmpR0b_;
+  SDFT_.Add(1.0, tmpR0a_);
+  */
+
+  G_->Mult(Tn_, tmpR1_);
+  MsInv_->Mult(tmpR1_, tmpR1a_);
+  tmpR1c_ = 0.0;
+  for (int i = 0; i < nSpecies_; i++) {
+    setScalarFromVector(Yn_next_, i, &tmpR0a_);
+    setScalarFromVector(diffY_, i, &tmpR0b_);
+    setScalarFromVector(CpY_, i, &tmpR0c_);
+    G_->Mult(tmpR0a_, tmpR1_);
+    MsInv_->Mult(tmpR1_, tmpR1b_);
+    tmpR0b_ *= tmpR0c_;
+    tmpR1b_ *= tmpR0b_;
+    tmpR1c_ += tmpR1b_;
+  }
+  dotVector(tmpR1a_, tmpR1c_, &tmpR1_, dim_);
+  MsRho_->Mult(tmpR1_, crossDiff_);
 }
 
 void ReactingFlow::computeExplicitTempConvectionOP(bool extrap) {

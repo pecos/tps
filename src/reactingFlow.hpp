@@ -163,6 +163,12 @@ class ReactingFlow : public ThermoChemModelBase {
   // Species \f$H^1\f$ finite element space.
   ParFiniteElementSpace *yfes_ = nullptr;
 
+  // Vector \f$H^1\f$ finite element collection.
+  FiniteElementCollection *vfec_ = nullptr;
+
+  // Vector \f$H^1\f$ finite element space.
+  ParFiniteElementSpace *vfes_ = nullptr;
+
   // Fields
   ParGridFunction Tnm1_gf_, Tnm2_gf_;
   ParGridFunction Tn_gf_, Tn_next_gf_, Text_gf_, resT_gf_;
@@ -224,6 +230,7 @@ class ReactingFlow : public ThermoChemModelBase {
   ParBilinearForm *LQ_form_ = nullptr;
   ParLinearForm *LQ_bdry_ = nullptr;
   ParBilinearForm *LY_form_ = nullptr;
+  ParMixedBilinearForm *G_form_ = nullptr;
 
   OperatorHandle LQ_;
   OperatorHandle LY_;
@@ -235,6 +242,7 @@ class ReactingFlow : public ThermoChemModelBase {
   OperatorHandle MsRho_;
   OperatorHandle MsRhoCp_;
   OperatorHandle Mq_;
+  OperatorHandle G_;
 
   mfem::Solver *MsInvPC_ = nullptr;
   mfem::CGSolver *MsInv_ = nullptr;
@@ -250,9 +258,10 @@ class ReactingFlow : public ThermoChemModelBase {
   Vector NTn_, NTnm1_, NTnm2_;
   Vector Text_;
   Vector resT_;
-  Vector tmpR1_;
   Vector tmpR0_;
   Vector tmpR0a_, tmpR0b_, tmpR0c_;
+  Vector tmpR1_;
+  Vector tmpR1a_, tmpR1b_, tmpR1c_;
 
   // additions for species
   Vector Yn_, Yn_next_, Ynm1_, Ynm2_;
@@ -263,7 +272,7 @@ class ReactingFlow : public ThermoChemModelBase {
   Vector prodY_;
   Vector hw_;
   Vector CpY_;
-  Vector SDFT_;
+  Vector crossDiff_;
   Vector speciesMolarCv_;
   Vector speciesMolarCp_;
   Vector specificHeatRatios_;
@@ -316,7 +325,7 @@ class ReactingFlow : public ThermoChemModelBase {
   void computeQtTO();
   void speciesProduction();
   void heatOfFormation();
-  void diffusionForTemperature();
+  void crossDiffusion();
 
   /// for creation of structs to interface with old plasma/chem stuff
   void identifySpeciesType(Array<ArgonSpcs> &speciesType);
