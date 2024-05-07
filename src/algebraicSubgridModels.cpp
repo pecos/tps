@@ -99,9 +99,10 @@ void AlgebraicSubgridModels::initializeSelf() {
   Sdof_ = sfes_->GetNDofs();
   SdofInt_ = sfes_->GetTrueVSize();
 
+  delta_.SetSize(sfes_truevsize);  
   subgridVisc_.SetSize(sfes_truevsize);
   subgridVisc_gf_.SetSpace(sfes_);
-  delta_.SetSize(sfes_truevsize);
+  subgridVisc_gf_ = 0.0;  
 
   gradU_.SetSize(vfes_truevsize);
   gradV_.SetSize(vfes_truevsize);

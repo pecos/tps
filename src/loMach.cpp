@@ -245,10 +245,10 @@ void LoMachSolver::initialize() {
   sponge_->setup();
 
   // Finish initializing operators
+  flow_->initializeOperators();
+  thermo_->initializeOperators();  
   turbModel_->setup();
   turbModel_->initializeOperators();
-  thermo_->initializeOperators();
-  flow_->initializeOperators();
 
   // TODO(trevilo): Enable averaging.  See note in loMach.hpp
 
