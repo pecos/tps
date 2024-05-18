@@ -660,13 +660,15 @@ double LoMachSolver::computeCFL() {
 
 void LoMachSolver::setTimestep() {
   double Umax_lcl = 1.0e-12;
+  double convT_lcl = 1.0e-12;  
   double max_speed = Umax_lcl;
+  double min_convT = 1.0;  
   double Umag;
   // int Sdof = sfes_->GetNDofs();
   // int Sdof = (turbModel_->getGridScale())->Size();
-  // const double *dataD = (meshData_->getGridScale())->HostRead();
+  const double *dataD = (meshData_->getGridScale())->HostRead();
   // int Sdof = dataD->Size();
-  hmin = meshData_->getMinGridScale();
+  //hmin = meshData_->getMinGridScale();
   int Sdof = meshData_->getDofSize();
 
   CFL = loMach_opts_.ts_opts_.cfl_;
@@ -686,9 +688,16 @@ void LoMachSolver::setTimestep() {
       }
       Umag = std::sqrt(Umag);
       Umax_lcl = std::max(Umag, Umax_lcl);
+
+      double hmin = dataD[n];
+      hmin /= (double)order;
+      convT_lcl = hmin / Umax_lcl; 
+      
     }
-    MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, pmesh_->GetComm());
-    double dtInst = CFL * hmin / (max_speed * (double)order);
+    // MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, pmesh_->GetComm());
+    // double dtInst = CFL * hmin / (max_speed * (double)order);
+    MPI_Allreduce(&convT_lcl, &min_convT, 1, MPI_DOUBLE, MPI_MIN, pmesh_->GetComm());        
+    double dtInst = 0.5 * CFL * convT_lcl;    
     temporal_coeff_.dt = dtInst;
 
     const double dt_initial = loMach_opts_.ts_opts_.initial_dt_;
