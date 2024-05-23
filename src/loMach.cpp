@@ -689,8 +689,8 @@ void LoMachSolver::setTimestep() {
       Umag = std::sqrt(Umag);
       Umax_lcl = std::max(Umag, Umax_lcl);
 
+      // local hmin comes in devided by order
       double hmin = dataD[n];
-      hmin /= (double)order;
       convT_lcl = hmin / Umax_lcl; 
       
     }
