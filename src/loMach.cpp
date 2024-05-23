@@ -351,7 +351,11 @@ void LoMachSolver::solveBegin() {
     std::cout << std::endl;
     std::cout << std::setw(11) << "#     Step ";
     std::cout << std::setw(13) << "Time ";
-    std::cout << std::setw(13) << "dt ";
+    if (loMach_opts_.ts_opts_.constant_dt_ < 0.0) {
+      std::cout << std::setw(13) << "CFL ";
+    } else {
+      std::cout << std::setw(13) << "dt ";
+    }
     std::cout << std::setw(13) << "Wtime/Step ";
     for (size_t i = 0; i < thermo_header.size(); i++) {
       std::cout << std::setw(12) << thermo_header[i] << " ";
@@ -365,7 +369,12 @@ void LoMachSolver::solveBegin() {
 
     std::cout << std::setw(10) << iter << " ";
     std::cout << std::setw(10) << std::scientific << temporal_coeff_.time << " ";
-    std::cout << std::setw(10) << std::scientific << temporal_coeff_.dt << " ";
+    if (loMach_opts_.ts_opts_.constant_dt_ < 0.0) {
+      double max_cfl = computeCFL();
+      std::cout << std::setw(10) << std::scientific << max_cfl << " ";      
+    } else {
+      std::cout << std::setw(10) << std::scientific << temporal_coeff_.dt << " ";
+    }
     std::cout << std::setw(10) << std::scientific << 0.0 << " ";
     for (size_t i = 0; i < thermo_screen_values.size(); i++) {
       std::cout << std::setw(10) << std::scientific << thermo_screen_values[i] << " ";
@@ -421,7 +430,12 @@ void LoMachSolver::solveStep() {
     if (rank0_) {
       // TODO(trevilo): Add state summary
       std::cout << std::setw(10) << iter << " ";
-      std::cout << std::setw(10) << std::scientific << temporal_coeff_.time << " ";
+      if (loMach_opts_.ts_opts_.constant_dt_ < 0.0) {
+        double max_cfl = computeCFL();
+        std::cout << std::setw(10) << std::scientific << max_cfl << " ";      
+      } else {      
+        std::cout << std::setw(10) << std::scientific << temporal_coeff_.time << " ";
+      }
       std::cout << std::setw(10) << std::scientific << temporal_coeff_.dt << " ";
       std::cout << std::setw(10) << std::scientific << max_time_per_step << " ";
       for (size_t i = 0; i < thermo_screen_values.size(); i++) {
