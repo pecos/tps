@@ -684,7 +684,7 @@ double LoMachSolver::computeCFL() {
 void LoMachSolver::setTimestep() {
   double Umax_lcl = 1.0e-12;
   double convT_lcl = 1.0e-12;
-  double max_speed = Umax_lcl;
+  // double max_speed = Umax_lcl;
   double min_convT = 1.0;
   double Umag;
   // int Sdof = sfes_->GetNDofs();
