@@ -114,7 +114,7 @@ void AlgebraicSubgridModels::initializeSelf() {
   // gridScaleZ_.SetSize(sfes_truevsize);
   // resolution_gf_.SetSpace(sfes_);
 
-  if (verbose) grvy_printf(ginfo, "AlgebraicSubgridModels vectors and gf initialized...\n");
+  if (rank0_) grvy_printf(ginfo, "AlgebraicSubgridModels vectors and gf initialized...\n");
 
   // exports
   toFlow_interface_.eddy_viscosity = &subgridVisc_gf_;

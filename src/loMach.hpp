@@ -180,7 +180,7 @@ class LoMachSolver : public TPS::PlasmaSolver {
   // Time marching related parameters
   int iter;
   int iter_start_;
-  double CFL;
+  double CFL_;
 
   int max_bdf_order;  // input option now
   temporalSchemeCoefficients temporal_coeff_;
