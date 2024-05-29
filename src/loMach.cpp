@@ -344,7 +344,7 @@ void LoMachSolver::solveBegin() {
   std::vector<double> flow_screen_values;
   flow_->screenValues(flow_screen_values);
 
-  double max_cfl;
+  double max_cfl = -1;
   if (loMach_opts_.ts_opts_.constant_dt_ > 0.0) {
     max_cfl = computeCFL();
   }
@@ -429,7 +429,7 @@ void LoMachSolver::solveStep() {
     std::vector<double> flow_screen_values;
     flow_->screenValues(flow_screen_values);
 
-    double max_cfl;
+    double max_cfl = -1;
     if (loMach_opts_.ts_opts_.constant_dt_ > 0.0) {
       max_cfl = computeCFL();
     }
