@@ -202,9 +202,7 @@ void LoMachSolver::initialize() {
   temporal_coeff_.dt = 1.0;
   temporal_coeff_.dt3 = temporal_coeff_.dt2 = temporal_coeff_.dt1 = temporal_coeff_.dt;
   SetTimeIntegrationCoefficients(0);
-
-  CFL = loMach_opts_.ts_opts_.cfl_;
-  if (verbose) grvy_printf(ginfo, "got CFL...\n");
+  CFL_ = loMach_opts_.ts_opts_.cfl_;
 
   //-----------------------------------------------------------
   // NOTE: Aspects of the ordering below are important.  Beware when
@@ -346,12 +344,21 @@ void LoMachSolver::solveBegin() {
   std::vector<double> flow_screen_values;
   flow_->screenValues(flow_screen_values);
 
+  double max_cfl = -1;
+  if (loMach_opts_.ts_opts_.constant_dt_ > 0.0) {
+    max_cfl = computeCFL();
+  }
+
   if (rank0_) {
     // TODO(trevilo): Add state summary
     std::cout << std::endl;
     std::cout << std::setw(11) << "#     Step ";
     std::cout << std::setw(13) << "Time ";
-    std::cout << std::setw(13) << "dt ";
+    if (loMach_opts_.ts_opts_.constant_dt_ > 0.0) {
+      std::cout << std::setw(13) << "CFL ";
+    } else {
+      std::cout << std::setw(13) << "dt ";
+    }
     std::cout << std::setw(13) << "Wtime/Step ";
     for (size_t i = 0; i < thermo_header.size(); i++) {
       std::cout << std::setw(12) << thermo_header[i] << " ";
@@ -365,7 +372,11 @@ void LoMachSolver::solveBegin() {
 
     std::cout << std::setw(10) << iter << " ";
     std::cout << std::setw(10) << std::scientific << temporal_coeff_.time << " ";
-    std::cout << std::setw(10) << std::scientific << temporal_coeff_.dt << " ";
+    if (loMach_opts_.ts_opts_.constant_dt_ > 0.0) {
+      std::cout << std::setw(10) << std::scientific << max_cfl << " ";
+    } else {
+      std::cout << std::setw(10) << std::scientific << temporal_coeff_.dt << " ";
+    }
     std::cout << std::setw(10) << std::scientific << 0.0 << " ";
     for (size_t i = 0; i < thermo_screen_values.size(); i++) {
       std::cout << std::setw(10) << std::scientific << thermo_screen_values[i] << " ";
@@ -418,11 +429,20 @@ void LoMachSolver::solveStep() {
     std::vector<double> flow_screen_values;
     flow_->screenValues(flow_screen_values);
 
+    double max_cfl = -1;
+    if (loMach_opts_.ts_opts_.constant_dt_ > 0.0) {
+      max_cfl = computeCFL();
+    }
+
     if (rank0_) {
       // TODO(trevilo): Add state summary
       std::cout << std::setw(10) << iter << " ";
       std::cout << std::setw(10) << std::scientific << temporal_coeff_.time << " ";
-      std::cout << std::setw(10) << std::scientific << temporal_coeff_.dt << " ";
+      if (loMach_opts_.ts_opts_.constant_dt_ > 0.0) {
+        std::cout << std::setw(10) << std::scientific << max_cfl << " ";
+      } else {
+        std::cout << std::setw(10) << std::scientific << temporal_coeff_.dt << " ";
+      }
       std::cout << std::setw(10) << std::scientific << max_time_per_step << " ";
       for (size_t i = 0; i < thermo_screen_values.size(); i++) {
         std::cout << std::setw(10) << std::scientific << thermo_screen_values[i] << " ";
@@ -515,11 +535,8 @@ void LoMachSolver::updateTimestep() {
   // int Sdof = (turbModel_->getGridScale())->Size();
   auto dataU = flow_->getCurrentVelocity()->HostRead();
 
-  // come in divided by order
-  // const double *dataD = bufferGridScale->HostRead();
-  // const double *dataD = (turbModel_->getGridScale())->HostRead();
+  // comes in divided by order
   const double *dataD = (meshData_->getGridScale())->HostRead();
-  // int Sdof = dataD->Size();
   int Sdof = meshData_->getDofSize();
 
   for (int n = 0; n < Sdof; n++) {
@@ -533,41 +550,7 @@ void LoMachSolver::updateTimestep() {
   }
 
   MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, pmesh_->GetComm());
-  double dtInst_conv = 0.5 * CFL / max_speed;
-
-  // double *dGradU = flowClass->gradU.HostReadWrite();
-  // double *dGradV = flowClass->gradV.HostReadWrite();
-  // double *dGradW = flowClass->gradW.HostReadWrite();
-  // double *dVisc = tcClass->viscSml.HostReadWrite();
-  // double *rho = tcClass->rn.HostReadWrite();
-  // Umax_lcl = 1.0e-12;
-  // for (int n = 0; n < SdofInt; n++) {
-  //   DenseMatrix gU;
-  //   gU.SetSize(nvel_, dim_);
-  //   for (int dir = 0; dir < dim_; dir++) {
-  //     gU(0, dir) = dGradU[n + dir * SdofInt];
-  //   }
-  //   for (int dir = 0; dir < dim_; dir++) {
-  //     gU(1, dir) = dGradV[n + dir * SdofInt];
-  //   }
-  //   for (int dir = 0; dir < dim_; dir++) {
-  //     gU(2, dir) = dGradW[n + dir * SdofInt];
-  //   }
-  //   double duMag = 0.0;
-  //   for (int dir = 0; dir < dim_; dir++) {
-  //     for (int eq = 0; eq < nvel_; eq++) {
-  //       duMag += gU(eq, dir) * gU(eq, dir);
-  //     }
-  //   }
-  //   duMag = sqrt(duMag);
-  //   double viscVel = sqrt(duMag * dVisc[n] / rho[n]);
-  //   viscVel /= dataD[n];
-  //   Umax_lcl = std::max(viscVel, Umax_lcl);
-  // }
-  // MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, pmesh_->GetComm());
-  // double dtInst_visc = 0.5 * CFL / max_speed;
-
-  // double dtInst = max(dtInst_conv, dtInst_visc);
+  double dtInst_conv = CFL_ / std::max(max_speed, 1.0e-12);
 
   double dtInst = dtInst_conv;
   double &dt = temporal_coeff_.dt;
@@ -592,21 +575,16 @@ void LoMachSolver::updateTimestep() {
 
 double LoMachSolver::computeCFL() {
   const double dt = temporal_coeff_.dt;
-
   double Umax_lcl = 1.0e-12;
   double max_speed = Umax_lcl;
   double Umag;
-  // int Sdof = sfes_->GetNDofs();
-  // int Sdof = (turbModel_->getGridScale())->Size();
 
-  // come in divided by order
-  // double *dataD = bufferGridScale->HostReadWrite();
-  // double *dataD = (turbModel_->getGridScale())->HostReadWrite();
+  // comes in divided by order
   auto dataU = flow_->getCurrentVelocity()->HostRead();
   const double *dataD = (meshData_->getGridScale())->HostRead();
-  // int Sdof = dataD->Size();
   int Sdof = meshData_->getDofSize();
 
+  MPI_Barrier(groupsMPI->getTPSCommWorld());
   for (int n = 0; n < Sdof; n++) {
     Umag = 0.0;
     // Vector delta({dataX[n], dataY[n], dataZ[n]});
@@ -617,59 +595,19 @@ double LoMachSolver::computeCFL() {
     Umag = std::sqrt(Umag);
     Umax_lcl = std::max(Umag, Umax_lcl);
   }
-  MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, pmesh_->GetComm());
-  double CFL_conv = 2.0 * dt * max_speed;
+  MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, groupsMPI->getTPSCommWorld());
+  double CFL_conv = dt * max_speed;
 
-  // double *dGradU = flowClass->gradU.HostReadWrite();
-  // double *dGradV = flowClass->gradV.HostReadWrite();
-  // double *dGradW = flowClass->gradW.HostReadWrite();
-  // double *dVisc = tcClass->viscSml.HostReadWrite();
-  // double *rho = tcClass->rn.HostReadWrite();
-  // Umax_lcl = 1.0e-12;
-  // for (int n = 0; n < SdofInt; n++) {
-  //   DenseMatrix gU;
-  //   gU.SetSize(nvel_, dim_);
-  //   for (int dir = 0; dir < dim_; dir++) {
-  //     gU(0, dir) = dGradU[n + dir * SdofInt];
-  //   }
-  //   for (int dir = 0; dir < dim_; dir++) {
-  //     gU(1, dir) = dGradV[n + dir * SdofInt];
-  //   }
-  //   for (int dir = 0; dir < dim_; dir++) {
-  //     gU(2, dir) = dGradW[n + dir * SdofInt];
-  //   }
-  //   double duMag = 0.0;
-  //   for (int dir = 0; dir < dim_; dir++) {
-  //     for (int eq = 0; eq < nvel_; eq++) {
-  //       duMag += gU(eq, dir) * gU(eq, dir);
-  //     }
-  //   }
-  //   duMag = sqrt(duMag);
-  //   double viscVel = sqrt(duMag * dVisc[n] / rho[n]);
-  //   viscVel /= dataD[n];
-  //   Umax_lcl = std::max(viscVel, Umax_lcl);
-  // }
-  // MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, pmesh_->GetComm());
-  // double CFL_visc = 2.0 * dt * max_speed;
-
-  // double CFL_here = max(CFL_conv, CFL_visc);
-  double CFL_here = CFL_conv;
-
-  return CFL_here;
+  return CFL_conv;
 }
 
 void LoMachSolver::setTimestep() {
   double Umax_lcl = 1.0e-12;
-  double max_speed = Umax_lcl;
+  double convT_lcl = 1.0e-12;
+  double min_convT = 1.0;
   double Umag;
-  // int Sdof = sfes_->GetNDofs();
-  // int Sdof = (turbModel_->getGridScale())->Size();
-  // const double *dataD = (meshData_->getGridScale())->HostRead();
-  // int Sdof = dataD->Size();
-  hmin = meshData_->getMinGridScale();
+  const double *dataD = (meshData_->getGridScale())->HostRead();
   int Sdof = meshData_->getDofSize();
-
-  CFL = loMach_opts_.ts_opts_.cfl_;
 
   // dt_fixed is initialized to -1, so if it is positive,
   // then the user requested a fixed dt run
@@ -686,17 +624,19 @@ void LoMachSolver::setTimestep() {
       }
       Umag = std::sqrt(Umag);
       Umax_lcl = std::max(Umag, Umax_lcl);
+
+      // local hmin comes in devided by order
+      double hmin = dataD[n];
+      convT_lcl = hmin / Umax_lcl;
     }
-    MPI_Allreduce(&Umax_lcl, &max_speed, 1, MPI_DOUBLE, MPI_MAX, pmesh_->GetComm());
-    double dtInst = CFL * hmin / (max_speed * (double)order);
+    MPI_Allreduce(&convT_lcl, &min_convT, 1, MPI_DOUBLE, MPI_MIN, pmesh_->GetComm());
+    double dtInst = CFL_ * min_convT;
     temporal_coeff_.dt = dtInst;
 
     const double dt_initial = loMach_opts_.ts_opts_.initial_dt_;
     if ((dt_initial < dtInst) && !(loMach_opts_.io_opts_.enable_restart_)) {
       temporal_coeff_.dt = dt_initial;
     }
-
-    std::cout << "dt from setTimestep: " << temporal_coeff_.dt << " max_speed: " << max_speed << endl;
   }
 }
 
