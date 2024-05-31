@@ -31,10 +31,11 @@
 // -----------------------------------------------------------------------------------el-
 
 /** @file
- * @copydoc gpu_constructor.hpp
+ * @copydoc cases.hpp
  */
 
-// #include "cases.hpp"
+#include "cases.hpp"
+
 #include <sys/stat.h>
 #include <unistd.h>
 #include <array>
@@ -44,8 +45,12 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
-#include "M2ulPhyS.hpp"
+#include <grvy.h>
+
 #include "tps_mfem_wrap.hpp"
+#include "utils.hpp"
+
+using namespace mfem;
 
 
 /// Used to set the velocity IC (and to check error)
@@ -122,5 +127,9 @@ fptr vel_ic(std::string ic_string_) {
       return vel_tgv2d_uniform;
     } else if (ic_string_ == "channel") {
       return vel_channel;
+    } else {
+      grvy_printf(GRVY_ERROR, "Attempting to use unknown vel_ic");
+      exit(ERROR);
+      return vel_exact_tgv2d;
     }
 }

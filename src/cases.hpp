@@ -39,14 +39,14 @@
 #include <assert.h>
 #include <hdf5.h>
 #include <string>
-#include "dataStructures.hpp"
 #include "tps_mfem_wrap.hpp"
 
-typedef std::function<void(const Vector &, double, Vector &)> (*fptr)();
+// typedef std::function<void(const Vector &, double, Vector &)> (*fptr)();
+typedef std::function<void(const mfem::Vector &, double, mfem::Vector &)> fptr;
 fptr vel_ic(std::string ic_string_);
-  
-void vel_exact_tgv2d(const Vector &x, double t, Vector &u);
-void vel_tgv2d_uniform(const Vector &x, double t, Vector &u);
-void vel_channel(const Vector &x, double t, Vector &u);
- 
+
+void vel_exact_tgv2d(const mfem::Vector &x, double t, mfem::Vector &u);
+void vel_tgv2d_uniform(const mfem::Vector &x, double t, mfem::Vector &u);
+void vel_channel(const mfem::Vector &x, double t, mfem::Vector &u);
+
 #endif  // CASES_HPP_
