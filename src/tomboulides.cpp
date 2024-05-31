@@ -1552,15 +1552,14 @@ void Tomboulides::step() {
 
 double Tomboulides::computeL2Error() const {
   double err = -1.0;
-  /*  
   if (ic_string_ == "tgv2d") {
     std::cout << "Evaluating TGV2D error..." << std::endl;
-    VectorFunctionCoefficient u_excoeff(2, vel_exact_tgv2d);
+    fptr user_func = vel_ic(ic_string_);
+    VectorFunctionCoefficient u_excoeff(nvel_, user_func);
     u_excoeff.SetTime(coeff_.time);
     err = u_curr_gf_->ComputeL2Error(u_excoeff);
   }
-  */  
-  return err;  
+  return err;
 }
 
 void Tomboulides::meanZero(ParGridFunction &v) {
