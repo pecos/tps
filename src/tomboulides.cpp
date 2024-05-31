@@ -390,7 +390,7 @@ void Tomboulides::initializeSelf() {
   if (!ic_string_.empty()) {
     // std::function *user_func;
     fptr user_func = vel_ic(ic_string_);
-    VectorFunctionCoefficient u_excoeff(3, user_func);
+    VectorFunctionCoefficient u_excoeff(nvel_, user_func);
     u_excoeff.SetTime(0.0);
     u_curr_gf_->ProjectCoefficient(u_excoeff);
   }
