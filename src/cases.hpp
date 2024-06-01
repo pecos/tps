@@ -58,5 +58,7 @@ void vel_channel(const mfem::Vector &x, double t, mfem::Vector &u);
 void vel_exact_pipe(const mfem::Vector &x, double t, mfem::Vector &u);
 
 double temp_rt3d(const mfem::Vector &x, double t);
+double temp_channel(const mfem::Vector &x, double t);
+double temp_lequereBox(const mfem::Vector &x, double t);
 
 #endif  // CASES_HPP_

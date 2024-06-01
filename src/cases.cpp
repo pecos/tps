@@ -171,10 +171,42 @@ double temp_rt3d(const Vector &x, double t) {
   return temp;
 }
 
+/// Hot/Cold wall channel
+double temp_inlet(const Vector &coords, double t) {
+  double Thi = 400.0;
+  double Tlo = 200.0;
+  double x = coords(0);
+  double y = coords(1);
+  double z = coords(2);
+  double temp;
+  temp = Tlo + (y + 0.5) * (Thi - Tlo);
+  return temp;
+}
+
+/// Bouyancy-driven cavity
+double temp_lequereBox(const Vector &coords, double t) {
+  double Thi = 480.0;
+  double Tlo = 120.0;
+  double Tmean, tRamp, wt;
+  double x = coords(0);
+  double y = coords(1);
+  double z = coords(2);
+  double temp;
+
+  Tmean = 0.5 * (Thi + Tlo);
+  temp = Tmean + x * (Thi - Tlo);
+
+  return temp;
+}
+
 /// Add temp ic cases to selection here
 sfptr temp_ic(std::string ic_string_) {
   if (ic_string_ == "rt3D") {
     return temp_rt3d;
+  } else if (ic_string_ == "channel") {
+    return temp_channel;
+  } else if (ic_string_ == "lequere-box") {
+    return temp_lequereBox;
   } else {
     grvy_printf(GRVY_ERROR, "Attempting to use unknown temp_ic");
     exit(ERROR);
