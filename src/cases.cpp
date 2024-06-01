@@ -36,8 +36,10 @@
 
 #include "cases.hpp"
 
+#include <grvy.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
 #include <array>
 #include <cstdio>
 #include <cstdlib>
@@ -45,13 +47,11 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
-#include <grvy.h>
 
 #include "tps_mfem_wrap.hpp"
 #include "utils.hpp"
 
 using namespace mfem;
-
 
 /// Used to set the velocity IC (and to check error)
 void vel_exact_tgv2d(const Vector &x, double t, Vector &u) {
@@ -116,20 +116,68 @@ void vel_channel(const Vector &x, double t, Vector &u) {
   }
 }
 
+/// Add ic cases to selection here
+vfptr vel_ic(std::string ic_string_) {
+  if (ic_string_ == "tgv2d") {
+    return vel_exact_tgv2d;
+  } else if (ic_string_ == "tgv2d_uniform") {
+    return vel_tgv2d_uniform;
+  } else if (ic_string_ == "channel") {
+    return vel_channel;
+  } else {
+    grvy_printf(GRVY_ERROR, "Attempting to use unknown vel_ic");
+    exit(ERROR);
+    return vel_exact_tgv2d;
+  }
+}
 
-// typedef int (*fptr)();
+/// Used to for pipe flow test case
+void vel_exact_pipe(const Vector &x, double t, Vector &u) {
+  u(0) = 0.0;
+  u(1) = 2.0 * (1 - x[0] * x[0]);
+}
 
-/// Add cases to selection here
-fptr vel_ic(std::string ic_string_) {
-    if (ic_string_ == "tgv2d") {
-      return vel_exact_tgv2d;
-    } else if (ic_string_ == "tgv2d_uniform") {
-      return vel_tgv2d_uniform;
-    } else if (ic_string_ == "channel") {
-      return vel_channel;
-    } else {
-      grvy_printf(GRVY_ERROR, "Attempting to use unknown vel_ic");
-      exit(ERROR);
-      return vel_exact_tgv2d;
-    }
+/// Add bc cases to selection here
+vfptr vel_bc(std::string type) {
+  if (type == "fully-developed-pipe") {
+    return vel_exact_pipe;
+  } else {
+    grvy_printf(GRVY_ERROR, "Attempting to use unknown vel_bc");
+    exit(ERROR);
+    return vel_exact_pipe;
+  }
+}
+
+/// Rayleigh-Taylor ic
+double temp_rt3d(const Vector &x, double t) {
+  double CC = 0.05;
+  double twoPi = 6.28318530718;
+  double yWidth = 0.1;
+  double yInt, dy, wt;
+  double temp, dT;
+  double Tlo = 100.0;
+  double Thi = 1500.0;
+
+  yInt = std::cos(twoPi * x[0]) + std::cos(twoPi * x[2]);
+  yInt *= CC;
+  yInt += 4.0;
+
+  dy = x[1] - yInt;
+  dT = Thi - Tlo;
+
+  wt = 0.5 * (tanh(-dy / yWidth) + 1.0);
+  temp = Tlo + wt * dT;
+
+  return temp;
+}
+
+/// Add temp ic cases to selection here
+sfptr temp_ic(std::string ic_string_) {
+  if (ic_string_ == "rt3D") {
+    return temp_rt3d;
+  } else {
+    grvy_printf(GRVY_ERROR, "Attempting to use unknown temp_ic");
+    exit(ERROR);
+    return temp_rt3d;
+  }
 }

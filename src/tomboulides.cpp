@@ -35,22 +35,17 @@
 #include <mfem/general/forall.hpp>
 
 #include "algebraicSubgridModels.hpp"
+#include "cases.hpp"
 #include "externalData_base.hpp"
 #include "io.hpp"
 #include "loMach.hpp"
 #include "thermo_chem_base.hpp"
 #include "tps.hpp"
 #include "utils.hpp"
-#include "cases.hpp"
 
 using namespace mfem;
 
 /// forward declarations
-// void vel_exact_tgv2d(const Vector &x, double t, Vector &u);
-// void vel_tgv2d_uniform(const Vector &x, double t, Vector &u);
-void vel_exact_pipe(const Vector &x, double t, Vector &u);
-// void vel_channel(const Vector &x, double t, Vector &u);
-
 static double radius(const Vector &pos) { return pos[0]; }
 FunctionCoefficient radius_coeff(radius);
 
@@ -388,14 +383,13 @@ void Tomboulides::initializeSelf() {
 
   // set IC if we have one at this point
   if (!ic_string_.empty()) {
-    // std::function *user_func;
-    fptr user_func = vel_ic(ic_string_);
+    vfptr user_func = vel_ic(ic_string_);
     VectorFunctionCoefficient u_excoeff(nvel_, user_func);
     u_excoeff.SetTime(0.0);
     u_curr_gf_->ProjectCoefficient(u_excoeff);
   }
 
-  /*      
+  /*
     if (ic_string_ == "tgv2d") {
       if (rank0_) std::cout << "Setting tgv2d IC..." << std::endl;
       VectorFunctionCoefficient u_excoeff(2, vel_exact_tgv2d);
@@ -413,7 +407,7 @@ void Tomboulides::initializeSelf() {
       u_curr_gf_->ProjectCoefficient(u_excoeff);
     }
   }
-  */  
+  */
 
   // Boundary conditions
   // number of BC regions defined
@@ -468,6 +462,20 @@ void Tomboulides::initializeSelf() {
       // axisymmetric not testsed with interpolation BCs yet.  For now, just stop.
       assert(!axisym_);
 
+    } else {
+      Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
+      inlet_attr = 0;
+      inlet_attr[patch - 1] = 1;
+
+      vfptr user_func = vel_bc(type);
+      addVelDirichletBC(user_func, inlet_attr);
+
+      if (axisym_) {
+        addSwirlDirichletBC(0.0, inlet_attr);
+      }
+    }
+
+    /*
     } else if (type == "fully-developed-pipe") {
       if (pmesh_->GetMyRank() == 0) {
         std::cout << "Tomboulides: Setting uniform inlet velocity on patch = " << patch << std::endl;
@@ -477,7 +485,6 @@ void Tomboulides::initializeSelf() {
       inlet_attr[patch - 1] = 1;
 
       addVelDirichletBC(vel_exact_pipe, inlet_attr);
-
       if (axisym_) {
         addSwirlDirichletBC(0.0, inlet_attr);
       }
@@ -489,6 +496,7 @@ void Tomboulides::initializeSelf() {
       assert(false);
       exit(1);
     }
+    */
   }
 
   // Wall Bcs
@@ -1549,12 +1557,11 @@ void Tomboulides::step() {
   }
 }
 
-
 double Tomboulides::computeL2Error() const {
   double err = -1.0;
   if (ic_string_ == "tgv2d") {
     std::cout << "Evaluating TGV2D error..." << std::endl;
-    fptr user_func = vel_ic(ic_string_);
+    vfptr user_func = vel_ic(ic_string_);
     VectorFunctionCoefficient u_excoeff(nvel_, user_func);
     u_excoeff.SetTime(coeff_.time);
     err = u_curr_gf_->ComputeL2Error(u_excoeff);
@@ -1616,6 +1623,10 @@ void Tomboulides::addVelDirichletBC(VectorCoefficient *coeff, Array<int> &attr) 
 }
 
 void Tomboulides::addVelDirichletBC(void (*f)(const Vector &, double, Vector &), Array<int> &attr) {
+  addVelDirichletBC(new VectorFunctionCoefficient(dim_, f), attr);
+}
+
+void Tomboulides::addVelDirichletBC(std::function<void(const Vector &, double, Vector &)> f, Array<int> &attr) {
   addVelDirichletBC(new VectorFunctionCoefficient(dim_, f), attr);
 }
 
@@ -1685,78 +1696,3 @@ void Tomboulides::evaluateVelocityGradient() {
   gradV_gf_->SetFromTrueDofs(gradV_);
   gradW_gf_->SetFromTrueDofs(gradW_);
 }
-
-// Non-class functions that are only used in this file below here
-
-/*
-/// Used to set the velocity IC (and to check error)
-void vel_exact_tgv2d(const Vector &x, double t, Vector &u) {
-  const double nu = 1.0;
-  const double F = std::exp(-2 * nu * t);
-
-  u(0) = F * std::sin(x[0]) * std::cos(x[1]);
-  u(1) = -F * std::cos(x[0]) * std::sin(x[1]);
-}
-*/
-
-/// Used to for pipe flow test case
-void vel_exact_pipe(const Vector &x, double t, Vector &u) {
-  u(0) = 0.0;
-  u(1) = 2.0 * (1 - x[0] * x[0]);
-}
-
-/*
-/// Used to set the velocity IC with TG field and uniform
-void vel_tgv2d_uniform(const Vector &x, double t, Vector &u) {
-  const double u0 = 1.0;
-  const double F = 0.1;
-  const double PI = 3.14159265359;
-  double twoPi = 2.0 * PI;
-
-  u(0) = u0;
-  u(1) = 0.0;
-
-  u(0) += +F * std::sin(twoPi * x[0]) * std::cos(twoPi * x[1]);
-  u(1) += -F * std::cos(twoPi * x[0]) * std::sin(twoPi * x[1]);
-}
-
-/// Used to set the channel IC
-void vel_channel(const Vector &x, double t, Vector &u) {
-  double PI = 3.14159265359;
-  double Lx = 25.0;
-  double Ly = 2.0;
-  double Lz = 9.4;
-  double Umean = 1.0;
-  double uInt = 0.1;
-  int nModes = 4;
-  double uM;
-  double ax, by, cz;
-  double AA, BB, CC;
-  double wall;
-
-  // expects channel height (-1,1)
-  wall = (1.0 - std::pow(x(1), 8.0));
-  u(0) = Umean * wall;
-  u(1) = 0.0;
-  u(2) = 0.0;
-
-  for (int n = 1; n <= nModes; n++) {
-    ax = 4.0 * PI / Lx * (double)n;
-    by = 2.0 * PI / Ly * (double)n;
-    cz = 2.0 * PI / Lz * (double)n;
-
-    AA = 1.0;
-    BB = 1.0;
-    CC = -(AA * ax + BB * by) / cz;
-
-    uM = uInt / (double)n;
-
-    u(0) += uM * AA * cos(ax * (x(0) + (double)(n - 1) * Umean)) * sin(by * x(1)) *
-            sin(cz * (x(2) + 0.5 * (double)(n - 1) * Umean)) * wall;
-    u(1) += uM * BB * sin(ax * (x(0) + (double)(n - 1) * Umean)) * cos(by * x(1)) *
-            sin(cz * (x(2) + 0.5 * (double)(n - 1) * Umean)) * wall;
-    u(2) += uM * CC * sin(ax * (x(0) + (double)(n - 1) * Umean)) * sin(by * x(1)) *
-            cos(cz * (x(2) + 0.5 * (double)(n - 1) * Umean)) * wall;
-  }
-}
-*/

@@ -33,20 +33,30 @@
 #define CASES_HPP_
 
 /** @file
- * @brief A place for case-specific bc and ic.
+ * @brief A place for case-specific bc and ic. All case names specified in the input
+ * file must be added to if-list in cases.cpp along with the actual ic/bc.
  */
 
 #include <assert.h>
 #include <hdf5.h>
+
 #include <string>
+
 #include "tps_mfem_wrap.hpp"
 
-// typedef std::function<void(const Vector &, double, Vector &)> (*fptr)();
-typedef std::function<void(const mfem::Vector &, double, mfem::Vector &)> fptr;
-fptr vel_ic(std::string ic_string_);
+typedef std::function<void(const mfem::Vector &, double, mfem::Vector &)> vfptr;
+vfptr vel_ic(std::string ic_string_);
+vfptr vel_bc(std::string type);
+
+typedef std::function<double(const mfem::Vector &, double)> sfptr;
+sfptr temp_ic(std::string ic_string_);
+sfptr temp_bc(std::string type);
 
 void vel_exact_tgv2d(const mfem::Vector &x, double t, mfem::Vector &u);
 void vel_tgv2d_uniform(const mfem::Vector &x, double t, mfem::Vector &u);
 void vel_channel(const mfem::Vector &x, double t, mfem::Vector &u);
+void vel_exact_pipe(const mfem::Vector &x, double t, mfem::Vector &u);
+
+double temp_rt3d(const mfem::Vector &x, double t);
 
 #endif  // CASES_HPP_

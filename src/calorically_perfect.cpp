@@ -38,6 +38,7 @@
 #include <iomanip>
 #include <mfem/general/forall.hpp>
 
+#include "cases.hpp"
 #include "loMach.hpp"
 #include "loMach_options.hpp"
 #include "logger.hpp"
@@ -47,8 +48,7 @@
 using namespace mfem;
 using namespace mfem::common;
 
-/// forward declarations
-double temp_rt3d(const Vector &x, double t);
+/// forward declarations (if any)
 
 MFEM_HOST_DEVICE double Sutherland(const double T, const double mu_star, const double T_star, const double S_star) {
   const double T_rat = T / T_star;
@@ -265,12 +265,18 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
 
   // set IC if we have one at this point
   if (!ic_string_.empty()) {
+    /*
     if (ic_string_ == "rt3D") {
       if (rank0_) std::cout << "Setting rt3D IC..." << std::endl;
       FunctionCoefficient t_excoeff(temp_rt3d);
       t_excoeff.SetTime(0.0);
       Tn_gf_.ProjectCoefficient(t_excoeff);
     }
+    */
+    sfptr user_func = temp_ic(ic_string_);
+    FunctionCoefficient t_excoeff(user_func);
+    t_excoeff.SetTime(0.0);
+    Tn_gf_.ProjectCoefficient(t_excoeff);
   } else {
     ConstantCoefficient t_ic_coef;
     t_ic_coef.constant = T_ic_;
@@ -1455,25 +1461,3 @@ double temp_inlet(const Vector &coords, double t) {
   return temp;
 }
 #endif
-
-double temp_rt3d(const Vector &x, double t) {
-  double CC = 0.05;
-  double twoPi = 6.28318530718;
-  double yWidth = 0.1;
-  double yInt, dy, wt;
-  double temp, dT;
-  double Tlo = 100.0;
-  double Thi = 1500.0;
-
-  yInt = std::cos(twoPi * x[0]) + std::cos(twoPi * x[2]);
-  yInt *= CC;
-  yInt += 4.0;
-
-  dy = x[1] - yInt;
-  dT = Thi - Tlo;
-
-  wt = 0.5 * (tanh(-dy / yWidth) + 1.0);
-  temp = Tlo + wt * dT;
-
-  return temp;
-}
