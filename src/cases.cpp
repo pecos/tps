@@ -53,6 +53,30 @@
 
 using namespace mfem;
 
+/// generic user-specified vel ic
+void velIC_user(const Vector &x, double t, Vector &u) {
+  u(0) = 0.0;
+  u(1) = 0.0;
+  u(2) = 0.0;
+}
+
+/// generic user-specified vel bc
+void velBC_user(const Vector &x, double t, Vector &u) {
+  u(0) = 0.0;
+  u(1) = 0.0;
+  u(2) = 0.0;
+}
+
+/// generic user-specified temp ic
+double tempIC_user(const Vector &coords, double t) {
+  double x = coords(0);
+  double y = coords(1);
+  double z = coords(2);
+  double temp;
+  temp = -1.0;
+  return temp;
+}
+
 /// Used to set the velocity IC (and to check error)
 void vel_exact_tgv2d(const Vector &x, double t, Vector &u) {
   const double nu = 1.0;
@@ -124,6 +148,8 @@ vfptr vel_ic(std::string ic_string_) {
     return vel_tgv2d_uniform;
   } else if (ic_string_ == "channel") {
     return vel_channel;
+  } else if (ic_string_ == "user") {
+    return velIC_user;
   } else {
     grvy_printf(GRVY_ERROR, "Attempting to use unknown vel_ic");
     exit(ERROR);
@@ -141,6 +167,8 @@ void vel_exact_pipe(const Vector &x, double t, Vector &u) {
 vfptr vel_bc(std::string type) {
   if (type == "fully-developed-pipe") {
     return vel_exact_pipe;
+  } else if (type == "user") {
+    return velBC_user;
   } else {
     grvy_printf(GRVY_ERROR, "Attempting to use unknown vel_bc");
     exit(ERROR);
@@ -172,12 +200,10 @@ double temp_rt3d(const Vector &x, double t) {
 }
 
 /// Hot/Cold wall channel
-double temp_inlet(const Vector &coords, double t) {
+double temp_channel(const Vector &coords, double t) {
   double Thi = 400.0;
   double Tlo = 200.0;
-  double x = coords(0);
   double y = coords(1);
-  double z = coords(2);
   double temp;
   temp = Tlo + (y + 0.5) * (Thi - Tlo);
   return temp;
@@ -187,10 +213,8 @@ double temp_inlet(const Vector &coords, double t) {
 double temp_lequereBox(const Vector &coords, double t) {
   double Thi = 480.0;
   double Tlo = 120.0;
-  double Tmean, tRamp, wt;
+  double Tmean;
   double x = coords(0);
-  double y = coords(1);
-  double z = coords(2);
   double temp;
 
   Tmean = 0.5 * (Thi + Tlo);
@@ -207,6 +231,8 @@ sfptr temp_ic(std::string ic_string_) {
     return temp_channel;
   } else if (ic_string_ == "lequere-box") {
     return temp_lequereBox;
+  } else if (ic_string_ == "user") {
+    return tempIC_user;
   } else {
     grvy_printf(GRVY_ERROR, "Attempting to use unknown temp_ic");
     exit(ERROR);
