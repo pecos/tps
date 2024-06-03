@@ -263,16 +263,8 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
 
   tpsP_->getInput("loMach/calperfect/ic", ic_string_, std::string(""));
 
-  // set IC if we have one at this point
+  // set IC if we have one at this point (see cases.cpp for options)
   if (!ic_string_.empty()) {
-    /*
-    if (ic_string_ == "rt3D") {
-      if (rank0_) std::cout << "Setting rt3D IC..." << std::endl;
-      FunctionCoefficient t_excoeff(temp_rt3d);
-      t_excoeff.SetTime(0.0);
-      Tn_gf_.ProjectCoefficient(t_excoeff);
-    }
-    */
     sfptr user_func = temp_ic(ic_string_);
     FunctionCoefficient t_excoeff(user_func);
     t_excoeff.SetTime(0.0);

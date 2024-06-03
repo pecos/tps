@@ -375,7 +375,7 @@ void Tomboulides::initializeSelf() {
     utheta_next_vec_ = 0.0;
   }
 
-  // Initial condition function... options are
+  // Initial condition function.  For options, see cases.cpp
   // 1) "" (Empty string), velocity initialized to zero
   // 2) "tgv2d", velocity initialized using vel_exact_tgv2d function
   // 3) "constant", TODO(trevilo) implement options to read constant
@@ -388,26 +388,6 @@ void Tomboulides::initializeSelf() {
     u_excoeff.SetTime(0.0);
     u_curr_gf_->ProjectCoefficient(u_excoeff);
   }
-
-  /*
-    if (ic_string_ == "tgv2d") {
-      if (rank0_) std::cout << "Setting tgv2d IC..." << std::endl;
-      VectorFunctionCoefficient u_excoeff(2, vel_exact_tgv2d);
-      u_excoeff.SetTime(0.0);
-      u_curr_gf_->ProjectCoefficient(u_excoeff);
-    } else if (ic_string_ == "tgv2d_uniform") {
-      if (rank0_) std::cout << "Setting tgv2d+uniform IC..." << std::endl;
-      VectorFunctionCoefficient u_excoeff(2, vel_tgv2d_uniform);
-      u_excoeff.SetTime(0.0);
-      u_curr_gf_->ProjectCoefficient(u_excoeff);
-    } else if (ic_string_ == "channel") {
-      if (rank0_) std::cout << "Setting channel IC..." << std::endl;
-      VectorFunctionCoefficient u_excoeff(3, vel_channel);
-      u_excoeff.SetTime(0.0);
-      u_curr_gf_->ProjectCoefficient(u_excoeff);
-    }
-  }
-  */
 
   // Boundary conditions
   // number of BC regions defined
