@@ -366,7 +366,7 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
 
   // Wall BCs
   {
-    std::cout << "There are " << pmesh_->bdr_attributes.Max() << " boundary attributes!" << std::endl;
+    if (rank0_) std::cout << "There are " << pmesh_->bdr_attributes.Max() << " boundary attributes" << std::endl;
     Array<int> attr_wall(pmesh_->bdr_attributes.Max());
     attr_wall = 0;
 
@@ -379,7 +379,7 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
       tpsP_->getRequiredInput((basepath + "/type").c_str(), type);
 
       if (type == "viscous_isothermal") {
-        std::cout << "Adding patch = " << patch << " to isothermal wall list!" << std::endl;
+        if (rank0_) std::cout << "Adding patch = " << patch << " to isothermal wall list" << std::endl;
 
         attr_wall = 0;
         attr_wall[patch - 1] = 1;
@@ -504,7 +504,9 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
     MsInvPC_ = new OperatorJacobiSmoother(diag_pa, empty);
   } else {
     MsInvPC_ = new HypreSmoother(*Ms_.As<HypreParMatrix>());
-    dynamic_cast<HypreSmoother *>(MsInvPC_)->SetType(HypreSmoother::Jacobi, 1);
+    dynamic_cast<HypreSmoother *>(MsInvPC_)->SetType(HypreSmoother::Jacobi, 0);
+    dynamic_cast<HypreSmoother *>(MsInvPC_)->SetSOROptions(0.0, 1.0);
+    dynamic_cast<HypreSmoother *>(MsInvPC_)->SetPolyOptions(3, 0.01);
   }
   MsInv_ = new CGSolver(sfes_->GetComm());
   MsInv_->iterative_mode = false;
@@ -520,7 +522,9 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
     HtInvPC_ = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof_);
   } else {
     HtInvPC_ = new HypreSmoother(*Ht_.As<HypreParMatrix>());
-    dynamic_cast<HypreSmoother *>(HtInvPC_)->SetType(HypreSmoother::Jacobi, 1);
+    dynamic_cast<HypreSmoother *>(HtInvPC_)->SetType(HypreSmoother::Jacobi, 0);
+    dynamic_cast<HypreSmoother *>(HtInvPC_)->SetSOROptions(0.0, 1.0);
+    dynamic_cast<HypreSmoother *>(HtInvPC_)->SetPolyOptions(3, 0.01);
   }
 
   HtInv_ = new CGSolver(sfes_->GetComm());
@@ -554,7 +558,9 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
     MqInvPC_ = new OperatorJacobiSmoother(diag_pa, empty);
   } else {
     MqInvPC_ = new HypreSmoother(*Mq_.As<HypreParMatrix>());
-    dynamic_cast<HypreSmoother *>(MqInvPC_)->SetType(HypreSmoother::Jacobi, 1);
+    dynamic_cast<HypreSmoother *>(MqInvPC_)->SetType(HypreSmoother::Jacobi, 0);
+    dynamic_cast<HypreSmoother *>(MqInvPC_)->SetSOROptions(0.0, 1.0);
+    dynamic_cast<HypreSmoother *>(MqInvPC_)->SetPolyOptions(3, 0.01);
   }
   MqInv_ = new CGSolver(sfes_->GetComm());
   MqInv_->iterative_mode = false;
