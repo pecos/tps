@@ -92,9 +92,20 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   tpsP_->getInput("plasma_models/species_number", nSpecies_, 3);
   mixtureInput_.numSpecies = nSpecies_;
   tpsP_->getInput("plasma_models/ambipolar", mixtureInput_.ambipolar, false);
-  tpsP_->getInput("plasma_models/includeElectron", mixtureInput_.isElectronIncluded, true);
+  // tpsP_->getInput("plasma_models/includeElectron", mixtureInput_.isElectronIncluded, true);
   tpsP_->getInput("plasma_models/two_temperature", mixtureInput_.twoTemperature, false);
   tpsP_->getInput("plasma_models/const_plasma_conductivity", const_plasma_conductivity_, 0.0);
+
+  // The ambipolar option isn't supported yet, so die if we try to use it
+  if (mixtureInput_.ambipolar) {
+    if (rank0_) std::cout << "Ambipolar is not yet supported in low Mach reacting flow." << std::endl;
+    exit(ERROR);
+  }
+
+  if (mixtureInput_.twoTemperature) {
+    if (rank0_) std::cout << "Two temperature is not yet supported in low Mach reacting flow." << std::endl;
+    exit(ERROR);
+  }
 
   gasParams_.SetSize(nSpecies_, GasParams::NUM_GASPARAMS);
   gasParams_ = 0.0;
