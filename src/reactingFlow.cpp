@@ -498,7 +498,7 @@ void ReactingFlow::initializeSelf() {
   yfes_ = new ParFiniteElementSpace(pmesh_, yfec_, nSpecies_);
 
   vfec_ = new H1_FECollection(order_, dim_);
-  vfes_ = new ParFiniteElementSpace(pmesh_, vfec_);
+  vfes_ = new ParFiniteElementSpace(pmesh_, vfec_, dim_);
 
   // Check if fully periodic mesh
   if (!(pmesh_->bdr_attributes.Size() == 0)) {
@@ -641,6 +641,7 @@ void ReactingFlow::initializeSelf() {
   CpMix_gf_ = 1000.6;
 
   crossDiff_.SetSize(sDofInt_);
+  crossDiff_ = 0.0;
 
   Mmix_gf_.SetSpace(sfes_);
   Rmix_gf_.SetSpace(sfes_);
@@ -1065,6 +1066,38 @@ void ReactingFlow::initializeOperators() {
   HyInv_->SetMaxIter(max_iter_);
   if (rank0_) std::cout << "Species operators set" << endl;
 
+  // Vector space mass matrix (used in gradient calcs)
+  Mv_form_ = new ParBilinearForm(vfes_);
+  VectorMassIntegrator *mv_blfi;
+  mv_blfi = new VectorMassIntegrator;
+  if (numerical_integ_) {
+    mv_blfi->SetIntRule(&ir_i);
+  }
+  Mv_form_->AddDomainIntegrator(mv_blfi);
+  if (partial_assembly_) {
+    Mv_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+  }
+  Mv_form_->Assemble();
+  Mv_form_->FormSystemMatrix(empty, Mv_op_);
+
+  // Inverse (unweighted) mass operator (velocity space)
+  if (partial_assembly_) {
+    Vector diag_pa(vfes_->GetTrueVSize());
+    Mv_form_->AssembleDiagonal(diag_pa);
+    Mv_inv_pc_ = new OperatorJacobiSmoother(diag_pa, empty);
+  } else {
+    Mv_inv_pc_ = new HypreSmoother(*Mv_op_.As<HypreParMatrix>());
+    dynamic_cast<HypreSmoother *>(Mv_inv_pc_)->SetType(HypreSmoother::Jacobi, 1);
+  }
+  Mv_inv_ = new CGSolver(vfes_->GetComm());
+  Mv_inv_->iterative_mode = false;
+  Mv_inv_->SetOperator(*Mv_op_);
+  Mv_inv_->SetPreconditioner(*Mv_inv_pc_);
+  Mv_inv_->SetPrintLevel(pl_solve_);
+  Mv_inv_->SetRelTol(rtol_);
+  Mv_inv_->SetAbsTol(1e-18);
+  Mv_inv_->SetMaxIter(max_iter_);
+
   // Qt .....................................
   Mq_form_ = new ParBilinearForm(sfes_);
   auto *mq_blfi = new MassIntegrator;
@@ -1482,40 +1515,21 @@ void ReactingFlow::heatOfFormation() {
 }
 
 void ReactingFlow::crossDiffusion() {
-  /*
-  Array<int> empty;
-  SDFT_ = 0.0;
-  for (int i = 0; i < nSpecies_; i++) {
-    setScalarFromVector(Yn_next_, i, &tmpR0_);
-    setScalarFromVector(CpY_, i, &tmpR0c_);
-    CpY_gf_.SetFromTrueDofs(tmpR0c_);
-    LY_form_->Update();
-    LY_form_->Assemble();
-    LY_form_->FormSystemMatrix(empty, LY_);
-    LY_->Mult(tmpR0_, tmpR0a_);
-    SDFT_.Add(1.0, tmpR0a_);
-  }
-  Rmix_gf_.GetTrueDofs(tmpR0b_);
-  SDFT_ *= thermo_pressure_;
-  SDFT_ /= tmpR0b_;
-  SDFT_.Add(1.0, tmpR0a_);
-  */
-
   G_->Mult(Tn_, tmpR1_);
-  MsInv_->Mult(tmpR1_, tmpR1a_);
+  Mv_inv_->Mult(tmpR1_, tmpR1a_);
   tmpR1c_ = 0.0;
   for (int i = 0; i < nSpecies_; i++) {
     setScalarFromVector(Yn_next_, i, &tmpR0a_);
     setScalarFromVector(diffY_, i, &tmpR0b_);
     setScalarFromVector(CpY_, i, &tmpR0c_);
     G_->Mult(tmpR0a_, tmpR1_);
-    MsInv_->Mult(tmpR1_, tmpR1b_);
+    Mv_inv_->Mult(tmpR1_, tmpR1b_);
     tmpR0b_ *= tmpR0c_;
-    tmpR1b_ *= tmpR0b_;
+    multScalarVectorIP(tmpR0b_, &tmpR1b_, dim_);
     tmpR1c_ += tmpR1b_;
   }
   dotVector(tmpR1a_, tmpR1c_, &tmpR1_, dim_);
-  MsRho_->Mult(tmpR1_, crossDiff_);
+  Ms_->Mult(tmpR1_, crossDiff_);
 }
 
 void ReactingFlow::computeExplicitTempConvectionOP(bool extrap) {
