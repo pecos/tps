@@ -379,7 +379,15 @@ void Tomboulides::initializeSelf() {
   tpsP_->getInput("loMach/tomboulides/ic", ic_string_, std::string(""));
 
   // set IC if we have one at this point
-  if (!ic_string_.empty()) {
+  if (ic_string_ == "uniform") {
+    Vector zero(dim_);
+    zero = 0.0;
+    velocity_ic_.SetSize(dim_);
+    std::string basepath("loMach/tomboulides");
+    tpsP_->getVec("loMach/tomboulides/velocity", velocity_ic_, dim_, zero);
+    VectorConstantCoefficient u_excoeff(velocity_ic_);
+    u_curr_gf_->ProjectCoefficient(u_excoeff);
+  } else if (!ic_string_.empty()) {
     vfptr user_func = vel_ic(ic_string_);
     VectorFunctionCoefficient u_excoeff(nvel_, user_func);
     u_excoeff.SetTime(0.0);
