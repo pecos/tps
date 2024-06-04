@@ -1218,7 +1218,6 @@ void ReactingFlow::temperatureStep() {
 
   // convection
   computeExplicitTempConvectionOP(true);  // ->tmpR0_
-  tmpR0_ = 0.0;                           // TODO(trevilo): Eliminate.  This is a bug, right?
   resT_.Set(-1.0, tmpR0_);
 
   // for unsteady term, compute and add known part of BDF unsteady term
