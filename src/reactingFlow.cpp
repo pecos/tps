@@ -40,9 +40,6 @@
 
 #include "loMach.hpp"
 #include "loMach_options.hpp"
-// #include "logger.hpp"
-// #include "tps.hpp"
-// #include "utils.hpp"
 
 using namespace mfem;
 using namespace mfem::common;
@@ -59,7 +56,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   rank0_ = (pmesh_->GetMyRank() == 0);
   order_ = loMach_opts->order;
 
-  std::cout << "Constructing ReactingFlow!" << endl;
+  if (rank0_) std::cout << "Constructing ReactingFlow!" << endl;
 
   /// Basic input information
   tpsP_->getInput("loMach/ambientPressure", ambient_pressure_, 101325.0);
@@ -84,12 +81,10 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   // plasma conditions. ???
   workFluid_ = USER_DEFINED;
   gasModel_ = PERFECT_MIXTURE;
-  // transportModel_ = ARGON_MINIMAL;
   transportModel_ = ARGON_MIXTURE;
   chemistryModel_ = NUM_CHEMISTRYMODEL;
 
   /// Minimal amount of info for mixture input struct
-  // Vector inputCV;
   mixtureInput_.f = workFluid_;
   tpsP_->getInput("plasma_models/species_number", nSpecies_, 3);
   mixtureInput_.numSpecies = nSpecies_;
@@ -97,16 +92,6 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   tpsP_->getInput("plasma_models/includeElectron", mixtureInput_.isElectronIncluded, true);
   tpsP_->getInput("plasma_models/two_temperature", mixtureInput_.twoTemperature, false);
   tpsP_->getInput("plasma_models/const_plasma_conductivity", const_plasma_conductivity_, 0.0);
-
-  /*
-enum GasParams {
-  SPECIES_MW,
-  SPECIES_CHARGES,
-  FORMATION_ENERGY,
-  SPECIES_DEGENERACY,
-  NUM_GASPARAMS
-};
-*/
 
   gasParams_.SetSize(nSpecies_, GasParams::NUM_GASPARAMS);
   gasParams_ = 0.0;
@@ -137,19 +122,13 @@ enum GasParams {
     mixtureInput_.gasParams[(i - 1) + nSpecies_ * GasParams::SPECIES_DEGENERACY] = levelDegeneracy;
     tpsP_->getRequiredInput((basepath + "/perfect_mixture/constant_molar_cv").c_str(), mixtureInput_.molarCV[i - 1]);
     tpsP_->getRequiredInput((basepath + "/initialMassFraction").c_str(), initialMassFraction_(i - 1));
-
-    // mixtureInput_.gasParams = gasParams_;
   }
 
   /// Minimal amount of info for transport input struct
   std::vector<std::string> InputSpeciesNames;
   InputSpeciesNames.resize(nSpecies_);
   std::map<std::string, int> speciesMapping;
-  // speciesMapping.resize(nSpecies_);
-  // Vector speciesMass(nSpecies_);
-  // Vector speciesCharge(nSpecies_);
   Vector mixtureToInputMap(nSpecies_);
-  // Vector atomMW;
   int backgroundIndex;
   int paramIdx = 0;
   int targetIdx;
@@ -243,14 +222,11 @@ enum GasParams {
 
   Vector speciesCharge(nSpecies_);
   for (int sp = 0; sp < nSpecies_; sp++) {
-    // if (sp == speciesMapping["Ar.+1"] ) {
     if (speciesNames_[sp] == "Ar.+1") {
       speciesCharge[sp] = +1.0;
-      // } else if (sp == speciesMapping["E"] ) {
     } else if (speciesNames_[sp] == "E") {
       speciesCharge[sp] = -1.0;
     } else {
-      std::cout << "caught Ar" << endl;
       speciesCharge[sp] = 0.0;
     }
   }
@@ -312,7 +288,6 @@ enum GasParams {
   identifyCollisionType(speciesType, argonInput_.collisionIndex);
 
   mixture_ = new PerfectMixture(mixtureInput_, dim_, dim_, const_plasma_conductivity_);
-  // transport_ = new ArgonMinimalTransport(mixture_, argonInput_);
   transport_ = new ArgonMixtureTransport(mixture_, argonInput_);
 
   /// Minimal amount of info for chemistry input struct
@@ -322,7 +297,6 @@ enum GasParams {
 
   Vector reactionEnergies(nReactions_);
   Vector detailedBalance(nReactions_);
-  // Vector reactionModels(nReactions_);
   Array<ReactionModel> reactionModels;
   reactionModels.SetSize(nReactions_);
   Vector equilibriumConstantParams(nSpecies_ * nReactions_);
@@ -347,6 +321,8 @@ enum GasParams {
     tpsP_->getRequiredInput((basepath + "/reaction_energy").c_str(), energy);
     reactionEnergies[r - 1] = energy;
 
+    // TODO(trevilo): Add 'tabulated' option.  Not supported yet b/c
+    // table read functionality is buried in M2ulPhyS.
     if (model == "arrhenius") {
       reactionModels[r - 1] = ARRHENIUS;
 
@@ -363,11 +339,6 @@ enum GasParams {
       tpsP_->getRequiredInput((basepath + "/arrhenius/b").c_str(), b);
       tpsP_->getRequiredInput((basepath + "/arrhenius/E").c_str(), E);
       rxnModelParamsHost.push_back(Vector({A, b, E}));
-
-      // } else if (model == "tabulated") {
-      // reactionModels[r - 1] = TABULATED_RXN;
-      // std::string inputPath(basepath + "/tabulated");
-      // readTable(inputPath, chemistryInput_.reactionInputs[r - 1].tableInput);
     } else {
       grvy_printf(GRVY_ERROR, "\nUnknown reaction_model -> %s", model.c_str());
       exit(ERROR);
@@ -495,6 +466,8 @@ void ReactingFlow::initializeSelf() {
   if (rank0_) grvy_printf(ginfo, "Initializing ReactingFlow solver.\n");
 
   nActiveSpecies_ = mixture_->GetNumActiveSpecies();
+
+  // TODO(trevilo): These shouldn't be hardcoded.
   Pr_ = 0.72;
   Sc_ = 1.0;
   invPr_ = 1 / Pr_;
@@ -678,6 +651,7 @@ void ReactingFlow::initializeSelf() {
   // 2) For restarts, this IC is overwritten by the restart field,
   // which is read later.
 
+  // TODO(trevilo): Move into cases.{hpp,cpp}
   if (!ic_string_.empty()) {
     if (ic_string_ == "step") {
       if (rank0_) std::cout << "Setting stepwise initial Yn condition." << endl;
@@ -816,12 +790,7 @@ void ReactingFlow::initializeSelf() {
   if (!(pmesh_->bdr_attributes.Size() == 0)) {
     Array<int> attr_outlet(pmesh_->bdr_attributes.Max());
     attr_outlet = 0;
-
-    // No code for this yet, so die if detected
-    assert(numOutlets == 0);
-
-    // But... outlets will just get homogeneous Neumann on T, so
-    // basically need to do nothing.
+    // Outlet is homogeneous Neumann on species and T, so nothing more to do here
   }
 
   // Wall BCs
@@ -888,7 +857,6 @@ void ReactingFlow::initializeOperators() {
 
   // coefficients for operators
   cpMix_coeff_ = new GridFunctionCoefficient(&CpMix_gf_);
-  // rho_coeff_ = new GridFunctionCoefficient(&rn_gf_);
   rhon_next_coeff_ = new GridFunctionCoefficient(&rn_gf_);
   species_Cp_coeff_ = new GridFunctionCoefficient(&CpY_gf_);
   mut_coeff_ = new GridFunctionCoefficient(turbModel_interface_->eddy_viscosity);
@@ -922,7 +890,6 @@ void ReactingFlow::initializeOperators() {
 
   At_form_ = new ParBilinearForm(sfes_);
   auto *at_blfi = new ConvectionIntegrator(*rhouCp_coeff_);
-  // auto *at_blfi = new ConvectionIntegrator(*rhou_coeff_);
   if (numerical_integ_) {
     at_blfi->SetIntRule(&ir_nli);
   }
@@ -965,7 +932,6 @@ void ReactingFlow::initializeOperators() {
   auto *msrho_blfi = new MassIntegrator(*rhon_next_coeff_);
   if (numerical_integ_) {
     msrho_blfi->SetIntRule(&ir_i);
-    // msrho_blfi->SetIntRule(&ir_di);
   }
   MsRho_form_->AddDomainIntegrator(msrho_blfi);
   if (partial_assembly_) {
@@ -992,7 +958,6 @@ void ReactingFlow::initializeOperators() {
   // temperature Helmholtz
   Ht_form_ = new ParBilinearForm(sfes_);
   auto *hmt_blfi = new MassIntegrator(*rhoCp_over_dt_coeff_);
-  // auto *hmt_blfi = new MassIntegrator(*rho_over_dt_coeff_);
   auto *hdt_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
 
   if (numerical_integ_) {
@@ -1090,7 +1055,6 @@ void ReactingFlow::initializeOperators() {
   }
   Mq_form_->Assemble();
   Mq_form_->FormSystemMatrix(Qt_ess_tdof_, Mq_);
-  // Mq_form_->FormSystemMatrix(empty, Mq);
   if (rank0_) std::cout << "ReactingFlow Mq operator set" << endl;
 
   if (partial_assembly_) {
@@ -1141,15 +1105,6 @@ void ReactingFlow::initializeOperators() {
   }
   LY_form_->Assemble();
   LY_form_->FormSystemMatrix(empty, LY_);
-
-  // // remaining initialization
-  // if (config_->resetTemp == true) {
-  //   double *data = Tn_gf_.HostReadWrite();
-  //   for (int i = 0; i < Sdof; i++) {
-  //     data[i] = config_->initRhoRhoVp[4];
-  //   }
-  //   if (rank0_) std::cout << "Reset temperature to IC" << endl;
-  // }
 
   // copy IC to other temp containers
   Tn_gf_.GetTrueDofs(Tn_);
@@ -1262,7 +1217,7 @@ void ReactingFlow::temperatureStep() {
 
   // convection
   computeExplicitTempConvectionOP(true);  // ->tmpR0_
-  tmpR0_ = 0.0;                           // testing...
+  tmpR0_ = 0.0;                           // TODO(trevilo): Eliminate.  This is a bug, right?
   resT_.Set(-1.0, tmpR0_);
 
   // for unsteady term, compute and add known part of BDF unsteady term
@@ -1277,8 +1232,6 @@ void ReactingFlow::temperatureStep() {
 
   // dPo/dt
   tmpR0_ = dtP_;  // with rho*Cp on LHS, no Cp on this term
-  // tmpR0_ = dtP_ / 1000.6; // FIX Cp for temp eq
-  // tmpR0_ = (dtP_ / Cp_); <- what is cp?
   Ms_->AddMult(tmpR0_, resT_);
 
   // heat of formation
@@ -1356,7 +1309,6 @@ void ReactingFlow::speciesStep(int iSpec) {
 
   // convection
   computeExplicitSpecConvectionOP(iSpec, true);  // ->tmpR0_
-  // tmpR0_ = 0.0; // testing...
   resY_.Set(-1.0, tmpR0_);
 
   // for unsteady term, compute and add known part of BDF unsteady term
@@ -1484,14 +1436,11 @@ void ReactingFlow::heatOfFormation() {
 
     // Sum over species to get enthalpy term
     for (int n = 0; n < nSpecies_; n++) {
-      // HACK: Hardcode Cv for now
-      // TODO(trevilo): Generalize this
-      double molarCV = speciesMolarCv_[n];  // 2.49996;
+      double molarCV = speciesMolarCv_[n];
       molarCV *= UNIVERSALGASCONSTANT;
       double molarCP = molarCV + UNIVERSALGASCONSTANT;
 
       hspecies = (molarCP * T + gasParams_(n, GasParams::FORMATION_ENERGY)) / gasParams_(n, GasParams::SPECIES_MW);
-      // hspecies = (gasParams_(n, GasParams::FORMATION_ENERGY)) / gasParams_(n, GasParams::SPECIES_MW);
       h_hw[i] -= hspecies * h_prodY[i + n * sDofInt_];
     }
   }
@@ -1715,7 +1664,6 @@ void ReactingFlow::updateMixture() {
       for (int sp = 0; sp < nSpecies_; sp++) {
         mixture_->GetSpeciesCp(n_sp, d_Rho[i], sp, cpY);
         d_Cp[i + sp * sDofInt_] = cpY / std::max(d_Rho[i] * d_Yn[i + sp * sDofInt_], 1.0e-14);
-        // std::cout << i << ", " << sp << ") CpY: " << cpY << " " << d_Cp[i + sp * sDofInt_] << endl;
       }
     }
   }
@@ -1744,25 +1692,9 @@ void ReactingFlow::updateThermoP() {
 
     // update Po so mass is conserved given the new temperature
     thermo_pressure_ = system_mass_ / allMass * Pnm1_;
-    // dtP_ = (thermo_pressure_ - Pnm1_) / dt_;
     dtP_ = time_coeff_.bd0 * thermo_pressure_ + time_coeff_.bd1 * Pnm1_ + time_coeff_.bd2 * Pnm2_ +
            time_coeff_.bd3 * Pnm3_;
     dtP_ *= 1.0 / dt_;
-
-    // testing...
-    /*
-    myMass = 0.0;
-    tmpR0_ = 1.0;
-    tmpR0_ /= Tn_;
-    tmpR0_ *= thermo_pressure_;
-    tmpR0_ /= tmpR0a_;
-    Ms_->Mult(tmpR0_, tmpR0b_);
-    myMass = tmpR0b_.Sum();
-    MPI_Allreduce(&myMass, &allMass, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-    if( rank0_ == true ) std::cout << " Original closed system mass: " << system_mass_ << " [kg]" << endl;
-    if( rank0_ == true ) std::cout << " New (closed) system mass: " << allMass << " [kg]" << endl;
-    if( rank0_ == true ) std::cout << " ThermoP: " << thermo_pressure_ << " dtP_: " << dtP_ << endl;
-    */
   }
 }
 
@@ -1780,10 +1712,8 @@ void ReactingFlow::updateDiffusivity() {
       double Efield[gpudata::MAXDIM];
       for (int v = 0; v < dim_; v++) Efield[v] = 0.0;
 
-      // int nEq = dim_ + 2 + nActiveSpecies_;  // last Yn not included, i guess...
       double state[gpudata::MAXEQUATIONS];
       double conservedState[gpudata::MAXEQUATIONS];
-      // double diffSp[nSpecies_];
       double diffSp[gpudata::MAXSPECIES];
 
       // Populate *primitive* state vector = [rho, velocity, temperature, species mole densities]
@@ -1809,7 +1739,6 @@ void ReactingFlow::updateDiffusivity() {
   {
     double *dataVisc = visc_.HostReadWrite();
     for (int i = 0; i < sDofInt_; i++) {
-      // int nEq = dim_ + 2 + nActiveSpecies_;
       double state[gpudata::MAXEQUATIONS];
       double conservedState[gpudata::MAXEQUATIONS];
       double visc[2];
@@ -1878,7 +1807,6 @@ void ReactingFlow::updateDensity(double tStep) {
       tmpR0_ /= Tn_;
       rn_.Add(0.5, tmpR0_);
     } else {
-      // multConstScalarInv((thermo_pressure_ / Rgas_), Tn_, &rn_);
       multConstScalarInv(thermo_pressure_, tmpR0a_, &tmpR0b_);
       multScalarScalarInv(tmpR0b_, Tn_, &rn_);
     }
@@ -1893,7 +1821,6 @@ void ReactingFlow::updateDensity(double tStep) {
 
   // project to p-space in case not same as vel-temp
   R0PM0_gf_.SetFromTrueDofs(rn_);
-  // R0PM1_gf.ProjectGridFunction(R0PM0_gf);
 }
 
 void ReactingFlow::computeSystemMass() {
@@ -1924,30 +1851,10 @@ void ReactingFlow::AddTempDirichletBC(Coefficient *coeff, Array<int> &attr) {
   temp_dbcs_.emplace_back(attr, coeff);
   for (int i = 0; i < attr.Size(); ++i) {
     if (attr[i] == 1) {
-      // std::cout << "patch: " << i << " temp_ess_attr: " << temp_ess_attr_[i] << endl;
       assert(!temp_ess_attr_[i]);
       temp_ess_attr_[i] = 1;
     }
   }
-
-  /*
-  if (rank0_) {
-    mfem::out << "Adding Temperature Dirichlet BC to attributes ";
-    for (int i = 0; i < attr.Size(); ++i) {
-      if (attr[i] == 1) {
-        mfem::out << i << " ";
-      }
-    }
-    mfem::out << std::endl;
-  }
-
-  for (int i = 0; i < attr.Size(); ++i) {
-    MFEM_ASSERT((temp_ess_attr_[i] && attr[i]) == 0, "Duplicate boundary definition deteceted.");
-    if (attr[i] == 1) {
-      temp_ess_attr_[i] = 1;
-    }
-  }
-  */
 }
 
 void ReactingFlow::AddTempDirichletBC(ScalarFuncT *f, Array<int> &attr) {
@@ -1980,6 +1887,7 @@ void ReactingFlow::AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr) {
 }
 
 void ReactingFlow::computeQtTO() {
+  // TODO(trevilo): This method isn't sufficiently general
   tmpR0_ = 0.0;
   LQ_bdry_->Update();
   LQ_bdry_->Assemble();
@@ -2033,7 +1941,6 @@ void ReactingFlow::identifySpeciesType(Array<ArgonSpcs> &speciesType) {
         if (argonMonomer) {
           speciesType[sp] = AR;
         } else {
-          // std::string name = speciesNames_[(*mixtureToInputMap_)[sp]];
           std::string name = speciesNames_[sp];
           grvy_printf(GRVY_ERROR, "The atom composition of species %s is not supported by ArgonMixtureTransport! \n",
                       name.c_str());
@@ -2052,14 +1959,12 @@ void ReactingFlow::identifySpeciesType(Array<ArgonSpcs> &speciesType) {
       if (electron) {
         speciesType[sp] = ELECTRON;
       } else {
-        // std::string name = speciesNames_[(*mixtureToInputMap_)[sp]];
         std::string name = speciesNames_[sp];
         grvy_printf(GRVY_ERROR, "The atom composition of species %s is not supported by ArgonMixtureTransport! \n",
                     name.c_str());
         exit(-1);
       }
     } else {
-      // std::string name = speciesNames_[(*mixtureToInputMap_)[sp]];
       std::string name = speciesNames_[sp];
       grvy_printf(GRVY_ERROR, "The atom composition of species %s is not supported by ArgonMixtureTransport! \n",
                   name.c_str());
@@ -2070,7 +1975,6 @@ void ReactingFlow::identifySpeciesType(Array<ArgonSpcs> &speciesType) {
   // Check all species are identified.
   for (int sp = 0; sp < nSpecies_; sp++) {
     if (speciesType[sp] == NONE_ARGSPCS) {
-      // std::string name = speciesNames_[(*mixtureToInputMap_)[sp]];
       std::string name = speciesNames_[sp];
       grvy_printf(GRVY_ERROR, "The species %s is not identified in ArgonMixtureTransport! \n", name.c_str());
       exit(-1);
@@ -2081,9 +1985,7 @@ void ReactingFlow::identifySpeciesType(Array<ArgonSpcs> &speciesType) {
 }
 
 void ReactingFlow::identifyCollisionType(const Array<ArgonSpcs> &speciesType, ArgonColl *collisionIndex) {
-  // collisionIndex_.resize(numSpecies);
   for (int spI = 0; spI < nSpecies_; spI++) {
-    // collisionIndex_[spI].resize(numSpecies - spI);
     for (int spJ = spI; spJ < nSpecies_; spJ++) {
       // If not initialized, will raise an error.
       collisionIndex[spI + spJ * nSpecies_] = NONE_ARGCOLL;
@@ -2103,8 +2005,6 @@ void ReactingFlow::identifyCollisionType(const Array<ArgonSpcs> &speciesType, Ar
                    ((speciesType[spI] == ELECTRON) && (speciesType[spJ] == AR))) {
           collisionIndex[spI + spJ * nSpecies_] = AR_E;
         } else {
-          // std::string name1 = speciesNames_[(*mixtureToInputMap_)[spI]];
-          // std::string name2 = speciesNames_[(*mixtureToInputMap_)[spJ]];
           std::string name1 = speciesNames_[spI];
           std::string name2 = speciesNames_[spJ];
           grvy_printf(GRVY_ERROR, "1. %s - %s is not supported in ArgonMixtureTransport! \n", name1.c_str(),

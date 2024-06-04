@@ -97,9 +97,7 @@ class ReactingFlow : public ThermoChemModelBase {
   ArgonTransportInput argonInput_;
   ChemistryInput chemistryInput_;
 
-  // GasMixture *mixture_ = NULL;
   PerfectMixture *mixture_ = NULL;
-  // TransportProperties *transport_ = NULL;
   ArgonMixtureTransport *transport_ = NULL;
   Chemistry *chemistry_ = NULL;
 
@@ -107,7 +105,6 @@ class ReactingFlow : public ThermoChemModelBase {
   std::map<std::string, int> atomMap_;
   DenseMatrix speciesComposition_;
   DenseMatrix gasParams_;
-  // double gasParams_[gpudata::MAXSPECIES * GasParams::NUM_GASPARAMS];
   double const_plasma_conductivity_;
 
   // Flags
@@ -212,7 +209,6 @@ class ReactingFlow : public ThermoChemModelBase {
   SumCoefficient *species_diff_sum_coeff_ = nullptr;
   ProductCoefficient *species_diff_total_coeff_ = nullptr;
 
-  // ConstantCoefficient *species_Cp_coeff_ = nullptr;
   GridFunctionCoefficient *species_Cp_coeff_ = nullptr;
   ProductCoefficient *species_diff_Cp_coeff_ = nullptr;
 
