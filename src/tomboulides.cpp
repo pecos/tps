@@ -672,9 +672,6 @@ void Tomboulides::initializeOperators() {
     L_iorho_blfi->SetIntRule(&ir_ni_p);
   }
   L_iorho_form_->AddDomainIntegrator(L_iorho_blfi);
-  if (partial_assembly_) {
-    L_iorho_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
-  }
   L_iorho_form_->Assemble();
   L_iorho_form_->FormSystemMatrix(pres_ess_tdof_, L_iorho_op_);
 
@@ -765,9 +762,6 @@ void Tomboulides::initializeOperators() {
     msr_blfi->SetIntRule(&ir_ni_p);
   }
   Ms_rho_form_->AddDomainIntegrator(msr_blfi);
-  if (partial_assembly_) {
-    Ms_rho_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
-  }
   Ms_rho_form_->Assemble();
   Ms_rho_form_->FormSystemMatrix(empty, Ms_rho_op_);
 
@@ -801,9 +795,6 @@ void Tomboulides::initializeOperators() {
     mvr_blfi->SetIntRule(&ir_ni_v);
   }
   Mv_rho_form_->AddDomainIntegrator(mvr_blfi);
-  if (partial_assembly_) {
-    Mv_rho_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
-  }
   Mv_rho_form_->Assemble();
   Mv_rho_form_->FormSystemMatrix(empty, Mv_rho_op_);
 
@@ -826,16 +817,11 @@ void Tomboulides::initializeOperators() {
   Mv_inv_->SetRelTol(mass_inverse_rtol_);
   Mv_inv_->SetMaxIter(mass_inverse_max_iter_);
 
-  if (partial_assembly_) {
-    Vector diag_pa(vfes_->GetTrueVSize());
-    Mv_rho_form_->AssembleDiagonal(diag_pa);
-    Mv_rho_inv_pc_ = new OperatorJacobiSmoother(diag_pa, empty);
-  } else {
-    Mv_rho_inv_pc_ = new HypreSmoother(*Mv_rho_op_.As<HypreParMatrix>());
-    dynamic_cast<HypreSmoother *>(Mv_rho_inv_pc_)->SetType(HypreSmoother::Jacobi, 0);
-    dynamic_cast<HypreSmoother *>(Mv_rho_inv_pc_)->SetSOROptions(0.0, 1.0);
-    dynamic_cast<HypreSmoother *>(Mv_rho_inv_pc_)->SetPolyOptions(3, 0.01);
-  }
+  Mv_rho_inv_pc_ = new HypreSmoother(*Mv_rho_op_.As<HypreParMatrix>());
+  dynamic_cast<HypreSmoother *>(Mv_rho_inv_pc_)->SetType(HypreSmoother::Jacobi, 0);
+  dynamic_cast<HypreSmoother *>(Mv_rho_inv_pc_)->SetSOROptions(0.0, 1.0);
+  dynamic_cast<HypreSmoother *>(Mv_rho_inv_pc_)->SetPolyOptions(3, 0.01);
+
   Mv_rho_inv_ = new CGSolver(vfes_->GetComm());
   Mv_rho_inv_->iterative_mode = false;
   Mv_rho_inv_->SetOperator(*Mv_rho_op_);
@@ -902,26 +888,15 @@ void Tomboulides::initializeOperators() {
     auto *hfv_blfi = new VectorMassIntegrator(*visc_forcing_coeff_);
     Hv_form_->AddDomainIntegrator(hfv_blfi);
   }
-  if (partial_assembly_) {
-    // Partial assembly is not supported for variable coefficient
-    // VectorMassIntegrator (as of mfem 4.5.2 at least)
-    assert(false);
-    Hv_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
-  }
   Hv_form_->Assemble();
   Hv_form_->FormSystemMatrix(vel_ess_tdof_, Hv_op_);
 
   // Helmholtz solver
-  if (partial_assembly_) {
-    Vector diag_pa(vfes_->GetTrueVSize());
-    Hv_form_->AssembleDiagonal(diag_pa);
-    Hv_inv_pc_ = new OperatorJacobiSmoother(diag_pa, vel_ess_tdof_);
-  } else {
-    Hv_inv_pc_ = new HypreSmoother(*Hv_op_.As<HypreParMatrix>());
-    dynamic_cast<HypreSmoother *>(Hv_inv_pc_)->SetType(HypreSmoother::Jacobi, 0);
-    dynamic_cast<HypreSmoother *>(Hv_inv_pc_)->SetSOROptions(0.0, 1.0);
-    dynamic_cast<HypreSmoother *>(Hv_inv_pc_)->SetPolyOptions(3, 0.01);
-  }
+  Hv_inv_pc_ = new HypreSmoother(*Hv_op_.As<HypreParMatrix>());
+  dynamic_cast<HypreSmoother *>(Hv_inv_pc_)->SetType(HypreSmoother::Jacobi, 0);
+  dynamic_cast<HypreSmoother *>(Hv_inv_pc_)->SetSOROptions(0.0, 1.0);
+  dynamic_cast<HypreSmoother *>(Hv_inv_pc_)->SetPolyOptions(3, 0.01);
+
   Hv_inv_ = new CGSolver(vfes_->GetComm());
   Hv_inv_->iterative_mode = true;
   Hv_inv_->SetOperator(*Hv_op_);
@@ -1201,10 +1176,7 @@ void Tomboulides::step() {
   Hv_form_->FormSystemMatrix(vel_ess_tdof_, Hv_op_);
 
   Hv_inv_->SetOperator(*Hv_op_);
-  if (partial_assembly_) {
-    // TODO(trevilo): Support partial assembly
-    assert(false);
-  }
+  
   sw_helm_.Stop();
 
   //------------------------------------------------------------------------
@@ -1408,15 +1380,7 @@ void Tomboulides::step() {
   pfes_->GetRestrictionMatrix()->MultTranspose(resp_vec_, *resp_gf_);
 
   Vector X1, B1;
-  if (partial_assembly_) {
-    // TODO(trevilo): Support partial assembly here
-    assert(false);
-    // auto *SpC = Sp.As<ConstrainedOperator>();
-    // EliminateRHS(*Sp_form, *SpC, pres_ess_tdof, pn_gf, resp_gf, X1, B1, 1);
-  } else {
-    L_iorho_form_->FormLinearSystem(pres_ess_tdof_, *p_gf_, *resp_gf_, L_iorho_op_, X1, B1, 1);
-  }
-
+  L_iorho_form_->FormLinearSystem(pres_ess_tdof_, *p_gf_, *resp_gf_, L_iorho_op_, X1, B1, 1);
   L_iorho_inv_->Mult(B1, X1);
   if (!L_iorho_inv_->GetConverged()) {
     if (rank0_) std::cout << "ERROR: Poisson solve did not converge." << std::endl;
@@ -1463,15 +1427,7 @@ void Tomboulides::step() {
   vfes_->GetRestrictionMatrix()->MultTranspose(resu_vec_, *resu_gf_);
 
   Vector X2, B2;
-  if (partial_assembly_) {
-    // TODO(trevilo): Add partial assembly support
-    assert(false);
-    // auto *HC = H.As<ConstrainedOperator>();
-    // EliminateRHS(*Hv_form_, *HC, vel_ess_tdof, un_next_gf, resu_gf, X2, B2, 1);
-  } else {
-    Hv_form_->FormLinearSystem(vel_ess_tdof_, *u_next_gf_, *resu_gf_, Hv_op_, X2, B2, 1);
-  }
-
+  Hv_form_->FormLinearSystem(vel_ess_tdof_, *u_next_gf_, *resu_gf_, Hv_op_, X2, B2, 1);
   Hv_inv_->Mult(B2, X2);
   if (!Hv_inv_->GetConverged()) {
     if (rank0_) std::cout << "ERROR: Helmholtz solve did not converge." << std::endl;
