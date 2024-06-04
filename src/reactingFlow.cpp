@@ -78,6 +78,9 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   tpsP_->getInput("loMach/reacting/linear-solver-max-iter", max_iter_, 2000);
   tpsP_->getInput("loMach/reacting/linear-solver-verbosity", pl_solve_, 0);
 
+  tpsP_->getInput("loMach/reacting/eddy-Pr", Pr_, 0.72);
+  tpsP_->getInput("loMach/reacting/eddy-Sc", Sc_, 1.0);
+
   // plasma conditions. ???
   workFluid_ = USER_DEFINED;
   gasModel_ = PERFECT_MIXTURE;
@@ -468,8 +471,6 @@ void ReactingFlow::initializeSelf() {
   nActiveSpecies_ = mixture_->GetNumActiveSpecies();
 
   // TODO(trevilo): These shouldn't be hardcoded.
-  Pr_ = 0.72;
-  Sc_ = 1.0;
   invPr_ = 1 / Pr_;
   invSc_ = 1 / Sc_;
 
