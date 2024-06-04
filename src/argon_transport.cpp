@@ -1105,9 +1105,8 @@ void ArgonMixtureTransport::computeMixtureAverageDiffusivity(const Vector &state
 }
 
 /*
-MFEM_HOST_DEVICE void ArgonMixtureTransport::computeMixtureAverageDiffusivity(const double *state, double *diffusivity) {
-  double primitiveState[gpudata::MAXEQUATIONS];
-  mixture->GetPrimitivesFromConservatives(state, primitiveState);
+MFEM_HOST_DEVICE void ArgonMixtureTransport::computeMixtureAverageDiffusivity(const double *state, double *diffusivity)
+{ double primitiveState[gpudata::MAXEQUATIONS]; mixture->GetPrimitivesFromConservatives(state, primitiveState);
 
   double n_sp[3], X_sp[3], Y_sp[3];
   mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
