@@ -74,13 +74,17 @@ class CPUData {
   size_t stride_;
 };
 
-Tps2Boltzmann::Tps2Boltzmann(Tps *tps) : NIndexes(7), tps_(tps), all_fes_(nullptr) {
+void idenity_fun(const Vector &x, Vector &out) {
+  for (int i(0); i < x.Size(); ++i) out[i] = x[i];
+}
+
+Tps2Boltzmann::Tps2Boltzmann(Tps *tps)
+    : NIndexes(7), tps_(tps), all_fes_(nullptr), save_to_paraview_dc(false), paraview_dc(nullptr) {
   // Assert we have a couple solver;
   assert(tps->isFlowEMCoupled());
 
   tps->getRequiredInput("species/numSpecies", nspecies_);
-  // TODO(Umberto): Get the number of reactions for the solver
-  tps->getRequiredInput("boltzmannInterface/nreactions", nreactions_);
+  nreactions_ = _countBTEReactions();
   tps->getRequiredInput("boltzmannInterface/order", order_);
   tps->getRequiredInput("boltzmannInterface/basisType", basis_type_);
   assert(basis_type_ == 0 || basis_type_ == 1);
@@ -88,8 +92,30 @@ Tps2Boltzmann::Tps2Boltzmann(Tps *tps) : NIndexes(7), tps_(tps), all_fes_(nullpt
   tps->getRequiredInput("em/current_frequency", EfieldAngularFreq_);
   EfieldAngularFreq_ *= 2. * M_PI;
 
+  save_to_paraview_dc = tps->getInput("boltzmannInterface/save_to_paraview", false);
+
+
   offsets.SetSize(NIndexes + 1);
   ncomps.SetSize(NIndexes + 1);
+}
+
+
+int Tps2Boltzmann::_countBTEReactions() {
+  int total_reactions(0);
+  int bte_reactions(0);
+  tps_->getRequiredInput("reactions/number_of_reactions", total_reactions);
+  reaction_eqs_.reserve(total_reactions);
+  for (int r(0); r < total_reactions; ++r) {
+    std::string basepath("reactions/reaction" + std::to_string(r + 1));
+    std::string equation, model;
+    tps_->getRequiredInput((basepath + "/equation").c_str(), equation);
+    tps_->getRequiredInput((basepath + "/model").c_str(), model);
+    if (model == "bte") {
+      ++bte_reactions;
+      reaction_eqs_.push_back(equation);
+    }
+  }
+  return bte_reactions;
 }
 
 void Tps2Boltzmann::init(TPS::PlasmaSolver *flowSolver) {
@@ -165,6 +191,29 @@ void Tps2Boltzmann::init(TPS::PlasmaSolver *flowSolver) {
   scalar_interpolator_->AddDomainInterpolator(new mfem::IdentityInterpolator());
   scalar_interpolator_->SetAssemblyLevel(assembly_level);
   scalar_interpolator_->Assemble();
+
+  scalar_interpolator_to_nativeFES_ = new mfem::ParDiscreteLinearOperator(scalar_fes_, scalar_native_fes_);
+  scalar_interpolator_to_nativeFES_->AddDomainInterpolator(new mfem::IdentityInterpolator());
+  scalar_interpolator_to_nativeFES_->SetAssemblyLevel(assembly_level);
+  scalar_interpolator_to_nativeFES_->Assemble();
+
+  // Spatial coordinates
+  spatial_coord_fes_ = new mfem::ParFiniteElementSpace(pmesh, fec_, pmesh->Dimension(), mfem::Ordering::byNODES);
+  spatial_coordinates_ = new mfem::ParGridFunction(spatial_coord_fes_);
+  mfem::VectorFunctionCoefficient coord_fun(pmesh->Dimension(),
+                                            std::function<void(const Vector &, Vector &)>(idenity_fun));
+  spatial_coordinates_->ProjectCoefficient(coord_fun);
+
+  if (save_to_paraview_dc) {
+    paraview_dc = new mfem::ParaViewDataCollection("interface", pmesh);
+    paraview_dc->SetPrefixPath("BoltzmannInterface");
+    paraview_dc->SetDataFormat(VTKFormat::BINARY);
+    paraview_dc->RegisterField("Heavy temperature", &(this->Field(TPS::Tps2Boltzmann::Index::HeavyTemperature)));
+    paraview_dc->RegisterField("Electron temperature", &(this->Field(TPS::Tps2Boltzmann::Index::ElectronTemperature)));
+    paraview_dc->RegisterField("Electric field", &(this->Field(TPS::Tps2Boltzmann::Index::ElectricField)));
+    paraview_dc->RegisterField("Species", &(this->Field(TPS::Tps2Boltzmann::Index::SpeciesDensities)));
+    paraview_dc->RegisterField("Reaction rates", &(this->Field(TPS::Tps2Boltzmann::Index::ReactionRates)));
+  }
 }
 
 void Tps2Boltzmann::interpolateFromNativeFES(const ParGridFunction &input, Tps2Boltzmann::Index index) {
@@ -182,6 +231,28 @@ void Tps2Boltzmann::interpolateFromNativeFES(const ParGridFunction &input, Tps2B
   }
 }
 
+void Tps2Boltzmann::interpolateToNativeFES(ParGridFunction &output, Index index) {
+  if (ncomps[index] == 1) {
+    scalar_interpolator_to_nativeFES_->Mult(*(fields_[index]), output);
+  } else {
+    const int loc_size_native = list_native_fes_[index]->GetNDofs();
+    const int loc_size = list_fes_[index]->GetNDofs();
+    for (int icomp(0); icomp < ncomps[index]; ++icomp) {
+      mfem::Vector view_output(output, icomp * loc_size_native, loc_size_native);
+      mfem::Vector view_field(*(fields_[index]), icomp * loc_size, loc_size);
+      scalar_interpolator_to_nativeFES_->Mult(view_field, view_output);
+    }
+  }
+}
+
+void Tps2Boltzmann::saveDataCollection(int cycle, double time) {
+  if (paraview_dc) {
+    paraview_dc->SetCycle(cycle);
+    paraview_dc->SetTime(time);
+    paraview_dc->Save();
+  }
+}
+
 Tps2Boltzmann::~Tps2Boltzmann() {
   // Delete views
   for (std::size_t i(0); i < NIndexes + 1; ++i) delete fields_[i];
@@ -189,6 +260,7 @@ Tps2Boltzmann::~Tps2Boltzmann() {
   delete[] fields_;
 
   // Delete interpolators
+  delete scalar_interpolator_to_nativeFES_;
   delete scalar_interpolator_;
 
   // Delete view Native Finite Element Spaces
@@ -207,6 +279,9 @@ Tps2Boltzmann::~Tps2Boltzmann() {
 
   // Delete monolithic function space
   delete all_fes_;
+
+  delete spatial_coord_fes_;
+  delete spatial_coordinates_;
 
   // Delete finite element collection
   delete fec_;
@@ -252,6 +327,10 @@ void tps2bolzmann(py::module &m) {
 
   py::class_<TPS::Tps2Boltzmann>(m, "Tps2Boltzmann")
       .def(py::init<TPS::Tps *>())
+      .def("HostReadSpatialCoordinates",
+           [](const TPS::Tps2Boltzmann &interface) {
+             return std::unique_ptr<TPS::CPUDataRead>(new TPS::CPUDataRead(interface.SpatialCoordinates()));
+           })
       .def("HostRead",
            [](const TPS::Tps2Boltzmann &interface, TPS::Tps2Boltzmann::Index index) {
              return std::unique_ptr<TPS::CPUDataRead>(new TPS::CPUDataRead(interface.Field(index)));
@@ -260,9 +339,20 @@ void tps2bolzmann(py::module &m) {
            [](TPS::Tps2Boltzmann &interface, TPS::Tps2Boltzmann::Index index) {
              return std::unique_ptr<TPS::CPUData>(new TPS::CPUData(interface.Field(index), false));
            })
-      .def("HostReadWrite", [](TPS::Tps2Boltzmann &interface, TPS::Tps2Boltzmann::Index index) {
-        return std::unique_ptr<TPS::CPUData>(new TPS::CPUData(interface.Field(index), true));
-      });
+      .def("HostReadWrite",
+           [](TPS::Tps2Boltzmann &interface, TPS::Tps2Boltzmann::Index index) {
+             return std::unique_ptr<TPS::CPUData>(new TPS::CPUData(interface.Field(index), true));
+           })
+      .def("EfieldAngularFreq", &TPS::Tps2Boltzmann::EfieldAngularFreq)
+      .def("timeStep", &TPS::Tps2Boltzmann::timeStep)
+      .def("currentTime", &TPS::Tps2Boltzmann::currentTime)
+      .def("Nspecies", &TPS::Tps2Boltzmann::Nspecies)
+      .def("NeFiledComps", &TPS::Tps2Boltzmann::NeFieldComps)
+      .def("nComponents", &TPS::Tps2Boltzmann::nComponents)
+      .def("saveDataCollection", &TPS::Tps2Boltzmann::saveDataCollection, "Save the data collection in Paraview format",
+           py::arg("cycle"), py::arg("time"))
+      .def("getReactionEquation", &TPS::Tps2Boltzmann::getReactionEquation, "Return the equation of the reaction",
+           py::arg("index"));
 }
 }  // namespace tps_wrappers
 #endif

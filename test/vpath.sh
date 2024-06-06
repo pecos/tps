@@ -30,7 +30,8 @@ if [ ! -d ref_solns ];then
 fi
 
 # necessary binaries
-binaries="bats die.sh soln_differ count_gpus.sh sniff_mpirun.sh ../src/tps.py ../src/tps-time-loop.py ../test/test_tps_splitcomm.py"
+binaries="bats die.sh soln_differ count_gpus.sh sniff_mpirun.sh "
+binaries+="../src/tps.py ../src/tps-time-loop.py ../src/tps-bte_0d3v.py ../test/test_tps_splitcomm.py"
 for binary in $binaries; do
     if [ ! -x $binary ];then
         if [ -x $testDir/$binary ];then

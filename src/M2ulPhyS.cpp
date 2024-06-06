@@ -405,7 +405,14 @@ void M2ulPhyS::initVariables() {
     serial_mesh->GetNodes(coordinates);
 
     // Evaluate the distance function
-    evaluateDistanceSerial(*serial_mesh, wall_patch_list, coordinates, *serial_distance);
+    if (!config.read_distance || !config.GetRestartCycle()) {
+      if (rank0_) grvy_printf(ginfo, "Computing distance function\n");
+      evaluateDistanceSerial(*serial_mesh, wall_patch_list, coordinates, *serial_distance);
+    } else {
+      // If distance function is read from restart, this will be overwritten later
+      if (rank0_) grvy_printf(ginfo, "Distance function to be read from restart\n");
+      *serial_distance = 0.0;
+    }
     delete tmp_dfes;
   }
 
@@ -616,6 +623,11 @@ void M2ulPhyS::initVariables() {
   initIndirectionArrays();
 #endif
   initSolutionAndVisualizationVectors();
+
+  if (distance_ != NULL) {
+    ioData.registerIOFamily("Distance function", "/distance", distance_, false, config.read_distance);
+    ioData.registerIOVar("/distance", "distance", 0, config.read_distance);
+  }
 
   average = new Averaging(config.avg_opts_, config.GetOutputName());
   average->registerField(std::string("primitive_state"), Up, true, 1, nvel);
@@ -1076,6 +1088,12 @@ void M2ulPhyS::initIndirectionArrays() {
   // See #199 for more info.
   const int NumBCelems = fes->GetNBE();
 
+  // NB: *Must* call this here, as otherwise some faces are
+  // erroneously included as boundary faces and asserts below may
+  // fail
+  mesh->ExchangeFaceNbrNodes();
+  mesh->ExchangeFaceNbrData();
+
   if (NumBCelems > 0) {
     bdry_face_data.shape.UseDevice(true);
     bdry_face_data.shape.SetSize(NumBCelems * maxIntPoints * maxDofs);
@@ -1118,12 +1136,6 @@ void M2ulPhyS::initIndirectionArrays() {
     const FiniteElement *fe;
     FaceElementTransformations *tr;
     // Mesh *mesh = fes->GetMesh();
-
-    // NB: *Must* call this here, as otherwise some faces are
-    // erroneously included as boundary faces and asserts below may
-    // fail
-    mesh->ExchangeFaceNbrNodes();
-    mesh->ExchangeFaceNbrData();
 
     std::vector<int> uniqueElems;
     uniqueElems.clear();
@@ -1941,6 +1953,10 @@ void M2ulPhyS::projectInitialSolution() {
 
   initGradUp();
 
+  // Exchange before computing primitives
+  U->ParFESpace()->ExchangeFaceNbrData();
+  U->ExchangeFaceNbrData();
+
   updatePrimitives();
 
   // update pressure grid function
@@ -2662,6 +2678,7 @@ void M2ulPhyS::parseFlowOptions() {
   }
   tpsP->getInput("flow/refinement_levels", config.ref_levels, 0);
   tpsP->getInput("flow/computeDistance", config.compute_distance, false);
+  tpsP->getInput("flow/readDistance", config.read_distance, false);
 
   std::string type;
   tpsP->getInput("flow/sgsModel", type, std::string("none"));
@@ -3298,6 +3315,11 @@ void M2ulPhyS::parseReactionInputs() {
       config.reactionModels[r - 1] = TABULATED_RXN;
       std::string inputPath(basepath + "/tabulated");
       readTable(inputPath, config.chemistryInput.reactionInputs[r - 1].tableInput);
+    } else if (model == "bte") {
+      config.reactionModels[r - 1] = GRIDFUNCTION_RXN;
+      int index;
+      tpsP->getRequiredInput((basepath + "/bte/index").c_str(), index);
+      config.chemistryInput.reactionInputs[r - 1].indexInput = index;
     } else {
       grvy_printf(GRVY_ERROR, "\nUnknown reaction_model -> %s", model.c_str());
       exit(ERROR);
@@ -3416,7 +3438,7 @@ void M2ulPhyS::parseReactionInputs() {
             config.equilibriumConstantParams[p + r * gpudata::MAXCHEMPARAMS];
       }
 
-      if (config.reactionModels[r] != TABULATED_RXN) {
+      if (config.reactionModels[r] == ARRHENIUS || config.reactionModels[r] == HOFFERTLIEN) {
         assert(rxn_param_idx < config.rxnModelParamsHost.size());
         config.chemistryInput.reactionInputs[r].modelParams = config.rxnModelParamsHost[rxn_param_idx].Read();
         rxn_param_idx += 1;
@@ -3976,8 +3998,7 @@ void M2ulPhyS::checkSolverOptions() const {
 }
 
 void M2ulPhyS::updatePrimitives() {
-  // U.V.: should this be U->HostRead() instead? U->HostWrite() does not sync memory before returning the pointer.
-  double *data = U->HostWrite();
+  const double *data = U->HostRead();
   double *dataUp = Up->HostWrite();
   int dof = vfes->GetNDofs();
 
@@ -4175,7 +4196,7 @@ void M2ulPhyS::updateVisualizationVariables() {
       Th = prim[1 + _nvel];
       Te = (in_mix->IsTwoTemperature()) ? prim[_num_equation - 1] : Th;
       double kfwd[gpudata::MAXREACTIONS], kC[gpudata::MAXREACTIONS];
-      in_chem->computeForwardRateCoeffs(Th, Te, kfwd);
+      in_chem->computeForwardRateCoeffs(Th, Te, n, kfwd);
       in_chem->computeEquilibriumConstants(Th, Te, kC);
       // get reaction rates
       double progressRates[gpudata::MAXREACTIONS];

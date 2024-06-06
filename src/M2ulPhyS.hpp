@@ -250,6 +250,9 @@ class M2ulPhyS : public TPS::PlasmaSolver {
   // ParNonlinearForm *gradUp_A;
   GradNonLinearForm *gradUp_A;
 
+  // Auxiliary grid function to store external reaction rates
+  std::unique_ptr<ParGridFunction> externalReactionRates;
+
   // Average handler
   Averaging *average;
 
