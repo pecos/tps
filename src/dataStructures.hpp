@@ -131,6 +131,7 @@ enum InletType {
   UNI_DENS_VEL,      // uniform inlet with density and vel specified
   INTERPOLATE,       // from an external data file
   SUB_DENS_VEL,      // Subsonic inlet specified by the density and velocity components
+  SUB_DENS_VEL_FACE,      // Subsonic inlet specified by the density and velocity component relative to the inlet face with u = normal, v & w tangent components  
   SUB_DENS_VEL_NR,   // Non-reflecting subsonic inlet specified by the density and velocity components
   SUB_VEL_CONST_ENT  // Subsonic non-reflecting. Specified vel, keeps entropy constant
 };

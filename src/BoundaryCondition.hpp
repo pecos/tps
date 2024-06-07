@@ -74,7 +74,7 @@ class BoundaryCondition {
   virtual ~BoundaryCondition();
 
   virtual void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip, double delta,
-                              double distance, Vector &bdrFlux) = 0;
+                              double time, double distance, Vector &bdrFlux) = 0;
 
   /** \brief Set the boundary state used in the gradient evaluation
    *

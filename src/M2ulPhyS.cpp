@@ -685,9 +685,12 @@ void M2ulPhyS::initVariables() {
   Array<int> local_attr;
   getAttributesInPartition(local_attr);
 
+  double *pTime;
+  pTime = &time;
+  
   bcIntegrator = NULL;
   if (local_attr.Size() > 0) {
-    bcIntegrator = new BCintegrator(groupsMPI, mesh, vfes, intRules, rsolver, dt, mixture, d_mixture, d_fluxClass, Up,
+    bcIntegrator = new BCintegrator(rank0_, groupsMPI, mesh, vfes, intRules, rsolver, dt, pTime, mixture, d_mixture, d_fluxClass, Up,
                                     gradUp, gpu_precomputed_data_.boundary_face_data, dim, num_equation, max_char_speed,
                                     config, local_attr, maxIntPoints, maxDofs, distance_);
   }
@@ -3563,6 +3566,7 @@ void M2ulPhyS::parseBCInputs() {
   // Inlet Bcs
   std::map<std::string, InletType> inletMapping;
   inletMapping["subsonic"] = SUB_DENS_VEL;
+  inletMapping["subsonicFaceBased"] = SUB_DENS_VEL_FACE;  
   inletMapping["nonreflecting"] = SUB_DENS_VEL_NR;
   inletMapping["nonreflectingConstEntropy"] = SUB_VEL_CONST_ENT;
 

@@ -59,6 +59,7 @@ class InletBC : public BoundaryCondition {
   Vector meanUp;
 
   Vector boundaryU;
+  Vector boundaryUp;  
   int bdrN;
   bool bdrUInit;
 
@@ -85,6 +86,8 @@ class InletBC : public BoundaryCondition {
 
   void subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn, Vector &bdrFlux);
 
+  void subsonicReflectingDensityVelocityFace(Vector &normal, Vector &stateIn, Vector transip, double time, Vector &bdrFlux);  
+
   void subsonicNonReflectingDensityVelocity(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
 
   virtual void updateMean(IntegrationRules *intRules, ParGridFunction *Up);
@@ -96,7 +99,7 @@ class InletBC : public BoundaryCondition {
           const Array<double> &_inputData, const int &_maxIntPoints, const int &maxDofs, bool axisym);
   ~InletBC();
 
-  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip, double delta,
+  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip, double delta, double time, 
                       double distance, Vector &bdrFlux);
 
   virtual void initBCs();

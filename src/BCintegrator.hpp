@@ -86,13 +86,17 @@ class BCintegrator : public NonlinearFormIntegrator {
   std::unordered_map<int, BoundaryCondition *> outletBCmap;
   std::unordered_map<int, BoundaryCondition *> wallBCmap;
 
+  bool mpiRoot;
+  double time;
+  double *pTime;
+  
   // void calcMeanState();
   void computeBdrFlux(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip,
-                      double delta, double distance, Vector &bdrFlux);
+                      double delta, double time, double distance, Vector &bdrFlux);
 
  public:
-  BCintegrator(MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElementSpace *_vfes, IntegrationRules *_intRules,
-               RiemannSolver *rsolver_, double &_dt, GasMixture *mixture, GasMixture *d_mixture, Fluxes *_fluxClass,
+  BCintegrator(bool _mpiRoot, MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElementSpace *_vfes, IntegrationRules *_intRules,
+               RiemannSolver *rsolver_, double &_dt, double *_time, GasMixture *mixture, GasMixture *d_mixture, Fluxes *_fluxClass,
                ParGridFunction *_Up, ParGridFunction *_gradUp, const boundaryFaceIntegrationData &boundary_face_data,
                const int _dim, const int _num_equation, double &_max_char_speed, RunConfiguration &_runFile,
                Array<int> &local_bdr_attr, const int &_maxIntPoints, const int &_maxDofs, ParGridFunction *distance_);
