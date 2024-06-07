@@ -408,6 +408,9 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
 void CaloricallyPerfectThermoChem::initializeOperators() {
   dt_ = time_coeff_.dt;
 
+  // polynomial order for smoother of precons
+  smoother_poly_order_ = order_ + 1;
+  
   Array<int> empty;
 
   // GLL integration rule (Numerical Integration)
@@ -495,9 +498,9 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
     MsInvPC_ = new OperatorJacobiSmoother(diag_pa, empty);
   } else {
     MsInvPC_ = new HypreSmoother(*Ms_.As<HypreParMatrix>());
-    dynamic_cast<HypreSmoother *>(MsInvPC_)->SetType(HypreSmoother::Jacobi, 0);
-    dynamic_cast<HypreSmoother *>(MsInvPC_)->SetSOROptions(0.0, 1.0);
-    dynamic_cast<HypreSmoother *>(MsInvPC_)->SetPolyOptions(3, 0.01);
+    dynamic_cast<HypreSmoother *>(MsInvPC_)->SetType(HypreSmoother::Jacobi, smoother_passes_);
+    dynamic_cast<HypreSmoother *>(MsInvPC_)->SetSOROptions(smoother_relax_weight_, smoother_relax_omega_);
+    dynamic_cast<HypreSmoother *>(MsInvPC_)->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_,smoother_eig_est_);    
   }
   MsInv_ = new CGSolver(sfes_->GetComm());
   MsInv_->iterative_mode = false;
@@ -508,9 +511,9 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   MsInv_->SetMaxIter(max_iter_);
 
   HtInvPC_ = new HypreSmoother(*Ht_.As<HypreParMatrix>());
-  dynamic_cast<HypreSmoother *>(HtInvPC_)->SetType(HypreSmoother::Jacobi, 0);
-  dynamic_cast<HypreSmoother *>(HtInvPC_)->SetSOROptions(0.0, 1.0);
-  dynamic_cast<HypreSmoother *>(HtInvPC_)->SetPolyOptions(3, 0.01);
+  dynamic_cast<HypreSmoother *>(HtInvPC_)->SetType(HypreSmoother::Jacobi, smoother_passes_);
+  dynamic_cast<HypreSmoother *>(HtInvPC_)->SetSOROptions(smoother_relax_weight_, smoother_relax_omega_);
+  dynamic_cast<HypreSmoother *>(HtInvPC_)->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_,smoother_eig_est_);  
   
   HtInv_ = new CGSolver(sfes_->GetComm());
   HtInv_->iterative_mode = true;
@@ -542,9 +545,9 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
     MqInvPC_ = new OperatorJacobiSmoother(diag_pa, empty);
   } else {
     MqInvPC_ = new HypreSmoother(*Mq_.As<HypreParMatrix>());
-    dynamic_cast<HypreSmoother *>(MqInvPC_)->SetType(HypreSmoother::Jacobi, 0);
-    dynamic_cast<HypreSmoother *>(MqInvPC_)->SetSOROptions(0.0, 1.0);
-    dynamic_cast<HypreSmoother *>(MqInvPC_)->SetPolyOptions(3, 0.01);
+    dynamic_cast<HypreSmoother *>(MqInvPC_)->SetType(HypreSmoother::Jacobi, smoother_passes_);
+    dynamic_cast<HypreSmoother *>(MqInvPC_)->SetSOROptions(smoother_relax_weight_, smoother_relax_omega_);
+    dynamic_cast<HypreSmoother *>(MqInvPC_)->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_,smoother_eig_est_);      
   }
   MqInv_ = new CGSolver(sfes_->GetComm());
   MqInv_->iterative_mode = false;

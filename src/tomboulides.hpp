@@ -84,6 +84,17 @@ class Tomboulides final : public FlowBase {
   bool numerical_integ_ = false;
   bool partial_assembly_ = false;
 
+  // linear-solver options
+  int smoother_poly_order_;
+  double smoother_poly_fraction_ = 0.1;
+  int smoother_eig_est_ = 10;
+  int smoother_passes_ = 1;
+  double smoother_relax_weight_ = 0.0;
+  double smoother_relax_omega_ = 0.001;
+  double amg_coarsening_ = 0.4;
+  int amg_aggresive_ = 4;
+  int amg_max_levels_ = 100;
+  
   int pressure_solve_pl_ = 0;
   int pressure_solve_max_iter_ = 1000;
   double pressure_solve_rtol_ = 1e-8;

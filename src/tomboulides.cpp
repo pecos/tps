@@ -577,6 +577,9 @@ void Tomboulides::initializeSelf() {
 void Tomboulides::initializeOperators() {
   assert(thermo_interface_ != NULL);
 
+  // polynomial order for smoother of precons
+  smoother_poly_order_ = vorder_ + 1;
+
   // Create all the Coefficient objects we need
   rho_coeff_ = new GridFunctionCoefficient(thermo_interface_->density);
 
@@ -679,9 +682,9 @@ void Tomboulides::initializeOperators() {
   L_iorho_lor_ = new ParLORDiscretization(*L_iorho_form_, pres_ess_tdof_);
   L_iorho_inv_pc_ = new HypreBoomerAMG(L_iorho_lor_->GetAssembledMatrix());
   L_iorho_inv_pc_->SetPrintLevel(0);
-  L_iorho_inv_pc_->SetCoarsening(0.4);
-  L_iorho_inv_pc_->SetAggressiveCoarsening(4);
-  L_iorho_inv_pc_->SetMaxLevels(200);
+  L_iorho_inv_pc_->SetCoarsening(amg_coarsening_);
+  L_iorho_inv_pc_->SetAggressiveCoarsening(amg_aggresive_);
+  L_iorho_inv_pc_->SetMaxLevels(amg_max_levels_);
   // L_iorho_inv_pc_->SetCycleType(1);
   // L_iorho_inv_pc_->SetRelaxType(1);
   L_iorho_inv_ortho_pc_ = new OrthoSolver(pfes_->GetComm());
@@ -805,9 +808,9 @@ void Tomboulides::initializeOperators() {
     Mv_inv_pc_ = new OperatorJacobiSmoother(diag_pa, empty);
   } else {
     Mv_inv_pc_ = new HypreSmoother(*Mv_op_.As<HypreParMatrix>());
-    dynamic_cast<HypreSmoother *>(Mv_inv_pc_)->SetType(HypreSmoother::Jacobi, 0);
-    dynamic_cast<HypreSmoother *>(Mv_inv_pc_)->SetSOROptions(0.0, 1.0);
-    dynamic_cast<HypreSmoother *>(Mv_inv_pc_)->SetPolyOptions(3, 0.01);
+    dynamic_cast<HypreSmoother *>(Mv_inv_pc_)->SetType(HypreSmoother::Jacobi, smoother_passes_);
+    dynamic_cast<HypreSmoother *>(Mv_inv_pc_)->SetSOROptions(smoother_relax_weight_, smoother_relax_omega_);
+    dynamic_cast<HypreSmoother *>(Mv_inv_pc_)->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_,smoother_eig_est_);
   }
   Mv_inv_ = new CGSolver(vfes_->GetComm());
   Mv_inv_->iterative_mode = false;
@@ -818,10 +821,10 @@ void Tomboulides::initializeOperators() {
   Mv_inv_->SetMaxIter(mass_inverse_max_iter_);
 
   Mv_rho_inv_pc_ = new HypreSmoother(*Mv_rho_op_.As<HypreParMatrix>());
-  dynamic_cast<HypreSmoother *>(Mv_rho_inv_pc_)->SetType(HypreSmoother::Jacobi, 0);
-  dynamic_cast<HypreSmoother *>(Mv_rho_inv_pc_)->SetSOROptions(0.0, 1.0);
-  dynamic_cast<HypreSmoother *>(Mv_rho_inv_pc_)->SetPolyOptions(3, 0.01);
-
+  dynamic_cast<HypreSmoother *>(Mv_rho_inv_pc_)->SetType(HypreSmoother::Jacobi, smoother_passes_);
+  dynamic_cast<HypreSmoother *>(Mv_rho_inv_pc_)->SetSOROptions(smoother_relax_weight_, smoother_relax_omega_);
+  dynamic_cast<HypreSmoother *>(Mv_rho_inv_pc_)->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_,smoother_eig_est_);  
+  
   Mv_rho_inv_ = new CGSolver(vfes_->GetComm());
   Mv_rho_inv_->iterative_mode = false;
   Mv_rho_inv_->SetOperator(*Mv_rho_op_);
@@ -892,10 +895,10 @@ void Tomboulides::initializeOperators() {
   Hv_form_->FormSystemMatrix(vel_ess_tdof_, Hv_op_);
 
   // Helmholtz solver
-  Hv_inv_pc_ = new HypreSmoother(*Hv_op_.As<HypreParMatrix>());
-  dynamic_cast<HypreSmoother *>(Hv_inv_pc_)->SetType(HypreSmoother::Jacobi, 0);
-  dynamic_cast<HypreSmoother *>(Hv_inv_pc_)->SetSOROptions(0.0, 1.0);
-  dynamic_cast<HypreSmoother *>(Hv_inv_pc_)->SetPolyOptions(3, 0.01);
+  Hv_inv_pc_ = new HypreSmoother(*Hv_op_.As<HypreParMatrix>());  
+  dynamic_cast<HypreSmoother *>(Hv_inv_pc_)->SetType(HypreSmoother::Jacobi, smoother_passes_);
+  dynamic_cast<HypreSmoother *>(Hv_inv_pc_)->SetSOROptions(smoother_relax_weight_, smoother_relax_omega_);
+  dynamic_cast<HypreSmoother *>(Hv_inv_pc_)->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_,smoother_eig_est_);  
 
   Hv_inv_ = new CGSolver(vfes_->GetComm());
   Hv_inv_->iterative_mode = true;
@@ -987,9 +990,9 @@ void Tomboulides::initializeOperators() {
     Hs_form_->FormSystemMatrix(swirl_ess_tdof_, Hs_op_);
 
     Hs_inv_pc_ = new HypreSmoother(*Hs_op_.As<HypreParMatrix>());
-    dynamic_cast<HypreSmoother *>(Hs_inv_pc_)->SetType(HypreSmoother::Jacobi, 0);
-    dynamic_cast<HypreSmoother *>(Hs_inv_pc_)->SetSOROptions(0.0, 1.0);
-    dynamic_cast<HypreSmoother *>(Hs_inv_pc_)->SetPolyOptions(3, 0.01);
+   dynamic_cast<HypreSmoother *>(Hs_inv_pc_)->SetType(HypreSmoother::Jacobi, smoother_passes_);
+   dynamic_cast<HypreSmoother *>(Hs_inv_pc_)->SetSOROptions(smoother_relax_weight_, smoother_relax_omega_);
+   dynamic_cast<HypreSmoother *>(Hs_inv_pc_)->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_,smoother_eig_est_); 
 
     Hs_inv_ = new CGSolver(pfes_->GetComm());
     Hs_inv_->iterative_mode = true;
@@ -1138,9 +1141,9 @@ void Tomboulides::step() {
   L_iorho_lor_ = new ParLORDiscretization(*L_iorho_form_, pres_ess_tdof_);
   L_iorho_inv_pc_ = new HypreBoomerAMG(L_iorho_lor_->GetAssembledMatrix());
   L_iorho_inv_pc_->SetPrintLevel(0);
-  L_iorho_inv_pc_->SetCoarsening(0.4);
-  L_iorho_inv_pc_->SetAggressiveCoarsening(4);
-  L_iorho_inv_pc_->SetMaxLevels(200);
+  L_iorho_inv_pc_->SetCoarsening(amg_coarsening_);
+  L_iorho_inv_pc_->SetAggressiveCoarsening(amg_aggresive_);
+  L_iorho_inv_pc_->SetMaxLevels(amg_max_levels_);  
   // L_iorho_inv_pc_->SetCycleType(1);
   // L_iorho_inv_pc_->SetRelaxType(2);
   L_iorho_inv_ortho_pc_ = new OrthoSolver(pfes_->GetComm());

@@ -85,7 +85,13 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   int pl_solve_ = 0;    /**< Verbosity level passed to mfem solvers */
   int max_iter_;        /**< Maximum number of linear solver iterations */
   double rtol_ = 1e-12; /**< Linear solver relative tolerance */
-
+  int smoother_poly_order_;
+  double smoother_poly_fraction_ = 0.1;
+  int smoother_eig_est_ = 10;
+  int smoother_passes_ = 1;
+  double smoother_relax_weight_ = 0.0;
+  double smoother_relax_omega_ = 0.001;
+  
   // Boundary condition info
   Array<int> temp_ess_attr_; /**< List of patches with Dirichlet BC on temperature */
   Array<int> Qt_ess_attr_;   /**< List of patches with Dirichlet BC on Q (thermal divergence) */
