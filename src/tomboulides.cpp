@@ -295,23 +295,6 @@ void Tomboulides::initializeSelf() {
   toTurbModel_interface_.gradV = gradV_gf_;
   toTurbModel_interface_.gradW = gradW_gf_;
 
-  // Gravity
-  assert(dim_ >= 2);
-  Vector zerog(dim_);
-  zerog = 0.0;
-  gravity_.SetSize(dim_);
-  tpsP_->getVec("loMach/gravity", gravity_, dim_, zerog);
-  gravity_vec_ = new VectorConstantCoefficient(gravity_);
-  Array<int> domain_attr(pmesh_->attributes.Max());
-  domain_attr = 1;
-
-  if (axisym_) {
-    rad_gravity_vec_ = new ScalarVectorProductCoefficient(radius_coeff, *gravity_vec_);
-    forcing_terms_.emplace_back(domain_attr, rad_gravity_vec_);
-  } else {
-    forcing_terms_.emplace_back(domain_attr, gravity_vec_);
-  }
-
   // Allocate Vector storage
   const int vfes_truevsize = vfes_->GetTrueVSize();
   const int sfes_truevsize = sfes_->GetTrueVSize();
@@ -388,39 +371,41 @@ void Tomboulides::initializeSelf() {
     utheta_next_vec_ = 0.0;
   }
 
-  // Initial condition function... options are
-  // 1) "" (Empty string), velocity initialized to zero
-  // 2) "tgv2d", velocity initialized using vel_exact_tgv2d function
-  // 3) "constant", TODO(trevilo) implement options to read constant
+  // Gravity
+  assert(dim_ >= 2);
+  Vector zerog(dim_);
+  zerog = 0.0;
+  gravity_.SetSize(dim_);
+  tpsP_->getVec("loMach/gravity", gravity_, dim_, zerog);
+  gravity_vec_ = new VectorConstantCoefficient(gravity_);
+  Array<int> domain_attr(pmesh_->attributes.Max());
+  domain_attr = 1;
+
+  if (axisym_) {
+    rad_gravity_vec_ = new ScalarVectorProductCoefficient(radius_coeff, *gravity_vec_);
+    forcing_terms_.emplace_back(domain_attr, rad_gravity_vec_);
+  } else {
+    forcing_terms_.emplace_back(domain_attr, gravity_vec_);
+  }
+
+  // Initial condition function.  For options, see cases.cpp
   tpsP_->getInput("loMach/tomboulides/ic", ic_string_, std::string(""));
 
   // set IC if we have one at this point
-  if (!ic_string_.empty()) {
+  if (ic_string_ == "uniform") {
+    Vector zero(dim_);
+    zero = 0.0;
+    velocity_ic_.SetSize(dim_);
+    std::string basepath("loMach/tomboulides");
+    tpsP_->getVec("loMach/tomboulides/velocity", velocity_ic_, dim_, zero);
+    VectorConstantCoefficient u_excoeff(velocity_ic_);
+    u_curr_gf_->ProjectCoefficient(u_excoeff);
+  } else if (!ic_string_.empty()) {
     vfptr user_func = vel_ic(ic_string_);
     VectorFunctionCoefficient u_excoeff(nvel_, user_func);
     u_excoeff.SetTime(0.0);
     u_curr_gf_->ProjectCoefficient(u_excoeff);
   }
-
-  /*
-    if (ic_string_ == "tgv2d") {
-      if (rank0_) std::cout << "Setting tgv2d IC..." << std::endl;
-      VectorFunctionCoefficient u_excoeff(2, vel_exact_tgv2d);
-      u_excoeff.SetTime(0.0);
-      u_curr_gf_->ProjectCoefficient(u_excoeff);
-    } else if (ic_string_ == "tgv2d_uniform") {
-      if (rank0_) std::cout << "Setting tgv2d+uniform IC..." << std::endl;
-      VectorFunctionCoefficient u_excoeff(2, vel_tgv2d_uniform);
-      u_excoeff.SetTime(0.0);
-      u_curr_gf_->ProjectCoefficient(u_excoeff);
-    } else if (ic_string_ == "channel") {
-      if (rank0_) std::cout << "Setting channel IC..." << std::endl;
-      VectorFunctionCoefficient u_excoeff(3, vel_channel);
-      u_excoeff.SetTime(0.0);
-      u_curr_gf_->ProjectCoefficient(u_excoeff);
-    }
-  }
-  */
 
   // Boundary conditions
   // number of BC regions defined

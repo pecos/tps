@@ -565,6 +565,13 @@ void multScalarScalar(Vector A, Vector B, Vector *C) {
   MFEM_FORALL(i, A.Size(), { dataC[i] = dataA[i] * dataB[i]; });
 }
 
+void multScalarScalarInv(Vector A, Vector B, Vector *C) {
+  double *dataA = A.HostReadWrite();
+  double *dataB = B.HostReadWrite();
+  double *dataC = C->HostReadWrite();
+  MFEM_FORALL(i, A.Size(), { dataC[i] = dataA[i] / dataB[i]; });
+}
+
 void multScalarVector(Vector A, Vector B, Vector *C, int dim) {
   int Ndof = A.Size();
   double *dataA = A.HostReadWrite();
@@ -681,6 +688,13 @@ void setScalarFromVector(Vector A, int ind, Vector *C) {
   const double *dataA = A.Read();
   double *data = C->Write();
   MFEM_FORALL(i, Ndof, { data[i] = dataA[i + ind * Ndof]; });
+}
+
+void setVectorFromScalar(Vector A, int ind, Vector *C) {
+  int Ndof = A.Size();
+  const double *dataA = A.Read();
+  double *data = C->Write();
+  MFEM_FORALL(i, Ndof, { data[i + ind * Ndof] = dataA[i]; });
 }
 
 void ComputeCurl3D(const ParGridFunction &u, ParGridFunction &cu) {

@@ -5,17 +5,31 @@ TEST="mms/euler"
 RUNFILE_1="inputs/mms.euler.3d.r1.ini"
 RUNFILE_2="inputs/mms.euler.3d.r2.ini"
 
+setup() {
+    NUM_GPUS=`./count_gpus.sh`
+    MPIRUN=`./sniff_mpirun.sh`
+}
+
 @test "[$TEST] run tps with input -> $RUNFILE_1" {
-    mpirun -np 2 ../src/tps --runFile $RUNFILE_1 >& euler_mms_r1.log
+    [ $NUM_GPUS -ge 2 ] || skip "Two GPUs not available"
+    [ "x$MPIRUN" != "x" ] || skip "Cannot launch parallel job"
+
+    $MPIRUN -n 2 ../src/tps --runFile $RUNFILE_1 >& euler_mms_r1.log
 }
 
 @test "[$TEST] run tps with input -> $RUNFILE_2" {
+    [ $NUM_GPUS -ge 2 ] || skip "Two GPUs not available"
+    [ "x$MPIRUN" != "x" ] || skip "Cannot launch parallel job"
+
     rm -f $SOLN_FILE
     touch DIE
-    mpirun -np 2 ../src/tps --runFile $RUNFILE_2 >& euler_mms_r2.log
+    $MPIRUN -n 2 ../src/tps --runFile $RUNFILE_2 >& euler_mms_r2.log
 }
 
 @test "[$TEST] verify tps density convergence rate for Euler MMS with linear elems" {
+    [ $NUM_GPUS -ge 2 ] || skip "Two GPUs not available"
+    [ "x$MPIRUN" != "x" ] || skip "Cannot launch parallel job"
+
     rho_err_r1=$(cat euler_mms_r1.log | grep "time step: 300" | head -1 | awk '{print $9}')
     rho_err_r2=$(cat euler_mms_r2.log | grep "time step: 600" | head -1 | awk '{print $9}')
 
@@ -35,6 +49,9 @@ RUNFILE_2="inputs/mms.euler.3d.r2.ini"
 }
 
 @test "[$TEST] verify tps velocity convergence rate for Euler MMS with linear elems" {
+    [ $NUM_GPUS -ge 2 ] || skip "Two GPUs not available"
+    [ "x$MPIRUN" != "x" ] || skip "Cannot launch parallel job"
+
     vel_err_r1=$(cat euler_mms_r1.log | grep "time step: 300" | head -1 | awk '{print $11}')
     vel_err_r2=$(cat euler_mms_r2.log | grep "time step: 600" | head -1 | awk '{print $11}')
 
@@ -54,6 +71,9 @@ RUNFILE_2="inputs/mms.euler.3d.r2.ini"
 }
 
 @test "[$TEST] verify tps pressure convergence rate for Euler MMS with linear elems" {
+    [ $NUM_GPUS -ge 2 ] || skip "Two GPUs not available"
+    [ "x$MPIRUN" != "x" ] || skip "Cannot launch parallel job"
+
     pre_err_r1=$(cat euler_mms_r1.log | grep "time step: 300" | head -1 | awk '{print $13}')
     pre_err_r2=$(cat euler_mms_r2.log | grep "time step: 600" | head -1 | awk '{print $13}')
 

@@ -542,7 +542,6 @@ MFEM_HOST_DEVICE PerfectMixture::PerfectMixture(PerfectMixtureInput inputs, int 
 
   SetNumActiveSpecies();
   SetNumEquations();
-
   SetSpeciesStateIndices();
 
   // We assume the background species is neutral.
@@ -576,13 +575,32 @@ MFEM_HOST_DEVICE PerfectMixture::PerfectMixture(PerfectMixtureInput inputs, int 
 // compute heavy-species heat capacity from number densities.
 MFEM_HOST_DEVICE double PerfectMixture::computeHeaviesHeatCapacity(const double *n_sp, const double &nB) const {
   double heatCapacity = 0.0;
-
   for (int sp = 0; sp < numActiveSpecies; sp++) {
     if (sp == iElectron) continue;  // neglect electron.
     heatCapacity += n_sp[sp] * molarCV_[sp];
   }
   heatCapacity += nB * molarCV_[iBackground];
+  return heatCapacity;
+}
 
+MFEM_HOST_DEVICE double PerfectMixture::computeHeaviesCp(const double *n_sp, const double &nB) const {
+  double heatCapacity = 0.0;
+  for (int sp = 0; sp < numActiveSpecies; sp++) {
+    if (sp == iElectron) continue;  // neglect electron.
+    heatCapacity += n_sp[sp] * molarCP_[sp];
+  }
+  // std::cout << "nB: " << nB << " and molarCP: " << molarCP_[iBackground] << endl;
+  heatCapacity += nB * molarCP_[iBackground];
+  return heatCapacity;
+}
+
+MFEM_HOST_DEVICE double PerfectMixture::computeSpeciesCp(const double *n_sp, const double &nB, int sp) {
+  double heatCapacity;
+  if (sp == iBackground) {
+    heatCapacity = nB * molarCP_[iBackground];
+  } else {
+    heatCapacity = n_sp[sp] * molarCP_[sp];
+  }
   return heatCapacity;
 }
 
@@ -762,6 +780,51 @@ MFEM_HOST_DEVICE void PerfectMixture::GetConservativesFromPrimitives(const doubl
   }
 
   conserv[iTh] = totalEnergy;
+}
+
+void PerfectMixture::GetMixtureCp(const Vector &ns, const double &rho, double &CpMix) {
+  GetMixtureCp(&ns[0], &rho, &CpMix);
+}
+
+MFEM_HOST_DEVICE void PerfectMixture::GetMixtureCp(const double *ns, const double *rho, double *CpMix) {
+  double n_e = 0.0;
+  if (ambipolar) {
+    n_e = computeAmbipolarElectronNumberDensity(ns);
+  } else {
+    n_e = ns[iElectron];
+  }
+  double rhoB = computeBackgroundMassDensity(*rho, ns, n_e, true);
+  double nB = rhoB / GetGasParams(iBackground, GasParams::SPECIES_MW);
+
+  // compute mixture heat capacity.
+  double totalHeatCapacity = computeHeaviesCp(ns, nB);
+  if (!twoTemperature_) totalHeatCapacity += n_e * molarCP_[iElectron];
+  // std::cout << "CpMix: " << totalHeatCapacity << endl;
+  *CpMix = totalHeatCapacity;
+}
+
+void PerfectMixture::GetSpeciesCp(const Vector &ns, const double &rho, int sp, double &CpY) {
+  GetSpeciesCp(&ns[0], &rho, sp, &CpY);
+}
+
+MFEM_HOST_DEVICE void PerfectMixture::GetSpeciesCp(const double *ns, const double *rho, int sp, double *CpY) {
+  double n_e = 0.0;
+  if (ambipolar) {
+    n_e = computeAmbipolarElectronNumberDensity(ns);
+  } else {
+    n_e = ns[iElectron];
+  }
+  double rhoB = computeBackgroundMassDensity(*rho, ns, n_e, true);
+  double nB = rhoB / GetGasParams(iBackground, GasParams::SPECIES_MW);
+  // double spHeatCapacity;
+  // for (int sp = 0; sp < numSpecies; sp++) {
+  // spHeatCapacity = computeSpeciesCp(ns, nB, sp);
+  // std::cout << sp << ") tHC: " << totalHeatCapacity[sp];
+  // }
+  // for (int sp = 0; sp < numSpecies; sp++) {
+  *CpY = computeSpeciesCp(ns, nB, sp);  // spHeatCapacity;
+  // std::cout << sp << ") CpY: " << *CpY << endl;
+  // }
 }
 
 // NOTE: Almost for sure ambipolar will remain true, then we have to always compute at least both Y and n.

@@ -95,13 +95,18 @@ class Chemistry {
 
   MFEM_HOST_DEVICE ~Chemistry();
 
+  // Set the grid function rates for GRIDFUNCTION_RXN reaction types
+  void setGridFunctionRates(mfem::GridFunction &f);
+  MFEM_HOST_DEVICE void setRates(const double * data, int size);
+
   // return Vector of reaction rate coefficients, with the size of numReaction_.
   // WARNING(marc) I have removed "virtual" qualifier here assuming these functions will not
   // change for child classes. Correct if wrong
-  void computeForwardRateCoeffs(const double &T_h, const double &T_e, Vector &kfwd);
-  MFEM_HOST_DEVICE void computeForwardRateCoeffs(const double &T_h, const double &T_e, double *kfwd);
+  // void computeForwardRateCoeffs(const double &T_h, const double &T_e, Vector &kfwd);
+  MFEM_HOST_DEVICE void computeForwardRateCoeffs(const double &T_h, const double &T_e, const int &dofindex,
+                                                 double *kfwd);
 
-  void computeEquilibriumConstants(const double &T_h, const double &T_e, Vector &kC);
+  // void computeEquilibriumConstants(const double &T_h, const double &T_e, Vector &kC);
   MFEM_HOST_DEVICE void computeEquilibriumConstants(const double &T_h, const double &T_e, double *kC);
 
   // return rate coefficients of (reactionIndex)-th reaction. (start from 0)

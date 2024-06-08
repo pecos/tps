@@ -69,9 +69,6 @@ void velBC_user(const Vector &x, double t, Vector &u) {
 
 /// generic user-specified temp ic
 double tempIC_user(const Vector &coords, double t) {
-  double x = coords(0);
-  double y = coords(1);
-  double z = coords(2);
   double temp;
   temp = -1.0;
   return temp;

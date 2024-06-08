@@ -81,7 +81,7 @@ class Tomboulides final : public FlowBase {
 
   // Options
   // TODO(trevilo): hardcoded for testing.  Need to set based on input file.
-  bool numerical_integ_ = false;
+  bool numerical_integ_ = true;
   bool partial_assembly_ = false;
 
   // linear-solver options
@@ -182,6 +182,9 @@ class Tomboulides final : public FlowBase {
   mfem::VectorConstantCoefficient *gravity_vec_;
   mfem::ScalarVectorProductCoefficient *rad_gravity_vec_;
   std::vector<ForcingTerm_T> forcing_terms_;
+
+  // initial condition holders
+  mfem::Vector velocity_ic_;
 
   // BCs holders
   std::vector<DirichletBC_T<mfem::VectorCoefficient>> vel_dbcs_;

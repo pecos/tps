@@ -118,6 +118,7 @@ CaloricallyPerfectThermoChem::CaloricallyPerfectThermoChem(mfem::ParMesh *pmesh,
   tpsP_->getInput("loMach/calperfect/linear-solver-rtol", rtol_, 1e-12);
   tpsP_->getInput("loMach/calperfect/linear-solver-max-iter", max_iter_, 1000);
   tpsP_->getInput("loMach/calperfect/linear-solver-verbosity", pl_solve_, 0);
+  tpsP_->getInput("loMach/calperfect/numerical-integ", numerical_integ_, true);
 }
 
 CaloricallyPerfectThermoChem::~CaloricallyPerfectThermoChem() {
@@ -263,16 +264,8 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
 
   tpsP_->getInput("loMach/calperfect/ic", ic_string_, std::string(""));
 
-  // set IC if we have one at this point
+  // set IC if we have one at this point (see cases.cpp for options)
   if (!ic_string_.empty()) {
-    /*
-    if (ic_string_ == "rt3D") {
-      if (rank0_) std::cout << "Setting rt3D IC..." << std::endl;
-      FunctionCoefficient t_excoeff(temp_rt3d);
-      t_excoeff.SetTime(0.0);
-      Tn_gf_.ProjectCoefficient(t_excoeff);
-    }
-    */
     sfptr user_func = temp_ic(ic_string_);
     FunctionCoefficient t_excoeff(user_func);
     t_excoeff.SetTime(0.0);
@@ -389,7 +382,6 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
 
         ConstantCoefficient *Twall_coeff = new ConstantCoefficient();
         Twall_coeff->constant = Twall;
-
         AddTempDirichletBC(Twall_coeff, attr_wall);
 
         ConstantCoefficient *Qt_bc_coeff = new ConstantCoefficient();
@@ -558,7 +550,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   MqInv_->SetMaxIter(max_iter_);
 
   LQ_form_ = new ParBilinearForm(sfes_);
-  auto *lqd_blfi = new DiffusionIntegrator(*thermal_diff_coeff_);
+  auto *lqd_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
   if (numerical_integ_) {
     lqd_blfi->SetIntRule(&ir_di);
   }

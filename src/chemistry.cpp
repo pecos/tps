@@ -86,6 +86,9 @@ MFEM_HOST_DEVICE Chemistry::Chemistry(GasMixture *mixture, const ChemistryInput 
       case TABULATED_RXN: {
         reactions_[r] = new Tabulated(inputs.reactionInputs[r].tableInput);
       } break;
+      case GRIDFUNCTION_RXN: {
+        reactions_[r] = new GridFunctionReaction(inputs.reactionInputs[r].indexInput);
+      } break;
       default:
         printf("Unknown reactionModel.");
         assert(false);
@@ -106,6 +109,25 @@ MFEM_HOST_DEVICE Chemistry::~Chemistry() {
   }
 }
 
+MFEM_HOST_DEVICE void Chemistry::setRates(const double * data, int size) {
+  for (int r = 0; r < numReactions_; r++) {
+    if (reactions_[r]->reactionModel == GRIDFUNCTION_RXN) {
+      GridFunctionReaction *rx = (GridFunctionReaction *)(reactions_[r]);
+      rx->setData(data, size);
+    }
+  }
+}
+
+void Chemistry::setGridFunctionRates(mfem::GridFunction &f) {
+  for (int r = 0; r < numReactions_; r++) {
+    if (reactions_[r]->reactionModel == GRIDFUNCTION_RXN) {
+      GridFunctionReaction *rx = dynamic_cast<GridFunctionReaction *>(reactions_[r]);
+      rx->setGridFunction(f);
+    }
+  }
+}
+
+#if 0
 void Chemistry::computeForwardRateCoeffs(const double &T_h, const double &T_e, Vector &kfwd) {
   kfwd.SetSize(numReactions_);
 
@@ -122,8 +144,10 @@ void Chemistry::computeForwardRateCoeffs(const double &T_h, const double &T_e, V
 
   return;
 }
+#endif
 
-MFEM_HOST_DEVICE void Chemistry::computeForwardRateCoeffs(const double &T_h, const double &T_e, double *kfwd) {
+MFEM_HOST_DEVICE void Chemistry::computeForwardRateCoeffs(const double &T_h, const double &T_e, const int &dofindex,
+                                                          double *kfwd) {
   // kfwd.SetSize(numReactions_);
   for (int r = 0; r < numReactions_; r++) kfwd[r] = 0.0;
 
@@ -132,12 +156,13 @@ MFEM_HOST_DEVICE void Chemistry::computeForwardRateCoeffs(const double &T_h, con
 
   for (int r = 0; r < numReactions_; r++) {
     bool isElectronInvolved = isElectronInvolvedAt(r);
-    kfwd[r] = reactions_[r]->computeRateCoefficient(Thlim, Telim, isElectronInvolved);
+    kfwd[r] = reactions_[r]->computeRateCoefficient(Thlim, Telim, dofindex, isElectronInvolved);
   }
 
   return;
 }
 
+#if 0
 // NOTE: if not detailedBalance, equilibrium constant is returned as zero, though it cannot be used.
 void Chemistry::computeEquilibriumConstants(const double &T_h, const double &T_e, Vector &kC) {
   kC.SetSize(numReactions_);
@@ -159,6 +184,7 @@ void Chemistry::computeEquilibriumConstants(const double &T_h, const double &T_e
 
   return;
 }
+#endif
 
 MFEM_HOST_DEVICE void Chemistry::computeEquilibriumConstants(const double &T_h, const double &T_e, double *kC) {
   for (int r = 0; r < numReactions_; r++) kC[r] = 0.0;

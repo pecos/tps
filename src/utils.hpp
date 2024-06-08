@@ -149,6 +149,7 @@ void multConstScalarIP(double A, Vector *C);
 void multConstScalarInvIP(double A, Vector *C);
 void multConstVectorIP(double A, Vector *C);
 void multScalarScalar(Vector A, Vector B, Vector *C);
+void multScalarScalarInv(Vector A, Vector B, Vector *C);
 void multScalarVector(Vector A, Vector B, Vector *C, int dim = 3);
 void multScalarInvVector(Vector A, Vector B, Vector *C, int dim = 3);
 void multScalarInvVectorIP(Vector A, Vector *C, int dim = 3);
@@ -158,6 +159,7 @@ void multScalarScalarIP(Vector A, Vector *C);
 void multScalarInvScalarIP(Vector A, Vector *C);
 void multScalarVectorIP(Vector A, Vector *C, int dim = 3);
 void setScalarFromVector(Vector A, int ind, Vector *C);
+void setVectorFromScalar(Vector A, int ind, Vector *C);
 
 /// Compute \f$\nabla \times \nabla \times u\f$ for \f$u \in (H^1)^2\f$.
 void ComputeCurl2D(const ParGridFunction &u, ParGridFunction &cu, bool assume_scalar = false);

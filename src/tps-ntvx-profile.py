@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import sys
 import os
+import cupy as cp
 from mpi4py import MPI
 
 # set path to C++ TPS library
@@ -18,6 +19,11 @@ tps.chooseDevices()
 tps.chooseSolver()
 tps.initialize()
 tps.solveStep()
-tps.solve()
+
+#cp.profiler.start()
+cp.cuda.nvtx.RangePush("tpsStep")
+tps.solveStep()
+cp.cuda.nvtx.RangePop()
+#tps.solve()
 
 sys.exit (tps.getStatus())
