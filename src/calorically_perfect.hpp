@@ -91,7 +91,7 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   int smoother_passes_ = 1;
   double smoother_relax_weight_ = 0.0;
   double smoother_relax_omega_ = 0.001;
-  
+
   // Boundary condition info
   Array<int> temp_ess_attr_; /**< List of patches with Dirichlet BC on temperature */
   Array<int> Qt_ess_attr_;   /**< List of patches with Dirichlet BC on Q (thermal divergence) */

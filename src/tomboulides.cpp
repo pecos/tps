@@ -120,14 +120,14 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
     tps->getInput("loMach/tomboulides/psolve_atol_", pressure_solve_atol_, 1.0e-18);
     tps->getInput("loMach/tomboulides/hsolve_atol_", hsolve_atol_, 1.0e-12);
     tps->getInput("loMach/tomboulides/msolve_atol_", mass_inverse_atol_, 1.0e-12);
-    
+
     tps->getInput("loMach/tomboulides/psolve_rtol_", pressure_solve_rtol_, 1.0e-08);
     tps->getInput("loMach/tomboulides/hsolve_rtol_", hsolve_rtol_, 1.0e-12);
     tps->getInput("loMach/tomboulides/msolve_rtol_", mass_inverse_rtol_, 1.0e-12);
-    
+
     tps->getInput("loMach/tomboulides/psolve_maxIters_", pressure_solve_max_iter_, 1000);
     tps->getInput("loMach/tomboulides/hsolve_maxIters_", hsolve_max_iter_, 1000);
-    tps->getInput("loMach/tomboulides/msolve_maxIters_", mass_inverse_max_iter_, 1000);      
+    tps->getInput("loMach/tomboulides/msolve_maxIters_", mass_inverse_max_iter_, 1000);
   }
 }
 
@@ -578,7 +578,7 @@ void Tomboulides::initializeOperators() {
   // polynomial order for smoother of precons
   smoother_poly_order_ = vorder_ + 1;
 
-  // AMG strength threshold 
+  // AMG strength threshold
   if (dim_ == 2) {
     pressure_strength_thres_ = 0.25;
   } else {
@@ -810,28 +810,30 @@ void Tomboulides::initializeOperators() {
     Mv_inv_pc_ = new HypreSmoother(*Mv_op_.As<HypreParMatrix>());
     dynamic_cast<HypreSmoother *>(Mv_inv_pc_)->SetType(smoother_type_, smoother_passes_);
     dynamic_cast<HypreSmoother *>(Mv_inv_pc_)->SetSOROptions(smoother_relax_weight_, smoother_relax_omega_);
-    dynamic_cast<HypreSmoother *>(Mv_inv_pc_)->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_,smoother_eig_est_);
+    dynamic_cast<HypreSmoother *>(Mv_inv_pc_)
+        ->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_, smoother_eig_est_);
   }
   Mv_inv_ = new CGSolver(vfes_->GetComm());
   Mv_inv_->iterative_mode = false;
   Mv_inv_->SetOperator(*Mv_op_);
   Mv_inv_->SetPreconditioner(*Mv_inv_pc_);
   Mv_inv_->SetPrintLevel(mass_inverse_pl_);
-  Mv_inv_->SetAbsTol(mass_inverse_atol_);  
+  Mv_inv_->SetAbsTol(mass_inverse_atol_);
   Mv_inv_->SetRelTol(mass_inverse_rtol_);
   Mv_inv_->SetMaxIter(mass_inverse_max_iter_);
 
   Mv_rho_inv_pc_ = new HypreSmoother(*Mv_rho_op_.As<HypreParMatrix>());
   dynamic_cast<HypreSmoother *>(Mv_rho_inv_pc_)->SetType(smoother_type_, smoother_passes_);
   dynamic_cast<HypreSmoother *>(Mv_rho_inv_pc_)->SetSOROptions(smoother_relax_weight_, smoother_relax_omega_);
-  dynamic_cast<HypreSmoother *>(Mv_rho_inv_pc_)->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_,smoother_eig_est_);  
-  
+  dynamic_cast<HypreSmoother *>(Mv_rho_inv_pc_)
+      ->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_, smoother_eig_est_);
+
   Mv_rho_inv_ = new CGSolver(vfes_->GetComm());
   Mv_rho_inv_->iterative_mode = false;
   Mv_rho_inv_->SetOperator(*Mv_rho_op_);
   Mv_rho_inv_->SetPreconditioner(*Mv_rho_inv_pc_);
   Mv_rho_inv_->SetPrintLevel(mass_inverse_pl_);
-  Mv_rho_inv_->SetAbsTol(mass_inverse_atol_);  
+  Mv_rho_inv_->SetAbsTol(mass_inverse_atol_);
   Mv_rho_inv_->SetRelTol(mass_inverse_rtol_);
   Mv_rho_inv_->SetMaxIter(mass_inverse_max_iter_);
 
@@ -897,17 +899,18 @@ void Tomboulides::initializeOperators() {
   Hv_form_->FormSystemMatrix(vel_ess_tdof_, Hv_op_);
 
   // Helmholtz solver
-  Hv_inv_pc_ = new HypreSmoother(*Hv_op_.As<HypreParMatrix>());  
+  Hv_inv_pc_ = new HypreSmoother(*Hv_op_.As<HypreParMatrix>());
   dynamic_cast<HypreSmoother *>(Hv_inv_pc_)->SetType(smoother_type_, smoother_passes_);
   dynamic_cast<HypreSmoother *>(Hv_inv_pc_)->SetSOROptions(smoother_relax_weight_, smoother_relax_omega_);
-  dynamic_cast<HypreSmoother *>(Hv_inv_pc_)->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_,smoother_eig_est_);  
+  dynamic_cast<HypreSmoother *>(Hv_inv_pc_)
+      ->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_, smoother_eig_est_);
 
   Hv_inv_ = new CGSolver(vfes_->GetComm());
   Hv_inv_->iterative_mode = true;
   Hv_inv_->SetOperator(*Hv_op_);
   Hv_inv_->SetPreconditioner(*Hv_inv_pc_);
   Hv_inv_->SetPrintLevel(hsolve_pl_);
-  Hv_inv_->SetAbsTol(hsolve_atol_);  
+  Hv_inv_->SetAbsTol(hsolve_atol_);
   Hv_inv_->SetRelTol(hsolve_rtol_);
   Hv_inv_->SetMaxIter(hsolve_max_iter_);
 
@@ -993,16 +996,17 @@ void Tomboulides::initializeOperators() {
     Hs_form_->FormSystemMatrix(swirl_ess_tdof_, Hs_op_);
 
     Hs_inv_pc_ = new HypreSmoother(*Hs_op_.As<HypreParMatrix>());
-   dynamic_cast<HypreSmoother *>(Hs_inv_pc_)->SetType(smoother_type_, smoother_passes_);
-   dynamic_cast<HypreSmoother *>(Hs_inv_pc_)->SetSOROptions(smoother_relax_weight_, smoother_relax_omega_);
-   dynamic_cast<HypreSmoother *>(Hs_inv_pc_)->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_,smoother_eig_est_); 
+    dynamic_cast<HypreSmoother *>(Hs_inv_pc_)->SetType(smoother_type_, smoother_passes_);
+    dynamic_cast<HypreSmoother *>(Hs_inv_pc_)->SetSOROptions(smoother_relax_weight_, smoother_relax_omega_);
+    dynamic_cast<HypreSmoother *>(Hs_inv_pc_)
+        ->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_, smoother_eig_est_);
 
     Hs_inv_ = new CGSolver(pfes_->GetComm());
     Hs_inv_->iterative_mode = true;
     Hs_inv_->SetOperator(*Hs_op_);
     Hs_inv_->SetPreconditioner(*Hs_inv_pc_);
     Hs_inv_->SetPrintLevel(hsolve_pl_);
-    Hs_inv_->SetAbsTol(hsolve_atol_);    
+    Hs_inv_->SetAbsTol(hsolve_atol_);
     Hs_inv_->SetRelTol(hsolve_rtol_);
     Hs_inv_->SetMaxIter(hsolve_max_iter_);
 
@@ -1150,10 +1154,10 @@ void Tomboulides::step() {
   L_iorho_inv_pc_->SetInterpolation(amg_interpolation_);
   L_iorho_inv_pc_->SetStrengthThresh(pressure_strength_thres_);
   L_iorho_inv_pc_->SetRelaxType(amg_relax_);
-  L_iorho_inv_pc_->SetMaxLevels(amg_max_levels_);  
-  L_iorho_inv_pc_->SetMaxIter(amg_max_iters_);  
+  L_iorho_inv_pc_->SetMaxLevels(amg_max_levels_);
+  L_iorho_inv_pc_->SetMaxIter(amg_max_iters_);
   // NOTE: other cycle types (i.e. not V-cycle) do not scale well in parallel, so option removed for now
-  // L_iorho_inv_pc_->SetCycleType(1); 
+  // L_iorho_inv_pc_->SetCycleType(1);
   L_iorho_inv_ortho_pc_ = new OrthoSolver(pfes_->GetComm());
   L_iorho_inv_ortho_pc_->SetSolver(*L_iorho_inv_pc_);
 
@@ -1187,7 +1191,7 @@ void Tomboulides::step() {
   Hv_form_->FormSystemMatrix(vel_ess_tdof_, Hv_op_);
 
   Hv_inv_->SetOperator(*Hv_op_);
-  
+
   sw_helm_.Stop();
 
   //------------------------------------------------------------------------
