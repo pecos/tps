@@ -1462,6 +1462,9 @@ void ReactingFlow::speciesProduction() {
   Vector progressRate;  // set to size nReactions_ in computeProgressRate
   Vector creationRate;  // set to size nSpecies_ in computeCreationRate
 
+  kfwd.SetSize(chemistry_->getNumReactions());
+  keq.SetSize(chemistry_->getNumReactions());
+
   for (int i = 0; i < sDofInt_; i++) {
     // Get temperature
     const double Th = dataT[i];
@@ -1479,8 +1482,8 @@ void ReactingFlow::speciesProduction() {
     mixture_->computeNumberDensities(state, n_sp);
 
     // Evaluate the chemical source terms
-    chemistry_->computeForwardRateCoeffs(Th, Te, kfwd);
-    chemistry_->computeEquilibriumConstants(Th, Te, keq);
+    chemistry_->computeForwardRateCoeffs(Th, Te, i, kfwd.HostWrite());
+    chemistry_->computeEquilibriumConstants(Th, Te, keq.HostWrite());
     chemistry_->computeProgressRate(n_sp, kfwd, keq, progressRate);
     chemistry_->computeCreationRate(progressRate, creationRate);
 
