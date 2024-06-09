@@ -117,13 +117,13 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
     if (axisym_) assert(!numerical_integ_);
 
     // exposing solver tolerance options to user
-    tps->getInput("loMach/tomboulides/psolve_atol_", pressure_solve_atol_, 1.0e-18);
+    tps->getInput("loMach/tomboulides/psolve_atol_", pressure_solve_atol_, 1.0e-12);
     tps->getInput("loMach/tomboulides/hsolve_atol_", hsolve_atol_, 1.0e-12);
     tps->getInput("loMach/tomboulides/msolve_atol_", mass_inverse_atol_, 1.0e-12);
 
     tps->getInput("loMach/tomboulides/psolve_rtol_", pressure_solve_rtol_, 1.0e-08);
-    tps->getInput("loMach/tomboulides/hsolve_rtol_", hsolve_rtol_, 1.0e-12);
-    tps->getInput("loMach/tomboulides/msolve_rtol_", mass_inverse_rtol_, 1.0e-12);
+    tps->getInput("loMach/tomboulides/hsolve_rtol_", hsolve_rtol_, 1.0e-08);
+    tps->getInput("loMach/tomboulides/msolve_rtol_", mass_inverse_rtol_, 1.0e-08);
 
     tps->getInput("loMach/tomboulides/psolve_maxIters_", pressure_solve_max_iter_, 1000);
     tps->getInput("loMach/tomboulides/hsolve_maxIters_", hsolve_max_iter_, 1000);
