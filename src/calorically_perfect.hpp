@@ -90,19 +90,19 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   double smoother_relax_omega_ = 0.001;
 
   // solver tolerance options
-  int pl_solve_; /**< Verbosity level passed to mfem solvers */  
+  int pl_solve_; /**< Verbosity level passed to mfem solvers */
   int max_iter_; /**< Maximum number of linear solver iterations */
-  double rtol_; /**< Linear solver relative tolerance */
-  
-  int mass_inverse_pl_ = 0; 
-  int mass_inverse_max_iter_ = 1000; 
-  double mass_inverse_rtol_ = 1e-12; 
-  double mass_inverse_atol_ = 1e-12; 
+  double rtol_;  /**< Linear solver relative tolerance */
+
+  int mass_inverse_pl_ = 0;
+  int mass_inverse_max_iter_ = 1000;
+  double mass_inverse_rtol_ = 1e-12;
+  double mass_inverse_atol_ = 1e-12;
 
   int hsolve_pl_ = 0;
   int hsolve_max_iter_ = 1000;
   double hsolve_rtol_ = 1e-12;
-  double hsolve_atol_ = 1e-12;  
+  double hsolve_atol_ = 1e-12;
 
   // Boundary condition info
   Array<int> temp_ess_attr_; /**< List of patches with Dirichlet BC on temperature */

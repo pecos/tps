@@ -124,14 +124,14 @@ CaloricallyPerfectThermoChem::CaloricallyPerfectThermoChem(mfem::ParMesh *pmesh,
 
   // not deleting above block to maintain backwards-compatability
   tpsP_->getInput("loMach/calperfect/hsolve-rtol", hsolve_rtol_, rtol_);
-  tpsP_->getInput("loMach/calperfect/hsolve-atol", hsolve_atol_, 1.0e-12);  
+  tpsP_->getInput("loMach/calperfect/hsolve-atol", hsolve_atol_, 1.0e-12);
   tpsP_->getInput("loMach/calperfect/hsolve-max-iter", hsolve_max_iter_, max_iter_);
   tpsP_->getInput("loMach/calperfect/hsolve-verbosity", hsolve_pl_, pl_solve_);
-  
+
   tpsP_->getInput("loMach/calperfect/msolve-rtol", mass_inverse_rtol_, rtol_);
-  tpsP_->getInput("loMach/calperfect/msolve-atol", mass_inverse_atol_, 1.0e-12);  
+  tpsP_->getInput("loMach/calperfect/msolve-atol", mass_inverse_atol_, 1.0e-12);
   tpsP_->getInput("loMach/calperfect/msolve-max-iter", mass_inverse_max_iter_, max_iter_);
-  tpsP_->getInput("loMach/calperfect/msolve-verbosity", mass_inverse_pl_, pl_solve_);  
+  tpsP_->getInput("loMach/calperfect/msolve-verbosity", mass_inverse_pl_, pl_solve_);
 }
 
 CaloricallyPerfectThermoChem::~CaloricallyPerfectThermoChem() {
@@ -514,7 +514,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   MsInv_->SetPreconditioner(*MsInvPC_);
   MsInv_->SetPrintLevel(mass_inverse_pl_);
   MsInv_->SetRelTol(mass_inverse_rtol_);
-  MsInv_->SetAbsTol(mass_inverse_atol_);  
+  MsInv_->SetAbsTol(mass_inverse_atol_);
   MsInv_->SetMaxIter(mass_inverse_max_iter_);
 
   HtInvPC_ = new HypreSmoother(*Ht_.As<HypreParMatrix>());
@@ -529,7 +529,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   HtInv_->SetPreconditioner(*HtInvPC_);
   HtInv_->SetPrintLevel(hsolve_pl_);
   HtInv_->SetRelTol(hsolve_rtol_);
-  HtInv_->SetAbsTol(hsolve_atol_);  
+  HtInv_->SetAbsTol(hsolve_atol_);
   HtInv_->SetMaxIter(hsolve_max_iter_);
   if (rank0_) std::cout << "Temperature operators set" << endl;
 
@@ -565,7 +565,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   MqInv_->SetPreconditioner(*MqInvPC_);
   MqInv_->SetPrintLevel(mass_inverse_pl_);
   MqInv_->SetRelTol(mass_inverse_rtol_);
-  MqInv_->SetAbsTol(mass_inverse_atol_);  
+  MqInv_->SetAbsTol(mass_inverse_atol_);
   MqInv_->SetMaxIter(mass_inverse_max_iter_);
 
   LQ_form_ = new ParBilinearForm(sfes_);
