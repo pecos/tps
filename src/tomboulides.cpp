@@ -901,7 +901,7 @@ void Tomboulides::initializeOperators() {
   // Helmholtz solver
   Hv_inv_pc_ = new HypreSmoother(*Hv_op_.As<HypreParMatrix>());
   dynamic_cast<HypreSmoother *>(Hv_inv_pc_)->SetType(smoother_type_, smoother_passes_);
-  dynamic_cast<HypreSmoother *>(Hv_inv_pc_)->SetSOROptions(smoother_relax_weight_, smoother_relax_omega_);
+  dynamic_cast<HypreSmoother *>(Hv_inv_pc_)->SetSOROptions(hsmoother_relax_weight_, hsmoother_relax_omega_);
   dynamic_cast<HypreSmoother *>(Hv_inv_pc_)
       ->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_, smoother_eig_est_);
 
@@ -997,7 +997,7 @@ void Tomboulides::initializeOperators() {
 
     Hs_inv_pc_ = new HypreSmoother(*Hs_op_.As<HypreParMatrix>());
     dynamic_cast<HypreSmoother *>(Hs_inv_pc_)->SetType(smoother_type_, smoother_passes_);
-    dynamic_cast<HypreSmoother *>(Hs_inv_pc_)->SetSOROptions(smoother_relax_weight_, smoother_relax_omega_);
+    dynamic_cast<HypreSmoother *>(Hs_inv_pc_)->SetSOROptions(hsmoother_relax_weight_, hsmoother_relax_omega_);
     dynamic_cast<HypreSmoother *>(Hs_inv_pc_)
         ->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_, smoother_eig_est_);
 

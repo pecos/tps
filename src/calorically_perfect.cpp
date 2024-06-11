@@ -506,7 +506,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
     dynamic_cast<HypreSmoother *>(MsInvPC_)->SetType(HypreSmoother::Jacobi, smoother_passes_);
     dynamic_cast<HypreSmoother *>(MsInvPC_)->SetSOROptions(smoother_relax_weight_, smoother_relax_omega_);
     dynamic_cast<HypreSmoother *>(MsInvPC_)->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_,
-                                                            smoother_eig_est_);
+                                                                smoother_eig_est_);
   }
   MsInv_ = new CGSolver(sfes_->GetComm());
   MsInv_->iterative_mode = false;
@@ -519,7 +519,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
 
   HtInvPC_ = new HypreSmoother(*Ht_.As<HypreParMatrix>());
   dynamic_cast<HypreSmoother *>(HtInvPC_)->SetType(HypreSmoother::Jacobi, smoother_passes_);
-  dynamic_cast<HypreSmoother *>(HtInvPC_)->SetSOROptions(smoother_relax_weight_, smoother_relax_omega_);
+  dynamic_cast<HypreSmoother *>(HtInvPC_)->SetSOROptions(hsmoother_relax_weight_, hsmoother_relax_omega_);
   dynamic_cast<HypreSmoother *>(HtInvPC_)->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_,
                                                           smoother_eig_est_);
 
@@ -557,7 +557,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
     dynamic_cast<HypreSmoother *>(MqInvPC_)->SetType(HypreSmoother::Jacobi, smoother_passes_);
     dynamic_cast<HypreSmoother *>(MqInvPC_)->SetSOROptions(smoother_relax_weight_, smoother_relax_omega_);
     dynamic_cast<HypreSmoother *>(MqInvPC_)->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_,
-                                                            smoother_eig_est_);
+                                                          smoother_eig_est_);
   }
   MqInv_ = new CGSolver(sfes_->GetComm());
   MqInv_->iterative_mode = false;
