@@ -92,7 +92,7 @@ class Tomboulides final : public FlowBase {
   double smoother_relax_weight_ = 0.0;
   double smoother_relax_omega_ = 0.001;
   double hsmoother_relax_weight_ = 0.01;
-  double hsmoother_relax_omega_ = 0.001;  
+  double hsmoother_relax_omega_ = 0.001;
   double pressure_strength_thres_ = 0.6;
   int amg_aggresive_ = 4;
   int amg_max_levels_ = 100;
