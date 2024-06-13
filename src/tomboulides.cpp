@@ -1156,6 +1156,7 @@ void Tomboulides::step() {
   L_iorho_inv_pc_->SetRelaxType(amg_relax_);
   L_iorho_inv_pc_->SetMaxLevels(amg_max_levels_);
   L_iorho_inv_pc_->SetMaxIter(amg_max_iters_);
+  L_iorho_inv_pc_->SetTol(0);
   // NOTE: other cycle types (i.e. not V-cycle) do not scale well in parallel, so option removed for now
   // L_iorho_inv_pc_->SetCycleType(1);
   L_iorho_inv_ortho_pc_ = new OrthoSolver(pfes_->GetComm());

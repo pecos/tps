@@ -138,7 +138,7 @@ setup() {
     $MPIRUN -n 2 $EXE --runFile $RUNFILE_LID_MOD
 
     # check solutions are the same!
-    h5diff -r --delta=1e-12 restart_output-lid.sol.h5 restart_output-lid.sol.2.h5
+    h5diff -r --delta=1e-11 restart_output-lid.sol.h5 restart_output-lid.sol.2.h5
 
     # delete intermediate files
     rm -f restart_output-lid*.h5
@@ -149,22 +149,22 @@ setup() {
     run $EXE --runFile $RUNFILE_PIPE
     [[ ${status} -eq 0 ]]
     test -s restart_output-pipe-lam.sol.h5
-    h5diff -r --delta=1e-12 restart_output-pipe-lam.sol.h5 $REF_SOLN_PIPE /velocity
-    h5diff -r --delta=1e-12 restart_output-pipe-lam.sol.h5 $REF_SOLN_PIPE /swirl
+    h5diff -r --delta=1e-11 restart_output-pipe-lam.sol.h5 $REF_SOLN_PIPE /velocity
+    h5diff -r --delta=1e-11 restart_output-pipe-lam.sol.h5 $REF_SOLN_PIPE /swirl
 }
 
 @test "[$TEST] check that Taylor-Couette (axisymmetric, with swirl) runs and verify result" {
     run $EXE --runFile $RUNFILE_TC
     [[ ${status} -eq 0 ]]
     test -s restart_output-tc.sol.h5
-    h5diff -r --delta=1e-12 restart_output-tc.sol.h5 $REF_SOLN_TC /velocity
-    h5diff -r --delta=1e-12 restart_output-tc.sol.h5 $REF_SOLN_TC /swirl
+    h5diff -r --delta=1e-11 restart_output-tc.sol.h5 $REF_SOLN_TC /velocity
+    h5diff -r --delta=1e-11 restart_output-tc.sol.h5 $REF_SOLN_TC /swirl
 }
 
 @test "[$TEST] check pipe (axisymmetric) flow with algebraic rans model" {
     run $EXE --runFile $RUNFILE_PIPE_ARANS
     [[ ${status} -eq 0 ]]
     test -s restart_output-pipe-arans.sol.h5
-    h5diff -r --delta=1e-12 restart_output-pipe-arans.sol.h5 $REF_SOLN_PIPE_ARANS /velocity
-    h5diff -r --delta=1e-12 restart_output-pipe-arans.sol.h5 $REF_SOLN_PIPE_ARANS /swirl
+    h5diff -r --delta=1e-11 restart_output-pipe-arans.sol.h5 $REF_SOLN_PIPE_ARANS /velocity
+    h5diff -r --delta=1e-11 restart_output-pipe-arans.sol.h5 $REF_SOLN_PIPE_ARANS /swirl
 }

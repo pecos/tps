@@ -89,15 +89,16 @@ class Tomboulides final : public FlowBase {
   double smoother_poly_fraction_ = 0.75;
   int smoother_eig_est_ = 10;
   int smoother_passes_ = 1;
-  double smoother_relax_weight_ = 0.4;
+  double smoother_relax_weight_ =
+      0.4;  // NOTE: setting relax wt to 0 should determine wt on a per-level basis but this does not seem to work
   double smoother_relax_omega_ = 0.01;
   double hsmoother_relax_weight_ = 0.4;
   double hsmoother_relax_omega_ = 0.01;
   double pressure_strength_thres_ = 0.6;
   int amg_aggresive_ = 4;
-  int amg_max_levels_ = 100;
-  int amg_max_iters_ = 1;
-  int amg_relax_ = 0;  // only 0 or 18 now
+  int amg_max_levels_ = 10;  // 100;
+  int amg_max_iters_ = 1;    // setting to zero is ~40% faster per step but effectively turns off precon?
+  int amg_relax_ = 0;        // only 0 or 18 now
 
   //  Options: Jacobi, l1Jacobi, l1GS, l1GStr, lumpedJacobi,
   //           GS, OPFS, Chebyshev, Taubin, FIR
