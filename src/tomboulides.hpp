@@ -89,7 +89,7 @@ class Tomboulides final : public FlowBase {
   double smoother_poly_fraction_ = 0.1;
   int smoother_eig_est_ = 10;
   int smoother_passes_ = 1;
-  double smoother_relax_weight_ = 0.0;
+  double smoother_relax_weight_ = 0.01;
   double smoother_relax_omega_ = 0.001;
   double hsmoother_relax_weight_ = 0.01;
   double hsmoother_relax_omega_ = 0.001;
