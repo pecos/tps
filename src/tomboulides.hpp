@@ -86,17 +86,17 @@ class Tomboulides final : public FlowBase {
 
   // linear-solver options
   int smoother_poly_order_;
-  double smoother_poly_fraction_ = 0.1;
+  double smoother_poly_fraction_ = 0.75;
   int smoother_eig_est_ = 10;
   int smoother_passes_ = 1;
-  double smoother_relax_weight_ = 0.01;
-  double smoother_relax_omega_ = 0.001;
-  double hsmoother_relax_weight_ = 0.01;
-  double hsmoother_relax_omega_ = 0.001;
+  double smoother_relax_weight_ = 0.4;
+  double smoother_relax_omega_ = 0.01;
+  double hsmoother_relax_weight_ = 0.4;
+  double hsmoother_relax_omega_ = 0.01;
   double pressure_strength_thres_ = 0.6;
   int amg_aggresive_ = 4;
   int amg_max_levels_ = 100;
-  int amg_max_iters_ = 0;
+  int amg_max_iters_ = 1;
   int amg_relax_ = 0;  // only 0 or 18 now
 
   //  Options: Jacobi, l1Jacobi, l1GS, l1GStr, lumpedJacobi,
