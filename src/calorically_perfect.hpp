@@ -98,12 +98,12 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
 
   int mass_inverse_pl_ = 0;
   int mass_inverse_max_iter_ = 1000;
-  double mass_inverse_rtol_ = 1e-12;
+  double mass_inverse_rtol_ = 1e-8;
   double mass_inverse_atol_ = 1e-12;
 
   int hsolve_pl_ = 0;
   int hsolve_max_iter_ = 1000;
-  double hsolve_rtol_ = 1e-12;
+  double hsolve_rtol_ = 1e-8;
   double hsolve_atol_ = 1e-12;
 
   // Boundary condition info

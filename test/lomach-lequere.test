@@ -25,7 +25,7 @@ setup() {
 
     # check
     h5diff -r --relative=1e-8 $SOLN_FILE $REF_SOLN /temperature/temperature
-    h5diff -r --relative=1e-8 $SOLN_FILE $REF_SOLN /velocity/x-comp
-    h5diff -r --relative=1e-8 $SOLN_FILE $REF_SOLN /velocity/y-comp
+    h5diff -r --delta=1e-8 $SOLN_FILE $REF_SOLN /velocity/x-comp
+    h5diff -r --delta=1e-8 $SOLN_FILE $REF_SOLN /velocity/y-comp
 }
 

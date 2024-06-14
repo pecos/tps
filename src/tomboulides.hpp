@@ -145,17 +145,17 @@ class Tomboulides final : public FlowBase {
   // solver tolerance options
   int pressure_solve_pl_ = 0;
   int pressure_solve_max_iter_ = 1000;
-  double pressure_solve_rtol_ = 1e-08;
-  double pressure_solve_atol_ = 1e-18;
+  double pressure_solve_rtol_ = 1e-8;
+  double pressure_solve_atol_ = 1e-12;
 
   int mass_inverse_pl_ = 0;
   int mass_inverse_max_iter_ = 1000;
-  double mass_inverse_rtol_ = 1e-10;
+  double mass_inverse_rtol_ = 1e-8;
   double mass_inverse_atol_ = 1e-12;
 
   int hsolve_pl_ = 0;
   int hsolve_max_iter_ = 1000;
-  double hsolve_rtol_ = 1e-10;
+  double hsolve_rtol_ = 1e-8;
   double hsolve_atol_ = 1e-12;
 
   // To use "numerical integration", quadrature rule must persist
