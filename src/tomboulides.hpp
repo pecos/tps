@@ -143,20 +143,24 @@ class Tomboulides final : public FlowBase {
   int amg_interpolation_ = 14;
 
   // solver tolerance options
+  int default_max_iter_ = 1000;
+  double default_rtol_ = 1e-8;
+  double default_atol_ = 1e-10;
+
   int pressure_solve_pl_ = 0;
-  int pressure_solve_max_iter_ = 1000;
-  double pressure_solve_rtol_ = 1e-8;
-  double pressure_solve_atol_ = 1e-12;
+  int pressure_solve_max_iter_;
+  double pressure_solve_rtol_;
+  double pressure_solve_atol_;
 
   int mass_inverse_pl_ = 0;
-  int mass_inverse_max_iter_ = 1000;
-  double mass_inverse_rtol_ = 1e-8;
-  double mass_inverse_atol_ = 1e-12;
+  int mass_inverse_max_iter_;
+  double mass_inverse_rtol_;
+  double mass_inverse_atol_;
 
   int hsolve_pl_ = 0;
-  int hsolve_max_iter_ = 1000;
-  double hsolve_rtol_ = 1e-8;
-  double hsolve_atol_ = 1e-12;
+  int hsolve_max_iter_;
+  double hsolve_rtol_;
+  double hsolve_atol_;
 
   // To use "numerical integration", quadrature rule must persist
   mfem::IntegrationRules gll_rules;

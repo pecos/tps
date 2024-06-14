@@ -96,15 +96,19 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   int max_iter_; /**< Maximum number of linear solver iterations */
   double rtol_;  /**< Linear solver relative tolerance */
 
+  int default_max_iter_ = 1000;
+  double default_rtol_ = 1.0e-8;
+  double default_atol_ = 1.0e-10;
+
   int mass_inverse_pl_ = 0;
-  int mass_inverse_max_iter_ = 1000;
-  double mass_inverse_rtol_ = 1e-8;
-  double mass_inverse_atol_ = 1e-12;
+  int mass_inverse_max_iter_;
+  double mass_inverse_rtol_;
+  double mass_inverse_atol_;
 
   int hsolve_pl_ = 0;
-  int hsolve_max_iter_ = 1000;
-  double hsolve_rtol_ = 1e-8;
-  double hsolve_atol_ = 1e-12;
+  int hsolve_max_iter_;
+  double hsolve_rtol_;
+  double hsolve_atol_;
 
   // Boundary condition info
   Array<int> temp_ess_attr_; /**< List of patches with Dirichlet BC on temperature */

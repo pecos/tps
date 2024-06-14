@@ -115,21 +115,21 @@ CaloricallyPerfectThermoChem::CaloricallyPerfectThermoChem(mfem::ParMesh *pmesh,
 
   tpsP_->getInput("loMach/openSystem", domain_is_open_, false);
 
-  tpsP_->getInput("loMach/calperfect/linear-solver-rtol", rtol_, 1e-12);
-  tpsP_->getInput("loMach/calperfect/linear-solver-max-iter", max_iter_, 1000);
-  tpsP_->getInput("loMach/calperfect/linear-solver-verbosity", pl_solve_, 0);
-
   // NOTE: this should default to FALSE (but would break all related test cases...)
   tpsP_->getInput("loMach/calperfect/numerical-integ", numerical_integ_, true);
 
+  tpsP_->getInput("loMach/calperfect/linear-solver-rtol", rtol_, default_rtol_);
+  tpsP_->getInput("loMach/calperfect/linear-solver-max-iter", max_iter_, default_max_iter_);
+  tpsP_->getInput("loMach/calperfect/linear-solver-verbosity", pl_solve_, 0);
+
   // not deleting above block to maintain backwards-compatability
   tpsP_->getInput("loMach/calperfect/hsolve-rtol", hsolve_rtol_, rtol_);
-  tpsP_->getInput("loMach/calperfect/hsolve-atol", hsolve_atol_, 1.0e-12);
+  tpsP_->getInput("loMach/calperfect/hsolve-atol", hsolve_atol_, default_atol_);
   tpsP_->getInput("loMach/calperfect/hsolve-max-iter", hsolve_max_iter_, max_iter_);
   tpsP_->getInput("loMach/calperfect/hsolve-verbosity", hsolve_pl_, pl_solve_);
 
   tpsP_->getInput("loMach/calperfect/msolve-rtol", mass_inverse_rtol_, rtol_);
-  tpsP_->getInput("loMach/calperfect/msolve-atol", mass_inverse_atol_, 1.0e-12);
+  tpsP_->getInput("loMach/calperfect/msolve-atol", mass_inverse_atol_, default_atol_);
   tpsP_->getInput("loMach/calperfect/msolve-max-iter", mass_inverse_max_iter_, max_iter_);
   tpsP_->getInput("loMach/calperfect/msolve-verbosity", mass_inverse_pl_, pl_solve_);
 }
