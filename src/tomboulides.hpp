@@ -150,12 +150,12 @@ class Tomboulides final : public FlowBase {
 
   int mass_inverse_pl_ = 0;
   int mass_inverse_max_iter_ = 1000;
-  double mass_inverse_rtol_ = 1e-08;
+  double mass_inverse_rtol_ = 1e-10;
   double mass_inverse_atol_ = 1e-12;
 
   int hsolve_pl_ = 0;
   int hsolve_max_iter_ = 1000;
-  double hsolve_rtol_ = 1e-08;
+  double hsolve_rtol_ = 1e-10;
   double hsolve_atol_ = 1e-12;
 
   // To use "numerical integration", quadrature rule must persist
