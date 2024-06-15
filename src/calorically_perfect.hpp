@@ -87,9 +87,9 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   int smoother_eig_est_ = 10;
   int smoother_passes_ = 1;
   double smoother_relax_weight_ = 0.4;
-  double smoother_relax_omega_ = 0.01;
-  double hsmoother_relax_weight_ = 0.4;
-  double hsmoother_relax_omega_ = 0.01;
+  double smoother_relax_omega_ = 1.0;
+  double hsmoother_relax_weight_ = 0.8;
+  double hsmoother_relax_omega_ = 0.1;
 
   // solver tolerance options
   int pl_solve_; /**< Verbosity level passed to mfem solvers */

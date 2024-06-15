@@ -90,19 +90,21 @@ class Tomboulides final : public FlowBase {
   int smoother_eig_est_ = 10;
   int smoother_passes_ = 1;
   double smoother_relax_weight_ =
-      0.4;  // NOTE: setting relax wt to 0 should determine wt on a per-level basis but this does not seem to work
-  double smoother_relax_omega_ = 0.01;
-  double hsmoother_relax_weight_ = 0.4;
-  double hsmoother_relax_omega_ = 0.01;
-  double pressure_strength_thres_ = 0.6;
-  int amg_aggresive_ = 4;
-  int amg_max_levels_ = 10;  // 100;
-  int amg_max_iters_ = 1;    // setting to zero is ~40% faster per step but effectively turns off precon?
-  int amg_relax_ = 0;        // only 0 or 18 now
+      0.4;  // NOTE: setting relax wt to 0 should determine wt dynamically but this does not seem to work
+  double smoother_relax_omega_ = 1.0;
+  double hsmoother_relax_weight_ = 0.8;
+  double hsmoother_relax_omega_ = 0.1;
 
   //  Options: Jacobi, l1Jacobi, l1GS, l1GStr, lumpedJacobi,
   //           GS, OPFS, Chebyshev, Taubin, FIR
   mfem::HypreSmoother::Type smoother_type_ = HypreSmoother::Jacobi;
+
+  double pressure_strength_thres_ = 0.6;
+  int amg_aggresive_ = 4;
+  int amg_max_levels_ = 10;
+  int amg_max_iters_ =
+      1;  // should be 1 for precon, setting to zero is ~30-40% faster per step but effectively turns off solve
+  int amg_relax_ = 18;  // only 0 or 18 now
 
   /*
   0 : CLJP-coarsening (a parallel coarsening algorithm using independent sets.
