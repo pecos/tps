@@ -117,17 +117,17 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
     if (axisym_) assert(!numerical_integ_);
 
     // exposing solver tolerance options to user
-    tps->getInput("loMach/tomboulides/psolve_atol_", pressure_solve_atol_, default_atol_);
-    tps->getInput("loMach/tomboulides/hsolve_atol_", hsolve_atol_, default_atol_);
-    tps->getInput("loMach/tomboulides/msolve_atol_", mass_inverse_atol_, default_atol_);
+    tps->getInput("loMach/tomboulides/psolve_atol", pressure_solve_atol_, default_atol_);
+    tps->getInput("loMach/tomboulides/hsolve_atol", hsolve_atol_, default_atol_);
+    tps->getInput("loMach/tomboulides/msolve_atol", mass_inverse_atol_, default_atol_);
 
-    tps->getInput("loMach/tomboulides/psolve_rtol_", pressure_solve_rtol_, default_rtol_);
-    tps->getInput("loMach/tomboulides/hsolve_rtol_", hsolve_rtol_, default_rtol_);
-    tps->getInput("loMach/tomboulides/msolve_rtol_", mass_inverse_rtol_, default_rtol_);
+    tps->getInput("loMach/tomboulides/psolve_rtol", pressure_solve_rtol_, default_rtol_);
+    tps->getInput("loMach/tomboulides/hsolve_rtol", hsolve_rtol_, default_rtol_);
+    tps->getInput("loMach/tomboulides/msolve_rtol", mass_inverse_rtol_, default_rtol_);
 
-    tps->getInput("loMach/tomboulides/psolve_maxIters_", pressure_solve_max_iter_, default_max_iter_);
-    tps->getInput("loMach/tomboulides/hsolve_maxIters_", hsolve_max_iter_, default_max_iter_);
-    tps->getInput("loMach/tomboulides/msolve_maxIters_", mass_inverse_max_iter_, default_max_iter_);
+    tps->getInput("loMach/tomboulides/psolve_maxIters", pressure_solve_max_iter_, default_max_iter_);
+    tps->getInput("loMach/tomboulides/hsolve_maxIters", hsolve_max_iter_, default_max_iter_);
+    tps->getInput("loMach/tomboulides/msolve_maxIters", mass_inverse_max_iter_, default_max_iter_);
   }
 }
 
