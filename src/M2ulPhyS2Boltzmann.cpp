@@ -90,12 +90,12 @@ void M2ulPhyS::fetch(TPS::Tps2Boltzmann &interface) {
   mfem::ParFiniteElementSpace *reaction_rates_fes(&(interface.NativeFes(TPS::Tps2Boltzmann::Index::ReactionRates)));
   externalReactionRates.reset(new mfem::ParGridFunction(reaction_rates_fes));
   interface.interpolateToNativeFES(*externalReactionRates, TPS::Tps2Boltzmann::Index::ReactionRates);
-  #if defined(_CUDA_) || defined(_HIP_)
-    const double * data(externalReactionRates->Read() );
-    int size(externalReactionRates->FESpace()->GetNDofs() );
-    assert(externalReactionRates->FESpace()->GetOrdering() == mfem::Ordering::byNODES);
-    gpu::deviceSetChemistryReactionData<<<1, 1>>>(data, size, chemistry_);
-  #else
-    chemistry_->setGridFunctionRates(*externalReactionRates);
-  #endif
+#if defined(_CUDA_) || defined(_HIP_)
+  const double *data(externalReactionRates->Read());
+  int size(externalReactionRates->FESpace()->GetNDofs());
+  assert(externalReactionRates->FESpace()->GetOrdering() == mfem::Ordering::byNODES);
+  gpu::deviceSetChemistryReactionData<<<1, 1>>>(data, size, chemistry_);
+#else
+  chemistry_->setGridFunctionRates(*externalReactionRates);
+#endif
 }

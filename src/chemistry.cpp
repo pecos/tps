@@ -109,7 +109,7 @@ MFEM_HOST_DEVICE Chemistry::~Chemistry() {
   }
 }
 
-MFEM_HOST_DEVICE void Chemistry::setRates(const double * data, int size) {
+MFEM_HOST_DEVICE void Chemistry::setRates(const double *data, int size) {
   for (int r = 0; r < numReactions_; r++) {
     if (reactions_[r]->reactionModel == GRIDFUNCTION_RXN) {
       GridFunctionReaction *rx = (GridFunctionReaction *)(reactions_[r]);

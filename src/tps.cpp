@@ -140,8 +140,7 @@ void Tps::parseCommandLineArgs(int argc, char *argv[]) {
   args.AddOption(&visualMode, "-visual", "--visualization", "", "--no-visualization",
                  "Launch post-process visualization.");
   gpu_aware_mpi_ = false;
-  args.AddOption(&gpu_aware_mpi_, "-ga", "--gpu-aware-mpi", "", "--no-gpu-aware-mpi",
-                 "Set GPU-aware MPI.");
+  args.AddOption(&gpu_aware_mpi_, "-ga", "--gpu-aware-mpi", "", "--no-gpu-aware-mpi", "Set GPU-aware MPI.");
   args.Parse();
 
   if (!args.Good()) {

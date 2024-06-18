@@ -38,10 +38,10 @@
 #include "wallBC.hpp"
 
 BCintegrator::BCintegrator(bool _mpiRoot, MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElementSpace *_vfes,
-                           IntegrationRules *_intRules, RiemannSolver *rsolver_, double &_dt, double *_time, GasMixture *_mixture,
-                           GasMixture *d_mixture, Fluxes *_fluxClass, ParGridFunction *_Up, ParGridFunction *_gradUp,
-                           const boundaryFaceIntegrationData &boundary_face_data, const int _dim,
-                           const int _num_equation, double &_max_char_speed, RunConfiguration &_runFile,
+                           IntegrationRules *_intRules, RiemannSolver *rsolver_, double &_dt, double *_time,
+                           GasMixture *_mixture, GasMixture *d_mixture, Fluxes *_fluxClass, ParGridFunction *_Up,
+                           ParGridFunction *_gradUp, const boundaryFaceIntegrationData &boundary_face_data,
+                           const int _dim, const int _num_equation, double &_max_char_speed, RunConfiguration &_runFile,
                            Array<int> &local_attr, const int &_maxIntPoints, const int &_maxDofs,
                            ParGridFunction *distance)
     : groupsMPI(_groupsMPI),
@@ -68,7 +68,7 @@ BCintegrator::BCintegrator(bool _mpiRoot, MPI_Groups *_groupsMPI, ParMesh *_mesh
   mpiRoot = _mpiRoot;
   time = *_time;
   pTime = _time;
-  
+
   // Init inlet BCs
   for (size_t in = 0; in < config.GetInletPatchType()->size(); in++) {
     std::pair<int, InletType> patchANDtype = (*config.GetInletPatchType())[in];

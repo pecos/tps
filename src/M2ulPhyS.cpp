@@ -687,12 +687,12 @@ void M2ulPhyS::initVariables() {
 
   double *pTime;
   pTime = &time;
-  
+
   bcIntegrator = NULL;
   if (local_attr.Size() > 0) {
-    bcIntegrator = new BCintegrator(rank0_, groupsMPI, mesh, vfes, intRules, rsolver, dt, pTime, mixture, d_mixture, d_fluxClass, Up,
-                                    gradUp, gpu_precomputed_data_.boundary_face_data, dim, num_equation, max_char_speed,
-                                    config, local_attr, maxIntPoints, maxDofs, distance_);
+    bcIntegrator = new BCintegrator(rank0_, groupsMPI, mesh, vfes, intRules, rsolver, dt, pTime, mixture, d_mixture,
+                                    d_fluxClass, Up, gradUp, gpu_precomputed_data_.boundary_face_data, dim,
+                                    num_equation, max_char_speed, config, local_attr, maxIntPoints, maxDofs, distance_);
   }
 
   // A->SetAssemblyLevel(AssemblyLevel::PARTIAL);
@@ -2786,19 +2786,19 @@ void M2ulPhyS::parseViscosityOptions() {
   tpsP->getInput("viscosityMultiplierFunction/isEnabled", config.linViscData.isEnabled, false);
   if (config.linViscData.isEnabled) {
     auto normal = config.linViscData.normal.HostWrite();
-    tpsP->getRequiredVecElem("viscosityMultiplierFunction/norm", normal[0], 0);
-    tpsP->getRequiredVecElem("viscosityMultiplierFunction/norm", normal[1], 1);
-    tpsP->getRequiredVecElem("viscosityMultiplierFunction/norm", normal[2], 2);
+    tpsP->getRequiredVecElem("viscosityMultiplierFunction/normal", normal[0], 0);
+    tpsP->getRequiredVecElem("viscosityMultiplierFunction/normal", normal[1], 1);
+    tpsP->getRequiredVecElem("viscosityMultiplierFunction/normal", normal[2], 2);
 
     auto point0 = config.linViscData.point0.HostWrite();
-    tpsP->getRequiredVecElem("viscosityMultiplierFunction/p0", point0[0], 0);
-    tpsP->getRequiredVecElem("viscosityMultiplierFunction/p0", point0[1], 1);
-    tpsP->getRequiredVecElem("viscosityMultiplierFunction/p0", point0[2], 2);
+    tpsP->getRequiredVecElem("viscosityMultiplierFunction/point", point0[0], 0);
+    tpsP->getRequiredVecElem("viscosityMultiplierFunction/point", point0[1], 1);
+    tpsP->getRequiredVecElem("viscosityMultiplierFunction/point", point0[2], 2);
 
-    auto pointInit = config.linViscData.pointInit.HostWrite();
-    tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[0], 0);
-    tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[1], 1);
-    tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[2], 2);
+    // auto pointInit = config.linViscData.pointInit.HostWrite();
+    // tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[0], 0);
+    // tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[1], 1);
+    // tpsP->getRequiredVecElem("viscosityMultiplierFunction/pInit", pointInit[2], 2);
 
     tpsP->getRequiredInput("viscosityMultiplierFunction/width", config.linViscData.width);
     tpsP->getRequiredInput("viscosityMultiplierFunction/viscosityRatio", config.linViscData.viscRatio);
@@ -3566,7 +3566,9 @@ void M2ulPhyS::parseBCInputs() {
   // Inlet Bcs
   std::map<std::string, InletType> inletMapping;
   inletMapping["subsonic"] = SUB_DENS_VEL;
-  inletMapping["subsonicFaceBased"] = SUB_DENS_VEL_FACE;  
+  inletMapping["subsonicFaceBasedX"] = SUB_DENS_VEL_FACE_X;
+  inletMapping["subsonicFaceBasedY"] = SUB_DENS_VEL_FACE_Y;
+  inletMapping["subsonicFaceBasedZ"] = SUB_DENS_VEL_FACE_Z;
   inletMapping["nonreflecting"] = SUB_DENS_VEL_NR;
   inletMapping["nonreflectingConstEntropy"] = SUB_VEL_CONST_ENT;
 
@@ -3586,6 +3588,17 @@ void M2ulPhyS::parseBCInputs() {
       config.inletBC.Append(density);
       config.inletBC.Append(uvw, 3);
     }
+
+    // NOTE: if there is a need, make face-based general by specifying tangent, leave
+    // as either tan = x, y, or z for now as fixing requires changing BC interface
+    // across the board
+    // FaceBased requires an additional tangent definition cooresponding to the w-component in uvw
+    // if (type == "subsonicFaceBased") {
+    //  Array<double> tangent2;
+    //  tpsP->getRequiredVec((basepath + "/w-tangent").c_str(), tangent2, 3);
+    //  config.inletBC.Append(tangent2, 3);
+    //}
+
     // For multi-component gas, require (numActiveSpecies)-more inputs.
     if ((config.workFluid != DRY_AIR) && (config.numSpecies > 1)) {
       grvy_printf(GRVY_INFO, "\nInlet mass fraction of background species will not be used. \n");
