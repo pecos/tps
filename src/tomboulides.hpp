@@ -80,8 +80,7 @@ class Tomboulides final : public FlowBase {
   bool axisym_;
 
   // Options
-  // TODO(trevilo): hardcoded for testing.  Need to set based on input file.
-  bool numerical_integ_ = true;
+  bool numerical_integ_ = false;
   bool partial_assembly_ = false;
 
   // linear-solver options
@@ -146,8 +145,8 @@ class Tomboulides final : public FlowBase {
 
   // solver tolerance options
   int default_max_iter_ = 1000;
-  double default_rtol_ = 1e-8;
-  double default_atol_ = 1e-10;
+  double default_rtol_ = 1e-10;
+  double default_atol_ = 1e-12;
 
   int pressure_solve_pl_ = 0;
   int pressure_solve_max_iter_;

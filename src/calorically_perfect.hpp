@@ -76,7 +76,7 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   // Flags
   bool rank0_;                      /**< true if this is rank 0 */
   bool partial_assembly_ = false;   /**< Enable/disable partial assembly of forms. */
-  bool numerical_integ_ = true;     /**< Enable/disable numerical integration rules of forms. */
+  bool numerical_integ_ = false;     /**< Enable/disable numerical integration rules of forms. */
   bool constant_viscosity_ = false; /**< Enable/disable constant viscosity */
   bool constant_density_ = false;   /**< Enable/disable constant density */
   bool domain_is_open_ = false;     /**< true if domain is open */
@@ -97,8 +97,8 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   double rtol_;  /**< Linear solver relative tolerance */
 
   int default_max_iter_ = 1000;
-  double default_rtol_ = 1.0e-8;
-  double default_atol_ = 1.0e-10;
+  double default_rtol_ = 1.0e-10;
+  double default_atol_ = 1.0e-12;
 
   int mass_inverse_pl_ = 0;
   int mass_inverse_max_iter_;
