@@ -56,7 +56,7 @@ ZetaModel::ZetaModel(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, TPS::Tps 
   dim_ = pmesh_->Dimension();
   nvel_ = dim_;
   order_ = loMach_opts_->order;
-  gridScale_ = gridScale;
+  gridScale_gf_ = gridScale;
 
   // read-ins, if any
   // example: tpsP_->getInput("loMach/sgsModelConstant", sgs_model_const_, sgs_const);
@@ -144,7 +144,6 @@ void ZetaModel::initializeSelf() {
   gradW_.SetSize(vfes_truevsize);
   
   rn_.SetSize(sfes_truevsize);
-  delta_.SetSize(sfes_truevsize);  
 
   if (rank0_) grvy_printf(ginfo, "zeta-f vectors and gf initialized...\n");
 
@@ -238,15 +237,26 @@ void ZetaModel::initializeSelf() {
         TKEwall_coeff->constant = 0.0;
         AddTKEDirichletBC(TKEwall_coeff, attr_wall);
 
-        TDRwall_coeff_ = new GridFunctionCoefficient(&tdrWall_gf_);
-        AddTDRDirichletBC(TDRwall_coeff_, attr_wall);
+        gradTKE_coeff_ = new GradientGridFunctionCoefficient(&tke_gf_);
+        nu_coeff_ = new RatioCoefficient(*(thermoChem_interface_->viscosity),*(thermoChem_interface_->rn));	
+	nu_delta_coeff_ = new RatioCoefficient(*nu_coeff_, &gridScale_gf_);
+	nu_delta_coeff_ *= 2.0;
+        tdr_wall_coeff_ = new ScalarVectorProductCoefficient(*nu_delta_coeff_, *gradTKE_coeff_);
+	
+        // TDRwall_coeff_ = new GridFunctionCoefficient(&tdrWall_gf_);
+        // AddTDRDirichletBC(TDRwall_coeff_, attr_wall);
 
         ConstantCoefficient *ZETAwall_coeff = new ConstantCoefficient();
         ZETAwall_coeff->constant = 0.0;
         AddZETADirichletBC(ZETAwall_coeff, attr_wall);
 
-        Fwall_coeff_ = new GridFunctionCoefficient(&fWall_gf_);	
-        AddFDirichletBC(Fwall_coeff_, attr_wall);		
+        gradZeta_coeff_ = new GradientGridFunctionCoefficient(&zeta_gf_);
+	nuNeg_delta_coeff_ = new RatioCoefficient(*nu_coeff_, &gridScale_gf_);	
+	nuNeg_delta_coeff_ *= -2.0;
+        f_wall_coeff_ = new ScalarVectorProductCoefficient(*nuNeg_delta_coeff_, *gradZeta_coeff_);
+	
+        // Fwall_coeff_ = new GridFunctionCoefficient(&fWall_gf_);	
+        // AddFDirichletBC(Fwall_coeff_, attr_wall);		
       }
     }
 
@@ -383,13 +393,6 @@ void ZetaModel::initializeViz(ParaViewDataCollection &pvdc) {
 }
 
 void ZetaModel::setup() {
-  // By calling step here, we initialize the eddy viscosity using
-  // the initial velocity gradient
-  this->step();  
-}
-
-void AlgebraicSubgridModels::step() {
-  // std::cout << " giddy up" << endl;
 
   // gather necessary information from other classes
   (flow_interface_->velocity)->GetTrueDofs(vel_);  
@@ -397,65 +400,267 @@ void AlgebraicSubgridModels::step() {
   (flow_interface_->gradV)->GetTrueDofs(gradV_);
   (flow_interface_->gradW)->GetTrueDofs(gradW_);
   (thermoChem_interface_->density)->GetTrueDofs(rn_);
+  (thermoChem_interface_->viscosity)->GetTrueDofs(mu_);  
+  
+  // By calling step here, we initialize the eddy viscosity using
+  // the initial velocity gradient
+  this->step();  
+}
 
-  eddyVisc_ = 0.0;
+void ZetaModel::step() {
+
+  dt_ = time_coeff_.dt;
+  time_ = time_coeff_.time;
+
+  // Set current time for Dirichlet boundary conditions.
+  for (auto &tke_dbc : tke_dbcs_) {
+    tke_dbc.coeff->SetTime(time_ + dt_);
+  }
+  for (auto &tdr_dbc : tdr_dbcs_) {
+    tdr_dbc.coeff->SetTime(time_ + dt_);
+  }
+  for (auto &f_dbc : f_dbcs_) {
+    f_dbc.coeff->SetTime(time_ + dt_);
+  }
+  for (auto &zeta_dbc : zeta_dbcs_) {
+    zeta_dbc.coeff->SetTime(time_ + dt_);
+  }  
+
+  // preliminaries
+  extrapolateState();  
+  computeStrain();
+  updateTTS();
+  updateTLS();
+  updateProd();  
+  //updateBC();
+
+  // actual solves
+  tkeStep();
+  tdrStep();
+  fStep();
+  zetaStep();
+
+  // final calc of eddy visc
+  updateMuT();
+
+}
+
+void ZetaModel::updateMuT() {
+
+  const double *dTKE = tke_.HostRead();
+  const double *dTTS = tts_.HostRead();
+  const double *dZeta = zeta_.HostRead();
+  const double *dRho = rn_.HostRead();      
+  double *muT = eddyVisc_.HostReadWrite();
+
+  for (int i = 0; i < SdofInt_; i++) muT[i] = Cmu_ * dRho[i];
+  for (int i = 0; i < SdofInt_; i++) muT[i] *= dZeta[i];
+  for (int i = 0; i < SdofInt_; i++) muT[i] *= dTKE[i];
+  for (int i = 0; i < SdofInt_; i++) muT[i] *= dTTS[i];
+
+  eddyVisc_gf_.SetFromTrueDofs(eddyVisc_);
+  
+}
+
+/// extrapolated states to {n+1}
+void ZetaModel::extrapolateState() {
+
+  TKEext_.Set(time_coeff_.ab1, TKEn_);
+  TKEext_.Add(time_coeff_.ab2, TKEnm1_);
+  TKEext_.Add(time_coeff_.ab3, TKEnm2_);
+
+  TDRext_.Set(time_coeff_.ab1, TDRn_);
+  TDRext_.Add(time_coeff_.ab2, TDRnm1_);
+  TDRext_.Add(time_coeff_.ab3, TDRnm2_);
+
+  Zext_.Set(time_coeff_.ab1, Zn_);
+  Zext_.Add(time_coeff_.ab2, Znm1_);
+  Zext_.Add(time_coeff_.ab3, Znm2_);  
+
+}
+
+void ZetaModel::computeStrain() {
+
   const double *dGradU = gradU_.HostRead();
   const double *dGradV = gradV_.HostRead();
   const double *dGradW = gradW_.HostRead();
-  const double *rho = rn_.HostRead();
-  const double *Un = vel_.HostRead();  
-  const double *del = gridScale_->HostRead();
-  double *data = eddyVisc_.HostReadWrite();
+  double *Sij = strain_.HostReadWrite();
+  double *dSmag = sMag_.HostReadWrite();
+  double Smin = 1.0e-12;
 
-  // solve order:
-  // 1. update T,L,Pk
-  // 2. advance tke
-  // 3. advance tdr
-  // 4. solve f
-  // 5. advance zeta  
-  
-  if (sModel_ == 1) {
-    // std::cout << "In Smag loop " << endl;
-    for (int i = 0; i < SdofInt_; i++) {
-      double nu_sgs = 0.;
-      DenseMatrix gradUp;
-      gradUp.SetSize(nvel_, dim_);
-      for (int dir = 0; dir < dim_; dir++) {
-        gradUp(0, dir) = dGradU[i + dir * SdofInt_];
-      }
-      for (int dir = 0; dir < dim_; dir++) {
-        gradUp(1, dir) = dGradV[i + dir * SdofInt_];
-      }
-      for (int dir = 0; dir < dim_; dir++) {
-        gradUp(2, dir) = dGradW[i + dir * SdofInt_];
-      }
-      sgsSmag(gradUp, del[i], nu_sgs);
-      // std::cout << "gradU diag:" << gradUp(0,0) << " " << gradUp(1,1) << " " << gradUp(1,1) << "| nuT: " << nu_sgs <<
-      // endl;
-      data[i] = rho[i] * nu_sgs;
+  for (int i = 0; i < SdofInt_; i++) {
+    DenseMatrix gradUp;
+    gradUp.SetSize(nvel_, dim_);
+    for (int dir = 0; dir < dim_; dir++) {
+      gradUp(0, dir) = dGradU[i + dir * SdofInt_];
     }
+    for (int dir = 0; dir < dim_; dir++) {
+      gradUp(1, dir) = dGradV[i + dir * SdofInt_];
+    }
+    for (int dir = 0; dir < dim_; dir++) {
+      gradUp(2, dir) = dGradW[i + dir * SdofInt_];
+    }    
+    
+    Sij[i+0*SdofInt_] = gradUp(0, 0);
+    Sij[i+1*SdofInt_] = gradUp(1, 1);
+    Sij[i+3*SdofInt_] = 0.5 * (gradUp(0, 1) + gradUp(1, 0));
 
-  } else if (sModel_ == 2) {
-    for (int i = 0; i < SdofInt_; i++) {
-      double nu_sgs = 0.;
-      DenseMatrix gradUp;
-      gradUp.SetSize(nvel_, dim_);
-      for (int dir = 0; dir < dim_; dir++) {
-        gradUp(0, dir) = dGradU[i + dir * SdofInt_];
-      }
-      for (int dir = 0; dir < dim_; dir++) {
-        gradUp(1, dir) = dGradV[i + dir * SdofInt_];
-      }
-      for (int dir = 0; dir < dim_; dir++) {
-        gradUp(2, dir) = dGradW[i + dir * SdofInt_];
-      }
-      sgsSigma(gradUp, del[i], nu_sgs);
-      data[i] = rho[i] * nu_sgs;
-    }
+    // TODO: make general for 2d * 2d-axisym
+    Sij[i+2*SdofInt_] = gradUp(2, 2);
+    Sij[i+4*SdofInt_] = 0.5 * (gradUp(0, 2) + gradUp(2, 0));
+    Sij[i+5*SdofInt_] = 0.5 * (gradUp(1, 2) + gradUp(2, 1));    
   }
 
-  subgridVisc_gf_.SetFromTrueDofs(subgridVisc_);
+  // NOTE:  not including sqrt(2) factor here
+  for (int i = 0; i < SdofInt_; i++) {
+    dSmag[i] = 0.0;
+    for (int j = 0; j < dim_; j++) dSmag[i] += Sij[i+j*SdofInt_] * Sij[i+j*SdofInt_];
+    for (int j = dim_; j < 2*dim_; j++) dSmag[i] += 2.0 * Sij[i+j*SdofInt_] * Sij[i+j*SdofInt_];
+    dSmag[i] = sqrt(dSmag[i]);
+    dSmag[i] = std::max(dSmag[i], Smin);
+  }
+  
 }
+
+void ZetaModel::updateTTS() {
+
+  const double *dTKE = tke_.HostRead();
+  const double *dTDR = tdr_.HostRead();
+  const double *dZeta = zeta_.HostRead();
+  const double *dSmag = sMag_.HostRead();
+  const double *dMu = mu_.HostRead();
+  const double *dRho = rn_.HostRead();
+  double *dTTS = tts_.HostReadWrite();
+
+  double Ctime;
+  Ctime = 0.6/(std::sqrt(0.6)*std::sqrt(2.0)*Cmu_);
+  for (int i = 0; i < SdofInt_; i++) {
+    double T1, T2, T3;
+    T1 = dTKE[i] / dTDR[i];
+    T2 = Ctime / (dSmag[i]*dZeta[i]);
+    T3 = Ct_ * std::sqrt( (dMu[i]/(dRho[i]) * 1.0/dTDR[i]) );
+    dTTS[i] = std::min(T1,T2);
+    dTTS[i] = std::max(dTTS[i],T3);    
+  }
+  tts_gf_.SetFromTrueDofs(tts_);
+
+}
+
+void ZetaModel::updateTLS() {
+
+  const double *dTKE = tke_.HostRead();
+  const double *dTDR = tdr_.HostRead();
+  const double *dZeta = zeta_.HostRead();
+  const double *dSmag = sMag_.HostRead();
+  const double *dMu = mu_.HostRead();
+  const double *dRho = rn_.HostRead();
+  double *dTLS = tls_.HostReadWrite();
+
+  double Clength;
+  Clength = 1.0/(std::sqrt(0.6)*std::sqrt(2.0)*Cmu_);
+  for (int i = 0; i < SdofInt_; i++) {
+    double L1, L2, L3;
+    L1 = std::pow(dTKE[i],1.5) / dTDR[i];
+    L2 = Clength * std::sqrt(dTKE[i]) / (dSmag[i]*dZeta[i]);
+    L3 = Cn_ * std::pow( std::pow(dMu[i]/(dRho[i]),3.0) * 1.0/dTDR[i]), 0.25 );
+    dTLS[i] = std::min(L1,L2);
+    dTLS[i] = Cl_ * std::max(dTLS[i],L3);    
+  }
+  tls_gf_.SetFromTrueDofs(tls_);
+
+}
+
+void ZetaModel::updateProd() {
+  
+  const double *dGradU = gradU_.HostRead();
+  const double *dGradV = gradV_.HostRead();
+  const double *dGradW = gradW_.HostRead();
+  const double *Sij = strain_.HostReadWrite();
+  const double *dTKE = tke_.HostRead();
+  const double *dmuT = eddyVisc_.HostRead();
+  const double *dRho = rn_.HostRead();  
+  double *Pk = prodK_.HostReadWrite();
+
+  double twoThirds = 2.0/3.0;
+  for (int i = 0; i < SdofInt_; i++) {
+
+    DenseMatrix gradUp;
+    gradUp.SetSize(nvel_, dim_);    
+    for (int dir = 0; dir < dim_; dir++) {
+      gradUp(0, dir) = dGradU[i + dir * SdofInt_];
+    }
+    for (int dir = 0; dir < dim_; dir++) {
+      gradUp(1, dir) = dGradV[i + dir * SdofInt_];
+    }
+    for (int dir = 0; dir < dim_; dir++) {
+      gradUp(2, dir) = dGradW[i + dir * SdofInt_];
+    }
+
+    double divU = 0.0;
+    for (int j = 0; j < dim_; j++) divU += gradUp(j,j);
+
+    DenseMatrix tau;
+    tau.SetSize(nvel_, dim_);    
+    tau(0,0) = 2.0 * Sij[i+0*SdofInt_];
+    tau(1,1) = 2.0 * Sij[i+1*SdofInt_];
+    tau(2,2) = 2.0 * Sij[i+2*SdofInt_];    
+    tau(0,1) = 2.0 * Sij[i+3*SdofInt_];
+    tau(1,0) = 2.0 * Sij[i+3*SdofInt_];
+    tau(0,2) = 2.0 * Sij[i+4*SdofInt_];
+    tau(1,2) = 2.0 * Sij[i+5*SdofInt_];    
+    tau(2,0) = 2.0 * Sij[i+4*SdofInt_];
+    tau(2,1) = 2.0 * Sij[i+5*SdofInt_];
+
+    for (int j = 0; j < dim_; j++) {
+      tau(j,j) -= twoThirds * divU;
+    }
+    tau *= dmuT[i];
+    
+    for (int j = 0; j < dim_; j++) {
+      tau(j,j) -= twoThirds * drho[i] * dTKE{i};
+    }
+
+    Pk[i] = 0.0;
+    for (int j = 0; j < dim_; j++) {
+      for (int k = 0; k < dim_; k++) {
+	Pk[i] += tau(j,k) * gradUp(j,k);
+      }
+    }
+    
+  }
+
+  prodK_gf_.SetFromTrueDofs(prodK_);
+  
+}
+
+/// TODO: pull in tensor gridscale and calc Mnn^T for wall-normal spacing
+/*
+void ZetaModel::updateBC() {
+
+  gridScale_gf_.GetTrueDofs(tmpR0b_);  
+  const double *dTKE = tke_.HostRead();
+  const double *dZeta = zeta_.HostRead();
+  const double *dMu = mu_.HostRead();
+  const double *delta = tmpR0b_.HostRead();
+  double *wallBC = tmpR0_.HostReadWrite();
+
+  //gradk * n *delta
+  
+  tdrWall_gf_.GetTrueDofs(tmpR0_);
+  for (int i = 0; i < SdofInt_; i++) {
+  }
+  tdrWall_gf_.SetFromTrueDofs(tmpR0_);  
+  
+  fWall_gf_.GetTrueDofs(tmpR0_);
+  for (int i = 0; i < SdofInt_; i++) {
+  }
+  fWall_gf_.SetFromTrueDofs(tmpR0_);   
+
+}
+
+void ZetaModel::tkeStep() {
+}
+*/
 
 /**
 Basic Smagorinksy subgrid model with user-specified coefficient
