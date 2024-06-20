@@ -239,6 +239,7 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
   toFlow_interface_.viscosity = &visc_gf_;
   toFlow_interface_.thermal_divergence = &Qt_gf_;
   toTurbModel_interface_.density = &rn_gf_;
+  toTurbModel_interface_.viscosity = &visc_gf_;  
   if (rank0_) {
     std::cout << "exports set..." << endl;
   }
