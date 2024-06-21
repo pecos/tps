@@ -9,6 +9,7 @@ RESTART="ref_solns/sgsLoMach/restart_output.sol.h5"
 setup() {
     SOLN_FILE=restart_output.sol.h5
     REF_FILE=ref_solns/sgsLoMach/restart_output.sol.h5
+    OUT_FILE=output_solns/restart_output_autoPeriodic.sol.h5    
 }
 
 @test "[$TEST] check for input file $RUNFILE" {
@@ -27,4 +28,5 @@ setup() {
     test -s $SOLN_FILE
     test -s $REF_FILE
     h5diff -r --delta=1e-10 $SOLN_FILE $REF_FILE /velocity
+    cp $SOLN_FILE $OUT_FILE
 }

@@ -10,6 +10,7 @@ setup() {
     RUNFILE="inputs/lomach.lequere.varmu.ini"
     REF_SOLN="ref_solns/lequere-varmu/reference-lequere-varmu.sol.h5"
     SOLN_FILE="restart_output-lequere-varmu.sol.h5"
+    OUT_SOLN="output_solns/reference-lequere-varmu.sol.h5"   
 }
 
 @test "[$TEST] Le Quere low Mach, thermally-driven cavity regression with variable viscosity" {
@@ -24,8 +25,9 @@ setup() {
     $EXE --runFile $RUNFILE
 
     # check
-    h5diff -r --relative=1e-8 $SOLN_FILE $REF_SOLN /temperature/temperature
-    h5diff -r --delta=1e-8 $SOLN_FILE $REF_SOLN /velocity/x-comp
-    h5diff -r --delta=1e-8 $SOLN_FILE $REF_SOLN /velocity/y-comp
+    h5diff -r --relative=1e-10 $SOLN_FILE $REF_SOLN /temperature/temperature
+    h5diff -r --delta=1e-10 $SOLN_FILE $REF_SOLN /velocity/x-comp
+    h5diff -r --delta=1e-10 $SOLN_FILE $REF_SOLN /velocity/y-comp
+    cp $SOLN_FILE $OUT_SOLN
 }
 
