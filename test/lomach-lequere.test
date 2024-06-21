@@ -28,6 +28,6 @@ setup() {
     h5diff -r --relative=1e-10 $SOLN_FILE $REF_SOLN /temperature/temperature
     h5diff -r --delta=1e-10 $SOLN_FILE $REF_SOLN /velocity/x-comp
     h5diff -r --delta=1e-10 $SOLN_FILE $REF_SOLN /velocity/y-comp
-    cp $SOLN_FILE $OUT_SOLN
+    # cp $SOLN_FILE $OUT_SOLN
 }
 

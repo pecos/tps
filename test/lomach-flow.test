@@ -154,7 +154,7 @@ setup() {
     test -s restart_output-pipe-lam.sol.h5
     h5diff -r --delta=1e-10 restart_output-pipe-lam.sol.h5 $REF_SOLN_PIPE /velocity
     h5diff -r --delta=1e-10 restart_output-pipe-lam.sol.h5 $REF_SOLN_PIPE /swirl
-    cp restart_output-pipe-lam.sol.h5 $OUT_SOLN_PIPE
+    # cp restart_output-pipe-lam.sol.h5 $OUT_SOLN_PIPE
 }
 
 @test "[$TEST] check that Taylor-Couette (axisymmetric, with swirl) runs and verify result" {
@@ -163,7 +163,7 @@ setup() {
     test -s restart_output-tc.sol.h5
     h5diff -r --delta=1e-10 restart_output-tc.sol.h5 $REF_SOLN_TC /velocity
     h5diff -r --delta=1e-10 restart_output-tc.sol.h5 $REF_SOLN_TC /swirl
-    cp restart_output-tc.sol.h5 $OUT_SOLN_TC    
+    # cp restart_output-tc.sol.h5 $OUT_SOLN_TC    
 }
 
 @test "[$TEST] check pipe (axisymmetric) flow with algebraic rans model" {
@@ -172,5 +172,5 @@ setup() {
     test -s restart_output-pipe-arans.sol.h5
     h5diff -r --delta=1e-10 restart_output-pipe-arans.sol.h5 $REF_SOLN_PIPE_ARANS /velocity
     h5diff -r --delta=1e-10 restart_output-pipe-arans.sol.h5 $REF_SOLN_PIPE_ARANS /swirl
-    cp restart_output-pipe-arans.sol.h5 $OUT_SOLN_PIPE_ARANS
+    # cp restart_output-pipe-arans.sol.h5 $OUT_SOLN_PIPE_ARANS
 }
