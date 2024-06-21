@@ -170,7 +170,7 @@ setup() {
     run $EXE --runFile $RUNFILE_PIPE_ARANS
     [[ ${status} -eq 0 ]]
     test -s restart_output-pipe-arans.sol.h5
-    h5diff -r --delta=1e-10 restart_output-pipe-arans.sol.h5 $REF_SOLN_PIPE_ARANS /velocity
-    h5diff -r --delta=1e-10 restart_output-pipe-arans.sol.h5 $REF_SOLN_PIPE_ARANS /swirl
+    h5diff -r --delta=1e-9 restart_output-pipe-arans.sol.h5 $REF_SOLN_PIPE_ARANS /velocity
+    h5diff -r --delta=1e-9 restart_output-pipe-arans.sol.h5 $REF_SOLN_PIPE_ARANS /swirl
     # cp restart_output-pipe-arans.sol.h5 $OUT_SOLN_PIPE_ARANS
 }

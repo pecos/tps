@@ -35,5 +35,5 @@ setup() {
     test -s $SOLN_FILE
     test -s $REF_FILE
     h5diff -r --relative=1e-10 $SOLN_FILE $REF_FILE /temperature/temperature
-    cp $SOLN_FILE $OUT_FILE
+    # cp $SOLN_FILE $OUT_FILE
 }
