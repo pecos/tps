@@ -9,6 +9,7 @@ RESTART="ref_solns/aveLoMach/restart_output.sol.h5"
 setup() {
     SOLN_FILE=restart_output.sol.h5
     REF_FILE=ref_solns/aveLoMach/restart_output.sol.h5
+    OUT_FILE=output_solns/restart_output_aveLoMach.sol.h5    
 }
 
 @test "[$TEST] check for input file $RUNFILE" {
@@ -26,5 +27,6 @@ setup() {
 @test "[$TEST] verify tps output with input -> $RUNFILE" {
     test -s $SOLN_FILE
     test -s $REF_FILE
-    h5diff -r --delta=1e-12 $SOLN_FILE $REF_FILE meanVel
+    h5diff -r --delta=1e-11 $SOLN_FILE $REF_FILE meanVel
+    # cp $SOLN_FILE $OUT_FILE
 }

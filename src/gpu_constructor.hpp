@@ -161,8 +161,8 @@ __global__ void freeDeviceChemistry(Chemistry *chem);
 __global__ void freeDeviceRadiation(Radiation *radiation);
 
 //! Set the data to a GridFunctionReaction
-__global__ void deviceSetGridFunctionReactionData(const double * data, int size, GridFunctionReaction * reaction);
-__global__ void deviceSetChemistryReactionData(const double * data, int size, Chemistry * chem);
+__global__ void deviceSetGridFunctionReactionData(const double *data, int size, GridFunctionReaction *reaction);
+__global__ void deviceSetChemistryReactionData(const double *data, int size, Chemistry *chem);
 
 #endif  // cuda or hip
 }  // namespace gpu

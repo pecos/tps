@@ -115,10 +115,23 @@ CaloricallyPerfectThermoChem::CaloricallyPerfectThermoChem(mfem::ParMesh *pmesh,
 
   tpsP_->getInput("loMach/openSystem", domain_is_open_, false);
 
-  tpsP_->getInput("loMach/calperfect/linear-solver-rtol", rtol_, 1e-12);
-  tpsP_->getInput("loMach/calperfect/linear-solver-max-iter", max_iter_, 1000);
-  tpsP_->getInput("loMach/calperfect/linear-solver-verbosity", pl_solve_, 0);
+  // NOTE: this should default to FALSE (but would break all related test cases...)
   tpsP_->getInput("loMach/calperfect/numerical-integ", numerical_integ_, true);
+
+  tpsP_->getInput("loMach/calperfect/linear-solver-rtol", rtol_, default_rtol_);
+  tpsP_->getInput("loMach/calperfect/linear-solver-max-iter", max_iter_, default_max_iter_);
+  tpsP_->getInput("loMach/calperfect/linear-solver-verbosity", pl_solve_, 0);
+
+  // not deleting above block to maintain backwards-compatability
+  tpsP_->getInput("loMach/calperfect/hsolve-rtol", hsolve_rtol_, rtol_);
+  tpsP_->getInput("loMach/calperfect/hsolve-atol", hsolve_atol_, default_atol_);
+  tpsP_->getInput("loMach/calperfect/hsolve-max-iter", hsolve_max_iter_, max_iter_);
+  tpsP_->getInput("loMach/calperfect/hsolve-verbosity", hsolve_pl_, pl_solve_);
+
+  tpsP_->getInput("loMach/calperfect/msolve-rtol", mass_inverse_rtol_, rtol_);
+  tpsP_->getInput("loMach/calperfect/msolve-atol", mass_inverse_atol_, default_atol_);
+  tpsP_->getInput("loMach/calperfect/msolve-max-iter", mass_inverse_max_iter_, max_iter_);
+  tpsP_->getInput("loMach/calperfect/msolve-verbosity", mass_inverse_pl_, pl_solve_);
 }
 
 CaloricallyPerfectThermoChem::~CaloricallyPerfectThermoChem() {
@@ -400,6 +413,9 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
 void CaloricallyPerfectThermoChem::initializeOperators() {
   dt_ = time_coeff_.dt;
 
+  // polynomial order for smoother of precons
+  smoother_poly_order_ = order_ + 1;
+
   Array<int> empty;
 
   // GLL integration rule (Numerical Integration)
@@ -438,9 +454,6 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
     at_blfi->SetIntRule(&ir_nli);
   }
   At_form_->AddDomainIntegrator(at_blfi);
-  if (partial_assembly_) {
-    At_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
-  }
   At_form_->Assemble();
   At_form_->FormSystemMatrix(empty, At_);
   if (rank0_) std::cout << "CaloricallyPerfectThermoChem At operator set" << endl;
@@ -466,9 +479,6 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
     // msrho_blfi->SetIntRule(&ir_di);
   }
   MsRho_form_->AddDomainIntegrator(msrho_blfi);
-  if (partial_assembly_) {
-    MsRho_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
-  }
   MsRho_form_->Assemble();
   MsRho_form_->FormSystemMatrix(empty, MsRho_);
   if (rank0_) std::cout << "CaloricallyPerfectThermoChem MsRho operator set" << endl;
@@ -483,9 +493,6 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   }
   Ht_form_->AddDomainIntegrator(hmt_blfi);
   Ht_form_->AddDomainIntegrator(hdt_blfi);
-  if (partial_assembly_) {
-    Ht_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
-  }
   Ht_form_->Assemble();
   Ht_form_->FormSystemMatrix(temp_ess_tdof_, Ht_);
   if (rank0_) std::cout << "CaloricallyPerfectThermoChem Ht operator set" << endl;
@@ -496,33 +503,34 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
     MsInvPC_ = new OperatorJacobiSmoother(diag_pa, empty);
   } else {
     MsInvPC_ = new HypreSmoother(*Ms_.As<HypreParMatrix>());
-    dynamic_cast<HypreSmoother *>(MsInvPC_)->SetType(HypreSmoother::Jacobi, 1);
+    dynamic_cast<HypreSmoother *>(MsInvPC_)->SetType(HypreSmoother::Jacobi, smoother_passes_);
+    dynamic_cast<HypreSmoother *>(MsInvPC_)->SetSOROptions(smoother_relax_weight_, smoother_relax_omega_);
+    dynamic_cast<HypreSmoother *>(MsInvPC_)->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_,
+                                                            smoother_eig_est_);
   }
   MsInv_ = new CGSolver(sfes_->GetComm());
   MsInv_->iterative_mode = false;
   MsInv_->SetOperator(*Ms_);
   MsInv_->SetPreconditioner(*MsInvPC_);
-  MsInv_->SetPrintLevel(pl_solve_);
-  MsInv_->SetRelTol(rtol_);
-  MsInv_->SetMaxIter(max_iter_);
+  MsInv_->SetPrintLevel(mass_inverse_pl_);
+  MsInv_->SetRelTol(mass_inverse_rtol_);
+  MsInv_->SetAbsTol(mass_inverse_atol_);
+  MsInv_->SetMaxIter(mass_inverse_max_iter_);
 
-  if (partial_assembly_) {
-    Vector diag_pa(sfes_->GetTrueVSize());
-    Ht_form_->AssembleDiagonal(diag_pa);
-    HtInvPC_ = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof_);
-  } else {
-    HtInvPC_ = new HypreSmoother(*Ht_.As<HypreParMatrix>());
-    dynamic_cast<HypreSmoother *>(HtInvPC_)->SetType(HypreSmoother::Jacobi, 1);
-  }
+  HtInvPC_ = new HypreSmoother(*Ht_.As<HypreParMatrix>());
+  dynamic_cast<HypreSmoother *>(HtInvPC_)->SetType(HypreSmoother::Jacobi, smoother_passes_);
+  dynamic_cast<HypreSmoother *>(HtInvPC_)->SetSOROptions(hsmoother_relax_weight_, hsmoother_relax_omega_);
+  dynamic_cast<HypreSmoother *>(HtInvPC_)->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_,
+                                                          smoother_eig_est_);
 
   HtInv_ = new CGSolver(sfes_->GetComm());
-
   HtInv_->iterative_mode = true;
   HtInv_->SetOperator(*Ht_);
   HtInv_->SetPreconditioner(*HtInvPC_);
-  HtInv_->SetPrintLevel(pl_solve_);
-  HtInv_->SetRelTol(rtol_);
-  HtInv_->SetMaxIter(max_iter_);
+  HtInv_->SetPrintLevel(hsolve_pl_);
+  HtInv_->SetRelTol(hsolve_rtol_);
+  HtInv_->SetAbsTol(hsolve_atol_);
+  HtInv_->SetMaxIter(hsolve_max_iter_);
   if (rank0_) std::cout << "Temperature operators set" << endl;
 
   // Qt .....................................
@@ -546,15 +554,19 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
     MqInvPC_ = new OperatorJacobiSmoother(diag_pa, empty);
   } else {
     MqInvPC_ = new HypreSmoother(*Mq_.As<HypreParMatrix>());
-    dynamic_cast<HypreSmoother *>(MqInvPC_)->SetType(HypreSmoother::Jacobi, 1);
+    dynamic_cast<HypreSmoother *>(MqInvPC_)->SetType(HypreSmoother::Jacobi, smoother_passes_);
+    dynamic_cast<HypreSmoother *>(MqInvPC_)->SetSOROptions(smoother_relax_weight_, smoother_relax_omega_);
+    dynamic_cast<HypreSmoother *>(MqInvPC_)->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_,
+                                                            smoother_eig_est_);
   }
   MqInv_ = new CGSolver(sfes_->GetComm());
   MqInv_->iterative_mode = false;
   MqInv_->SetOperator(*Mq_);
   MqInv_->SetPreconditioner(*MqInvPC_);
-  MqInv_->SetPrintLevel(pl_solve_);
-  MqInv_->SetRelTol(rtol_);
-  MqInv_->SetMaxIter(max_iter_);
+  MqInv_->SetPrintLevel(mass_inverse_pl_);
+  MqInv_->SetRelTol(mass_inverse_rtol_);
+  MqInv_->SetAbsTol(mass_inverse_atol_);
+  MqInv_->SetMaxIter(mass_inverse_max_iter_);
 
   LQ_form_ = new ParBilinearForm(sfes_);
   auto *lqd_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
@@ -664,15 +676,7 @@ void CaloricallyPerfectThermoChem::step() {
   Ht_form_->Update();
   Ht_form_->Assemble();
   Ht_form_->FormSystemMatrix(temp_ess_tdof_, Ht_);
-
   HtInv_->SetOperator(*Ht_);
-  if (partial_assembly_) {
-    delete HtInvPC_;
-    Vector diag_pa(sfes_->GetTrueVSize());
-    Ht_form_->AssembleDiagonal(diag_pa);
-    HtInvPC_ = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof_);
-    HtInv_->SetPreconditioner(*HtInvPC_);
-  }
 
   // Prepare for the solve
   for (auto &temp_dbc : temp_dbcs_) {
@@ -681,12 +685,7 @@ void CaloricallyPerfectThermoChem::step() {
   sfes_->GetRestrictionMatrix()->MultTranspose(resT_, resT_gf_);
 
   Vector Xt2, Bt2;
-  if (partial_assembly_) {
-    auto *HC = Ht_.As<ConstrainedOperator>();
-    EliminateRHS(*Ht_form_, *HC, temp_ess_tdof_, Tn_next_gf_, resT_gf_, Xt2, Bt2, 1);
-  } else {
-    Ht_form_->FormLinearSystem(temp_ess_tdof_, Tn_next_gf_, resT_gf_, Ht_, Xt2, Bt2, 1);
-  }
+  Ht_form_->FormLinearSystem(temp_ess_tdof_, Tn_next_gf_, resT_gf_, Ht_, Xt2, Bt2, 1);
 
   // solve helmholtz eq for temp
   HtInv_->Mult(Bt2, Xt2);

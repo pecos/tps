@@ -129,9 +129,9 @@ class GridFunctionReaction : public Reaction {
 
   MFEM_HOST_DEVICE virtual ~GridFunctionReaction();
 
-  void setGridFunction(const mfem::GridFunction & f);
+  void setGridFunction(const mfem::GridFunction &f);
 
-  MFEM_HOST_DEVICE void setData(const double * data, int size);
+  MFEM_HOST_DEVICE void setData(const double *data, int size);
 
   MFEM_HOST_DEVICE virtual double computeRateCoefficient([[maybe_unused]] const double &T_h,
                                                          [[maybe_unused]] const double &T_e, const int &dofindex,

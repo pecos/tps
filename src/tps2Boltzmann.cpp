@@ -94,11 +94,9 @@ Tps2Boltzmann::Tps2Boltzmann(Tps *tps)
 
   save_to_paraview_dc = tps->getInput("boltzmannInterface/save_to_paraview", false);
 
-
   offsets.SetSize(NIndexes + 1);
   ncomps.SetSize(NIndexes + 1);
 }
-
 
 int Tps2Boltzmann::_countBTEReactions() {
   int total_reactions(0);

@@ -97,7 +97,7 @@ class Chemistry {
 
   // Set the grid function rates for GRIDFUNCTION_RXN reaction types
   void setGridFunctionRates(mfem::GridFunction &f);
-  MFEM_HOST_DEVICE void setRates(const double * data, int size);
+  MFEM_HOST_DEVICE void setRates(const double *data, int size);
 
   // return Vector of reaction rate coefficients, with the size of numReaction_.
   // WARNING(marc) I have removed "virtual" qualifier here assuming these functions will not

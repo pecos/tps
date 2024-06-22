@@ -115,6 +115,19 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
     // locates quadrature points on the axis, which can lead to
     // singular mass matrices and evaluations of 1/r = 1/0.
     if (axisym_) assert(!numerical_integ_);
+
+    // exposing solver tolerance options to user
+    tps->getInput("loMach/tomboulides/psolve-atol", pressure_solve_atol_, default_atol_);
+    tps->getInput("loMach/tomboulides/hsolve-atol", hsolve_atol_, default_atol_);
+    tps->getInput("loMach/tomboulides/msolve-atol", mass_inverse_atol_, default_atol_);
+
+    tps->getInput("loMach/tomboulides/psolve-rtol", pressure_solve_rtol_, default_rtol_);
+    tps->getInput("loMach/tomboulides/hsolve-rtol", hsolve_rtol_, default_rtol_);
+    tps->getInput("loMach/tomboulides/msolve-rtol", mass_inverse_rtol_, default_rtol_);
+
+    tps->getInput("loMach/tomboulides/psolve-maxIters", pressure_solve_max_iter_, default_max_iter_);
+    tps->getInput("loMach/tomboulides/hsolve-maxIters", hsolve_max_iter_, default_max_iter_);
+    tps->getInput("loMach/tomboulides/msolve-maxIters", mass_inverse_max_iter_, default_max_iter_);
   }
 }
 
@@ -562,6 +575,16 @@ void Tomboulides::initializeSelf() {
 void Tomboulides::initializeOperators() {
   assert(thermo_interface_ != NULL);
 
+  // polynomial order for smoother of precons
+  smoother_poly_order_ = vorder_ + 1;
+
+  // AMG strength threshold
+  if (dim_ == 2) {
+    pressure_strength_thres_ = 0.25;
+  } else {
+    pressure_strength_thres_ = 0.6;
+  }
+
   // Create all the Coefficient objects we need
   rho_coeff_ = new GridFunctionCoefficient(thermo_interface_->density);
 
@@ -657,16 +680,13 @@ void Tomboulides::initializeOperators() {
     L_iorho_blfi->SetIntRule(&ir_ni_p);
   }
   L_iorho_form_->AddDomainIntegrator(L_iorho_blfi);
-  if (partial_assembly_) {
-    L_iorho_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
-  }
   L_iorho_form_->Assemble();
   L_iorho_form_->FormSystemMatrix(pres_ess_tdof_, L_iorho_op_);
 
-  // Variable coefficient Laplacian inverse
+  // Variable coefficient Laplacian inverse (gets destoryed and rebuilt every step)
   L_iorho_lor_ = new ParLORDiscretization(*L_iorho_form_, pres_ess_tdof_);
   L_iorho_inv_pc_ = new HypreBoomerAMG(L_iorho_lor_->GetAssembledMatrix());
-  L_iorho_inv_pc_->SetPrintLevel(0);
+  L_iorho_inv_pc_->SetPrintLevel(pressure_solve_pl_);
   L_iorho_inv_ortho_pc_ = new OrthoSolver(pfes_->GetComm());
   L_iorho_inv_ortho_pc_->SetSolver(*L_iorho_inv_pc_);
 
@@ -745,9 +765,6 @@ void Tomboulides::initializeOperators() {
     msr_blfi->SetIntRule(&ir_ni_p);
   }
   Ms_rho_form_->AddDomainIntegrator(msr_blfi);
-  if (partial_assembly_) {
-    Ms_rho_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
-  }
   Ms_rho_form_->Assemble();
   Ms_rho_form_->FormSystemMatrix(empty, Ms_rho_op_);
 
@@ -781,9 +798,6 @@ void Tomboulides::initializeOperators() {
     mvr_blfi->SetIntRule(&ir_ni_v);
   }
   Mv_rho_form_->AddDomainIntegrator(mvr_blfi);
-  if (partial_assembly_) {
-    Mv_rho_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
-  }
   Mv_rho_form_->Assemble();
   Mv_rho_form_->FormSystemMatrix(empty, Mv_rho_op_);
 
@@ -794,29 +808,32 @@ void Tomboulides::initializeOperators() {
     Mv_inv_pc_ = new OperatorJacobiSmoother(diag_pa, empty);
   } else {
     Mv_inv_pc_ = new HypreSmoother(*Mv_op_.As<HypreParMatrix>());
-    dynamic_cast<HypreSmoother *>(Mv_inv_pc_)->SetType(HypreSmoother::Jacobi, 1);
+    dynamic_cast<HypreSmoother *>(Mv_inv_pc_)->SetType(smoother_type_, smoother_passes_);
+    dynamic_cast<HypreSmoother *>(Mv_inv_pc_)->SetSOROptions(smoother_relax_weight_, smoother_relax_omega_);
+    dynamic_cast<HypreSmoother *>(Mv_inv_pc_)
+        ->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_, smoother_eig_est_);
   }
   Mv_inv_ = new CGSolver(vfes_->GetComm());
   Mv_inv_->iterative_mode = false;
   Mv_inv_->SetOperator(*Mv_op_);
   Mv_inv_->SetPreconditioner(*Mv_inv_pc_);
   Mv_inv_->SetPrintLevel(mass_inverse_pl_);
+  Mv_inv_->SetAbsTol(mass_inverse_atol_);
   Mv_inv_->SetRelTol(mass_inverse_rtol_);
   Mv_inv_->SetMaxIter(mass_inverse_max_iter_);
 
-  if (partial_assembly_) {
-    Vector diag_pa(vfes_->GetTrueVSize());
-    Mv_rho_form_->AssembleDiagonal(diag_pa);
-    Mv_rho_inv_pc_ = new OperatorJacobiSmoother(diag_pa, empty);
-  } else {
-    Mv_rho_inv_pc_ = new HypreSmoother(*Mv_rho_op_.As<HypreParMatrix>());
-    dynamic_cast<HypreSmoother *>(Mv_rho_inv_pc_)->SetType(HypreSmoother::Jacobi, 1);
-  }
+  Mv_rho_inv_pc_ = new HypreSmoother(*Mv_rho_op_.As<HypreParMatrix>());
+  dynamic_cast<HypreSmoother *>(Mv_rho_inv_pc_)->SetType(smoother_type_, smoother_passes_);
+  dynamic_cast<HypreSmoother *>(Mv_rho_inv_pc_)->SetSOROptions(smoother_relax_weight_, smoother_relax_omega_);
+  dynamic_cast<HypreSmoother *>(Mv_rho_inv_pc_)
+      ->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_, smoother_eig_est_);
+
   Mv_rho_inv_ = new CGSolver(vfes_->GetComm());
   Mv_rho_inv_->iterative_mode = false;
   Mv_rho_inv_->SetOperator(*Mv_rho_op_);
   Mv_rho_inv_->SetPreconditioner(*Mv_rho_inv_pc_);
   Mv_rho_inv_->SetPrintLevel(mass_inverse_pl_);
+  Mv_rho_inv_->SetAbsTol(mass_inverse_atol_);
   Mv_rho_inv_->SetRelTol(mass_inverse_rtol_);
   Mv_rho_inv_->SetMaxIter(mass_inverse_max_iter_);
 
@@ -878,29 +895,22 @@ void Tomboulides::initializeOperators() {
     auto *hfv_blfi = new VectorMassIntegrator(*visc_forcing_coeff_);
     Hv_form_->AddDomainIntegrator(hfv_blfi);
   }
-  if (partial_assembly_) {
-    // Partial assembly is not supported for variable coefficient
-    // VectorMassIntegrator (as of mfem 4.5.2 at least)
-    assert(false);
-    Hv_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
-  }
   Hv_form_->Assemble();
   Hv_form_->FormSystemMatrix(vel_ess_tdof_, Hv_op_);
 
   // Helmholtz solver
-  if (partial_assembly_) {
-    Vector diag_pa(vfes_->GetTrueVSize());
-    Hv_form_->AssembleDiagonal(diag_pa);
-    Hv_inv_pc_ = new OperatorJacobiSmoother(diag_pa, vel_ess_tdof_);
-  } else {
-    Hv_inv_pc_ = new HypreSmoother(*Hv_op_.As<HypreParMatrix>());
-    dynamic_cast<HypreSmoother *>(Hv_inv_pc_)->SetType(HypreSmoother::Jacobi, 1);
-  }
+  Hv_inv_pc_ = new HypreSmoother(*Hv_op_.As<HypreParMatrix>());
+  dynamic_cast<HypreSmoother *>(Hv_inv_pc_)->SetType(smoother_type_, smoother_passes_);
+  dynamic_cast<HypreSmoother *>(Hv_inv_pc_)->SetSOROptions(hsmoother_relax_weight_, hsmoother_relax_omega_);
+  dynamic_cast<HypreSmoother *>(Hv_inv_pc_)
+      ->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_, smoother_eig_est_);
+
   Hv_inv_ = new CGSolver(vfes_->GetComm());
   Hv_inv_->iterative_mode = true;
   Hv_inv_->SetOperator(*Hv_op_);
   Hv_inv_->SetPreconditioner(*Hv_inv_pc_);
   Hv_inv_->SetPrintLevel(hsolve_pl_);
+  Hv_inv_->SetAbsTol(hsolve_atol_);
   Hv_inv_->SetRelTol(hsolve_rtol_);
   Hv_inv_->SetMaxIter(hsolve_max_iter_);
 
@@ -986,13 +996,17 @@ void Tomboulides::initializeOperators() {
     Hs_form_->FormSystemMatrix(swirl_ess_tdof_, Hs_op_);
 
     Hs_inv_pc_ = new HypreSmoother(*Hs_op_.As<HypreParMatrix>());
-    dynamic_cast<HypreSmoother *>(Hs_inv_pc_)->SetType(HypreSmoother::Jacobi, 1);
+    dynamic_cast<HypreSmoother *>(Hs_inv_pc_)->SetType(smoother_type_, smoother_passes_);
+    dynamic_cast<HypreSmoother *>(Hs_inv_pc_)->SetSOROptions(hsmoother_relax_weight_, hsmoother_relax_omega_);
+    dynamic_cast<HypreSmoother *>(Hs_inv_pc_)
+        ->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_, smoother_eig_est_);
 
     Hs_inv_ = new CGSolver(pfes_->GetComm());
     Hs_inv_->iterative_mode = true;
     Hs_inv_->SetOperator(*Hs_op_);
     Hs_inv_->SetPreconditioner(*Hs_inv_pc_);
     Hs_inv_->SetPrintLevel(hsolve_pl_);
+    Hs_inv_->SetAbsTol(hsolve_atol_);
     Hs_inv_->SetRelTol(hsolve_rtol_);
     Hs_inv_->SetMaxIter(hsolve_max_iter_);
 
@@ -1134,7 +1148,17 @@ void Tomboulides::step() {
 
   L_iorho_lor_ = new ParLORDiscretization(*L_iorho_form_, pres_ess_tdof_);
   L_iorho_inv_pc_ = new HypreBoomerAMG(L_iorho_lor_->GetAssembledMatrix());
-  L_iorho_inv_pc_->SetPrintLevel(0);
+  L_iorho_inv_pc_->SetPrintLevel(pressure_solve_pl_);
+  L_iorho_inv_pc_->SetCoarsening(amg_coarsening_);
+  L_iorho_inv_pc_->SetAggressiveCoarsening(amg_aggresive_);
+  L_iorho_inv_pc_->SetInterpolation(amg_interpolation_);
+  L_iorho_inv_pc_->SetStrengthThresh(pressure_strength_thres_);
+  L_iorho_inv_pc_->SetRelaxType(amg_relax_);
+  L_iorho_inv_pc_->SetMaxLevels(amg_max_levels_);
+  L_iorho_inv_pc_->SetMaxIter(amg_max_iters_);
+  L_iorho_inv_pc_->SetTol(0);
+  // NOTE: other cycle types (i.e. not V-cycle) do not scale well in parallel, so option removed for now
+  // L_iorho_inv_pc_->SetCycleType(1);
   L_iorho_inv_ortho_pc_ = new OrthoSolver(pfes_->GetComm());
   L_iorho_inv_ortho_pc_->SetSolver(*L_iorho_inv_pc_);
 
@@ -1168,10 +1192,7 @@ void Tomboulides::step() {
   Hv_form_->FormSystemMatrix(vel_ess_tdof_, Hv_op_);
 
   Hv_inv_->SetOperator(*Hv_op_);
-  if (partial_assembly_) {
-    // TODO(trevilo): Support partial assembly
-    assert(false);
-  }
+
   sw_helm_.Stop();
 
   //------------------------------------------------------------------------
@@ -1375,15 +1396,7 @@ void Tomboulides::step() {
   pfes_->GetRestrictionMatrix()->MultTranspose(resp_vec_, *resp_gf_);
 
   Vector X1, B1;
-  if (partial_assembly_) {
-    // TODO(trevilo): Support partial assembly here
-    assert(false);
-    // auto *SpC = Sp.As<ConstrainedOperator>();
-    // EliminateRHS(*Sp_form, *SpC, pres_ess_tdof, pn_gf, resp_gf, X1, B1, 1);
-  } else {
-    L_iorho_form_->FormLinearSystem(pres_ess_tdof_, *p_gf_, *resp_gf_, L_iorho_op_, X1, B1, 1);
-  }
-
+  L_iorho_form_->FormLinearSystem(pres_ess_tdof_, *p_gf_, *resp_gf_, L_iorho_op_, X1, B1, 1);
   L_iorho_inv_->Mult(B1, X1);
   if (!L_iorho_inv_->GetConverged()) {
     if (rank0_) std::cout << "ERROR: Poisson solve did not converge." << std::endl;
@@ -1430,15 +1443,7 @@ void Tomboulides::step() {
   vfes_->GetRestrictionMatrix()->MultTranspose(resu_vec_, *resu_gf_);
 
   Vector X2, B2;
-  if (partial_assembly_) {
-    // TODO(trevilo): Add partial assembly support
-    assert(false);
-    // auto *HC = H.As<ConstrainedOperator>();
-    // EliminateRHS(*Hv_form_, *HC, vel_ess_tdof, un_next_gf, resu_gf, X2, B2, 1);
-  } else {
-    Hv_form_->FormLinearSystem(vel_ess_tdof_, *u_next_gf_, *resu_gf_, Hv_op_, X2, B2, 1);
-  }
-
+  Hv_form_->FormLinearSystem(vel_ess_tdof_, *u_next_gf_, *resu_gf_, Hv_op_, X2, B2, 1);
   Hv_inv_->Mult(B2, X2);
   if (!Hv_inv_->GetConverged()) {
     if (rank0_) std::cout << "ERROR: Helmholtz solve did not converge." << std::endl;

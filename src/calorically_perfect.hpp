@@ -76,15 +76,39 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   // Flags
   bool rank0_;                      /**< true if this is rank 0 */
   bool partial_assembly_ = false;   /**< Enable/disable partial assembly of forms. */
-  bool numerical_integ_ = true;     /**< Enable/disable numerical integration rules of forms. */
+  bool numerical_integ_ = false;    /**< Enable/disable numerical integration rules of forms. */
   bool constant_viscosity_ = false; /**< Enable/disable constant viscosity */
   bool constant_density_ = false;   /**< Enable/disable constant density */
   bool domain_is_open_ = false;     /**< true if domain is open */
 
   // Linear-solver-related options
-  int pl_solve_ = 0;    /**< Verbosity level passed to mfem solvers */
-  int max_iter_;        /**< Maximum number of linear solver iterations */
-  double rtol_ = 1e-12; /**< Linear solver relative tolerance */
+  int smoother_poly_order_;
+  double smoother_poly_fraction_ = 0.75;
+  int smoother_eig_est_ = 10;
+  int smoother_passes_ = 1;
+  double smoother_relax_weight_ = 0.4;
+  double smoother_relax_omega_ = 1.0;
+  double hsmoother_relax_weight_ = 0.8;
+  double hsmoother_relax_omega_ = 0.1;
+
+  // solver tolerance options
+  int pl_solve_; /**< Verbosity level passed to mfem solvers */
+  int max_iter_; /**< Maximum number of linear solver iterations */
+  double rtol_;  /**< Linear solver relative tolerance */
+
+  int default_max_iter_ = 1000;
+  double default_rtol_ = 1.0e-10;
+  double default_atol_ = 1.0e-12;
+
+  int mass_inverse_pl_ = 0;
+  int mass_inverse_max_iter_;
+  double mass_inverse_rtol_;
+  double mass_inverse_atol_;
+
+  int hsolve_pl_ = 0;
+  int hsolve_max_iter_;
+  double hsolve_rtol_;
+  double hsolve_atol_;
 
   // Boundary condition info
   Array<int> temp_ess_attr_; /**< List of patches with Dirichlet BC on temperature */
