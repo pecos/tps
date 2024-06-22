@@ -764,7 +764,8 @@ void InletBC::subsonicReflectingDensityVelocityFace(Vector &normal, Vector tange
   Vector state2(num_equation_);
   state2 = stateIn;
 
-  double Rgas = mixture->GetGasConstant();
+  // double Rgas = mixture->GetGasConstant();
+  // double pi = 3.14159265359;
   Vector unitNorm;
 
   double tRamp, wt;
@@ -774,7 +775,6 @@ void InletBC::subsonicReflectingDensityVelocityFace(Vector &normal, Vector tange
   wt = 1.0;
 
   // injectsion relative to face
-  double pi = 3.14159265359;
   double Un = wt * inputState[1];
   double Ut = wt * inputState[2];
 
@@ -1012,6 +1012,21 @@ void InletBC::interpInlet_gpu(const mfem::Vector &x, const elementIndexingData &
       // compute mirror state
       switch (type) {
         case InletType::SUB_DENS_VEL:
+          p = d_mix->ComputePressure(u1);
+          pluginInputState(d_inputState, u2, nvel, numActiveSpecies);
+          d_mix->modifyEnergyForPressure(u2, u2, p, true);
+          break;
+        case InletType::SUB_DENS_VEL_FACE_X:
+          p = d_mix->ComputePressure(u1);
+          pluginInputState(d_inputState, u2, nvel, numActiveSpecies);
+          d_mix->modifyEnergyForPressure(u2, u2, p, true);
+          break;
+        case InletType::SUB_DENS_VEL_FACE_Y:
+          p = d_mix->ComputePressure(u1);
+          pluginInputState(d_inputState, u2, nvel, numActiveSpecies);
+          d_mix->modifyEnergyForPressure(u2, u2, p, true);
+          break;
+        case InletType::SUB_DENS_VEL_FACE_Z:
           p = d_mix->ComputePressure(u1);
           pluginInputState(d_inputState, u2, nvel, numActiveSpecies);
           d_mix->modifyEnergyForPressure(u2, u2, p, true);
