@@ -67,10 +67,21 @@ AlgebraicSubgridModels::AlgebraicSubgridModels(mfem::ParMesh *pmesh, LoMachOptio
     sgs_const = 0.135;
   }
   tpsP_->getInput("loMach/sgsModelConstant", sgs_model_const_, sgs_const);
+
+  tpsP_->getInput("loMach/sgsFilterModes", sgs_model_nFilter_, 0);
+  if ((order_ - sgs_model_nFilter_) < 1) {
+    if (rank0_) {
+      std::cout << "WARNING: cannot apply requested nu_t filter with polynomial orderof basis functions" << endl;
+    }
+    sgs_model_nFilter_ = 0;
+  }
 }
 
 AlgebraicSubgridModels::~AlgebraicSubgridModels() {
-  // delete bufferGridScale_;
+  if (sgs_model_nFilter_ > 0) {
+    delete sfec_filter_;
+    delete sfes_filter_;
+  }
   delete sfec_;
   delete sfes_;
   delete vfec_;
@@ -108,17 +119,23 @@ void AlgebraicSubgridModels::initializeSelf() {
   gradW_.SetSize(vfes_truevsize);
   rn_.SetSize(sfes_truevsize);
 
-  // gridScale_.SetSize(sfes_truevsize);
-  // gridScaleX_.SetSize(sfes_truevsize);
-  // gridScaleY_.SetSize(sfes_truevsize);
-  // gridScaleZ_.SetSize(sfes_truevsize);
-  // resolution_gf_.SetSpace(sfes_);
-
   if (rank0_) grvy_printf(ginfo, "AlgebraicSubgridModels vectors and gf initialized...\n");
 
   // exports
   toFlow_interface_.eddy_viscosity = &subgridVisc_gf_;
   toThermoChem_interface_.eddy_viscosity = &subgridVisc_gf_;
+
+  // filter
+  if (sgs_model_nFilter_ > 0) {
+    sfec_filter_ = new H1_FECollection(order_ - sgs_model_nFilter_);
+    sfes_filter_ = new ParFiniteElementSpace(pmesh_, sfec_filter_);
+
+    muT_NM1_gf_.SetSpace(sfes_filter_);
+    muT_NM1_gf_ = 0.0;
+
+    muT_filtered_gf_.SetSpace(sfes_);
+    muT_filtered_gf_ = 0.0;
+  }
 }
 
 void AlgebraicSubgridModels::initializeOperators() {
@@ -128,104 +145,17 @@ void AlgebraicSubgridModels::initializeOperators() {
 }
 
 void AlgebraicSubgridModels::initializeViz(ParaViewDataCollection &pvdc) {
-  // pvdc.RegisterField("resolution", &resolution_gf_);
   pvdc.RegisterField("muT", &subgridVisc_gf_);
 }
 
 void AlgebraicSubgridModels::setup() {
-  /*
-  /// Grid-related ///
-
-  // Build grid size vector and grid function
-  bufferGridScale_ = new ParGridFunction(sfes_);
-  // bufferGridScaleX = new ParGridFunction(sfes);
-  // bufferGridScaleY = new ParGridFunction(sfes);
-  // bufferGridScaleZ = new ParGridFunction(sfes);
-  ParGridFunction dofCount(sfes_);
-  {
-    int elndofs;
-    Array<int> vdofs;
-    Vector vals;
-    Vector loc_data;
-    int nSize = bufferGridScale_->Size();
-    Array<int> zones_per_vdof;
-    zones_per_vdof.SetSize(sfes_->GetVSize());
-    zones_per_vdof = 0;
-    Array<int> zones_per_vdofALL;
-    zones_per_vdofALL.SetSize(sfes_->GetVSize());
-    zones_per_vdofALL = 0;
-
-    double *data = bufferGridScale_->HostReadWrite();
-    double *count = dofCount.HostReadWrite();
-
-    for (int i = 0; i < sfes_->GetNDofs(); i++) {
-      data[i] = 0.0;
-      count[i] = 0.0;
-    }
-
-    // element loop
-    for (int e = 0; e < sfes_->GetNE(); ++e) {
-      sfes_->GetElementVDofs(e, vdofs);
-      vals.SetSize(vdofs.Size());
-      ElementTransformation *tr = sfes_->GetElementTransformation(e);
-      const FiniteElement *el = sfes_->GetFE(e);
-      elndofs = el->GetDof();
-      double delta;
-
-      // element dof
-      for (int dof = 0; dof < elndofs; ++dof) {
-        const IntegrationPoint &ip = el->GetNodes().IntPoint(dof);
-        tr->SetIntPoint(&ip);
-        delta = pmesh_->GetElementSize(tr->ElementNo, 1);
-        delta = delta / ((double)order_);
-        vals(dof) = delta;
-      }
-
-      // Accumulate values in all dofs, count the zones.
-      for (int j = 0; j < vdofs.Size(); j++) {
-        int ldof = vdofs[j];
-        data[ldof + 0 * nSize] += vals[j];
-      }
-
-      for (int j = 0; j < vdofs.Size(); j++) {
-        int ldof = vdofs[j];
-        zones_per_vdof[ldof]++;
-      }
-    }
-
-    // Count the zones globally.
-    GroupCommunicator &gcomm = bufferGridScale_->ParFESpace()->GroupComm();
-    gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
-    gcomm.Bcast(zones_per_vdof);
-
-    // Accumulate for all vdofs.
-    gcomm.Reduce<double>(bufferGridScale_->GetData(), GroupCommunicator::Sum);
-    gcomm.Bcast<double>(bufferGridScale_->GetData());
-
-    // Compute means.
-    for (int i = 0; i < nSize; i++) {
-      const int nz = zones_per_vdof[i];
-      if (nz) {
-        data[i] /= nz;
-      }
-    }
-
-    bufferGridScale_->GetTrueDofs(gridScale_);
-    // bufferGridScaleX->GetTrueDofs(gridScaleXSml);
-    // bufferGridScaleY->GetTrueDofs(gridScaleYSml);
-    // bufferGridScaleZ->GetTrueDofs(gridScaleZSml);
-  }
-
-  resolution_gf_ = *bufferGridScale_;
-  */
+  // empty for now
 }
 
 void AlgebraicSubgridModels::step() {
-  // std::cout << "In SGS step: " << sModel_ << "..." << endl;
   if (sModel_ != 1 && sModel_ != 2) {
     return;
   }
-  // std::cout << " giddy up" << endl;
 
   // gather necessary information from other classes
   (flow_interface_->gradU)->GetTrueDofs(gradU_);
@@ -242,7 +172,6 @@ void AlgebraicSubgridModels::step() {
   double *data = subgridVisc_.HostReadWrite();
 
   if (sModel_ == 1) {
-    // std::cout << "In Smag loop " << endl;
     for (int i = 0; i < SdofInt_; i++) {
       double nu_sgs = 0.;
       DenseMatrix gradUp;
@@ -257,8 +186,6 @@ void AlgebraicSubgridModels::step() {
         gradUp(2, dir) = dGradW[i + dir * SdofInt_];
       }
       sgsSmag(gradUp, del[i], nu_sgs);
-      // std::cout << "gradU diag:" << gradUp(0,0) << " " << gradUp(1,1) << " " << gradUp(1,1) << "| nuT: " << nu_sgs <<
-      // endl;
       data[i] = rho[i] * nu_sgs;
     }
 
@@ -282,6 +209,18 @@ void AlgebraicSubgridModels::step() {
   }
 
   subgridVisc_gf_.SetFromTrueDofs(subgridVisc_);
+
+  // filter, assume full truncation weight for now
+  if (sgs_model_nFilter_ > 0) {
+    double filter_alpha = 1.0;
+    muT_NM1_gf_.ProjectGridFunction(subgridVisc_gf_);
+    muT_filtered_gf_.ProjectGridFunction(muT_NM1_gf_);
+    const auto d_muT_filtered_gf = muT_filtered_gf_.Read();
+    auto d_muT_gf = subgridVisc_gf_.ReadWrite();
+    MFEM_FORALL(i, subgridVisc_gf_.Size(),
+                { d_muT_gf[i] = (1.0 - filter_alpha) * d_muT_gf[i] + filter_alpha * d_muT_filtered_gf[i]; });
+    subgridVisc_gf_.GetTrueDofs(subgridVisc_);
+  }
 }
 
 /**

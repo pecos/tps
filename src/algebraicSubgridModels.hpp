@@ -111,6 +111,10 @@ class AlgebraicSubgridModels : public TurbModelBase {
   /// Velocity \f$(H^1)^d\f$ finite element space.
   ParFiniteElementSpace *vfes_ = nullptr;
 
+  /// spaces for filtered eddy viscosity
+  FiniteElementCollection *sfec_filter_ = nullptr;
+  ParFiniteElementSpace *sfes_filter_ = nullptr;
+
   ParGridFunction *gradU_gf_ = nullptr;
   ParGridFunction *gradV_gf_ = nullptr;
   ParGridFunction *gradW_gf_ = nullptr;
@@ -127,18 +131,15 @@ class AlgebraicSubgridModels : public TurbModelBase {
   ParGridFunction subgridVisc_gf_;
   Vector subgridVisc_;
 
-  // for plotting
-  // ParGridFunction resolution_gf_;
-  // Vector gridScale_;
+  // filter related
+  ParGridFunction muT_NM1_gf_;
+  ParGridFunction muT_filtered_gf_;
 
   // grid information
   ParGridFunction *gridScale_ = nullptr;
-  // ParGridFunction *bufferGridScale_ = nullptr;
-  // ParGridFunction *bufferGridScaleX = nullptr;
-  // ParGridFunction *bufferGridScaleY = nullptr;
-  // ParGridFunction *bufferGridScaleZ = nullptr;
 
   double sgs_model_const_;
+  int sgs_model_nFilter_;
 
  public:
   AlgebraicSubgridModels(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, TPS::Tps *tps, ParGridFunction *gridScale,
@@ -154,9 +155,6 @@ class AlgebraicSubgridModels : public TurbModelBase {
 
   /// Return a pointer to the current temperature ParGridFunction.
   ParGridFunction *getCurrentEddyViscosity() { return &subgridVisc_gf_; }
-
-  /// Return a pointer to the scalar grid size measure ParGridFunction.
-  // ParGridFunction *getGridScale() { return &resolution_gf_; }
 
   // subgrid scale models => move to turb model class
   void sgsSmag(const DenseMatrix &gradUp, double delta, double &nu_sgs);
