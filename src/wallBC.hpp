@@ -87,7 +87,7 @@ class WallBC : public BoundaryCondition {
   WallType getType() { return wallType_; }
 
   void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip, double delta,
-                      double distance, Vector &bdrFlux) override;
+                      double time, double distance, Vector &bdrFlux) override;
   void computeBdrPrimitiveStateForGradient(const Vector &primIn, Vector &primBC) const override;
 
   void initBCs() override;

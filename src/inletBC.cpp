@@ -139,6 +139,11 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rs
   boundaryU.UseDevice(true);
   boundaryU.SetSize(bdrN * num_equation_);
   boundaryU = 0.;
+
+  boundaryUp.UseDevice(true);
+  boundaryUp.SetSize(bdrN * num_equation_);
+  boundaryUp = 0.;
+
   Vector iState, iUp;
   iState.UseDevice(false);
   iUp.UseDevice(false);
@@ -210,6 +215,7 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rs
 
   meanUp.Read();
   boundaryU.Read();
+  boundaryUp.Read();
   tangent1.Read();
   tangent2.Read();
 }
@@ -433,13 +439,28 @@ void InletBC::initBoundaryU(ParGridFunction *Up) {
   }
 
   boundaryU.Read();
+  boundaryUp.Read();
 }
 
 void InletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip, double delta,
-                             double distance, Vector &bdrFlux) {
+                             double time, double distance, Vector &bdrFlux) {
+  Vector tangentW(dim_);
+  for (int d = 0; d < dim_; d++) tangentW[d] = 0.0;
   switch (inletType_) {
     case SUB_DENS_VEL:
       subsonicReflectingDensityVelocity(normal, stateIn, bdrFlux);
+      break;
+    case SUB_DENS_VEL_FACE_X:
+      tangentW[0] = 1.0;
+      subsonicReflectingDensityVelocityFace(normal, tangentW, stateIn, transip, time, bdrFlux);
+      break;
+    case SUB_DENS_VEL_FACE_Y:
+      tangentW[1] = 1.0;
+      subsonicReflectingDensityVelocityFace(normal, tangentW, stateIn, transip, time, bdrFlux);
+      break;
+    case SUB_DENS_VEL_FACE_Z:
+      tangentW[2] = 1.0;
+      subsonicReflectingDensityVelocityFace(normal, tangentW, stateIn, transip, time, bdrFlux);
       break;
     case SUB_DENS_VEL_NR:
       subsonicNonReflectingDensityVelocity(normal, stateIn, gradState, bdrFlux);
@@ -734,6 +755,114 @@ void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn,
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }
 
+/// Specifying subsonic vel and rho wher v is relative to the FACE-coordinate system specifyied by the face normal and
+/// tangentW
+void InletBC::subsonicReflectingDensityVelocityFace(Vector &normal, Vector tangentW, Vector &stateIn, Vector transip,
+                                                    double time, Vector &bdrFlux) {
+  const double p = mixture->ComputePressure(stateIn);
+
+  Vector state2(num_equation_);
+  state2 = stateIn;
+
+  // double Rgas = mixture->GetGasConstant();
+  // double pi = 3.14159265359;
+  Vector unitNorm;
+
+  double tRamp, wt;
+  tRamp = 0.1;  // make this readable
+  wt = time / tRamp;
+  wt = min(wt, 1.0);
+  wt = 1.0;
+
+  // injectsion relative to face
+  double Un = wt * inputState[1];
+  double Ut = wt * inputState[2];
+
+  // unit normals pointing INTO of domain
+  unitNorm = normal;
+  double mod = 0.;
+  for (int d = 0; d < dim_; d++) mod += normal[d] * normal[d];
+  unitNorm *= -1.0 / sqrt(mod);  // inward-facing normal
+
+  // t2 aligned with tangent-w
+  for (int d = 0; d < dim_; d++) tangent2[d] = tangentW[d];
+
+  // ensure normal is orthogonal to tangent-w
+  {
+    Vector projt2(dim_);
+    double tmag, tn;
+    tmag = 0.0;
+    tn = 0.0;
+    for (int d = 0; d < dim_; d++) tmag += tangent2[d] * tangent2[d];
+    for (int d = 0; d < dim_; d++) tn += tangent2[d] * unitNorm[d];
+    for (int d = 0; d < dim_; d++) projt2[d] = (tn / tmag) * tangent2[d];
+    for (int d = 0; d < dim_; d++) unitNorm[d] -= projt2[d];
+  }
+
+  // t1 is then orthogonal to both normal and y-axis (clockwise, looking down +)
+  tangent1[0] = +(unitNorm[1] * tangent2[2] - unitNorm[2] * tangent2[1]);
+  tangent1[1] = -(unitNorm[0] * tangent2[2] - unitNorm[2] * tangent2[0]);
+  tangent1[2] = +(unitNorm[0] * tangent2[1] - unitNorm[1] * tangent2[0]);
+
+  // aligned with face coords
+  state2[0] = inputState[0];
+  // if using temp as the input input, then... p / (Rgas * inputState[0]);
+  state2[1] = state2[0] * Un;
+  state2[2] = state2[0] * Ut;
+  if (nvel_ == 3) state2[3] = state2[0] * 0.0;
+
+  if (eqSystem == NS_PASSIVE) {
+    state2[num_equation_ - 1] = 0.;
+  } else if (numActiveSpecies_ > 0) {
+    for (int sp = 0; sp < numActiveSpecies_; sp++) {
+      // NOTE: inlet BC does not specify total energy. therefore skips one index.
+      // NOTE: regardless of dim_ension, inletBC save the first 4 elements for density and velocity.
+      state2[nvel_ + 2 + sp] = inputState[4 + sp];
+    }
+  }
+
+  // transform from face coords to global
+  {
+    DenseMatrix M(dim_, dim_);
+    for (int d = 0; d < dim_; d++) {
+      M(0, d) = unitNorm[d];
+      M(1, d) = tangent1[d];
+      if (dim_ == 3) M(2, d) = tangent2[d];
+    }
+    DenseMatrix invM(dim_, dim_);
+    mfem::CalcInverse(M, invM);
+    Vector momN(dim_), momX(dim_);
+    for (int d = 0; d < dim_; d++) momN[d] = state2[1 + d];
+    invM.Mult(momN, momX);
+    for (int d = 0; d < dim_; d++) state2[1 + d] = momX[d];
+  }
+
+  if (eqSystem == NS_PASSIVE) {
+    state2[num_equation_ - 1] = 0.;
+  } else if (numActiveSpecies_ > 0) {
+    for (int sp = 0; sp < numActiveSpecies_; sp++) {
+      // NOTE: inlet BC does not specify total energy. therefore skips one index.
+      // NOTE: regardless of dim_ension, inletBC save the first 4 elements for density and velocity.
+      state2[nvel_ + 2 + sp] = inputState[4 + sp];
+    }
+  }
+
+  // NOTE: If two-temperature, BC for electron temperature is T_e = T_h, where the total pressure is p.
+  Vector tmpU(num_equation_);
+  tmpU = state2;
+  for (int eq = 1; eq <= dim_; eq++) tmpU[eq] = 2.0 * state2[eq] - stateIn[eq];
+  mixture->modifyEnergyForPressure(tmpU, tmpU, p, true);
+  rsolver->Eval(stateIn, tmpU, normal, bdrFlux, true);
+
+  // store primitive in boundaryU for gradient calcs
+  Vector iUp(num_equation_);
+  mixture->GetPrimitivesFromConservatives(tmpU, iUp);
+  for (int eq = 0; eq < num_equation_; eq++) {
+    boundaryUp[eq + bdrN * num_equation_] = iUp[eq];
+  }
+  bdrN++;
+}
+
 void InletBC::integrateInlets_gpu(Vector &y, const Vector &x, const elementIndexingData &elem_index_data,
                                   const boundaryFaceIntegrationData &boundary_face_data, Array<int> &listElems,
                                   Array<int> &offsetsBoundaryU) {
@@ -883,6 +1012,21 @@ void InletBC::interpInlet_gpu(const mfem::Vector &x, const elementIndexingData &
       // compute mirror state
       switch (type) {
         case InletType::SUB_DENS_VEL:
+          p = d_mix->ComputePressure(u1);
+          pluginInputState(d_inputState, u2, nvel, numActiveSpecies);
+          d_mix->modifyEnergyForPressure(u2, u2, p, true);
+          break;
+        case InletType::SUB_DENS_VEL_FACE_X:
+          p = d_mix->ComputePressure(u1);
+          pluginInputState(d_inputState, u2, nvel, numActiveSpecies);
+          d_mix->modifyEnergyForPressure(u2, u2, p, true);
+          break;
+        case InletType::SUB_DENS_VEL_FACE_Y:
+          p = d_mix->ComputePressure(u1);
+          pluginInputState(d_inputState, u2, nvel, numActiveSpecies);
+          d_mix->modifyEnergyForPressure(u2, u2, p, true);
+          break;
+        case InletType::SUB_DENS_VEL_FACE_Z:
           p = d_mix->ComputePressure(u1);
           pluginInputState(d_inputState, u2, nvel, numActiveSpecies);
           d_mix->modifyEnergyForPressure(u2, u2, p, true);

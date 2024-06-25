@@ -203,7 +203,7 @@ void WallBC::buildWallElemsArray() {
 }
 
 void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip, double delta,
-                            double distance, Vector &bdrFlux) {
+                            double time, double distance, Vector &bdrFlux) {
   switch (wallType_) {
       /*
       case INV:
