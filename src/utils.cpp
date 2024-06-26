@@ -1156,6 +1156,13 @@ void Orthogonalize(Vector &v, MPI_Comm comm) {
   v -= global_sum / static_cast<double>(global_size);
 }
 
+bool copyFile(const char *SRC, const char *DEST) {
+  std::ifstream src(SRC, std::ios::binary);
+  std::ofstream dest(DEST, std::ios::binary);
+  dest << src.rdbuf();
+  return src && dest;
+}
+
 namespace mfem {
 GradientVectorGridFunctionCoefficient::GradientVectorGridFunctionCoefficient(const GridFunction *gf)
     : MatrixCoefficient((gf) ? gf->VectorDim() : 0) {

@@ -66,8 +66,8 @@ class IOOptions {
 
   int exit_check_frequency_ = 500;
 
+  std::string restart_dir_;
   std::string restart_mode_;
-
   bool restart_variable_order_ = false;
   bool restart_serial_read_ = false;
   bool restart_serial_write_ = false;
@@ -362,5 +362,6 @@ void write_variable_data_hdf5(hid_t group, std::string varName, hid_t dataspace,
  * @todo Refactor this function to make it more generic and fit better
  * into the IODataOrganizer paradigm.
  */
-void partitioning_file_hdf5(std::string mode, MPI_Groups *groupsMPI, int nelemGlobal, mfem::Array<int> &partitioning);
+void partitioning_file_hdf5(std::string mode, MPI_Groups *groupsMPI, int nelemGlobal, mfem::Array<int> &partitioning,
+                            std::string fileName = "./");
 #endif  // IO_HPP_

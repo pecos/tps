@@ -181,7 +181,8 @@ void LoMachSolver::restart_files_hdf5(string mode, string inputFileName) {
     }
     serialName = inputFileName;
   } else {
-    serialName = "restart_";
+    serialName = loMach_opts_.io_opts_.restart_dir_;
+    serialName.append("/restart_");
     serialName.append(loMach_opts_.io_opts_.output_dir_);
     serialName.append(".sol.h5");
   }

@@ -174,6 +174,8 @@ void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu);
 void vectorGrad3DV(FiniteElementSpace *fes, Vector u, Vector *gu, Vector *gv, Vector *gw);
 void scalarGrad3DV(FiniteElementSpace *fes, FiniteElementSpace *vfes, Vector u, Vector *gu);
 
+bool copyFile(const char *SRC, const char *DEST);
+
 /// Eliminate essential BCs in an Operator and apply to RHS.
 /// rename this to something sensible "ApplyEssentialBC" or something
 void EliminateRHS(Operator &A, ConstrainedOperator &constrainedA, const Array<int> &ess_tdof_list, Vector &x, Vector &b,

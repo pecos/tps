@@ -174,13 +174,17 @@ void MeshBase::initializeMesh() {
     // nelemGlobal_ = mesh->GetNE();
     if (rank0_) grvy_printf(ginfo, "Total # of mesh elements = %i\n", nelemGlobal_);
 
+    string restartDir;
+    restartDir = loMach_opts_->io_opts_.restart_dir_;
+    restartDir += "/";
+
     if (nprocs_ > 1) {
       if (loMach_opts_->io_opts_.restart_serial_read_) {
         assert(serial_mesh_->Conforming());
         partitioning_ = Array<int>(serial_mesh_->GeneratePartitioning(nprocs_, defaultPartMethod), nelemGlobal_);
-        partitioning_file_hdf5("write", groupsMPI, nelemGlobal_, partitioning_);
+        partitioning_file_hdf5("write", groupsMPI, nelemGlobal_, partitioning_, restartDir);
       } else {
-        partitioning_file_hdf5("read", groupsMPI, nelemGlobal_, partitioning_);
+        partitioning_file_hdf5("read", groupsMPI, nelemGlobal_, partitioning_, restartDir);
       }
     }
 
@@ -203,12 +207,16 @@ void MeshBase::initializeMesh() {
       serial_mesh_->UniformRefinement();
     }
 
+    string restartDir;
+    restartDir = loMach_opts_->io_opts_.restart_dir_;
+    restartDir += "/";
+
     // generate partitioning file (we assume conforming meshes)
     nelemGlobal_ = serial_mesh_->GetNE();
     if (nprocs_ > 1) {
       assert(serial_mesh_->Conforming());
       partitioning_ = Array<int>(serial_mesh_->GeneratePartitioning(nprocs_, defaultPartMethod), nelemGlobal_);
-      if (rank0_) partitioning_file_hdf5("write", groupsMPI, nelemGlobal_, partitioning_);
+      if (rank0_) partitioning_file_hdf5("write", groupsMPI, nelemGlobal_, partitioning_, restartDir);
     }
   }
 

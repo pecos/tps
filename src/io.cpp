@@ -35,6 +35,8 @@
 #include "io.hpp"
 
 #include <hdf5.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #include "M2ulPhyS.hpp"
 #include "utils.hpp"
@@ -268,7 +270,8 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
   return;
 }
 
-void partitioning_file_hdf5(std::string mode, MPI_Groups *groupsMPI, int nelemGlobal, Array<int> &partitioning) {
+void partitioning_file_hdf5(std::string mode, MPI_Groups *groupsMPI, int nelemGlobal, Array<int> &partitioning,
+                            std::string pathName) {
   MPI_Comm TPSCommWorld = groupsMPI->getTPSCommWorld();
   const bool rank0 = groupsMPI->isWorldRoot();
   const int nprocs = groupsMPI->getTPSWorldSize();
@@ -281,8 +284,10 @@ void partitioning_file_hdf5(std::string mode, MPI_Groups *groupsMPI, int nelemGl
   // hid_t file, dataspace, data_soln;
   hid_t file = -1, dataspace;
   herr_t status;
-  std::string fileName("partition");
-  fileName += "." + std::to_string(nprocs) + "p.h5";
+  std::string fileNameEnd("partition");
+  fileNameEnd += "." + std::to_string(nprocs) + "p.h5";
+  std::string fileName;
+  fileName = pathName + fileNameEnd;
 
   assert((mode == "read") || (mode == "write"));
 
@@ -402,7 +407,7 @@ void read_variable_data_hdf5(hid_t file, string varName, size_t index, double *d
   H5Dclose(data_soln);
 }
 
-IOOptions::IOOptions() : output_dir_("output"), restart_mode_("standard") {}
+IOOptions::IOOptions() : output_dir_("output"), restart_dir_("./"), restart_mode_("standard") {}
 
 void IOOptions::read(TPS::Tps *tps, std::string prefix) {
   std::string basename;
@@ -417,8 +422,12 @@ void IOOptions::read(TPS::Tps *tps, std::string prefix) {
   tps->getInput((basename + "/exitCheckFreq").c_str(), exit_check_frequency_, 500);
   assert(exit_check_frequency_ > 0);
 
+  tps->getInput((basename + "/restartBase").c_str(), restart_dir_, std::string("./"));
   tps->getInput((basename + "/restartMode").c_str(), restart_mode_, std::string("standard"));
   setRestartFlags();
+
+  int status = mkdir(restart_dir_.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+  if (status == 0) std::cout << "created restartBase directory: " << restart_dir_ << endl;
 }
 
 void IOOptions::setRestartFlags() {
