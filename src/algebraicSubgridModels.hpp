@@ -130,6 +130,10 @@ class AlgebraicSubgridModels : public TurbModelBase {
 
   ParGridFunction subgridVisc_gf_;
   Vector subgridVisc_;
+  Vector muT_NM0_;
+  Vector muT_NM1_;
+  Vector muT_NM2_;
+  Vector muT_NM3_;
 
   // filter related
   ParGridFunction muT_NM1_gf_;
@@ -140,6 +144,8 @@ class AlgebraicSubgridModels : public TurbModelBase {
 
   double sgs_model_const_;
   int sgs_model_nFilter_;
+  bool sgs_model_smooth_;
+  int aveSteps_;
 
  public:
   AlgebraicSubgridModels(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, TPS::Tps *tps, ParGridFunction *gridScale,

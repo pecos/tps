@@ -173,6 +173,7 @@ void vectorGrad3D(ParGridFunction &u, ParGridFunction &gu, ParGridFunction &gv, 
 void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu);
 void vectorGrad3DV(FiniteElementSpace *fes, Vector u, Vector *gu, Vector *gv, Vector *gw);
 void scalarGrad3DV(FiniteElementSpace *fes, FiniteElementSpace *vfes, Vector u, Vector *gu);
+void makeContinuous(ParGridFunction &u);
 
 bool copyFile(const char *SRC, const char *DEST);
 

@@ -1163,6 +1163,63 @@ bool copyFile(const char *SRC, const char *DEST) {
   return src && dest;
 }
 
+void makeContinuous(ParGridFunction &u) {
+  FiniteElementSpace *fes = u.FESpace();
+
+  ParGridFunction au;
+  au.SetSpace(fes);
+  au = 0.0;
+
+  int elndofs;
+  Array<int> vdofs;
+  Vector vals;
+  Vector loc_data;
+  // int vdim = fes->GetVDim();
+  Array<int> zones_per_vdof;
+  zones_per_vdof.SetSize(fes->GetVSize());
+  zones_per_vdof = 0;
+
+  for (int e = 0; e < fes->GetNE(); ++e) {
+    fes->GetElementVDofs(e, vdofs);
+    u.GetSubVector(vdofs, loc_data);
+    vals.SetSize(vdofs.Size());
+    const FiniteElement *el = fes->GetFE(e);
+    elndofs = el->GetDof();
+    for (int dof = 0; dof < elndofs; ++dof) {
+      vals(dof) = loc_data(dof);
+    }
+
+    // Accumulate values in all dofs, count the zones.
+    for (int j = 0; j < vdofs.Size(); j++) {
+      int ldof = vdofs[j];
+      au(ldof) += vals[j];
+      zones_per_vdof[ldof]++;
+    }
+  }
+
+  // Communication
+
+  // Count the zones globally.
+  GroupCommunicator &gcomm = u.ParFESpace()->GroupComm();
+  gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
+  gcomm.Bcast(zones_per_vdof);
+
+  // Accumulate for all vdofs.
+  gcomm.Reduce<double>(au.GetData(), GroupCommunicator::Sum);
+  gcomm.Bcast<double>(au.GetData());
+
+  // Compute means.
+  for (int i = 0; i < au.Size(); i++) {
+    const int nz = zones_per_vdof[i];
+    if (nz) {
+      au(i) /= nz;
+    }
+  }
+
+  // copy back
+  u = au;
+}
+
 namespace mfem {
 GradientVectorGridFunctionCoefficient::GradientVectorGridFunctionCoefficient(const GridFunction *gf)
     : MatrixCoefficient((gf) ? gf->VectorDim() : 0) {
