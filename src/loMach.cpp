@@ -458,6 +458,7 @@ void LoMachSolver::solveStep() {
   }
 
   // averages
+  flow_->computeDissipation(*average_, iter);
   average_->addSample(iter);
 
   // restart files
