@@ -224,6 +224,8 @@ Tomboulides::~Tomboulides() {
   delete gradU_gf_;
   delete gradV_gf_;
   delete gradW_gf_;
+  delete Up_gf_;
+  delete epsi_gf_;
   delete vfes_;
   delete vfec_;
   delete sfes_;
@@ -251,6 +253,9 @@ void Tomboulides::initializeSelf() {
   p_gf_ = new ParGridFunction(pfes_);
   resp_gf_ = new ParGridFunction(pfes_);
 
+  Up_gf_ = new ParGridFunction(vfes_);
+  epsi_gf_ = new ParGridFunction(sfes_);
+
   mu_total_gf_ = new ParGridFunction(pfes_);
 
   // pp_div_rad_comp_gf_ = new ParGridFunction(pfes_, *pp_div_gf_);
@@ -277,6 +282,8 @@ void Tomboulides::initializeSelf() {
   *p_gf_ = 0.0;
   *resp_gf_ = 0.0;
   *mu_total_gf_ = 0.0;
+
+  *epsi_gf_ = 0.0;
 
   if (axisym_) {
     *utheta_gf_ = 0.0;
@@ -1069,6 +1076,7 @@ void Tomboulides::initializeStats(Averaging &average, IODataOrganizer &io, bool 
     // fields for averaging
     average.registerField(std::string("velocity"), u_curr_gf_, true, 0, nvel_);
     average.registerField(std::string("pressure"), p_gf_, false, 0, 1);
+    average.registerField(std::string("dissipation"), epsi_gf_, false, 0, 1);
 
     // io init
     io.registerIOFamily("Time-averaged velocity", "/meanVel", average.GetMeanField(std::string("velocity")), false,
@@ -1080,6 +1088,7 @@ void Tomboulides::initializeStats(Averaging &average, IODataOrganizer &io, bool 
     io.registerIOFamily("Time-averaged pressure", "/meanPres", average.GetMeanField(std::string("pressure")), false,
                         continuation, pfec_);
     io.registerIOVar("/meanPres", "<P>", 0, true);
+    io.registerIOVar("/meanEpsi", "<e>", 0, true);
 
     // rms
     io.registerIOFamily("RMS velocity fluctuation", "/rmsData", average.GetVariField(std::string("velocity")), false,
@@ -1098,6 +1107,61 @@ void Tomboulides::initializeStats(Averaging &average, IODataOrganizer &io, bool 
     } else {
       // only nvel = 2 or 3 supported
       assert(false);
+    }
+  }
+}
+
+void Tomboulides::computeDissipation(Averaging &average, const int iter) {
+  if (average.ComputeMean()) {
+    int sample_interval = average.GetSamplesInterval();
+    int sample_start = average.GetStartMean();
+    if (iter % sample_interval == 0 && iter >= sample_start) {
+      // fluctuating velocity
+      u_curr_gf_->GetTrueDofs(tmpR1_);
+      average.GetMeanField("velocity")->GetTrueDofs(u_vec_);
+      tmpR1_.Add(-1.0, u_vec_);
+
+      // gradient of u'
+      Up_gf_->SetFromTrueDofs(tmpR1_);
+      vectorGrad3D(*Up_gf_, *gradU_gf_, *gradV_gf_, *gradW_gf_);
+
+      // const double *dmu = (*thermo_interface_->viscosity).HostRead();
+      const double *dmu = mu_total_gf_->HostRead();
+      const double *drho = (*thermo_interface_->density).HostRead();
+      const double *dGradU = gradU_gf_->HostRead();
+      const double *dGradV = gradV_gf_->HostRead();
+      const double *dGradW = gradW_gf_->HostRead();
+      double *depsi = epsi_gf_->HostReadWrite();
+
+      int Sdof = epsi_gf_->Size();
+      for (int dof = 0; dof < Sdof; dof++) {
+        depsi[dof] = 0.0;
+
+        DenseMatrix gradUp;
+        gradUp.SetSize(nvel_, dim_);
+        for (int dir = 0; dir < dim_; dir++) {
+          gradUp(0, dir) = dGradU[dof + dir * Sdof];
+        }
+        for (int dir = 0; dir < dim_; dir++) {
+          gradUp(1, dir) = dGradV[dof + dir * Sdof];
+        }
+        for (int dir = 0; dir < dim_; dir++) {
+          gradUp(2, dir) = dGradW[dof + dir * Sdof];
+        }
+
+        for (int i = 0; i < dim_; i++) {
+          for (int j = 0; j < dim_; j++) {
+            depsi[dof] += gradUp(i, j) * gradUp(i, j);
+          }
+        }
+        depsi[dof] *= 2.0 * dmu[dof] / drho[dof];
+      }
+
+      // probably not necessary but just to be extra safe
+      u_curr_gf_->GetTrueDofs(u_vec_);
+      gradU_gf_->GetTrueDofs(gradU_);
+      gradV_gf_->GetTrueDofs(gradV_);
+      gradW_gf_->GetTrueDofs(gradW_);
     }
   }
 }

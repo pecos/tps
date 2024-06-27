@@ -225,6 +225,8 @@ class Tomboulides final : public FlowBase {
   mfem::ParGridFunction *gradW_gf_ = nullptr;
   // mfem::ParGridFunction *buffer_uInlet_ = nullptr;
   mfem::VectorGridFunctionCoefficient *velocity_field_ = nullptr;
+  mfem::ParGridFunction *Up_gf_ = nullptr;
+  mfem::ParGridFunction *epsi_gf_ = nullptr;
 
   /// Pressure FEM objects and fields
   mfem::FiniteElementCollection *pfec_ = nullptr;
@@ -428,6 +430,11 @@ class Tomboulides final : public FlowBase {
    * @brief Initialize statistics outputs
    */
   void initializeStats(Averaging &average, IODataOrganizer &io, bool continuation) const final;
+
+  /**
+   * @brief Compute turbulent dissipation using average u
+   */
+  void computeDissipation(Averaging &average, const int iter);
 
   /// Advance
   void step() final;
