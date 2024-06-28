@@ -1163,6 +1163,103 @@ bool copyFile(const char *SRC, const char *DEST) {
   return src && dest;
 }
 
+void streamwiseGrad(ParGridFunction &phi, ParGridFunction &u, ParGridFunction &swGrad) {
+  // need to make this general...
+  int dim_ = 3;
+
+  // compute gradient of input field
+  scalarGrad3D(phi, swGrad);
+
+  const double *vel = u.HostRead();
+  double *gPhi = swGrad.HostReadWrite();
+
+  int Sdof = phi.Size();
+  for (int dof = 0; dof < Sdof; dof++) {
+    // streamwise coordinate system
+    Vector unitNorm;
+    Vector unitT1;
+    Vector unitT2;
+    unitNorm.SetSize(dim_);
+    unitT1.SetSize(dim_);
+    unitT2.SetSize(dim_);
+
+    // streamwise direction
+    for (int i = 0; i < dim_; i++) unitNorm[i] = vel[dof + i * Sdof];
+    double mod = 0.0;
+    for (int i = 0; i < dim_; i++) mod += unitNorm[i] * unitNorm[i];
+    unitNorm /= mod;
+    double Umag = std::sqrt(mod);
+
+    // tangent direction (not unique)
+    int maxInd, minusInd, plusInd;
+    if (unitNorm[0] > unitNorm[1]) {
+      maxInd = 0;
+    } else {
+      maxInd = 1;
+    }
+    if (dim_ == 3 && unitNorm[maxInd] < unitNorm[2]) {
+      maxInd = 2;
+    }
+    minusInd = (maxInd - 1) % dim_;
+    plusInd = (maxInd + 1) % dim_;
+    unitT1[minusInd] = -unitNorm[maxInd];
+    unitT1[maxInd] = unitNorm[minusInd];
+    unitT1[plusInd] = 0.0;
+    mod = 0.0;
+    for (int i = 0; i < dim_; i++) mod += unitT1[i] * unitT1[i];
+    unitT1 /= mod;
+
+    // t2 is then orthogonal to both normal & t1
+    if (dim_ == 3) {
+      unitT2[0] = +(unitNorm[1] * unitT1[2] - unitNorm[2] * unitT1[1]);
+      unitT2[1] = -(unitNorm[0] * unitT1[2] - unitNorm[2] * unitT1[0]);
+      unitT2[2] = +(unitNorm[0] * unitT1[1] - unitNorm[1] * unitT1[0]);
+    }
+
+    // transform from streamwise coords to global
+    DenseMatrix M(dim_, dim_);
+    for (int d = 0; d < dim_; d++) {
+      M(d, 0) = unitNorm[d];
+      M(d, 1) = unitT1[d];
+      if (dim_ == 3) M(d, 2) = unitT2[d];
+    }
+
+    // streamwise diffusion coeff
+    DenseMatrix swM(dim_, dim_);
+    swM = 0.0;
+    swM(0, 0) = 1.0;
+
+    // muSWgbl = M_{im} muSw_{mn} M_{jn} or M*mu*M^T (with n,t1,t2 in columns of M)
+    DenseMatrix swMgbl(dim_, dim_);
+    swMgbl = 0.0;
+    for (int i = 0; i < dim_; i++) {
+      for (int j = 0; j < dim_; j++) {
+        for (int m = 0; m < dim_; m++) {
+          for (int n = 0; n < dim_; n++) {
+            swMgbl(i, j) += M(i, m) * M(j, n) * swM(m, n);
+          }
+        }
+      }
+    }
+
+    // mu*gPhi
+    Vector tmp1;
+    tmp1.SetSize(dim_);
+    for (int i = 0; i < dim_; i++) tmp1[i] = gPhi[dof + i * Sdof];
+    Vector tmp2;
+    tmp2.SetSize(dim_);
+    tmp2 = 0.0;
+    for (int i = 0; i < dim_; i++) {
+      for (int j = 0; j < dim_; j++) {
+        tmp2[i] += swMgbl(i, j) * tmp1[j];
+      }
+    }
+
+    // copy back to input vector gf
+    for (int i = 0; i < dim_; i++) gPhi[dof + i * Sdof] = tmp2[i];
+  }
+}
+
 namespace mfem {
 GradientVectorGridFunctionCoefficient::GradientVectorGridFunctionCoefficient(const GridFunction *gf)
     : MatrixCoefficient((gf) ? gf->VectorDim() : 0) {

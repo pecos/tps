@@ -67,7 +67,8 @@ void Orthogonalize(Vector &v, const ParFiniteElementSpace *pfes) {
   v -= global_sum / static_cast<double>(global_size);
 }
 
-Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalSchemeCoefficients &coeff, TPS::Tps *tps)
+Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalSchemeCoefficients &coeff,
+                         ParGridFunction *gridScale, TPS::Tps *tps)
     : gll_rules(0, Quadrature1D::GaussLobatto),
       tpsP_(tps),
       pmesh_(pmesh),
@@ -80,6 +81,7 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
   rank0_ = (pmesh_->GetMyRank() == 0);
   axisym_ = false;
   nvel_ = dim_;
+  gridScale_gf_ = gridScale;
 
   // make sure there is room for BC attributes
   if (!(pmesh_->bdr_attributes.Size() == 0)) {
@@ -129,6 +131,10 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
     tps->getInput("loMach/tomboulides/hsolve-maxIters", hsolve_max_iter_, default_max_iter_);
     tps->getInput("loMach/tomboulides/msolve-maxIters", mass_inverse_max_iter_, default_max_iter_);
   }
+
+  tps->getInput("loMach/tomboulides/streamwise-stabilization", sw_stab_, false);
+  tps->getInput("loMach/tomboulides/Reh_offset", re_offset_, 1.0);
+  tps->getInput("loMach/tomboulides/Reh_factor", re_factor_, 0.01);
 }
 
 Tomboulides::~Tomboulides() {
@@ -224,6 +230,8 @@ Tomboulides::~Tomboulides() {
   delete gradU_gf_;
   delete gradV_gf_;
   delete gradW_gf_;
+  delete tmpR0_gf_;
+  delete tmpR1_gf_;
   delete vfes_;
   delete vfec_;
   delete sfes_;
@@ -255,6 +263,9 @@ void Tomboulides::initializeSelf() {
 
   pp_div_rad_comp_gf_ = new ParGridFunction(pfes_, *pp_div_gf_);
   u_next_rad_comp_gf_ = new ParGridFunction(pfes_, *u_next_gf_);
+
+  tmpR0_gf_ = new ParGridFunction(sfes_);
+  tmpR1_gf_ = new ParGridFunction(vfes_);
 
   if (axisym_) {
     utheta_gf_ = new ParGridFunction(pfes_);
@@ -333,7 +344,10 @@ void Tomboulides::initializeSelf() {
     utheta_next_vec_.SetSize(pfes_truevsize);
   }
 
+  swDiff_vec_.SetSize(vfes_truevsize);
   tmpR0_.SetSize(sfes_truevsize);
+  tmpR0a_.SetSize(sfes_truevsize);
+  tmpR0b_.SetSize(sfes_truevsize);
   tmpR1_.SetSize(vfes_truevsize);
 
   gradU_.SetSize(vfes_truevsize);
@@ -1345,6 +1359,17 @@ void Tomboulides::step() {
     });
   }
 
+  // Add streamwise stability to rhs
+  if (sw_stab_) {
+    for (int i = 0; i < dim_; i++) {
+      setScalarFromVector(u_vec_, i, &tmpR0a_);
+      streamwiseDiffusion(tmpR0a_, tmpR0b_);
+      setVectorFromScalar(tmpR0b_, i, &swDiff_vec_);
+    }
+    Mv_rho_inv_->Mult(swDiff_vec_, tmpR1_);
+    pp_div_vec_ += tmpR1_;
+  }
+
   // Add ustar/dt contribution
   pp_div_vec_ += ustar_vec_;
 
@@ -1435,6 +1460,9 @@ void Tomboulides::step() {
 
   // rho * vstar / dt term
   Mv_rho_op_->AddMult(ustar_vec_, resu_vec_);
+
+  // Add streamwise diffusion
+  if (sw_stab_) resu_vec_ += swDiff_vec_;
 
   for (auto &vel_dbc : vel_dbcs_) {
     u_next_gf_->ProjectBdrCoefficient(*vel_dbc.coeff, vel_dbc.attr);
@@ -1685,4 +1713,44 @@ void Tomboulides::evaluateVelocityGradient() {
   gradU_gf_->SetFromTrueDofs(gradU_);
   gradV_gf_->SetFromTrueDofs(gradV_);
   gradW_gf_->SetFromTrueDofs(gradW_);
+}
+
+// f(Re_h) * Mu_sw * div(streamwiseGrad), i.e. this does not consider grad of f(Re_h) * Mu_sw
+void Tomboulides::streamwiseDiffusion(Vector &phi, Vector &swDiff) {
+  // compute streamwise gradient of input field
+  tmpR0_gf_->SetFromTrueDofs(phi);
+  streamwiseGrad(*tmpR0_gf_, *u_curr_gf_, *tmpR1_gf_);
+
+  // divergence of sw-grad
+  tmpR1_gf_->GetTrueDofs(tmpR1_);
+  D_form_->Mult(tmpR1_, swDiff);
+
+  (thermo_interface_->density)->GetTrueDofs(rho_vec_);
+  gridScale_gf_->GetTrueDofs(tmpR0_);
+  mu_total_gf_->GetTrueDofs(mu_vec_);
+
+  const double *rho = rho_vec_.HostRead();
+  const double *del = tmpR0_.HostRead();
+  const double *vel = u_vec_.HostRead();
+  const double *mu = mu_vec_.HostRead();
+  double *data = swDiff.HostReadWrite();
+
+  int Sdof = rho_vec_.Size();
+  for (int dof = 0; dof < Sdof; dof++) {
+    double Umag = 0.0;
+    for (int i = 0; i < dim_; i++) Umag += vel[i] * vel[i];
+    Umag = std::sqrt(Umag);
+
+    // element Re
+    double Re = Umag * del[dof] * rho[dof] / mu[dof];
+
+    // SUPG weight
+    double Csupg = 0.5 * (tanh(re_factor_ * Re - re_offset_) + 1.0);
+
+    // streamwise diffusion coeff
+    double CswDiff = Csupg * Umag * del[dof] * rho[dof];
+
+    // scaled streamwise Laplacian
+    data[dof] *= CswDiff;
+  }
 }
