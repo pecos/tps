@@ -167,7 +167,7 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   ParGridFunction tmpR0_gf_;
   ParGridFunction tmpR1_gf_;
   ParGridFunction vel_gf_;
-  ParGridFunction gridScale_gf_;
+  ParGridFunction *gridScale_gf_ = nullptr;
 
   // ParGridFunction *buffer_tInlet_ = nullptr;
   GridFunctionCoefficient *temperature_bc_field_ = nullptr;

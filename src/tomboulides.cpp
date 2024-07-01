@@ -1719,11 +1719,11 @@ void Tomboulides::evaluateVelocityGradient() {
 void Tomboulides::streamwiseDiffusion(Vector &phi, Vector &swDiff) {
   // compute streamwise gradient of input field
   tmpR0_gf_->SetFromTrueDofs(phi);
-  streamwiseGrad(*tmpR0_gf_, *u_curr_gf_, *tmpR1_gf_);
+  streamwiseGrad(dim_, *tmpR0_gf_, *u_curr_gf_, *tmpR1_gf_);
 
   // divergence of sw-grad
   tmpR1_gf_->GetTrueDofs(tmpR1_);
-  D_form_->Mult(tmpR1_, swDiff);
+  D_op_->Mult(tmpR1_, swDiff);
 
   (thermo_interface_->density)->GetTrueDofs(rho_vec_);
   gridScale_gf_->GetTrueDofs(tmpR0_);

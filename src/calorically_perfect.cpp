@@ -63,7 +63,7 @@ CaloricallyPerfectThermoChem::CaloricallyPerfectThermoChem(mfem::ParMesh *pmesh,
     : tpsP_(tps), pmesh_(pmesh), dim_(pmesh->Dimension()), time_coeff_(time_coeff) {
   rank0_ = (pmesh_->GetMyRank() == 0);
   order_ = loMach_opts->order;
-  gridScale_gf_ = *gridScale;
+  gridScale_gf_ = gridScale;
 
   std::string visc_model;
   tpsP_->getInput("loMach/calperfect/viscosity-model", visc_model, std::string("sutherland"));
@@ -135,9 +135,9 @@ CaloricallyPerfectThermoChem::CaloricallyPerfectThermoChem(mfem::ParMesh *pmesh,
   tpsP_->getInput("loMach/calperfect/msolve-max-iter", mass_inverse_max_iter_, max_iter_);
   tpsP_->getInput("loMach/calperfect/msolve-verbosity", mass_inverse_pl_, pl_solve_);
 
-  tps->getInput("loMach/tomboulides/streamwise-stabilization", sw_stab_, false);
-  tps->getInput("loMach/tomboulides/Reh_offset", re_offset_, 1.0);
-  tps->getInput("loMach/tomboulides/Reh_factor", re_factor_, 0.01);
+  tps->getInput("loMach/calperfect/streamwise-stabilization", sw_stab_, false);
+  tps->getInput("loMach/calperfect/Reh_offset", re_offset_, 1.0);
+  tps->getInput("loMach/calperfect/Reh_factor", re_factor_, 0.1);
 }
 
 CaloricallyPerfectThermoChem::~CaloricallyPerfectThermoChem() {
@@ -1073,13 +1073,13 @@ void CaloricallyPerfectThermoChem::streamwiseDiffusion(Vector &phi, Vector &swDi
   tmpR0_gf_.SetFromTrueDofs(phi);
   (flow_interface_->velocity)->GetTrueDofs(tmpR0a_);
   vel_gf_.SetFromTrueDofs(tmpR0a_);
-  streamwiseGrad(tmpR0_gf_, vel_gf_, tmpR1_gf_);
+  streamwiseGrad(dim_, tmpR0_gf_, vel_gf_, tmpR1_gf_);
 
   // divergence of sw-grad
   tmpR1_gf_.GetTrueDofs(tmpR1_);
-  D_form_->Mult(tmpR1_, swDiff);
+  D_op_->Mult(tmpR1_, swDiff);
 
-  gridScale_gf_.GetTrueDofs(tmpR0b_);
+  gridScale_gf_->GetTrueDofs(tmpR0b_);
   (turbModel_interface_->eddy_viscosity)->GetTrueDofs(tmpR0c_);
 
   const double *rho = rn_.HostRead();
