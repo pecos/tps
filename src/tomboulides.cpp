@@ -592,9 +592,9 @@ void Tomboulides::initializeOperators() {
   rho_coeff_ = new GridFunctionCoefficient(thermo_interface_->density);
 
   if (axisym_) {
-    iorho_coeff_ = new RatioCoefficient(radius_coeff, *rho_coeff_);
+    iorho_coeff_ = new TpsRatioCoefficient(radius_coeff, *rho_coeff_);
   } else {
-    iorho_coeff_ = new RatioCoefficient(1.0, *rho_coeff_);
+    iorho_coeff_ = new TpsRatioCoefficient(1.0, *rho_coeff_);
   }
 
   Hv_bdfcoeff_.constant = 1.0 / coeff_.dt;
@@ -626,7 +626,7 @@ void Tomboulides::initializeOperators() {
     rad_rho_coeff_ = new ProductCoefficient(radius_coeff, *rho_coeff_);
     rad_rho_over_dt_coeff_ = new ProductCoefficient(Hv_bdfcoeff_, *rad_rho_coeff_);
     rad_mu_coeff_ = new ProductCoefficient(radius_coeff, *mu_coeff_);
-    mu_over_rad_coeff_ = new RatioCoefficient(*mu_coeff_, radius_coeff);
+    mu_over_rad_coeff_ = new TpsRatioCoefficient(*mu_coeff_, radius_coeff);
     rad_S_poisson_coeff_ = new ScalarVectorProductCoefficient(radius_coeff, *S_poisson_coeff_);
     rad_S_mom_coeff_ = new ScalarVectorProductCoefficient(radius_coeff, *S_mom_coeff_);
 
@@ -1375,9 +1375,7 @@ void Tomboulides::step() {
       // systems.  As a workaround, we copy instead.
       auto d_pp_div_rad = pp_div_rad_comp_gf_->Write();
       auto d_pp_div = pp_div_gf_->Read();
-      MFEM_FORALL(i, pp_div_rad_comp_gf_->Size(), {
-          d_pp_div_rad[i] = d_pp_div[i];
-        });
+      MFEM_FORALL(i, pp_div_rad_comp_gf_->Size(), { d_pp_div_rad[i] = d_pp_div[i]; });
     }
     pp_div_rad_comp_gf_->HostRead();
 
@@ -1490,9 +1488,7 @@ void Tomboulides::step() {
       // about pp_div_rad_comp_gf_ above.
       auto d_u_next_rad = u_next_rad_comp_gf_->Write();
       auto d_u_next = u_next_gf_->Read();
-      MFEM_FORALL(i, u_next_rad_comp_gf_->Size(), {
-          d_u_next_rad[i] = d_u_next[i];
-        });
+      MFEM_FORALL(i, u_next_rad_comp_gf_->Size(), { d_u_next_rad[i] = d_u_next[i]; });
     }
     u_next_rad_comp_gf_->HostRead();
 

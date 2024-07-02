@@ -41,7 +41,7 @@ cxx_sources          = averaging.cpp faceGradientIntegration.cpp M2ulPhyS.cpp rh
 	               thermo_chem_base.cpp split_flow_base.cpp tomboulides.cpp dirichlet_bc_helper.cpp \
                        sponge_base.cpp geometricSponge.cpp gaussianInterpExtData.cpp turb_model_base.cpp \
                        algebraicSubgridModels.cpp algebraic_rans.cpp mesh_base.cpp lte_thermo_chem.cpp cases.cpp \
-                       reactingFlow.cpp
+                       reactingFlow.cpp coefficient.cpp
 
 mfem_extra_sources   = ../utils/mfem_extras/pfem_extras.cpp
 
@@ -58,7 +58,7 @@ headers              = averaging.hpp equation_of_state.hpp transport_properties.
 		       thermo_chem_base.hpp split_flow_base.hpp tomboulides.hpp dirichlet_bc_helper.hpp \
                        sponge_base.hpp geometricSponge.hpp externalData_base.hpp gaussianInterpExtData.hpp \
                        turb_model_base.hpp algebraicSubgridModels.hpp algebraic_rans.hpp mesh_base.hpp \
-                       lte_thermo_chem.hpp cases.hpp reactingFlow.hpp
+                       lte_thermo_chem.hpp cases.hpp reactingFlow.hpp coefficient.hpp
 
 mfem_extra_headers   = ../utils/mfem_extras/pfem_extras.hpp
 

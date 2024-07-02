@@ -47,6 +47,7 @@ class Tps;
 // forward-declaration of struct hold temporal coefficients (loMach.hpp)
 struct temporalSchemeCoefficients;
 
+#include "coefficient.hpp"
 #include "dirichlet_bc_helper.hpp"
 #include "split_flow_base.hpp"
 #include "utils.hpp"
@@ -243,7 +244,7 @@ class Tomboulides final : public FlowBase {
 
   /// mfem::Coefficients used in forming necessary operators
   mfem::GridFunctionCoefficient *rho_coeff_ = nullptr;
-  mfem::RatioCoefficient *iorho_coeff_ = nullptr;
+  mfem::TpsRatioCoefficient *iorho_coeff_ = nullptr;
   mfem::ConstantCoefficient nlcoeff_;
   mfem::ConstantCoefficient one_coeff_;
   mfem::ConstantCoefficient Hv_bdfcoeff_;
@@ -267,7 +268,7 @@ class Tomboulides final : public FlowBase {
   mfem::ProductCoefficient *rad_mu_coeff_ = nullptr;
   mfem::ScalarVectorProductCoefficient *rad_S_poisson_coeff_ = nullptr;
   mfem::ScalarVectorProductCoefficient *rad_S_mom_coeff_ = nullptr;
-  mfem::RatioCoefficient *mu_over_rad_coeff_ = nullptr;
+  mfem::TpsRatioCoefficient *mu_over_rad_coeff_ = nullptr;
   mfem::VectorArrayCoefficient *visc_forcing_coeff_ = nullptr;
   mfem::GridFunctionCoefficient *pp_div_rad_comp_coeff_ = nullptr;
 
