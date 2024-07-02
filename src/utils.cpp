@@ -1166,9 +1166,6 @@ bool copyFile(const char *SRC, const char *DEST) {
 }
 
 void streamwiseGrad(int dim, ParGridFunction &phi, ParGridFunction &u, ParGridFunction &swGrad) {
-  // need to make this general...
-  // int dim_ = 3;
-
   /*
   std::cout << "maxInd   minusInd   plusInd" << endl;
   std::cout << 0 << " " << ((0-1) % dim_ + dim_) % dim_ << " " << (0 + 1) % dim_ << endl;
@@ -1241,7 +1238,7 @@ void streamwiseGrad(int dim, ParGridFunction &phi, ParGridFunction &u, ParGridFu
       if (dim == 3) M(d, 2) = unitT2[d];
     }
 
-    // streamwise diffusion coeff
+    // streamwise coeff
     DenseMatrix swM(dim, dim);
     swM = 0.0;
     swM(0, 0) = 1.0;

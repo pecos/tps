@@ -68,10 +68,11 @@ static double sigmaTorchStartUp(const Vector &pos) {
 static FunctionCoefficient sigma_start_up(sigmaTorchStartUp);
 
 LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &time_coeff,
-                             TPS::Tps *tps)
-    : tpsP_(tps), pmesh_(pmesh), time_coeff_(time_coeff) {
+                             ParGridFunction *gridScale, TPS::Tps *tps)
+    : tpsP_(tps), pmesh_(pmesh), dim_(pmesh->Dimension()), time_coeff_(time_coeff) {
   rank0_ = (pmesh_->GetMyRank() == 0);
   order_ = loMach_opts->order;
+  gridScale_gf_ = gridScale;
 
   tps->getInput("loMach/axisymmetric", axisym_, false);
 
@@ -166,6 +167,10 @@ LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, t
   tps->getInput("loMach/ltethermo/linear-solver-rtol", rtol_, 1e-12);
   tps->getInput("loMach/ltethermo/linear-solver-max-iter", max_iter_, 1000);
   tps->getInput("loMach/ltethermo/linear-solver-verbosity", pl_solve_, 0);
+
+  tps->getInput("loMach/ltethermo/streamwise-stabilization", sw_stab_, false);
+  tps->getInput("loMach/ltethermo/Reh_offset", re_offset_, 1.0);
+  tps->getInput("loMach/ltethermo/Reh_factor", re_factor_, 0.1);
 }
 
 LteThermoChem::~LteThermoChem() {
@@ -192,6 +197,7 @@ LteThermoChem::~LteThermoChem() {
   delete M_rho_Cp_form_;
   delete Ms_form_;
   delete At_form_;
+  delete D_form_;
   delete rho_Cp_u_coeff_;
   delete un_next_coeff_;
   delete kap_gradT_coeff_;
@@ -208,6 +214,8 @@ LteThermoChem::~LteThermoChem() {
   // allocated in initializeSelf
   delete sfes_;
   delete sfec_;
+  delete vfes_;
+  delete vfec_;
 }
 
 void LteThermoChem::initializeSelf() {
@@ -218,6 +226,9 @@ void LteThermoChem::initializeSelf() {
   //-----------------------------------------------------
   sfec_ = new H1_FECollection(order_);
   sfes_ = new ParFiniteElementSpace(pmesh_, sfec_);
+
+  vfec_ = new H1_FECollection(order_, dim_);
+  vfes_ = new ParFiniteElementSpace(pmesh_, vfec_, dim_);
 
   // Check if fully periodic mesh
   if (!(pmesh_->bdr_attributes.Size() == 0)) {
@@ -230,6 +241,7 @@ void LteThermoChem::initializeSelf() {
   if (rank0_) grvy_printf(ginfo, "LteThermoChem paces constructed...\n");
 
   int sfes_truevsize = sfes_->GetTrueVSize();
+  int vfes_truevsize = vfes_->GetTrueVSize();
 
   Qt_.SetSize(sfes_truevsize);
   Qt_ = 0.0;
@@ -317,8 +329,16 @@ void LteThermoChem::initializeSelf() {
   radiation_sink_.SetSize(sfes_truevsize);
   radiation_sink_ = 0.0;
 
+  vel_gf_.SetSpace(vfes_);
+  tmpR1_gf_.SetSpace(vfes_);
+  tmpR0_gf_.SetSpace(sfes_);
+
+  swDiff_.SetSize(sfes_truevsize);
   tmpR0_.SetSize(sfes_truevsize);
+  tmpR0a_.SetSize(sfes_truevsize);
   tmpR0b_.SetSize(sfes_truevsize);
+  tmpR0c_.SetSize(sfes_truevsize);
+  tmpR1_.SetSize(vfes_truevsize);
 
   R0PM0_gf_.SetSpace(sfes_);
 
@@ -628,6 +648,24 @@ void LteThermoChem::initializeOperators() {
   M_rho_form_->Assemble();
   M_rho_form_->FormSystemMatrix(empty, M_rho_);
 
+  // Divergence operator
+  D_form_ = new ParMixedBilinearForm(vfes_, sfes_);
+  VectorDivergenceIntegrator *vd_mblfi;
+  // if (axisym_) {
+  //  vd_mblfi = new VectorDivergenceIntegrator(radius_coeff);
+  // } else {
+  vd_mblfi = new VectorDivergenceIntegrator();
+  // }
+  if (numerical_integ_) {
+    vd_mblfi->SetIntRule(&ir_nli);
+  }
+  D_form_->AddDomainIntegrator(vd_mblfi);
+  if (partial_assembly_) {
+    D_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+  }
+  D_form_->Assemble();
+  D_form_->FormRectangularSystemMatrix(empty, empty, D_op_);
+
   // helmholtz
   Ht_form_ = new ParBilinearForm(sfes_);
   MassIntegrator *hmt_blfi;
@@ -904,6 +942,12 @@ void LteThermoChem::step() {
   // dPo/dt
   tmpR0_ = dtP_;
   Ms_->AddMult(tmpR0_, resT_);
+
+  // Add streamwise stability to rhs
+  if (sw_stab_) {
+    streamwiseDiffusion(Tn_, swDiff_);
+    resT_.Add(1.0, swDiff_);
+  }
 
   // Joule heating (and radiation sink)
   jh_form_->Update();
@@ -1230,4 +1274,45 @@ void LteThermoChem::computeQt() {
   Qt_ /= thermo_pressure_;
   Qt_.Neg();
   Qt_gf_.SetFromTrueDofs(Qt_);
+}
+
+void LteThermoChem::streamwiseDiffusion(Vector &phi, Vector &swDiff) {
+  // compute streamwise gradient of input field
+  tmpR0_gf_.SetFromTrueDofs(phi);
+  (flow_interface_->velocity)->GetTrueDofs(tmpR0a_);
+  vel_gf_.SetFromTrueDofs(tmpR0a_);
+  streamwiseGrad(dim_, tmpR0_gf_, vel_gf_, tmpR1_gf_);
+
+  // divergence of sw-grad
+  tmpR1_gf_.GetTrueDofs(tmpR1_);
+  D_op_->Mult(tmpR1_, swDiff);
+
+  gridScale_gf_->GetTrueDofs(tmpR0b_);
+  (turbModel_interface_->eddy_viscosity)->GetTrueDofs(tmpR0c_);
+
+  const double *rho = rn_.HostRead();
+  const double *vel = tmpR0a_.HostRead();
+  const double *del = tmpR0b_.HostRead();
+  const double *mu = visc_.HostRead();
+  const double *muT = tmpR0c_.HostRead();
+  double *data = swDiff.HostReadWrite();
+
+  int Sdof = rn_.Size();
+  for (int dof = 0; dof < Sdof; dof++) {
+    double Umag = 0.0;
+    for (int i = 0; i < dim_; i++) Umag += vel[i] * vel[i];
+    Umag = std::sqrt(Umag);
+
+    // element Re
+    double Re = Umag * del[dof] * rho[dof] / (mu[dof] + muT[dof]);
+
+    // SUPG weight
+    double Csupg = 0.5 * (tanh(re_factor_ * Re - re_offset_) + 1.0);
+
+    // streamwise diffusion coeff
+    double CswDiff = Csupg * Umag * del[dof] * rho[dof];
+
+    // scaled streamwise Laplacian
+    data[dof] *= CswDiff;
+  }
 }

@@ -111,6 +111,7 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   double hsolve_rtol_;
   double hsolve_atol_;
 
+  // streamwise-stabilization
   bool sw_stab_;
   double re_offset_;
   double re_factor_;
