@@ -111,6 +111,9 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
     // test results rely on it being true
     tps->getInput("loMach/tomboulides/numerical-integ", numerical_integ_, true);
 
+    // Use partial assembly support (defaults to false)
+    tps->getInput("loMach/tomboulides/partial-assembly", partial_assembly_, false);
+
     // Can't use numerical integration with axisymmetric b/c it
     // locates quadrature points on the axis, which can lead to
     // singular mass matrices and evaluations of 1/r = 1/0.
