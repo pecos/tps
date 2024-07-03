@@ -35,6 +35,7 @@
  */
 
 #include "coefficient.hpp"
+#include <mfem/general/forall.hpp>
 
 namespace mfem {
 GradientVectorGridFunctionCoefficient::GradientVectorGridFunctionCoefficient(const GridFunction *gf)
@@ -87,6 +88,85 @@ void TpsRatioCoefficient::SetTime(double t) {
     b->SetTime(t);
   }
   this->Coefficient::SetTime(t);
+}
+
+// PA Mass Assemble kernel
+void TpsVectorMassIntegrator::AssemblePA(const FiniteElementSpace &fes) {
+  // Assuming the same element type
+  Mesh *mesh = fes.GetMesh();
+  if (mesh->GetNE() == 0) {
+    return;
+  }
+  const FiniteElement &el = *fes.GetFE(0);
+  ElementTransformation *T = mesh->GetElementTransformation(0);
+  const IntegrationRule *ir = IntRule ? IntRule : &MassIntegrator::GetRule(el, el, *T);
+
+  dim = mesh->Dimension();
+  ne = fes.GetMesh()->GetNE();
+  nq = ir->GetNPoints();
+  geom = mesh->GetGeometricFactors(*ir, GeometricFactors::COORDINATES | GeometricFactors::JACOBIANS);
+  maps = &el.GetDofToQuad(*ir, DofToQuad::TENSOR);
+  dofs1D = maps->ndof;
+  quad1D = maps->nqpt;
+  pa_data.SetSize(ne * nq, Device::GetDeviceMemoryType());
+
+  QuadratureSpace qs(*mesh, *ir);
+  CoefficientVector coeff(qs, CoefficientStorage::COMPRESSED);
+
+  if (Q) { coeff.Project(*Q); }
+  else { coeff.SetConstant(1.0); }
+
+  if (!(dim == 2 || dim == 3)) {
+    MFEM_ABORT("Dimension not supported.");
+  }
+  if (dim == 2) {
+    //const double constant = coeff;
+    const bool const_c = coeff.Size() == 1;
+    const int NE = ne;
+    const int NQ = nq;
+    auto w = ir->GetWeights().Read();
+    auto J = Reshape(geom->J.Read(), NQ, 2, 2, NE);
+    auto v = Reshape(pa_data.Write(), NQ, NE);
+
+    const auto C = const_c ? Reshape(coeff.Read(),1,1,1) :
+      Reshape(coeff.Read(),1,NQ,NE);
+
+    MFEM_FORALL(e, NE, {
+      for (int q = 0; q < NQ; ++q) {
+        const double constant = const_c ? C(0,0,0) : C(0,q,e);
+        const double J11 = J(q, 0, 0, e);
+        const double J12 = J(q, 1, 0, e);
+        const double J21 = J(q, 0, 1, e);
+        const double J22 = J(q, 1, 1, e);
+        const double detJ = (J11 * J22) - (J21 * J12);
+        v(q, e) = w[q] * constant * detJ;
+      }
+    });
+  }
+  if (dim == 3) {
+    // const double constant = coeff;
+    const bool const_c = coeff.Size() == 1;
+    const int NE = ne;
+    const int NQ = nq;
+    auto W = ir->GetWeights().Read();
+    auto J = Reshape(geom->J.Read(), NQ, 3, 3, NE);
+    auto v = Reshape(pa_data.Write(), NQ, NE);
+    const auto C = const_c ? Reshape(coeff.Read(),1,1,1) :
+      Reshape(coeff.Read(),1,NQ,NE);
+
+    MFEM_FORALL(e, NE, {
+      for (int q = 0; q < NQ; ++q) {
+        const double constant = const_c ? C(0,0,0) : C(0,q,e);
+        const double J11 = J(q, 0, 0, e), J12 = J(q, 0, 1, e), J13 = J(q, 0, 2, e);
+        const double J21 = J(q, 1, 0, e), J22 = J(q, 1, 1, e), J23 = J(q, 1, 2, e);
+        const double J31 = J(q, 2, 0, e), J32 = J(q, 2, 1, e), J33 = J(q, 2, 2, e);
+        const double detJ = J11 * (J22 * J33 - J32 * J23) -
+                            /* */ J21 * (J12 * J33 - J32 * J13) +
+                            /* */ J31 * (J12 * J23 - J22 * J13);
+        v(q, e) = W[q] * constant * detJ;
+      }
+    });
+  }
 }
 
 }  // namespace mfem

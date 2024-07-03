@@ -95,5 +95,13 @@ class TpsRatioCoefficient : public Coefficient {
   }
 };
 
+class TpsVectorMassIntegrator : public VectorMassIntegrator {
+ public:
+  TpsVectorMassIntegrator(Coefficient &q, int qo = 0) : VectorMassIntegrator(q, qo) {}
+
+  using BilinearFormIntegrator::AssemblePA;
+  virtual void AssemblePA(const FiniteElementSpace &fes);
+};
+
 }  // namespace mfem
 #endif  // COEFFICIENT_HPP_

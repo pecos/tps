@@ -113,6 +113,9 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
 
     // Use partial assembly support (defaults to false)
     tps->getInput("loMach/tomboulides/partial-assembly", partial_assembly_, false);
+    if (partial_assembly_) {
+      std::cout << "Using partial assembly!!" << std::endl;
+    }
 
     // Can't use numerical integration with axisymmetric b/c it
     // locates quadrature points on the axis, which can lead to
@@ -794,16 +797,19 @@ void Tomboulides::initializeOperators() {
 
   // Mass matrix (density weighted) for the velocity
   Mv_rho_form_ = new ParBilinearForm(vfes_);
-  VectorMassIntegrator *mvr_blfi;
+  TpsVectorMassIntegrator *mvr_blfi;
   if (axisym_) {
-    mvr_blfi = new VectorMassIntegrator(*rad_rho_coeff_);
+    mvr_blfi = new TpsVectorMassIntegrator(*rad_rho_coeff_);
   } else {
-    mvr_blfi = new VectorMassIntegrator(*rho_coeff_);
+    mvr_blfi = new TpsVectorMassIntegrator(*rho_coeff_);
   }
   if (numerical_integ_) {
     mvr_blfi->SetIntRule(&ir_ni_v);
   }
   Mv_rho_form_->AddDomainIntegrator(mvr_blfi);
+  if (partial_assembly_) {
+    Mv_rho_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+  }
   Mv_rho_form_->Assemble();
   Mv_rho_form_->FormSystemMatrix(empty, Mv_rho_op_);
 
@@ -828,11 +834,17 @@ void Tomboulides::initializeOperators() {
   Mv_inv_->SetRelTol(mass_inverse_rtol_);
   Mv_inv_->SetMaxIter(mass_inverse_max_iter_);
 
-  Mv_rho_inv_pc_ = new HypreSmoother(*Mv_rho_op_.As<HypreParMatrix>());
-  dynamic_cast<HypreSmoother *>(Mv_rho_inv_pc_)->SetType(smoother_type_, smoother_passes_);
-  dynamic_cast<HypreSmoother *>(Mv_rho_inv_pc_)->SetSOROptions(smoother_relax_weight_, smoother_relax_omega_);
-  dynamic_cast<HypreSmoother *>(Mv_rho_inv_pc_)
+  if (partial_assembly_) {
+    Vector diag_pa(vfes_->GetTrueVSize());
+    Mv_rho_form_->AssembleDiagonal(diag_pa);
+    Mv_rho_inv_pc_ = new OperatorJacobiSmoother(diag_pa, empty);
+  } else {
+    Mv_rho_inv_pc_ = new HypreSmoother(*Mv_rho_op_.As<HypreParMatrix>());
+    dynamic_cast<HypreSmoother *>(Mv_rho_inv_pc_)->SetType(smoother_type_, smoother_passes_);
+    dynamic_cast<HypreSmoother *>(Mv_rho_inv_pc_)->SetSOROptions(smoother_relax_weight_, smoother_relax_omega_);
+    dynamic_cast<HypreSmoother *>(Mv_rho_inv_pc_)
       ->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_, smoother_eig_est_);
+  }
 
   Mv_rho_inv_ = new CGSolver(vfes_->GetComm());
   Mv_rho_inv_->iterative_mode = false;
