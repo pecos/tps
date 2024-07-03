@@ -35,6 +35,7 @@
  */
 
 #include "coefficient.hpp"
+
 #include <mfem/general/forall.hpp>
 
 namespace mfem {
@@ -132,14 +133,17 @@ void TpsVectorMassIntegrator::AssemblePA(const FiniteElementSpace &fes) {
   QuadratureSpace qs(*mesh, *ir);
   CoefficientVector coeff(qs, CoefficientStorage::COMPRESSED);
 
-  if (Q) { coeff.Project(*Q); }
-  else { coeff.SetConstant(1.0); }
+  if (Q) {
+    coeff.Project(*Q);
+  } else {
+    coeff.SetConstant(1.0);
+  }
 
   if (!(dim == 2 || dim == 3)) {
     MFEM_ABORT("Dimension not supported.");
   }
   if (dim == 2) {
-    //const double constant = coeff;
+    // const double constant = coeff;
     const bool const_c = coeff.Size() == 1;
     const int NE = ne;
     const int NQ = nq;
@@ -147,12 +151,11 @@ void TpsVectorMassIntegrator::AssemblePA(const FiniteElementSpace &fes) {
     auto J = Reshape(geom->J.Read(), NQ, 2, 2, NE);
     auto v = Reshape(pa_data.Write(), NQ, NE);
 
-    const auto C = const_c ? Reshape(coeff.Read(),1,1,1) :
-      Reshape(coeff.Read(),1,NQ,NE);
+    const auto C = const_c ? Reshape(coeff.Read(), 1, 1, 1) : Reshape(coeff.Read(), 1, NQ, NE);
 
     MFEM_FORALL(e, NE, {
       for (int q = 0; q < NQ; ++q) {
-        const double constant = const_c ? C(0,0,0) : C(0,q,e);
+        const double constant = const_c ? C(0, 0, 0) : C(0, q, e);
         const double J11 = J(q, 0, 0, e);
         const double J12 = J(q, 1, 0, e);
         const double J21 = J(q, 0, 1, e);
@@ -170,12 +173,11 @@ void TpsVectorMassIntegrator::AssemblePA(const FiniteElementSpace &fes) {
     auto W = ir->GetWeights().Read();
     auto J = Reshape(geom->J.Read(), NQ, 3, 3, NE);
     auto v = Reshape(pa_data.Write(), NQ, NE);
-    const auto C = const_c ? Reshape(coeff.Read(),1,1,1) :
-      Reshape(coeff.Read(),1,NQ,NE);
+    const auto C = const_c ? Reshape(coeff.Read(), 1, 1, 1) : Reshape(coeff.Read(), 1, NQ, NE);
 
     MFEM_FORALL(e, NE, {
       for (int q = 0; q < NQ; ++q) {
-        const double constant = const_c ? C(0,0,0) : C(0,q,e);
+        const double constant = const_c ? C(0, 0, 0) : C(0, q, e);
         const double J11 = J(q, 0, 0, e), J12 = J(q, 0, 1, e), J13 = J(q, 0, 2, e);
         const double J21 = J(q, 1, 0, e), J22 = J(q, 1, 1, e), J23 = J(q, 1, 2, e);
         const double J31 = J(q, 2, 0, e), J32 = J(q, 2, 1, e), J33 = J(q, 2, 2, e);

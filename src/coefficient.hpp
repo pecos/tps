@@ -84,7 +84,7 @@ class TpsRatioCoefficient : public Coefficient {
       scalar coefficient and @a B is a constant */
   TpsRatioCoefficient(Coefficient &A, double B) : aConst(0.0), bConst(B), a(&A), b(NULL) {}
 
-  virtual ~TpsRatioCoefficient() { }
+  virtual ~TpsRatioCoefficient() {}
 
   /// Set the time for internally stored coefficients
   void SetTime(double t);

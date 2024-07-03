@@ -843,7 +843,7 @@ void Tomboulides::initializeOperators() {
     dynamic_cast<HypreSmoother *>(Mv_rho_inv_pc_)->SetType(smoother_type_, smoother_passes_);
     dynamic_cast<HypreSmoother *>(Mv_rho_inv_pc_)->SetSOROptions(smoother_relax_weight_, smoother_relax_omega_);
     dynamic_cast<HypreSmoother *>(Mv_rho_inv_pc_)
-      ->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_, smoother_eig_est_);
+        ->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_, smoother_eig_est_);
   }
 
   Mv_rho_inv_ = new CGSolver(vfes_->GetComm());
