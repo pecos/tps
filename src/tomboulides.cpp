@@ -1125,12 +1125,30 @@ void Tomboulides::computeDissipation(Averaging &average, const int iter) {
       tmpR1_.Add(-1.0, u_vec_);
 
       // gradient of u'
-      Up_gf_->SetFromTrueDofs(tmpR1_);
-      //      vectorGrad3D(*epsi_gf_, *Up_gf_, *gradU_gf_, *gradV_gf_, *gradW_gf_);
+      setScalarFromVector(tmpR1_, 0, &tmpR0_);
+      G_op_->Mult(tmpR0_, gradU_);
+      setScalarFromVector(tmpR1_, 1, &tmpR0_);
+      G_op_->Mult(tmpR0_, gradV_);
+      if (dim_ == 3) {
+        setScalarFromVector(tmpR1_, 2, &tmpR0_);
+        G_op_->Mult(tmpR0_, gradW_);
+      }
 
-      ComputeCurl3D(*Up_gf_, *gradU_gf_);
-      ComputeCurl3D(*Up_gf_, *gradV_gf_);
-      ComputeCurl3D(*Up_gf_, *gradW_gf_);
+      Mv_inv_->Mult(gradU_, tmpR1_);
+      gradU_ = tmpR1_;
+      Mv_inv_->Mult(gradV_, tmpR1_);
+      gradV_ = tmpR1_;
+      if (dim_ == 3) {
+        Mv_inv_->Mult(gradW_, tmpR1_);
+        gradW_ = tmpR1_;
+      }
+
+      gradU_gf_->SetFromTrueDofs(gradU_);
+      gradV_gf_->SetFromTrueDofs(gradV_);
+      if (dim_ == 3) gradW_gf_->SetFromTrueDofs(gradW_);
+
+      // Up_gf_->SetFromTrueDofs(tmpR1_);
+      // vectorGrad3D(*epsi_gf_, *Up_gf_, *gradU_gf_, *gradV_gf_, *gradW_gf_);
 
       // const double *dmu = (*thermo_interface_->viscosity).HostRead();
       const double *dmu = mu_total_gf_->HostRead();
@@ -1152,8 +1170,10 @@ void Tomboulides::computeDissipation(Averaging &average, const int iter) {
         for (int dir = 0; dir < dim_; dir++) {
           gradUp(1, dir) = dGradV[dof + dir * Sdof];
         }
-        for (int dir = 0; dir < dim_; dir++) {
-          gradUp(2, dir) = dGradW[dof + dir * Sdof];
+        if (dim_ == 3) {
+          for (int dir = 0; dir < dim_; dir++) {
+            gradUp(2, dir) = dGradW[dof + dir * Sdof];
+          }
         }
 
         for (int i = 0; i < dim_; i++) {

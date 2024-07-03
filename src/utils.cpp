@@ -900,10 +900,6 @@ void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu) {
     }
   }
 
-  // NOTE: this block seems to be broken in that the averages
-  //  at partition bdr's becomes too small
-  //  either zpv is too high at bdrs or gu is not summing properly
-  /*
   // Count the zones globally.
   gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
   gcomm.Bcast(zones_per_vdof);
@@ -911,7 +907,6 @@ void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu) {
   // Accumulate for all vdofs.
   gcomm.Reduce<double>(gu.GetData(), GroupCommunicator::Sum);
   gcomm.Bcast<double>(gu.GetData());
-  */
 
   // Compute means.
   for (int dir = 0; dir < dim; dir++) {
