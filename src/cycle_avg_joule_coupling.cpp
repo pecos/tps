@@ -65,6 +65,10 @@ CycleAvgJouleCoupling::CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tp
   tps->getInput("cycle-avg-joule-coupled/initial-input-power", initial_input_power_, -1.);
   tps->getInput("cycle-avg-joule-coupled/fixed-conductivity", fixed_conductivity_, false);
 
+  tps->getInput("cycle-avg-joule-coupled/oscillating-power", oscillating_power_, false);
+  tps->getInput("cycle-avg-joule-coupled/input-power-amplitude",  power_amplitude_, 0.0);
+  tps->getInput("cycle-avg-joule-coupled/input-power-period",  power_period_, 1.0);
+
   if (axisym) {
     qmsa_solver_ = new QuasiMagnetostaticSolverAxiSym(em_opt_, tps);
   } else {
@@ -450,7 +454,11 @@ void CycleAvgJouleCoupling::solveStep() {
 
     // scale the Joule heating (if we are controlling the power input)
     if (input_power_ > 0) {
-      const double target_power = initial_input_power_ + (current_iter_ / solve_em_every_n_ + 1) * delta_power;
+      double target_power = initial_input_power_ + (current_iter_ / solve_em_every_n_ + 1) * delta_power;
+      if (oscillating_power_) {
+        const double tau = ((double)current_iter_) / power_period_;
+        target_power = input_power_ + power_amplitude_ * sin(2 * M_PI * tau);
+      }
       const double ratio = target_power / tot_jh;
       qmsa_solver_->scaleJouleHeating(ratio);
       const double upd_jh = qmsa_solver_->totalJouleHeating();
