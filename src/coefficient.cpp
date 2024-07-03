@@ -90,6 +90,25 @@ void TpsRatioCoefficient::SetTime(double t) {
   this->Coefficient::SetTime(t);
 }
 
+void TpsRatioCoefficient::Project(QuadratureFunction &qf) {
+  // Evaluate the numerator
+  if (a == NULL) {
+    qf = aConst;
+  } else {
+    a->Project(qf);
+  }
+
+  // Evaluate the denominator and form qf = a/b
+  if (b == NULL) {
+    qf /= bConst;
+  } else {
+    // Temporary QuadratureFunction for the denominator
+    QuadratureFunction qden(qf.GetSpace());
+    b->Project(qden);
+    qf /= qden;
+  }
+}
+
 // PA Mass Assemble kernel
 void TpsVectorMassIntegrator::AssemblePA(const FiniteElementSpace &fes) {
   // Assuming the same element type

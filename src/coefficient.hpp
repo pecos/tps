@@ -84,6 +84,8 @@ class TpsRatioCoefficient : public Coefficient {
       scalar coefficient and @a B is a constant */
   TpsRatioCoefficient(Coefficient &A, double B) : aConst(0.0), bConst(B), a(&A), b(NULL) {}
 
+  virtual ~TpsRatioCoefficient() { }
+
   /// Set the time for internally stored coefficients
   void SetTime(double t);
 
@@ -93,6 +95,8 @@ class TpsRatioCoefficient : public Coefficient {
     MFEM_ASSERT(den != 0.0, "Division by zero in TpsRatioCoefficient");
     return ((a == NULL) ? aConst : a->Eval(T, ip)) / den;
   }
+
+  virtual void Project(QuadratureFunction &qf);
 };
 
 class TpsVectorMassIntegrator : public VectorMassIntegrator {
