@@ -99,6 +99,39 @@ class TpsRatioCoefficient : public Coefficient {
   virtual void Project(QuadratureFunction &qf);
 };
 
+/** @brief Scalar coefficient defined as the product of two scalars where one or
+    both scalars are scalar coefficients. */
+class TpsProductCoefficient : public Coefficient {
+ private:
+  double aConst;
+  double bConst;
+  Coefficient *a;
+  Coefficient *b;
+
+ public:
+  /** Initialize a coefficient which returns A / B where @a A is a
+      constant and @a B is a scalar coefficient */
+  TpsProductCoefficient(double A, Coefficient &B) : aConst(A), bConst(1.0), a(NULL), b(&B) {}
+  /** Initialize a coefficient which returns A / B where @a A and @a B are both
+      scalar coefficients */
+  TpsProductCoefficient(Coefficient &A, Coefficient &B) : aConst(0.0), bConst(1.0), a(&A), b(&B) {}
+  /** Initialize a coefficient which returns A / B where @a A is a
+      scalar coefficient and @a B is a constant */
+  TpsProductCoefficient(Coefficient &A, double B) : aConst(0.0), bConst(B), a(&A), b(NULL) {}
+
+  virtual ~TpsProductCoefficient() {}
+
+  /// Set the time for internally stored coefficients
+  void SetTime(double t);
+
+  /// Evaluate the coefficient
+  virtual double Eval(ElementTransformation &T, const IntegrationPoint &ip) {
+    return ((a == NULL) ? aConst : a->Eval(T, ip)) * b->Eval(T, ip);
+  }
+
+  virtual void Project(QuadratureFunction &qf);
+};
+
 class TpsVectorMassIntegrator : public VectorMassIntegrator {
  public:
   TpsVectorMassIntegrator(Coefficient &q, int qo = 0) : VectorMassIntegrator(q, qo) {}

@@ -604,7 +604,7 @@ void Tomboulides::initializeOperators() {
   }
 
   Hv_bdfcoeff_.constant = 1.0 / coeff_.dt;
-  rho_over_dt_coeff_ = new ProductCoefficient(Hv_bdfcoeff_, *rho_coeff_);
+  rho_over_dt_coeff_ = new TpsProductCoefficient(Hv_bdfcoeff_, *rho_coeff_);
 
   updateTotalViscosity();
 
@@ -629,9 +629,9 @@ void Tomboulides::initializeOperators() {
 
   // Coefficients for axisymmetric
   if (axisym_) {
-    rad_rho_coeff_ = new ProductCoefficient(radius_coeff, *rho_coeff_);
-    rad_rho_over_dt_coeff_ = new ProductCoefficient(Hv_bdfcoeff_, *rad_rho_coeff_);
-    rad_mu_coeff_ = new ProductCoefficient(radius_coeff, *mu_coeff_);
+    rad_rho_coeff_ = new TpsProductCoefficient(radius_coeff, *rho_coeff_);
+    rad_rho_over_dt_coeff_ = new TpsProductCoefficient(Hv_bdfcoeff_, *rad_rho_coeff_);
+    rad_mu_coeff_ = new TpsProductCoefficient(radius_coeff, *mu_coeff_);
     mu_over_rad_coeff_ = new TpsRatioCoefficient(*mu_coeff_, radius_coeff);
     rad_S_poisson_coeff_ = new ScalarVectorProductCoefficient(radius_coeff, *S_poisson_coeff_);
     rad_S_mom_coeff_ = new ScalarVectorProductCoefficient(radius_coeff, *S_mom_coeff_);
@@ -641,7 +641,7 @@ void Tomboulides::initializeOperators() {
     visc_forcing_coeff_->Set(0, mu_over_rad_coeff_);
 
     utheta_coeff_ = new GridFunctionCoefficient(utheta_next_gf_);
-    utheta2_coeff_ = new ProductCoefficient(*utheta_coeff_, *utheta_coeff_);
+    utheta2_coeff_ = new TpsProductCoefficient(*utheta_coeff_, *utheta_coeff_);
 
     // NB: Takes ownership of utheta2_coeff_
     ur_conv_forcing_coeff_ = new VectorArrayCoefficient(2);
@@ -651,8 +651,8 @@ void Tomboulides::initializeOperators() {
     rad_rhou_coeff_ = new ScalarVectorProductCoefficient(*rad_rho_coeff_, *u_next_coeff_);
 
     u_next_rad_coeff_ = new GridFunctionCoefficient(u_next_rad_comp_gf_);
-    ur_ut_coeff_ = new ProductCoefficient(*u_next_rad_coeff_, *utheta_coeff_);
-    rho_ur_ut_coeff_ = new ProductCoefficient(*rho_coeff_, *ur_ut_coeff_);
+    ur_ut_coeff_ = new TpsProductCoefficient(*u_next_rad_coeff_, *utheta_coeff_);
+    rho_ur_ut_coeff_ = new TpsProductCoefficient(*rho_coeff_, *ur_ut_coeff_);
 
     // NB: This is a sort of hacky/sneaky way to form the variable
     // viscosity contribution to the swirl equation.  Should find a

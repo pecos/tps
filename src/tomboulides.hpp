@@ -248,7 +248,7 @@ class Tomboulides final : public FlowBase {
   mfem::ConstantCoefficient nlcoeff_;
   mfem::ConstantCoefficient one_coeff_;
   mfem::ConstantCoefficient Hv_bdfcoeff_;
-  mfem::ProductCoefficient *rho_over_dt_coeff_ = nullptr;
+  mfem::TpsProductCoefficient *rho_over_dt_coeff_ = nullptr;
   mfem::GridFunctionCoefficient *mu_coeff_ = nullptr;
   mfem::VectorGridFunctionCoefficient *pp_div_coeff_ = nullptr;
 
@@ -263,9 +263,9 @@ class Tomboulides final : public FlowBase {
   mfem::VectorSumCoefficient *S_poisson_coeff_ = nullptr;
   mfem::VectorSumCoefficient *S_mom_coeff_ = nullptr;
 
-  mfem::ProductCoefficient *rad_rho_coeff_ = nullptr;
-  mfem::ProductCoefficient *rad_rho_over_dt_coeff_ = nullptr;
-  mfem::ProductCoefficient *rad_mu_coeff_ = nullptr;
+  mfem::TpsProductCoefficient *rad_rho_coeff_ = nullptr;
+  mfem::TpsProductCoefficient *rad_rho_over_dt_coeff_ = nullptr;
+  mfem::TpsProductCoefficient *rad_mu_coeff_ = nullptr;
   mfem::ScalarVectorProductCoefficient *rad_S_poisson_coeff_ = nullptr;
   mfem::ScalarVectorProductCoefficient *rad_S_mom_coeff_ = nullptr;
   mfem::TpsRatioCoefficient *mu_over_rad_coeff_ = nullptr;
@@ -276,13 +276,13 @@ class Tomboulides final : public FlowBase {
   std::vector<mfem::ScalarVectorProductCoefficient *> rad_vel_coeff_;
 
   mfem::GridFunctionCoefficient *utheta_coeff_ = nullptr;
-  mfem::ProductCoefficient *utheta2_coeff_ = nullptr;
+  mfem::TpsProductCoefficient *utheta2_coeff_ = nullptr;
   mfem::VectorArrayCoefficient *ur_conv_forcing_coeff_ = nullptr;
   mfem::VectorGridFunctionCoefficient *u_next_coeff_ = nullptr;
   mfem::ScalarVectorProductCoefficient *rad_rhou_coeff_ = nullptr;
   mfem::GridFunctionCoefficient *u_next_rad_coeff_ = nullptr;
-  mfem::ProductCoefficient *ur_ut_coeff_ = nullptr;
-  mfem::ProductCoefficient *rho_ur_ut_coeff_ = nullptr;
+  mfem::TpsProductCoefficient *ur_ut_coeff_ = nullptr;
+  mfem::TpsProductCoefficient *rho_ur_ut_coeff_ = nullptr;
   mfem::VectorArrayCoefficient *utheta_vec_coeff_ = nullptr;
   mfem::InnerProductCoefficient *swirl_var_viscosity_coeff_ = nullptr;
 
