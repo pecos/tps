@@ -788,7 +788,7 @@ void ComputeCurl3D(const ParGridFunction &u, ParGridFunction &cu) {
 
 void vectorGrad3D(ParGridFunction &uSub, ParGridFunction &u, ParGridFunction &gu, ParGridFunction &gv,
                   ParGridFunction &gw) {
-  FiniteElementSpace *sfes = uSub.FESpace();
+  // FiniteElementSpace *sfes = uSub.FESpace();
   int dim = 3;
   int nSize = uSub.Size();
 
