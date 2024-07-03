@@ -820,7 +820,7 @@ void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu) {
 
   // AccumulateAndCountZones.
   Array<int> zones_per_vdof;
-  zones_per_vdof.SetSize(3 * (fes->GetVSize()));
+  zones_per_vdof.SetSize(fes->GetVSize());
   zones_per_vdof = 0;
 
   gu = 0.0;
@@ -860,7 +860,7 @@ void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu) {
       // Eval and GetVectorGradientHat.
       el->CalcDShape(tr->GetIntPoint(), dshape);
       grad_hat.SetSize(vdim, dim);
-      DenseMatrix loc_data_mat(loc_data.GetData(), elndofs, 1);
+      DenseMatrix loc_data_mat(loc_data.GetData(), elndofs, vdim);
       MultAtB(loc_data_mat, dshape, grad_hat);
 
       const DenseMatrix &Jinv = tr->InverseJacobian();
