@@ -169,9 +169,10 @@ void ComputeCurlAxi(const ParGridFunction &u, ParGridFunction &cu, bool assume_s
 /// Compute \f$\nabla \times \nabla \times u\f$ for \f$u \in (H^1)^3\f$.
 void ComputeCurl3D(const ParGridFunction &u, ParGridFunction &cu);
 
-void vectorGrad3D(ParGridFunction &u, ParGridFunction &gu, ParGridFunction &gv, ParGridFunction &gw);
+void vectorGrad3D(ParGridFunction &uSub, ParGridFunction &u, ParGridFunction &gu, ParGridFunction &gv,
+                  ParGridFunction &gw);
 void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu);
-void vectorGrad3DV(FiniteElementSpace *fes, Vector u, Vector *gu, Vector *gv, Vector *gw);
+// void vectorGrad3DV(FiniteElementSpace *fes, Vector u, Vector *gu, Vector *gv, Vector *gw);
 void scalarGrad3DV(FiniteElementSpace *fes, FiniteElementSpace *vfes, Vector u, Vector *gu);
 void makeContinuous(ParGridFunction &u);
 

@@ -1088,6 +1088,9 @@ void Tomboulides::initializeStats(Averaging &average, IODataOrganizer &io, bool 
     io.registerIOFamily("Time-averaged pressure", "/meanPres", average.GetMeanField(std::string("pressure")), false,
                         continuation, pfec_);
     io.registerIOVar("/meanPres", "<P>", 0, true);
+
+    io.registerIOFamily("Time-averaged dissipation", "/meanEpsi", average.GetMeanField(std::string("dissipation")),
+                        false, continuation, pfec_);
     io.registerIOVar("/meanEpsi", "<e>", 0, true);
 
     // rms
@@ -1123,7 +1126,11 @@ void Tomboulides::computeDissipation(Averaging &average, const int iter) {
 
       // gradient of u'
       Up_gf_->SetFromTrueDofs(tmpR1_);
-      vectorGrad3D(*Up_gf_, *gradU_gf_, *gradV_gf_, *gradW_gf_);
+      //      vectorGrad3D(*epsi_gf_, *Up_gf_, *gradU_gf_, *gradV_gf_, *gradW_gf_);
+
+      ComputeCurl3D(*Up_gf_, *gradU_gf_);
+      ComputeCurl3D(*Up_gf_, *gradV_gf_);
+      ComputeCurl3D(*Up_gf_, *gradW_gf_);
 
       // const double *dmu = (*thermo_interface_->viscosity).HostRead();
       const double *dmu = mu_total_gf_->HostRead();

@@ -115,6 +115,7 @@ void AlgebraicSubgridModels::initializeSelf() {
   subgridVisc_.SetSize(sfes_truevsize);
   subgridVisc_gf_.SetSpace(sfes_);
   delta_.SetSize(sfes_truevsize);
+  subgridVisc_gf_ = 0.0;
 
   muT_NM0_.SetSize(sfes_truevsize);
   muT_NM1_.SetSize(sfes_truevsize);

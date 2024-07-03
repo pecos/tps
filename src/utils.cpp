@@ -786,10 +786,10 @@ void ComputeCurl3D(const ParGridFunction &u, ParGridFunction &cu) {
   }
 }
 
-void vectorGrad3D(ParGridFunction &u, ParGridFunction &gu, ParGridFunction &gv, ParGridFunction &gw) {
-  ParGridFunction uSub;
-  FiniteElementSpace *sfes = u.FESpace();
-  uSub.SetSpace(sfes);
+void vectorGrad3D(ParGridFunction &uSub, ParGridFunction &u, ParGridFunction &gu, ParGridFunction &gv,
+                  ParGridFunction &gw) {
+  FiniteElementSpace *sfes = uSub.FESpace();
+  int dim = 3;
   int nSize = uSub.Size();
 
   {
@@ -810,22 +810,25 @@ void vectorGrad3D(ParGridFunction &u, ParGridFunction &gu, ParGridFunction &gv, 
   }
   scalarGrad3D(uSub, gv);
 
-  {
+  if (dim == 3) {
     double *dataSub = uSub.HostReadWrite();
     double *data = u.HostReadWrite();
     for (int i = 0; i < nSize; i++) {
       dataSub[i] = data[i + 2 * nSize];
     }
+    scalarGrad3D(uSub, gw);
   }
-  scalarGrad3D(uSub, gw);
 }
 
 void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu) {
   FiniteElementSpace *fes = u.FESpace();
+  GroupCommunicator &gcomm = u.ParFESpace()->GroupComm();
+  int dim = 3;                // spatial dimension
+  int vdim = fes->GetVDim();  // vector dimension (or u)
 
   // AccumulateAndCountZones.
   Array<int> zones_per_vdof;
-  zones_per_vdof.SetSize(3 * (fes->GetVSize()));
+  zones_per_vdof.SetSize(fes->GetVSize());
   zones_per_vdof = 0;
 
   gu = 0.0;
@@ -836,11 +839,9 @@ void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu) {
   Array<int> vdofs;
   Vector vals1, vals2, vals3;
   Vector loc_data;
-  int vdim = fes->GetVDim();
   DenseMatrix grad_hat;
   DenseMatrix dshape;
   DenseMatrix grad;
-  int dim_ = 3;
 
   // element loop
   for (int e = 0; e < fes->GetNE(); ++e) {
@@ -853,7 +854,6 @@ void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu) {
     const FiniteElement *el = fes->GetFE(e);
     elndofs = el->GetDof();
     int dim = el->GetDim();
-    dim_ = dim;
     dshape.SetSize(elndofs, dim);
 
     // element dof
@@ -865,7 +865,8 @@ void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu) {
       // Eval and GetVectorGradientHat.
       el->CalcDShape(tr->GetIntPoint(), dshape);
       grad_hat.SetSize(vdim, dim);
-      DenseMatrix loc_data_mat(loc_data.GetData(), elndofs, 1);
+      // DenseMatrix loc_data_mat(loc_data.GetData(), elndofs, 1);
+      DenseMatrix loc_data_mat(loc_data.GetData(), elndofs, vdim);
       MultAtB(loc_data_mat, dshape, grad_hat);
 
       const DenseMatrix &Jinv = tr->InverseJacobian();
@@ -874,7 +875,7 @@ void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu) {
 
       vals1(dof) = grad(0, 0);
       vals2(dof) = grad(0, 1);
-      vals3(dof) = grad(0, 2);
+      if (dim == 3) vals3(dof) = grad(0, 2);
     }
 
     // Accumulate values in all dofs, count the zones.
@@ -886,9 +887,11 @@ void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu) {
       int ldof = vdofs[j];
       gu(ldof + 1 * nSize) += vals2[j];
     }
-    for (int j = 0; j < vdofs.Size(); j++) {
-      int ldof = vdofs[j];
-      gu(ldof + 2 * nSize) += vals3[j];
+    if (dim == 3) {
+      for (int j = 0; j < vdofs.Size(); j++) {
+        int ldof = vdofs[j];
+        gu(ldof + 2 * nSize) += vals3[j];
+      }
     }
 
     for (int j = 0; j < vdofs.Size(); j++) {
@@ -897,22 +900,24 @@ void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu) {
     }
   }
 
+  // NOTE: this block seems to be broken in that the averages
+  //  at partition bdr's becomes too small
+  //  either zpv is too high at bdrs or gu is not summing properly
+  /*
   // Count the zones globally.
-  GroupCommunicator &gcomm = u.ParFESpace()->GroupComm();
   gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
   gcomm.Bcast(zones_per_vdof);
 
   // Accumulate for all vdofs.
   gcomm.Reduce<double>(gu.GetData(), GroupCommunicator::Sum);
   gcomm.Bcast<double>(gu.GetData());
+  */
 
   // Compute means.
-  for (int dir = 0; dir < dim_; dir++) {
-    for (int i = 0; i < u.Size(); i++) {
+  for (int dir = 0; dir < dim; dir++) {
+    for (int i = 0; i < nSize; i++) {
       const int nz = zones_per_vdof[i];
-      if (nz) {
-        gu(i + dir * nSize) /= nz;
-      }
+      if (nz) gu(i + dir * nSize) /= nz;
     }
   }
 }
@@ -1131,6 +1136,7 @@ void scalarGrad3DV(FiniteElementSpace *fes, FiniteElementSpace *vfes, Vector u, 
   R1_gf.GetTrueDofs(*gu);
 }
 
+/*
 void vectorGrad3DV(FiniteElementSpace *fes, Vector u, Vector *gu, Vector *gv, Vector *gw) {
   ParGridFunction R1_gf;
   R1_gf.SetSpace(fes);
@@ -1146,6 +1152,7 @@ void vectorGrad3DV(FiniteElementSpace *fes, Vector u, Vector *gu, Vector *gv, Ve
   R1b_gf.GetTrueDofs(*gv);
   R1c_gf.GetTrueDofs(*gw);
 }
+*/
 
 void EliminateRHS(Operator &A, ConstrainedOperator &constrainedA, const Array<int> &ess_tdof_list, Vector &x, Vector &b,
                   Vector &X, Vector &B, int copy_interior) {
