@@ -168,6 +168,17 @@ LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, t
   tps->getInput("loMach/ltethermo/linear-solver-max-iter", max_iter_, 1000);
   tps->getInput("loMach/ltethermo/linear-solver-verbosity", pl_solve_, 0);
 
+  // not deleting above block to maintain backwards-compatability
+  tpsP_->getInput("loMach/ltethermo/hsolve-rtol", hsolve_rtol_, rtol_);
+  tpsP_->getInput("loMach/ltethermo/hsolve-atol", hsolve_atol_, default_atol_);
+  tpsP_->getInput("loMach/ltethermo/hsolve-max-iter", hsolve_max_iter_, max_iter_);
+  tpsP_->getInput("loMach/ltethermo/hsolve-verbosity", hsolve_pl_, pl_solve_);
+
+  tpsP_->getInput("loMach/ltethermo/msolve-rtol", mass_inverse_rtol_, rtol_);
+  tpsP_->getInput("loMach/ltethermo/msolve-atol", mass_inverse_atol_, default_atol_);
+  tpsP_->getInput("loMach/ltethermo/msolve-max-iter", mass_inverse_max_iter_, max_iter_);
+  tpsP_->getInput("loMach/ltethermo/msolve-verbosity", mass_inverse_pl_, pl_solve_);
+
   tps->getInput("loMach/ltethermo/streamwise-stabilization", sw_stab_, false);
   tps->getInput("loMach/ltethermo/Reh_offset", re_offset_, 1.0);
   tps->getInput("loMach/ltethermo/Reh_factor", re_factor_, 0.1);
@@ -192,12 +203,16 @@ LteThermoChem::~LteThermoChem() {
   delete MsInvPC_;
   delete MrhoInv_;
   delete MrhoInvPC_;
+  delete Mv_inv_;
+  delete Mv_inv_pc_;
   delete Ht_form_;
   delete M_rho_form_;
   delete M_rho_Cp_form_;
   delete Ms_form_;
+  delete Mv_form_;
   delete At_form_;
   delete D_form_;
+  delete G_form_;
   delete rho_Cp_u_coeff_;
   delete un_next_coeff_;
   delete kap_gradT_coeff_;
@@ -666,6 +681,43 @@ void LteThermoChem::initializeOperators() {
   D_form_->Assemble();
   D_form_->FormRectangularSystemMatrix(empty, empty, D_op_);
 
+  // Gradient
+  G_form_ = new ParMixedBilinearForm(sfes_, vfes_);
+  // auto *g_mblfi = new GradientIntegrator();
+  GradientIntegrator *g_mblfi;
+  if (axisym_) {
+    g_mblfi = new GradientIntegrator(radius_coeff);
+  } else {
+    g_mblfi = new GradientIntegrator();
+  }
+  if (numerical_integ_) {
+    g_mblfi->SetIntRule(&ir_nli);
+  }
+  G_form_->AddDomainIntegrator(g_mblfi);
+  if (partial_assembly_) {
+    G_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+  }
+  G_form_->Assemble();
+  G_form_->FormRectangularSystemMatrix(empty, empty, G_op_);
+
+  // Mass matrix for the vector (gradT)
+  Mv_form_ = new ParBilinearForm(vfes_);
+  VectorMassIntegrator *mv_blfi;
+  if (axisym_) {
+    mv_blfi = new VectorMassIntegrator(radius_coeff);
+  } else {
+    mv_blfi = new VectorMassIntegrator();
+  }
+  if (numerical_integ_) {
+    mv_blfi->SetIntRule(&ir_nli);
+  }
+  Mv_form_->AddDomainIntegrator(mv_blfi);
+  if (partial_assembly_) {
+    Mv_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+  }
+  Mv_form_->Assemble();
+  Mv_form_->FormSystemMatrix(temp_ess_tdof_, Mv_);
+
   // helmholtz
   Ht_form_ = new ParBilinearForm(sfes_);
   MassIntegrator *hmt_blfi;
@@ -721,6 +773,27 @@ void LteThermoChem::initializeOperators() {
   MrhoInv_->SetPrintLevel(pl_solve_);
   MrhoInv_->SetRelTol(rtol_);
   MrhoInv_->SetMaxIter(max_iter_);
+
+  // Inverse (unweighted) mass operator (velocity space)
+  if (partial_assembly_) {
+    Vector diag_pa(vfes_->GetTrueVSize());
+    Mv_form_->AssembleDiagonal(diag_pa);
+    Mv_inv_pc_ = new OperatorJacobiSmoother(diag_pa, empty);
+  } else {
+    Mv_inv_pc_ = new HypreSmoother(*Mv_.As<HypreParMatrix>());
+    dynamic_cast<HypreSmoother *>(Mv_inv_pc_)->SetType(HypreSmoother::Jacobi, smoother_passes_);
+    dynamic_cast<HypreSmoother *>(Mv_inv_pc_)->SetSOROptions(smoother_relax_weight_, smoother_relax_omega_);
+    dynamic_cast<HypreSmoother *>(Mv_inv_pc_)
+        ->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_, smoother_eig_est_);
+  }
+  Mv_inv_ = new CGSolver(vfes_->GetComm());
+  Mv_inv_->iterative_mode = false;
+  Mv_inv_->SetOperator(*Mv_);
+  Mv_inv_->SetPreconditioner(*Mv_inv_pc_);
+  Mv_inv_->SetPrintLevel(mass_inverse_pl_);
+  Mv_inv_->SetAbsTol(mass_inverse_atol_);
+  Mv_inv_->SetRelTol(mass_inverse_rtol_);
+  Mv_inv_->SetMaxIter(mass_inverse_max_iter_);
 
   if (partial_assembly_) {
     Vector diag_pa(sfes_->GetTrueVSize());
@@ -945,7 +1018,12 @@ void LteThermoChem::step() {
 
   // Add streamwise stability to rhs
   if (sw_stab_) {
-    streamwiseDiffusion(Tn_, swDiff_);
+    // compute temp gradient (only really needed for sw-stab)
+    G_op_->Mult(Text_, tmpR1_);
+    Mv_inv_->Mult(tmpR1_, gradT_);
+
+    // streamwiseDiffusion(Tn_, swDiff_);
+    streamwiseDiffusion(gradT_, swDiff_);
     resT_.Add(1.0, swDiff_);
   }
 
@@ -1276,25 +1354,32 @@ void LteThermoChem::computeQt() {
   Qt_gf_.SetFromTrueDofs(Qt_);
 }
 
-void LteThermoChem::streamwiseDiffusion(Vector &phi, Vector &swDiff) {
-  // compute streamwise gradient of input field
-  tmpR0_gf_.SetFromTrueDofs(phi);
+// void LteThermoChem::streamwiseDiffusion(Vector &phi, Vector &swDiff) {
+void LteThermoChem::streamwiseDiffusion(Vector &gradPhi, Vector &swDiff) {
   (flow_interface_->velocity)->GetTrueDofs(tmpR0a_);
   vel_gf_.SetFromTrueDofs(tmpR0a_);
-  streamwiseGrad(dim_, tmpR0_gf_, vel_gf_, tmpR1_gf_);
+
+  // compute streamwise gradient of input field
+  // tmpR0_gf_.SetFromTrueDofs(phi);
+  // streamwiseGrad(dim_, tmpR0_gf_, vel_gf_, tmpR1_gf_);
+
+  tmpR1_gf_.SetFromTrueDofs(gradPhi);
+  streamwiseGrad(dim_, vel_gf_, tmpR1_gf_);
 
   // divergence of sw-grad
   tmpR1_gf_.GetTrueDofs(tmpR1_);
   D_op_->Mult(tmpR1_, swDiff);
 
   gridScale_gf_->GetTrueDofs(tmpR0b_);
-  (turbModel_interface_->eddy_viscosity)->GetTrueDofs(tmpR0c_);
+  //(turbModel_interface_->eddy_viscosity)->GetTrueDofs(tmpR0c_);
+  (flow_interface_->Reh)->GetTrueDofs(tmpR0c_);
 
   const double *rho = rn_.HostRead();
   const double *vel = tmpR0a_.HostRead();
   const double *del = tmpR0b_.HostRead();
-  const double *mu = visc_.HostRead();
-  const double *muT = tmpR0c_.HostRead();
+  // const double *mu = visc_.HostRead();
+  // const double *muT = tmpR0c_.HostRead();
+  const double *Reh = tmpR0c_.HostRead();
   double *data = swDiff.HostReadWrite();
 
   int Sdof = rn_.Size();
@@ -1304,7 +1389,8 @@ void LteThermoChem::streamwiseDiffusion(Vector &phi, Vector &swDiff) {
     Umag = std::sqrt(Umag);
 
     // element Re
-    double Re = Umag * del[dof] * rho[dof] / (mu[dof] + muT[dof]);
+    // double Re = Umag * del[dof] * rho[dof] / (mu[dof] + muT[dof]);
+    double Re = Reh[dof];
 
     // SUPG weight
     double Csupg = 0.5 * (tanh(re_factor_ * Re - re_offset_) + 1.0);

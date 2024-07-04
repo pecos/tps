@@ -229,6 +229,7 @@ class Tomboulides final : public FlowBase {
   mfem::ParGridFunction *gradW_gf_ = nullptr;
   // mfem::ParGridFunction *buffer_uInlet_ = nullptr;
   mfem::VectorGridFunctionCoefficient *velocity_field_ = nullptr;
+  mfem::ParGridFunction *Reh_gf_ = nullptr;
   mfem::ParGridFunction *tmpR0_gf_ = nullptr;
   mfem::ParGridFunction *tmpR1_gf_ = nullptr;
 
@@ -367,6 +368,7 @@ class Tomboulides final : public FlowBase {
   mfem::Vector tmpR0_;
   mfem::Vector tmpR0a_;
   mfem::Vector tmpR0b_;
+  mfem::Vector tmpR0c_;
   mfem::Vector tmpR1_;
   mfem::Vector gradU_;
   mfem::Vector gradV_;
@@ -446,6 +448,11 @@ class Tomboulides final : public FlowBase {
    * streamwise direction
    */
   void streamwiseDiffusion(Vector &phi, Vector &swDiff);
+
+  /**
+   * @brief Computes element convective Reynolds number
+   */
+  void computeReh();
 
   /// Advance
   void step() final;

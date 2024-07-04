@@ -189,11 +189,13 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   // operators and solvers
   ParBilinearForm *At_form_ = nullptr;
   ParBilinearForm *Ms_form_ = nullptr;
+  ParBilinearForm *Mv_form_ = nullptr;
   ParBilinearForm *MsRho_form_ = nullptr;
   ParBilinearForm *Ht_form_ = nullptr;
   ParBilinearForm *Mq_form_ = nullptr;
   ParBilinearForm *LQ_form_ = nullptr;
   ParMixedBilinearForm *D_form_ = nullptr;
+  ParMixedBilinearForm *G_form_ = nullptr;
   ParLinearForm *LQ_bdry_ = nullptr;
 
   OperatorHandle LQ_;
@@ -202,7 +204,9 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   OperatorHandle Ms_;
   OperatorHandle MsRho_;
   OperatorHandle Mq_;
+  OperatorHandle Mv_;
   OperatorHandle D_op_;
+  OperatorHandle G_op_;
 
   mfem::Solver *MsInvPC_ = nullptr;
   mfem::CGSolver *MsInv_ = nullptr;
@@ -210,6 +214,8 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   mfem::CGSolver *MqInv_ = nullptr;
   mfem::Solver *HtInvPC_ = nullptr;
   mfem::CGSolver *HtInv_ = nullptr;
+  mfem::Solver *Mv_inv_pc_ = nullptr;
+  mfem::CGSolver *Mv_inv_ = nullptr;
 
   // Vectors
   Vector Tn_, Tn_next_, Tnm1_, Tnm2_;
@@ -219,6 +225,7 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   Vector tmpR0_, tmpR0a_, tmpR0b_, tmpR0c_;
   Vector tmpR1_;
   Vector swDiff_;
+  Vector gradT_;
 
   Vector Qt_;
   Vector rn_;
@@ -276,7 +283,8 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   void computeExplicitTempConvectionOP(bool extrap);
   void computeQt();
   void computeQtTO();
-  void streamwiseDiffusion(Vector &phi, Vector &swDiff);
+  //  void streamwiseDiffusion(Vector &phi, Vector &swDiff);
+  void streamwiseDiffusion(Vector &gradPhi, Vector &swDiff);
 
   /// Return a pointer to the current temperature ParGridFunction.
   ParGridFunction *GetCurrentTemperature() { return &Tn_gf_; }

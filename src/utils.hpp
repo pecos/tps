@@ -174,7 +174,10 @@ void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu);
 void vectorGrad3DV(FiniteElementSpace *fes, Vector u, Vector *gu, Vector *gv, Vector *gw);
 void scalarGrad3DV(FiniteElementSpace *fes, FiniteElementSpace *vfes, Vector u, Vector *gu);
 bool copyFile(const char *SRC, const char *DEST);
-void streamwiseGrad(int dim, ParGridFunction &phi, ParGridFunction &u, ParGridFunction &swGrad);
+// void streamwiseGrad(int dim, ParGridFunction &phi, ParGridFunction &u, ParGridFunction &swGrad);
+void streamwiseGrad(int dim, ParGridFunction &u, ParGridFunction &swGrad);
+void upwindDiff(int dim, double re_factor, double re_offset, Vector &u_vec, Vector &rho_vec, Vector &del_vec,
+                Vector &Reh_vec, Vector &swDiff);
 
 /// Eliminate essential BCs in an Operator and apply to RHS.
 /// rename this to something sensible "ApplyEssentialBC" or something

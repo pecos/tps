@@ -230,6 +230,7 @@ Tomboulides::~Tomboulides() {
   delete gradU_gf_;
   delete gradV_gf_;
   delete gradW_gf_;
+  delete Reh_gf_;
   delete tmpR0_gf_;
   delete tmpR1_gf_;
   delete vfes_;
@@ -242,6 +243,11 @@ void Tomboulides::initializeSelf() {
   // Initialize minimal state and interface
   vfec_ = new H1_FECollection(vorder_, dim_);
   vfes_ = new ParFiniteElementSpace(pmesh_, vfec_, dim_);
+  // sfec_ = new H1_FECollection(vorder_);
+  // sfes_ = new ParFiniteElementSpace(pmesh_, sfec_);
+  pfec_ = new H1_FECollection(porder_);
+  pfes_ = new ParFiniteElementSpace(pmesh_, pfec_);
+
   u_curr_gf_ = new ParGridFunction(vfes_);
   u_next_gf_ = new ParGridFunction(vfes_);
   curl_gf_ = new ParGridFunction(vfes_);
@@ -251,20 +257,15 @@ void Tomboulides::initializeSelf() {
   gradU_gf_ = new ParGridFunction(vfes_);
   gradV_gf_ = new ParGridFunction(vfes_);
   gradW_gf_ = new ParGridFunction(vfes_);
-  sfec_ = new H1_FECollection(vorder_);
-  sfes_ = new ParFiniteElementSpace(pmesh_, sfec_);
-
-  pfec_ = new H1_FECollection(porder_);
-  pfes_ = new ParFiniteElementSpace(pmesh_, pfec_);
   p_gf_ = new ParGridFunction(pfes_);
   resp_gf_ = new ParGridFunction(pfes_);
-
   mu_total_gf_ = new ParGridFunction(pfes_);
 
   pp_div_rad_comp_gf_ = new ParGridFunction(pfes_, *pp_div_gf_);
   u_next_rad_comp_gf_ = new ParGridFunction(pfes_, *u_next_gf_);
 
-  tmpR0_gf_ = new ParGridFunction(sfes_);
+  Reh_gf_ = new ParGridFunction(pfes_);
+  tmpR0_gf_ = new ParGridFunction(pfes_);
   tmpR1_gf_ = new ParGridFunction(vfes_);
 
   if (axisym_) {
@@ -285,17 +286,20 @@ void Tomboulides::initializeSelf() {
   *p_gf_ = 0.0;
   *resp_gf_ = 0.0;
   *mu_total_gf_ = 0.0;
+  *Reh_gf_ = 0.0;
 
   if (axisym_) {
     *utheta_gf_ = 0.0;
     *utheta_next_gf_ = 0.0;
   }
 
+  // exports
   toThermoChem_interface_.velocity = u_next_gf_;
   if (axisym_) {
     toThermoChem_interface_.swirl_supported = true;
     toThermoChem_interface_.swirl = utheta_next_gf_;
   }
+  toThermoChem_interface_.Reh = Reh_gf_;
 
   toTurbModel_interface_.velocity = u_next_gf_;
   if (axisym_) {
@@ -305,10 +309,11 @@ void Tomboulides::initializeSelf() {
   toTurbModel_interface_.gradU = gradU_gf_;
   toTurbModel_interface_.gradV = gradV_gf_;
   toTurbModel_interface_.gradW = gradW_gf_;
+  toTurbModel_interface_.Reh = Reh_gf_;
 
   // Allocate Vector storage
   const int vfes_truevsize = vfes_->GetTrueVSize();
-  const int sfes_truevsize = sfes_->GetTrueVSize();
+  // const int sfes_truevsize = sfes_->GetTrueVSize();
   const int pfes_truevsize = pfes_->GetTrueVSize();
 
   forcing_vec_.SetSize(vfes_truevsize);
@@ -345,9 +350,10 @@ void Tomboulides::initializeSelf() {
   }
 
   swDiff_vec_.SetSize(vfes_truevsize);
-  tmpR0_.SetSize(sfes_truevsize);
-  tmpR0a_.SetSize(sfes_truevsize);
-  tmpR0b_.SetSize(sfes_truevsize);
+  tmpR0_.SetSize(pfes_truevsize);
+  tmpR0a_.SetSize(pfes_truevsize);
+  tmpR0b_.SetSize(pfes_truevsize);
+  tmpR0c_.SetSize(pfes_truevsize);
   tmpR1_.SetSize(vfes_truevsize);
 
   gradU_.SetSize(vfes_truevsize);
@@ -799,6 +805,9 @@ void Tomboulides::initializeOperators() {
   }
   Mv_form_->Assemble();
   Mv_form_->FormSystemMatrix(empty, Mv_op_);
+  // NOTE: should have dirichlet bc's here for inverse solve, but
+  // this operator is overloaded and not just used for vel...
+  // Mv_form_->FormSystemMatrix(vel_ess_tdof_, Mv_op_);
 
   // Mass matrix (density weighted) for the velocity
   Mv_rho_form_ = new ParBilinearForm(vfes_);
@@ -1073,6 +1082,7 @@ void Tomboulides::initializeViz(mfem::ParaViewDataCollection &pvdc) const {
   if (axisym_) {
     pvdc.RegisterField("swirl", utheta_gf_);
   }
+  pvdc.RegisterField("Re_h", Reh_gf_);
 }
 
 void Tomboulides::initializeStats(Averaging &average, IODataOrganizer &io, bool continuation) const {
@@ -1360,12 +1370,21 @@ void Tomboulides::step() {
   }
 
   // Add streamwise stability to rhs
+  computeReh();
   if (sw_stab_) {
+    /*
     for (int i = 0; i < dim_; i++) {
       setScalarFromVector(u_vec_, i, &tmpR0a_);
       streamwiseDiffusion(tmpR0a_, tmpR0b_);
       setVectorFromScalar(tmpR0b_, i, &swDiff_vec_);
     }
+    */
+    streamwiseDiffusion(gradU_, tmpR0b_);
+    setVectorFromScalar(tmpR0b_, 0, &swDiff_vec_);
+    streamwiseDiffusion(gradV_, tmpR0b_);
+    setVectorFromScalar(tmpR0b_, 1, &swDiff_vec_);
+    streamwiseDiffusion(gradW_, tmpR0b_);
+    setVectorFromScalar(tmpR0b_, 2, &swDiff_vec_);
     Mv_rho_inv_->Mult(swDiff_vec_, tmpR1_);
     pp_div_vec_ += tmpR1_;
   }
@@ -1715,11 +1734,42 @@ void Tomboulides::evaluateVelocityGradient() {
   gradW_gf_->SetFromTrueDofs(gradW_);
 }
 
+void Tomboulides::computeReh() {
+  (thermo_interface_->density)->GetTrueDofs(rho_vec_);
+  gridScale_gf_->GetTrueDofs(tmpR0_);
+  mu_total_gf_->GetTrueDofs(mu_vec_);
+  // u_curr_gf_->GetTrueDofs(u_vec_);
+  u_next_gf_->GetTrueDofs(uext_vec_);
+
+  const double *rho = rho_vec_.HostRead();
+  const double *del = tmpR0_.HostRead();
+  const double *vel = uext_vec_.HostRead();
+  const double *mu = mu_vec_.HostRead();
+  double *data = tmpR0c_.HostReadWrite();
+
+  int Sdof = tmpR0c_.Size();
+  for (int dof = 0; dof < Sdof; dof++) {
+    // vel mag
+    double Umag = 0.0;
+    for (int i = 0; i < dim_; i++) Umag += vel[dof + i * Sdof] * vel[dof + i * Sdof];
+    Umag = std::sqrt(Umag);
+
+    // element Re
+    double Re = Umag * del[dof] * rho[dof] / mu[dof];
+    data[dof] = Re;
+  }
+  Reh_gf_->SetFromTrueDofs(tmpR0c_);
+}
+
 // f(Re_h) * Mu_sw * div(streamwiseGrad), i.e. this does not consider grad of f(Re_h) * Mu_sw
-void Tomboulides::streamwiseDiffusion(Vector &phi, Vector &swDiff) {
+// void Tomboulides::streamwiseDiffusion(Vector &phi, Vector &swDiff) {
+void Tomboulides::streamwiseDiffusion(Vector &gradPhi, Vector &swDiff) {
   // compute streamwise gradient of input field
-  tmpR0_gf_->SetFromTrueDofs(phi);
-  streamwiseGrad(dim_, *tmpR0_gf_, *u_curr_gf_, *tmpR1_gf_);
+  // tmpR0_gf_->SetFromTrueDofs(phi);
+  // streamwiseGrad(dim_, *tmpR0_gf_, *u_curr_gf_, *tmpR1_gf_);
+
+  tmpR1_gf_->SetFromTrueDofs(gradPhi);
+  streamwiseGrad(dim_, *u_curr_gf_, *tmpR1_gf_);
 
   // divergence of sw-grad
   tmpR1_gf_->GetTrueDofs(tmpR1_);
@@ -1727,12 +1777,16 @@ void Tomboulides::streamwiseDiffusion(Vector &phi, Vector &swDiff) {
 
   (thermo_interface_->density)->GetTrueDofs(rho_vec_);
   gridScale_gf_->GetTrueDofs(tmpR0_);
-  mu_total_gf_->GetTrueDofs(mu_vec_);
+  Reh_gf_->GetTrueDofs(tmpR0c_);
+  // mu_total_gf_->GetTrueDofs(mu_vec_);
+  upwindDiff(dim_, re_factor_, re_offset_, u_vec_, rho_vec_, tmpR0_, tmpR0c_, swDiff);
 
+  /*
   const double *rho = rho_vec_.HostRead();
   const double *del = tmpR0_.HostRead();
   const double *vel = u_vec_.HostRead();
-  const double *mu = mu_vec_.HostRead();
+  //const double *mu = mu_vec_.HostRead();
+  const double *Reh = tmpR0c_.HostRead();
   double *data = swDiff.HostReadWrite();
 
   int Sdof = rho_vec_.Size();
@@ -1742,7 +1796,8 @@ void Tomboulides::streamwiseDiffusion(Vector &phi, Vector &swDiff) {
     Umag = std::sqrt(Umag);
 
     // element Re
-    double Re = Umag * del[dof] * rho[dof] / mu[dof];
+    //double Re = Umag * del[dof] * rho[dof] / mu[dof];
+    double Re = Reh[dof];
 
     // SUPG weight
     double Csupg = 0.5 * (tanh(re_factor_ * Re - re_offset_) + 1.0);
@@ -1753,4 +1808,5 @@ void Tomboulides::streamwiseDiffusion(Vector &phi, Vector &swDiff) {
     // scaled streamwise Laplacian
     data[dof] *= CswDiff;
   }
+  */
 }
