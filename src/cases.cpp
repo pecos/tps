@@ -81,6 +81,7 @@ void vel_exact_tgv2d(const Vector &x, double t, Vector &u) {
 
   u(0) = F * std::sin(x[0]) * std::cos(x[1]);
   u(1) = -F * std::cos(x[0]) * std::sin(x[1]);
+  if (u.Size() == 3) u(2) = 0.0;
 }
 
 /// Used to set the velocity IC with TG field and uniform
@@ -92,6 +93,7 @@ void vel_tgv2d_uniform(const Vector &x, double t, Vector &u) {
 
   u(0) = u0;
   u(1) = 0.0;
+  if (u.Size() == 3) u(2) = 0.0;
 
   u(0) += +F * std::sin(twoPi * x[0]) * std::cos(twoPi * x[1]);
   u(1) += -F * std::cos(twoPi * x[0]) * std::sin(twoPi * x[1]);
