@@ -84,12 +84,12 @@ MFEM_HOST_DEVICE GridFunctionReaction::GridFunctionReaction(int comp)
 
 MFEM_HOST_DEVICE GridFunctionReaction::~GridFunctionReaction() {}
 
-MFEM_HOST_DEVICE void GridFunctionReaction::setData(const double * data, int size) {
+MFEM_HOST_DEVICE void GridFunctionReaction::setData(const double *data, int size) {
   data_ = data + comp_ * size_;
   size_ = size;
 }
 
-void GridFunctionReaction::setGridFunction(const mfem::GridFunction & f) {
+void GridFunctionReaction::setGridFunction(const mfem::GridFunction &f) {
   size_ = f.FESpace()->GetNDofs();
   assert(comp_ < f.FESpace()->GetVDim());
   assert(f.FESpace()->GetOrdering() == mfem::Ordering::byNODES);

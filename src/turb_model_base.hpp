@@ -38,6 +38,8 @@
 #include "tps_mfem_wrap.hpp"
 
 struct flowToTurbModel;
+struct thermoChemToTurbModel;
+struct spongeToTurbModel;
 
 /**
  * Provides wrapper for fields that need to be provided by the
@@ -46,8 +48,6 @@ struct flowToTurbModel;
 struct turbModelToFlow {
   const mfem::ParGridFunction *eddy_viscosity = nullptr;
 };
-
-struct thermoChemToTurbModel;
 
 /**
  * Provides wrapper for fields that need to be provided by the
@@ -66,6 +66,7 @@ class TurbModelBase {
  protected:
   const flowToTurbModel *flow_interface_;
   const thermoChemToTurbModel *thermoChem_interface_;
+  const spongeToTurbModel *sponge_interface_;
 
  public:
   /// Destructor

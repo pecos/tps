@@ -135,6 +135,7 @@ void GeometricSponge::initializeSelf() {
   // exports
   toFlow_interface_.visc_multiplier = &mult_gf_;
   toThermoChem_interface_.diff_multiplier = &mult_gf_;
+  toTurbModel_interface_.diff_multiplier = &mult_gf_;
 }
 
 void GeometricSponge::initializeViz(ParaViewDataCollection &pvdc) { pvdc.RegisterField("sponge", &mult_gf_); }
