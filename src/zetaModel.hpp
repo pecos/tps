@@ -44,6 +44,8 @@ class Tps;
 
 // #include "loMach_options.hpp"
 #include "../utils/mfem_extras/pfem_extras.hpp"
+#include "averaging.hpp"
+#include "dirichlet_bc_helper.hpp"
 #include "io.hpp"
 #include "mfem.hpp"
 #include "mfem/linalg/solvers.hpp"
@@ -69,6 +71,17 @@ class ZetaModel : public TurbModelBase {
   TPS::Tps *tpsP_;
   LoMachOptions *loMach_opts_ = nullptr;
 
+  // Mesh and discretization scheme info
+  ParMesh *pmesh_ = nullptr;
+  int order_;
+  IntegrationRules gll_rules_;
+  const temporalSchemeCoefficients &time_coeff_;
+  double dt_;
+  double time_;
+  int nvel_, dim_;
+
+  std::string ic_string_;
+
   // MPI_Groups *groupsMPI;
   int nprocs_;  // total number of MPI procs
   int rank_;    // local MPI rank
@@ -80,13 +93,18 @@ class ZetaModel : public TurbModelBase {
   /// Enable/disable verbose output.
   bool verbose = true;
 
-  /// pointer to mesh 
-  ParMesh *pmesh_ = nullptr;
+  // Flags
+  bool partial_assembly_ = false;
+  bool numerical_integ_ = false;
 
-  // The order of the scalar spaces
-  int order_;
+  // Linear-solver-related options
+  int pl_solve_ = 0;
+  int max_iter_;
+  double rtol_ = 1e-12;
 
-  int nvel_, dim_;
+  double tke_ic_, tdr_ic_;
+  double tke_min_, tdr_min_, zeta_min_;
+  double fRate_min_, tts_min_, tls_min_;
 
   // just keep these saved for ease
   int numWalls_, numInlets_, numOutlets_;
@@ -106,7 +124,7 @@ class ZetaModel : public TurbModelBase {
   /// velocity
   ParGridFunction *vel_gf_ = nullptr;
   Vector vel_;
-  
+
   /// velocity gradients
   ParGridFunction *gradU_gf_ = nullptr;
   ParGridFunction *gradV_gf_ = nullptr;
@@ -115,15 +133,20 @@ class ZetaModel : public TurbModelBase {
   Vector gradV_;
   Vector gradW_;
 
+  // Fields
+  ParGridFunction rhoDt_gf_;
+
   /// fluid density
-  ParGridFunction *rn_gf_ = nullptr;
-  Vector rn_;
-  
+  // ParGridFunction *rho_gf_ = nullptr;
+  Vector rho_;
+
+  /// molecular viscosity
+  // ParGridFunction *mu_gf_ = nullptr;
+  Vector mu_;
+
   /// grid information
-  ParGridFunction *gridScale_ = nullptr;
-  ParGridFunction *delta_gf_ = nullptr;
-  Vector delta_;  
-  
+  ParGridFunction *gridScale_gf_ = nullptr;
+
   /// eddy viscosity
   ParGridFunction eddyVisc_gf_;
   Vector eddyVisc_;
@@ -131,14 +154,26 @@ class ZetaModel : public TurbModelBase {
   /// turbulent kinetic energy
   ParGridFunction tke_gf_;
   Vector tke_;
+  ParGridFunction tke_next_gf_;
+  Vector tke_next_;
+  Vector tke_nm1_, tke_nm2_;
+  Vector Ntke_, Ntke_nm1_, Ntke_nm2_;
 
-  /// turbulent dissipation rate  
+  /// turbulent dissipation rate
   ParGridFunction tdr_gf_;
   Vector tdr_;
+  ParGridFunction tdr_next_gf_;
+  Vector tdr_next_;
+  Vector tdr_nm1_, tdr_nm2_;
+  Vector Ntdr_, Ntdr_nm1_, Ntdr_nm2_;
 
-  /// ratio of wall normal stress component to k  
+  /// ratio of wall normal stress component to k
   ParGridFunction zeta_gf_;
   Vector zeta_;
+  ParGridFunction zeta_next_gf_;
+  Vector zeta_next_;
+  Vector zeta_nm1_, zeta_nm2_;
+  Vector Nzeta_, Nzeta_nm1_, Nzeta_nm2_;
 
   /// elliptic relaxation rate
   ParGridFunction fRate_gf_;
@@ -147,15 +182,17 @@ class ZetaModel : public TurbModelBase {
   /// turbulent length scale
   ParGridFunction tls_gf_;
   Vector tls_;
+  ParGridFunction tls2_gf_;
+  Vector tls2_;
 
   /// turbulent time scale
   ParGridFunction tts_gf_;
-  Vector tts_;    
+  Vector tts_;
 
   /// turbulent production
   ParGridFunction prod_gf_;
-  Vector prod_;      
-  
+  Vector prod_;
+
   /// model coefficients
   double Cmu_ = 0.22;
   double sigmaK_ = 1.0;
@@ -167,40 +204,143 @@ class ZetaModel : public TurbModelBase {
   double Ct_ = 6.0;
   double Cl_ = 0.36;
   double Cn_ = 85.0;
-  double Ce1_; // function of local zeta
+  double Ce1_;  // function of local zeta
+
+  ParGridFunction res_gf_;
+  Vector res_;
+
+  // ParGridFunction diag_gf_;
+
+  Vector tmpR0_, tmpR0a_, tmpR0b_, tmpR0c_;
+  Vector strain_, sMag_;
 
   /// coefficient fields for operators
-  VectorGridFunctionCoefficient *un_next_coeff_ = nullptr;
-  GridFunctionCoefficient *rhon_next_coeff_ = nullptr;
+  GridFunctionCoefficient *delta_coeff_ = nullptr;
+  GradientGridFunctionCoefficient *gradTKE_coeff_ = nullptr;
+  GridFunctionCoefficient *mu_coeff_ = nullptr;
+  RatioCoefficient *nu_coeff_ = nullptr;
+  RatioCoefficient *nu_delta_coeff_ = nullptr;
+  ProductCoefficient *two_nu_delta_coeff_ = nullptr;
+  ProductCoefficient *two_nuNeg_delta_coeff_ = nullptr;
+  GradientGridFunctionCoefficient *gradZeta_coeff_ = nullptr;
+  ScalarVectorProductCoefficient *tdr_wall_coeff_ = nullptr;
+  ScalarVectorProductCoefficient *fRate_wall_coeff_ = nullptr;
+  ScalarVectorProductCoefficient *wall_coeff_ = nullptr;
+
+  GridFunctionCoefficient *tts_coeff_ = nullptr;
+  GridFunctionCoefficient *tls2_coeff_ = nullptr;
+  GridFunctionCoefficient *prod_coeff_ = nullptr;
+  GridFunctionCoefficient *tke_coeff_ = nullptr;
+  GridFunctionCoefficient *rho_coeff_ = nullptr;
+  VectorGridFunctionCoefficient *vel_coeff_ = nullptr;
   ScalarVectorProductCoefficient *rhou_coeff_ = nullptr;
+  GridFunctionCoefficient *scalar_diff_coeff_ = nullptr;
   GridFunctionCoefficient *mut_coeff_ = nullptr;
   GridFunctionCoefficient *mult_coeff_ = nullptr;
-  GridFunctionCoefficient *rho_over_dt_coeff_ = nullptr;
-  GridFunctionCoefficient *rho_coeff_ = nullptr;
-  
+  SumCoefficient *tke_diff_sum_coeff_ = nullptr;
+  SumCoefficient *tdr_diff_sum_coeff_ = nullptr;
+  SumCoefficient *zeta_diff_sum_coeff_ = nullptr;
+  ProductCoefficient *tke_diff_total_coeff_ = nullptr;
+  ProductCoefficient *tdr_diff_total_coeff_ = nullptr;
+  ProductCoefficient *zeta_diff_total_coeff_ = nullptr;
+  ConstantCoefficient *unity_diff_coeff_ = nullptr;
+  ProductCoefficient *unity_diff_total_coeff_ = nullptr;
+  ConstantCoefficient *unity_coeff_ = nullptr;
+  ConstantCoefficient *zero_coeff_ = nullptr;
+  ConstantCoefficient *posTwo_coeff_ = nullptr;
+  ConstantCoefficient *negTwo_coeff_ = nullptr;
+
+  GridFunctionCoefficient *rhoDt_coeff_ = nullptr;
+  RatioCoefficient *rhoTTS_coeff_ = nullptr;
+  ConstantCoefficient *Ce2_coeff_ = nullptr;
+  ProductCoefficient *Ce2rhoTTS_coeff_ = nullptr;
+  RatioCoefficient *Pk_coeff_ = nullptr;
+  SumCoefficient *tke_diag_coeff_ = nullptr;
+  SumCoefficient *tdr_diag_coeff_ = nullptr;
+  SumCoefficient *zeta_diag_coeff_ = nullptr;
+  RatioCoefficient *f_diag_coeff_ = nullptr;
+  SumCoefficient *f_diag_total_coeff_ = nullptr;
+
+  ProductCoefficient *diff_total_coeff_ = nullptr;
+  SumCoefficient *diag_coeff_ = nullptr;
+
   /// operators and solvers
+  ParBilinearForm *As_form_ = nullptr;
   ParBilinearForm *Ms_form_ = nullptr;
-  ParBilinearForm *Hs_form_ = nullptr;  
-  OperatorHandle Ms_; 
-  OperatorHandle Hs_;   
+  ParBilinearForm *MsRho_form_ = nullptr;
+  ParBilinearForm *Hs_form_ = nullptr;
+  ParLinearForm *Hs_bdry_ = nullptr;
+
+  OperatorHandle As_;
+  OperatorHandle Ms_;
+  OperatorHandle MsRho_;
+  OperatorHandle Hs_;
+
   mfem::Solver *MsInvPC_ = nullptr;
   mfem::CGSolver *MsInv_ = nullptr;
   mfem::Solver *HsInvPC_ = nullptr;
   mfem::CGSolver *HsInv_ = nullptr;
-  
+
+  // Boundary condition info
+  Array<int> tke_ess_attr_;
+  Array<int> tdr_ess_attr_;
+  Array<int> zeta_ess_attr_;
+  Array<int> fRate_ess_attr_;
+  Array<int> tke_ess_tdof_;
+  Array<int> tdr_ess_tdof_;
+  Array<int> zeta_ess_tdof_;
+  Array<int> fRate_ess_tdof_;
+  Array<int> *ess_attr_ = nullptr;
+  Array<int> *ess_tdof_ = nullptr;
+
+  std::vector<DirichletBC_T<Coefficient>> tke_dbcs_;
+  std::vector<DirichletBC_T<Coefficient>> tdr_dbcs_;
+  std::vector<DirichletBC_T<Coefficient>> zeta_dbcs_;
+  std::vector<DirichletBC_T<Coefficient>> fRate_dbcs_;
+
  public:
-  ZetaModel(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, TPS::Tps *tps, ParGridFunction *gridScale);
+  ZetaModel(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &time_coeff, TPS::Tps *tps,
+            ParGridFunction *gridScale);
   virtual ~ZetaModel();
 
   // Functions overriden from base class
   void initializeSelf() final;
   void initializeOperators() final;
+  void updateBC(int current_step);
   void step() final;
   void setup() final;
   void initializeViz(ParaViewDataCollection &pvdc) final;
+  void tkeStep();
+  void tdrStep();
+  void zetaStep();
+  void fStep();
+  void convection(string scalar);
+  void UpdateTimestepHistory(double dt);
+  void extrapolateState();
+  void updateProd();
+  void updateTLS();
+  void updateTTS();
+  void computeStrain();
+  void updateMuT();
 
   /// Return a pointer to the current temperature ParGridFunction.
   ParGridFunction *getCurrentEddyViscosity() { return &eddyVisc_gf_; }
 
+  /// Add a Dirichlet boundary condition to the temperature and Qt field.
+  void AddTKEDirichletBC(const double &tke, Array<int> &attr);
+  void AddTKEDirichletBC(Coefficient *coeff, Array<int> &attr);
+  void AddTKEDirichletBC(ScalarFuncT *f, Array<int> &attr);
+
+  void AddTDRDirichletBC(const double &tdr, Array<int> &attr);
+  void AddTDRDirichletBC(Coefficient *coeff, Array<int> &attr);
+  void AddTDRDirichletBC(ScalarFuncT *f, Array<int> &attr);
+
+  void AddZETADirichletBC(const double &zeta, Array<int> &attr);
+  void AddZETADirichletBC(Coefficient *coeff, Array<int> &attr);
+  void AddZETADirichletBC(ScalarFuncT *f, Array<int> &attr);
+
+  void AddFRATEDirichletBC(const double &fRate, Array<int> &attr);
+  void AddFRATEDirichletBC(Coefficient *coeff, Array<int> &attr);
+  void AddFRATEDirichletBC(ScalarFuncT *f, Array<int> &attr);
 };
 #endif  // ZETAMODEL_HPP_
