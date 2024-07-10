@@ -224,7 +224,6 @@ Tomboulides::~Tomboulides() {
   delete gradU_gf_;
   delete gradV_gf_;
   delete gradW_gf_;
-  delete Up_gf_;
   delete epsi_gf_;
   delete vfes_;
   delete vfec_;
@@ -253,7 +252,6 @@ void Tomboulides::initializeSelf() {
   p_gf_ = new ParGridFunction(pfes_);
   resp_gf_ = new ParGridFunction(pfes_);
 
-  Up_gf_ = new ParGridFunction(vfes_);
   epsi_gf_ = new ParGridFunction(sfes_);
 
   mu_total_gf_ = new ParGridFunction(pfes_);
@@ -1146,9 +1144,6 @@ void Tomboulides::computeDissipation(Averaging &average, const int iter) {
       gradU_gf_->SetFromTrueDofs(gradU_);
       gradV_gf_->SetFromTrueDofs(gradV_);
       if (dim_ == 3) gradW_gf_->SetFromTrueDofs(gradW_);
-
-      // Up_gf_->SetFromTrueDofs(tmpR1_);
-      // vectorGrad3D(*epsi_gf_, *Up_gf_, *gradU_gf_, *gradV_gf_, *gradW_gf_);
 
       // const double *dmu = (*thermo_interface_->viscosity).HostRead();
       const double *dmu = mu_total_gf_->HostRead();

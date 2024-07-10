@@ -86,7 +86,6 @@ Averaging::~Averaging() {
     delete meanP;
     delete meanV;
     delete meanRho;
-    // delete meanEpsi;
   }
 }
 
@@ -183,7 +182,6 @@ void Averaging::initializeVizForM2ulPhyS(ParFiniteElementSpace *fes, ParFiniteEl
   meanRho = new ParGridFunction(fes, meanUp->GetData());
   meanV = new ParGridFunction(dfes, meanUp->GetData() + fes->GetNDofs());
   meanP = new ParGridFunction(fes, meanUp->GetData() + (1 + nvel) * fes->GetNDofs());
-  // meanEpsi = new ParGridFunction(fes, meanUp->GetData() + (1 + nvel) * fes->GetNDofs() + 1);
 
   // Register fields with paraview
   pvdc_ = new ParaViewDataCollection(mean_output_name_, mesh);
@@ -194,7 +192,6 @@ void Averaging::initializeVizForM2ulPhyS(ParFiniteElementSpace *fes, ParFiniteEl
   pvdc_->RegisterField("dens", meanRho);
   pvdc_->RegisterField("vel", meanV);
   pvdc_->RegisterField("press", meanP);
-  // pvdc_->RegisterField("epsi", meanEpsi);
   pvdc_->RegisterField("rms", vari);
 }
 
