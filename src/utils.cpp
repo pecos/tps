@@ -763,7 +763,7 @@ void ComputeCurl3D(const ParGridFunction &u, ParGridFunction &cu) {
 
   // Communication
 
-  /*
+  /**/
   // Count the zones globally.
   GroupCommunicator &gcomm = u.ParFESpace()->GroupComm();
   gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
@@ -772,7 +772,7 @@ void ComputeCurl3D(const ParGridFunction &u, ParGridFunction &cu) {
   // Accumulate for all vdofs.
   gcomm.Reduce<double>(cu.GetData(), GroupCommunicator::Sum);
   gcomm.Bcast<double>(cu.GetData());
-  */
+  /**/
 
   // Compute means.
   for (int i = 0; i < cu.Size(); i++) {
@@ -896,16 +896,14 @@ void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu) {
     }
   }
 
-  /*
   // Count the zones globally.
-  GroupCommunicator &gcomm = u.ParFESpace()->GroupComm();
+  GroupCommunicator &gcomm = gu.ParFESpace()->GroupComm();
   gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
   gcomm.Bcast(zones_per_vdof);
 
   // Accumulate for all vdofs.
   gcomm.Reduce<double>(gu.GetData(), GroupCommunicator::Sum);
   gcomm.Bcast<double>(gu.GetData());
-  */
 
   // Compute means.
   for (int dir = 0; dir < dim_; dir++) {
