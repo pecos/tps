@@ -905,8 +905,9 @@ void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu) {
   gcomm.Bcast(zones_per_vdof);
 
   // Accumulate for all vdofs.
-  gcomm.Reduce<double>(gu.GetData(), GroupCommunicator::Sum);
-  gcomm.Bcast<double>(gu.GetData());
+  GroupCommunicator &gcomm_g = gu.ParFESpace()->GroupComm();
+  gcomm_g.Reduce<double>(gu.GetData(), GroupCommunicator::Sum);
+  gcomm_g.Bcast<double>(gu.GetData());
 
   // Compute means.
   for (int dir = 0; dir < dim; dir++) {
