@@ -143,6 +143,7 @@ class ZetaModel : public TurbModelBase {
   /// molecular viscosity
   // ParGridFunction *mu_gf_ = nullptr;
   Vector mu_;
+  Vector mult_;  
 
   /// grid information
   ParGridFunction *gridScale_gf_ = nullptr;

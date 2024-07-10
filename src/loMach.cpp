@@ -45,6 +45,7 @@
 
 #include "algebraicSubgridModels.hpp"
 #include "algebraic_rans.hpp"
+#include "zetaModel.hpp"
 #include "calorically_perfect.hpp"
 #include "gaussianInterpExtData.hpp"
 #include "geometricSponge.hpp"
@@ -150,6 +151,10 @@ void LoMachSolver::initialize() {
   } else if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::ALGEBRAIC_RANS) {
     //    turbModel_ = new AlgebraicRans(serial_mesh_, pmesh_, partitioning_, loMach_opts_.order, tpsP_);
     turbModel_ = new AlgebraicRans(pmesh_, partitioning_, loMach_opts_.order, tpsP_, (meshData_->getWallDistance()));
+  } else if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::ZETA_F) {
+    if(rank0_) std::cout << "Caught zeta-f" << endl;
+    turbModel_ = new ZetaModel(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_, (meshData_->getWallDistance()));
+    if(rank0_) std::cout << "zeta-f constructed" << endl;    
   } else if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::NONE) {
     // default
     turbModel_ = new ZeroTurbModel(pmesh_, loMach_opts_.order);
@@ -176,7 +181,7 @@ void LoMachSolver::initialize() {
       grvy_printf(GRVY_ERROR, "Unknown loMach/thermo-solver option > %s\n", loMach_opts_.thermo_solver.c_str());
     }
     exit(ERROR);
-  }
+  }  
 
   // Instantiate flow solver
   if (loMach_opts_.flow_solver == "zero-flow") {
@@ -238,8 +243,10 @@ void LoMachSolver::initialize() {
   turbModel_->initializeSelf();
   flow_->initializeSelf();
   thermo_->initializeSelf();
+  if(rank0_) std::cout << "zeta-f initialized" << endl;      
 
   // Exchange interface information
+  turbModel_->initializeFromSponge(&sponge_->toTurbModel_interface_);  
   turbModel_->initializeFromThermoChem(&thermo_->toTurbModel_interface_);
   turbModel_->initializeFromFlow(&flow_->toTurbModel_interface_);
   flow_->initializeFromTurbModel(&turbModel_->toFlow_interface_);
@@ -248,10 +255,12 @@ void LoMachSolver::initialize() {
   thermo_->initializeFromFlow(&flow_->toThermoChem_interface_);
   flow_->initializeFromSponge(&sponge_->toFlow_interface_);
   thermo_->initializeFromSponge(&sponge_->toThermoChem_interface_);
+  if(rank0_) std::cout << "zeta-f interface set" << endl;        
 
   // Initialize restart read/write capability
   flow_->initializeIO(ioData);
   thermo_->initializeIO(ioData);
+  if(rank0_) std::cout << "IO set" << endl;          
 
   // Initialize statistics
   flow_->initializeStats(*average_, ioData, average_->ContinueMean());
@@ -272,12 +281,17 @@ void LoMachSolver::initialize() {
 
   // static sponge
   sponge_->setup();
+  if(rank0_) std::cout << "starting all operators..." << endl;          
 
   // Finish initializing operators
   flow_->initializeOperators();
+  if(rank0_) std::cout << "...flow" << endl;  
   turbModel_->setup();
+  if(rank0_) std::cout << "...zeta-f setup" << endl;    
   turbModel_->initializeOperators();
+  if(rank0_) std::cout << "...zeta-f " << endl;      
   thermo_->initializeOperators();
+  if(rank0_) std::cout << "...thermo setup" << endl;      
 
   // Initialize visualization
   pvdc_ = new ParaViewDataCollection(loMach_opts_.io_opts_.output_dir_, pmesh_);
@@ -292,6 +306,7 @@ void LoMachSolver::initialize() {
   sponge_->initializeViz(*pvdc_);
   extData_->initializeViz(*pvdc_);
   average_->initializeViz();
+  if(rank0_) std::cout << "zeta-f viz initialized" << endl;   
 
   sw_setup_.Stop();
 }

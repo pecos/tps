@@ -110,6 +110,17 @@ class TurbModelBase {
   virtual void setup() = 0;
 
   /**
+   * @brief Initialize data from visc mult class
+   *
+   * Initialize fields that the turbulence model needs from the
+   * visc mult.
+   */
+  void initializeFromSponge(spongeToTurbModel *sponge) { sponge_interface_ = sponge; }
+
+  /// Get interface provided by flow model
+  const spongeToTurbModel *getSpongeInterface() const { return sponge_interface_; }
+  
+  /**
    * @brief Initialize data from the flow class
    *
    * Initialize fields that the turbulence model needs from the

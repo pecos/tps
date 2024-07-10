@@ -202,7 +202,7 @@ double temp_channel(const Vector &coords, double t) {
   double Tlo = 200.0;
   double y = coords(1);
   double temp;
-  temp = Tlo + (y + 0.5) * (Thi - Tlo);
+  temp = Tlo + 0.5 * (y + 1.0) * (Thi - Tlo);
   return temp;
 }
 
