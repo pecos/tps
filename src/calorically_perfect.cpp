@@ -685,8 +685,8 @@ void CaloricallyPerfectThermoChem::step() {
     auto *HC = Ht_.As<ConstrainedOperator>();
     EliminateRHS(*Ht_form_, *HC, temp_ess_tdof_, Tn_next_gf_, resT_gf_, Xt2, Bt2, 1);
   } else {
-    //Ht_form_->FormLinearSystem(temp_ess_tdof_, Tn_next_gf_, resT_gf_, Ht_, Xt2, Bt2, 1);
-    Ht_form_->FormLinearSystem(temp_ess_tdof_, Tn_gf_, resT_gf_, Ht_, Xt2, Bt2, 1);    
+    Ht_form_->FormLinearSystem(temp_ess_tdof_, Tn_next_gf_, resT_gf_, Ht_, Xt2, Bt2, 1);
+    //Ht_form_->FormLinearSystem(temp_ess_tdof_, Tn_gf_, resT_gf_, Ht_, Xt2, Bt2, 1);    
   }
 
   // solve helmholtz eq for temp

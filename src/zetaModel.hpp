@@ -105,7 +105,8 @@ class ZetaModel : public TurbModelBase {
   double tke_ic_, tdr_ic_;
   double tke_min_, tdr_min_, zeta_min_;
   double fRate_min_, tts_min_, tls_min_;
-  double fRate_max_, tts_max_, tls_max_;  
+  double fRate_max_, tts_max_, tls_max_;
+  double mut_min_;
 
   // just keep these saved for ease
   int numWalls_, numInlets_, numOutlets_;
@@ -168,6 +169,7 @@ class ZetaModel : public TurbModelBase {
   Vector tdr_next_;
   Vector tdr_nm1_, tdr_nm2_;
   Vector Ntdr_, Ntdr_nm1_, Ntdr_nm2_;
+  ParGridFunction tdr_wall_gf_;  
 
   /// ratio of wall normal stress component to k
   ParGridFunction zeta_gf_;
@@ -202,7 +204,8 @@ class ZetaModel : public TurbModelBase {
   double sigmaZ_ = 1.2;
   double Ce2_ = 1.9;
   double C1_ = 1.4;
-  double C2_ = 0.65;
+  double C2prime_ = 0.65;
+  double C2_ = 0.3;  
   double Ct_ = 6.0;
   double Cl_ = 0.36;
   double Cn_ = 85.0;
@@ -229,6 +232,7 @@ class ZetaModel : public TurbModelBase {
   ScalarVectorProductCoefficient *tdr_wall_coeff_ = nullptr;
   ScalarVectorProductCoefficient *fRate_wall_coeff_ = nullptr;
   ScalarVectorProductCoefficient *wall_coeff_ = nullptr;
+  GridFunctionCoefficient *tdr_wall_eval_coeff_ = nullptr;
 
   GridFunctionCoefficient *tts_coeff_ = nullptr;
   GridFunctionCoefficient *tls2_coeff_ = nullptr;
