@@ -893,7 +893,7 @@ void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu) {
   }
 
   // Count the zones globally.
-  GroupCommunicator &gcomm = u.ParFESpace()->GroupComm();
+  GroupCommunicator &gcomm = gu.ParFESpace()->GroupComm();
   gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
   gcomm.Bcast(zones_per_vdof);
 

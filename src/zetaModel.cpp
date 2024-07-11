@@ -61,8 +61,8 @@ ZetaModel::ZetaModel(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalS
   // read-ins, if any
   // example: tpsP_->getInput("loMach/sgsModelConstant", sgs_model_const_, sgs_const);
 
-  tpsP_->getInput("ransModel/tke", tke_ic_, 1.0e-8);
-  tpsP_->getInput("ransModel/tdr", tdr_ic_, 1.0e-10);
+  tpsP_->getInput("ransModel/tke-ic", tke_ic_, 1.0e-4);
+  tpsP_->getInput("ransModel/tdr-ic", tdr_ic_, 1.0e-8);
 
   tpsP_->getInput("ransModel/tke-min", tke_min_, 1.0e-11);
   tpsP_->getInput("ransModel/tdr-min", tdr_min_, 1.0e-12);
@@ -70,9 +70,64 @@ ZetaModel::ZetaModel(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalS
   tpsP_->getInput("ransModel/f-min", fRate_min_, 1.0e-14);
   tpsP_->getInput("ransModel/tts-min", tts_min_, 1.0e-12);
   tpsP_->getInput("ransModel/tls-min", tls_min_, 1.0e-12);
+  tpsP_->getInput("ransModel/tts-max", tts_max_, 10.0);
+  tpsP_->getInput("ransModel/tls-max", tls_max_, 10.0);  
 }
 
 ZetaModel::~ZetaModel() {
+
+  delete HsInv_;
+  delete HsInvPC_;
+  delete MsInv_;
+  delete MsInvPC_;
+  delete Hs_form_;
+  delete MsRho_form_;
+  delete Ms_form_;
+  delete As_form_;
+  delete Hs_bdry_;
+  
+  delete zero_coeff_;
+  delete unity_coeff_;
+  delete posTwo_coeff_;
+  delete negTwo_coeff_;
+  delete delta_coeff_;
+  delete rho_coeff_;
+  delete mu_coeff_;
+  delete tts_coeff_;
+  delete tls2_coeff_;
+  delete prod_coeff_;
+  delete tke_coeff_;
+  delete nu_coeff_;
+  delete nu_delta_coeff_;
+  delete gradTKE_coeff_;
+  delete two_nu_delta_coeff_;
+  delete tdr_wall_coeff_;
+  delete gradZeta_coeff_;
+  delete two_nuNeg_delta_coeff_;
+  delete fRate_wall_coeff_;
+  delete vel_coeff_;
+  delete rhou_coeff_;
+  delete scalar_diff_coeff_;
+  delete mut_coeff_;
+  delete mult_coeff_;
+  delete tke_diff_sum_coeff_;
+  delete tdr_diff_sum_coeff_;
+  delete zeta_diff_sum_coeff_;
+  delete tke_diff_total_coeff_;
+  delete tdr_diff_total_coeff_;
+  delete zeta_diff_total_coeff_;
+  delete unity_diff_total_coeff_;
+  delete rhoDt_coeff_;
+  delete rhoTTS_coeff_;
+  delete Ce2_coeff_;
+  delete Ce2rhoTTS_coeff_;
+  delete Pk_coeff_;
+  delete tke_diag_coeff_;
+  delete tdr_diag_coeff_;
+  delete zeta_diag_coeff_;
+  delete f_diag_coeff_;
+  delete f_diag_total_coeff_;
+  
   delete sfec_;
   delete sfes_;
   delete vfec_;
@@ -118,22 +173,22 @@ void ZetaModel::initializeSelf() {
   eddyVisc_gf_.SetSpace(sfes_);
   eddyVisc_.SetSize(sfes_truevsize);
   eddyVisc_gf_ = 1.0e-8;
-  eddyVisc_ = 1.0e-8;
+  eddyVisc_gf_.GetTrueDofs(eddyVisc_);  
 
   tke_gf_.SetSpace(sfes_);
   tke_.SetSize(sfes_truevsize);
   tke_gf_ = tke_min_;
-  tke_ = tke_min_;
+  tke_gf_.GetTrueDofs(tke_);
   
   tdr_gf_.SetSpace(sfes_);
   tdr_.SetSize(sfes_truevsize);
   tdr_gf_ = tdr_min_;
-  tdr_ = tdr_min_;
+  tdr_gf_.GetTrueDofs(tdr_);  
   
   zeta_gf_.SetSpace(sfes_);
   zeta_.SetSize(sfes_truevsize);
   zeta_gf_ = 2.0/3.0;
-  zeta_ = 2.0/3.0;
+  zeta_gf_.GetTrueDofs(zeta_);  
 
   fRate_gf_.SetSpace(sfes_);
   fRate_.SetSize(sfes_truevsize);
@@ -154,40 +209,53 @@ void ZetaModel::initializeSelf() {
   Ntke_.SetSize(sfes_truevsize);
   Ntke_nm1_.SetSize(sfes_truevsize);
   Ntke_nm2_.SetSize(sfes_truevsize);
-
+  tke_nm1_ = tke_min_;
+  tke_nm2_ = tke_min_;
+  Ntke_ = 0.0;
+  Ntke_nm1_ = 0.0;
+  Ntke_nm2_ = 0.0;
+  
   tdr_nm1_.SetSize(sfes_truevsize);
   tdr_nm2_.SetSize(sfes_truevsize);
   Ntdr_.SetSize(sfes_truevsize);
   Ntdr_nm1_.SetSize(sfes_truevsize);
   Ntdr_nm2_.SetSize(sfes_truevsize);
-
+  tdr_nm1_ = tdr_min_;
+  tdr_nm2_ = tdr_min_;
+  Ntdr_ = 0.0;
+  Ntdr_nm1_ = 0.0;
+  Ntdr_nm2_ = 0.0;
+  
   zeta_nm1_.SetSize(sfes_truevsize);
   zeta_nm2_.SetSize(sfes_truevsize);
   Nzeta_.SetSize(sfes_truevsize);
   Nzeta_nm1_.SetSize(sfes_truevsize);
   Nzeta_nm2_.SetSize(sfes_truevsize);
+  zeta_nm1_ = 2.0/3.0;
+  zeta_nm2_ = 2.0/3.0;
+  Nzeta_ = 0.0;
+  Nzeta_nm1_ = 0.0;
+  Nzeta_nm2_ = 0.0;
 
   tls_gf_.SetSpace(sfes_);
   tls_.SetSize(sfes_truevsize);
-  tls_gf_.SetSpace(sfes_);
-  tls_.SetSize(sfes_truevsize);
   tls_gf_ = 1.0;
-  tls_ = 1.0;  
+  tls_gf_.GetTrueDofs(tls_);
   
   tls2_gf_.SetSpace(sfes_);
   tls2_.SetSize(sfes_truevsize);
   tls2_gf_ = 1.0;
-  tls2_ = 1.0;    
+  tls2_gf_.GetTrueDofs(tls2_);  
 
   tts_gf_.SetSpace(sfes_);
   tts_.SetSize(sfes_truevsize);
   tts_gf_ = 1.0;
-  tts_ = 1.0;
+  tts_gf_.GetTrueDofs(tts_);
   
   prod_gf_.SetSpace(sfes_);
   prod_.SetSize(sfes_truevsize);
   prod_gf_ = 1.0e-8;
-  prod_ = 1.0e-8;
+  prod_gf_.GetTrueDofs(prod_);
   
   // tdrWall_gf_.SetSpace(sfes_);
   // fWall_gf_.SetSpace(sfes_);
@@ -209,11 +277,13 @@ void ZetaModel::initializeSelf() {
   tmpR0c_.SetSize(sfes_truevsize);
 
   rhoDt_gf_.SetSpace(sfes_);
-  
+
+  sMag_gf_.SetSpace(sfes_);
+  sMag_gf_ = 1.0e-12;  
   strain_.SetSize(6 * sfes_truevsize);
-  sMag_.SetSize(sfes_truevsize);
-  strain_ = 0.0;
-  sMag_ = 0.0;
+  sMag_.SetSize(sfes_truevsize);  
+  strain_ = 1.0e-14;
+  sMag_ = 1.0e-12;
   
   if (rank0_) grvy_printf(ginfo, "zeta-f vectors and gf initialized...\n");
 
@@ -318,7 +388,7 @@ void ZetaModel::initializeSelf() {
         zeta_wall_coeff->constant = 0.0;
         AddZETADirichletBC(zeta_wall_coeff, attr_wall);
 
-        // f handled through Hs_bdry
+        // f handled through Hs_bdry	
         ConstantCoefficient *fRate_wall_coeff = new ConstantCoefficient();
         fRate_wall_coeff->constant = 0.0;
         AddFRATEDirichletBC(fRate_wall_coeff, attr_wall);
@@ -357,7 +427,6 @@ void ZetaModel::initializeOperators() {
   tls2_coeff_ = new GridFunctionCoefficient(&tls2_gf_);
   prod_coeff_ = new GridFunctionCoefficient(&prod_gf_);
   tke_coeff_ = new GridFunctionCoefficient(&tke_gf_);
-  if (rank0_) std::cout << "... block 1" << endl;  
 
   // boundary-condition related
   nu_coeff_ = new RatioCoefficient(*mu_coeff_, *rho_coeff_);
@@ -368,27 +437,22 @@ void ZetaModel::initializeOperators() {
   gradZeta_coeff_ = new GradientGridFunctionCoefficient(&zeta_gf_);
   two_nuNeg_delta_coeff_ = new ProductCoefficient(*nu_delta_coeff_, *negTwo_coeff_);
   fRate_wall_coeff_ = new ScalarVectorProductCoefficient(*two_nuNeg_delta_coeff_, *gradZeta_coeff_);
-  if (rank0_) std::cout << "... block 2" << endl;    
 
   // convection-related
   vel_coeff_ = new VectorGridFunctionCoefficient(flow_interface_->velocity);
   rhou_coeff_ = new ScalarVectorProductCoefficient(*rho_coeff_, *vel_coeff_);
-  if (rank0_) std::cout << "... block 3" << endl;    
 
   // diffusion-related
   scalar_diff_coeff_ = new GridFunctionCoefficient(thermoChem_interface_->viscosity);
   mut_coeff_ = new GridFunctionCoefficient(&eddyVisc_gf_);
   mult_coeff_ = new GridFunctionCoefficient(sponge_interface_->diff_multiplier);
-
   tke_diff_sum_coeff_ = new SumCoefficient(*mut_coeff_, *scalar_diff_coeff_, 1.0, 1.0 / sigmaK_);
   tdr_diff_sum_coeff_ = new SumCoefficient(*mut_coeff_, *scalar_diff_coeff_, 1.0, 1.0 / sigmaO_);
   zeta_diff_sum_coeff_ = new SumCoefficient(*mut_coeff_, *scalar_diff_coeff_, 1.0, 1.0 / sigmaZ_);
-
   tke_diff_total_coeff_ = new ProductCoefficient(*mult_coeff_, *tke_diff_sum_coeff_);
   tdr_diff_total_coeff_ = new ProductCoefficient(*mult_coeff_, *tdr_diff_sum_coeff_);
   zeta_diff_total_coeff_ = new ProductCoefficient(*mult_coeff_, *zeta_diff_sum_coeff_);
   unity_diff_total_coeff_ = new ProductCoefficient(*unity_coeff_, *unity_diff_coeff_);
-  if (rank0_) std::cout << "... block 4" << endl;    
 
   // unsteady- and destruction-related
   rhoDt_gf_ = *(thermoChem_interface_->density);
@@ -398,12 +462,11 @@ void ZetaModel::initializeOperators() {
   Ce2_coeff_ = new ConstantCoefficient(Ce2_);
   Ce2rhoTTS_coeff_ = new ProductCoefficient(*Ce2_coeff_, *rhoTTS_coeff_);
   Pk_coeff_ = new RatioCoefficient(*prod_coeff_, *tke_coeff_);
-  tke_diag_coeff_ = new SumCoefficient(*rhoDt_coeff_, *rhoTTS_coeff_);
-  tdr_diag_coeff_ = new SumCoefficient(*rhoDt_coeff_, *Ce2rhoTTS_coeff_);
+  tke_diag_coeff_ = new SumCoefficient(*rhoDt_coeff_, *rhoTTS_coeff_);  
+  tdr_diag_coeff_ = new SumCoefficient(*rhoDt_coeff_, *Ce2rhoTTS_coeff_);    
   zeta_diag_coeff_ = new SumCoefficient(*rhoDt_coeff_, *Pk_coeff_);
   f_diag_coeff_ = new RatioCoefficient(*unity_coeff_, *tls2_coeff_);
   f_diag_total_coeff_ = new SumCoefficient(*f_diag_coeff_, *zero_coeff_);
-  if (rank0_) std::cout << "... block 5" << endl;    
 
   // operators
   As_form_ = new ParBilinearForm(sfes_);
@@ -417,7 +480,6 @@ void ZetaModel::initializeOperators() {
   }
   As_form_->Assemble();
   As_form_->FormSystemMatrix(empty, As_);
-  if (rank0_) std::cout << "... As_form" << endl;    
 
   // mass matrix
   Ms_form_ = new ParBilinearForm(sfes_);
@@ -431,7 +493,6 @@ void ZetaModel::initializeOperators() {
   }
   Ms_form_->Assemble();
   Ms_form_->FormSystemMatrix(empty, Ms_);
-  if (rank0_) std::cout << "... Ms_form" << endl;      
 
   // mass matrix with rho
   MsRho_form_ = new ParBilinearForm(sfes_);
@@ -446,137 +507,35 @@ void ZetaModel::initializeOperators() {
   }
   MsRho_form_->Assemble();
   MsRho_form_->FormSystemMatrix(empty, MsRho_);
-  if (rank0_) std::cout << "... MsRho_form" << endl;      
 
-
+  // assign pointers for construction, update in each scalar solve
   diag_coeff_ = tke_diag_coeff_;
   diff_total_coeff_ = tke_diff_total_coeff_;
   wall_coeff_ = tdr_wall_coeff_;
   ess_tdof_ = &tke_ess_tdof_; 
   ess_attr_ = &tke_ess_attr_; 
   Hs_form_ = new ParBilinearForm(sfes_);
-  //auto *hms_blfi = new MassIntegrator(*diag_coeff_);
-  auto *hms_blfi = new MassIntegrator(*tke_diag_coeff_);
-  if (rank0_) std::cout << "... Hs_form::diag_coeff_ ptr" << endl;          
-  //auto *hds_blfi = new DiffusionIntegrator(*diff_total_coeff_);
-  auto *hds_blfi = new DiffusionIntegrator(*tke_diff_total_coeff_);
-  if (rank0_) std::cout << "... Hs_form::diff_total_coeff_ ptr" << endl;        
+  auto *hms_blfi = new MassIntegrator(*diag_coeff_);
+  auto *hds_blfi = new DiffusionIntegrator(*diff_total_coeff_);
   if (numerical_integ_) {
     hms_blfi->SetIntRule(&ir_di);
     hds_blfi->SetIntRule(&ir_di);
   }
-  if (rank0_) std::cout << "... Hs_form::1" << endl;   
   Hs_form_->AddDomainIntegrator(hms_blfi);
-  if (rank0_) std::cout << "... Hs_form::2" << endl;     
   Hs_form_->AddDomainIntegrator(hds_blfi);
-  if (rank0_) std::cout << "... Hs_form::3" << endl;     
   //if (partial_assembly_) {
   //  Hs_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   //}
   Hs_form_->Assemble();
-  if (rank0_) std::cout << "... Hs_form::4" << endl;     
-  //Hs_form_->FormSystemMatrix(*ess_tdof_, Hs_);
-  Hs_form_->FormSystemMatrix(tke_ess_tdof_, Hs_);
-  if (rank0_) std::cout << "... Hs_form" << endl;      
-  
+  Hs_form_->FormSystemMatrix(*ess_tdof_, Hs_);
+
+  // boundary terms for tdr and f
   Hs_bdry_ = new ParLinearForm(sfes_);
   auto *hs_bdry_lfi = new BoundaryNormalLFIntegrator(*wall_coeff_, 2, -1);
-  //auto *hs_bdry_lfi = new BoundaryNormalLFIntegrator(tke_wall_coeff_, 2, -1);
   if (numerical_integ_) {
     hs_bdry_lfi->SetIntRule(&ir_di);
   }
   Hs_bdry_->AddBoundaryIntegrator(hs_bdry_lfi, *ess_attr_);
-  if (rank0_) std::cout << "... Hs_bdry" << endl;      
-
-
-  
-  /*  
-  // helmholtz
-  Htke_form_ = new ParBilinearForm(sfes_);
-  auto *hmtke_blfi = new MassIntegrator(*tke_diag_coeff_);
-  if (rank0_) std::cout << "... Hs_form::diag_coeff_ ptr" << endl;          
-  auto *hdtke_blfi = new DiffusionIntegrator(*tke_diff_total_coeff_);
-  if (rank0_) std::cout << "... Hs_form::diff_total_coeff_ ptr" << endl;        
-  if (numerical_integ_) {
-    hmtke_blfi->SetIntRule(&ir_di);
-    hdtke_blfi->SetIntRule(&ir_di);
-  }
-  Htke_form_->AddDomainIntegrator(hmtke_blfi);
-  Htke_form_->AddDomainIntegrator(hdtke_blfi);
-  if (partial_assembly_) {
-    Htke_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
-  }
-  Htke_form_->Assemble();
-  Htke_form_->FormSystemMatrix(tke_ess_tdof_, Htke_);
-  if (rank0_) std::cout << "... Htke_form" << endl;      
-
-  Htdr_form_ = new ParBilinearForm(sfes_);
-  auto *hmtdr_blfi = new MassIntegrator(*tdr_diag_coeff_);
-  auto *hdtdr_blfi = new DiffusionIntegrator(*tdr_diff_total_coeff_);
-  if (numerical_integ_) {
-    hmtdr_blfi->SetIntRule(&ir_di);
-    hdtdr_blfi->SetIntRule(&ir_di);
-  }
-  Htdr_form_->AddDomainIntegrator(hmtdr_blfi);
-  Htdr_form_->AddDomainIntegrator(hdtdr_blfi);
-  if (partial_assembly_) {
-    Htdr_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
-  }
-  Htdr_form_->Assemble();
-  Htdr_form_->FormSystemMatrix(tdr_ess_tdof_, Htdr_);
-  if (rank0_) std::cout << "... Htdr_form" << endl;      
-
-  Hz_form_ = new ParBilinearForm(sfes_);
-  auto *hmz_blfi = new MassIntegrator(*zeta_diag_coeff_);
-  auto *hdz_blfi = new DiffusionIntegrator(*zeta_diff_total_coeff_);
-  if (numerical_integ_) {
-    hmz_blfi->SetIntRule(&ir_di);
-    hdz_blfi->SetIntRule(&ir_di);
-  }
-  Hz_form_->AddDomainIntegrator(hmz_blfi);
-  Hz_form_->AddDomainIntegrator(hdz_blfi);
-  if (partial_assembly_) {
-    Hz_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
-  }
-  Hz_form_->Assemble();
-  Hz_form_->FormSystemMatrix(zeta_ess_tdof_, Hz_);
-  if (rank0_) std::cout << "... Hz_form" << endl;      
-
-  Hf_form_ = new ParBilinearForm(sfes_);
-  auto *hmf_blfi = new MassIntegrator(*fRate_diag_coeff_);
-  auto *hdf_blfi = new DiffusionIntegrator(*fRate_diff_total_coeff_);
-  if (numerical_integ_) {
-    hmf_blfi->SetIntRule(&ir_di);
-    hdf_blfi->SetIntRule(&ir_di);
-  }
-  Hf_form_->AddDomainIntegrator(hmf_blfi);
-  Hf_form_->AddDomainIntegrator(hdf_blfi);
-  if (partial_assembly_) {
-    Hf_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
-  }
-  Hf_form_->Assemble();
-  Hf_form_->FormSystemMatrix(fRate_ess_tdof_, Hf_);
-  if (rank0_) std::cout << "... Hf_form" << endl;      
-    
-  Htdr_bdry_ = new ParLinearForm(sfes_);
-  auto *htdr_bdry_lfi = new BoundaryNormalLFIntegrator(*tdr_wall_coeff_, 2, -1);
-  if (numerical_integ_) {
-    htdr_bdry_lfi->SetIntRule(&ir_di);
-  }
-  Htdr_bdry_->AddBoundaryIntegrator(htdr_bdry_lfi, tdr_ess_attr_);
-  if (rank0_) std::cout << "... Htdr_bdry" << endl;      
-
-  Hf_bdry_ = new ParLinearForm(sfes_);
-  auto *hf_bdry_lfi = new BoundaryNormalLFIntegrator(*fRate_wall_coeff_, 2, -1);
-  if (numerical_integ_) {
-    hf_bdry_lfi->SetIntRule(&ir_di);
-  }
-  Hf_bdry_->AddBoundaryIntegrator(hf_bdry_lfi, fRate_ess_attr_);
-  if (rank0_) std::cout << "... Hf_bdry" << endl;      
-  */
-
-
-
   
   // inverse operators:: linear solves
   if (partial_assembly_) {
@@ -598,7 +557,7 @@ void ZetaModel::initializeOperators() {
   if (partial_assembly_) {
     Vector diag_pa(sfes_->GetTrueVSize());
     Hs_form_->AssembleDiagonal(diag_pa);
-    // HsInvPC_ = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof_);
+    //HsInvPC_ = new OperatorJacobiSmoother(diag_pa, tke_ess_tdof_);
     HsInvPC_ = new OperatorJacobiSmoother(diag_pa, *ess_tdof_);
   } else {
     HsInvPC_ = new HypreSmoother(*Hs_.As<HypreParMatrix>());
@@ -616,14 +575,15 @@ void ZetaModel::initializeOperators() {
 }
 
 void ZetaModel::initializeViz(ParaViewDataCollection &pvdc) {
+  pvdc.RegisterField("Pk", &prod_gf_);
+  pvdc.RegisterField("TTS", &tts_gf_);
+  pvdc.RegisterField("TLS", &tls_gf_);
+  pvdc.RegisterField("|S|", &sMag_gf_);      
   pvdc.RegisterField("muT", &eddyVisc_gf_);
-  pvdc.RegisterField("tke", &tke_gf_);
-  pvdc.RegisterField("tdr", &tdr_gf_);
+  pvdc.RegisterField("TKE", &tke_gf_);
+  pvdc.RegisterField("TDR", &tdr_gf_);
   pvdc.RegisterField("zeta", &zeta_gf_);
   pvdc.RegisterField("f", &fRate_gf_);
-  pvdc.RegisterField("tts", &tts_gf_);
-  pvdc.RegisterField("tls", &tls_gf_);
-  pvdc.RegisterField("Pk", &prod_gf_);
 }
 
 void ZetaModel::setup() {
@@ -636,10 +596,9 @@ void ZetaModel::setup() {
 }
 
 void ZetaModel::step() {
-  // update time and rotate storage
+  // update time
   dt_ = time_coeff_.dt;
   time_ = time_coeff_.time;
-  UpdateTimestepHistory(dt_);
 
   // gather necessary information from other classes
   (flow_interface_->velocity)->GetTrueDofs(vel_);
@@ -680,6 +639,9 @@ void ZetaModel::step() {
 
   // final calc of eddy visc
   updateMuT();
+
+  // rotate storage
+  UpdateTimestepHistory(dt_);  
 }
 
 void ZetaModel::updateMuT() {
@@ -733,9 +695,10 @@ void ZetaModel::computeStrain() {
     dSmag[i] = 0.0;
     for (int j = 0; j < dim_; j++) dSmag[i] += Sij[i + j * SdofInt_] * Sij[i + j * SdofInt_];
     for (int j = dim_; j < 2 * dim_; j++) dSmag[i] += 2.0 * Sij[i + j * SdofInt_] * Sij[i + j * SdofInt_];
-    dSmag[i] = sqrt(dSmag[i]);
+    dSmag[i] = sqrt(std::max(dSmag[i],0.0));
     dSmag[i] = std::max(dSmag[i], Smin);
   }
+  sMag_gf_.SetFromTrueDofs(sMag_);
 }
 
 void ZetaModel::updateTTS() {
@@ -748,15 +711,17 @@ void ZetaModel::updateTTS() {
   double *dTTS = tts_.HostReadWrite();
 
   double Ctime;
+  tke_gf_.GetTrueDofs(tke_);  
   Ctime = 0.6 / (std::sqrt(0.6) * std::sqrt(2.0) * Cmu_);
   for (int i = 0; i < SdofInt_; i++) {
     double T1, T2, T3;
     T1 = dTKE[i] / dTDR[i];
     T2 = Ctime / (dSmag[i] * dZeta[i]);
-    T3 = Ct_ * std::sqrt((dMu[i] / (dRho[i]) * 1.0 / dTDR[i]));
+    T3 = Ct_ * std::sqrt( std::max(dMu[i] / (dRho[i] * dTDR[i]),0.0) );
     dTTS[i] = std::min(T1, T2);
     dTTS[i] = std::max(dTTS[i], T3);
     dTTS[i] = std::max(dTTS[i], tts_min_);
+    dTTS[i] = std::min(dTTS[i], tts_max_);    
   }
   tts_gf_.SetFromTrueDofs(tts_);
 }
@@ -769,6 +734,7 @@ void ZetaModel::updateTLS() {
   const double *dMu = mu_.HostRead();
   const double *dRho = rho_.HostRead();
   double *dTLS = tls_.HostReadWrite();
+  double Lmax = 10.0;
 
   double Clength;
   Clength = 1.0 / (std::sqrt(0.6) * std::sqrt(2.0) * Cmu_);
@@ -780,6 +746,7 @@ void ZetaModel::updateTLS() {
     dTLS[i] = std::min(L1, L2);
     dTLS[i] = Cl_ * std::max(dTLS[i], L3);
     dTLS[i] = std::max(dTLS[i], tls_min_);
+    dTLS[i] = std::min(dTLS[i], tls_max_);  
   }
   tls_gf_.SetFromTrueDofs(tls_);
 
@@ -947,14 +914,14 @@ void ZetaModel::tkeStep() {
   // destruction => include in lhs
   // MsRho_->AddMult(tdr_, res_, -1.0);
 
-  // Update Helmholtz operator
-  // rhoDt_gf_ = *rho_gf_;
+  // Update Helmholtz operator  
   rhoDt_gf_ = *(thermoChem_interface_->density);
   rhoDt_gf_ *= (time_coeff_.bd0 / dt_);
+  
   diag_coeff_ = tke_diag_coeff_;
   diff_total_coeff_ = tke_diff_total_coeff_;
   ess_tdof_ = &tke_ess_tdof_;
-  ess_attr_ = &tke_ess_attr_;
+  ess_attr_ = &tke_ess_attr_;  
 
   Hs_form_->Update();
   Hs_form_->Assemble();
@@ -980,7 +947,7 @@ void ZetaModel::tkeStep() {
     auto *HC = Hs_.As<ConstrainedOperator>();
     EliminateRHS(*Hs_form_, *HC, tke_ess_tdof_, tke_next_gf_, res_gf_, Xt2, Bt2, 1);
   } else {
-    Hs_form_->FormLinearSystem(tke_ess_tdof_, tke_next_gf_, res_gf_, Hs_, Xt2, Bt2, 1);
+    Hs_form_->FormLinearSystem(tke_ess_tdof_, tke_gf_, res_gf_, Hs_, Xt2, Bt2, 1);    
   }
 
   // solve helmholtz eq for temp
@@ -1004,7 +971,7 @@ void ZetaModel::tdrStep() {
 
   // convection (->tmpR0_)
   convection("tdr");
-  res_.Set(-1.0, tmpR0_);
+  res_.Add(-1.0, tmpR0_);
 
   // for unsteady term, compute and add known part of BDF unsteady term
   tmpR0_.Set(time_coeff_.bd1 / dt_, tdr_);
@@ -1029,19 +996,23 @@ void ZetaModel::tdrStep() {
   // MsRho_->AddMult(tmpR0_, res_, -1.0);
 
   // Update Helmholtz operator
-  // rhoDt_gf_ = *rho_gf_;
   rhoDt_gf_ = *(thermoChem_interface_->density);
   rhoDt_gf_ *= (time_coeff_.bd0 / dt_);
   diag_coeff_ = tdr_diag_coeff_;
   diff_total_coeff_ = tdr_diff_total_coeff_;
+  
   ess_tdof_ = &tdr_ess_tdof_;
   ess_attr_ = &tdr_ess_attr_;
   wall_coeff_ = tdr_wall_coeff_;
 
+  // boundary condition
+  /*
+  tmpR0_ = 0.0;
   Hs_bdry_->Update();
   Hs_bdry_->Assemble();
   Hs_bdry_->ParallelAssemble(tmpR0_);
   res_.Add(-1.0, tmpR0_);
+  */
 
   Hs_form_->Update();
   Hs_form_->Assemble();
@@ -1067,9 +1038,9 @@ void ZetaModel::tdrStep() {
     auto *HC = Hs_.As<ConstrainedOperator>();
     EliminateRHS(*Hs_form_, *HC, tdr_ess_tdof_, tdr_next_gf_, res_gf_, Xt2, Bt2, 1);
   } else {
-    Hs_form_->FormLinearSystem(tdr_ess_tdof_, tdr_next_gf_, res_gf_, Hs_, Xt2, Bt2, 1);
+    Hs_form_->FormLinearSystem(tdr_ess_tdof_, tdr_gf_, res_gf_, Hs_, Xt2, Bt2, 1);
   }
-
+  
   // solve helmholtz eq for temp
   HsInv_->Mult(Bt2, Xt2);
   assert(HsInv_->GetConverged());
@@ -1091,7 +1062,7 @@ void ZetaModel::zetaStep() {
 
   // convection
   convection("zeta");  // ->tmpR0_
-  res_.Set(-1.0, tmpR0_);
+  res_.Add(-1.0, tmpR0_);
 
   // for unsteady term, compute and add known part of BDF unsteady term
   tmpR0_.Set(time_coeff_.bd1 / dt_, zeta_);
@@ -1109,7 +1080,6 @@ void ZetaModel::zetaStep() {
   // Ms_->AddMult(tmpR0_, res_, -1.0);
 
   // Update Helmholtz operator to account for changing dt, rho, and kappa
-  // rhoDt_gf_ = *rho_gf_;
   rhoDt_gf_ = *(thermoChem_interface_->density);
   rhoDt_gf_ *= (time_coeff_.bd0 / dt_);
   diag_coeff_ = zeta_diag_coeff_;
@@ -1141,7 +1111,7 @@ void ZetaModel::zetaStep() {
     auto *HC = Hs_.As<ConstrainedOperator>();
     EliminateRHS(*Hs_form_, *HC, zeta_ess_tdof_, zeta_next_gf_, res_gf_, Xt2, Bt2, 1);
   } else {
-    Hs_form_->FormLinearSystem(zeta_ess_tdof_, zeta_next_gf_, res_gf_, Hs_, Xt2, Bt2, 1);
+    Hs_form_->FormLinearSystem(zeta_ess_tdof_, zeta_gf_, res_gf_, Hs_, Xt2, Bt2, 1);
   }
 
   // solve helmholtz eq for temp
@@ -1185,6 +1155,8 @@ void ZetaModel::fStep() {
   ess_attr_ = &fRate_ess_attr_;
   wall_coeff_ = fRate_wall_coeff_;
 
+  // boundary condition
+  tmpR0_ = 0.0;
   Hs_bdry_->Update();
   Hs_bdry_->Assemble();
   Hs_bdry_->ParallelAssemble(tmpR0_);
