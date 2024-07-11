@@ -99,12 +99,13 @@ class ZetaModel : public TurbModelBase {
 
   // Linear-solver-related options
   int pl_solve_ = 0;
-  int max_iter_;
-  double rtol_ = 1e-12;
+  int max_iter_ = 2000;
+  double rtol_ = 1e-8;
 
   double tke_ic_, tdr_ic_;
   double tke_min_, tdr_min_, zeta_min_;
   double fRate_min_, tts_min_, tls_min_;
+  double fRate_max_, tts_max_, tls_max_;  
 
   // just keep these saved for ease
   int numWalls_, numInlets_, numOutlets_;
@@ -212,6 +213,7 @@ class ZetaModel : public TurbModelBase {
 
   // ParGridFunction diag_gf_;
 
+  ParGridFunction sMag_gf_;  
   Vector tmpR0_, tmpR0a_, tmpR0b_, tmpR0c_;
   Vector strain_, sMag_;
 
