@@ -450,10 +450,6 @@ void ZetaModel::initializeSelf() {
   sfes_->GetEssentialTrueDofs(v2_ess_attr_, v2_ess_tdof_);  
   sfes_->GetEssentialTrueDofs(fRate_ess_attr_, fRate_ess_tdof_);
   if (rank0_) std::cout << "Zeta-f RANS model  essential true dof step" << endl;
-
-  // call twice to fill previous step registers
-  updateTimestepHistory();
-  updateTimestepHistory();    
   
 }
 
@@ -635,6 +631,17 @@ void ZetaModel::initializeOperators() {
   if (rank0_) std::cout << "zeta-f operators set" << endl;
 }
 
+void ZetaModel::initializeIO(IODataOrganizer &io) {
+  io.registerIOFamily("tke", "/tke", &tke_gf_, true, true, sfec_);
+  io.registerIOVar("/tke", "tke", 0);
+  io.registerIOFamily("tdr", "/tdr", &tdr_gf_, true, true, sfec_);
+  io.registerIOVar("/tdr", "tdr", 0);  
+  io.registerIOFamily("v2", "/v2", &v2_gf_, true, true, sfec_);
+  io.registerIOVar("/v2", "v2", 0);  
+  io.registerIOFamily("zeta", "/zeta", &zeta_gf_, true, true, sfec_);  
+  io.registerIOVar("/zeta", "zeta", 0);
+}
+
 void ZetaModel::initializeViz(ParaViewDataCollection &pvdc) {
   pvdc.RegisterField("Pk", &prod_gf_);
   pvdc.RegisterField("TTS", &tts_gf_);
@@ -648,12 +655,31 @@ void ZetaModel::initializeViz(ParaViewDataCollection &pvdc) {
 }
 
 void ZetaModel::setup() {
-  // initial mu_t 
-  //computeStrain();
-  //updateTTS();
-  //updateMuT();
+  /*
+  tke_gf_.GetTrueDofs(tke_);
+  tdr_gf_.GetTrueDofs(tdr_);
+  zeta_gf_.GetTrueDofs(zeta_);
+  v2_gf_.GetTrueDofs(v2_);  
+  
+  tke_next_gf_.SetFromTrueDofs(tke_);
+  tdr_next_gf_.SetFromTrueDofs(tdr_);
+  zeta_next_gf_.SetFromTrueDofs(zeta_);
+  v2_next_gf_.SetFromTrueDofs(v2_);  
 
-  // nothing for now...
+  tke_next_gf_.GetTrueDofs(tke_next_);
+  tdr_next_gf_.GetTrueDofs(tdr_next_);
+  zeta_next_gf_.GetTrueDofs(zeta_next_);
+  v2_next_gf_.GetTrueDofs(v2_next_);  
+  
+  // call twice to fill previous step registers
+  updateTimestepHistory();
+  updateTimestepHistory();
+  
+  // initial mu_t 
+  computeStrain();
+  updateTTS();
+  updateMuT();
+  */
 }
 
 void ZetaModel::step() {

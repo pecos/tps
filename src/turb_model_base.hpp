@@ -37,6 +37,7 @@
 
 #include "tps_mfem_wrap.hpp"
 
+class IODataOrganizer;
 struct flowToTurbModel;
 struct thermoChemToTurbModel;
 struct spongeToTurbModel;
@@ -88,6 +89,8 @@ class TurbModelBase {
    * @brief Hook to let derived classes register visualization fields with ParaViewDataCollection
    */
   virtual void initializeViz(mfem::ParaViewDataCollection &pvdc) {}
+
+  virtual void initializeIO(IODataOrganizer &io) {}  
 
   /**
    * @brief Initialize model operators
