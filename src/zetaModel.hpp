@@ -333,6 +333,7 @@ class ZetaModel : public TurbModelBase {
   void updateBC(int current_step);
   void step() final;
   void setup() final;
+  void initializeIO(IODataOrganizer &io) final;  
   void initializeViz(ParaViewDataCollection &pvdc) final;
   void tkeStep();
   void tdrStep();

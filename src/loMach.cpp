@@ -256,6 +256,7 @@ void LoMachSolver::initialize() {
   thermo_->initializeFromSponge(&sponge_->toThermoChem_interface_);
 
   // Initialize restart read/write capability
+  turbModel_->initializeIO(ioData);    
   flow_->initializeIO(ioData);
   thermo_->initializeIO(ioData);
 
@@ -281,7 +282,7 @@ void LoMachSolver::initialize() {
 
   // Finish initializing operators
   flow_->initializeOperators();
-  turbModel_->setup();
+  turbModel_->setup();    
   turbModel_->initializeOperators();
   thermo_->initializeOperators();
 
@@ -377,7 +378,7 @@ void LoMachSolver::solveBegin() {
     }
 
     std::cout << std::endl;
-    std::cout << "#==================================================================" << std::endl;
+    std::cout << "#=========================================================================" << std::endl;
 
     std::cout << std::setw(10) << iter << " ";
     std::cout << std::setw(10) << std::scientific << temporal_coeff_.time << " ";
