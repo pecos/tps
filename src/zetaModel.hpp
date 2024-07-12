@@ -79,6 +79,7 @@ class ZetaModel : public TurbModelBase {
   double dt_;
   double time_;
   int nvel_, dim_;
+  double dt_nm2_, dt_nm1_;  
 
   std::string ic_string_;
 
@@ -103,7 +104,7 @@ class ZetaModel : public TurbModelBase {
   double rtol_ = 1e-8;
 
   double tke_ic_, tdr_ic_;
-  double tke_min_, tdr_min_, zeta_min_;
+  double tke_min_, tdr_min_, zeta_min_, v2_min_;
   double fRate_min_, tts_min_, tls_min_;
   double fRate_max_, tts_max_, tls_max_;
   double mut_min_;
@@ -179,6 +180,13 @@ class ZetaModel : public TurbModelBase {
   Vector zeta_nm1_, zeta_nm2_;
   Vector Nzeta_, Nzeta_nm1_, Nzeta_nm2_;
 
+  ParGridFunction v2_gf_;
+  Vector v2_;
+  ParGridFunction v2_next_gf_;
+  Vector v2_next_;
+  Vector v2_nm1_, v2_nm2_;
+  Vector Nv2_, Nv2_nm1_, Nv2_nm2_;
+  
   /// elliptic relaxation rate
   ParGridFunction fRate_gf_;
   Vector fRate_;
@@ -191,7 +199,7 @@ class ZetaModel : public TurbModelBase {
 
   /// turbulent time scale
   ParGridFunction tts_gf_;
-  Vector tts_;
+  Vector tts_, tts_strain_;
 
   /// turbulent production
   ParGridFunction prod_gf_;
@@ -207,8 +215,10 @@ class ZetaModel : public TurbModelBase {
   double C2prime_ = 0.65;
   double C2_ = 0.3;  
   double Ct_ = 6.0;
-  double Cl_ = 0.36;
-  double Cn_ = 85.0;
+  //double Cl_ = 0.36;
+  double Cl_ = 0.23;
+  //double Cn_ = 85.0;
+  double Cn_ = 70.0;  
   double Ce1_;  // function of local zeta
 
   ParGridFunction res_gf_;
@@ -238,6 +248,7 @@ class ZetaModel : public TurbModelBase {
   GridFunctionCoefficient *tls2_coeff_ = nullptr;
   GridFunctionCoefficient *prod_coeff_ = nullptr;
   GridFunctionCoefficient *tke_coeff_ = nullptr;
+  GridFunctionCoefficient *tdr_coeff_ = nullptr;  
   GridFunctionCoefficient *rho_coeff_ = nullptr;
   VectorGridFunctionCoefficient *vel_coeff_ = nullptr;
   ScalarVectorProductCoefficient *rhou_coeff_ = nullptr;
@@ -262,9 +273,12 @@ class ZetaModel : public TurbModelBase {
   ConstantCoefficient *Ce2_coeff_ = nullptr;
   ProductCoefficient *Ce2rhoTTS_coeff_ = nullptr;
   RatioCoefficient *Pk_coeff_ = nullptr;
+  RatioCoefficient *ek_coeff_ = nullptr;
+  ProductCoefficient *ek_rho_coeff_ = nullptr;    
   SumCoefficient *tke_diag_coeff_ = nullptr;
   SumCoefficient *tdr_diag_coeff_ = nullptr;
   SumCoefficient *zeta_diag_coeff_ = nullptr;
+  SumCoefficient *v2_diag_coeff_ = nullptr;  
   RatioCoefficient *f_diag_coeff_ = nullptr;
   SumCoefficient *f_diag_total_coeff_ = nullptr;
 
@@ -292,10 +306,12 @@ class ZetaModel : public TurbModelBase {
   Array<int> tke_ess_attr_;
   Array<int> tdr_ess_attr_;
   Array<int> zeta_ess_attr_;
+  Array<int> v2_ess_attr_;  
   Array<int> fRate_ess_attr_;
   Array<int> tke_ess_tdof_;
   Array<int> tdr_ess_tdof_;
   Array<int> zeta_ess_tdof_;
+  Array<int> v2_ess_tdof_;  
   Array<int> fRate_ess_tdof_;
   Array<int> *ess_attr_ = nullptr;
   Array<int> *ess_tdof_ = nullptr;
@@ -303,6 +319,7 @@ class ZetaModel : public TurbModelBase {
   std::vector<DirichletBC_T<Coefficient>> tke_dbcs_;
   std::vector<DirichletBC_T<Coefficient>> tdr_dbcs_;
   std::vector<DirichletBC_T<Coefficient>> zeta_dbcs_;
+  std::vector<DirichletBC_T<Coefficient>> v2_dbcs_;  
   std::vector<DirichletBC_T<Coefficient>> fRate_dbcs_;
 
  public:
@@ -320,9 +337,11 @@ class ZetaModel : public TurbModelBase {
   void tkeStep();
   void tdrStep();
   void zetaStep();
+  void v2Step();  
   void fStep();
   void convection(string scalar);
-  void UpdateTimestepHistory(double dt);
+  void updateTimestepHistory();
+  void updateZeta();
   void extrapolateState();
   void updateProd();
   void updateTLS();
@@ -338,6 +357,10 @@ class ZetaModel : public TurbModelBase {
   void AddTKEDirichletBC(Coefficient *coeff, Array<int> &attr);
   void AddTKEDirichletBC(ScalarFuncT *f, Array<int> &attr);
 
+  void AddV2DirichletBC(const double &tke, Array<int> &attr);
+  void AddV2DirichletBC(Coefficient *coeff, Array<int> &attr);
+  void AddV2DirichletBC(ScalarFuncT *f, Array<int> &attr);
+  
   void AddTDRDirichletBC(const double &tdr, Array<int> &attr);
   void AddTDRDirichletBC(Coefficient *coeff, Array<int> &attr);
   void AddTDRDirichletBC(ScalarFuncT *f, Array<int> &attr);
