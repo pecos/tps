@@ -280,6 +280,7 @@ void LoMachSolver::initialize() {
 
   // Finish initializing operators
   flow_->initializeOperators();
+  flow_->setup();      
   turbModel_->setup();    
   turbModel_->initializeOperators();
   thermo_->initializeOperators();

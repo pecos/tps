@@ -404,6 +404,9 @@ class Tomboulides final : public FlowBase {
 
   /// Compute Galerkin projection of velocity gradient
   void evaluateVelocityGradient();
+
+  /// additional initialization actions
+  void setup();
 };
 
 #endif  // TOMBOULIDES_HPP_

@@ -640,6 +640,11 @@ void ZetaModel::initializeIO(IODataOrganizer &io) {
   io.registerIOVar("/v2", "v2", 0);  
   io.registerIOFamily("zeta", "/zeta", &zeta_gf_, true, true, sfec_);  
   io.registerIOVar("/zeta", "zeta", 0);
+
+  // should not be necessary with a computeMuT (and strain/tts) call in setup, but
+  // does not seem to work
+  io.registerIOFamily("eddy viscosity", "/muT", &eddyVisc_gf_, true, true, sfec_);  
+  io.registerIOVar("/muT", "muT", 0);  
 }
 
 void ZetaModel::initializeViz(ParaViewDataCollection &pvdc) {
@@ -655,7 +660,10 @@ void ZetaModel::initializeViz(ParaViewDataCollection &pvdc) {
 }
 
 void ZetaModel::setup() {
+
+  // seems to break the startup...
   /*
+  // populate  registers after restarts
   tke_gf_.GetTrueDofs(tke_);
   tdr_gf_.GetTrueDofs(tdr_);
   zeta_gf_.GetTrueDofs(zeta_);
@@ -670,8 +678,8 @@ void ZetaModel::setup() {
   tdr_next_gf_.GetTrueDofs(tdr_next_);
   zeta_next_gf_.GetTrueDofs(zeta_next_);
   v2_next_gf_.GetTrueDofs(v2_next_);  
-  
-  // call twice to fill previous step registers
+
+  // call twice to fill both {n-1} and {n-2} 
   updateTimestepHistory();
   updateTimestepHistory();
   
@@ -680,6 +688,7 @@ void ZetaModel::setup() {
   updateTTS();
   updateMuT();
   */
+
 }
 
 void ZetaModel::step() {
