@@ -1781,6 +1781,10 @@ double Tomboulides::maxVelocityMagnitude() {
   return global_max_vel_magnitude;
 }
 
+void Tomboulides::setup() {
+  evaluateVelocityGradient();
+}
+
 void Tomboulides::evaluateVelocityGradient() {
   setScalarFromVector(u_next_vec_, 0, &tmpR0_);
   G_op_->Mult(tmpR0_, tmpR1_);

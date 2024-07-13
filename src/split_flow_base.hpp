@@ -99,6 +99,8 @@ class FlowBase {
   virtual void initializeStats(Averaging &average, IODataOrganizer &io, bool continuation) const {}
   virtual void computeDissipation(Averaging &average, const int iter) {}
 
+  virtual void setup() {}
+
   /**
    * @brief Header strings for screen dump
    *
