@@ -1375,9 +1375,7 @@ void Tomboulides::step() {
       // systems.  As a workaround, we copy instead.
       auto d_pp_div_rad = pp_div_rad_comp_gf_->Write();
       auto d_pp_div = pp_div_gf_->Read();
-      MFEM_FORALL(i, pp_div_rad_comp_gf_->Size(), {
-          d_pp_div_rad[i] = d_pp_div[i];
-        });
+      MFEM_FORALL(i, pp_div_rad_comp_gf_->Size(), { d_pp_div_rad[i] = d_pp_div[i]; });
     }
     pp_div_rad_comp_gf_->HostRead();
 
@@ -1490,9 +1488,7 @@ void Tomboulides::step() {
       // about pp_div_rad_comp_gf_ above.
       auto d_u_next_rad = u_next_rad_comp_gf_->Write();
       auto d_u_next = u_next_gf_->Read();
-      MFEM_FORALL(i, u_next_rad_comp_gf_->Size(), {
-          d_u_next_rad[i] = d_u_next[i];
-        });
+      MFEM_FORALL(i, u_next_rad_comp_gf_->Size(), { d_u_next_rad[i] = d_u_next[i]; });
     }
     u_next_rad_comp_gf_->HostRead();
 

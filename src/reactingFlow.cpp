@@ -421,6 +421,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   chemistry_ = new Chemistry(mixture_, chemistryInput_);
 
   tpsP_->getInput("loMach/reactingFlow/ic", ic_string_, std::string(""));
+  tpsP_->getInput("loMach/reactingFlow/sub-steps", nSub_, 1);
 }
 
 ReactingFlow::~ReactingFlow() {
@@ -565,6 +566,12 @@ void ReactingFlow::initializeSelf() {
   NYn_ = 0.0;
   NYnm1_ = 0.0;
   NYnm2_ = 0.0;
+
+  // for time-splitting
+  spec_buffer_.SetSize(yDofInt_);
+  temp_buffer_.SetSize(sDofInt_);
+  YnStar_.SetSize(yDofInt_);
+  TnStar_.SetSize(sDofInt_);
 
   // number density
   Xn_.SetSize(yDofInt_);
@@ -1238,7 +1245,8 @@ void ReactingFlow::step() {
   updateThermoP();
   updateDensity(1.0);
   updateDiffusivity();
-  speciesProduction();
+
+  /// PART I: advect-diffuse species and temp to get T* and Yn*
 
   // advance species, last slot is from calculated sum of others
   for (int iSpecies = 0; iSpecies < nSpecies_ - 1; iSpecies++) {
@@ -1246,9 +1254,6 @@ void ReactingFlow::step() {
   }
   speciesLastStep();
   YnFull_gf_.SetFromTrueDofs(Yn_next_);
-
-  // ho_i*w_i
-  heatOfFormation();
 
   // TODO(swh): this is a bad name
   crossDiffusion();
@@ -1268,11 +1273,53 @@ void ReactingFlow::step() {
     Tn_next_gf_.GetTrueDofs(Tn_next_);
   }
 
-  // explicit filter species (is this necessary?)
+  // explicit filter species
+  // Add if found to be necessary
 
-  // prepare for external use
+  /// PART II: time-splitting of reaction
+
+  // Notes:
+  // 1) store phi^{n} fields in buffer so substeps can use {n}
+  // as containers for {n}+iSub*dtsub substates
+  // 2) YnStar and TnStar contain interpolated star states at substep
+  // 3) _next contains full {n+1}* state
+  Yn_gf_.GetTrueDofs(spec_buffer_);
+  Tn_gf_.GetTrueDofs(temp_buffer_);
+
+  for (int iSub = 0; iSub < nSub_; iSub++) {
+    // update wdot quantities at full substep in Yn/Tn state
+    updateMixture();
+    speciesProduction();
+
+    // interpolate to substep time
+    substepState(iSub);
+
+    // advance over substep
+    for (int iSpecies = 0; iSpecies < nSpecies_ - 1; iSpecies++) {
+      speciesSubstep(iSpecies);
+    }
+    speciesLastSubstep();
+    Yn_gf_.SetFromTrueDofs(Yn_);
+
+    // ho_i*w_i
+    heatOfFormation();
+    temperatureSubstep();
+    Tn_gf_.SetFromTrueDofs(Tn_);
+  }
+
+  // set register to correct full step fields
+  Yn_next_gf_.SetFromTrueDofs(Yn_);
+  Tn_next_gf_.SetFromTrueDofs(Tn_);
+  Yn_next_gf_.GetTrueDofs(Yn_next_);
+  Tn_next_gf_.GetTrueDofs(Tn_next_);
+
+  Yn_gf_.SetFromTrueDofs(spec_buffer_);
+  Tn_gf_.SetFromTrueDofs(temp_buffer_);
+  Yn_gf_.GetTrueDofs(Yn_);
+  Tn_gf_.GetTrueDofs(Tn_);
+
+  /// PART III: prepare for external use
   updateDensity(1.0);
-  // computeQt();
   computeQtTO();
 
   UpdateTimestepHistory(dt_);
@@ -1302,8 +1349,8 @@ void ReactingFlow::temperatureStep() {
   tmpR0_ = dtP_;  // with rho*Cp on LHS, no Cp on this term
   Ms_->AddMult(tmpR0_, resT_);
 
-  // heat of formation
-  Ms_->AddMult(hw_, resT_);
+  // heat of formation -> treated explicitly now in substep
+  // Ms_->AddMult(hw_, resT_);
 
   // species-temp diffusion term, already in int-weak form
   resT_.Add(1.0, crossDiff_);
@@ -1351,9 +1398,39 @@ void ReactingFlow::temperatureStep() {
   Tn_next_gf_.GetTrueDofs(Tn_next_);
 }
 
+void ReactingFlow::temperatureSubstep() {
+  // substep dt
+  double dtSub = dt_ / (double)nSub_;
+
+  // heat of formation term
+  tmpR0_.Set(1.0, hw_);
+  tmpR0_ /= rn_;
+  tmpR0_ *= dtSub;
+
+  // TnStar has star state at substep here
+  tmpR0_ += TnStar_;
+
+  // Tn now has full state at substep
+  Tn_ = tmpR0_;
+}
+
 void ReactingFlow::speciesLastStep() {
   tmpR0_ = 0.0;
   double *dataYn = Yn_next_.HostReadWrite();
+  double *dataYsum = tmpR0_.HostReadWrite();
+  for (int n = 0; n < nSpecies_ - 1; n++) {
+    for (int i = 0; i < sDofInt_; i++) {
+      dataYsum[i] += dataYn[i + n * sDofInt_];
+    }
+  }
+  for (int i = 0; i < sDofInt_; i++) {
+    dataYn[i + (nSpecies_ - 1) * sDofInt_] = 1.0 - dataYsum[i];
+  }
+}
+
+void ReactingFlow::speciesLastSubstep() {
+  tmpR0_ = 0.0;
+  double *dataYn = Yn_.HostReadWrite();
   double *dataYsum = tmpR0_.HostReadWrite();
   for (int n = 0; n < nSpecies_ - 1; n++) {
     for (int i = 0; i < sDofInt_; i++) {
@@ -1392,9 +1469,9 @@ void ReactingFlow::speciesStep(int iSpec) {
   MsRho_form_->FormSystemMatrix(empty, MsRho_);
   MsRho_->AddMult(tmpR0_, resY_, -1.0);
 
-  // production of iSpec
-  setScalarFromVector(prodY_, iSpec, &tmpR0_);
-  Ms_->AddMult(tmpR0_, resY_);
+  // production of iSpec => treated explicitly now in substep
+  // setScalarFromVector(prodY_, iSpec, &tmpR0_);
+  // Ms_->AddMult(tmpR0_, resY_);
 
   // Add natural boundary terms here later
   // NB: adiabatic natural BC is handled, but don't have ability to impose non-zero heat flux yet
@@ -1443,6 +1520,24 @@ void ReactingFlow::speciesStep(int iSpec) {
   Hy_form_->RecoverFEMSolution(Xt2, resT_gf_, Yn_next_gf_);
   Yn_next_gf_.GetTrueDofs(tmpR0_);
   setVectorFromScalar(tmpR0_, iSpec, &Yn_next_);
+}
+
+// Y{n + (substep+1)} = dt * wdot(Y{n + (substep)} + Y{n + (substep+1)}*
+void ReactingFlow::speciesSubstep(int iSpec) {
+  // substep dt
+  double dtSub = dt_ / (double)nSub_;
+
+  // production of iSpec
+  setScalarFromVector(prodY_, iSpec, &tmpR0_);
+  tmpR0_ /= rn_;
+  tmpR0_ *= dtSub;
+
+  // YnStar has star state at substep here
+  setScalarFromVector(YnStar_, iSpec, &tmpR0a_);
+  tmpR0a_ += tmpR0_;
+
+  // Yn now has full state at substep
+  setVectorFromScalar(tmpR0a_, iSpec, &Yn_);
 }
 
 void ReactingFlow::speciesProduction() {
@@ -1655,6 +1750,22 @@ void ReactingFlow::extrapolateState() {
   Yext_.Set(time_coeff_.ab1, Yn_);
   Yext_.Add(time_coeff_.ab2, Ynm1_);
   Yext_.Add(time_coeff_.ab3, Ynm2_);
+}
+
+// Interpolate star state to substeps. Linear for now, use higher order
+// if time-splitting order can be improved
+void ReactingFlow::substepState(int iSub) {
+  double wt0, wt1;
+  wt0 = (double)(iSub + 1) / (double)nSub_;
+  wt1 = 1.0 - wt1;
+
+  TnStar_.Set(wt0, temp_buffer_);
+  TnStar_.Add(wt1, Tn_next_);
+  // Tn_gf_.SetFromTrueDofs(Tn_);
+
+  YnStar_.Set(wt0, spec_buffer_);
+  YnStar_.Add(wt1, Yn_next_);
+  // Yn_gf_.SetFromTrueDofs(Yn_);
 }
 
 void ReactingFlow::updateMixture() {
