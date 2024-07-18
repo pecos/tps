@@ -120,25 +120,32 @@ setup() {
 }
 
 @test "[$TEST] verify consistent serialized restart for Tomboulides with lid-driven cavity with 2 mpi ranks" {
+    rm -f restart_output-lid*.h5
+
     # Runs 2 iter on 2 mpi ranks using restartMode = singleFileReadWrite
     cat $RUNFILE_LID | sed 's/maxIters = 1000/maxIters = 2/' | \
         sed 's/outputFreq = 10000/outputFreq = 1/' | \
         sed 's/#restartMode = singleFileReadWrite/restartMode = singleFileReadWrite/' > $RUNFILE_LID_MOD
-    $MPIRUN -n 2 $EXE --runFile $RUNFILE_LID_MOD
+    run $MPIRUN -n 2 $EXE --runFile $RUNFILE_LID_MOD
+    [[ ${status} -eq 0 ]]
+    echo $(ls *.h5)
+    test -s restart_output-lid.sol.h5
     mv restart_output-lid.sol.h5 restart_output-lid.sol.2.h5
 
     # Run 1 iter (from 0 IC)
     cat $RUNFILE_LID | sed 's/maxIters = 1000/maxIters = 1/' | \
         sed 's/outputFreq = 10000/outputFreq = 1/' |
         sed 's/#restartMode = singleFileReadWrite/restartMode = singleFileReadWrite/' > $RUNFILE_LID_MOD
-    $MPIRUN -n 2 $EXE --runFile $RUNFILE_LID_MOD
+    run $MPIRUN -n 2 $EXE --runFile $RUNFILE_LID_MOD
+    [[ ${status} -eq 0 ]]
 
     # Run 1 more (from restart)
     cat $RUNFILE_LID | sed 's/maxIters = 1000/maxIters = 2/' | \
         sed 's/outputFreq = 10000/outputFreq = 1/' | \
         sed 's/#enableRestart = True/enableRestart = True/' | \
         sed 's/#restartMode = singleFileReadWrite/restartMode = singleFileReadWrite/' > $RUNFILE_LID_MOD
-    $MPIRUN -n 2 $EXE --runFile $RUNFILE_LID_MOD
+    run $MPIRUN -n 2 $EXE --runFile $RUNFILE_LID_MOD
+    [[ ${status} -eq 0 ]]
 
     # check solutions are the same!
     h5diff -r --delta=1e-10 restart_output-lid.sol.h5 restart_output-lid.sol.2.h5
