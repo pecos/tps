@@ -337,10 +337,10 @@ class ReactingFlow : public ThermoChemModelBase {
   void crossDiffusion();
 
   // time-splitting
-  void substepState(int iSub);
+  void substepState();
   void speciesLastSubstep();
-  void speciesSubstep(int iSpec);
-  void temperatureSubstep();
+  void speciesSubstep(int iSpec, int iSub);
+  void temperatureSubstep(int iSub);
 
   /// for creation of structs to interface with old plasma/chem stuff
   void identifySpeciesType(Array<ArgonSpcs> &speciesType);
