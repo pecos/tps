@@ -1256,7 +1256,7 @@ void ReactingFlow::step() {
   YnFull_gf_.SetFromTrueDofs(Yn_next_);
 
   // TODO(swh): this is a bad name
-  crossDiffusion();
+  //crossDiffusion();
 
   // advance temperature
   temperatureStep();
@@ -1296,7 +1296,8 @@ void ReactingFlow::step() {
     // update wdot quantities at full substep in Yn/Tn state
     updateMixture();
     speciesProduction();
-    heatOfFormation();    
+    heatOfFormation();
+    crossDiffusion();    
 
     // advance over substep
     for (int iSpecies = 0; iSpecies < nSpecies_ - 1; iSpecies++) {
@@ -1407,6 +1408,7 @@ void ReactingFlow::temperatureSubstep(int iSub) {
 
   // heat of formation term
   tmpR0_.Set(1.0, hw_);
+  //tmpR0_.Add(1.0, crossDiff_);
   tmpR0_ /= rn_;
   tmpR0_ *= dtSub;
 
@@ -1639,7 +1641,8 @@ void ReactingFlow::crossDiffusion() {
     tmpR1c_ += tmpR1b_;
   }
   dotVector(tmpR1a_, tmpR1c_, &tmpR1_, dim_);
-  Ms_->Mult(tmpR1_, crossDiff_);
+  Ms_->Mult(tmpR1_, crossDiff_); // if including in time-splitting comment
+  //crossDiff_.Set(1.0,tmpR1_);
 }
 
 void ReactingFlow::computeExplicitTempConvectionOP(bool extrap) {
