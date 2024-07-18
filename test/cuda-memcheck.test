@@ -3,16 +3,35 @@
 
 TEST="cuda-memcheck"
 RUNFILE="inputs/input.dtconst.2iters.cyl.ini"
+LIBTOOL_RUN="../libtool --mode=execute"
+
+setup() {
+    found=1
+
+    # if in path, use whatever compute-sanitizer we find
+    SANITIZER=$(type -P compute-sanitizer) || found=0
+
+    # if not in path, try /usr/local/cuda/bin
+    if [ $found -eq 0 ]; then
+        SANITIZER=$(type -P /usr/local/cuda/bin/compute-sanitizer) || found=-1
+    fi
+
+    # otherwise, give up and skip
+    if [ $found -eq -1 ]; then
+        SANITIZER=skip
+    fi
+}
 
 @test "[$TEST] verify cuda-memcheck detects known error" {
+    [ "x$SANITIZER" == "xskip" ] && skip "compute-sanitizer not found"
     test -e ./badcuda
-    run /usr/local/cuda/bin/compute-sanitizer --error-exitcode 1 ./badcuda
+    run $SANITIZER --error-exitcode 1 ./badcuda
     [[ "${status}" -eq 1 ]]
 }
 
 @test "[$TEST] run tps with input -> $RUNFILE under cuda-memcheck" {
+    [ "x$SANITIZER" == "xskip" ] && skip "compute-sanitizer not found"
     test -s $RUNFILE
-
-    ../libtool --mode=execute /usr/local/cuda/bin/compute-sanitizer --error-exitcode 1 ../src/tps --runFile $RUNFILE
+    $LIBTOOL_RUN $SANITIZER --error-exitcode 1 ../src/tps --runFile $RUNFILE
 }
 
