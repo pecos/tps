@@ -289,18 +289,36 @@ class ZetaModel : public TurbModelBase {
   ParBilinearForm *As_form_ = nullptr;
   ParBilinearForm *Ms_form_ = nullptr;
   ParBilinearForm *MsRho_form_ = nullptr;
-  ParBilinearForm *Hs_form_ = nullptr;
-  ParLinearForm *Hs_bdry_ = nullptr;
+  ParBilinearForm *Hk_form_ = nullptr;
+  ParBilinearForm *He_form_ = nullptr;
+  ParBilinearForm *Hv_form_ = nullptr;
+  ParBilinearForm *Hf_form_ = nullptr;
+  ParBilinearForm *Hz_form_ = nullptr;
+  ParBilinearForm *Lk_form_ = nullptr;  
+  ParLinearForm *He_bdry_ = nullptr;
 
   OperatorHandle As_;
   OperatorHandle Ms_;
   OperatorHandle MsRho_;
-  OperatorHandle Hs_;
+  OperatorHandle Hk_;
+  OperatorHandle He_;
+  OperatorHandle Hv_;
+  OperatorHandle Hf_;
+  OperatorHandle Hz_;
+  OperatorHandle Lk_;   
 
   mfem::Solver *MsInvPC_ = nullptr;
   mfem::CGSolver *MsInv_ = nullptr;
-  mfem::Solver *HsInvPC_ = nullptr;
-  mfem::CGSolver *HsInv_ = nullptr;
+  mfem::Solver *HkInvPC_ = nullptr;
+  mfem::Solver *HeInvPC_ = nullptr;
+  mfem::Solver *HvInvPC_ = nullptr;
+  mfem::Solver *HfInvPC_ = nullptr;
+  mfem::Solver *HzInvPC_ = nullptr;    
+  mfem::CGSolver *HkInv_ = nullptr;
+  mfem::CGSolver *HeInv_ = nullptr;
+  mfem::CGSolver *HvInv_ = nullptr;
+  mfem::CGSolver *HfInv_ = nullptr;
+  mfem::CGSolver *HzInv_ = nullptr;    
 
   // Boundary condition info
   Array<int> tke_ess_attr_;

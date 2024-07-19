@@ -377,7 +377,7 @@ void LoMachSolver::solveBegin() {
     }
 
     std::cout << std::endl;
-    std::cout << "#=========================================================================" << std::endl;
+    std::cout << "#==========================================================================" << std::endl;
 
     std::cout << std::setw(10) << iter << " ";
     std::cout << std::setw(10) << std::scientific << temporal_coeff_.time << " ";
