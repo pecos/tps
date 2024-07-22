@@ -646,6 +646,11 @@ void ReactingFlow::initializeSelf() {
   Mmix_gf_.SetSpace(sfes_);
   Rmix_gf_.SetSpace(sfes_);
 
+  hw_gf_.SetSpace(sfes_);
+  prod_gf_.SetSpace(sfes_);
+  hw_gf_ = 0.0;
+  prod_gf_ = 0.0;
+  
   if (rank0_) grvy_printf(ginfo, "ReactingFlow vectors and gf initialized...\n");
 
   // exports
@@ -892,6 +897,12 @@ void ReactingFlow::initializeOperators() {
   rho_over_dt_coeff_ = new GridFunctionCoefficient(&rhoDt_gf_);
   rhoCp_over_dt_coeff_ = new ProductCoefficient(*cpMix_coeff_, *rho_over_dt_coeff_);
 
+  // diagonal
+  hof_coeff_ = new GridFunctionCoefficient(&hw_gf_);
+  rx_coeff_ = new GridFunctionCoefficient(&prod_gf_);    
+  temp_diag_coeff_ = new SumCoefficient(*rhoCp_over_dt_coeff_, *hof_coeff_, 1.0, 1.0);
+  spec_diag_coeff_ = new SumCoefficient(*rho_over_dt_coeff_, *rx_coeff_, 1.0, 1.0);    
+
   // thermal_diff_coeff.constant = thermal_diff;
   thermal_diff_coeff_ = new GridFunctionCoefficient(&kappa_gf_);
   thermal_diff_sum_coeff_ = new SumCoefficient(*mut_coeff_, *thermal_diff_coeff_, invPr_, 1.0);
@@ -980,7 +991,8 @@ void ReactingFlow::initializeOperators() {
 
   // temperature Helmholtz
   Ht_form_ = new ParBilinearForm(sfes_);
-  auto *hmt_blfi = new MassIntegrator(*rhoCp_over_dt_coeff_);
+  //auto *hmt_blfi = new MassIntegrator(*rhoCp_over_dt_coeff_);
+  auto *hmt_blfi = new MassIntegrator(*temp_diag_coeff_);  
   auto *hdt_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
 
   if (numerical_integ_) {
@@ -998,7 +1010,8 @@ void ReactingFlow::initializeOperators() {
 
   // species Helmholtz
   Hy_form_ = new ParBilinearForm(sfes_);
-  auto *hmy_blfi = new MassIntegrator(*rho_over_dt_coeff_);
+  //auto *hmy_blfi = new MassIntegrator(*rho_over_dt_coeff_);
+  auto *hmy_blfi = new MassIntegrator(*spec_diag_coeff_);
   auto *hdy_blfi = new DiffusionIntegrator(*species_diff_total_coeff_);
 
   if (numerical_integ_) {
@@ -1303,7 +1316,25 @@ void ReactingFlow::temperatureStep() {
   Ms_->AddMult(tmpR0_, resT_);
 
   // heat of formation
-  Ms_->AddMult(hw_, resT_);
+  {
+    double *prod = hw_.HostReadWrite();
+    double *exp = tmpR0a_.HostReadWrite();
+    double *imp = tmpR0b_.HostReadWrite();
+    double *temp = Text_.HostReadWrite();        
+    for (int i = 0; i < sDofInt_; i++){
+      exp[i] = 0.0;
+      imp[i] = 0.0;      
+      if (prod[i] > 0.0) {
+	exp[i] = prod[i];
+      } else {
+	imp[i] = prod[i] / std::max(temp[i], 1.0e-12);
+      }
+    }
+  }
+  Ms_->AddMult(tmpR0a_, resT_);
+  hw_gf_.SetFromTrueDofs(tmpR0b_);
+  
+  //Ms_->AddMult(hw_, resT_);
 
   // species-temp diffusion term, already in int-weak form
   resT_.Add(1.0, crossDiff_);
@@ -1392,9 +1423,26 @@ void ReactingFlow::speciesStep(int iSpec) {
   MsRho_form_->FormSystemMatrix(empty, MsRho_);
   MsRho_->AddMult(tmpR0_, resY_, -1.0);
 
-  // production of iSpec
+  // production of iSpec  
   setScalarFromVector(prodY_, iSpec, &tmpR0_);
-  Ms_->AddMult(tmpR0_, resY_);
+  setScalarFromVector(Yext_, iSpec, &tmpR0c_);  
+  {
+    double *prod = tmpR0_.HostReadWrite();
+    double *exp = tmpR0a_.HostReadWrite();
+    double *imp = tmpR0b_.HostReadWrite();
+    double *spec = tmpR0c_.HostReadWrite();        
+    for (int i = 0; i < sDofInt_; i++){
+      exp[i] = 0.0;
+      imp[i] = 0.0;      
+      if (prod[i] > 0.0) {
+	exp[i] = prod[i];
+      } else {
+	imp[i] = prod[i] / std::max(spec[i], 1.0e-12);
+      }
+    }
+  }
+  Ms_->AddMult(tmpR0a_, resY_);
+  prod_gf_.SetFromTrueDofs(tmpR0b_);
 
   // Add natural boundary terms here later
   // NB: adiabatic natural BC is handled, but don't have ability to impose non-zero heat flux yet

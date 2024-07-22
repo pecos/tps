@@ -191,6 +191,10 @@ class ReactingFlow : public ThermoChemModelBase {
   ParGridFunction R0PM0_gf_;
   ParGridFunction Qt_gf_;
 
+  // implicitizing of reaction source terms
+  ParGridFunction hw_gf_;
+  ParGridFunction prod_gf_;  
+
   // ParGridFunction *buffer_tInlet_ = nullptr;
   GridFunctionCoefficient *temperature_bc_field_ = nullptr;
 
@@ -217,6 +221,11 @@ class ReactingFlow : public ThermoChemModelBase {
 
   GridFunctionCoefficient *species_Cp_coeff_ = nullptr;
   ProductCoefficient *species_diff_Cp_coeff_ = nullptr;
+
+  GridFunctionCoefficient *hof_coeff_ = nullptr;
+  GridFunctionCoefficient *rx_coeff_ = nullptr;    
+  SumCoefficient *temp_diag_coeff_ = nullptr;
+  SumCoefficient *spec_diag_coeff_ = nullptr;    
 
   // operators and solvers
   ParBilinearForm *At_form_ = nullptr;
