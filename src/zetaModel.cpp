@@ -73,7 +73,8 @@ ZetaModel::ZetaModel(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalS
   tpsP_->getInput("ransModel/tls-min", tls_min_, 1.0e-12);
   tpsP_->getInput("ransModel/tts-max", tts_max_, 100.0);
   tpsP_->getInput("ransModel/tls-max", tls_max_, 100.0);
-  tpsP_->getInput("ransModel/mut-min", mut_min_, 1.0e-12);  
+  tpsP_->getInput("ransModel/mut-min", mut_min_, 1.0e-12);
+  tpsP_->getInput("ransModel/destruction", des_wgt_, 1.0);    
 }
 
 ZetaModel::~ZetaModel() {
@@ -528,11 +529,11 @@ void ZetaModel::initializeOperators() {
   Pk_coeff_ = new RatioCoefficient(*prod_coeff_, *tke_coeff_);
   ek_coeff_ = new RatioCoefficient(*tdr_coeff_, *tke_coeff_); 
   ek_rho_coeff_ = new ProductCoefficient(*ek_coeff_, *rho_coeff_);   
-  tke_diag_coeff_ = new SumCoefficient(*rhoDt_coeff_, *rhoTTS_coeff_, 1.0, 0.5);
+  tke_diag_coeff_ = new SumCoefficient(*rhoDt_coeff_, *rhoTTS_coeff_, 1.0, des_wgt_);
   //tke_diag_coeff_ = new SumCoefficient(*rhoDt_coeff_, *ek_rho_coeff_, 1.0, 1.0);  
-  tdr_diag_coeff_ = new SumCoefficient(*rhoDt_coeff_, *Ce2rhoTTS_coeff_, 1.0, 0.5);    
+  tdr_diag_coeff_ = new SumCoefficient(*rhoDt_coeff_, *Ce2rhoTTS_coeff_, 1.0, des_wgt_);    
   zeta_diag_coeff_ = new SumCoefficient(*rhoDt_coeff_, *Pk_coeff_, 1.0, 1.0);
-  v2_diag_coeff_ = new SumCoefficient(*rhoDt_coeff_, *rhoTTS_coeff_, 1.0, 0.5);
+  v2_diag_coeff_ = new SumCoefficient(*rhoDt_coeff_, *rhoTTS_coeff_, 1.0, des_wgt_);
   //v2_diag_coeff_ = new SumCoefficient(*rhoDt_coeff_, *ek_rho_coeff_, 1.0, 1.0);  
   f_diag_coeff_ = new RatioCoefficient(*unity_coeff_, *tls2_coeff_);
   f_diag_total_coeff_ = new SumCoefficient(*f_diag_coeff_, *zero_coeff_);
@@ -1182,7 +1183,7 @@ void ZetaModel::tkeStep() {
   Ms_->AddMult(prod_, res_, +1.0);
 
   // destruction => 1/2 included in lhs
-  tmpR0_.Set(0.5,tdr_);
+  tmpR0_.Set((1.0 - des_wgt_),tdr_);
   MsRho_->AddMult(tmpR0_, res_, -1.0);
 
   // Update Helmholtz operator  
@@ -1258,7 +1259,7 @@ void ZetaModel::tdrStep() {
   Ms_->AddMult(tmpR0_, res_, +1.0);
 
   // destruction => 1/2 included in lhs
-  tmpR0_.Set(0.5*Ce2_,tdr_);
+  tmpR0_.Set((1.0 - des_wgt_) * Ce2_, tdr_);
   tmpR0_ /= tts_;
   MsRho_->AddMult(tmpR0_, res_, -1.0);
 
@@ -1410,7 +1411,7 @@ void ZetaModel::v2Step() {
   MsRho_->AddMult(tmpR0_, res_, +1.0);
 
   // destruction => 1/2 included in lhs
-  tmpR0_.Set(0.5, tdr_);
+  tmpR0_.Set((1.0 - des_wgt_), tdr_);
   tmpR0_ *= zeta_;
   MsRho_->AddMult(tmpR0_, res_, -1.0);  
 
@@ -1481,7 +1482,7 @@ void ZetaModel::fStep() {
   Ctmp2 = C1_ - 6.0;
   tmpR0b_.Set(C2_, prod_);
   tmpR0b_ /= rho_;
-  tmpR0b_ /= tdr_;
+  tmpR0b_ /= tke_;
   tmpR0a_.Set(Ctmp2, zeta_);  
   tmpR0a_ -= Ctmp1;
   tmpR0a_ /= tts_;
