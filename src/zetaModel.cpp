@@ -71,9 +71,9 @@ ZetaModel::ZetaModel(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalS
   tpsP_->getInput("ransModel/f-min", fRate_min_, 1.0e-14);
   tpsP_->getInput("ransModel/tts-min", tts_min_, 1.0e-12);
   tpsP_->getInput("ransModel/tls-min", tls_min_, 1.0e-12);
-  tpsP_->getInput("ransModel/tts-max", tts_max_, 10.0);
-  tpsP_->getInput("ransModel/tls-max", tls_max_, 10.0);
-  tpsP_->getInput("ransModel/mut-min", mut_min_, 1.0e-10);  
+  tpsP_->getInput("ransModel/tts-max", tts_max_, 100.0);
+  tpsP_->getInput("ransModel/tls-max", tls_max_, 100.0);
+  tpsP_->getInput("ransModel/mut-min", mut_min_, 1.0e-12);  
 }
 
 ZetaModel::~ZetaModel() {
@@ -192,7 +192,7 @@ void ZetaModel::initializeSelf() {
 
   eddyVisc_gf_.SetSpace(sfes_);
   eddyVisc_.SetSize(sfes_truevsize);
-  eddyVisc_gf_ = 1.0e-3;
+  eddyVisc_gf_ = 1.0e-2;
   eddyVisc_gf_.GetTrueDofs(eddyVisc_);  
 
   tke_gf_.SetSpace(sfes_);
@@ -528,12 +528,12 @@ void ZetaModel::initializeOperators() {
   Pk_coeff_ = new RatioCoefficient(*prod_coeff_, *tke_coeff_);
   ek_coeff_ = new RatioCoefficient(*tdr_coeff_, *tke_coeff_); 
   ek_rho_coeff_ = new ProductCoefficient(*ek_coeff_, *rho_coeff_);   
-  tke_diag_coeff_ = new SumCoefficient(*rhoDt_coeff_, *rhoTTS_coeff_);
-  //tke_diag_coeff_ = new SumCoefficient(*rhoDt_coeff_, *ek_rho_coeff_);  
-  tdr_diag_coeff_ = new SumCoefficient(*rhoDt_coeff_, *Ce2rhoTTS_coeff_);    
-  zeta_diag_coeff_ = new SumCoefficient(*rhoDt_coeff_, *Pk_coeff_);
-  v2_diag_coeff_ = new SumCoefficient(*rhoDt_coeff_, *rhoTTS_coeff_);
-  //v2_diag_coeff_ = new SumCoefficient(*rhoDt_coeff_, *ek_rho_coeff_);  
+  tke_diag_coeff_ = new SumCoefficient(*rhoDt_coeff_, *rhoTTS_coeff_, 1.0, 0.5);
+  //tke_diag_coeff_ = new SumCoefficient(*rhoDt_coeff_, *ek_rho_coeff_, 1.0, 1.0);  
+  tdr_diag_coeff_ = new SumCoefficient(*rhoDt_coeff_, *Ce2rhoTTS_coeff_, 1.0, 0.5);    
+  zeta_diag_coeff_ = new SumCoefficient(*rhoDt_coeff_, *Pk_coeff_, 1.0, 1.0);
+  v2_diag_coeff_ = new SumCoefficient(*rhoDt_coeff_, *rhoTTS_coeff_, 1.0, 0.5);
+  //v2_diag_coeff_ = new SumCoefficient(*rhoDt_coeff_, *ek_rho_coeff_, 1.0, 1.0);  
   f_diag_coeff_ = new RatioCoefficient(*unity_coeff_, *tls2_coeff_);
   f_diag_total_coeff_ = new SumCoefficient(*f_diag_coeff_, *zero_coeff_);
 
@@ -594,6 +594,7 @@ void ZetaModel::initializeOperators() {
   // Helmholtz operators for lhs of all scalars  
   Hk_form_ = new ParBilinearForm(sfes_);
   auto *hmk_blfi = new MassIntegrator(*tke_diag_coeff_);
+  //auto *hmk_blfi = new MassIntegrator(*rhoDt_coeff_);  
   auto *hdk_blfi = new DiffusionIntegrator(*tke_diff_total_coeff_);
   if (numerical_integ_) {
     hmk_blfi->SetIntRule(&ir_di);
@@ -607,6 +608,7 @@ void ZetaModel::initializeOperators() {
 
   He_form_ = new ParBilinearForm(sfes_);
   auto *hme_blfi = new MassIntegrator(*tdr_diag_coeff_);
+  //auto *hme_blfi = new MassIntegrator(*rhoDt_coeff_);
   auto *hde_blfi = new DiffusionIntegrator(*tdr_diff_total_coeff_);
   if (numerical_integ_) {
     hme_blfi->SetIntRule(&ir_di);
@@ -620,6 +622,7 @@ void ZetaModel::initializeOperators() {
 
   Hv_form_ = new ParBilinearForm(sfes_);
   auto *hmv_blfi = new MassIntegrator(*v2_diag_coeff_);
+  //auto *hmv_blfi = new MassIntegrator(*rhoDt_coeff_);  
   auto *hdv_blfi = new DiffusionIntegrator(*tke_diff_total_coeff_); // NOTE: not an error
   if (numerical_integ_) {
     hmv_blfi->SetIntRule(&ir_di);
@@ -861,9 +864,12 @@ void ZetaModel::updateMuT() {
   const double *dRho = rho_.HostRead();
   double *muT = eddyVisc_.HostReadWrite();
 
-  for (int i = 0; i < SdofInt_; i++) muT[i] = Cmu_ * dRho[i];
-  for (int i = 0; i < SdofInt_; i++) muT[i] *= dZeta[i];
-  for (int i = 0; i < SdofInt_; i++) muT[i] *= dTKE[i];
+  //for (int i = 0; i < SdofInt_; i++) muT[i] = Cmu_ * dRho[i];
+  //for (int i = 0; i < SdofInt_; i++) muT[i] *= dZeta[i];
+  //for (int i = 0; i < SdofInt_; i++) muT[i] *= dTKE[i];
+  eddyVisc_.Set(Cmu_,rho_);
+  eddyVisc_ *= zeta_next_;
+  eddyVisc_ *= tke_next_;  
   for (int i = 0; i < SdofInt_; i++) muT[i] *= std::min(dTTS[i], dTTS_strain[i]);
   for (int i = 0; i < SdofInt_; i++) muT[i] = std::max(muT[i], mut_min_);
   
@@ -1175,8 +1181,9 @@ void ZetaModel::tkeStep() {
   // production
   Ms_->AddMult(prod_, res_, +1.0);
 
-  // destruction => include in lhs
-  // MsRho_->AddMult(tdr_, res_, -1.0);
+  // destruction => 1/2 included in lhs
+  tmpR0_.Set(0.5,tdr_);
+  MsRho_->AddMult(tmpR0_, res_, -1.0);
 
   // Update Helmholtz operator  
   rhoDt_gf_ = *(thermoChem_interface_->density);
@@ -1233,26 +1240,27 @@ void ZetaModel::tdrStep() {
   MsRho_->AddMult(tmpR0_, res_, -1.0);
 
   // production
-  const double *dp = prod_.HostRead();
-  const double *dz = zeta_.HostRead();
-  double *data = tmpR0_.HostReadWrite();
-  for (int i = 0; i < SdofInt_; i++) {
-
-    // zeta model
-    //double ceps1 = 1.4 * (1.0 + 0.012 / dz[i]);
-
-    // code-friendly 
-    double ceps1 = 1.4 * (1.0 + 0.05 / std::sqrt(dz[i]));
-    
-    data[i] = ceps1 * dp[i];
-  }
+  tmpR0_.Set(1.0, prod_);
   tmpR0_ /= tts_;
+  {
+    const double *dz = zeta_.HostRead();
+    double *data = tmpR0_.HostReadWrite();  
+    for (int i = 0; i < SdofInt_; i++) {
+      // zeta model
+      //double ceps1 = 1.4 * (1.0 + 0.012 / dz[i]);
+
+      // code-friendly 
+      double ceps1 = 1.4 * (1.0 + 0.05 / std::sqrt(dz[i]));
+    
+      data[i] *= ceps1;
+    }
+  }
   Ms_->AddMult(tmpR0_, res_, +1.0);
 
-  // destruction => include in lhs
-  // tmpR0.Set(Ce2_,tdr_);
-  // tmpR0 /= TTS;
-  // MsRho_->AddMult(tmpR0_, res_, -1.0);
+  // destruction => 1/2 included in lhs
+  tmpR0_.Set(0.5*Ce2_,tdr_);
+  tmpR0_ /= tts_;
+  MsRho_->AddMult(tmpR0_, res_, -1.0);
 
   // Update Helmholtz operator
   rhoDt_gf_ = *(thermoChem_interface_->density);
@@ -1397,12 +1405,14 @@ void ZetaModel::v2Step() {
   MsRho_->AddMult(tmpR0_, res_, -1.0);
 
   // production
-  tmpR0_ = tke_;
-  tmpR0_ *= fRate_;
-  tmpR0_ *= rho_;  
+  tmpR0_.Set(1.0, tke_);
+  tmpR0_ *= fRate_;  
   MsRho_->AddMult(tmpR0_, res_, +1.0);
 
-  // destruction => include in lhs
+  // destruction => 1/2 included in lhs
+  tmpR0_.Set(0.5, tdr_);
+  tmpR0_ *= zeta_;
+  MsRho_->AddMult(tmpR0_, res_, -1.0);  
 
   // Update Helmholtz operator to account for changing dt, rho, and kappa
   rhoDt_gf_ = *(thermoChem_interface_->density);
