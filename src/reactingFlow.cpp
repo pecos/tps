@@ -1256,7 +1256,7 @@ void ReactingFlow::step() {
   YnFull_gf_.SetFromTrueDofs(Yn_next_);
 
   // TODO(swh): this is a bad name
-  //crossDiffusion();
+  // crossDiffusion();
 
   // advance temperature
   temperatureStep();
@@ -1283,21 +1283,20 @@ void ReactingFlow::step() {
   // as containers for {n}+iSub*dtsub substates
   // 2) YnStar and TnStar contain interpolated star states at substep
   // 3) _next contains full {n+1}* state
-  //Yn_gf_.GetTrueDofs(spec_buffer_);
-  //Tn_gf_.GetTrueDofs(temp_buffer_);
-  spec_buffer_.Set(1.0,Yn_);
-  temp_buffer_.Set(1.0,Tn_);  
+  // Yn_gf_.GetTrueDofs(spec_buffer_);
+  // Tn_gf_.GetTrueDofs(temp_buffer_);
+  spec_buffer_.Set(1.0, Yn_);
+  temp_buffer_.Set(1.0, Tn_);
 
   // delta of substep for star state
   substepState();
 
   for (int iSub = 0; iSub < nSub_; iSub++) {
-    
     // update wdot quantities at full substep in Yn/Tn state
     updateMixture();
     speciesProduction();
     heatOfFormation();
-    crossDiffusion();    
+    crossDiffusion();
 
     // advance over substep
     for (int iSpecies = 0; iSpecies < nSpecies_ - 1; iSpecies++) {
@@ -1403,23 +1402,23 @@ void ReactingFlow::temperatureStep() {
 
 void ReactingFlow::temperatureSubstep(int iSub) {
   // substep dt
-  //double dtSub = dt_ * (double)(iSub+1) / (double)nSub_;
-  double dtSub = dt_  / (double)nSub_;  
+  // double dtSub = dt_ * (double)(iSub+1) / (double)nSub_;
+  double dtSub = dt_ / (double)nSub_;
 
   // heat of formation term
   tmpR0_.Set(1.0, hw_);
-  //tmpR0_.Add(1.0, crossDiff_);
+  // tmpR0_.Add(1.0, crossDiff_);
   tmpR0_ /= rn_;
   tmpR0_ *= dtSub;
 
-  //tmpR0_ = 0.0;
-  
+  // tmpR0_ = 0.0;
+
   // TnStar has star state at substep here
-  tmpR0_.Add(1.0,TnStar_);
-  tmpR0_.Add(1.0,Tn_);  
+  tmpR0_.Add(1.0, TnStar_);
+  tmpR0_.Add(1.0, Tn_);
 
   // Tn now has full state at substep
-  Tn_.Set(1.0,tmpR0_);
+  Tn_.Set(1.0, tmpR0_);
 }
 
 void ReactingFlow::speciesLastStep() {
@@ -1533,23 +1532,23 @@ void ReactingFlow::speciesStep(int iSpec) {
 // Y{n + (substep+1)} = dt * wdot(Y{n + (substep)} + Y{n + (substep+1)}*
 void ReactingFlow::speciesSubstep(int iSpec, int iSub) {
   // substep dt
-  //double dtSub = dt_ * (double)(iSub+1) / (double)nSub_;
-  double dtSub = dt_  / (double)nSub_;
+  // double dtSub = dt_ * (double)(iSub+1) / (double)nSub_;
+  double dtSub = dt_ / (double)nSub_;
 
   // production of iSpec
   setScalarFromVector(prodY_, iSpec, &tmpR0_);
   tmpR0_ /= rn_;
   tmpR0_ *= dtSub;
 
-  //tmpR0_ = 0.0;  
+  // tmpR0_ = 0.0;
 
   // YnStar has star state at substep here
   setScalarFromVector(YnStar_, iSpec, &tmpR0a_);
-  tmpR0_.Add(1.0,tmpR0a_); 
+  tmpR0_.Add(1.0, tmpR0a_);
 
   setScalarFromVector(Yn_, iSpec, &tmpR0a_);
-  tmpR0_.Add(1.0,tmpR0a_); 
-  
+  tmpR0_.Add(1.0, tmpR0a_);
+
   // Yn now has full state at substep
   setVectorFromScalar(tmpR0_, iSpec, &Yn_);
 }
@@ -1641,8 +1640,8 @@ void ReactingFlow::crossDiffusion() {
     tmpR1c_ += tmpR1b_;
   }
   dotVector(tmpR1a_, tmpR1c_, &tmpR1_, dim_);
-  Ms_->Mult(tmpR1_, crossDiff_); // if including in time-splitting comment
-  //crossDiff_.Set(1.0,tmpR1_);
+  Ms_->Mult(tmpR1_, crossDiff_);  // if including in time-splitting comment
+  // crossDiff_.Set(1.0,tmpR1_);
 }
 
 void ReactingFlow::computeExplicitTempConvectionOP(bool extrap) {
@@ -1771,9 +1770,9 @@ void ReactingFlow::extrapolateState() {
 // if time-splitting order can be improved
 void ReactingFlow::substepState() {
   /*
-  double wt0, wt1;  
+  double wt0, wt1;
   wt1 = (double)(iSub + 1) / (double)nSub_;
-  wt0 = 1.0 - wt1;  
+  wt0 = 1.0 - wt1;
 
   TnStar_.Set(wt0, temp_buffer_);
   TnStar_.Add(wt1, Tn_next_);
@@ -1786,13 +1785,12 @@ void ReactingFlow::substepState() {
 
   // delta over substep of star state
   double wt = 1.0 / (double)nSub_;
-    
-  TnStar_.Set(wt, Tn_next_);  
+
+  TnStar_.Set(wt, Tn_next_);
   TnStar_.Add(-wt, temp_buffer_);
 
-  YnStar_.Set(wt, Yn_next_);    
+  YnStar_.Set(wt, Yn_next_);
   YnStar_.Add(-wt, spec_buffer_);
-  
 }
 
 void ReactingFlow::updateMixture() {
