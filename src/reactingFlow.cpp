@@ -432,6 +432,12 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     assert(false);
     exit(1);
   }
+
+  // By default, do not use operator split scheme.
+  operator_split_ = false;
+  if (nSub_ > 1) {
+    operator_split_ = true;
+  }
 }
 
 ReactingFlow::~ReactingFlow() {
@@ -1256,7 +1262,17 @@ void ReactingFlow::step() {
   updateDensity(1.0);
   updateDiffusivity();
 
-  /// PART I: advect-diffuse species and temp to get T* and Yn*
+  // PART I: Form and solve implicit systems for species and temperature.
+  //
+  // If NOT using operator splitting, these systems include all terms,
+  // with the reaction source terms treated explicitly in time.  When
+  // using operator splitting, this solve includes the
+  // advection-diffusion terms but the reaction source terms are
+  // handled separately with substepping below.
+
+  if (!operator_split_) {
+    speciesProduction();
+  }
 
   // advance species, last slot is from calculated sum of others
   for (int iSpecies = 0; iSpecies < nSpecies_ - 1; iSpecies++) {
@@ -1265,8 +1281,12 @@ void ReactingFlow::step() {
   speciesLastStep();
   YnFull_gf_.SetFromTrueDofs(Yn_next_);
 
-  // TODO(swh): this is a bad name
-  // crossDiffusion();
+  // ho_i*w_i
+  if (!operator_split_) {
+    heatOfFormation();
+  }
+
+  crossDiffusion();
 
   // advance temperature
   temperatureStep();
@@ -1286,49 +1306,50 @@ void ReactingFlow::step() {
   // explicit filter species
   // Add if found to be necessary
 
-  /// PART II: time-splitting of reaction
+  if (operator_split_) {
+    /// PART II: time-splitting of reaction
 
-  // Notes:
-  // 1) store phi^{n} fields in buffer so substeps can use {n}
-  // as containers for {n}+iSub*dtsub substates
-  // 2) YnStar and TnStar contain interpolated star states at substep
-  // 3) _next contains full {n+1}* state
-  // Yn_gf_.GetTrueDofs(spec_buffer_);
-  // Tn_gf_.GetTrueDofs(temp_buffer_);
-  spec_buffer_.Set(1.0, Yn_);
-  temp_buffer_.Set(1.0, Tn_);
+    // Notes:
+    // 1) store phi^{n} fields in buffer so substeps can use {n}
+    // as containers for {n}+iSub*dtsub substates
+    // 2) YnStar and TnStar contain interpolated star states at substep
+    // 3) _next contains full {n+1}* state
+    // Yn_gf_.GetTrueDofs(spec_buffer_);
+    // Tn_gf_.GetTrueDofs(temp_buffer_);
+    spec_buffer_.Set(1.0, Yn_);
+    temp_buffer_.Set(1.0, Tn_);
 
-  // delta of substep for star state
-  substepState();
+    // delta of substep for star state
+    substepState();
 
-  for (int iSub = 0; iSub < nSub_; iSub++) {
-    // update wdot quantities at full substep in Yn/Tn state
-    updateMixture();
-    speciesProduction();
-    heatOfFormation();
-    crossDiffusion();
+    for (int iSub = 0; iSub < nSub_; iSub++) {
+      // update wdot quantities at full substep in Yn/Tn state
+      updateMixture();
+      speciesProduction();
+      heatOfFormation();
 
-    // advance over substep
-    for (int iSpecies = 0; iSpecies < nSpecies_ - 1; iSpecies++) {
-      speciesSubstep(iSpecies, iSub);
+      // advance over substep
+      for (int iSpecies = 0; iSpecies < nSpecies_ - 1; iSpecies++) {
+        speciesSubstep(iSpecies, iSub);
+      }
+      speciesLastSubstep();
+      Yn_gf_.SetFromTrueDofs(Yn_);
+
+      temperatureSubstep(iSub);
+      Tn_gf_.SetFromTrueDofs(Tn_);
     }
-    speciesLastSubstep();
-    Yn_gf_.SetFromTrueDofs(Yn_);
 
-    temperatureSubstep(iSub);
-    Tn_gf_.SetFromTrueDofs(Tn_);
+    // set register to correct full step fields
+    Yn_next_gf_.SetFromTrueDofs(Yn_);
+    Tn_next_gf_.SetFromTrueDofs(Tn_);
+    Yn_next_gf_.GetTrueDofs(Yn_next_);
+    Tn_next_gf_.GetTrueDofs(Tn_next_);
+
+    Yn_gf_.SetFromTrueDofs(spec_buffer_);
+    Tn_gf_.SetFromTrueDofs(temp_buffer_);
+    Yn_gf_.GetTrueDofs(Yn_);
+    Tn_gf_.GetTrueDofs(Tn_);
   }
-
-  // set register to correct full step fields
-  Yn_next_gf_.SetFromTrueDofs(Yn_);
-  Tn_next_gf_.SetFromTrueDofs(Tn_);
-  Yn_next_gf_.GetTrueDofs(Yn_next_);
-  Tn_next_gf_.GetTrueDofs(Tn_next_);
-
-  Yn_gf_.SetFromTrueDofs(spec_buffer_);
-  Tn_gf_.SetFromTrueDofs(temp_buffer_);
-  Yn_gf_.GetTrueDofs(Yn_);
-  Tn_gf_.GetTrueDofs(Tn_);
 
   /// PART III: prepare for external use
   updateDensity(1.0);
@@ -1361,8 +1382,11 @@ void ReactingFlow::temperatureStep() {
   tmpR0_ = dtP_;  // with rho*Cp on LHS, no Cp on this term
   Ms_->AddMult(tmpR0_, resT_);
 
-  // heat of formation -> treated explicitly now in substep
-  // Ms_->AddMult(hw_, resT_);
+  // heat of formation
+  // Add here if NOT using operator splitting
+  if (!operator_split_) {
+    Ms_->AddMult(hw_, resT_);
+  }
 
   // species-temp diffusion term, already in int-weak form
   resT_.Add(1.0, crossDiff_);
@@ -1489,9 +1513,12 @@ void ReactingFlow::speciesStep(int iSpec) {
   MsRho_form_->FormSystemMatrix(empty, MsRho_);
   MsRho_->AddMult(tmpR0_, resY_, -1.0);
 
-  // production of iSpec => treated explicitly now in substep
-  // setScalarFromVector(prodY_, iSpec, &tmpR0_);
-  // Ms_->AddMult(tmpR0_, resY_);
+  // production of iSpec
+  // Add here if NOT using operator splitting
+  if (!operator_split_) {
+    setScalarFromVector(prodY_, iSpec, &tmpR0_);
+    Ms_->AddMult(tmpR0_, resY_);
+  }
 
   // Add natural boundary terms here later
   // NB: adiabatic natural BC is handled, but don't have ability to impose non-zero heat flux yet

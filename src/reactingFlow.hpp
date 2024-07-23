@@ -293,6 +293,7 @@ class ReactingFlow : public ThermoChemModelBase {
   // time-splitting
   Vector YnStar_, spec_buffer_;
   Vector TnStar_, temp_buffer_;
+  bool operator_split_ = false;
   int nSub_;
 
   // Parameters and objects used in filter-based stabilization
