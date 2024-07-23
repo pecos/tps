@@ -493,6 +493,10 @@ ReactingFlow::~ReactingFlow() {
   delete rad_rho_Cp_coeff_;
   delete rad_rho_u_coeff_;
   delete rad_rho_Cp_u_coeff_;
+  delete rad_rho_over_dt_coeff_;
+  delete rad_species_diff_total_coeff_;
+  delete rad_rho_Cp_over_dt_coeff_;
+  delete rad_thermal_diff_total_coeff_;
 
   delete Ay_form_;
   delete HyInv_;
@@ -949,6 +953,10 @@ void ReactingFlow::initializeOperators() {
     rad_rho_Cp_coeff_ = new ProductCoefficient(radius_coeff, *rhoCp_coeff_);
     rad_rho_u_coeff_ = new ScalarVectorProductCoefficient(radius_coeff, *rhou_coeff_);
     rad_rho_Cp_u_coeff_ = new ScalarVectorProductCoefficient(radius_coeff, *rhouCp_coeff_);
+    rad_rho_over_dt_coeff_ = new ProductCoefficient(radius_coeff, *rho_over_dt_coeff_);
+    rad_species_diff_total_coeff_ = new ProductCoefficient(radius_coeff, *species_diff_total_coeff_);
+    rad_rho_Cp_over_dt_coeff_ = new ProductCoefficient(radius_coeff, *rhoCp_over_dt_coeff_);
+    rad_thermal_diff_total_coeff_ = new ProductCoefficient(radius_coeff, *thermal_diff_total_coeff_);
   }
 
   At_form_ = new ParBilinearForm(sfes_);
@@ -1036,9 +1044,18 @@ void ReactingFlow::initializeOperators() {
 
   // temperature Helmholtz
   Ht_form_ = new ParBilinearForm(sfes_);
-  auto *hmt_blfi = new MassIntegrator(*rhoCp_over_dt_coeff_);
-  auto *hdt_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
-
+  MassIntegrator *hmt_blfi;
+  if (axisym_) {
+    hmt_blfi = new MassIntegrator(*rad_rho_Cp_over_dt_coeff_);
+  } else {
+    hmt_blfi = new MassIntegrator(*rhoCp_over_dt_coeff_);
+  }
+  DiffusionIntegrator *hdt_blfi;
+  if (axisym_) {
+    hdt_blfi = new DiffusionIntegrator(*rad_thermal_diff_total_coeff_);
+  } else {
+    hdt_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
+  }
   if (numerical_integ_) {
     hmt_blfi->SetIntRule(&ir_di);
     hdt_blfi->SetIntRule(&ir_di);
@@ -1053,9 +1070,18 @@ void ReactingFlow::initializeOperators() {
 
   // species Helmholtz
   Hy_form_ = new ParBilinearForm(sfes_);
-  auto *hmy_blfi = new MassIntegrator(*rho_over_dt_coeff_);
-  auto *hdy_blfi = new DiffusionIntegrator(*species_diff_total_coeff_);
-
+  MassIntegrator *hmy_blfi;
+  if (axisym_) {
+    hmy_blfi = new MassIntegrator(*rad_rho_over_dt_coeff_);
+  } else {
+    hmy_blfi = new MassIntegrator(*rho_over_dt_coeff_);
+  }
+  DiffusionIntegrator *hdy_blfi;
+  if (axisym_) {
+    hdy_blfi = new DiffusionIntegrator(*rad_species_diff_total_coeff_);
+  } else {
+    hdy_blfi = new DiffusionIntegrator(*species_diff_total_coeff_);
+  }
   if (numerical_integ_) {
     hmy_blfi->SetIntRule(&ir_di);
     hdy_blfi->SetIntRule(&ir_di);
