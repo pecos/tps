@@ -1405,10 +1405,13 @@ void ReactingFlow::temperatureSubstep(int iSub) {
   // double dtSub = dt_ * (double)(iSub+1) / (double)nSub_;
   double dtSub = dt_ / (double)nSub_;
 
+  CpMix_gf_.GetTrueDofs(CpMix_);
+
   // heat of formation term
   tmpR0_.Set(1.0, hw_);
   // tmpR0_.Add(1.0, crossDiff_);
   tmpR0_ /= rn_;
+  tmpR0_ /= CpMix_;
   tmpR0_ *= dtSub;
 
   // tmpR0_ = 0.0;

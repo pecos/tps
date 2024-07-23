@@ -282,6 +282,7 @@ class ReactingFlow : public ThermoChemModelBase {
   Vector specificHeatRatios_;
   Vector initialMassFraction_;
   Vector atomMW_;
+  Vector CpMix_;
 
   Vector Qt_;
   Vector rn_;
