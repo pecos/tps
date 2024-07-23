@@ -491,6 +491,8 @@ ReactingFlow::~ReactingFlow() {
 
   delete rad_rho_coeff_;
   delete rad_rho_Cp_coeff_;
+  delete rad_rho_u_coeff_;
+  delete rad_rho_Cp_u_coeff_;
 
   delete Ay_form_;
   delete HyInv_;
@@ -945,10 +947,17 @@ void ReactingFlow::initializeOperators() {
     // for axisymmetric case, need to multply many coefficients by the radius
     rad_rho_coeff_ = new ProductCoefficient(radius_coeff, *rhon_next_coeff_);
     rad_rho_Cp_coeff_ = new ProductCoefficient(radius_coeff, *rhoCp_coeff_);
+    rad_rho_u_coeff_ = new ScalarVectorProductCoefficient(radius_coeff, *rhou_coeff_);
+    rad_rho_Cp_u_coeff_ = new ScalarVectorProductCoefficient(radius_coeff, *rhouCp_coeff_);
   }
 
   At_form_ = new ParBilinearForm(sfes_);
-  auto *at_blfi = new ConvectionIntegrator(*rhouCp_coeff_);
+  ConvectionIntegrator *at_blfi;
+  if (axisym_) {
+    at_blfi = new ConvectionIntegrator(*rad_rho_Cp_u_coeff_);
+  } else {
+    at_blfi = new ConvectionIntegrator(*rhouCp_coeff_);
+  }
   if (numerical_integ_) {
     at_blfi->SetIntRule(&ir_nli);
   }
@@ -960,7 +969,12 @@ void ReactingFlow::initializeOperators() {
   At_form_->FormSystemMatrix(empty, At_);
 
   Ay_form_ = new ParBilinearForm(sfes_);
-  auto *ay_blfi = new ConvectionIntegrator(*rhou_coeff_);
+  ConvectionIntegrator *ay_blfi;
+  if (axisym_) {
+    ay_blfi = new ConvectionIntegrator(*rad_rho_u_coeff_);
+  } else {
+    ay_blfi = new ConvectionIntegrator(*rhou_coeff_);
+  }
   if (numerical_integ_) {
     ay_blfi->SetIntRule(&ir_nli);
   }
