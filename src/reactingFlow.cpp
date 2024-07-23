@@ -1340,15 +1340,15 @@ void ReactingFlow::step() {
     }
 
     // set register to correct full step fields
-    Yn_next_gf_.SetFromTrueDofs(Yn_);
-    Tn_next_gf_.SetFromTrueDofs(Tn_);
-    Yn_next_gf_.GetTrueDofs(Yn_next_);
-    Tn_next_gf_.GetTrueDofs(Tn_next_);
+    Yn_next_ = Yn_;
+    Tn_next_ = Tn_;
 
-    Yn_gf_.SetFromTrueDofs(spec_buffer_);
-    Tn_gf_.SetFromTrueDofs(temp_buffer_);
-    Yn_gf_.GetTrueDofs(Yn_);
-    Tn_gf_.GetTrueDofs(Tn_);
+    YnFull_gf_.SetFromTrueDofs(Yn_next_);
+    Tn_next_gf_.SetFromTrueDofs(Tn_next_);
+
+    Yn_ = spec_buffer_;
+    Tn_ = temp_buffer_;
+    Tn_gf_.SetFromTrueDofs(Tn_);
   }
 
   /// PART III: prepare for external use
