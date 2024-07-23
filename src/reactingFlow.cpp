@@ -99,12 +99,6 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   tpsP_->getInput("plasma_models/two_temperature", mixtureInput_.twoTemperature, false);
   tpsP_->getInput("plasma_models/const_plasma_conductivity", const_plasma_conductivity_, 0.0);
 
-  // The ambipolar option isn't supported yet, so die if we try to use it
-  if (mixtureInput_.ambipolar) {
-    if (rank0_) std::cout << "Ambipolar is not yet supported in low Mach reacting flow." << std::endl;
-    exit(ERROR);
-  }
-
   if (mixtureInput_.twoTemperature) {
     if (rank0_) std::cout << "Two temperature is not yet supported in low Mach reacting flow." << std::endl;
     exit(ERROR);
@@ -1356,8 +1350,28 @@ void ReactingFlow::step() {
   }
 
   // advance species, last slot is from calculated sum of others
-  for (int iSpecies = 0; iSpecies < nSpecies_ - 1; iSpecies++) {
+  for (int iSpecies = 0; iSpecies < nActiveSpecies_; iSpecies++) {
     speciesStep(iSpecies);
+  }
+  if (mixtureInput_.ambipolar) {
+    // Evaluate electron mass fraction based on quasi-neutrality
+
+    // temporary storage for electron mass fraction
+    tmpR0_ = 0.0;
+
+    // Y_electron = sum_{i \in active species} (m_electron / m_i) * q_i * Y_i
+    for (int iSpecies = 0; iSpecies < nActiveSpecies_; iSpecies++) {
+      setScalarFromVector(Yn_next_, iSpecies, &tmpR1_);
+      const double q_sp = mixture_->GetGasParams(iSpecies, GasParams::SPECIES_CHARGES);
+      const double m_sp = mixture_->GetGasParams(iSpecies, GasParams::SPECIES_MW);
+      const double fac = q_sp / m_sp;
+      tmpR1_ *= fac;
+      tmpR0_ += tmpR1_;
+    }
+    const int iElectron = nSpecies_ - 2;  // TODO(trevilo): check me!
+    const double m_electron = mixture_->GetGasParams(iElectron, GasParams::SPECIES_MW);
+    tmpR0_ *= m_electron;
+    setVectorFromScalar(tmpR0_, iElectron, &Yn_next_);
   }
   speciesLastStep();
   YnFull_gf_.SetFromTrueDofs(Yn_next_);
@@ -1412,8 +1426,28 @@ void ReactingFlow::step() {
       heatOfFormation();
 
       // advance over substep
-      for (int iSpecies = 0; iSpecies < nSpecies_ - 1; iSpecies++) {
+      for (int iSpecies = 0; iSpecies < nActiveSpecies_; iSpecies++) {
         speciesSubstep(iSpecies, iSub);
+      }
+      if (mixtureInput_.ambipolar) {
+        // Evaluate electron mass fraction based on quasi-neutrality
+
+        // temporary storage for electron mass fraction
+        tmpR0_ = 0.0;
+
+        // Y_electron = sum_{i \in active species} (m_electron / m_i) * q_i * Y_i
+        for (int iSpecies = 0; iSpecies < nActiveSpecies_; iSpecies++) {
+          setScalarFromVector(Yn_, iSpecies, &tmpR1_);
+          const double q_sp = mixture_->GetGasParams(iSpecies, GasParams::SPECIES_CHARGES);
+          const double m_sp = mixture_->GetGasParams(iSpecies, GasParams::SPECIES_MW);
+          const double fac = q_sp / m_sp;
+          tmpR1_ *= fac;
+          tmpR0_ += tmpR1_;
+        }
+        const int iElectron = nSpecies_ - 2;  // TODO(trevilo): check me!
+        const double m_electron = mixture_->GetGasParams(iElectron, GasParams::SPECIES_MW);
+        tmpR0_ *= m_electron;
+        setVectorFromScalar(tmpR0_, iElectron, &Yn_);
       }
       speciesLastSubstep();
       Yn_gf_.SetFromTrueDofs(Yn_);
