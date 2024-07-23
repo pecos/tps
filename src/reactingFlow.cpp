@@ -422,6 +422,16 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
 
   tpsP_->getInput("loMach/reactingFlow/ic", ic_string_, std::string(""));
   tpsP_->getInput("loMach/reactingFlow/sub-steps", nSub_, 1);
+
+  // Check time marching order.  Operator split (i.e., nSub_ > 1) not supported for order > 1.
+  if ((nSub_ > 1) && (time_coeff_.order > 1)) {
+    if (rank0_) {
+      std::cout << "ERROR: BDF order > 1 not supported with operator split." << std::endl;
+      std::cout << "       Either set loMach/reactingFlow/sub-steps = 1 or time/bdfOrder = 1" << std::endl;
+    }
+    assert(false);
+    exit(1);
+  }
 }
 
 ReactingFlow::~ReactingFlow() {

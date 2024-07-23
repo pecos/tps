@@ -74,6 +74,9 @@ class Tps;
 #include "turb_model_base.hpp"
 
 struct temporalSchemeCoefficients {
+  // Max order
+  int order;
+
   // Current time
   double time;
 

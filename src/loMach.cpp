@@ -114,6 +114,7 @@ void LoMachSolver::initialize() {
     iter = 0;
     temporal_coeff_.nStep = iter;
   }
+  temporal_coeff_.order = max_bdf_order;
 
   //-----------------------------------------------------
   // 1) Prepare the mesh
