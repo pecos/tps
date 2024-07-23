@@ -3,12 +3,16 @@
 
 TEST="singleReaction"
 RUNFILE="inputs/input.reactSingleRx.ini"
+RUNFILE_STIFF="inputs/input.reactStiffRx.ini"
 EXE="../src/tps"
 RESTART="ref_solns/reactSingleRx/restart_output.sol.h5"
 
 setup() {
     SOLN_FILE=restart_output.sol.h5
     REF_FILE=ref_solns/reactSingleRx/restart_output.sol.h5
+
+    SOLN_FILE_STIFF=restart_output-stiff.sol.h5
+    REF_FILE_STIFF=ref_solns/reactSingleRx/restart_output-stiff.sol.h5
 }
 
 @test "[$TEST] check for input file $RUNFILE" {
@@ -19,11 +23,29 @@ setup() {
     rm -rf output/*
     rm -f $SOLN_FILE
     $EXE --runFile $RUNFILE
-    test -s $SOLN_FILE    
+    test -s $SOLN_FILE
 }
 
 @test "[$TEST] verify tps output with input -> $RUNFILE" {
     test -s $SOLN_FILE
     test -s $REF_FILE
     h5diff -r --delta=1e-11 $SOLN_FILE $REF_FILE /species/speciesAll
+}
+
+@test "[$TEST] check for input file $RUNFILE_STIFF" {
+    test -s $RUNFILE
+}
+
+@test "[$TEST] run tps with input -> $RUNFILE_STIFF" {
+    rm -rf output-stiff
+    rm -f $SOLN_FILE_STIFF
+    $EXE --runFile $RUNFILE_STIFF
+    test -s $SOLN_FILE_STIFF
+}
+
+@test "[$TEST] verify tps output with input -> $RUNFILE_STIFF" {
+    test -s $SOLN_FILE_STIFF
+    test -s $REF_FILE_STIFF
+    h5diff -r --relative=1e-12 $SOLN_FILE_STIFF $REF_FILE_STIFF /species/speciesAll
+    h5diff -r --relative=1e-12 $SOLN_FILE_STIFF $REF_FILE_STIFF /temperature/temperature
 }
