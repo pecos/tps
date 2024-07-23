@@ -219,6 +219,9 @@ class ReactingFlow : public ThermoChemModelBase {
   GridFunctionCoefficient *species_Cp_coeff_ = nullptr;
   ProductCoefficient *species_diff_Cp_coeff_ = nullptr;
 
+  ProductCoefficient *rad_rho_coeff_ = nullptr;
+  ProductCoefficient *rad_rho_Cp_coeff_ = nullptr;
+
   // operators and solvers
   ParBilinearForm *At_form_ = nullptr;
   ParBilinearForm *Ay_form_ = nullptr;
