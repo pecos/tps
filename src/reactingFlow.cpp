@@ -1258,7 +1258,11 @@ void ReactingFlow::step() {
   updateMixture();
   extrapolateState();
   updateBC(0);  // NB: can't ramp right now
-  updateThermoP();
+
+  if (!operator_split_) {
+    updateThermoP();
+  }
+
   updateDensity(1.0);
   updateDiffusivity();
 
@@ -1325,6 +1329,8 @@ void ReactingFlow::step() {
     for (int iSub = 0; iSub < nSub_; iSub++) {
       // update wdot quantities at full substep in Yn/Tn state
       updateMixture();
+      updateThermoP();
+      updateDensity(0.0);
       speciesProduction();
       heatOfFormation();
 
@@ -1378,13 +1384,13 @@ void ReactingFlow::temperatureStep() {
   MsRhoCp_form_->FormSystemMatrix(empty, MsRhoCp_);
   MsRhoCp_->AddMult(tmpR0_, resT_, -1.0);
 
-  // dPo/dt
-  tmpR0_ = dtP_;  // with rho*Cp on LHS, no Cp on this term
-  Ms_->AddMult(tmpR0_, resT_);
-
-  // heat of formation
   // Add here if NOT using operator splitting
   if (!operator_split_) {
+    // dPo/dt
+    tmpR0_ = dtP_;  // with rho*Cp on LHS, no Cp on this term
+    Ms_->AddMult(tmpR0_, resT_);
+
+    // heat of formation
     Ms_->AddMult(hw_, resT_);
   }
 
@@ -1443,6 +1449,10 @@ void ReactingFlow::temperatureSubstep(int iSub) {
 
   // heat of formation term
   tmpR0_.Set(1.0, hw_);
+
+  // pressure
+  tmpR0_ += dtP_;
+
   // tmpR0_.Add(1.0, crossDiff_);
   tmpR0_ /= rn_;
   tmpR0_ /= CpMix_;
@@ -1941,7 +1951,11 @@ void ReactingFlow::updateThermoP() {
     thermo_pressure_ = system_mass_ / allMass * Pnm1_;
     dtP_ = time_coeff_.bd0 * thermo_pressure_ + time_coeff_.bd1 * Pnm1_ + time_coeff_.bd2 * Pnm2_ +
            time_coeff_.bd3 * Pnm3_;
-    dtP_ *= 1.0 / dt_;
+
+    // For operator split, dtP term is in split substeps, so need to
+    // divide dt by nSub.  For 'unified' approach (not operator
+    // split), nSub = 1, so it makes no difference.
+    dtP_ *= (nSub_ / dt_);
   }
 }
 
