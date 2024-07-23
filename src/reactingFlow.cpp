@@ -1313,17 +1313,14 @@ void ReactingFlow::step() {
   if (operator_split_) {
     /// PART II: time-splitting of reaction
 
-    // Notes:
-    // 1) store phi^{n} fields in buffer so substeps can use {n}
-    // as containers for {n}+iSub*dtsub substates
-    // 2) YnStar and TnStar contain interpolated star states at substep
-    // 3) _next contains full {n+1}* state
-    // Yn_gf_.GetTrueDofs(spec_buffer_);
-    // Tn_gf_.GetTrueDofs(temp_buffer_);
+    // Save Yn_ and Tn_ because substep routines overwrite these as
+    // with the {n}+iSub substates, which is convenient b/c helper
+    // functions (like speciesProduction) use these Vectors
     spec_buffer_.Set(1.0, Yn_);
     temp_buffer_.Set(1.0, Tn_);
 
-    // delta of substep for star state
+    // Evaluate (Yn_next_ - Yn_)/nSub and store in YnStar_, and analog
+    // for TnStar_.
     substepState();
 
     for (int iSub = 0; iSub < nSub_; iSub++) {
@@ -1384,7 +1381,9 @@ void ReactingFlow::temperatureStep() {
   MsRhoCp_form_->FormSystemMatrix(empty, MsRhoCp_);
   MsRhoCp_->AddMult(tmpR0_, resT_, -1.0);
 
-  // Add here if NOT using operator splitting
+  // If NOT using operator splitting, include the unsteady pressure
+  // term and the heat of formation contribution on the rhs.  If using
+  // operator splitting, these are handled in temperatureSubstep.
   if (!operator_split_) {
     // dPo/dt
     tmpR0_ = dtP_;  // with rho*Cp on LHS, no Cp on this term
@@ -1442,7 +1441,6 @@ void ReactingFlow::temperatureStep() {
 
 void ReactingFlow::temperatureSubstep(int iSub) {
   // substep dt
-  // double dtSub = dt_ * (double)(iSub+1) / (double)nSub_;
   double dtSub = dt_ / (double)nSub_;
 
   CpMix_gf_.GetTrueDofs(CpMix_);
@@ -1453,12 +1451,10 @@ void ReactingFlow::temperatureSubstep(int iSub) {
   // pressure
   tmpR0_ += dtP_;
 
-  // tmpR0_.Add(1.0, crossDiff_);
+  // contribution to temperature update is dt * rhs / (rho * Cp)
   tmpR0_ /= rn_;
   tmpR0_ /= CpMix_;
   tmpR0_ *= dtSub;
-
-  // tmpR0_ = 0.0;
 
   // TnStar has star state at substep here
   tmpR0_.Add(1.0, TnStar_);
@@ -1523,8 +1519,9 @@ void ReactingFlow::speciesStep(int iSpec) {
   MsRho_form_->FormSystemMatrix(empty, MsRho_);
   MsRho_->AddMult(tmpR0_, resY_, -1.0);
 
-  // production of iSpec
-  // Add here if NOT using operator splitting
+  // If NOT using operator splitting, include the reaction source term
+  // on the rhs.  If using operator splitting, this is handled by
+  // speciesSubstep.
   if (!operator_split_) {
     setScalarFromVector(prodY_, iSpec, &tmpR0_);
     Ms_->AddMult(tmpR0_, resY_);
@@ -1582,15 +1579,12 @@ void ReactingFlow::speciesStep(int iSpec) {
 // Y{n + (substep+1)} = dt * wdot(Y{n + (substep)} + Y{n + (substep+1)}*
 void ReactingFlow::speciesSubstep(int iSpec, int iSub) {
   // substep dt
-  // double dtSub = dt_ * (double)(iSub+1) / (double)nSub_;
   double dtSub = dt_ / (double)nSub_;
 
   // production of iSpec
   setScalarFromVector(prodY_, iSpec, &tmpR0_);
   tmpR0_ /= rn_;
   tmpR0_ *= dtSub;
-
-  // tmpR0_ = 0.0;
 
   // YnStar has star state at substep here
   setScalarFromVector(YnStar_, iSpec, &tmpR0a_);
@@ -1690,8 +1684,7 @@ void ReactingFlow::crossDiffusion() {
     tmpR1c_ += tmpR1b_;
   }
   dotVector(tmpR1a_, tmpR1c_, &tmpR1_, dim_);
-  Ms_->Mult(tmpR1_, crossDiff_);  // if including in time-splitting comment
-  // crossDiff_.Set(1.0,tmpR1_);
+  Ms_->Mult(tmpR1_, crossDiff_);
 }
 
 void ReactingFlow::computeExplicitTempConvectionOP(bool extrap) {
@@ -1819,20 +1812,6 @@ void ReactingFlow::extrapolateState() {
 // Interpolate star state to substeps. Linear for now, use higher order
 // if time-splitting order can be improved
 void ReactingFlow::substepState() {
-  /*
-  double wt0, wt1;
-  wt1 = (double)(iSub + 1) / (double)nSub_;
-  wt0 = 1.0 - wt1;
-
-  TnStar_.Set(wt0, temp_buffer_);
-  TnStar_.Add(wt1, Tn_next_);
-  // Tn_gf_.SetFromTrueDofs(Tn_);
-
-  YnStar_.Set(wt0, spec_buffer_);
-  YnStar_.Add(wt1, Yn_next_);
-  // Yn_gf_.SetFromTrueDofs(Yn_);
-  */
-
   // delta over substep of star state
   double wt = 1.0 / (double)nSub_;
 
