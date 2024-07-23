@@ -50,6 +50,9 @@ double species_stepRight(const Vector &coords, double t);
 double species_uniform(const Vector &coords, double t);
 double binaryTest(const Vector &coords, double t);
 
+static double radius(const Vector &pos) { return pos[0]; }
+static FunctionCoefficient radius_coeff(radius);
+
 ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &time_coeff,
                            TPS::Tps *tps)
     : tpsP_(tps), pmesh_(pmesh), dim_(pmesh->Dimension()), time_coeff_(time_coeff) {
@@ -485,6 +488,9 @@ ReactingFlow::~ReactingFlow() {
   // delete rho_coeff_;
   delete cpMix_coeff_;
   delete rhoCp_coeff_;
+
+  delete rad_rho_coeff_;
+  delete rad_rho_Cp_coeff_;
 
   delete Ay_form_;
   delete HyInv_;
@@ -935,6 +941,11 @@ void ReactingFlow::initializeOperators() {
   rhoCp_coeff_ = new ProductCoefficient(*cpMix_coeff_, *rhon_next_coeff_);
   rhouCp_coeff_ = new ScalarVectorProductCoefficient(*rhoCp_coeff_, *un_next_coeff_);
   rhou_coeff_ = new ScalarVectorProductCoefficient(*rhon_next_coeff_, *un_next_coeff_);
+  if (axisym_) {
+    // for axisymmetric case, need to multply many coefficients by the radius
+    rad_rho_coeff_ = new ProductCoefficient(radius_coeff, *rhon_next_coeff_);
+    rad_rho_Cp_coeff_ = new ProductCoefficient(radius_coeff, *rhoCp_coeff_);
+  }
 
   At_form_ = new ParBilinearForm(sfes_);
   auto *at_blfi = new ConvectionIntegrator(*rhouCp_coeff_);
@@ -975,7 +986,12 @@ void ReactingFlow::initializeOperators() {
 
   // mass matrix with rho
   MsRho_form_ = new ParBilinearForm(sfes_);
-  auto *msrho_blfi = new MassIntegrator(*rhon_next_coeff_);
+  MassIntegrator *msrho_blfi;
+  if (axisym_) {
+    msrho_blfi = new MassIntegrator(*rad_rho_coeff_);
+  } else {
+    msrho_blfi = new MassIntegrator(*rhon_next_coeff_);
+  }
   if (numerical_integ_) {
     msrho_blfi->SetIntRule(&ir_i);
   }
@@ -988,7 +1004,12 @@ void ReactingFlow::initializeOperators() {
 
   // mass matrix with rho and Cp
   MsRhoCp_form_ = new ParBilinearForm(sfes_);
-  auto *msrhocp_blfi = new MassIntegrator(*rhoCp_coeff_);
+  MassIntegrator *msrhocp_blfi;
+  if (axisym_) {
+    msrhocp_blfi = new MassIntegrator(*rad_rho_Cp_coeff_);
+  } else {
+    msrhocp_blfi = new MassIntegrator(*rhoCp_coeff_);
+  }
   if (numerical_integ_) {
     msrhocp_blfi->SetIntRule(&ir_i);
   }
