@@ -995,7 +995,12 @@ void ReactingFlow::initializeOperators() {
 
   // mass matrix
   Ms_form_ = new ParBilinearForm(sfes_);
-  auto *ms_blfi = new MassIntegrator;
+  MassIntegrator *ms_blfi;
+  if (axisym_) {
+    ms_blfi = new MassIntegrator(radius_coeff);
+  } else {
+    ms_blfi = new MassIntegrator;
+  }
   if (numerical_integ_) {
     ms_blfi->SetIntRule(&ir_i);
   }
@@ -1147,7 +1152,11 @@ void ReactingFlow::initializeOperators() {
   // Vector space mass matrix (used in gradient calcs)
   Mv_form_ = new ParBilinearForm(vfes_);
   VectorMassIntegrator *mv_blfi;
-  mv_blfi = new VectorMassIntegrator;
+  if (axisym_) {
+    mv_blfi = new VectorMassIntegrator(radius_coeff);
+  } else {
+    mv_blfi = new VectorMassIntegrator;
+  }
   if (numerical_integ_) {
     mv_blfi->SetIntRule(&ir_i);
   }
@@ -1178,7 +1187,12 @@ void ReactingFlow::initializeOperators() {
 
   // Qt .....................................
   Mq_form_ = new ParBilinearForm(sfes_);
-  auto *mq_blfi = new MassIntegrator;
+  MassIntegrator *mq_blfi;
+  if (axisym_) {
+    mq_blfi = new MassIntegrator(radius_coeff);
+  } else {
+    mq_blfi = new MassIntegrator;
+  }
   if (numerical_integ_) {
     mq_blfi->SetIntRule(&ir_i);
   }
@@ -1206,7 +1220,12 @@ void ReactingFlow::initializeOperators() {
   MqInv_->SetMaxIter(max_iter_);
 
   LQ_form_ = new ParBilinearForm(sfes_);
-  auto *lqd_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
+  DiffusionIntegrator *lqd_blfi;
+  if (axisym_) {
+    lqd_blfi = new DiffusionIntegrator(*rad_thermal_diff_total_coeff_);
+  } else {
+    lqd_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
+  }
   if (numerical_integ_) {
     lqd_blfi->SetIntRule(&ir_di);
   }
@@ -1225,6 +1244,7 @@ void ReactingFlow::initializeOperators() {
   LQ_bdry_->AddBoundaryIntegrator(lq_bdry_lfi, temp_ess_attr_);
 
   // for explicit species-diff source term in energy (inv not needed)
+  // TODO(trevilo): This operator is not used.  Can we eliminate it?
   LY_form_ = new ParBilinearForm(sfes_);
   auto *lyd_blfi = new DiffusionIntegrator(*species_diff_Cp_coeff_);
   if (numerical_integ_) {
@@ -1239,7 +1259,12 @@ void ReactingFlow::initializeOperators() {
 
   // gradient of scalar
   G_form_ = new ParMixedBilinearForm(sfes_, vfes_);
-  auto *g_mblfi = new GradientIntegrator();
+  GradientIntegrator *g_mblfi;
+  if (axisym_) {
+    g_mblfi = new GradientIntegrator(radius_coeff);
+  } else {
+    g_mblfi = new GradientIntegrator();
+  }
   if (numerical_integ_) {
     g_mblfi->SetIntRule(&ir_i);
   }
