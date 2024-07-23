@@ -64,6 +64,8 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   Pnm3_ = Pnm1_;
   dtP_ = 0.0;
 
+  tps->getInput("loMach/axisymmetric", axisym_, false);
+
   tpsP_->getInput("initialConditions/temperature", T_ic_, 300.0);
 
   filter_temperature_ = loMach_opts->filterTemp;
