@@ -1371,7 +1371,7 @@ void LteThermoChem::streamwiseDiffusion(Vector &gradPhi, Vector &swDiff) {
   D_op_->Mult(tmpR1_, swDiff);
 
   gridScale_gf_->GetTrueDofs(tmpR0b_);
-  //(turbModel_interface_->eddy_viscosity)->GetTrueDofs(tmpR0c_);
+  // (turbModel_interface_->eddy_viscosity)->GetTrueDofs(tmpR0c_);
   (flow_interface_->Reh)->GetTrueDofs(tmpR0c_);
 
   const double *rho = rn_.HostRead();

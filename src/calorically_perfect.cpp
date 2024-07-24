@@ -1156,7 +1156,7 @@ void CaloricallyPerfectThermoChem::streamwiseDiffusion(Vector &gradPhi, Vector &
   D_op_->Mult(tmpR1_, swDiff);
 
   gridScale_gf_->GetTrueDofs(tmpR0b_);
-  //(turbModel_interface_->eddy_viscosity)->GetTrueDofs(tmpR0c_);
+  // (turbModel_interface_->eddy_viscosity)->GetTrueDofs(tmpR0c_);
   (flow_interface_->Reh)->GetTrueDofs(tmpR0c_);
 
   upwindDiff(dim_, re_factor_, re_offset_, tmpR0a_, rn_, tmpR0b_, tmpR0c_, swDiff);
