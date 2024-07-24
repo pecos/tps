@@ -2010,20 +2010,22 @@ void ReactingFlow::initializeIO(IODataOrganizer &io) {
   io.registerIOFamily("Temperature", "/temperature", &Tn_gf_, false);
   io.registerIOVar("/temperature", "temperature", 0);
 
-  // not sure if this will automatically take the full size(all Yn) via the sapce
-  io.registerIOFamily("Species", "/species", &YnFull_gf_, false);
-  io.registerIOVar("/species", "speciesAll", 0);
+  // TODO(trevilo): This hackery is necessary b/c we don't have access
+  // to the IOOptions object we already read (as part of the low Mach
+  // parsing in LoMachSolver::parseSolverOptions()).  That object
+  // should be made available here.
+  bool restart_from_lte;
+  tpsP_->getInput("io/restartFromLTE", restart_from_lte, false);
 
-  // TODO(swh): must be a better way to do this...
-  //???
-  /*
-  io.registerIOFamily("Species", "/species", &YnFull_gf_, false);
-  io.registerIOVar("/species", "Spec1", 0);
-  if (nSpecies_ >= 2) io.registerIOVar("/species", "Spec2", 1);
-  if (nSpecies_ >= 3) io.registerIOVar("/species", "Spec3", 2);
-  if (nSpecies_ >= 4) io.registerIOVar("/species", "Spec4", 3);
-  if (nSpecies_ == 5) io.registerIOVar("/species", "Spec5", 4);
-  */
+  // If restarting from LTE, we don't expect to find species in the restart file
+  const bool species_in_restart_file = !restart_from_lte;
+
+  io.registerIOFamily("Species", "/species", &YnFull_gf_, false, species_in_restart_file);
+  io.registerIOVar("/species", "speciesAll", 0, species_in_restart_file);
+  for (int sp = 0; sp < nSpecies_; sp++) {
+    std::string speciesName = std::to_string(sp);
+    io.registerIOVar("/species", "Y_" + speciesName, sp, species_in_restart_file);
+  }
 }
 
 void ReactingFlow::initializeViz(ParaViewDataCollection &pvdc) {
