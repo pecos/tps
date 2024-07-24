@@ -1389,6 +1389,39 @@ void ReactingFlow::initializeOperators() {
     Tn_filtered_gf_ = 0.0;
   }
 
+  // If we are restarting from an LTE field, compute the species mass
+  // fractions from the temperature and pressure
+  bool restart_from_lte;
+  tpsP_->getInput("io/restartFromLTE", restart_from_lte, false);
+  if (restart_from_lte) {
+    Vector n_sp(nSpecies_);
+    Vector rho_sp(nSpecies_);
+    const double *h_T = Tn_.HostRead();
+    double *h_Yn = Yn_.HostWrite();
+    for (int i = 0; i < sDofInt_; i++) {
+      const double Ti = h_T[i];
+
+      // Evaluate the mole densities of each species at this point,
+      // assuming LTE at given temperature and pressure
+      mixture_->GetSpeciesFromLTE(Ti, thermo_pressure_, n_sp.HostWrite());
+
+      // From the mole densities, evaluate the mass densities and mixture density
+      double mixture_density = 0.0;
+      for (int sp = 0; sp < nSpecies_; sp++) {
+        rho_sp[sp] = n_sp[sp] * mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
+        mixture_density += rho_sp[sp];
+      }
+
+      // Finally, evaluate mass fraction
+      for (int sp = 0; sp < nSpecies_; sp++) {
+        h_Yn[i + sp * sDofInt_] = rho_sp[sp] / mixture_density;
+      }
+    }
+    Ynm1_ = Yn_;
+    Ynm2_ = Yn_;
+    YnFull_gf_.SetFromTrueDofs(Yn_);
+  }
+
   // and initialize system mass
   updateMixture();
   computeSystemMass();
