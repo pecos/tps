@@ -288,6 +288,7 @@ class Averaging {
   int GetSamplesMean() { return ns_mean_; }
   int GetSamplesRMS() { return ns_vari_; }
   int GetSamplesInterval() { return sample_interval_; }
+  int GetStartMean() { return step_start_mean_; }
 
   bool ComputeMean() { return compute_mean_; }
   bool ContinueMean() { return enable_mean_continuation_; }

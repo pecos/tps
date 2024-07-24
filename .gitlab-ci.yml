@@ -9,6 +9,9 @@ variables:
 ##    - echo "hello world2"
 
 lassen:
+ id_tokens:
+   SITE_ID_TOKEN:
+     aud: https://lc.llnl.gov/gitlab
  variables:
    COMPILER:  "gcc/8.3.1"
    CUDA_ARCH: "sm_70"
@@ -34,6 +37,9 @@ lassen:
    - lalloc 1 -q pdebug make check
 
 tioga:
+ id_tokens:
+   SITE_ID_TOKEN:
+     aud: https://lc.llnl.gov/gitlab
  variables:
    ROCM_VER: "5.4.1"
    CCE_VER: "15.0.0c"

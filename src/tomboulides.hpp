@@ -232,6 +232,7 @@ class Tomboulides final : public FlowBase {
   mfem::ParGridFunction *Reh_gf_ = nullptr;
   mfem::ParGridFunction *tmpR0_gf_ = nullptr;
   mfem::ParGridFunction *tmpR1_gf_ = nullptr;
+  mfem::ParGridFunction *epsi_gf_ = nullptr;
 
   /// Pressure FEM objects and fields
   mfem::FiniteElementCollection *pfec_ = nullptr;
@@ -453,6 +454,11 @@ class Tomboulides final : public FlowBase {
    * @brief Computes element convective Reynolds number
    */
   void computeReh();
+
+  /**
+   * @brief Compute turbulent dissipation using average u
+   */
+  void computeDissipation(Averaging &average, const int iter);
 
   /// Advance
   void step() final;

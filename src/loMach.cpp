@@ -114,6 +114,7 @@ void LoMachSolver::initialize() {
     iter = 0;
     temporal_coeff_.nStep = iter;
   }
+  temporal_coeff_.order = max_bdf_order;
 
   //-----------------------------------------------------
   // 1) Prepare the mesh
@@ -460,6 +461,7 @@ void LoMachSolver::solveStep() {
   }
 
   // averages
+  flow_->computeDissipation(*average_, iter);
   average_->addSample(iter);
 
   // restart files

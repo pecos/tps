@@ -282,12 +282,19 @@ class ReactingFlow : public ThermoChemModelBase {
   Vector specificHeatRatios_;
   Vector initialMassFraction_;
   Vector atomMW_;
+  Vector CpMix_;
 
   Vector Qt_;
   Vector rn_;
   Vector diffY_;
   Vector kappa_;
   Vector visc_;
+
+  // time-splitting
+  Vector YnStar_, spec_buffer_;
+  Vector TnStar_, temp_buffer_;
+  bool operator_split_ = false;
+  int nSub_;
 
   // Parameters and objects used in filter-based stabilization
   bool filter_temperature_ = false;
@@ -330,6 +337,12 @@ class ReactingFlow : public ThermoChemModelBase {
   void speciesProduction();
   void heatOfFormation();
   void crossDiffusion();
+
+  // time-splitting
+  void substepState();
+  void speciesLastSubstep();
+  void speciesSubstep(int iSpec, int iSub);
+  void temperatureSubstep(int iSub);
 
   /// for creation of structs to interface with old plasma/chem stuff
   void identifySpeciesType(Array<ArgonSpcs> &speciesType);

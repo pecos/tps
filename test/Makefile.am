@@ -70,7 +70,10 @@ TESTS += cyl3d.gpu.test \
 	 heatEq.test \
          plate.test \
 	 pipe.mix.test \
-	 plasma.axisym.lte1d.test
+	 plasma.axisym.lte1d.test \
+         sgsLoMach.test \
+	 lomach-flow.test \
+	 lomach-lequere.test
 
 if PYTHON_ENABLED
 TESTS += cyl3d.gpu.python.test

@@ -421,6 +421,23 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   chemistry_ = new Chemistry(mixture_, chemistryInput_);
 
   tpsP_->getInput("loMach/reactingFlow/ic", ic_string_, std::string(""));
+  tpsP_->getInput("loMach/reactingFlow/sub-steps", nSub_, 1);
+
+  // Check time marching order.  Operator split (i.e., nSub_ > 1) not supported for order > 1.
+  if ((nSub_ > 1) && (time_coeff_.order > 1)) {
+    if (rank0_) {
+      std::cout << "ERROR: BDF order > 1 not supported with operator split." << std::endl;
+      std::cout << "       Either set loMach/reactingFlow/sub-steps = 1 or time/bdfOrder = 1" << std::endl;
+    }
+    assert(false);
+    exit(1);
+  }
+
+  // By default, do not use operator split scheme.
+  operator_split_ = false;
+  if (nSub_ > 1) {
+    operator_split_ = true;
+  }
 }
 
 ReactingFlow::~ReactingFlow() {
@@ -565,6 +582,12 @@ void ReactingFlow::initializeSelf() {
   NYn_ = 0.0;
   NYnm1_ = 0.0;
   NYnm2_ = 0.0;
+
+  // for time-splitting
+  spec_buffer_.SetSize(yDofInt_);
+  temp_buffer_.SetSize(sDofInt_);
+  YnStar_.SetSize(yDofInt_);
+  TnStar_.SetSize(sDofInt_);
 
   // number density
   Xn_.SetSize(yDofInt_);
@@ -1235,10 +1258,25 @@ void ReactingFlow::step() {
   updateMixture();
   extrapolateState();
   updateBC(0);  // NB: can't ramp right now
-  updateThermoP();
+
+  if (!operator_split_) {
+    updateThermoP();
+  }
+
   updateDensity(1.0);
   updateDiffusivity();
-  speciesProduction();
+
+  // PART I: Form and solve implicit systems for species and temperature.
+  //
+  // If NOT using operator splitting, these systems include all terms,
+  // with the reaction source terms treated explicitly in time.  When
+  // using operator splitting, this solve includes the
+  // advection-diffusion terms but the reaction source terms are
+  // handled separately with substepping below.
+
+  if (!operator_split_) {
+    speciesProduction();
+  }
 
   // advance species, last slot is from calculated sum of others
   for (int iSpecies = 0; iSpecies < nSpecies_ - 1; iSpecies++) {
@@ -1248,9 +1286,10 @@ void ReactingFlow::step() {
   YnFull_gf_.SetFromTrueDofs(Yn_next_);
 
   // ho_i*w_i
-  heatOfFormation();
+  if (!operator_split_) {
+    heatOfFormation();
+  }
 
-  // TODO(swh): this is a bad name
   crossDiffusion();
 
   // advance temperature
@@ -1268,11 +1307,55 @@ void ReactingFlow::step() {
     Tn_next_gf_.GetTrueDofs(Tn_next_);
   }
 
-  // explicit filter species (is this necessary?)
+  // explicit filter species
+  // Add if found to be necessary
 
-  // prepare for external use
+  if (operator_split_) {
+    /// PART II: time-splitting of reaction
+
+    // Save Yn_ and Tn_ because substep routines overwrite these as
+    // with the {n}+iSub substates, which is convenient b/c helper
+    // functions (like speciesProduction) use these Vectors
+    spec_buffer_.Set(1.0, Yn_);
+    temp_buffer_.Set(1.0, Tn_);
+
+    // Evaluate (Yn_next_ - Yn_)/nSub and store in YnStar_, and analog
+    // for TnStar_.
+    substepState();
+
+    for (int iSub = 0; iSub < nSub_; iSub++) {
+      // update wdot quantities at full substep in Yn/Tn state
+      updateMixture();
+      updateThermoP();
+      updateDensity(0.0);
+      speciesProduction();
+      heatOfFormation();
+
+      // advance over substep
+      for (int iSpecies = 0; iSpecies < nSpecies_ - 1; iSpecies++) {
+        speciesSubstep(iSpecies, iSub);
+      }
+      speciesLastSubstep();
+      Yn_gf_.SetFromTrueDofs(Yn_);
+
+      temperatureSubstep(iSub);
+      Tn_gf_.SetFromTrueDofs(Tn_);
+    }
+
+    // set register to correct full step fields
+    Yn_next_ = Yn_;
+    Tn_next_ = Tn_;
+
+    YnFull_gf_.SetFromTrueDofs(Yn_next_);
+    Tn_next_gf_.SetFromTrueDofs(Tn_next_);
+
+    Yn_ = spec_buffer_;
+    Tn_ = temp_buffer_;
+    Tn_gf_.SetFromTrueDofs(Tn_);
+  }
+
+  /// PART III: prepare for external use
   updateDensity(1.0);
-  // computeQt();
   computeQtTO();
 
   UpdateTimestepHistory(dt_);
@@ -1298,12 +1381,17 @@ void ReactingFlow::temperatureStep() {
   MsRhoCp_form_->FormSystemMatrix(empty, MsRhoCp_);
   MsRhoCp_->AddMult(tmpR0_, resT_, -1.0);
 
-  // dPo/dt
-  tmpR0_ = dtP_;  // with rho*Cp on LHS, no Cp on this term
-  Ms_->AddMult(tmpR0_, resT_);
+  // If NOT using operator splitting, include the unsteady pressure
+  // term and the heat of formation contribution on the rhs.  If using
+  // operator splitting, these are handled in temperatureSubstep.
+  if (!operator_split_) {
+    // dPo/dt
+    tmpR0_ = dtP_;  // with rho*Cp on LHS, no Cp on this term
+    Ms_->AddMult(tmpR0_, resT_);
 
-  // heat of formation
-  Ms_->AddMult(hw_, resT_);
+    // heat of formation
+    Ms_->AddMult(hw_, resT_);
+  }
 
   // species-temp diffusion term, already in int-weak form
   resT_.Add(1.0, crossDiff_);
@@ -1351,9 +1439,48 @@ void ReactingFlow::temperatureStep() {
   Tn_next_gf_.GetTrueDofs(Tn_next_);
 }
 
+void ReactingFlow::temperatureSubstep(int iSub) {
+  // substep dt
+  double dtSub = dt_ / (double)nSub_;
+
+  CpMix_gf_.GetTrueDofs(CpMix_);
+
+  // heat of formation term
+  tmpR0_.Set(1.0, hw_);
+
+  // pressure
+  tmpR0_ += dtP_;
+
+  // contribution to temperature update is dt * rhs / (rho * Cp)
+  tmpR0_ /= rn_;
+  tmpR0_ /= CpMix_;
+  tmpR0_ *= dtSub;
+
+  // TnStar has star state at substep here
+  tmpR0_.Add(1.0, TnStar_);
+  tmpR0_.Add(1.0, Tn_);
+
+  // Tn now has full state at substep
+  Tn_.Set(1.0, tmpR0_);
+}
+
 void ReactingFlow::speciesLastStep() {
   tmpR0_ = 0.0;
   double *dataYn = Yn_next_.HostReadWrite();
+  double *dataYsum = tmpR0_.HostReadWrite();
+  for (int n = 0; n < nSpecies_ - 1; n++) {
+    for (int i = 0; i < sDofInt_; i++) {
+      dataYsum[i] += dataYn[i + n * sDofInt_];
+    }
+  }
+  for (int i = 0; i < sDofInt_; i++) {
+    dataYn[i + (nSpecies_ - 1) * sDofInt_] = 1.0 - dataYsum[i];
+  }
+}
+
+void ReactingFlow::speciesLastSubstep() {
+  tmpR0_ = 0.0;
+  double *dataYn = Yn_.HostReadWrite();
   double *dataYsum = tmpR0_.HostReadWrite();
   for (int n = 0; n < nSpecies_ - 1; n++) {
     for (int i = 0; i < sDofInt_; i++) {
@@ -1392,9 +1519,13 @@ void ReactingFlow::speciesStep(int iSpec) {
   MsRho_form_->FormSystemMatrix(empty, MsRho_);
   MsRho_->AddMult(tmpR0_, resY_, -1.0);
 
-  // production of iSpec
-  setScalarFromVector(prodY_, iSpec, &tmpR0_);
-  Ms_->AddMult(tmpR0_, resY_);
+  // If NOT using operator splitting, include the reaction source term
+  // on the rhs.  If using operator splitting, this is handled by
+  // speciesSubstep.
+  if (!operator_split_) {
+    setScalarFromVector(prodY_, iSpec, &tmpR0_);
+    Ms_->AddMult(tmpR0_, resY_);
+  }
 
   // Add natural boundary terms here later
   // NB: adiabatic natural BC is handled, but don't have ability to impose non-zero heat flux yet
@@ -1443,6 +1574,27 @@ void ReactingFlow::speciesStep(int iSpec) {
   Hy_form_->RecoverFEMSolution(Xt2, resT_gf_, Yn_next_gf_);
   Yn_next_gf_.GetTrueDofs(tmpR0_);
   setVectorFromScalar(tmpR0_, iSpec, &Yn_next_);
+}
+
+// Y{n + (substep+1)} = dt * wdot(Y{n + (substep)} + Y{n + (substep+1)}*
+void ReactingFlow::speciesSubstep(int iSpec, int iSub) {
+  // substep dt
+  double dtSub = dt_ / (double)nSub_;
+
+  // production of iSpec
+  setScalarFromVector(prodY_, iSpec, &tmpR0_);
+  tmpR0_ /= rn_;
+  tmpR0_ *= dtSub;
+
+  // YnStar has star state at substep here
+  setScalarFromVector(YnStar_, iSpec, &tmpR0a_);
+  tmpR0_.Add(1.0, tmpR0a_);
+
+  setScalarFromVector(Yn_, iSpec, &tmpR0a_);
+  tmpR0_.Add(1.0, tmpR0a_);
+
+  // Yn now has full state at substep
+  setVectorFromScalar(tmpR0_, iSpec, &Yn_);
 }
 
 void ReactingFlow::speciesProduction() {
@@ -1657,6 +1809,19 @@ void ReactingFlow::extrapolateState() {
   Yext_.Add(time_coeff_.ab3, Ynm2_);
 }
 
+// Interpolate star state to substeps. Linear for now, use higher order
+// if time-splitting order can be improved
+void ReactingFlow::substepState() {
+  // delta over substep of star state
+  double wt = 1.0 / (double)nSub_;
+
+  TnStar_.Set(wt, Tn_next_);
+  TnStar_.Add(-wt, temp_buffer_);
+
+  YnStar_.Set(wt, Yn_next_);
+  YnStar_.Add(-wt, spec_buffer_);
+}
+
 void ReactingFlow::updateMixture() {
   {
     double *dataY = Yn_gf_.HostReadWrite();
@@ -1765,7 +1930,11 @@ void ReactingFlow::updateThermoP() {
     thermo_pressure_ = system_mass_ / allMass * Pnm1_;
     dtP_ = time_coeff_.bd0 * thermo_pressure_ + time_coeff_.bd1 * Pnm1_ + time_coeff_.bd2 * Pnm2_ +
            time_coeff_.bd3 * Pnm3_;
-    dtP_ *= 1.0 / dt_;
+
+    // For operator split, dtP term is in split substeps, so need to
+    // divide dt by nSub.  For 'unified' approach (not operator
+    // split), nSub = 1, so it makes no difference.
+    dtP_ *= (nSub_ / dt_);
   }
 }
 

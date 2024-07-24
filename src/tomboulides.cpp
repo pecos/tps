@@ -239,6 +239,7 @@ Tomboulides::~Tomboulides() {
   delete Reh_gf_;
   delete tmpR0_gf_;
   delete tmpR1_gf_;
+  delete epsi_gf_;
   delete vfes_;
   delete vfec_;
   delete sfes_;
@@ -265,16 +266,20 @@ void Tomboulides::initializeSelf() {
   gradW_gf_ = new ParGridFunction(vfes_);
   p_gf_ = new ParGridFunction(pfes_);
   resp_gf_ = new ParGridFunction(pfes_);
+  epsi_gf_ = new ParGridFunction(sfes_);
   mu_total_gf_ = new ParGridFunction(pfes_);
 
-  pp_div_rad_comp_gf_ = new ParGridFunction(pfes_, *pp_div_gf_);
-  u_next_rad_comp_gf_ = new ParGridFunction(pfes_, *u_next_gf_);
+  // pp_div_rad_comp_gf_ = new ParGridFunction(pfes_, *pp_div_gf_);
+  // u_next_rad_comp_gf_ = new ParGridFunction(pfes_, *u_next_gf_);
 
   Reh_gf_ = new ParGridFunction(pfes_);
   tmpR0_gf_ = new ParGridFunction(pfes_);
   tmpR1_gf_ = new ParGridFunction(vfes_);
 
   if (axisym_) {
+    pp_div_rad_comp_gf_ = new ParGridFunction(pfes_);
+    u_next_rad_comp_gf_ = new ParGridFunction(pfes_);
+
     utheta_gf_ = new ParGridFunction(pfes_);
     utheta_next_gf_ = new ParGridFunction(pfes_);
   }
@@ -293,6 +298,8 @@ void Tomboulides::initializeSelf() {
   *resp_gf_ = 0.0;
   *mu_total_gf_ = 0.0;
   *Reh_gf_ = 0.0;
+
+  *epsi_gf_ = 0.0;
 
   if (axisym_) {
     *utheta_gf_ = 0.0;
@@ -1096,6 +1103,7 @@ void Tomboulides::initializeStats(Averaging &average, IODataOrganizer &io, bool 
     // fields for averaging
     average.registerField(std::string("velocity"), u_curr_gf_, true, 0, nvel_);
     average.registerField(std::string("pressure"), p_gf_, false, 0, 1);
+    average.registerField(std::string("dissipation"), epsi_gf_, false, 0, 1);
 
     // io init
     io.registerIOFamily("Time-averaged velocity", "/meanVel", average.GetMeanField(std::string("velocity")), false,
@@ -1107,6 +1115,10 @@ void Tomboulides::initializeStats(Averaging &average, IODataOrganizer &io, bool 
     io.registerIOFamily("Time-averaged pressure", "/meanPres", average.GetMeanField(std::string("pressure")), false,
                         continuation, pfec_);
     io.registerIOVar("/meanPres", "<P>", 0, true);
+
+    io.registerIOFamily("Time-averaged dissipation", "/meanEpsi", average.GetMeanField(std::string("dissipation")),
+                        false, continuation, pfec_);
+    io.registerIOVar("/meanEpsi", "<e>", 0, true);
 
     // rms
     io.registerIOFamily("RMS velocity fluctuation", "/rmsData", average.GetVariField(std::string("velocity")), false,
@@ -1125,6 +1137,82 @@ void Tomboulides::initializeStats(Averaging &average, IODataOrganizer &io, bool 
     } else {
       // only nvel = 2 or 3 supported
       assert(false);
+    }
+  }
+}
+
+void Tomboulides::computeDissipation(Averaging &average, const int iter) {
+  if (average.ComputeMean()) {
+    int sample_interval = average.GetSamplesInterval();
+    int sample_start = average.GetStartMean();
+    if (iter % sample_interval == 0 && iter >= sample_start) {
+      // fluctuating velocity
+      u_curr_gf_->GetTrueDofs(tmpR1_);
+      average.GetMeanField("velocity")->GetTrueDofs(u_vec_);
+      tmpR1_.Add(-1.0, u_vec_);
+
+      // gradient of u'
+      setScalarFromVector(tmpR1_, 0, &tmpR0_);
+      G_op_->Mult(tmpR0_, gradU_);
+      setScalarFromVector(tmpR1_, 1, &tmpR0_);
+      G_op_->Mult(tmpR0_, gradV_);
+      if (dim_ == 3) {
+        setScalarFromVector(tmpR1_, 2, &tmpR0_);
+        G_op_->Mult(tmpR0_, gradW_);
+      }
+
+      Mv_inv_->Mult(gradU_, tmpR1_);
+      gradU_ = tmpR1_;
+      Mv_inv_->Mult(gradV_, tmpR1_);
+      gradV_ = tmpR1_;
+      if (dim_ == 3) {
+        Mv_inv_->Mult(gradW_, tmpR1_);
+        gradW_ = tmpR1_;
+      }
+
+      gradU_gf_->SetFromTrueDofs(gradU_);
+      gradV_gf_->SetFromTrueDofs(gradV_);
+      if (dim_ == 3) gradW_gf_->SetFromTrueDofs(gradW_);
+
+      // const double *dmu = (*thermo_interface_->viscosity).HostRead();
+      const double *dmu = mu_total_gf_->HostRead();
+      const double *drho = (*thermo_interface_->density).HostRead();
+      const double *dGradU = gradU_gf_->HostRead();
+      const double *dGradV = gradV_gf_->HostRead();
+      const double *dGradW = gradW_gf_->HostRead();
+      double *depsi = epsi_gf_->HostReadWrite();
+
+      int Sdof = epsi_gf_->Size();
+      for (int dof = 0; dof < Sdof; dof++) {
+        depsi[dof] = 0.0;
+
+        DenseMatrix gradUp;
+        gradUp.SetSize(nvel_, dim_);
+        for (int dir = 0; dir < dim_; dir++) {
+          gradUp(0, dir) = dGradU[dof + dir * Sdof];
+        }
+        for (int dir = 0; dir < dim_; dir++) {
+          gradUp(1, dir) = dGradV[dof + dir * Sdof];
+        }
+        if (dim_ == 3) {
+          for (int dir = 0; dir < dim_; dir++) {
+            gradUp(2, dir) = dGradW[dof + dir * Sdof];
+          }
+        }
+
+        for (int i = 0; i < dim_; i++) {
+          for (int j = 0; j < dim_; j++) {
+            depsi[dof] += gradUp(i, j) * gradUp(i, j);
+          }
+        }
+        depsi[dof] *= 2.0 * dmu[dof] / drho[dof];
+      }
+
+      // probably not necessary but just to be extra safe
+      u_curr_gf_->GetTrueDofs(u_vec_);
+      gradU_gf_->GetTrueDofs(gradU_);
+      gradV_gf_->GetTrueDofs(gradV_);
+      gradW_gf_->GetTrueDofs(gradW_);
     }
   }
 }
@@ -1414,6 +1502,20 @@ void Tomboulides::step() {
 
   // Add axisymmetric "forcing" term to rhs
   if (axisym_) {
+    pp_div_gf_->HostRead();
+    {
+      // Copy radial components of pp_div_gf_.  We should be able to
+      // just make pp_div_rad_comp_gf_ wrap pp_div_gf_, but that is
+      // causing problems (that aren't understood) on some gpu
+      // systems.  As a workaround, we copy instead.
+      auto d_pp_div_rad = pp_div_rad_comp_gf_->Write();
+      auto d_pp_div = pp_div_gf_->Read();
+      MFEM_FORALL(i, pp_div_rad_comp_gf_->Size(), {
+          d_pp_div_rad[i] = d_pp_div[i];
+        });
+    }
+    pp_div_rad_comp_gf_->HostRead();
+
     Faxi_poisson_form_->Update();
     Faxi_poisson_form_->Assemble();
     Faxi_poisson_form_->ParallelAssemble(Faxi_poisson_vec_);
@@ -1520,6 +1622,18 @@ void Tomboulides::step() {
   evaluateVelocityGradient();
 
   if (axisym_) {
+    u_next_gf_->HostRead();
+    {
+      // Copy radial components of u_next_gf_.  Same comments here
+      // about pp_div_rad_comp_gf_ above.
+      auto d_u_next_rad = u_next_rad_comp_gf_->Write();
+      auto d_u_next = u_next_gf_->Read();
+      MFEM_FORALL(i, u_next_rad_comp_gf_->Size(), {
+          d_u_next_rad[i] = d_u_next[i];
+        });
+    }
+    u_next_rad_comp_gf_->HostRead();
+
     // Update the Helmholtz operator and inverse
     Hv_bdfcoeff_.constant = coeff_.bd0 / dt;
     Hs_form_->Update();

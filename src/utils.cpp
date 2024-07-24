@@ -705,7 +705,12 @@ void ComputeCurl3D(const ParGridFunction &u, ParGridFunction &cu) {
   zones_per_vdof.SetSize(fes->GetVSize());
   zones_per_vdof = 0;
 
-  cu = 0.0;
+  // Force data copy to host (b/c host data used below)
+  u.HostRead();
+
+  // Initialize curl
+  cu = 0.0;            // On device (if present)
+  cu.HostReadWrite();  // Copy to host and invalidate device data (b/c host written to below)
 
   // Local interpolation.
   int elndofs;
@@ -783,10 +788,10 @@ void ComputeCurl3D(const ParGridFunction &u, ParGridFunction &cu) {
   }
 }
 
-void vectorGrad3D(ParGridFunction &u, ParGridFunction &gu, ParGridFunction &gv, ParGridFunction &gw) {
-  ParGridFunction uSub;
-  FiniteElementSpace *sfes = u.FESpace();
-  uSub.SetSpace(sfes);
+void vectorGrad3D(ParGridFunction &uSub, ParGridFunction &u, ParGridFunction &gu, ParGridFunction &gv,
+                  ParGridFunction &gw) {
+  // FiniteElementSpace *sfes = uSub.FESpace();
+  int dim = 3;
   int nSize = uSub.Size();
 
   {
@@ -807,18 +812,21 @@ void vectorGrad3D(ParGridFunction &u, ParGridFunction &gu, ParGridFunction &gv, 
   }
   scalarGrad3D(uSub, gv);
 
-  {
+  if (dim == 3) {
     double *dataSub = uSub.HostReadWrite();
     double *data = u.HostReadWrite();
     for (int i = 0; i < nSize; i++) {
       dataSub[i] = data[i + 2 * nSize];
     }
+    scalarGrad3D(uSub, gw);
   }
-  scalarGrad3D(uSub, gw);
 }
 
 void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu) {
   FiniteElementSpace *fes = u.FESpace();
+  GroupCommunicator &gcomm = u.ParFESpace()->GroupComm();
+  int dim = 3;                // spatial dimension
+  int vdim = fes->GetVDim();  // vector dimension (or u)
 
   // AccumulateAndCountZones.
   Array<int> zones_per_vdof;
@@ -833,11 +841,9 @@ void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu) {
   Array<int> vdofs;
   Vector vals1, vals2, vals3;
   Vector loc_data;
-  int vdim = fes->GetVDim();
   DenseMatrix grad_hat;
   DenseMatrix dshape;
   DenseMatrix grad;
-  int dim_ = 3;
 
   // element loop
   for (int e = 0; e < fes->GetNE(); ++e) {
@@ -850,7 +856,6 @@ void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu) {
     const FiniteElement *el = fes->GetFE(e);
     elndofs = el->GetDof();
     int dim = el->GetDim();
-    dim_ = dim;
     dshape.SetSize(elndofs, dim);
 
     // element dof
@@ -871,7 +876,7 @@ void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu) {
 
       vals1(dof) = grad(0, 0);
       vals2(dof) = grad(0, 1);
-      if (dim_ == 3) vals3(dof) = grad(0, 2);
+      if (dim == 3) vals3(dof) = grad(0, 2);
     }
 
     // Accumulate values in all dofs, count the zones.
@@ -883,7 +888,8 @@ void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu) {
       int ldof = vdofs[j];
       gu(ldof + 1 * nSize) += vals2[j];
     }
-    if (dim_ == 3) {
+
+    if (dim == 3) {
       for (int j = 0; j < vdofs.Size(); j++) {
         int ldof = vdofs[j];
         gu(ldof + 2 * nSize) += vals3[j];
@@ -897,21 +903,19 @@ void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu) {
   }
 
   // Count the zones globally.
-  GroupCommunicator &gcomm = gu.ParFESpace()->GroupComm();
   gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
   gcomm.Bcast(zones_per_vdof);
 
   // Accumulate for all vdofs.
-  gcomm.Reduce<double>(gu.GetData(), GroupCommunicator::Sum);
-  gcomm.Bcast<double>(gu.GetData());
+  GroupCommunicator &gcomm_g = gu.ParFESpace()->GroupComm();
+  gcomm_g.Reduce<double>(gu.GetData(), GroupCommunicator::Sum);
+  gcomm_g.Bcast<double>(gu.GetData());
 
   // Compute means.
-  for (int dir = 0; dir < dim_; dir++) {
-    for (int i = 0; i < u.Size(); i++) {
+  for (int dir = 0; dir < dim; dir++) {
+    for (int i = 0; i < nSize; i++) {
       const int nz = zones_per_vdof[i];
-      if (nz) {
-        gu(i + dir * nSize) /= nz;
-      }
+      if (nz) gu(i + dir * nSize) /= nz;
     }
   }
 }
@@ -924,7 +928,12 @@ void ComputeCurl2D(const ParGridFunction &u, ParGridFunction &cu, bool assume_sc
   zones_per_vdof.SetSize(fes->GetVSize());
   zones_per_vdof = 0;
 
-  cu = 0.0;
+  // Force data copy to host (b/c host data used below)
+  u.HostRead();
+
+  // Initialize curl
+  cu = 0.0;            // On device (if present)
+  cu.HostReadWrite();  // Copy to host and invalidate device data (b/c host written to below)
 
   // Local interpolation.
   int elndofs;
@@ -1016,7 +1025,12 @@ void ComputeCurlAxi(const ParGridFunction &u, ParGridFunction &cu, bool assume_s
   zones_per_vdof.SetSize(cfes->GetVSize());
   zones_per_vdof = 0;
 
-  cu = 0.0;
+  // Force data copy to host (b/c host data used below)
+  u.HostRead();
+
+  // Initialize curl
+  cu = 0.0;            // On device (if present)
+  cu.HostReadWrite();  // Copy to host and invalidate device data (b/c host written to below)
 
   // Local interpolation.
   int elndofs;
@@ -1124,6 +1138,7 @@ void scalarGrad3DV(FiniteElementSpace *fes, FiniteElementSpace *vfes, Vector u, 
   R1_gf.GetTrueDofs(*gu);
 }
 
+/*
 void vectorGrad3DV(FiniteElementSpace *fes, Vector u, Vector *gu, Vector *gv, Vector *gw) {
   ParGridFunction R1_gf;
   R1_gf.SetSpace(fes);
@@ -1139,6 +1154,7 @@ void vectorGrad3DV(FiniteElementSpace *fes, Vector u, Vector *gu, Vector *gv, Ve
   R1b_gf.GetTrueDofs(*gv);
   R1c_gf.GetTrueDofs(*gw);
 }
+*/
 
 void EliminateRHS(Operator &A, ConstrainedOperator &constrainedA, const Array<int> &ess_tdof_list, Vector &x, Vector &b,
                   Vector &X, Vector &B, int copy_interior) {
@@ -1319,6 +1335,63 @@ void upwindDiff(int dim, double re_factor, double re_offset, Vector &u_vec, Vect
     // scaled streamwise Laplacian
     data[dof] *= CswDiff;
   }
+}
+  
+void makeContinuous(ParGridFunction &u) {
+  FiniteElementSpace *fes = u.FESpace();
+
+  ParGridFunction au;
+  au.SetSpace(fes);
+  au = 0.0;
+
+  int elndofs;
+  Array<int> vdofs;
+  Vector vals;
+  Vector loc_data;
+  // int vdim = fes->GetVDim();
+  Array<int> zones_per_vdof;
+  zones_per_vdof.SetSize(fes->GetVSize());
+  zones_per_vdof = 0;
+
+  for (int e = 0; e < fes->GetNE(); ++e) {
+    fes->GetElementVDofs(e, vdofs);
+    u.GetSubVector(vdofs, loc_data);
+    vals.SetSize(vdofs.Size());
+    const FiniteElement *el = fes->GetFE(e);
+    elndofs = el->GetDof();
+    for (int dof = 0; dof < elndofs; ++dof) {
+      vals(dof) = loc_data(dof);
+    }
+
+    // Accumulate values in all dofs, count the zones.
+    for (int j = 0; j < vdofs.Size(); j++) {
+      int ldof = vdofs[j];
+      au(ldof) += vals[j];
+      zones_per_vdof[ldof]++;
+    }
+  }
+
+  // Communication
+
+  // Count the zones globally.
+  GroupCommunicator &gcomm = u.ParFESpace()->GroupComm();
+  gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
+  gcomm.Bcast(zones_per_vdof);
+
+  // Accumulate for all vdofs.
+  gcomm.Reduce<double>(au.GetData(), GroupCommunicator::Sum);
+  gcomm.Bcast<double>(au.GetData());
+
+  // Compute means.
+  for (int i = 0; i < au.Size(); i++) {
+    const int nz = zones_per_vdof[i];
+    if (nz) {
+      au(i) /= nz;
+    }
+  }
+
+  // copy back
+  u = au;
 }
 
 namespace mfem {
