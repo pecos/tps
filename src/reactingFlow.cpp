@@ -2219,10 +2219,12 @@ void ReactingFlow::updateDiffusivity() {
 
       mixture_->GetConservativesFromPrimitives(state, conservedState);
       transport_->GetThermalConductivities(conservedState, state, kappa);
-      dataKappa[i] = kappa[0];
+      dataKappa[i] = kappa[0];  // TODO(trevilo): Add electron thermal conductivity
     }
   }
-  kappa_gf_.SetFromTrueDofs(visc_);
+  kappa_gf_.SetFromTrueDofs(visc_);   // TODO(trevilo): Bug... should be kappa_, not visc_
+
+  // TODO(trevilo): Compute electrical conductivity here, and put into sigma_gf_
 }
 
 void ReactingFlow::updateDensity(double tStep) {
