@@ -40,6 +40,7 @@
 
 #include "loMach.hpp"
 #include "loMach_options.hpp"
+#include "radiation.hpp"
 
 using namespace mfem;
 using namespace mfem::common;
@@ -421,6 +422,57 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
 
   chemistry_ = new Chemistry(mixture_, chemistryInput_);
 
+  // Initialize radiation (just NEC for now) model
+  std::string type;
+  std::string basepath("plasma_models/radiation_model");
+
+  tpsP_->getInput(basepath.c_str(), type, std::string("none"));
+  std::string model_input_path(basepath + "/" + type);
+
+  RadiationInput rad_model_input;
+  if (type == "net_emission") {
+    rad_model_input.model = NET_EMISSION;
+
+    std::string coefficient_type;
+    tpsP_->getRequiredInput((model_input_path + "/coefficient").c_str(), coefficient_type);
+    if (coefficient_type == "tabulated") {
+      rad_model_input.necModel = TABULATED_NEC;
+      std::string table_input_path(model_input_path + "/tabulated");
+      std::string filename;
+      tpsP_->getRequiredInput((table_input_path + "/filename").c_str(), filename);
+
+      std::vector<TableInput> rad_tables(1);
+      for (size_t i = 0; i < rad_tables.size(); i++) {
+        rad_tables[i].order = 1;
+        rad_tables[i].xLogScale = false;
+        rad_tables[i].fLogScale = false;
+      }
+
+      // Read data from hdf5 file containing 4 columns: T, energy, gas constant, speed of sound
+      DenseMatrix rad_data;
+      bool success =
+          h5ReadBcastMultiColumnTable(filename, std::string("table"), pmesh_->GetComm(), rad_data, rad_tables);
+      if (!success) exit(ERROR);
+
+      rad_model_input.necTableInput.order = 1;
+      rad_model_input.necTableInput.xLogScale = false;
+      rad_model_input.necTableInput.fLogScale = false;
+      rad_model_input.necTableInput.Ndata = rad_tables[0].Ndata;
+      rad_model_input.necTableInput.xdata = rad_tables[0].xdata;
+      rad_model_input.necTableInput.fdata = rad_tables[0].fdata;
+
+      radiation_ = new NetEmission(rad_model_input);
+    } else {
+      grvy_printf(GRVY_ERROR, "\nUnknown net emission coefficient type -> %s\n", coefficient_type.c_str());
+      exit(ERROR);
+    }
+  } else if (type == "none") {
+    radiation_ = nullptr;
+  } else {
+    grvy_printf(GRVY_ERROR, "\nUnknown radiation model -> %s\n", type.c_str());
+    exit(ERROR);
+  }
+
   tpsP_->getInput("loMach/reactingFlow/ic", ic_string_, std::string(""));
 
   // will be over-written if dynamic is active
@@ -486,6 +538,7 @@ ReactingFlow::~ReactingFlow() {
   delete rhoCp_coeff_;
 
   delete jh_coeff_;
+  delete radiation_sink_coeff_;
 
   delete rad_rho_coeff_;
   delete rad_rho_Cp_coeff_;
@@ -669,6 +722,12 @@ void ReactingFlow::initializeSelf() {
 
   jh_.SetSize(sDofInt_);
   jh_ = 0.0;
+
+  radiation_sink_gf_.SetSpace(sfes_);
+  radiation_sink_gf_ = 0.0;
+
+  radiation_sink_.SetSize(sDofInt_);
+  radiation_sink_ = 0.0;
 
   tmpR1_.SetSize(dim_ * sDofInt_);
   tmpR1a_.SetSize(dim_ * sDofInt_);
@@ -962,6 +1021,9 @@ void ReactingFlow::initializeOperators() {
   // Joule heating
   jh_coeff_ = new GridFunctionCoefficient(&jh_gf_);
 
+  // Radiation energy sink
+  radiation_sink_coeff_ = new GridFunctionCoefficient(&radiation_sink_gf_);
+
   if (axisym_) {
     // for axisymmetric case, need to multply many coefficients by the radius
     rad_rho_coeff_ = new ProductCoefficient(radius_coeff, *rhon_next_coeff_);
@@ -973,6 +1035,7 @@ void ReactingFlow::initializeOperators() {
     rad_rho_Cp_over_dt_coeff_ = new ProductCoefficient(radius_coeff, *rhoCp_over_dt_coeff_);
     rad_thermal_diff_total_coeff_ = new ProductCoefficient(radius_coeff, *thermal_diff_total_coeff_);
     rad_jh_coeff_ = new ProductCoefficient(radius_coeff, *jh_coeff_);
+    rad_radiation_sink_coeff_ = new ProductCoefficient(radius_coeff, *radiation_sink_coeff_);
   }
 
   At_form_ = new ParBilinearForm(sfes_);
@@ -1204,20 +1267,20 @@ void ReactingFlow::initializeOperators() {
   // Energy sink/source terms: Joule heating and radiation sink
   jh_form_ = new ParLinearForm(sfes_);
   DomainLFIntegrator *jh_dlfi;
-  // DomainLFIntegrator *rad_dlfi;
+  DomainLFIntegrator *rad_dlfi;
   if (axisym_) {
     jh_dlfi = new DomainLFIntegrator(*rad_jh_coeff_);
-    // rad_dlfi = new DomainLFIntegrator(*rad_radiation_sink_coeff_);
+    rad_dlfi = new DomainLFIntegrator(*rad_radiation_sink_coeff_);
   } else {
     jh_dlfi = new DomainLFIntegrator(*jh_coeff_);
-    // rad_dlfi = new DomainLFIntegrator(*radiation_sink_coeff_);
+    rad_dlfi = new DomainLFIntegrator(*radiation_sink_coeff_);
   }
   if (numerical_integ_) {
     jh_dlfi->SetIntRule(&ir_i);
-    // rad_dlfi->SetIntRule(&ir_i);
+    rad_dlfi->SetIntRule(&ir_i);
   }
   jh_form_->AddDomainIntegrator(jh_dlfi);
-  // jh_form_->AddDomainIntegrator(rad_dlfi);
+  jh_form_->AddDomainIntegrator(rad_dlfi);
 
   // Qt .....................................
   Mq_form_ = new ParBilinearForm(sfes_);
@@ -2222,7 +2285,7 @@ void ReactingFlow::updateDiffusivity() {
       dataKappa[i] = kappa[0];  // TODO(trevilo): Add electron thermal conductivity
     }
   }
-  kappa_gf_.SetFromTrueDofs(visc_);   // TODO(trevilo): Bug... should be kappa_, not visc_
+  kappa_gf_.SetFromTrueDofs(visc_);  // TODO(trevilo): Bug... should be kappa_, not visc_
 
   // TODO(trevilo): Compute electrical conductivity here, and put into sigma_gf_
 }

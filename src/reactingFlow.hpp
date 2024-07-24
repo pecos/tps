@@ -62,6 +62,7 @@ using ScalarFuncT = double(const Vector &x, double t);
 
 class LoMachOptions;
 struct temporalSchemeCoefficients;
+class Radiation;
 
 /**
    Energy/species class specific for temperature solves with loMach flows
@@ -91,6 +92,7 @@ class ReactingFlow : public ThermoChemModelBase {
   GasModel gasModel_;
   TransportModel transportModel_;
   ChemistryModel chemistryModel_;
+  Radiation *radiation_ = nullptr;
 
   // packaged inputs
   PerfectMixtureInput mixtureInput_;
@@ -192,6 +194,8 @@ class ReactingFlow : public ThermoChemModelBase {
   ParGridFunction R0PM0_gf_;
   ParGridFunction Qt_gf_;
 
+  ParGridFunction radiation_sink_gf_;
+
   // Interface with EM
   ParGridFunction sigma_gf_;
   ParGridFunction jh_gf_;
@@ -224,6 +228,7 @@ class ReactingFlow : public ThermoChemModelBase {
   ProductCoefficient *species_diff_Cp_coeff_ = nullptr;
 
   GridFunctionCoefficient *jh_coeff_ = nullptr;
+  GridFunctionCoefficient *radiation_sink_coeff_ = nullptr;
 
   ProductCoefficient *rad_rho_coeff_ = nullptr;
   ProductCoefficient *rad_rho_Cp_coeff_ = nullptr;
@@ -234,6 +239,7 @@ class ReactingFlow : public ThermoChemModelBase {
   ProductCoefficient *rad_rho_Cp_over_dt_coeff_ = nullptr;
   ProductCoefficient *rad_thermal_diff_total_coeff_ = nullptr;
   ProductCoefficient *rad_jh_coeff_ = nullptr;
+  ProductCoefficient *rad_radiation_sink_coeff_ = nullptr;
 
   // operators and solvers
   ParBilinearForm *At_form_ = nullptr;
@@ -286,6 +292,7 @@ class ReactingFlow : public ThermoChemModelBase {
   Vector tmpR1_;
   Vector tmpR1a_, tmpR1b_, tmpR1c_;
   Vector jh_;
+  Vector radiation_sink_;
 
   // additions for species
   Vector Yn_, Yn_next_, Ynm1_, Ynm2_;
