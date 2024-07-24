@@ -79,7 +79,8 @@ class ZetaModel : public TurbModelBase {
   double dt_;
   double time_;
   int nvel_, dim_;
-  double dt_nm2_, dt_nm1_;  
+  double dt_nm2_, dt_nm1_;
+  int forder_ = 1;    
 
   std::string ic_string_;
 
@@ -102,6 +103,9 @@ class ZetaModel : public TurbModelBase {
   int pl_solve_ = 0;
   int max_iter_ = 2000;
   double rtol_ = 1e-8;
+  
+  int f_max_iter_ = 4000;
+  double f_rtol_ = 1e-6;  
 
   double tke_ic_, tdr_ic_;
   double tke_min_, tdr_min_, zeta_min_, v2_min_;
@@ -124,6 +128,9 @@ class ZetaModel : public TurbModelBase {
 
   /// Velocity \f$(H^1)^d\f$ finite element space.
   ParFiniteElementSpace *vfes_ = nullptr;
+
+  FiniteElementCollection *ffec_ = nullptr;
+  ParFiniteElementSpace *ffes_ = nullptr;  
 
   /// velocity
   ParGridFunction *vel_gf_ = nullptr;
@@ -225,6 +232,9 @@ class ZetaModel : public TurbModelBase {
   ParGridFunction res_gf_;
   Vector res_;
 
+  ParGridFunction resf_gf_;
+  Vector resf_;  
+  
   // ParGridFunction diag_gf_;
 
   ParGridFunction sMag_gf_;  
@@ -295,7 +305,8 @@ class ZetaModel : public TurbModelBase {
   ParBilinearForm *Hv_form_ = nullptr;
   ParBilinearForm *Hf_form_ = nullptr;
   ParBilinearForm *Hz_form_ = nullptr;
-  ParBilinearForm *Lk_form_ = nullptr;  
+  ParBilinearForm *Lk_form_ = nullptr;
+  ParBilinearForm *Lf_form_ = nullptr;    
   ParLinearForm *He_bdry_ = nullptr;
 
   OperatorHandle As_;
@@ -306,7 +317,8 @@ class ZetaModel : public TurbModelBase {
   OperatorHandle Hv_;
   OperatorHandle Hf_;
   OperatorHandle Hz_;
-  OperatorHandle Lk_;   
+  OperatorHandle Lk_;
+  OperatorHandle Lf_;     
 
   mfem::Solver *MsInvPC_ = nullptr;
   mfem::CGSolver *MsInv_ = nullptr;
@@ -319,6 +331,7 @@ class ZetaModel : public TurbModelBase {
   mfem::CGSolver *HeInv_ = nullptr;
   mfem::CGSolver *HvInv_ = nullptr;
   mfem::CGSolver *HfInv_ = nullptr;
+  // mfem::GMRESSolver *HfInv_ = nullptr;  
   mfem::CGSolver *HzInv_ = nullptr;    
 
   // Boundary condition info
