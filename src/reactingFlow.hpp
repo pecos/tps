@@ -192,6 +192,10 @@ class ReactingFlow : public ThermoChemModelBase {
   ParGridFunction R0PM0_gf_;
   ParGridFunction Qt_gf_;
 
+  // Interface with EM
+  ParGridFunction sigma_gf_;
+  ParGridFunction jh_gf_;
+
   // ParGridFunction *buffer_tInlet_ = nullptr;
   GridFunctionCoefficient *temperature_bc_field_ = nullptr;
 
@@ -219,6 +223,8 @@ class ReactingFlow : public ThermoChemModelBase {
   GridFunctionCoefficient *species_Cp_coeff_ = nullptr;
   ProductCoefficient *species_diff_Cp_coeff_ = nullptr;
 
+  GridFunctionCoefficient *jh_coeff_ = nullptr;
+
   ProductCoefficient *rad_rho_coeff_ = nullptr;
   ProductCoefficient *rad_rho_Cp_coeff_ = nullptr;
   ScalarVectorProductCoefficient *rad_rho_u_coeff_ = nullptr;
@@ -227,6 +233,7 @@ class ReactingFlow : public ThermoChemModelBase {
   ProductCoefficient *rad_species_diff_total_coeff_ = nullptr;
   ProductCoefficient *rad_rho_Cp_over_dt_coeff_ = nullptr;
   ProductCoefficient *rad_thermal_diff_total_coeff_ = nullptr;
+  ProductCoefficient *rad_jh_coeff_ = nullptr;
 
   // operators and solvers
   ParBilinearForm *At_form_ = nullptr;
@@ -242,6 +249,8 @@ class ReactingFlow : public ThermoChemModelBase {
   ParBilinearForm *LY_form_ = nullptr;
   ParMixedBilinearForm *G_form_ = nullptr;
   ParBilinearForm *Mv_form_ = nullptr;
+
+  ParLinearForm *jh_form_ = nullptr;
 
   OperatorHandle LQ_;
   OperatorHandle LY_;
@@ -276,6 +285,7 @@ class ReactingFlow : public ThermoChemModelBase {
   Vector tmpR0a_, tmpR0b_, tmpR0c_;
   Vector tmpR1_;
   Vector tmpR1a_, tmpR1b_, tmpR1c_;
+  Vector jh_;
 
   // additions for species
   Vector Yn_, Yn_next_, Ynm1_, Ynm2_;
