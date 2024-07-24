@@ -80,7 +80,7 @@ class ZetaModel : public TurbModelBase {
   double time_;
   int nvel_, dim_;
   double dt_nm2_, dt_nm1_;
-  int forder_ = 1;    
+  int forder_ = 1;
 
   std::string ic_string_;
 
@@ -240,6 +240,7 @@ class ZetaModel : public TurbModelBase {
   ParGridFunction sMag_gf_;  
   Vector tmpR0_, tmpR0a_, tmpR0b_, tmpR0c_;
   Vector strain_, sMag_;
+  Vector ftmpR0_;
 
   /// coefficient fields for operators
   GridFunctionCoefficient *delta_coeff_ = nullptr;
@@ -300,6 +301,7 @@ class ZetaModel : public TurbModelBase {
   ParBilinearForm *As_form_ = nullptr;
   ParBilinearForm *Ms_form_ = nullptr;
   ParBilinearForm *MsRho_form_ = nullptr;
+  ParBilinearForm *Mf_form_ = nullptr;  
   ParBilinearForm *Hk_form_ = nullptr;
   ParBilinearForm *He_form_ = nullptr;
   ParBilinearForm *Hv_form_ = nullptr;
@@ -312,6 +314,7 @@ class ZetaModel : public TurbModelBase {
   OperatorHandle As_;
   OperatorHandle Ms_;
   OperatorHandle MsRho_;
+  OperatorHandle Mf_;  
   OperatorHandle Hk_;
   OperatorHandle He_;
   OperatorHandle Hv_;

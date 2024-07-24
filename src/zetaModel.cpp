@@ -100,6 +100,7 @@ ZetaModel::~ZetaModel() {
   delete Lf_form_;  
   delete MsRho_form_;
   delete Ms_form_;
+  delete Mf_form_;  
   delete As_form_;
   //delete He_bdry_;
   
@@ -335,6 +336,7 @@ void ZetaModel::initializeSelf() {
   tmpR0a_.SetSize(sfes_truevsize);
   tmpR0b_.SetSize(sfes_truevsize);
   tmpR0c_.SetSize(sfes_truevsize);
+  ftmpR0_.SetSize(ffes_truevsize);  
 
   rhoDt_gf_.SetSpace(sfes_);
 
@@ -488,7 +490,8 @@ void ZetaModel::initializeOperators() {
   const IntegrationRule &ir_i = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 2 * order_ + 1);
   const IntegrationRule &ir_nli = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 4 * order_);
   const IntegrationRule &ir_di = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 3 * order_ - 1);
-  const IntegrationRule &ir_dif = gll_rules_.Get(ffes_->GetFE(0)->GetGeomType(), 3 * forder_ - 1);  
+  const IntegrationRule &ir_dif = gll_rules_.Get(ffes_->GetFE(0)->GetGeomType(), 3 * forder_ - 1);
+  const IntegrationRule &ir_if = gll_rules_.Get(ffes_->GetFE(0)->GetGeomType(), 2 * forder_ + 1);  
 
   // coefficients for operators
   zero_coeff_ = new ConstantCoefficient(0.0);
@@ -590,6 +593,18 @@ void ZetaModel::initializeOperators() {
   MsRho_form_->Assemble();
   MsRho_form_->FormSystemMatrix(empty, MsRho_);
 
+  Mf_form_ = new ParBilinearForm(ffes_);
+  auto *mf_blfi = new MassIntegrator;
+  if (numerical_integ_) {
+    mf_blfi->SetIntRule(&ir_if);
+  }
+  Mf_form_->AddDomainIntegrator(mf_blfi);
+  if (partial_assembly_) {
+    Mf_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+  }
+  Mf_form_->Assemble();
+  Mf_form_->FormSystemMatrix(empty, Mf_);
+  
   // diffusion of tke for tdr bc
   Lk_form_ = new ParBilinearForm(sfes_);
   auto *lkd_blfi = new DiffusionIntegrator(*tke_diff_total_coeff_);
@@ -997,11 +1012,11 @@ void ZetaModel::updateTLS() {
     L2 = Clength * std::sqrt(dTKE[i]) / (dSmag[i] * dZeta[i]);
     L3 = Cn_ * std::pow((std::pow(dMu[i] / dRho[i], 3.0) * 1.0 / dTDR[i]), 0.25);
     
-    // dTLS[i] = std::min(L1, L2);
-    // dTLS[i] = Cl_ * std::max(dTLS[i], L3);
+    dTLS[i] = std::min(L1, L2);
+    dTLS[i] = Cl_ * std::max(dTLS[i], L3);
 
-    dTLS[i] = std::max(L1, L3);
-    dTLS[i] = Cl_ * std::min(dTLS[i], L2);        
+    // dTLS[i] = std::max(L1, L3);
+    // dTLS[i] = Cl_ * std::min(dTLS[i], L2);        
     
     dTLS[i] = std::max(dTLS[i], tls_min_);
     dTLS[i] = std::min(dTLS[i], tls_max_);  
@@ -1516,15 +1531,6 @@ void ZetaModel::fStep() {
   tmpR0b_.Set(C2_, prod_);
   tmpR0b_ /= rho_;
   tmpR0b_ /= tke_;
-  /*
-  {
-    const double *dTTS_strain = tts_strain_.HostRead();      
-    double *data = tmpR0b_.HostReadWrite();
-    for (int i = 0; i < SdofInt_; i++) {
-      data[i] = std::min(data[i], 1.0/dTTS_strain[i]);
-    }
-  }
-  */
   tmpR0a_.Set(Ctmp2, zeta_);  
   tmpR0a_ -= Ctmp1;
   tmpR0a_ /= tts_;
@@ -1532,12 +1538,14 @@ void ZetaModel::fStep() {
   //tmpR0a_ /= tls2_; // if not including L2 in laplacian term
 
   // minus is to (-) on operator
-  Ms_->AddMult(tmpR0a_, res_, -1.0);
+  //Ms_->AddMult(tmpR0a_, res_, -1.0);
 
   // project to f-space
-  res_gf_.SetFromTrueDofs(res_);
+  res_gf_.SetFromTrueDofs(tmpR0a_);
   resf_gf_.ProjectGridFunction(res_gf_);
-  resf_gf_.GetTrueDofs(resf_);  
+  resf_gf_.GetTrueDofs(ftmpR0_);
+  Mf_->AddMult(ftmpR0_, resf_, -1.0);
+  resf_gf_.SetFromTrueDofs(resf_);  
   
   // boundary condition
   /*
