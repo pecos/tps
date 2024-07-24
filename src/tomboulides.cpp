@@ -135,6 +135,12 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
   tps->getInput("loMach/tomboulides/streamwise-stabilization", sw_stab_, false);
   tps->getInput("loMach/tomboulides/Reh_offset", re_offset_, 1.0);
   tps->getInput("loMach/tomboulides/Reh_factor", re_factor_, 0.01);
+
+  if ((sw_stab_ == true) && (dim_ != 3)) {
+    if (rank0_) std::cout << " ERROR: streamwise stabalization only implemented for 3D simulations. exiting..." << endl;
+    assert(false);
+    exit(1);
+  }
 }
 
 Tomboulides::~Tomboulides() {
