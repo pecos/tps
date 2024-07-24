@@ -1336,7 +1336,7 @@ void upwindDiff(int dim, double re_factor, double re_offset, Vector &u_vec, Vect
     data[dof] *= CswDiff;
   }
 }
-  
+
 void makeContinuous(ParGridFunction &u) {
   FiniteElementSpace *fes = u.FESpace();
 
