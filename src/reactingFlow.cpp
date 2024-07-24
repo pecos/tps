@@ -467,6 +467,8 @@ ReactingFlow::~ReactingFlow() {
   delete Ms_form_;
   delete At_form_;
   delete G_form_;
+  delete jh_form_;
+
   delete rhou_coeff_;
   delete rhon_next_coeff_;
   delete un_next_coeff_;
@@ -483,6 +485,8 @@ ReactingFlow::~ReactingFlow() {
   delete cpMix_coeff_;
   delete rhoCp_coeff_;
 
+  delete jh_coeff_;
+
   delete rad_rho_coeff_;
   delete rad_rho_Cp_coeff_;
   delete rad_rho_u_coeff_;
@@ -491,6 +495,7 @@ ReactingFlow::~ReactingFlow() {
   delete rad_species_diff_total_coeff_;
   delete rad_rho_Cp_over_dt_coeff_;
   delete rad_thermal_diff_total_coeff_;
+  delete rad_jh_coeff_;
 
   delete Ay_form_;
   delete HyInv_;
@@ -656,6 +661,15 @@ void ReactingFlow::initializeSelf() {
   prodY_gf_.SetSpace(sfes_);
   prodY_gf_ = 0.0;
 
+  sigma_gf_.SetSpace(sfes_);
+  sigma_gf_ = 0.0;
+
+  jh_gf_.SetSpace(sfes_);
+  jh_gf_ = 0.0;
+
+  jh_.SetSize(sDofInt_);
+  jh_ = 0.0;
+
   tmpR1_.SetSize(dim_ * sDofInt_);
   tmpR1a_.SetSize(dim_ * sDofInt_);
   tmpR1b_.SetSize(dim_ * sDofInt_);
@@ -690,6 +704,9 @@ void ReactingFlow::initializeSelf() {
   toFlow_interface_.viscosity = &visc_gf_;
   toFlow_interface_.thermal_divergence = &Qt_gf_;
   toTurbModel_interface_.density = &rn_gf_;
+
+  plasma_conductivity_gf_ = &sigma_gf_;
+  joule_heating_gf_ = &jh_gf_;
 
   //-----------------------------------------------------
   // 2) Set the initial condition
@@ -941,6 +958,10 @@ void ReactingFlow::initializeOperators() {
   rhoCp_coeff_ = new ProductCoefficient(*cpMix_coeff_, *rhon_next_coeff_);
   rhouCp_coeff_ = new ScalarVectorProductCoefficient(*rhoCp_coeff_, *un_next_coeff_);
   rhou_coeff_ = new ScalarVectorProductCoefficient(*rhon_next_coeff_, *un_next_coeff_);
+
+  // Joule heating
+  jh_coeff_ = new GridFunctionCoefficient(&jh_gf_);
+
   if (axisym_) {
     // for axisymmetric case, need to multply many coefficients by the radius
     rad_rho_coeff_ = new ProductCoefficient(radius_coeff, *rhon_next_coeff_);
@@ -951,6 +972,7 @@ void ReactingFlow::initializeOperators() {
     rad_species_diff_total_coeff_ = new ProductCoefficient(radius_coeff, *species_diff_total_coeff_);
     rad_rho_Cp_over_dt_coeff_ = new ProductCoefficient(radius_coeff, *rhoCp_over_dt_coeff_);
     rad_thermal_diff_total_coeff_ = new ProductCoefficient(radius_coeff, *thermal_diff_total_coeff_);
+    rad_jh_coeff_ = new ProductCoefficient(radius_coeff, *jh_coeff_);
   }
 
   At_form_ = new ParBilinearForm(sfes_);
@@ -1178,6 +1200,24 @@ void ReactingFlow::initializeOperators() {
   Mv_inv_->SetRelTol(rtol_);
   Mv_inv_->SetAbsTol(1e-18);
   Mv_inv_->SetMaxIter(max_iter_);
+
+  // Energy sink/source terms: Joule heating and radiation sink
+  jh_form_ = new ParLinearForm(sfes_);
+  DomainLFIntegrator *jh_dlfi;
+  // DomainLFIntegrator *rad_dlfi;
+  if (axisym_) {
+    jh_dlfi = new DomainLFIntegrator(*rad_jh_coeff_);
+    // rad_dlfi = new DomainLFIntegrator(*rad_radiation_sink_coeff_);
+  } else {
+    jh_dlfi = new DomainLFIntegrator(*jh_coeff_);
+    // rad_dlfi = new DomainLFIntegrator(*radiation_sink_coeff_);
+  }
+  if (numerical_integ_) {
+    jh_dlfi->SetIntRule(&ir_i);
+    // rad_dlfi->SetIntRule(&ir_i);
+  }
+  jh_form_->AddDomainIntegrator(jh_dlfi);
+  // jh_form_->AddDomainIntegrator(rad_dlfi);
 
   // Qt .....................................
   Mq_form_ = new ParBilinearForm(sfes_);
@@ -1535,6 +1575,12 @@ void ReactingFlow::temperatureStep() {
     // heat of formation
     Ms_->AddMult(hw_, resT_);
   }
+
+  // Joule heating (and radiation sink)
+  jh_form_->Update();
+  jh_form_->Assemble();
+  jh_form_->ParallelAssemble(jh_);
+  resT_ += jh_;
 
   // species-temp diffusion term, already in int-weak form
   resT_.Add(1.0, crossDiff_);
