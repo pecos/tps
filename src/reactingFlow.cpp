@@ -1610,6 +1610,15 @@ void ReactingFlow::evalSubstepNumber() {
 void ReactingFlow::temperatureStep() {
   Array<int> empty;
 
+  // Update radiation sink
+  if (radiation_ != nullptr) {
+    const double *d_T = Tn_next_.Read();
+    double *d_rad = radiation_sink_.Write();
+    Radiation *rmodel = radiation_;
+    MFEM_FORALL(i, Tn_next_.Size(), { d_rad[i] = rmodel->computeEnergySink(d_T[i]); });
+  }
+  radiation_sink_gf_.SetFromTrueDofs(radiation_sink_);
+
   // Build the right-hand-side
   resT_ = 0.0;
 
