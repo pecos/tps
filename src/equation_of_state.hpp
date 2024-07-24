@@ -345,6 +345,10 @@ class GasMixture {
     printf("GetSpeciesFromLTE is not implemented.");
     return;
   }
+  virtual void GetSpeciesFromLTE(const double T, const double p, double *n_sp) {
+    printf("GetSpeciesFromLTE is not implemented.");
+    return;
+  }
 };
 
 //////////////////////////////////////////////////////
@@ -764,6 +768,7 @@ class PerfectMixture : public GasMixture {
   virtual void GetSpeciesFromLTE(double *conserv, double *primit, TableInterpolator2D *energy_table,
                                  TableInterpolator2D *R_table, TableInterpolator2D *c_table,
                                  TableInterpolator2D *T_table);
+  virtual void GetSpeciesFromLTE(const double T, const double p, double *n_sp);
 
   // GPU functions
 #ifdef _GPU_
