@@ -316,6 +316,7 @@ class ReactingFlow : public ThermoChemModelBase {
   Vector diffY_;
   Vector kappa_;
   Vector visc_;
+  Vector sigma_;
 
   // time-splitting
   Vector YnStar_, spec_buffer_;
