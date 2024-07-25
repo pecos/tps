@@ -1210,3 +1210,44 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::computeMixtureAverageDiffusivity(co
   for (int sp = 0; sp < 3; sp++) diffusivity[sp] = 0.0;
   CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
 }
+
+MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeElectricalConductivity(const double *state, double &sigma) {
+  double X_sp[gpudata::MAXSPECIES], Y_sp[gpudata::MAXSPECIES], n_sp[gpudata::MAXSPECIES];
+  for (int sp = 0; sp < numSpecies; sp++) n_sp[sp] = X_sp[sp] = Y_sp[sp] = 0.0;
+  mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
+  double nTotal = 0.0;
+  for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp[sp];
+
+  double primitiveState[gpudata::MAXEQUATIONS];
+  mixture->GetPrimitivesFromConservatives(state, primitiveState);
+
+  collisionInputs collInputs = computeCollisionInputs(primitiveState, n_sp);
+
+  double binaryDiff[gpudata::MAXSPECIES * gpudata::MAXSPECIES];
+  // binaryDiff = 0.0;
+  for (int spI = 0; spI < numSpecies - 1; spI++) {
+    for (int spJ = spI + 1; spJ < numSpecies; spJ++) {
+      double temp = ((spI == electronIndex_) || (spJ == electronIndex_)) ? collInputs.Te : collInputs.Th;
+      binaryDiff[spI + spJ * numSpecies] =
+          diffusivityFactor_ * sqrt(temp / getMuw(spI, spJ)) / nTotal / collisionIntegral(spI, spJ, 1, 1, collInputs);
+      binaryDiff[spJ + spI * numSpecies] = binaryDiff[spI + spJ * numSpecies];
+    }
+  }
+
+  double diffusivity[gpudata::MAXSPECIES], mobility[gpudata::MAXSPECIES];
+  CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
+
+  for (int sp = 0; sp < numSpecies; sp++) {
+    double temp = (sp == electronIndex_) ? collInputs.Te : collInputs.Th;
+    mobility[sp] = qeOverkB_ * mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) / temp * diffusivity[sp];
+  }
+
+  // Apply artificial multipliers.
+  if (multiply_) {
+    for (int sp = 0; sp < numSpecies; sp++) {
+      mobility[sp] *= mobilMult_;
+    }
+  }
+
+  sigma = computeMixtureElectricConductivity(mobility, n_sp) * MOLARELECTRONCHARGE;
+}
