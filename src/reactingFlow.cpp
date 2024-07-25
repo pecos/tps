@@ -717,6 +717,9 @@ void ReactingFlow::initializeSelf() {
   sigma_gf_.SetSpace(sfes_);
   sigma_gf_ = 0.0;
 
+  sigma_.SetSize(sDofInt_);
+  sigma_ = 0.0;
+
   jh_gf_.SetSpace(sfes_);
   jh_gf_ = 0.0;
 
@@ -1609,6 +1612,9 @@ void ReactingFlow::step() {
   computeQtTO();
 
   UpdateTimestepHistory(dt_);
+
+  updateMixture();
+  updateDiffusivity();
 }
 
 void ReactingFlow::evalSubstepNumber() {
@@ -2331,7 +2337,32 @@ void ReactingFlow::updateDiffusivity() {
   }
   kappa_gf_.SetFromTrueDofs(visc_);  // TODO(trevilo): Bug... should be kappa_, not visc_
 
-  // TODO(trevilo): Compute electrical conductivity here, and put into sigma_gf_
+  // electrical conductivity
+  {
+    double *h_sig = sigma_.HostReadWrite();
+    for (int i = 0; i < sDofInt_; i++) {
+      // int nEq = dim_ + 2 + nActiveSpecies_;
+      double state[gpudata::MAXEQUATIONS];
+      double conservedState[gpudata::MAXEQUATIONS];
+
+      // Populate *primitive* state vector = [rho, velocity, temperature, species mole densities]
+      state[0] = dataRho[i];
+      for (int eq = 0; eq < dim_; eq++) {
+        state[eq + 1] = dataU[i + eq * sDofInt_];
+      }
+      state[dim_ + 1] = dataTemp[i];
+      for (int sp = 0; sp < nActiveSpecies_; sp++) {
+        state[dim_ + 2 + sp] = dataRho[i] * Yn_[i + sp * sDofInt_] / mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
+      }
+
+      mixture_->GetConservativesFromPrimitives(state, conservedState);
+
+      double sig;
+      transport_->ComputeElectricalConductivity(conservedState, sig);
+      h_sig[i] = sig;
+    }
+  }
+  sigma_gf_.SetFromTrueDofs(sigma_);
 }
 
 void ReactingFlow::updateDensity(double tStep) {
