@@ -2070,6 +2070,7 @@ void ReactingFlow::initializeIO(IODataOrganizer &io) {
 void ReactingFlow::initializeViz(ParaViewDataCollection &pvdc) {
   pvdc.RegisterField("temperature", &Tn_gf_);
   pvdc.RegisterField("density", &rn_gf_);
+  pvdc.RegisterField("sigma", &sigma_gf_);
   pvdc.RegisterField("kappa", &kappa_gf_);
   pvdc.RegisterField("mu", &visc_gf_);
   pvdc.RegisterField("Qt", &Qt_gf_);
@@ -2332,10 +2333,10 @@ void ReactingFlow::updateDiffusivity() {
 
       mixture_->GetConservativesFromPrimitives(state, conservedState);
       transport_->GetThermalConductivities(conservedState, state, kappa);
-      dataKappa[i] = kappa[0];  // TODO(trevilo): Add electron thermal conductivity
+      dataKappa[i] = kappa[0] + kappa[1];  // for single temperature, transport includes both heavy and electron kappa
     }
   }
-  kappa_gf_.SetFromTrueDofs(visc_);  // TODO(trevilo): Bug... should be kappa_, not visc_
+  kappa_gf_.SetFromTrueDofs(kappa_);
 
   // electrical conductivity
   {
