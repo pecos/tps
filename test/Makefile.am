@@ -122,7 +122,7 @@ TESTS += cyl3d.test \
          aveLoMach.test \
          reactFlow-binDiff.test \
          reactFlow-singleRx.test \
-         loMach-chan-stab.test
+         lomach-chan-stab.test
 
 if PYTHON_ENABLED
 TESTS += cyl3d.python.test \
