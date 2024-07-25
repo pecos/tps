@@ -139,6 +139,27 @@ void vel_channel(const Vector &x, double t, Vector &u) {
   }
 }
 
+/// Used to set the channel IC
+void vel_channel_uniform(const Vector &x, double t, Vector &u) {
+  double PI = 3.14159265359;
+  double Lx = 25.0;
+  double Ly = 2.0;
+  double Lz = 9.4;
+  double Umean = 10.0;
+  double uInt = 0.1;
+  int nModes = 4;
+  double uM;
+  double ax, by, cz;
+  double AA, BB, CC;
+  double wall;
+
+  // expects channel height (-1,1)
+  wall = (1.0 - std::pow(x(1), 10.0));
+  u(0) = Umean * wall;
+  u(1) = 0.0;
+  u(2) = 0.0;
+}
+
 /// Add ic cases to selection here
 vfptr vel_ic(std::string ic_string_) {
   if (ic_string_ == "tgv2d") {
@@ -147,6 +168,8 @@ vfptr vel_ic(std::string ic_string_) {
     return vel_tgv2d_uniform;
   } else if (ic_string_ == "channel") {
     return vel_channel;
+  } else if (ic_string_ == "channel-uniform") {
+    return vel_channel_uniform;    
   } else if (ic_string_ == "user") {
     return velIC_user;
   } else {
