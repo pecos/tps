@@ -37,7 +37,7 @@ cxx_sources          = averaging.cpp faceGradientIntegration.cpp M2ulPhyS.cpp rh
                        reaction.cpp collision_integrals.cpp argon_transport.cpp source_term.cpp gpu_constructor.cpp \
                        independent_coupling.cpp cycle_avg_joule_coupling.cpp table.cpp radiation.cpp lte_mixture.cpp \
                        lte_transport_properties.cpp mixing_length_transport.cpp tps2Boltzmann.cpp  M2ulPhyS2Boltzmann.cpp \
-                       pybindings.cpp gslib_interpolator.cpp loMach.cpp loMachIO.cpp loMach_options.cpp calorically_perfect.cpp \
+                    data_exchange_utils.cpp pybindings.cpp gslib_interpolator.cpp loMach.cpp loMachIO.cpp loMach_options.cpp calorically_perfect.cpp \
 	               thermo_chem_base.cpp split_flow_base.cpp tomboulides.cpp dirichlet_bc_helper.cpp \
                        sponge_base.cpp geometricSponge.cpp gaussianInterpExtData.cpp turb_model_base.cpp \
                        algebraicSubgridModels.cpp algebraic_rans.cpp mesh_base.cpp lte_thermo_chem.cpp cases.cpp \
@@ -53,7 +53,7 @@ headers              = averaging.hpp equation_of_state.hpp transport_properties.
 		       quasimagnetostatic.hpp gradients.hpp logger.hpp solver.hpp tps.hpp chemistry.hpp reaction.hpp \
 	               collision_integrals.hpp argon_transport.hpp source_term.hpp tps_mfem_wrap.hpp gpu_constructor.hpp \
                        independent_coupling.hpp cycle_avg_joule_coupling.hpp table.hpp radiation.hpp lte_mixture.hpp \
-                       lte_transport_properties.hpp mixing_length_transport.hpp tps2Boltzmann.hpp gslib_interpolator.hpp \
+                       lte_transport_properties.hpp mixing_length_transport.hpp data_exchange_utils.hpp tps2Boltzmann.hpp gslib_interpolator.hpp \
                        loMach.hpp loMach_options.hpp calorically_perfect.hpp \
 		       thermo_chem_base.hpp split_flow_base.hpp tomboulides.hpp dirichlet_bc_helper.hpp \
                        sponge_base.hpp geometricSponge.hpp externalData_base.hpp gaussianInterpExtData.hpp \

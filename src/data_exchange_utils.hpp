@@ -30,30 +30,38 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
 
-#include <sys/types.h>
-#include <tps_config.h>
-#include <unistd.h>
+#include "tps.hpp"
 
-#ifdef HAVE_PYTHON
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
+#ifndef DATA_EXCHANGE_UTILS_HPP_
+#define DATA_EXCHANGE_UTILS_HPP_
 
-namespace py = pybind11;
+namespace TPS {
 
-namespace tps_wrappers {
-void tps(py::module& m);
-void tps2bolzmann(py::module& m);
-void data_exchange_utils(py::module& m);
-// void qms2flow1d(py::module& m);
-}  // namespace tps_wrappers
+class CPUDataRead {
+ public:
+  CPUDataRead(const mfem::Vector &v) : data_(v.HostRead()), size_(v.Size()), stride_(1) {}
+  double *data() const { return const_cast<double *>(data_); }
+  size_t size() const { return size_; }
+  size_t stride() const { return stride_; }
 
-PYBIND11_MODULE(libtps, m) {
-  m.doc() = "TPS Python Interface";
+ private:
+  const double *data_;
+  size_t size_;
+  size_t stride_;
+};
 
-  tps_wrappers::tps(m);
-  tps_wrappers::tps2bolzmann(m);
-  tps_wrappers::data_exchange_utils(m);
-  // tps_wrappers::qms2flow1d(m);
-}
+class CPUData {
+ public:
+  CPUData(mfem::Vector &v, bool rw) : data_(rw ? v.HostReadWrite() : v.HostWrite()), size_(v.Size()), stride_(1) {}
+  double *data() { return data_; }
+  size_t size() const { return size_; }
+  size_t stride() const { return stride_; }
 
-#endif
+ private:
+  double *data_;
+  size_t size_;
+  size_t stride_;
+};
+}  // namespace TPS
+
+#endif  // DATA_EXCHANGE_UTILS_HPP_
