@@ -540,6 +540,7 @@ ReactingFlow::~ReactingFlow() {
   delete rad_rho_Cp_over_dt_coeff_;
   delete rad_thermal_diff_total_coeff_;
   delete rad_jh_coeff_;
+  delete rad_kap_gradT_coeff_;
 
   delete Ay_form_;
   delete HyInv_;
@@ -1039,6 +1040,7 @@ void ReactingFlow::initializeOperators() {
     rad_thermal_diff_total_coeff_ = new ProductCoefficient(radius_coeff, *thermal_diff_total_coeff_);
     rad_jh_coeff_ = new ProductCoefficient(radius_coeff, *jh_coeff_);
     rad_radiation_sink_coeff_ = new ProductCoefficient(radius_coeff, *radiation_sink_coeff_);
+    rad_kap_gradT_coeff_ = new ScalarVectorProductCoefficient(radius_coeff, *kap_gradT_coeff_);
   }
 
   if (rank0_) std::cout << "Operator coefficients set" << endl;
@@ -1348,7 +1350,12 @@ void ReactingFlow::initializeOperators() {
   LQ_form_->FormSystemMatrix(empty, LQ_);
 
   LQ_bdry_ = new ParLinearForm(sfes_);
-  auto *lq_bdry_lfi = new BoundaryNormalLFIntegrator(*kap_gradT_coeff_, 2, -1);
+  BoundaryNormalLFIntegrator *lq_bdry_lfi;
+  if (axisym_) {
+    lq_bdry_lfi = new BoundaryNormalLFIntegrator(*rad_kap_gradT_coeff_, 2, -1);
+  } else {
+    lq_bdry_lfi = new BoundaryNormalLFIntegrator(*kap_gradT_coeff_, 2, -1);
+  }
   if (numerical_integ_) {
     lq_bdry_lfi->SetIntRule(&ir_di);
   }
@@ -1854,6 +1861,15 @@ void ReactingFlow::speciesStep(int iSpec) {
   // copy into full species vector & gf
   Hy_form_->RecoverFEMSolution(Xt2, resT_gf_, Yn_next_gf_);
   Yn_next_gf_.GetTrueDofs(tmpR0_);
+
+  if (tmpR0_.Min() < 0.0) {
+    std::cout << "Caught negative mass fraction!  Resetting..." << std::endl;
+    for (int i = 0; i < sDofInt_; i++) {
+      if (tmpR0_[i] < 0.0) tmpR0_[i] = 0.0;
+    }
+    Yn_next_gf_.SetFromTrueDofs(tmpR0_);
+  }
+
   setVectorFromScalar(tmpR0_, iSpec, &Yn_next_);
 }
 
@@ -2438,7 +2454,6 @@ void ReactingFlow::AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr) {
 }
 
 void ReactingFlow::computeQtTO() {
-  // TODO(trevilo): This method isn't sufficiently general
   tmpR0_ = 0.0;
   LQ_bdry_->Update();
   LQ_bdry_->Assemble();
@@ -2451,10 +2466,17 @@ void ReactingFlow::computeQtTO() {
   LQ_form_->FormSystemMatrix(empty, LQ_);
   LQ_->AddMult(Tn_next_, tmpR0_);  // tmpR0_ += LQ{Tn_next}
 
+  // Joule heating (and radiation sink)
+  jh_form_->Update();
+  jh_form_->Assemble();
+  jh_form_->ParallelAssemble(jh_);
+  tmpR0_ -= jh_;
+
   sfes_->GetRestrictionMatrix()->MultTranspose(tmpR0_, resT_gf_);
 
   Qt_ = 0.0;
-  Qt_gf_.SetFromTrueDofs(tmpR0_);
+  //Qt_gf_.SetFromTrueDofs(tmpR0_);
+  Qt_gf_.SetFromTrueDofs(Qt_);
 
   Vector Xqt, Bqt;
   Mq_form_->FormLinearSystem(Qt_ess_tdof_, Qt_gf_, resT_gf_, Mq_, Xqt, Bqt, 1);
@@ -2462,9 +2484,38 @@ void ReactingFlow::computeQtTO() {
   MqInv_->Mult(Bqt, Xqt);
   Mq_form_->RecoverFEMSolution(Xqt, resT_gf_, Qt_gf_);
 
-  Qt_gf_.GetTrueDofs(Qt_);
-  Qt_ *= -Rgas_ / thermo_pressure_;
-  Qt_gf_.SetFromTrueDofs(Qt_);
+  Qt_gf_ *= Rmix_gf_;
+  Qt_gf_ /= CpMix_gf_;
+  Qt_gf_ /= thermo_pressure_;
+  Qt_gf_.Neg();
+
+  // // TODO(trevilo): This method isn't sufficiently general
+  // tmpR0_ = 0.0;
+  // LQ_bdry_->Update();
+  // LQ_bdry_->Assemble();
+  // LQ_bdry_->ParallelAssemble(tmpR0_);
+  // tmpR0_.Neg();
+
+  // Array<int> empty;
+  // LQ_form_->Update();
+  // LQ_form_->Assemble();
+  // LQ_form_->FormSystemMatrix(empty, LQ_);
+  // LQ_->AddMult(Tn_next_, tmpR0_);  // tmpR0_ += LQ{Tn_next}
+
+  // sfes_->GetRestrictionMatrix()->MultTranspose(tmpR0_, resT_gf_);
+
+  // Qt_ = 0.0;
+  // Qt_gf_.SetFromTrueDofs(tmpR0_);
+
+  // Vector Xqt, Bqt;
+  // Mq_form_->FormLinearSystem(Qt_ess_tdof_, Qt_gf_, resT_gf_, Mq_, Xqt, Bqt, 1);
+
+  // MqInv_->Mult(Bqt, Xqt);
+  // Mq_form_->RecoverFEMSolution(Xqt, resT_gf_, Qt_gf_);
+
+  // Qt_gf_.GetTrueDofs(Qt_);
+  // Qt_ *= -Rgas_ / thermo_pressure_;
+  // Qt_gf_.SetFromTrueDofs(Qt_);
 }
 
 /// identifySpeciesType and identifyCollisionType copies from M2ulPhyS

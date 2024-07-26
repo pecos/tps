@@ -240,6 +240,7 @@ class ReactingFlow : public ThermoChemModelBase {
   ProductCoefficient *rad_thermal_diff_total_coeff_ = nullptr;
   ProductCoefficient *rad_jh_coeff_ = nullptr;
   ProductCoefficient *rad_radiation_sink_coeff_ = nullptr;
+  ScalarVectorProductCoefficient *rad_kap_gradT_coeff_ = nullptr;
 
   // operators and solvers
   ParBilinearForm *At_form_ = nullptr;
