@@ -873,6 +873,7 @@ void ZetaModel::step() {
   updateTLS();
   updateProd();
   //updateBC();
+  updateMsRho();
 
   // actual solves
   tkeStep();
@@ -911,7 +912,7 @@ void ZetaModel::computeStrain() {
   const double *dGradW = gradW_.HostRead();
   double *Sij = strain_.HostReadWrite();
   double *dSmag = sMag_.HostReadWrite();
-  double Smin = 1.0e-12;
+  double Smin = 1.0e-14;
 
   for (int i = 0; i < SdofInt_; i++) {
     DenseMatrix gradUp;
@@ -970,9 +971,9 @@ void ZetaModel::updateTTS() {
   Ctime = 0.6 / (std::sqrt(6.0) * Cmu_);
   for (int i = 0; i < SdofInt_; i++) {
     double T1, T2, T3;
-    T1 = dTKE[i] / dTDR[i];
-    T2 = Ctime / (dSmag[i] * dZeta[i]);
-    T3 = Ct_ * std::sqrt( std::max(dMu[i] / (dRho[i] * dTDR[i]),0.0) );
+    T1 = dTKE[i] / std::max(dTDR[i], tdr_min_);
+    T2 = Ctime / (dSmag[i] * std::max(dZeta[i], zeta_min_));
+    T3 = Ct_ * std::sqrt( std::max(dMu[i] / (dRho[i] * std::max(dTDR[i], tdr_min_)),0.0) );
 
     // zeta ordering
     //dTTS[i] = std::min(T1, T2);
@@ -1009,9 +1010,9 @@ void ZetaModel::updateTLS() {
   Clength = 1.0 / (std::sqrt(6.0) * Cmu_);
   for (int i = 0; i < SdofInt_; i++) {
     double L1, L2, L3;
-    L1 = std::pow(dTKE[i], 1.5) / dTDR[i];
-    L2 = Clength * std::sqrt(dTKE[i]) / (dSmag[i] * dZeta[i]);
-    L3 = Cn_ * std::pow((std::pow(dMu[i] / dRho[i], 3.0) * 1.0 / dTDR[i]), 0.25);
+    L1 = std::pow(dTKE[i], 1.5) / std::max(dTDR[i], tdr_min_);
+    L2 = Clength * std::sqrt(dTKE[i]) / (dSmag[i] * std::max(dZeta[i], zeta_min_));
+    L3 = Cn_ * std::pow((std::pow(dMu[i] / dRho[i], 3.0) * 1.0 / std::max(dTDR[i], tdr_min_)), 0.25);
     
     dTLS[i] = std::min(L1, L2);
     dTLS[i] = Cl_ * std::max(dTLS[i], L3);
@@ -1030,6 +1031,13 @@ void ZetaModel::updateTLS() {
   res_gf_.SetFromTrueDofs(tmpR0_);
   tls2_gf_.ProjectGridFunction(res_gf_);
   tls2_gf_.GetTrueDofs(tls2_);    
+}
+
+void ZetaModel::updateMsRho() {
+  Array<int> empty;
+  MsRho_form_->Update();
+  MsRho_form_->Assemble();
+  MsRho_form_->FormSystemMatrix(empty, MsRho_);
 }
 
 void ZetaModel::updateProd() {
@@ -1125,7 +1133,13 @@ void ZetaModel::extrapolateState() {
 
 void ZetaModel::updateZeta() {
   zeta_next_.Set(1.0, v2_next_);
-  zeta_next_ /= tke_next_;  
+  {
+    const double *dk = tke_next_.HostRead();
+    double *dz = zeta_next_.HostReadWrite();    
+    for (int i = 0; i < SdofInt_; i++) {  
+      dz[i] /= std::max(dk[i], tke_min_);
+    }
+  }
   zeta_next_gf_.SetFromTrueDofs(zeta_next_);
 }
 
@@ -1268,7 +1282,7 @@ void ZetaModel::tkeStep() {
   {
     double *dTKE = tke_next_.HostReadWrite();
     for (int i = 0; i < SdofInt_; i++) {
-      dTKE[i] = std::max(dTKE[i], tke_min_);
+      dTKE[i] = std::max(dTKE[i], 0.0);
     }
   }
   tke_next_gf_.SetFromTrueDofs(tke_next_);
@@ -1299,7 +1313,7 @@ void ZetaModel::tdrStep() {
       //double ceps1 = 1.4 * (1.0 + 0.012 / dz[i]);
 
       // code-friendly 
-      double ceps1 = 1.4 * (1.0 + 0.05 / std::sqrt(dz[i]));
+      double ceps1 = 1.4 * (1.0 + 0.05 / std::sqrt(std::max(dz[i], zeta_min_)));
       ceps1 = std::min(ceps1, 1.55);
     
       data[i] *= ceps1;
@@ -1371,7 +1385,7 @@ void ZetaModel::tdrStep() {
   // hard-clip
   double *dTDR = tdr_next_.HostReadWrite();
   for (int i = 0; i < SdofInt_; i++) {
-    dTDR[i] = std::max(dTDR[i], tdr_min_);
+    dTDR[i] = std::max(dTDR[i], 0.0);
   }
   tdr_next_gf_.SetFromTrueDofs(tdr_next_);
 }
@@ -1506,7 +1520,7 @@ void ZetaModel::v2Step() {
     const double *dtke = tke_next_.HostReadWrite();  
     double *dv2 = v2_next_.HostReadWrite();
     for (int i = 0; i < SdofInt_; i++) {
-      dv2[i] = std::max(dv2[i], v2_min_);
+      dv2[i] = std::max(dv2[i], 0.0);
       dv2[i] = std::min(dv2[i], 2.0/3.0 * dtke[i]);    
     }
   }
@@ -1537,7 +1551,13 @@ void ZetaModel::fStep() {
   Ctmp2 = C1_ - 6.0;
   tmpR0b_.Set(C2_, prod_);
   tmpR0b_ /= rho_;
-  tmpR0b_ /= tke_;
+  {
+    const double *dk = tke_.HostRead();
+    double *data = tmpR0b_.HostReadWrite();
+    for (int i = 0; i < SdofInt_; i++) {  
+      data[i] /= std::max(dk[i], tke_min_);
+    }
+  }
   tmpR0a_.Set(Ctmp2, zeta_);  
   tmpR0a_ -= Ctmp1;
   tmpR0a_ /= tts_;

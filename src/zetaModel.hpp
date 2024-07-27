@@ -380,6 +380,7 @@ class ZetaModel : public TurbModelBase {
   void updateZeta();
   void extrapolateState();
   void updateProd();
+  void updateMsRho();  
   void updateTLS();
   void updateTTS();
   void computeStrain();
