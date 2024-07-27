@@ -102,10 +102,10 @@ class ZetaModel : public TurbModelBase {
   // Linear-solver-related options
   int pl_solve_ = 0;
   int max_iter_ = 2000;
-  double rtol_ = 1e-8;
+  double rtol_ = 1e-10;
   
   int f_max_iter_ = 4000;
-  double f_rtol_ = 1e-6;  
+  double f_rtol_ = 1e-8;  
 
   double tke_ic_, tdr_ic_;
   double tke_min_, tdr_min_, zeta_min_, v2_min_;
@@ -178,7 +178,8 @@ class ZetaModel : public TurbModelBase {
   Vector tdr_next_;
   Vector tdr_nm1_, tdr_nm2_;
   Vector Ntdr_, Ntdr_nm1_, Ntdr_nm2_;
-  ParGridFunction tdr_wall_gf_;  
+  ParGridFunction tdr_wall_gf_;
+  GridFunctionCoefficient *tdr_bc_ = nullptr;  
 
   /// ratio of wall normal stress component to k
   ParGridFunction zeta_gf_;
@@ -216,7 +217,7 @@ class ZetaModel : public TurbModelBase {
   /// model coefficients
   double Cmu_ = 0.22;
   double sigmaK_ = 1.0;
-  double sigmaO_ = 1.3;
+  double sigmaE_ = 1.3;
   double sigmaZ_ = 1.2;
   double Ce2_ = 1.9;
   double C1_ = 1.4;
@@ -224,8 +225,8 @@ class ZetaModel : public TurbModelBase {
   double C2_ = 0.3;  
   double Ct_ = 6.0;
   //double Cl_ = 0.36;
+  //double Cn_ = 85.0;  
   double Cl_ = 0.23;
-  //double Cn_ = 85.0;
   double Cn_ = 70.0;  
   double Ce1_;  // function of local zeta
 
