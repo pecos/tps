@@ -675,8 +675,8 @@ void ZetaModel::initializeOperators() {
   auto *hmf_blfi = new MassIntegrator(*f_diag_coeff_);
   auto *hdf_blfi = new DiffusionIntegrator(*unity_diff_coeff_);
   // div(L^2 df) - f =...
-  // auto *hmf_blfi = new MassIntegrator(*unity_coeff_);
-  // auto *hdf_blfi = new DiffusionIntegrator(*tls2_coeff_);
+  //auto *hmf_blfi = new MassIntegrator(*unity_coeff_);
+  //auto *hdf_blfi = new DiffusionIntegrator(*tls2_coeff_);
   if (numerical_integ_) {
     hmf_blfi->SetIntRule(&ir_dif);
     hdf_blfi->SetIntRule(&ir_dif);
@@ -791,7 +791,7 @@ void ZetaModel::initializeIO(IODataOrganizer &io) {
   io.registerIOVar("/zeta", "zeta", 0);
 
   // should not be necessary with a computeMuT (and strain/tts) call in setup, but
-  // does not seem to work
+  // does not seem to works
   io.registerIOFamily("eddy viscosity", "/muT", &eddyVisc_gf_, true, true, sfec_);  
   io.registerIOVar("/muT", "muT", 0);  
 }
@@ -901,11 +901,14 @@ void ZetaModel::step() {
 
 void ZetaModel::updateMuT() {
   eddyVisc_.Set(Cmu_,rho_);
-  eddyVisc_ *= v2_next_;
   {
+    double twoThirds = 2.0/3.0;
+    const double *dv2 = v2_next_.HostRead();
+    const double *dk = tke_next_.HostRead();        
     const double *dTTS = tts_.HostRead();
     const double *dTTS_strain = tts_strain_.HostRead();    
-    double *muT = eddyVisc_.HostReadWrite();  
+    double *muT = eddyVisc_.HostReadWrite();
+    for (int i = 0; i < SdofInt_; i++) muT[i] *= std::min(dv2[i], twoThirds*dk[i]);
     for (int i = 0; i < SdofInt_; i++) muT[i] *= std::min(dTTS[i], dTTS_strain[i]);
     for (int i = 0; i < SdofInt_; i++) muT[i] = std::max(muT[i], mut_min_);
   }  
@@ -966,7 +969,8 @@ void ZetaModel::computeStrain() {
 void ZetaModel::updateTTS() {
   const double *dTKE = tke_next_.HostRead();
   const double *dTDR = tdr_next_.HostRead();
-  const double *dZeta = zeta_next_.HostRead();
+  const double *dv2 = v2_next_.HostRead();  
+  // const double *dZeta = zeta_next_.HostRead();
   const double *dSmag = sMag_.HostRead();
   const double *dMu = mu_.HostRead();
   const double *dRho = rho_.HostRead();
@@ -978,7 +982,7 @@ void ZetaModel::updateTTS() {
   for (int i = 0; i < SdofInt_; i++) {
     double T1, T2, T3;
     T1 = dTKE[i] / std::max(dTDR[i], tdr_min_);
-    T2 = Ctime / (dSmag[i] * std::max(dZeta[i], zeta_min_));
+    T2 = Ctime * dTKE[i] / (dSmag[i] * std::max(dv2[i], v2_min_));
     T3 = Ct_ * std::sqrt( std::max(dMu[i] / (dRho[i] * std::max(dTDR[i], tdr_min_)),0.0) );
 
     // zeta ordering
@@ -1006,7 +1010,8 @@ void ZetaModel::updateTTS() {
 void ZetaModel::updateTLS() {
   const double *dTKE = tke_next_.HostRead();
   const double *dTDR = tdr_next_.HostRead();
-  const double *dZeta = zeta_next_.HostRead();
+  const double *dv2 = v2_next_.HostRead();    
+  // const double *dZeta = zeta_next_.HostRead();
   const double *dSmag = sMag_.HostRead();
   const double *dMu = mu_.HostRead();
   const double *dRho = rho_.HostRead();
@@ -1017,7 +1022,7 @@ void ZetaModel::updateTLS() {
   for (int i = 0; i < SdofInt_; i++) {
     double L1, L2, L3;
     L1 = std::pow(dTKE[i], 1.5) / std::max(dTDR[i], tdr_min_);
-    L2 = Clength * std::sqrt(dTKE[i]) / (dSmag[i] * std::max(dZeta[i], zeta_min_));
+    L2 = Clength * std::pow(dTKE[i], 1.5) / (dSmag[i] * std::max(dv2[i], v2_min_));
     L3 = Cn_ * std::pow((std::pow(dMu[i] / dRho[i], 3.0) / std::max(dTDR[i], tdr_min_)), 0.25);    
     dTLS[i] = std::min(L1, L2);
     dTLS[i] = Cl_ * std::max(dTLS[i], L3);    
@@ -1307,15 +1312,26 @@ void ZetaModel::tdrStep() {
   tmpR0_.Set(1.0, prod_);
   tmpR0_ /= tts_;
   {
-    const double *dz = zeta_.HostRead();
+    double twoThirds = 2.0/3.0;
+    double ceps1_min;
+    ceps1_min = 1.4 * (1.0 + 0.05 * std::sqrt(1.5));
+    //const double *dk = tke_next_.HostRead();    
+    //const double *dv2 = v2_next_.HostRead();
+    const double *dz = zeta_next_.HostRead();    
     double *data = tmpR0_.HostReadWrite();  
     for (int i = 0; i < SdofInt_; i++) {
       // zeta model
       //double ceps1 = 1.4 * (1.0 + 0.012 / dz[i]);
 
-      // code-friendly 
+      // code-friendly
+      //double vtmp, ktmp;
+      //ktmp = std::max(dk[i], 0.0); // if using extrapolation must guard against very small negatives in sqrt
+      //vtmp = std::max(dv2[i], v2_min_);
+      //vtmp = std::min(vtmp, twoThirds*ktmp);
+      //double ceps1 = 1.4 * (1.0 + 0.05 * std::sqrt(ktmp/vtmp));
       double ceps1 = 1.4 * (1.0 + 0.05 / std::sqrt(std::max(dz[i], zeta_min_)));
       // ceps1 = std::min(ceps1, 1.55);
+      ceps1 = std::max(ceps1, ceps1_min);
     
       data[i] *= ceps1;
     }
@@ -1475,7 +1491,7 @@ void ZetaModel::v2Step() {
   // tmpR0_ *= fRate_;
   res_gf_.ProjectGridFunction(fRate_gf_);
   res_gf_.GetTrueDofs(tmpR0a_);
-  tmpR0_ *= tmpR0a_;  
+  tmpR0_ *= tmpR0a_;
   MsRho_->AddMult(tmpR0_, res_, +1.0);
   
   // destruction => 1/2 included in lhs
@@ -1522,7 +1538,9 @@ void ZetaModel::v2Step() {
     double *dv2 = v2_next_.HostReadWrite();
     for (int i = 0; i < SdofInt_; i++) {
       dv2[i] = std::max(dv2[i], 0.0);
-      dv2[i] = std::min(dv2[i], 2.0/3.0 * dtke[i]);    
+      // clip when used in certain areas, allow to be above 2/3k for destruction in v2
+      // dv2[i] = std::min(dv2[i], 2.0/3.0 * dtke[i]);
+      if(dv2[i] != dv2[i]) std::cout << " v2 is actually NaN!" << endl;
     }
   }
   v2_next_gf_.SetFromTrueDofs(v2_next_);
@@ -1531,6 +1549,7 @@ void ZetaModel::v2Step() {
 void ZetaModel::fStep() {
   // Build the right-hand-side
   res_ = 0.0;
+  resf_ = 0.0;  
 
   // assemble source
   /*
@@ -1553,17 +1572,74 @@ void ZetaModel::fStep() {
   tmpR0b_.Set(C2_, prod_);
   tmpR0b_ /= rho_;
   {
-    const double *dk = tke_.HostRead();
+    const double *dk = tke_next_.HostRead();
     double *data = tmpR0b_.HostReadWrite();
     for (int i = 0; i < SdofInt_; i++) {  
       data[i] /= std::max(dk[i], tke_min_);
     }
   }
-  tmpR0a_.Set(Ctmp2, zeta_);  
+  {
+    double twoThirds = 2.0/3.0;
+    const double *dv2 = v2_next_.HostRead();    
+    const double *dk = tke_next_.HostRead();
+    double *data = tmpR0a_.HostReadWrite();
+    for (int i = 0; i < SdofInt_; i++) {  
+      data[i] = std::min(dv2[i], twoThirds * dk[i]);
+    }    
+    for (int i = 0; i < SdofInt_; i++) {  
+      data[i] /= std::max(dk[i], tke_min_);
+    }
+  }
   tmpR0a_ -= Ctmp1;
   tmpR0a_ /= tts_;
   tmpR0a_ -= tmpR0b_;
-  tmpR0a_ /= tls2_; // if not including L2 in laplacian term
+
+  // limiter-term
+  /*
+  {
+    double twoThirds = 2.0/3.0;
+    double tmp;
+    const double *dz = zeta_next_.HostRead();
+    double *data = tmpR0c_.HostReadWrite();
+    for (int i = 0; i < SdofInt_; i++) {
+      tmp = dz[i] - twoThirds;
+      tmp = std::max(tmp, 0.0);
+      tmp *= (C1_ - 1.0);
+      data[i] = tmp;
+    }    
+  }
+  tmpR0c_ /= tts_;
+  tmpR0a_ += tmpR0c_;
+  {
+    double *data = tmpR0a_.HostReadWrite();
+    for (int i = 0; i < SdofInt_; i++) {
+      data[i] = std::min(data[i], 0.0);
+    }    
+  }
+  */
+
+  //HACK limit
+  /*
+  {
+    double twoThirds = 2.0/3.0;
+    double Pv2_max;
+    const double *dP = prod_.HostRead();    
+    const double *de = tdr_.HostRead();
+    const double *dv2 = v2_.HostRead();
+    const double *dk = tke_.HostRead();        
+    const double *drho = rho_.HostRead();    
+    double *data = tmpR0a_.HostReadWrite();
+    for (int i = 0; i < SdofInt_; i++) {
+      Pv2_max = twoThirds * (dP[i]/drho[i] - de[i]);
+      // Pv2_max += 6.0 * (dv2[i]/std::max(dk[i], tke_min_)) * de[i];
+      Pv2_max += 6.0 * twoThirds * de[i];      
+      data[i] = - Pv2_max;
+    }
+  }
+  */
+
+  // if not including L2 in laplacian term
+  tmpR0a_ /= tls2_; 
 
   // minus is to (-) on operator
   //Ms_->AddMult(tmpR0a_, res_, -1.0);
@@ -1574,34 +1650,6 @@ void ZetaModel::fStep() {
   resf_gf_.GetTrueDofs(ftmpR0_);
   Mf_->AddMult(ftmpR0_, resf_, -1.0);
   resf_gf_.SetFromTrueDofs(resf_);  
-  
-  // boundary condition
-  /*
-  tmpR0_ = 0.0;
-  Hs_bdry_->Update();
-  Hs_bdry_->Assemble();
-  Hs_bdry_->ParallelAssemble(tmpR0_);
-  res_.Add(-1.0, tmpR0_);
-  */
-
-  /*
-  Array<int> empty;
-  Lf_form_->Update();
-  Lf_form_->Assemble();
-  Lf_form_->FormSystemMatrix(empty, Lf_);
-  Lf_->Mult(tmpR0a_, tmpR0_);
-  tmpR0_ *= -1.0;
-  res_ += tmpR0_;
-  MsInv_->Mult(res_,tmpR0_);
-  {
-    double *data = tmpR0_.HostReadWrite();
-    for (int i = 0; i < SdofInt_; i++) {
-      data[i] = std::max(data[i], 0.0);
-    }
-  }
-  fRate_gf_.SetFromTrueDofs(tmpR0_);  
-  fRate_gf_.GetTrueDofs(fRate_);
-  */
   
   // Update Helmholtz operator  
   Hf_form_->Update();
@@ -1635,14 +1683,10 @@ void ZetaModel::fStep() {
 
   // hard-clip
   {
-    double twoThirds = 2.0/3.0;
-    double Ctmp = 1.0;
-    const double *dk = tke_next_.HostRead();
-    const double *dP = prod_.HostRead();     
     double *df = fRate_.HostReadWrite();
     for (int i = 0; i < ffes_->GetTrueVSize(); i++) {
       df[i] = std::max(df[i], 0.0);
-      df[i] = std::min(df[i], twoThirds * Ctmp * dP[i]/std::max(dk[i],tke_min_));  
+      if(df[i] != df[i]) std::cout << " f is actually NaN!" << endl;      
     }
   }
   fRate_gf_.SetFromTrueDofs(fRate_);
