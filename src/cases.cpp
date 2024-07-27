@@ -145,7 +145,7 @@ void vel_channel_uniform(const Vector &x, double t, Vector &u) {
   double Lx = 25.0;
   double Ly = 2.0;
   double Lz = 9.4;
-  double Umean = 10.0;
+  double Umean = 1.0;
   double uInt = 0.1;
   int nModes = 4;
   double uM;
@@ -154,7 +154,7 @@ void vel_channel_uniform(const Vector &x, double t, Vector &u) {
   double wall;
 
   // expects channel height (-1,1)
-  wall = (1.0 - std::pow(x(1), 10.0));
+  wall = (1.0 - std::pow(x(1), 8.0));
   u(0) = Umean * wall;
   u(1) = 0.0;
   u(2) = 0.0;
