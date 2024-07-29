@@ -2387,6 +2387,37 @@ void ReactingFlow::updateDiffusivity() {
   sigma_gf_.SetFromTrueDofs(sigma_);
 }
 
+void ReactingFlow::evaluatePlasmaConductivityGF() {
+  (flow_interface_->velocity)->GetTrueDofs(tmpR1_);
+  const double *dataTemp = Tn_.HostRead();
+  const double *dataRho = rn_.HostRead();
+  const double *dataU = tmpR1_.HostRead();
+
+  double *h_sig = sigma_.HostReadWrite();
+  for (int i = 0; i < sDofInt_; i++) {
+    // int nEq = dim_ + 2 + nActiveSpecies_;
+    double state[gpudata::MAXEQUATIONS];
+    double conservedState[gpudata::MAXEQUATIONS];
+
+    // Populate *primitive* state vector = [rho, velocity, temperature, species mole densities]
+    state[0] = dataRho[i];
+    for (int eq = 0; eq < dim_; eq++) {
+      state[eq + 1] = dataU[i + eq * sDofInt_];
+    }
+    state[dim_ + 1] = dataTemp[i];
+    for (int sp = 0; sp < nActiveSpecies_; sp++) {
+      state[dim_ + 2 + sp] = dataRho[i] * Yn_[i + sp * sDofInt_] / mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
+    }
+
+    mixture_->GetConservativesFromPrimitives(state, conservedState);
+
+    double sig;
+    transport_->ComputeElectricalConductivity(conservedState, sig);
+    h_sig[i] = sig;
+  }
+  sigma_gf_.SetFromTrueDofs(sigma_);
+}
+
 void ReactingFlow::updateDensity(double tStep) {
   Array<int> empty;
   Rmix_gf_.GetTrueDofs(tmpR0a_);
@@ -2508,7 +2539,7 @@ void ReactingFlow::computeQtTO() {
   sfes_->GetRestrictionMatrix()->MultTranspose(tmpR0_, resT_gf_);
 
   Qt_ = 0.0;
-  //Qt_gf_.SetFromTrueDofs(tmpR0_);
+  // Qt_gf_.SetFromTrueDofs(tmpR0_);
   Qt_gf_.SetFromTrueDofs(Qt_);
 
   Vector Xqt, Bqt;

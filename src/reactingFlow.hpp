@@ -353,6 +353,7 @@ class ReactingFlow : public ThermoChemModelBase {
   void step() final;
   void initializeIO(IODataOrganizer &io) final;
   void initializeViz(ParaViewDataCollection &pvdc) final;
+  void evaluatePlasmaConductivityGF() final;
 
   // Functions added here
   void speciesLastStep();
