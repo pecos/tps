@@ -1434,6 +1434,8 @@ void ReactingFlow::initializeOperators() {
 
   // and initialize system mass
   updateMixture();
+  updateDensity(0.0);
+
   computeSystemMass();
 
   // for initial plot
@@ -2095,6 +2097,10 @@ void ReactingFlow::initializeViz(ParaViewDataCollection &pvdc) {
   pvdc.RegisterField("kappa", &kappa_gf_);
   pvdc.RegisterField("mu", &visc_gf_);
   pvdc.RegisterField("Qt", &Qt_gf_);
+  pvdc.RegisterField("Rmix", &Rmix_gf_);
+  pvdc.RegisterField("CpMix", &CpMix_gf_);
+  pvdc.RegisterField("Sjoule", &jh_gf_);
+  pvdc.RegisterField("epsilon_rad", &radiation_sink_gf_);
 
   vizSpecFields_.clear();
   vizSpecNames_.clear();
