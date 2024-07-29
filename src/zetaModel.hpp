@@ -97,7 +97,8 @@ class ZetaModel : public TurbModelBase {
 
   // Flags
   bool partial_assembly_ = false;
-  bool numerical_integ_ = false;
+  //bool numerical_integ_ = false;
+  bool numerical_integ_ = true;
 
   // Linear-solver-related options
   int pl_solve_ = 0;
@@ -208,7 +209,7 @@ class ZetaModel : public TurbModelBase {
 
   /// turbulent time scale
   ParGridFunction tts_gf_;
-  Vector tts_, tts_strain_;
+  Vector tts_, tts_strain_, tts_kol_;
 
   /// turbulent production
   ParGridFunction prod_gf_;
