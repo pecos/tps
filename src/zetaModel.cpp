@@ -1638,9 +1638,6 @@ void ZetaModel::fStep() {
   }
   */
 
-  // if not including L2 in laplacian term
-  tmpR0a_ /= tls2_; 
-
   // minus is to (-) on operator
   //Ms_->AddMult(tmpR0a_, res_, -1.0);
 
@@ -1648,6 +1645,10 @@ void ZetaModel::fStep() {
   res_gf_.SetFromTrueDofs(tmpR0a_);
   resf_gf_.ProjectGridFunction(res_gf_);
   resf_gf_.GetTrueDofs(ftmpR0_);
+
+  // if not including L2 in laplacian term
+  ftmpR0_ /= tls2_; 
+  
   Mf_->AddMult(ftmpR0_, resf_, -1.0);
   resf_gf_.SetFromTrueDofs(resf_);  
   
