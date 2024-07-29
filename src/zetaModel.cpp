@@ -76,7 +76,7 @@ ZetaModel::ZetaModel(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalS
   tpsP_->getInput("ransModel/mut-min", mut_min_, 1.0e-12);
   tpsP_->getInput("ransModel/destruction", des_wgt_, 1.0);
   tpsP_->getInput("ransModel/tls-coeff", Cl_, 0.23);
-  tpsP_->getInput("ransModel/f-order", forder_, order_);    
+  tpsP_->getInput("ransModel/f-order", forder_, 1);
 }
 
 ZetaModel::~ZetaModel() {
