@@ -177,6 +177,7 @@ class ReactingFlow : public ThermoChemModelBase {
   ParGridFunction Tn_gf_, Tn_next_gf_, Text_gf_, resT_gf_;
   ParGridFunction rn_gf_;
   ParGridFunction rhoDt_gf_;
+  ParGridFunction weff_gf_;
 
   // additions for species
   ParGridFunction Ynm1_gf_, Ynm2_gf_;
