@@ -610,6 +610,8 @@ void ReactingFlow::initializeSelf() {
   sDofInt_ = sfes_->GetTrueVSize();
   yDofInt_ = yfes_->GetTrueVSize();
 
+  weff_gf_.SetSpace(vfes_);
+
   Qt_.SetSize(sDofInt_);
   Qt_ = 0.0;
   Qt_gf_.SetSpace(sfes_);
@@ -1500,6 +1502,7 @@ void ReactingFlow::step() {
   // advance species, last slot is from calculated sum of others
   for (int iSpecies = 0; iSpecies < nActiveSpecies_; iSpecies++) {
     speciesStep(iSpecies);
+    // Yn_next_ = Yn_;
   }
   if (mixtureInput_.ambipolar) {
     // Evaluate electron mass fraction based on quasi-neutrality
@@ -1746,6 +1749,8 @@ void ReactingFlow::temperatureStep() {
 
   Ht_form_->RecoverFEMSolution(Xt2, resT_gf_, Tn_next_gf_);
   Tn_next_gf_.GetTrueDofs(Tn_next_);
+
+  
 }
 
 void ReactingFlow::temperatureSubstep(int iSub) {
@@ -1806,6 +1811,9 @@ void ReactingFlow::speciesStep(int iSpec) {
 
   // copy relevant species properties from full Vector to particular case
   setScalarFromVector(diffY_, iSpec, &tmpR0_);
+
+  // if (iSpec == 0) tmpR0_ *= 2.0;
+
   diffY_gf_.SetFromTrueDofs(tmpR0_);
 
   // Build the right-hand-side
@@ -2007,6 +2015,10 @@ void ReactingFlow::crossDiffusion() {
   for (int i = 0; i < nSpecies_; i++) {
     setScalarFromVector(Yn_next_, i, &tmpR0a_);
     setScalarFromVector(diffY_, i, &tmpR0b_);
+
+    // if (i==0) tmpR0b_ *= 2.0;
+    // if (i==1){ setScalarFromVector(diffY_, 0, &tmpR0b_); tmpR0b_ *= 2.0; }
+
     setScalarFromVector(CpY_, i, &tmpR0c_);
     G_->Mult(tmpR0a_, tmpR1_);
     Mv_inv_->Mult(tmpR1_, tmpR1b_);
@@ -2014,8 +2026,9 @@ void ReactingFlow::crossDiffusion() {
     multScalarVectorIP(tmpR0b_, &tmpR1b_, dim_);
     tmpR1c_ += tmpR1b_;
   }
-  dotVector(tmpR1a_, tmpR1c_, &tmpR1_, dim_);
-  Ms_->Mult(tmpR1_, crossDiff_);
+  weff_gf_.SetFromTrueDofs(tmpR1c_);
+  dotVector(tmpR1a_, tmpR1c_, &tmpR0_, dim_);
+  Ms_->Mult(tmpR0_, crossDiff_);
 }
 
 void ReactingFlow::computeExplicitTempConvectionOP(bool extrap) {
@@ -2101,6 +2114,7 @@ void ReactingFlow::initializeViz(ParaViewDataCollection &pvdc) {
   pvdc.RegisterField("CpMix", &CpMix_gf_);
   pvdc.RegisterField("Sjoule", &jh_gf_);
   pvdc.RegisterField("epsilon_rad", &radiation_sink_gf_);
+  pvdc.RegisterField("weff", &weff_gf_);
 
   vizSpecFields_.clear();
   vizSpecNames_.clear();
@@ -2238,7 +2252,15 @@ void ReactingFlow::updateMixture() {
 
       for (int sp = 0; sp < nSpecies_; sp++) {
         mixture_->GetSpeciesCp(n_sp, d_Rho[i], sp, cpY);
-        d_Cp[i + sp * sDofInt_] = cpY / std::max(d_Rho[i] * d_Yn[i + sp * sDofInt_], 1.0e-14);
+        double molarCV = speciesMolarCv_[sp];
+        molarCV *= UNIVERSALGASCONSTANT;
+        double molarCP = molarCV + UNIVERSALGASCONSTANT;
+        const double cp_sp = molarCP / gasParams_(sp, GasParams::SPECIES_MW);
+        // if (i==0) {
+        //   std::cout << "cp[" << sp << "] = " << cp_sp << std::endl;
+        // }
+
+        d_Cp[i + sp * sDofInt_] = cp_sp; //cpY / std::max(d_Rho[i] * d_Yn[i + sp * sDofInt_], 1.0e-14);
       }
     }
   }
@@ -2361,6 +2383,7 @@ void ReactingFlow::updateDiffusivity() {
       mixture_->GetConservativesFromPrimitives(state, conservedState);
       transport_->GetThermalConductivities(conservedState, state, kappa);
       dataKappa[i] = kappa[0] + kappa[1];  // for single temperature, transport includes both heavy and electron kappa
+      // dataKappa[i] = kappa[0];  // for single temperature, transport includes both heavy and electron kappa
     }
   }
   kappa_gf_.SetFromTrueDofs(kappa_);
@@ -2449,6 +2472,17 @@ void ReactingFlow::updateDensity(double tStep) {
     }
   } else {
     rn_ = static_rho_;
+  }
+
+  const double min_rho = rn_.Min();
+  // printf("min(rho) = %.6e\n", rn_.Min());
+  if (min_rho < 0.0) {
+    for (int i = 0; i < rn_.Size(); i++) {
+      if (rn_[i] < 0.0) {
+        printf("i = %d, Tn = %.6e, Tnext = %.6e, rho = %.6e\n", i, Tn_[i], Tn_next_[i], rn_[i]);
+        fflush(stdout);
+      }
+    }
   }
   rn_gf_.SetFromTrueDofs(rn_);
 
@@ -2541,6 +2575,13 @@ void ReactingFlow::computeQtTO() {
   jh_form_->Assemble();
   jh_form_->ParallelAssemble(jh_);
   tmpR0_ -= jh_;
+
+  // heat of formation
+  Ms_->AddMult(hw_, tmpR0_, -1.0);
+
+  // species-temp diffusion term, already in int-weak form
+  tmpR0_.Add(-1.0, crossDiff_);
+
 
   sfes_->GetRestrictionMatrix()->MultTranspose(tmpR0_, resT_gf_);
 
