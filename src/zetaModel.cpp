@@ -919,6 +919,11 @@ void ZetaModel::updateMuT() {
     for (int i = 0; i < SdofInt_; i++) muT[i] = std::max(muT[i], mut_min_);
   }  
   eddyVisc_gf_.SetFromTrueDofs(eddyVisc_);
+  
+  resf_gf_.ProjectGridFunction(eddyVisc_gf_);
+  eddyVisc_gf_.ProjectGridFunction(resf_gf_);  
+  eddyVisc_gf_.GetTrueDofs(eddyVisc_);
+  
 }
 
 void ZetaModel::computeStrain() {
@@ -1124,6 +1129,11 @@ void ZetaModel::updateProd() {
   }
 
   prod_gf_.SetFromTrueDofs(prod_);
+
+  resf_gf_.ProjectGridFunction(prod_gf_);
+  prod_gf_.ProjectGridFunction(resf_gf_);  
+  prod_gf_.GetTrueDofs(prod_);
+  
 }
 
 /// extrapolated states to {n+1}
