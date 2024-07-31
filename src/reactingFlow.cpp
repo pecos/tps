@@ -1434,6 +1434,11 @@ void ReactingFlow::initializeOperators() {
     YnFull_gf_.SetFromTrueDofs(Yn_);
   }
 
+  // Ensure Yn_ is consistent with YnFull_gf_.  Specifically this is
+  // necessary on standard restart, when the solution is read into
+  // YnFull_gf_ after the Yn_ IC is set.
+  YnFull_gf_.GetTrueDofs(Yn_);
+
   // and initialize system mass
   updateMixture();
   updateDensity(0.0);
@@ -2096,7 +2101,6 @@ void ReactingFlow::initializeIO(IODataOrganizer &io) {
   const bool species_in_restart_file = !restart_from_lte;
 
   io.registerIOFamily("Species", "/species", &YnFull_gf_, false, species_in_restart_file);
-  io.registerIOVar("/species", "speciesAll", 0, species_in_restart_file);
   for (int sp = 0; sp < nSpecies_; sp++) {
     std::string speciesName = std::to_string(sp);
     io.registerIOVar("/species", "Y_" + speciesName, sp, species_in_restart_file);

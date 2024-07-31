@@ -19,18 +19,11 @@ setup() {
     rm -rf output/*
     rm -f $SOLN_FILE
     $EXE --runFile $RUNFILE
-    test -s $SOLN_FILE    
+    test -s $SOLN_FILE
 }
 
 @test "[$TEST] verify tps output with input -> $RUNFILE" {
     test -s $SOLN_FILE
     test -s $REF_FILE
-    #h5diff -r --delta=1e-11 $SOLN_FILE $REF_FILE /species/speciesAll
-
-    # NOTE(trevilo): I relaxed the tolerance here to make the test
-    # pass.  I think this new tolerance is reasonable due to the
-    # combination of number of time steps taken in the test and the
-    # linear solver tolerance, but this needs to be confirmed with
-    # shaering.
-    h5diff -r --delta=5e-10 $SOLN_FILE $REF_FILE /species/speciesAll
+    h5diff -r --delta=5e-10 $SOLN_FILE $REF_FILE /species
 }
