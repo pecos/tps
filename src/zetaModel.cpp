@@ -818,7 +818,6 @@ void ZetaModel::initializeViz(ParaViewDataCollection &pvdc) {
 void ZetaModel::setup() {
   
   // populate  registers after restarts
-  /*
   tke_gf_.GetTrueDofs(tke_);
   tdr_gf_.GetTrueDofs(tdr_);
   zeta_gf_.GetTrueDofs(zeta_);
@@ -838,7 +837,8 @@ void ZetaModel::setup() {
   updateTimestepHistory();
   updateTimestepHistory();
   
-  // initial mu_t 
+  // initial mu_t
+  /*
   computeStrain();
   updateTTS();
   updateMuT();
