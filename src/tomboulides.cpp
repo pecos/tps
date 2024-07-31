@@ -395,7 +395,7 @@ void Tomboulides::initializeSelf() {
   } else {
     forcing_terms_.emplace_back(domain_attr, gravity_vec_);
   }
-
+  
   // Initial condition function.  For options, see cases.cpp
   tpsP_->getInput("loMach/tomboulides/ic", ic_string_, std::string(""));
 
