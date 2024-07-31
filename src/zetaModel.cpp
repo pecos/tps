@@ -655,8 +655,8 @@ void ZetaModel::initializeOperators() {
   auto *hde_blfi = new DiffusionIntegrator(*tdr_diff_total_coeff_);
   if (numerical_integ_) {
     hme_blfi->SetIntRule(&ir_di);
-    //hde_blfi->SetIntRule(&ir_di);
-    hde_blfi->SetIntRule(&ir_lump);
+    hde_blfi->SetIntRule(&ir_i);
+    //hde_blfi->SetIntRule(&ir_lump);
   }
   He_form_->AddDomainIntegrator(hme_blfi);
   He_form_->AddDomainIntegrator(hde_blfi);
