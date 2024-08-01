@@ -1881,13 +1881,18 @@ void ReactingFlow::speciesStep(int iSpec) {
   Hy_form_->RecoverFEMSolution(Xt2, resT_gf_, Yn_next_gf_);
   Yn_next_gf_.GetTrueDofs(tmpR0_);
 
-  if (tmpR0_.Min() < 0.0) {
-    std::cout << "Caught negative mass fraction!  Resetting..." << std::endl;
-    for (int i = 0; i < sDofInt_; i++) {
-      if (tmpR0_[i] < 0.0) tmpR0_[i] = 0.0;
-    }
-    Yn_next_gf_.SetFromTrueDofs(tmpR0_);
+  // if (tmpR0_.Min() < 0.0) {
+  //   std::cout << "Caught negative mass fraction!  Resetting..." << std::endl;
+  //   for (int i = 0; i < sDofInt_; i++) {
+  //     if (tmpR0_[i] < 0.0) tmpR0_[i] = 0.0;
+  //   }
+  //   Yn_next_gf_.SetFromTrueDofs(tmpR0_);
+  // }
+
+  for (int i = 0; i < sDofInt_; i++) {
+    if (tmpR0_[i] < 0.0) tmpR0_[i] = 0.0;
   }
+  Yn_next_gf_.SetFromTrueDofs(tmpR0_);
 
   setVectorFromScalar(tmpR0_, iSpec, &Yn_next_);
 }
