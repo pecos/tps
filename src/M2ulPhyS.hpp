@@ -393,6 +393,7 @@ class M2ulPhyS : public TPS::PlasmaSolver {
   void parsePostProcessVisualizationInputs();
   void parseRadiationInputs();
   void parsePlaneDump();
+  void readTableWrapper(std::string inputPath, TableInput &result);
 
   void packUpGasMixtureInput();
   void identifySpeciesType(Array<ArgonSpcs> &speciesType);
@@ -467,8 +468,6 @@ class M2ulPhyS : public TPS::PlasmaSolver {
   int getMaximumIterations() const { return MaxIters; }
   int getCurrentIterations() const { return iter; }
   void setMaximumIterations(int value) { MaxIters = value; }
-
-  void readTable(const std::string &inputPath, TableInput &result);
 };
 
 #endif  // M2ULPHYS_HPP_

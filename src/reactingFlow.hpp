@@ -372,5 +372,7 @@ class ReactingFlow : public ThermoChemModelBase {
   void AddTempDirichletBC(ScalarFuncT *f, Array<int> &attr);
   void AddQtDirichletBC(Coefficient *coeff, Array<int> &attr);
   void AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr);
+
+  void readTableWrapper(std::string inputPath, TableInput &result);
 };
 #endif  // REACTINGFLOW_HPP_

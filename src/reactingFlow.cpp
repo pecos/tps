@@ -353,6 +353,12 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
       tpsP_->getRequiredInput((basepath + "/arrhenius/b").c_str(), b);
       tpsP_->getRequiredInput((basepath + "/arrhenius/E").c_str(), E);
       rxnModelParamsHost.push_back(Vector({A, b, E}));
+
+    } else if (model == "tabulated") {
+      reactionModels[r - 1] = TABULATED_RXN;
+      std::string inputPath(basepath + "/tabulated");
+      readTableWrapper(inputPath, chemistryInput_.reactionInputs[r - 1].tableInput);
+
     } else {
       grvy_printf(GRVY_ERROR, "\nUnknown reaction_model -> %s", model.c_str());
       exit(ERROR);
@@ -2222,6 +2228,16 @@ void ReactingFlow::identifySpeciesType(Array<ArgonSpcs> &speciesType) {
   }
 
   return;
+}
+
+void ReactingFlow::readTableWrapper(std::string inputPath, TableInput &result) {
+  // MPI_Comm TPSCommWorld = this->groupsMPI->getTPSCommWorld();
+  std::string filename;
+  tpsP_->getInput((inputPath + "/x_log").c_str(), result.xLogScale, false);
+  tpsP_->getInput((inputPath + "/f_log").c_str(), result.fLogScale, false);
+  tpsP_->getInput((inputPath + "/order").c_str(), result.order, 1);
+  tpsP_->getRequiredInput((inputPath + "/filename").c_str(), filename);
+  readTable(MPI_COMM_WORLD, filename, result.xLogScale, result.fLogScale, result.order, result);
 }
 
 void ReactingFlow::identifyCollisionType(const Array<ArgonSpcs> &speciesType, ArgonColl *collisionIndex) {
