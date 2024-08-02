@@ -97,6 +97,9 @@ bool h5ReadTable(const std::string &fileName, const std::string &datasetName, mf
 bool h5ReadBcastMultiColumnTable(const std::string &fileName, const std::string &datasetName, MPI_Comm TPSCommWorld,
                                  mfem::DenseMatrix &output, std::vector<TableInput> &tables);
 
+void readTable(MPI_Comm TPSCommWorld, std::string filename, bool xLogScale, bool fLogScale, int order,
+               TableInput &result);
+
 // MFEM extensions
 
 /** Project discontinous function onto FE space

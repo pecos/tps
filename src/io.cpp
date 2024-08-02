@@ -578,6 +578,7 @@ void write_variable_data_hdf5(hid_t group, string varName, hid_t dataspace, cons
   H5Dclose(data_soln);
 }
 
+/*
 void M2ulPhyS::readTable(const std::string &inputPath, TableInput &result) {
   MPI_Comm TPSCommWorld = this->groupsMPI->getTPSCommWorld();
   tpsP->getInput((inputPath + "/x_log").c_str(), result.xLogScale, false);
@@ -620,6 +621,7 @@ void M2ulPhyS::readTable(const std::string &inputPath, TableInput &result) {
 
   return;
 }
+*/
 
 // ---------------------------------------------
 // Routines for I/O data organizer helper class
