@@ -35,6 +35,8 @@
 
 #include "tps_mfem_wrap.hpp"
 #include "tps.hpp"
+#include "em_options.hpp"
+#include "quasimagnetostatic.hpp"
 
 namespace TPS {
 
@@ -51,37 +53,43 @@ namespace TPS {
 
 class Qms2Flow1d {
  public:
-  Qms2Flow1d(Tps *tps) {}
+  Qms2Flow1d(Tps *tps);
+  ~Qms2Flow1d();
   void initialize(int n_1d_);
   void print_all_1d();
 
-  const Vector &PlasmaConductivity1d() const { return plasma_conductivity_1d; }
-  Vector &PlasmaConductivity1d() { return plasma_conductivity_1d; }
+  const Vector &PlasmaConductivity1d() const { return *cond_1d; }
+  Vector &PlasmaConductivity1d() { return *cond_1d; }
 
-  const Vector &JouleHeating1d() const { return joule_heating_1d; }
-  Vector &JouleHeating1d() { return joule_heating_1d; }
+  const Vector &JouleHeating1d() const { return *joule_1d; }
+  Vector &JouleHeating1d() { return *joule_1d; }
 
-  const Vector &Coordinates1d() const { return coordinates_1d; }
-  Vector &Coordinates1d() { return coordinates_1d; }
+  const Vector &Coordinates1d() const { return *z_coords_1d; }
+  Vector &Coordinates1d() { return *z_coords_1d; }
 
-  const Vector &Radius1d() const { return radius_1d; }
-  Vector &Radius1d() { return radius_1d; }
+  const Vector &Radius1d() const { return *radius_1d; }
+  Vector &Radius1d() { return *radius_1d; }
 
  private:
+  Tps *tpsP_;
+  ElectromagneticOptions *em_opts;
+  QuasiMagnetostaticSolverAxiSym *qmsa;
+
   int n_1d;
-  Vector plasma_conductivity_1d;
-  Vector joule_heating_1d;
-  Vector coordinates_1d;
-  Vector radius_1d;
+  Vector *cond_1d;
+  Vector *joule_1d;
+  Vector *z_coords_1d;  //  1d coordinates are assumed to be sorted
+  Vector *radius_1d;  //  Torch radius at z coordinates
 
   //  r is radial location, R is torch radius, r_c is modeling parameter
-  double radial_profile(double r, double R, double r_c);
-
+  double radial_profile(double r, double R, double r_c) const;
   //  Binary search to find interval
-  int find_z_interval(double z, Vector &z_coords);
-
+  int find_z_interval(double z) const;
   //  Interpolation of 1d values along centerline
-  double interpolate_z(double z, Vector &z_coords, Vector &values);
+  double interpolate_z(double z, const Vector &values) const;
+  double expand_cond_2d(double r, double z) const;
+
+  void set_plasma_conductivity();
 };
 
 }  // namespace TPS

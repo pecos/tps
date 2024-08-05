@@ -45,35 +45,57 @@
 
 namespace TPS {
 
-void Qms2Flow1d::initialize(int n_1d_) {
-  n_1d = n_1d_;
-  plasma_conductivity_1d = mfem::Vector(n_1d_);
-  joule_heating_1d = mfem::Vector(n_1d_);
-  coordinates_1d = mfem::Vector(n_1d_);
-  radius_1d = mfem::Vector(n_1d_);
+Qms2Flow1d::Qms2Flow1d(Tps *tps) {
+  tpsP_ = tps;
+  em_opts = nullptr;
+  qmsa = nullptr;
+
+  n_1d = 0;
+  cond_1d = nullptr;
+  joule_1d = nullptr;
+  z_coords_1d = nullptr;
+  radius_1d = nullptr;
 }
 
-void print_vec(Vector &vec) {
-  for (int i = 0; i < vec.Size(); i++) {
-    std::cout << i << ": " << vec[i] << endl;
-  }
+Qms2Flow1d::~Qms2Flow1d() {
+  delete cond_1d;
+  delete joule_1d;
+  delete z_coords_1d;
+  delete radius_1d;
+
+  delete em_opts;
+  delete qmsa;
+}
+
+void Qms2Flow1d::initialize(int n_1d_) {
+  n_1d = n_1d_;
+  cond_1d = new Vector(n_1d_);
+  joule_1d = new Vector(n_1d_);
+  z_coords_1d = new Vector(n_1d_);
+  radius_1d = new Vector(n_1d_);
+
+  em_opts = new ElectromagneticOptions();
+  qmsa = new QuasiMagnetostaticSolverAxiSym(*em_opts, tpsP_);
+
+  qmsa->parseSolverOptions();
+  qmsa->initialize();
 }
 
 void Qms2Flow1d::print_all_1d() {
-  std::cout << "---\nCoordinates:\n---" << endl;
-  print_vec(coordinates_1d);
-  std::cout << "---\nRadius:\n---" << endl;
-  print_vec(radius_1d);
-  std::cout << "---\nPlasma Conductivity:\n---" << endl;
-  print_vec(plasma_conductivity_1d);
-  std::cout << "---\nJoule Heating:\n---" << endl;
-  print_vec(joule_heating_1d);
+  std::cout << "---\n1d Coordinates:\n---" << endl;
+  z_coords_1d->Print();
+  std::cout << "---\nTorch Radius:\n---" << endl;
+  radius_1d->Print();
+  std::cout << "---\n1d Plasma Conductivity:\n---" << endl;
+  cond_1d->Print();
+  std::cout << "---\n1d Joule Heating:\n---" << endl;
+  joule_1d->Print();
 }
 
-double Qms2Flow1d::radial_profile(double r, double R, double r_c) {
+double Qms2Flow1d::radial_profile(double r, double R, double r_c) const {
   //  Constant over [0, r_c]. Zero beyond torch radius R
   //  Cosine for cont. connection between the two
-  assert(0 <= r);
+  assert(0 <= r && 0 <= R && 0 <= r_c);
   double out = 0;
   if (0 <= r && r <= r_c) {
     out = 1;
@@ -84,21 +106,21 @@ double Qms2Flow1d::radial_profile(double r, double R, double r_c) {
   return out;
 }
 
-int Qms2Flow1d::find_z_interval(double z, Vector &z_coords) {
-  int n_points = z_coords.Size(), i_min;
-  if (z < z_coords[1]) {
+int Qms2Flow1d::find_z_interval(double z) const {
+  int i_min;
+  if (z < z_coords_1d->Elem(1)) {
     i_min = 0;
-  } else if (z > z_coords[n_points - 1]) {
-    i_min = n_points - 2;
+  } else if (z > z_coords_1d->Elem(n_1d - 1)) {
+    i_min = n_1d - 2;
   } else {
     i_min = 1;
-    int i_max = n_points - 2;
+    int i_max = n_1d - 2;
     while (i_max > i_min + 1) {
       int i_test = round(0.5*(i_max - i_min) + i_min);
-      if (z == z_coords[i_test]) {
+      if (z == z_coords_1d->Elem(i_test)) {
         i_min = i_test;
         break;
-      } else if (z < z_coords[i_test]) {
+      } else if (z < z_coords_1d->Elem(i_test)) {
         i_max = i_test;
       } else {
         i_min = i_test;
@@ -108,12 +130,40 @@ int Qms2Flow1d::find_z_interval(double z, Vector &z_coords) {
   return i_min;
 }
 
-double Qms2Flow1d::interpolate_z(double z, Vector &z_coords, Vector &values) {
-  int ind = Qms2Flow1d::find_z_interval(z, z_coords);
-  double interp = (values[ind+1] - values[ind])/(z_coords[ind+1] - z_coords[ind]);
-  interp *= (z - z_coords[ind]);
+double Qms2Flow1d::interpolate_z(double z, const Vector &values) const {
+  const int ind = find_z_interval(z);
+  double interp = (values[ind+1] - values[ind])/(z_coords_1d->Elem(ind+1) - z_coords_1d->Elem(ind));
+  interp *= (z - z_coords_1d->Elem(ind));
   interp += values[ind];
   return interp;
+}
+
+double Qms2Flow1d::expand_cond_2d(double r, double z) const {
+  const double sigma_1d = interpolate_z(z, *cond_1d);
+  const double torch_radius = interpolate_z(z, *radius_1d);
+  double sigma = radial_profile(r, torch_radius, 0.9*torch_radius);
+  sigma *= sigma_1d;
+  return sigma;
+}
+
+void Qms2Flow1d::set_plasma_conductivity() {
+  ParFiniteElementSpace *fes = qmsa->getFESpace();
+  ParMesh *pmesh = qmsa->getMesh();
+
+  ParGridFunction *coordsDof = new ParGridFunction(fes);
+  pmesh->GetNodes(*coordsDof);
+
+  ParGridFunction *pc = qmsa->getPlasmaConductivityGF();
+  double *plasma_conductivity_gf = pc->HostWrite();
+
+  const int n_nodes = pc->FESpace()->GetNDofs();
+  for (int i = 0; i < n_nodes; i++) {
+    const double r = (*coordsDof)[i];
+    const double z = (*coordsDof)[i + n_nodes];
+    plasma_conductivity_gf[i] = expand_cond_2d(r, z);
+  }
+
+  delete coordsDof;
 }
 
 }  // namespace TPS
