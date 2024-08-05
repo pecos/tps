@@ -30,30 +30,59 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
 
-#include <sys/types.h>
-#include <tps_config.h>
-#include <unistd.h>
+#ifndef QMS2FLOW1D_HPP_
+#define QMS2FLOW1D_HPP_
 
-#ifdef HAVE_PYTHON
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
+#include "tps_mfem_wrap.hpp"
+#include "tps.hpp"
 
-namespace py = pybind11;
+namespace TPS {
 
-namespace tps_wrappers {
-void tps(py::module& m);
-void tps2bolzmann(py::module& m);
-void data_exchange_utils(py::module& m);
-void qms2flow1d(py::module& m);
-}  // namespace tps_wrappers
+// Need to:
+// [X] - Initialize vector of integer size with argument given in Python
+//       (Number of 1D grid points)
+// [X] - Form vector of that size in C++
+//       (To receive plasma conductivity/send Joule heating)
+// [X] - Receive 1D plasma conductivity from Python
+// [ ] - Expand to 2D plasma conductivity in C++
+// [ ] - Solve for 2D Joule heating with axisymmetric solver
+// [ ] - Reduce to 1D Joule heating in C++
+// [X] - Send 1D Joule heating to Python
 
-PYBIND11_MODULE(libtps, m) {
-  m.doc() = "TPS Python Interface";
+class Qms2Flow1d {
+ public:
+  Qms2Flow1d(Tps *tps) {}
+  void initialize(int n_1d_);
+  void print_all_1d();
 
-  tps_wrappers::tps(m);
-  tps_wrappers::tps2bolzmann(m);
-  tps_wrappers::data_exchange_utils(m);
-  tps_wrappers::qms2flow1d(m);
-}
+  const Vector &PlasmaConductivity1d() const { return plasma_conductivity_1d; }
+  Vector &PlasmaConductivity1d() { return plasma_conductivity_1d; }
 
-#endif
+  const Vector &JouleHeating1d() const { return joule_heating_1d; }
+  Vector &JouleHeating1d() { return joule_heating_1d; }
+
+  const Vector &Coordinates1d() const { return coordinates_1d; }
+  Vector &Coordinates1d() { return coordinates_1d; }
+
+  const Vector &Radius1d() const { return radius_1d; }
+  Vector &Radius1d() { return radius_1d; }
+
+ private:
+  int n_1d;
+  Vector plasma_conductivity_1d;
+  Vector joule_heating_1d;
+  Vector coordinates_1d;
+  Vector radius_1d;
+
+  //  r is radial location, R is torch radius, r_c is modeling parameter
+  double radial_profile(double r, double R, double r_c);
+
+  //  Binary search to find interval
+  int find_z_interval(double z, Vector &z_coords);
+
+  //  Interpolation of 1d values along centerline
+  double interpolate_z(double z, Vector &z_coords, Vector &values);
+};
+
+}  // namespace TPS
+#endif  // QMS2FLOW1D_HPP_
