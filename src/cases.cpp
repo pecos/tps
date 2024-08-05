@@ -141,7 +141,7 @@ void vel_channel(const Vector &x, double t, Vector &u) {
 
 /// Used to set the channel IC
 void vel_channel_uniform(const Vector &x, double t, Vector &u) {
-  double Umean = 1.0;
+  double Umean = 0.12;
   double wall;
 
   // expects channel height (-1,1)

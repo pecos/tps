@@ -205,15 +205,19 @@ class ZetaModel : public TurbModelBase {
   ParGridFunction tls_gf_;
   Vector tls_;
   ParGridFunction tls2_gf_;
-  Vector tls2_;
+  ParGridFunction tls2_next_gf_;  
+  Vector tls2_, tls2_next_, tls2_nm1_, tls2_nm2_;  
 
   /// turbulent time scale
   ParGridFunction tts_gf_;
+  ParGridFunction tts_next_gf_;  
   Vector tts_, tts_strain_, tts_kol_;
+  Vector tts_next_, tts_nm1_, tts_nm2_;
 
   /// turbulent production
   ParGridFunction prod_gf_;
-  Vector prod_;
+  ParGridFunction prod_next_gf_;  
+  Vector prod_, prod_next_, prod_nm1_, prod_nm2_;
 
   /// model coefficients
   double Cmu_ = 0.22;
@@ -327,6 +331,8 @@ class ZetaModel : public TurbModelBase {
 
   mfem::Solver *MsInvPC_ = nullptr;
   mfem::CGSolver *MsInv_ = nullptr;
+  mfem::Solver *MsRhoInvPC_ = nullptr;
+  mfem::CGSolver *MsRhoInv_ = nullptr;  
   mfem::Solver *HkInvPC_ = nullptr;
   mfem::Solver *HeInvPC_ = nullptr;
   mfem::Solver *HvInvPC_ = nullptr;
@@ -380,7 +386,8 @@ class ZetaModel : public TurbModelBase {
   void convection(string scalar);
   void updateTimestepHistory();
   void updateZeta();
-  void extrapolateState();
+  void extrapolateState(); 
+  void extrapolateRHS();  
   void updateProd();
   void updateMsRho();  
   void updateTLS();
