@@ -44,7 +44,7 @@ namespace tps_wrappers {
 void tps(py::module& m);
 void tps2bolzmann(py::module& m);
 void data_exchange_utils(py::module& m);
-// void qms2flow1d(py::module& m);
+void qms2flow1d(py::module& m);
 }  // namespace tps_wrappers
 
 PYBIND11_MODULE(libtps, m) {
@@ -53,7 +53,7 @@ PYBIND11_MODULE(libtps, m) {
   tps_wrappers::tps(m);
   tps_wrappers::tps2bolzmann(m);
   tps_wrappers::data_exchange_utils(m);
-  // tps_wrappers::qms2flow1d(m);
+  tps_wrappers::qms2flow1d(m);
 }
 
 #endif
