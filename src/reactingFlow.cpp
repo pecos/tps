@@ -508,10 +508,10 @@ void ReactingFlow::initializeSelf() {
   //-----------------------------------------------------
   // 1) Prepare the required finite element objects
   //-----------------------------------------------------
-  sfec_ = new H1_FECollection(order_);
+  sfec_ = new H1_FECollection(order_, dim_);
   sfes_ = new ParFiniteElementSpace(pmesh_, sfec_);
 
-  yfec_ = new H1_FECollection(order_, nSpecies_);
+  yfec_ = new H1_FECollection(order_, dim_);
   yfes_ = new ParFiniteElementSpace(pmesh_, yfec_, nSpecies_);
 
   vfec_ = new H1_FECollection(order_, dim_);
