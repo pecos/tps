@@ -173,6 +173,11 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     std::string basepath("species/species" + std::to_string(i));
     tpsP_->getRequiredInput((basepath + "/name").c_str(), speciesName);
     InputSpeciesNames[i - 1] = speciesName;
+
+    if(rank0_) {
+      std::cout << i << "): " << speciesName << " | " << gasParams_((i - 1), GasParams::FORMATION_ENERGY) << endl;
+    }
+    
   }
 
   tpsP_->getRequiredInput("species/background_index", backgroundIndex);
@@ -195,6 +200,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   }
 
   // input file species index.
+  if(rank0_) std::cout << "Species found in input file: " << nSpecies_ << endl;  
   for (int sp = 0; sp < nSpecies_; sp++) {
     if (sp == backgroundIndex - 1) {
       targetIdx = nSpecies_ - 1;
@@ -206,6 +212,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
       paramIdx++;
     }
     speciesMapping[InputSpeciesNames[sp]] = targetIdx;
+    if(rank0_) std::cout << sp << "): " << InputSpeciesNames[sp] << endl;
     speciesNames_[targetIdx] = InputSpeciesNames[sp];
     mixtureToInputMap[targetIdx] = sp;
   }
@@ -358,7 +365,8 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
       reactionModels[r - 1] = TABULATED_RXN;
       std::string inputPath(basepath + "/tabulated");
       readTableWrapper(inputPath, chemistryInput_.reactionInputs[r - 1].tableInput);
-
+      if(rank0_) std::cout << "table read for reaction: " << r << endl;
+      
     } else {
       grvy_printf(GRVY_ERROR, "\nUnknown reaction_model -> %s", model.c_str());
       exit(ERROR);
@@ -514,10 +522,10 @@ void ReactingFlow::initializeSelf() {
   //-----------------------------------------------------
   // 1) Prepare the required finite element objects
   //-----------------------------------------------------
-  sfec_ = new H1_FECollection(order_);
+  sfec_ = new H1_FECollection(order_, dim_);
   sfes_ = new ParFiniteElementSpace(pmesh_, sfec_);
 
-  yfec_ = new H1_FECollection(order_, nSpecies_);
+  yfec_ = new H1_FECollection(order_, dim_);
   yfes_ = new ParFiniteElementSpace(pmesh_, yfec_, nSpecies_);
 
   vfec_ = new H1_FECollection(order_, dim_);

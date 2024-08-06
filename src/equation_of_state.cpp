@@ -545,12 +545,21 @@ MFEM_HOST_DEVICE PerfectMixture::PerfectMixture(PerfectMixtureInput inputs, int 
   SetSpeciesStateIndices();
 
   // We assume the background species is neutral.
+  if(gasParams[(iBackground) + GasParams::SPECIES_CHARGES * numSpecies] != 0.0) {
+    std::cout << "(" << iBackground << ") Error: background species not nuetral: " << gasParams[(iBackground) + GasParams::SPECIES_CHARGES * numSpecies] << endl;
+  }  
   assert(gasParams[(iBackground) + GasParams::SPECIES_CHARGES * numSpecies] == 0.0);
   // TODO(kevin): release electron species enforcing.
   assert(inputs.isElectronIncluded);
   // We assume the background species and electron have zero formation energy.
+  if(gasParams[(iElectron) + GasParams::FORMATION_ENERGY * numSpecies] != 0.0) {
+    std::cout << "(" << iElectron << ") Error: electron formation energy non-zero: " << gasParams[(iElectron) + GasParams::FORMATION_ENERGY * numSpecies] << endl;
+  }
   assert(gasParams[(iElectron) + GasParams::FORMATION_ENERGY * numSpecies] == 0.0);
-  assert(gasParams[(iBackground) + GasParams::FORMATION_ENERGY * numSpecies] == 0.0);
+  if(gasParams[(iBackground) + GasParams::FORMATION_ENERGY * numSpecies] != 0.0) {
+    std::cout << "(" << iBackground << ") Error: background formation energy non-zero: " << gasParams[(iBackground) + GasParams::FORMATION_ENERGY * numSpecies] << endl;
+  }  
+  assert(gasParams[(iBackground) + GasParams::FORMATION_ENERGY * numSpecies] == 0.0);  
 
   for (int sp = 0; sp < gpudata::MAXSPECIES; sp++) {
     molarCV_[sp] = -1.0;
