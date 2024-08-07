@@ -1445,16 +1445,15 @@ void ZetaModel::tdrStep() {
   diff_total_coeff_ = tdr_diff_total_coeff_;
 
   // boundary condition
-  /*
   Array<int> empty;
   Lk_form_->Update();
   Lk_form_->Assemble();
-  Lk_form_->FormSystemMatrix(tke_ess_tdof_, Lk_);  
+  //Lk_form_->FormSystemMatrix(tke_ess_tdof_, Lk_);
+  Lk_form_->FormSystemMatrix(empty, Lk_);  
   Lk_->Mult(tke_next_, tmpR0_);
   MsRhoInv_->Mult(tmpR0_, tmpR0a_);
   tmpR0a_ *= -1.0;  
   tdr_wall_gf_.SetFromTrueDofs(tmpR0a_);
-  */
 
   He_form_->Update();
   He_form_->Assemble();
@@ -1471,8 +1470,8 @@ void ZetaModel::tdrStep() {
 
   // project new tdr bc onto gf which transfers actual ess bc's to solver
   for (auto &tdr_dbc : tdr_dbcs_) {
-    tdr_next_gf_.ProjectBdrCoefficient(*tdr_dbc.coeff, tdr_dbc.attr);
-    //tdr_next_gf_.ProjectBdrCoefficient(*tdr_wall_eval_coeff_, tdr_dbc.attr);
+    // tdr_next_gf_.ProjectBdrCoefficient(*tdr_dbc.coeff, tdr_dbc.attr);
+    tdr_next_gf_.ProjectBdrCoefficient(*tdr_wall_eval_coeff_, tdr_dbc.attr);
   }
   sfes_->GetRestrictionMatrix()->MultTranspose(res_, res_gf_);
 
