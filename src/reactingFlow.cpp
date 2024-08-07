@@ -1754,8 +1754,6 @@ void ReactingFlow::temperatureStep() {
 
   Ht_form_->RecoverFEMSolution(Xt2, resT_gf_, Tn_next_gf_);
   Tn_next_gf_.GetTrueDofs(Tn_next_);
-
-  
 }
 
 void ReactingFlow::temperatureSubstep(int iSub) {
@@ -2264,7 +2262,7 @@ void ReactingFlow::updateMixture() {
         //   std::cout << "cp[" << sp << "] = " << cp_sp << std::endl;
         // }
 
-        d_Cp[i + sp * sDofInt_] = cp_sp; //cpY / std::max(d_Rho[i] * d_Yn[i + sp * sDofInt_], 1.0e-14);
+        d_Cp[i + sp * sDofInt_] = cp_sp;  // cpY / std::max(d_Rho[i] * d_Yn[i + sp * sDofInt_], 1.0e-14);
       }
     }
   }
@@ -2585,7 +2583,6 @@ void ReactingFlow::computeQtTO() {
 
   // species-temp diffusion term, already in int-weak form
   tmpR0_.Add(-1.0, crossDiff_);
-
 
   sfes_->GetRestrictionMatrix()->MultTranspose(tmpR0_, resT_gf_);
 
