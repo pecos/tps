@@ -310,6 +310,7 @@ bool h5ReadTable(const std::string &fileName, const std::string &datasetName, mf
   H5Sget_simple_extent_dims(dataspace, dims, NULL);
 
   // DenseMatrix memory is column-major, while HDF5 follows row-major.
+  // Here is where the actual memory is allocated for all the tables
   output.SetSize(dims[1], dims[0]);
 
   herr_t status;
@@ -1239,17 +1240,12 @@ void makeContinuous(ParGridFunction &u) {
 }
 
 void readTable(MPI_Comm TPSCommWorld, std::string filename, bool xLogScale, bool fLogScale, int order,
-               TableInput &result) {
-  // MPI_Comm TPSCommWorld = this->groupsMPI->getTPSCommWorld();
-  // tpsP->getInput((inputPath + "/x_log").c_str(), result.xLogScale, false);
-  // tpsP->getInput((inputPath + "/f_log").c_str(), result.fLogScale, false);
-  // tpsP->getInput((inputPath + "/order").c_str(), result.order, 1);
+	       std::list<mfem::DenseMatrix> &tableHost, TableInput &result) {
 
   int myrank;
   MPI_Comm_rank(TPSCommWorld, &myrank);
   const bool rank0 = (myrank == 0);
 
-  std::list<mfem::DenseMatrix> tableHost;
   tableHost.push_back(DenseMatrix());
 
   int Ndata;
@@ -1257,8 +1253,6 @@ void readTable(MPI_Comm TPSCommWorld, std::string filename, bool xLogScale, bool
   bool success = false;
   int suc_int = 0;
   if (rank0) {
-    // std::string filename;
-    // tpsP->getRequiredInput((inputPath + "/filename").c_str(), filename);
     success = h5ReadTable(filename, "table", tableHost.back(), dims);
     suc_int = (int)success;
 
@@ -1276,6 +1270,7 @@ void readTable(MPI_Comm TPSCommWorld, std::string filename, bool xLogScale, bool
   assert(dims[0] > 0);
   assert(dims[1] == 2);
 
+  // all not 0 ranks have not had matrix size set as in h5ReadTable
   if (!rank0) tableHost.back().SetSize(dims[0], dims[1]);
   double *d_table = tableHost.back().HostReadWrite();
   MPI_Bcast(d_table, dims[0] * dims[1], MPI_DOUBLE, 0, TPSCommWorld);

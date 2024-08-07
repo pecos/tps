@@ -308,6 +308,8 @@ class ReactingFlow : public ThermoChemModelBase {
 
   double Pnm1_, Pnm2_, Pnm3_;
 
+  std::list<mfem::DenseMatrix> tableHost_;
+
  public:
   ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff, TPS::Tps *tps);
   virtual ~ReactingFlow();

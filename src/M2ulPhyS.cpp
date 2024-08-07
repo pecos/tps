@@ -3775,7 +3775,7 @@ void M2ulPhyS::readTableWrapper(std::string inputPath, TableInput &result) {
   tpsP->getInput((inputPath + "/f_log").c_str(), result.fLogScale, false);
   tpsP->getInput((inputPath + "/order").c_str(), result.order, 1);
   tpsP->getRequiredInput((inputPath + "/filename").c_str(), filename);
-  readTable(TPSCommWorld, filename, result.xLogScale, result.fLogScale, result.order, result);
+  readTable(TPSCommWorld, filename, result.xLogScale, result.fLogScale, result.order, tableHost_, result);
 }
 
 void M2ulPhyS::parsePeriodicInputs() {

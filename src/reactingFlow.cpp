@@ -357,8 +357,34 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     } else if (model == "tabulated") {
       reactionModels[r - 1] = TABULATED_RXN;
       std::string inputPath(basepath + "/tabulated");
-      readTableWrapper(inputPath, chemistryInput_.reactionInputs[r - 1].tableInput);
+      //readTableWrapper(inputPath, chemistryInput_.reactionInputs[r - 1].tableInput);
 
+  std::string filename;
+  tpsP_->getInput((inputPath + "/x_log").c_str(), chemistryInput_.reactionInputs[r - 1].tableInput.xLogScale, false);
+  tpsP_->getInput((inputPath + "/f_log").c_str(), chemistryInput_.reactionInputs[r - 1].tableInput.fLogScale, false);
+  tpsP_->getInput((inputPath + "/order").c_str(), chemistryInput_.reactionInputs[r - 1].tableInput.order, 1);
+  tpsP_->getRequiredInput((inputPath + "/filename").c_str(), filename);
+  readTable(MPI_COMM_WORLD, filename, chemistryInput_.reactionInputs[r - 1].tableInput.xLogScale, chemistryInput_.reactionInputs[r - 1].tableInput.fLogScale, chemistryInput_.reactionInputs[r - 1].tableInput.order, tableHost_, chemistryInput_.reactionInputs[r - 1].tableInput);
+
+  std::cout << "Table input dump from filename: " << filename << endl;
+  std::cout << "+ Ndata: " << chemistryInput_.reactionInputs[r - 1].tableInput.Ndata << endl;
+  std::cout << "+ xLogScale: " << chemistryInput_.reactionInputs[r - 1].tableInput.xLogScale << endl;
+  std::cout << "+ fLogScale: " << chemistryInput_.reactionInputs[r - 1].tableInput.fLogScale << endl;
+  std::cout << "+ order: " << chemistryInput_.reactionInputs[r - 1].tableInput.order << endl;
+ for (int i = 0; i < chemistryInput_.reactionInputs[r - 1].tableInput.Ndata; i++) {
+    std::cout << "   " << i << ". " << chemistryInput_.reactionInputs[r - 1].tableInput.xdata[i] << " " << chemistryInput_.reactionInputs[r - 1].tableInput.fdata[i] << endl;
+  }
+
+      /*
+  std::cout << "+ Ndata: " << chemistryInput_.reactionInputs[r - 1].tableInput.Ndata << endl;
+  std::cout << "+ xLogScale: " << chemistryInput_.reactionInputs[r - 1].tableInput.xLogScale << endl;
+  std::cout << "+ fLogScale: " << chemistryInput_.reactionInputs[r - 1].tableInput.fLogScale << endl;
+  std::cout << "+ order: " << chemistryInput_.reactionInputs[r - 1].tableInput.order << endl;
+  for (int i = 0; i < chemistryInput_.reactionInputs[r - 1].tableInput.Ndata; i++) {
+    std::cout << "   " << i << ". " << chemistryInput_.reactionInputs[r - 1].tableInput.xdata[i] << " " << chemistryInput_.reactionInputs[r - 1].tableInput.fdata[i] << endl;
+  }
+      */
+      
     } else {
       grvy_printf(GRVY_ERROR, "\nUnknown reaction_model -> %s", model.c_str());
       exit(ERROR);
@@ -755,16 +781,35 @@ void ReactingFlow::initializeSelf() {
 
     ConstantCoefficient Yn_ic_coef;
     for (int sp = 0; sp < nSpecies_; sp++) {
-      Yn_ic_coef.constant = initialMassFraction_[sp];
+      Yn_ic_coef.constant = initialMassFraction_(sp);
+      // std::cout << sp << "): Yn:" << initialMassFraction_(sp) << endl;
       Yn_gf_.ProjectCoefficient(Yn_ic_coef);
       Yn_gf_.GetTrueDofs(tmpR0_);
       setVectorFromScalar(tmpR0_, sp, &Yn_);
     }
+    
   }
   Ynm1_ = Yn_;
   Ynm2_ = Yn_;
   Yn_next_gf_ = Yn_gf_;
   YnFull_gf_.SetFromTrueDofs(Yn_);
+
+  {
+    double *d_Yn = Yn_.HostReadWrite();
+    double *d_Rho = rn_.HostReadWrite();
+    Vector state(gpudata::MAXEQUATIONS);
+    state = 0.0;
+
+    for (int i = 0; i < sDofInt_; i++) {
+      state[0] = d_Rho[i];
+      for (int sp = 0; sp < nActiveSpecies_; sp++) {
+      //for (int sp = 0; sp < nSpecies_; sp++) {      
+	// state[dim_ + 1 + sp + 1] = d_Rho[i] * d_Yn[i + sp * sDofInt_];
+        state[dim_ + sp + 1] = d_Rho[i] * d_Yn[i + sp * sDofInt_];
+	std::cout << "*state[" << dim_ + sp + 1 << "] <= Yn:" << d_Yn[i + sp * sDofInt_] << endl;	
+      }
+    }
+  }
 
   ConstantCoefficient t_ic_coef;
   t_ic_coef.constant = T_ic_;
@@ -891,6 +936,7 @@ void ReactingFlow::initializeSelf() {
 
   // with ic set, update Rmix
   updateMixture();
+  if (rank0_) std::cout << "Mixture update 1" << endl;  
 }
 
 void ReactingFlow::initializeOperators() {
@@ -1223,6 +1269,7 @@ void ReactingFlow::initializeOperators() {
 
   // and initialize system mass
   updateMixture();
+  if (rank0_) std::cout << "Mixture update 2" << endl;    
   computeSystemMass();
 
   // for initial plot
@@ -1261,6 +1308,7 @@ void ReactingFlow::step() {
   }
 
   // Prepare for residual calc
+  std::cout << "step updateMixture..." << endl;
   updateMixture();
   extrapolateState();
   updateBC(0);  // NB: can't ramp right now
@@ -1331,10 +1379,15 @@ void ReactingFlow::step() {
 
     for (int iSub = 0; iSub < nSub_; iSub++) {
       // update wdot quantities at full substep in Yn/Tn state
+      std::cout << iSub << "): opSplit updateMixture..." << endl;      
       updateMixture();
+      std::cout << iSub << "): thermoP..." << endl;                  
       updateThermoP();
+      std::cout << iSub << "): density..." << endl;            
       updateDensity(0.0);
+      std::cout << iSub << "): Yprod..." << endl;              
       speciesProduction();
+      std::cout << iSub << "): HoF..." << endl;            
       heatOfFormation();
 
       // advance over substep
@@ -1599,6 +1652,14 @@ void ReactingFlow::speciesSubstep(int iSpec, int iSub) {
   setScalarFromVector(Yn_, iSpec, &tmpR0a_);
   tmpR0_.Add(1.0, tmpR0a_);
 
+  // clip any small negative values
+  {
+    double *data = tmpR0_.HostReadWrite();
+    for (int i = 0; i < sDofInt_; i++) {
+      data[i] = max(data[i], 0.0);
+    } 
+  }
+
   // Yn now has full state at substep
   setVectorFromScalar(tmpR0_, iSpec, &Yn_);
 }
@@ -1633,21 +1694,35 @@ void ReactingFlow::speciesProduction() {
     // species (mass) densities are used and need to be filled
     state[0] = dataRho[i];
     for (int sp = 0; sp < nActiveSpecies_; sp++) {
+    // for (int sp = 0; sp < nSpecies_; sp++) {
       state[dim_ + 1 + sp + 1] = dataRho[i] * dataY[i + sp * sDofInt_];
     }
 
     // Evaluate the mole densities (from mass densities)
     mixture_->computeNumberDensities(state, n_sp);
+    for (int sp = 0; sp < nSpecies_; sp++) {
+      std::cout << "mole density at species " << sp << ": " << n_sp[sp] << endl;
+    }
 
     // Evaluate the chemical source terms
     chemistry_->computeForwardRateCoeffs(Th, Te, i, kfwd.HostWrite());
+    for (int sp = 0; sp < nReactions_; sp++) {
+      std::cout << "kfwd(" << sp << "):" << kfwd[sp] << endl;
+    }        
     chemistry_->computeEquilibriumConstants(Th, Te, keq.HostWrite());
+    for (int sp = 0; sp < nReactions_; sp++) {
+      std::cout << "keq(" << sp << "):" << keq[sp] << endl;
+    }        
     chemistry_->computeProgressRate(n_sp, kfwd, keq, progressRate);
+    for (int sp = 0; sp < nReactions_; sp++) {
+      std::cout << "progressRate(" << sp << "):" << progressRate[sp] << endl;
+    }    
     chemistry_->computeCreationRate(progressRate, creationRate);
 
     // Place sources into storage for use in speciesStep
     for (int sp = 0; sp < nSpecies_; sp++) {
       dataProd[i + sp * sDofInt_] = creationRate[sp];
+      std::cout << "P_Yn(" << sp << "):" << creationRate[sp] << endl;
     }
   }
 }
@@ -1672,6 +1747,7 @@ void ReactingFlow::heatOfFormation() {
       hspecies = (molarCP * T + gasParams_(n, GasParams::FORMATION_ENERGY)) / gasParams_(n, GasParams::SPECIES_MW);
       h_hw[i] -= hspecies * h_prodY[i + n * sDofInt_];
     }
+    std::cout << "HoF: " << h_hw[i] << endl;
   }
 }
 
@@ -1850,7 +1926,8 @@ void ReactingFlow::updateMixture() {
       dataR[i] = Rgas_ / dataM[i];
     }
   }
-
+  if (rank0_) std::cout << "okay 1..." << endl;  
+  
   // can use mixture calls directly for this
   for (int sp = 0; sp < nSpecies_; sp++) {
     setScalarFromVector(Yn_, sp, &tmpR0a_);
@@ -1864,6 +1941,7 @@ void ReactingFlow::updateMixture() {
     }
     setVectorFromScalar(tmpR0b_, sp, &Xn_);
   }
+  if (rank0_) std::cout << "okay 2..." << endl;    
 
   // mixture Cp
   {
@@ -1885,11 +1963,22 @@ void ReactingFlow::updateMixture() {
       // Set up conserved state (just the mass densities, which is all we need here)
       state[0] = d_Rho[i];
       for (int sp = 0; sp < nActiveSpecies_; sp++) {
-        state[dim_ + 1 + sp + 1] = d_Rho[i] * d_Yn[i + sp * sDofInt_];
+      // for (int sp = 0; sp < nSpecies_; sp++) {	
+	// state[dim_ + 1 + sp + 1] = d_Rho[i] * d_Yn[i + sp * sDofInt_];
+        state[dim_ + sp + 1] = d_Rho[i] * d_Yn[i + sp * sDofInt_];
+	std::cout << "state[" << dim_ + sp + 1 << "] <= Yn:" << d_Yn[i + sp * sDofInt_] << endl;	
       }
 
       // Evaluate the mole densities (from mass densities)
+      if (rank0_) {	
+	std::cout << "calling compute number density..." << endl;
+        for (int sp = 0; sp <= nActiveSpecies_ + dim_; sp++) {
+        // for (int sp = 0; sp <= nSpecies_ + dim_; sp++) {	  	  
+	  std::cout << "state[" << sp << "]: " << state[sp] << endl;
+	}
+      }
       mixture_->computeNumberDensities(state, n_sp);
+      if (rank0_) std::cout << "okay a..." << endl;        
 
       // GetMixtureCp returns cpMix = sum_s X_s Cp_s, where X_s is
       // mole density of species s and Cp_s is molar specific heat
@@ -1898,6 +1987,7 @@ void ReactingFlow::updateMixture() {
       // density (kg/m^3) and Cp is the is the mixture mass specific
       // heat (units J/(kg*K).
       mixture_->GetMixtureCp(n_sp, d_Rho[i], cpMix);
+      if (rank0_) std::cout << "okay b..." << endl;              
 
       // Everything else expects CpMix_gf_ to be the mixture mass Cp
       // (with units J/(kg*K)), so divide by mixture density
@@ -1907,6 +1997,7 @@ void ReactingFlow::updateMixture() {
         mixture_->GetSpeciesCp(n_sp, d_Rho[i], sp, cpY);
         d_Cp[i + sp * sDofInt_] = cpY / std::max(d_Rho[i] * d_Yn[i + sp * sDofInt_], 1.0e-14);
       }
+      if (rank0_) std::cout << "okay c..." << endl;       
     }
   }
   CpMix_gf_.SetFromTrueDofs(tmpR0c_);
@@ -1942,6 +2033,7 @@ void ReactingFlow::updateThermoP() {
     // split), nSub = 1, so it makes no difference.
     dtP_ *= (nSub_ / dt_);
   }
+  std::cout << "Po: " << thermo_pressure_ << endl;
 }
 
 void ReactingFlow::updateDiffusivity() {
@@ -2061,6 +2153,10 @@ void ReactingFlow::updateDensity(double tStep) {
   }
   rn_gf_.SetFromTrueDofs(rn_);
 
+  for (int i = 0; i < sDofInt_; i++) {
+    std::cout << "density: "<< rn_(i) << endl;
+  }
+  
   MsRho_form_->Update();
   MsRho_form_->Assemble();
   MsRho_form_->FormSystemMatrix(empty, MsRho_);
@@ -2237,7 +2333,17 @@ void ReactingFlow::readTableWrapper(std::string inputPath, TableInput &result) {
   tpsP_->getInput((inputPath + "/f_log").c_str(), result.fLogScale, false);
   tpsP_->getInput((inputPath + "/order").c_str(), result.order, 1);
   tpsP_->getRequiredInput((inputPath + "/filename").c_str(), filename);
-  readTable(MPI_COMM_WORLD, filename, result.xLogScale, result.fLogScale, result.order, result);
+  readTable(MPI_COMM_WORLD, filename, result.xLogScale, result.fLogScale, result.order, tableHost_, result);
+
+  std::cout << "Table input dump from filename: " << filename << endl;
+  std::cout << "+ Ndata: " << result.Ndata << endl;
+  std::cout << "+ xLogScale: " << result.xLogScale << endl;
+  std::cout << "+ fLogScale: " << result.fLogScale << endl;
+  std::cout << "+ order: " << result.order << endl;
+  for (int i = 0; i < result.Ndata; i++) {
+    std::cout << "   " << i << ". " << result.xdata[i] << " " << result.fdata[i] << endl;
+  }
+  
 }
 
 void ReactingFlow::identifyCollisionType(const Array<ArgonSpcs> &speciesType, ArgonColl *collisionIndex) {
