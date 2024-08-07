@@ -55,20 +55,31 @@ MFEM_HOST_DEVICE int TableInterpolator::findInterval(const double &xEval) {
   int it, step;
 
   // Find the first index which value is larger than xEval.
-  while (count > 0) {
-    it = first;
-    step = count / 2;
-    it += step;
-    if (xEval > xdata_[it]) {
-      first = ++it;
-      count -= step + 1;
-    } else {
-      count = step;
+  std::cout << "Table range: " << xdata_[0] << " to " << xdata_[Ndata_] << endl;
+  if (xEval < xdata_[0]) {
+    std::cout << "caught less than " << xEval << " " << xdata_[0] << endl;
+    first = 1;
+  } else if (xEval > xdata_[Ndata_-1]) {
+    first = Ndata_ - 1;
+  } else {  
+    while (count > 0) {
+      it = first;
+      step = count / 2;
+      it += step;
+      std::cout << "iterating " << it << ") " << xEval << " " << xdata_[it] << endl;      
+      if (xEval > xdata_[it]) {
+        first = ++it;
+        count -= step + 1;
+      } else {
+        count = step;
+      }
     }
   }
+  
   // if xEval is outside the range, first has either 0 or Ndata_. Limit the value.
-  first = max(1, min(Ndata_ - 1, first));
-  // We want the left index of the interval.
+  //first = max(1, min(Ndata_ - 1, first));
+  
+  // We want the left index of the interval  
   return first - 1;
 }
 
@@ -79,6 +90,9 @@ MFEM_HOST_DEVICE int TableInterpolator::findInterval(const double &xEval) {
 MFEM_HOST_DEVICE LinearTable::LinearTable(const TableInput &input)
     : TableInterpolator(input.Ndata, input.xdata, input.fdata, input.xLogScale, input.fLogScale) {
   assert(input.order == 1);
+
+  std::cout << "LinearTable constructor: table range " << xdata_[0] << " : " << xdata_[Ndata_-1] << " and " << fdata_[0] << " : " << fdata_[Ndata_-1] << endl;
+  
   for (int k = 0; k < Ndata_ - 1; k++) {
     a_[k] = (fLogScale_) ? log(fdata_[k]) : fdata_[k];
     double df = (fLogScale_) ? (log(fdata_[k + 1]) - log(fdata_[k])) : (fdata_[k + 1] - fdata_[k]);
@@ -92,7 +106,7 @@ MFEM_HOST_DEVICE double LinearTable::eval(const double &xEval) {
   double xt = (xLogScale_) ? log(xEval) : xEval;
   double ft = a_[index] + b_[index] * xt;
   if (fLogScale_) ft = exp(ft);
-
+  std::cout << " (temp, index): (" << xEval << ", " << index << "): a " << a_[index] << " b " << b_[index] << " xt " << xt << " val " << ft << endl;
   return ft;
 }
 

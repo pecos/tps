@@ -3318,7 +3318,7 @@ void M2ulPhyS::parseReactionInputs() {
     } else if (model == "tabulated") {
       config.reactionModels[r - 1] = TABULATED_RXN;
       std::string inputPath(basepath + "/tabulated");
-      readTableWrapper(inputPath, config.chemistryInput.reactionInputs[r - 1].tableInput);
+      readTableWrapper(inputPath, tableHost_, config.chemistryInput.reactionInputs[r - 1].tableInput);
     } else if (model == "bte") {
       config.reactionModels[r - 1] = GRIDFUNCTION_RXN;
       int index;
@@ -3755,7 +3755,7 @@ void M2ulPhyS::parseRadiationInputs() {
     if (coefficientType == "tabulated") {
       config.radiationInput.necModel = TABULATED_NEC;
       std::string inputPath(modelInputPath + "/tabulated");
-      readTableWrapper(inputPath, config.radiationInput.necTableInput);
+      readTableWrapper(inputPath, tableHost_, config.radiationInput.necTableInput);
     } else {
       grvy_printf(GRVY_ERROR, "\nUnknown net emission coefficient type -> %s\n", coefficientType.c_str());
       exit(ERROR);
@@ -3768,14 +3768,14 @@ void M2ulPhyS::parseRadiationInputs() {
   }
 }
 
-void M2ulPhyS::readTableWrapper(std::string inputPath, TableInput &result) {
+void M2ulPhyS::readTableWrapper(std::string inputPath, std::list<mfem::DenseMatrix> tableHost, TableInput &result) {
   MPI_Comm TPSCommWorld = this->groupsMPI->getTPSCommWorld();
   std::string filename;
   tpsP->getInput((inputPath + "/x_log").c_str(), result.xLogScale, false);
   tpsP->getInput((inputPath + "/f_log").c_str(), result.fLogScale, false);
   tpsP->getInput((inputPath + "/order").c_str(), result.order, 1);
   tpsP->getRequiredInput((inputPath + "/filename").c_str(), filename);
-  readTable(TPSCommWorld, filename, result.xLogScale, result.fLogScale, result.order, result);
+  readTable(TPSCommWorld, filename, result.xLogScale, result.fLogScale, result.order, tableHost_, result);
 }
 
 void M2ulPhyS::parsePeriodicInputs() {

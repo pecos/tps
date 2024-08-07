@@ -39,7 +39,14 @@
 #include <assert.h>
 #include <hdf5.h>
 
+#include <array>
+#include <cstdio>
+#include <cstdlib>
+#include <iostream>
+#include <memory>
+#include <stdexcept>
 #include <string>
+#include <list>
 
 #include "dataStructures.hpp"
 #include "tps_mfem_wrap.hpp"
@@ -97,8 +104,7 @@ bool h5ReadTable(const std::string &fileName, const std::string &datasetName, mf
 bool h5ReadBcastMultiColumnTable(const std::string &fileName, const std::string &datasetName, MPI_Comm TPSCommWorld,
                                  mfem::DenseMatrix &output, std::vector<TableInput> &tables);
 
-void readTable(MPI_Comm TPSCommWorld, std::string filename, bool xLogScale, bool fLogScale, int order,
-               TableInput &result);
+void readTable(MPI_Comm TPSCommWorld, std::string filename, bool xLogScale, bool fLogScale, int order, std::list<mfem::DenseMatrix> &tableHost, TableInput &result);
 
 // MFEM extensions
 

@@ -84,6 +84,17 @@ MFEM_HOST_DEVICE Chemistry::Chemistry(GasMixture *mixture, const ChemistryInput 
         reactions_[r] = new HoffertLien(A, b, E);
       } break;
       case TABULATED_RXN: {
+
+	/*
+  std::cout << "+ Ndata: " << inputs.reactionInputs[r].tableInput.Ndata << endl;
+  std::cout << "+ xLogScale: " << inputs.reactionInputs[r].tableInput.xLogScale << endl;
+  std::cout << "+ fLogScale: " << inputs.reactionInputs[r].tableInput.fLogScale << endl;
+  std::cout << "+ order: " << inputs.reactionInputs[r].tableInput.order << endl;
+  for (int i = 0; i < inputs.reactionInputs[r].tableInput.Ndata; i++) {
+    std::cout << "   " << i << ". " << inputs.reactionInputs[r].tableInput.xdata[i] << " " << inputs.reactionInputs[r].tableInput.fdata[i] << endl;
+  }
+	*/
+	
         reactions_[r] = new Tabulated(inputs.reactionInputs[r].tableInput);
       } break;
       case GRIDFUNCTION_RXN: {
@@ -154,7 +165,9 @@ MFEM_HOST_DEVICE void Chemistry::computeForwardRateCoeffs(const double &T_h, con
   const double Thlim = max(T_h, min_temperature_);
   const double Telim = max(T_e, min_temperature_);
 
+  std::cout << " chemistry numReactions: " << numReactions_ << endl;  
   for (int r = 0; r < numReactions_; r++) {
+    std::cout << "kfwd computeRateCoeff for reaction number: " << r+1 << endl;
     bool isElectronInvolved = isElectronInvolvedAt(r);
     kfwd[r] = reactions_[r]->computeRateCoefficient(Thlim, Telim, dofindex, isElectronInvolved);
   }

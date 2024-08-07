@@ -61,7 +61,19 @@ MFEM_HOST_DEVICE double HoffertLien::computeRateCoefficient(const double &T_h, c
 MFEM_HOST_DEVICE Tabulated::Tabulated(const TableInput &input) : Reaction(TABULATED_RXN) {
   switch (input.order) {
     case 1: {
+
+      /*
+  std::cout << "+ Ndata: " << input.Ndata << endl;
+  std::cout << "+ xLogScale: " << input.xLogScale << endl;
+  std::cout << "+ fLogScale: " << input.fLogScale << endl;
+  std::cout << "+ order: " << input.order << endl;
+  for (int i = 0; i < input.Ndata; i++) {
+    std::cout << "   " << i << ". " << input.xdata[i] << " " << input.fdata[i] << endl;
+  }
+      */
+      
       table_ = new LinearTable(input);
+      std::cout << "LinearTable constructed!" << endl;
     } break;
     default: {
       printf("Given interpolation order is not supported for TableInterpolator!");
@@ -76,7 +88,8 @@ MFEM_HOST_DEVICE double Tabulated::computeRateCoefficient(const double &T_h, con
                                                           [[maybe_unused]] const int &dofindex,
                                                           const bool isElectronInvolved) {
   double temp = (isElectronInvolved) ? T_e : T_h;
-  return table_->eval(temp);
+  std::cout << "...attempting to evaluate table for temp: " << temp << endl;
+  return table_->eval(temp);  
 }
 
 MFEM_HOST_DEVICE GridFunctionReaction::GridFunctionReaction(int comp)
