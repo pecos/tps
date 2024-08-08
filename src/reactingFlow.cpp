@@ -1815,8 +1815,6 @@ void ReactingFlow::speciesStep(int iSpec) {
   // copy relevant species properties from full Vector to particular case
   setScalarFromVector(diffY_, iSpec, &tmpR0_);
 
-  // if (iSpec == 0) tmpR0_ *= 2.0;
-
   diffY_gf_.SetFromTrueDofs(tmpR0_);
 
   // Build the right-hand-side
@@ -1893,14 +1891,6 @@ void ReactingFlow::speciesStep(int iSpec) {
   // copy into full species vector & gf
   Hy_form_->RecoverFEMSolution(Xt2, resT_gf_, Yn_next_gf_);
   Yn_next_gf_.GetTrueDofs(tmpR0_);
-
-  // if (tmpR0_.Min() < 0.0) {
-  //   std::cout << "Caught negative mass fraction!  Resetting..." << std::endl;
-  //   for (int i = 0; i < sDofInt_; i++) {
-  //     if (tmpR0_[i] < 0.0) tmpR0_[i] = 0.0;
-  //   }
-  //   Yn_next_gf_.SetFromTrueDofs(tmpR0_);
-  // }
 
   for (int i = 0; i < sDofInt_; i++) {
     if (tmpR0_[i] < 0.0) tmpR0_[i] = 0.0;
@@ -2018,10 +2008,6 @@ void ReactingFlow::crossDiffusion() {
   for (int i = 0; i < nSpecies_; i++) {
     setScalarFromVector(Yn_next_, i, &tmpR0a_);
     setScalarFromVector(diffY_, i, &tmpR0b_);
-
-    // if (i==0) tmpR0b_ *= 2.0;
-    // if (i==1){ setScalarFromVector(diffY_, 0, &tmpR0b_); tmpR0b_ *= 2.0; }
-
     setScalarFromVector(CpY_, i, &tmpR0c_);
     G_->Mult(tmpR0a_, tmpR1_);
     Mv_inv_->Mult(tmpR1_, tmpR1b_);
@@ -2229,7 +2215,6 @@ void ReactingFlow::updateMixture() {
 
     for (int i = 0; i < sDofInt_; i++) {
       double cpMix;
-      double cpY;
 
       // Set up conserved state (just the mass densities, which is all we need here)
       state[0] = d_Rho[i];
@@ -2253,16 +2238,11 @@ void ReactingFlow::updateMixture() {
       d_CMix[i] = cpMix / d_Rho[i];
 
       for (int sp = 0; sp < nSpecies_; sp++) {
-        mixture_->GetSpeciesCp(n_sp, d_Rho[i], sp, cpY);
         double molarCV = speciesMolarCv_[sp];
         molarCV *= UNIVERSALGASCONSTANT;
         double molarCP = molarCV + UNIVERSALGASCONSTANT;
         const double cp_sp = molarCP / gasParams_(sp, GasParams::SPECIES_MW);
-        // if (i==0) {
-        //   std::cout << "cp[" << sp << "] = " << cp_sp << std::endl;
-        // }
-
-        d_Cp[i + sp * sDofInt_] = cp_sp;  // cpY / std::max(d_Rho[i] * d_Yn[i + sp * sDofInt_], 1.0e-14);
+        d_Cp[i + sp * sDofInt_] = cp_sp;
       }
     }
   }
@@ -2385,7 +2365,6 @@ void ReactingFlow::updateDiffusivity() {
       mixture_->GetConservativesFromPrimitives(state, conservedState);
       transport_->GetThermalConductivities(conservedState, state, kappa);
       dataKappa[i] = kappa[0] + kappa[1];  // for single temperature, transport includes both heavy and electron kappa
-      // dataKappa[i] = kappa[0];  // for single temperature, transport includes both heavy and electron kappa
     }
   }
   kappa_gf_.SetFromTrueDofs(kappa_);
@@ -2477,7 +2456,6 @@ void ReactingFlow::updateDensity(double tStep) {
   }
 
   const double min_rho = rn_.Min();
-  // printf("min(rho) = %.6e\n", rn_.Min());
   if (min_rho < 0.0) {
     for (int i = 0; i < rn_.Size(); i++) {
       if (rn_[i] < 0.0) {
@@ -2587,7 +2565,6 @@ void ReactingFlow::computeQtTO() {
   sfes_->GetRestrictionMatrix()->MultTranspose(tmpR0_, resT_gf_);
 
   Qt_ = 0.0;
-  // Qt_gf_.SetFromTrueDofs(tmpR0_);
   Qt_gf_.SetFromTrueDofs(Qt_);
 
   Vector Xqt, Bqt;
@@ -2600,34 +2577,6 @@ void ReactingFlow::computeQtTO() {
   Qt_gf_ /= CpMix_gf_;
   Qt_gf_ /= thermo_pressure_;
   Qt_gf_.Neg();
-
-  // // TODO(trevilo): This method isn't sufficiently general
-  // tmpR0_ = 0.0;
-  // LQ_bdry_->Update();
-  // LQ_bdry_->Assemble();
-  // LQ_bdry_->ParallelAssemble(tmpR0_);
-  // tmpR0_.Neg();
-
-  // Array<int> empty;
-  // LQ_form_->Update();
-  // LQ_form_->Assemble();
-  // LQ_form_->FormSystemMatrix(empty, LQ_);
-  // LQ_->AddMult(Tn_next_, tmpR0_);  // tmpR0_ += LQ{Tn_next}
-
-  // sfes_->GetRestrictionMatrix()->MultTranspose(tmpR0_, resT_gf_);
-
-  // Qt_ = 0.0;
-  // Qt_gf_.SetFromTrueDofs(tmpR0_);
-
-  // Vector Xqt, Bqt;
-  // Mq_form_->FormLinearSystem(Qt_ess_tdof_, Qt_gf_, resT_gf_, Mq_, Xqt, Bqt, 1);
-
-  // MqInv_->Mult(Bqt, Xqt);
-  // Mq_form_->RecoverFEMSolution(Xqt, resT_gf_, Qt_gf_);
-
-  // Qt_gf_.GetTrueDofs(Qt_);
-  // Qt_ *= -Rgas_ / thermo_pressure_;
-  // Qt_gf_.SetFromTrueDofs(Qt_);
 }
 
 /// identifySpeciesType and identifyCollisionType copies from M2ulPhyS
