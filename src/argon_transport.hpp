@@ -199,6 +199,8 @@ class ArgonMixtureTransport : public ArgonMinimalTransport {
                                                                  double *diffusivity, bool unused);
 
   MFEM_HOST_DEVICE void GetThermalConductivities(const double *conserved, const double *primitive, double *kappa);
+
+  MFEM_HOST_DEVICE void ComputeElectricalConductivity(const double *state, double &sigma);
 };
 
 #endif  // ARGON_TRANSPORT_HPP_

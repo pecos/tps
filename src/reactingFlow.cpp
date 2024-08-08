@@ -40,6 +40,7 @@
 
 #include "loMach.hpp"
 #include "loMach_options.hpp"
+#include "radiation.hpp"
 
 using namespace mfem;
 using namespace mfem::common;
@@ -49,6 +50,9 @@ double species_stepLeft(const Vector &coords, double t);
 double species_stepRight(const Vector &coords, double t);
 double species_uniform(const Vector &coords, double t);
 double binaryTest(const Vector &coords, double t);
+
+static double radius(const Vector &pos) { return pos[0]; }
+static FunctionCoefficient radius_coeff(radius);
 
 ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &time_coeff,
                            TPS::Tps *tps)
@@ -65,6 +69,8 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   Pnm2_ = Pnm1_;
   Pnm3_ = Pnm1_;
   dtP_ = 0.0;
+
+  tps->getInput("loMach/axisymmetric", axisym_, false);
 
   tpsP_->getInput("initialConditions/temperature", T_ic_, 300.0);
 
@@ -95,12 +101,6 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   // tpsP_->getInput("plasma_models/includeElectron", mixtureInput_.isElectronIncluded, true);
   tpsP_->getInput("plasma_models/two_temperature", mixtureInput_.twoTemperature, false);
   tpsP_->getInput("plasma_models/const_plasma_conductivity", const_plasma_conductivity_, 0.0);
-
-  // The ambipolar option isn't supported yet, so die if we try to use it
-  if (mixtureInput_.ambipolar) {
-    if (rank0_) std::cout << "Ambipolar is not yet supported in low Mach reacting flow." << std::endl;
-    exit(ERROR);
-  }
 
   if (mixtureInput_.twoTemperature) {
     if (rank0_) std::cout << "Two temperature is not yet supported in low Mach reacting flow." << std::endl;
@@ -420,6 +420,57 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
 
   chemistry_ = new Chemistry(mixture_, chemistryInput_);
 
+  // Initialize radiation (just NEC for now) model
+  std::string type;
+  std::string basepath("plasma_models/radiation_model");
+
+  tpsP_->getInput(basepath.c_str(), type, std::string("none"));
+  std::string model_input_path(basepath + "/" + type);
+
+  RadiationInput rad_model_input;
+  if (type == "net_emission") {
+    rad_model_input.model = NET_EMISSION;
+
+    std::string coefficient_type;
+    tpsP_->getRequiredInput((model_input_path + "/coefficient").c_str(), coefficient_type);
+    if (coefficient_type == "tabulated") {
+      rad_model_input.necModel = TABULATED_NEC;
+      std::string table_input_path(model_input_path + "/tabulated");
+      std::string filename;
+      tpsP_->getRequiredInput((table_input_path + "/filename").c_str(), filename);
+
+      std::vector<TableInput> rad_tables(1);
+      for (size_t i = 0; i < rad_tables.size(); i++) {
+        rad_tables[i].order = 1;
+        rad_tables[i].xLogScale = false;
+        rad_tables[i].fLogScale = false;
+      }
+
+      // Read data from hdf5 file containing 4 columns: T, energy, gas constant, speed of sound
+      DenseMatrix rad_data;
+      bool success =
+          h5ReadBcastMultiColumnTable(filename, std::string("table"), pmesh_->GetComm(), rad_data, rad_tables);
+      if (!success) exit(ERROR);
+
+      rad_model_input.necTableInput.order = 1;
+      rad_model_input.necTableInput.xLogScale = false;
+      rad_model_input.necTableInput.fLogScale = false;
+      rad_model_input.necTableInput.Ndata = rad_tables[0].Ndata;
+      rad_model_input.necTableInput.xdata = rad_tables[0].xdata;
+      rad_model_input.necTableInput.fdata = rad_tables[0].fdata;
+
+      radiation_ = new NetEmission(rad_model_input);
+    } else {
+      grvy_printf(GRVY_ERROR, "\nUnknown net emission coefficient type -> %s\n", coefficient_type.c_str());
+      exit(ERROR);
+    }
+  } else if (type == "none") {
+    radiation_ = nullptr;
+  } else {
+    grvy_printf(GRVY_ERROR, "\nUnknown radiation model -> %s\n", type.c_str());
+    exit(ERROR);
+  }
+
   tpsP_->getInput("loMach/reactingFlow/ic", ic_string_, std::string(""));
   tpsP_->getInput("loMach/reactingFlow/sub-steps", nSub_, 1);
 
@@ -459,6 +510,8 @@ ReactingFlow::~ReactingFlow() {
   delete Ms_form_;
   delete At_form_;
   delete G_form_;
+  delete jh_form_;
+
   delete rhou_coeff_;
   delete rhon_next_coeff_;
   delete un_next_coeff_;
@@ -474,6 +527,20 @@ ReactingFlow::~ReactingFlow() {
   // delete rho_coeff_;
   delete cpMix_coeff_;
   delete rhoCp_coeff_;
+
+  delete jh_coeff_;
+  delete radiation_sink_coeff_;
+
+  delete rad_rho_coeff_;
+  delete rad_rho_Cp_coeff_;
+  delete rad_rho_u_coeff_;
+  delete rad_rho_Cp_u_coeff_;
+  delete rad_rho_over_dt_coeff_;
+  delete rad_species_diff_total_coeff_;
+  delete rad_rho_Cp_over_dt_coeff_;
+  delete rad_thermal_diff_total_coeff_;
+  delete rad_jh_coeff_;
+  delete rad_kap_gradT_coeff_;
 
   delete Ay_form_;
   delete HyInv_;
@@ -534,6 +601,8 @@ void ReactingFlow::initializeSelf() {
   yDof_ = yfes_->GetVSize();
   sDofInt_ = sfes_->GetTrueVSize();
   yDofInt_ = yfes_->GetTrueVSize();
+
+  weff_gf_.SetSpace(vfes_);
 
   Qt_.SetSize(sDofInt_);
   Qt_ = 0.0;
@@ -640,6 +709,24 @@ void ReactingFlow::initializeSelf() {
   prodY_gf_.SetSpace(sfes_);
   prodY_gf_ = 0.0;
 
+  sigma_gf_.SetSpace(sfes_);
+  sigma_gf_ = 0.0;
+
+  sigma_.SetSize(sDofInt_);
+  sigma_ = 0.0;
+
+  jh_gf_.SetSpace(sfes_);
+  jh_gf_ = 0.0;
+
+  jh_.SetSize(sDofInt_);
+  jh_ = 0.0;
+
+  radiation_sink_gf_.SetSpace(sfes_);
+  radiation_sink_gf_ = 0.0;
+
+  radiation_sink_.SetSize(sDofInt_);
+  radiation_sink_ = 0.0;
+
   tmpR1_.SetSize(dim_ * sDofInt_);
   tmpR1a_.SetSize(dim_ * sDofInt_);
   tmpR1b_.SetSize(dim_ * sDofInt_);
@@ -676,6 +763,10 @@ void ReactingFlow::initializeSelf() {
   toFlow_interface_.viscosity = &visc_gf_;
   toFlow_interface_.thermal_divergence = &Qt_gf_;
   toTurbModel_interface_.density = &rn_gf_;
+
+  plasma_conductivity_gf_ = &sigma_gf_;
+  joule_heating_gf_ = &jh_gf_;
+
   if (rank0_) {
     std::cout << "exports set..." << endl;
   }
@@ -932,10 +1023,37 @@ void ReactingFlow::initializeOperators() {
   rhoCp_coeff_ = new ProductCoefficient(*cpMix_coeff_, *rhon_next_coeff_);
   rhouCp_coeff_ = new ScalarVectorProductCoefficient(*rhoCp_coeff_, *un_next_coeff_);
   rhou_coeff_ = new ScalarVectorProductCoefficient(*rhon_next_coeff_, *un_next_coeff_);
+
+  // Joule heating
+  jh_coeff_ = new GridFunctionCoefficient(&jh_gf_);
+
+  // Radiation energy sink
+  radiation_sink_coeff_ = new GridFunctionCoefficient(&radiation_sink_gf_);
+
+  if (axisym_) {
+    // for axisymmetric case, need to multply many coefficients by the radius
+    rad_rho_coeff_ = new ProductCoefficient(radius_coeff, *rhon_next_coeff_);
+    rad_rho_Cp_coeff_ = new ProductCoefficient(radius_coeff, *rhoCp_coeff_);
+    rad_rho_u_coeff_ = new ScalarVectorProductCoefficient(radius_coeff, *rhou_coeff_);
+    rad_rho_Cp_u_coeff_ = new ScalarVectorProductCoefficient(radius_coeff, *rhouCp_coeff_);
+    rad_rho_over_dt_coeff_ = new ProductCoefficient(radius_coeff, *rho_over_dt_coeff_);
+    rad_species_diff_total_coeff_ = new ProductCoefficient(radius_coeff, *species_diff_total_coeff_);
+    rad_rho_Cp_over_dt_coeff_ = new ProductCoefficient(radius_coeff, *rhoCp_over_dt_coeff_);
+    rad_thermal_diff_total_coeff_ = new ProductCoefficient(radius_coeff, *thermal_diff_total_coeff_);
+    rad_jh_coeff_ = new ProductCoefficient(radius_coeff, *jh_coeff_);
+    rad_radiation_sink_coeff_ = new ProductCoefficient(radius_coeff, *radiation_sink_coeff_);
+    rad_kap_gradT_coeff_ = new ScalarVectorProductCoefficient(radius_coeff, *kap_gradT_coeff_);
+  }
+
   if (rank0_) std::cout << "Operator coefficients set" << endl;
 
   At_form_ = new ParBilinearForm(sfes_);
-  auto *at_blfi = new ConvectionIntegrator(*rhouCp_coeff_);
+  ConvectionIntegrator *at_blfi;
+  if (axisym_) {
+    at_blfi = new ConvectionIntegrator(*rad_rho_Cp_u_coeff_);
+  } else {
+    at_blfi = new ConvectionIntegrator(*rhouCp_coeff_);
+  }
   if (numerical_integ_) {
     at_blfi->SetIntRule(&ir_nli);
   }
@@ -948,7 +1066,12 @@ void ReactingFlow::initializeOperators() {
   if (rank0_) std::cout << "ReactingFlow At operator set" << endl;
 
   Ay_form_ = new ParBilinearForm(sfes_);
-  auto *ay_blfi = new ConvectionIntegrator(*rhou_coeff_);
+  ConvectionIntegrator *ay_blfi;
+  if (axisym_) {
+    ay_blfi = new ConvectionIntegrator(*rad_rho_u_coeff_);
+  } else {
+    ay_blfi = new ConvectionIntegrator(*rhou_coeff_);
+  }
   if (numerical_integ_) {
     ay_blfi->SetIntRule(&ir_nli);
   }
@@ -962,7 +1085,12 @@ void ReactingFlow::initializeOperators() {
 
   // mass matrix
   Ms_form_ = new ParBilinearForm(sfes_);
-  auto *ms_blfi = new MassIntegrator;
+  MassIntegrator *ms_blfi;
+  if (axisym_) {
+    ms_blfi = new MassIntegrator(radius_coeff);
+  } else {
+    ms_blfi = new MassIntegrator;
+  }
   if (numerical_integ_) {
     ms_blfi->SetIntRule(&ir_i);
   }
@@ -975,7 +1103,12 @@ void ReactingFlow::initializeOperators() {
 
   // mass matrix with rho
   MsRho_form_ = new ParBilinearForm(sfes_);
-  auto *msrho_blfi = new MassIntegrator(*rhon_next_coeff_);
+  MassIntegrator *msrho_blfi;
+  if (axisym_) {
+    msrho_blfi = new MassIntegrator(*rad_rho_coeff_);
+  } else {
+    msrho_blfi = new MassIntegrator(*rhon_next_coeff_);
+  }
   if (numerical_integ_) {
     msrho_blfi->SetIntRule(&ir_i);
   }
@@ -989,7 +1122,12 @@ void ReactingFlow::initializeOperators() {
 
   // mass matrix with rho and Cp
   MsRhoCp_form_ = new ParBilinearForm(sfes_);
-  auto *msrhocp_blfi = new MassIntegrator(*rhoCp_coeff_);
+  MassIntegrator *msrhocp_blfi;
+  if (axisym_) {
+    msrhocp_blfi = new MassIntegrator(*rad_rho_Cp_coeff_);
+  } else {
+    msrhocp_blfi = new MassIntegrator(*rhoCp_coeff_);
+  }
   if (numerical_integ_) {
     msrhocp_blfi->SetIntRule(&ir_i);
   }
@@ -1003,9 +1141,18 @@ void ReactingFlow::initializeOperators() {
 
   // temperature Helmholtz
   Ht_form_ = new ParBilinearForm(sfes_);
-  auto *hmt_blfi = new MassIntegrator(*rhoCp_over_dt_coeff_);
-  auto *hdt_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
-
+  MassIntegrator *hmt_blfi;
+  if (axisym_) {
+    hmt_blfi = new MassIntegrator(*rad_rho_Cp_over_dt_coeff_);
+  } else {
+    hmt_blfi = new MassIntegrator(*rhoCp_over_dt_coeff_);
+  }
+  DiffusionIntegrator *hdt_blfi;
+  if (axisym_) {
+    hdt_blfi = new DiffusionIntegrator(*rad_thermal_diff_total_coeff_);
+  } else {
+    hdt_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
+  }
   if (numerical_integ_) {
     hmt_blfi->SetIntRule(&ir_di);
     hdt_blfi->SetIntRule(&ir_di);
@@ -1021,9 +1168,18 @@ void ReactingFlow::initializeOperators() {
 
   // species Helmholtz
   Hy_form_ = new ParBilinearForm(sfes_);
-  auto *hmy_blfi = new MassIntegrator(*rho_over_dt_coeff_);
-  auto *hdy_blfi = new DiffusionIntegrator(*species_diff_total_coeff_);
-
+  MassIntegrator *hmy_blfi;
+  if (axisym_) {
+    hmy_blfi = new MassIntegrator(*rad_rho_over_dt_coeff_);
+  } else {
+    hmy_blfi = new MassIntegrator(*rho_over_dt_coeff_);
+  }
+  DiffusionIntegrator *hdy_blfi;
+  if (axisym_) {
+    hdy_blfi = new DiffusionIntegrator(*rad_species_diff_total_coeff_);
+  } else {
+    hdy_blfi = new DiffusionIntegrator(*species_diff_total_coeff_);
+  }
   if (numerical_integ_) {
     hmy_blfi->SetIntRule(&ir_di);
     hdy_blfi->SetIntRule(&ir_di);
@@ -1092,7 +1248,11 @@ void ReactingFlow::initializeOperators() {
   // Vector space mass matrix (used in gradient calcs)
   Mv_form_ = new ParBilinearForm(vfes_);
   VectorMassIntegrator *mv_blfi;
-  mv_blfi = new VectorMassIntegrator;
+  if (axisym_) {
+    mv_blfi = new VectorMassIntegrator(radius_coeff);
+  } else {
+    mv_blfi = new VectorMassIntegrator;
+  }
   if (numerical_integ_) {
     mv_blfi->SetIntRule(&ir_i);
   }
@@ -1121,9 +1281,32 @@ void ReactingFlow::initializeOperators() {
   Mv_inv_->SetAbsTol(1e-18);
   Mv_inv_->SetMaxIter(max_iter_);
 
+  // Energy sink/source terms: Joule heating and radiation sink
+  jh_form_ = new ParLinearForm(sfes_);
+  DomainLFIntegrator *jh_dlfi;
+  DomainLFIntegrator *rad_dlfi;
+  if (axisym_) {
+    jh_dlfi = new DomainLFIntegrator(*rad_jh_coeff_);
+    rad_dlfi = new DomainLFIntegrator(*rad_radiation_sink_coeff_);
+  } else {
+    jh_dlfi = new DomainLFIntegrator(*jh_coeff_);
+    rad_dlfi = new DomainLFIntegrator(*radiation_sink_coeff_);
+  }
+  if (numerical_integ_) {
+    jh_dlfi->SetIntRule(&ir_i);
+    rad_dlfi->SetIntRule(&ir_i);
+  }
+  jh_form_->AddDomainIntegrator(jh_dlfi);
+  jh_form_->AddDomainIntegrator(rad_dlfi);
+
   // Qt .....................................
   Mq_form_ = new ParBilinearForm(sfes_);
-  auto *mq_blfi = new MassIntegrator;
+  MassIntegrator *mq_blfi;
+  if (axisym_) {
+    mq_blfi = new MassIntegrator(radius_coeff);
+  } else {
+    mq_blfi = new MassIntegrator;
+  }
   if (numerical_integ_) {
     mq_blfi->SetIntRule(&ir_i);
   }
@@ -1152,7 +1335,12 @@ void ReactingFlow::initializeOperators() {
   MqInv_->SetMaxIter(max_iter_);
 
   LQ_form_ = new ParBilinearForm(sfes_);
-  auto *lqd_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
+  DiffusionIntegrator *lqd_blfi;
+  if (axisym_) {
+    lqd_blfi = new DiffusionIntegrator(*rad_thermal_diff_total_coeff_);
+  } else {
+    lqd_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
+  }
   if (numerical_integ_) {
     lqd_blfi->SetIntRule(&ir_di);
   }
@@ -1164,7 +1352,12 @@ void ReactingFlow::initializeOperators() {
   LQ_form_->FormSystemMatrix(empty, LQ_);
 
   LQ_bdry_ = new ParLinearForm(sfes_);
-  auto *lq_bdry_lfi = new BoundaryNormalLFIntegrator(*kap_gradT_coeff_, 2, -1);
+  BoundaryNormalLFIntegrator *lq_bdry_lfi;
+  if (axisym_) {
+    lq_bdry_lfi = new BoundaryNormalLFIntegrator(*rad_kap_gradT_coeff_, 2, -1);
+  } else {
+    lq_bdry_lfi = new BoundaryNormalLFIntegrator(*kap_gradT_coeff_, 2, -1);
+  }
   if (numerical_integ_) {
     lq_bdry_lfi->SetIntRule(&ir_di);
   }
@@ -1172,6 +1365,7 @@ void ReactingFlow::initializeOperators() {
   if (rank0_) std::cout << "ReactingFlow LQ operator set" << endl;
 
   // for explicit species-diff source term in energy (inv not needed)
+  // TODO(trevilo): This operator is not used.  Can we eliminate it?
   LY_form_ = new ParBilinearForm(sfes_);
   auto *lyd_blfi = new DiffusionIntegrator(*species_diff_Cp_coeff_);
   if (numerical_integ_) {
@@ -1186,7 +1380,12 @@ void ReactingFlow::initializeOperators() {
 
   // gradient of scalar
   G_form_ = new ParMixedBilinearForm(sfes_, vfes_);
-  auto *g_mblfi = new GradientIntegrator();
+  GradientIntegrator *g_mblfi;
+  if (axisym_) {
+    g_mblfi = new GradientIntegrator(radius_coeff);
+  } else {
+    g_mblfi = new GradientIntegrator();
+  }
   if (numerical_integ_) {
     g_mblfi->SetIntRule(&ir_i);
   }
@@ -1215,8 +1414,48 @@ void ReactingFlow::initializeOperators() {
     Tn_filtered_gf_ = 0.0;
   }
 
+  // If we are restarting from an LTE field, compute the species mass
+  // fractions from the temperature and pressure
+  bool restart_from_lte;
+  tpsP_->getInput("io/restartFromLTE", restart_from_lte, false);
+  if (restart_from_lte) {
+    Vector n_sp(nSpecies_);
+    Vector rho_sp(nSpecies_);
+    const double *h_T = Tn_.HostRead();
+    double *h_Yn = Yn_.HostWrite();
+    for (int i = 0; i < sDofInt_; i++) {
+      const double Ti = h_T[i];
+
+      // Evaluate the mole densities of each species at this point,
+      // assuming LTE at given temperature and pressure
+      mixture_->GetSpeciesFromLTE(Ti, thermo_pressure_, n_sp.HostWrite());
+
+      // From the mole densities, evaluate the mass densities and mixture density
+      double mixture_density = 0.0;
+      for (int sp = 0; sp < nSpecies_; sp++) {
+        rho_sp[sp] = n_sp[sp] * mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
+        mixture_density += rho_sp[sp];
+      }
+
+      // Finally, evaluate mass fraction
+      for (int sp = 0; sp < nSpecies_; sp++) {
+        h_Yn[i + sp * sDofInt_] = rho_sp[sp] / mixture_density;
+      }
+    }
+    Ynm1_ = Yn_;
+    Ynm2_ = Yn_;
+    YnFull_gf_.SetFromTrueDofs(Yn_);
+  }
+
+  // Ensure Yn_ is consistent with YnFull_gf_.  Specifically this is
+  // necessary on standard restart, when the solution is read into
+  // YnFull_gf_ after the Yn_ IC is set.
+  YnFull_gf_.GetTrueDofs(Yn_);
+
   // and initialize system mass
   updateMixture();
+  updateDensity(0.0);
+
   computeSystemMass();
 
   // for initial plot
@@ -1279,8 +1518,29 @@ void ReactingFlow::step() {
   }
 
   // advance species, last slot is from calculated sum of others
-  for (int iSpecies = 0; iSpecies < nSpecies_ - 1; iSpecies++) {
+  for (int iSpecies = 0; iSpecies < nActiveSpecies_; iSpecies++) {
     speciesStep(iSpecies);
+    // Yn_next_ = Yn_;
+  }
+  if (mixtureInput_.ambipolar) {
+    // Evaluate electron mass fraction based on quasi-neutrality
+
+    // temporary storage for electron mass fraction
+    tmpR0_ = 0.0;
+
+    // Y_electron = sum_{i \in active species} (m_electron / m_i) * q_i * Y_i
+    for (int iSpecies = 0; iSpecies < nActiveSpecies_; iSpecies++) {
+      setScalarFromVector(Yn_next_, iSpecies, &tmpR1_);
+      const double q_sp = mixture_->GetGasParams(iSpecies, GasParams::SPECIES_CHARGES);
+      const double m_sp = mixture_->GetGasParams(iSpecies, GasParams::SPECIES_MW);
+      const double fac = q_sp / m_sp;
+      tmpR1_ *= fac;
+      tmpR0_ += tmpR1_;
+    }
+    const int iElectron = nSpecies_ - 2;  // TODO(trevilo): check me!
+    const double m_electron = mixture_->GetGasParams(iElectron, GasParams::SPECIES_MW);
+    tmpR0_ *= m_electron;
+    setVectorFromScalar(tmpR0_, iElectron, &Yn_next_);
   }
   speciesLastStep();
   YnFull_gf_.SetFromTrueDofs(Yn_next_);
@@ -1332,8 +1592,28 @@ void ReactingFlow::step() {
       heatOfFormation();
 
       // advance over substep
-      for (int iSpecies = 0; iSpecies < nSpecies_ - 1; iSpecies++) {
+      for (int iSpecies = 0; iSpecies < nActiveSpecies_; iSpecies++) {
         speciesSubstep(iSpecies, iSub);
+      }
+      if (mixtureInput_.ambipolar) {
+        // Evaluate electron mass fraction based on quasi-neutrality
+
+        // temporary storage for electron mass fraction
+        tmpR0_ = 0.0;
+
+        // Y_electron = sum_{i \in active species} (m_electron / m_i) * q_i * Y_i
+        for (int iSpecies = 0; iSpecies < nActiveSpecies_; iSpecies++) {
+          setScalarFromVector(Yn_, iSpecies, &tmpR1_);
+          const double q_sp = mixture_->GetGasParams(iSpecies, GasParams::SPECIES_CHARGES);
+          const double m_sp = mixture_->GetGasParams(iSpecies, GasParams::SPECIES_MW);
+          const double fac = q_sp / m_sp;
+          tmpR1_ *= fac;
+          tmpR0_ += tmpR1_;
+        }
+        const int iElectron = nSpecies_ - 2;  // TODO(trevilo): check me!
+        const double m_electron = mixture_->GetGasParams(iElectron, GasParams::SPECIES_MW);
+        tmpR0_ *= m_electron;
+        setVectorFromScalar(tmpR0_, iElectron, &Yn_);
       }
       speciesLastSubstep();
       Yn_gf_.SetFromTrueDofs(Yn_);
@@ -1359,10 +1639,22 @@ void ReactingFlow::step() {
   computeQtTO();
 
   UpdateTimestepHistory(dt_);
+
+  updateMixture();
+  updateDiffusivity();
 }
 
 void ReactingFlow::temperatureStep() {
   Array<int> empty;
+
+  // Update radiation sink
+  if (radiation_ != nullptr) {
+    const double *d_T = Tn_next_.Read();
+    double *d_rad = radiation_sink_.Write();
+    Radiation *rmodel = radiation_;
+    MFEM_FORALL(i, Tn_next_.Size(), { d_rad[i] = rmodel->computeEnergySink(d_T[i]); });
+  }
+  radiation_sink_gf_.SetFromTrueDofs(radiation_sink_);
 
   // Build the right-hand-side
   resT_ = 0.0;
@@ -1392,6 +1684,12 @@ void ReactingFlow::temperatureStep() {
     // heat of formation
     Ms_->AddMult(hw_, resT_);
   }
+
+  // Joule heating (and radiation sink)
+  jh_form_->Update();
+  jh_form_->Assemble();
+  jh_form_->ParallelAssemble(jh_);
+  resT_ += jh_;
 
   // species-temp diffusion term, already in int-weak form
   resT_.Add(1.0, crossDiff_);
@@ -1497,6 +1795,7 @@ void ReactingFlow::speciesStep(int iSpec) {
 
   // copy relevant species properties from full Vector to particular case
   setScalarFromVector(diffY_, iSpec, &tmpR0_);
+
   diffY_gf_.SetFromTrueDofs(tmpR0_);
 
   // Build the right-hand-side
@@ -1573,6 +1872,12 @@ void ReactingFlow::speciesStep(int iSpec) {
   // copy into full species vector & gf
   Hy_form_->RecoverFEMSolution(Xt2, resT_gf_, Yn_next_gf_);
   Yn_next_gf_.GetTrueDofs(tmpR0_);
+
+  for (int i = 0; i < sDofInt_; i++) {
+    if (tmpR0_[i] < 0.0) tmpR0_[i] = 0.0;
+  }
+  Yn_next_gf_.SetFromTrueDofs(tmpR0_);
+
   setVectorFromScalar(tmpR0_, iSpec, &Yn_next_);
 }
 
@@ -1683,8 +1988,9 @@ void ReactingFlow::crossDiffusion() {
     multScalarVectorIP(tmpR0b_, &tmpR1b_, dim_);
     tmpR1c_ += tmpR1b_;
   }
-  dotVector(tmpR1a_, tmpR1c_, &tmpR1_, dim_);
-  Ms_->Mult(tmpR1_, crossDiff_);
+  weff_gf_.SetFromTrueDofs(tmpR1c_);
+  dotVector(tmpR1a_, tmpR1c_, &tmpR0_, dim_);
+  Ms_->Mult(tmpR0_, crossDiff_);
 }
 
 void ReactingFlow::computeExplicitTempConvectionOP(bool extrap) {
@@ -1741,28 +2047,35 @@ void ReactingFlow::initializeIO(IODataOrganizer &io) {
   io.registerIOFamily("Temperature", "/temperature", &Tn_gf_, false);
   io.registerIOVar("/temperature", "temperature", 0);
 
-  // not sure if this will automatically take the full size(all Yn) via the sapce
-  io.registerIOFamily("Species", "/species", &YnFull_gf_, false);
-  io.registerIOVar("/species", "speciesAll", 0);
+  // TODO(trevilo): This hackery is necessary b/c we don't have access
+  // to the IOOptions object we already read (as part of the low Mach
+  // parsing in LoMachSolver::parseSolverOptions()).  That object
+  // should be made available here.
+  bool restart_from_lte;
+  tpsP_->getInput("io/restartFromLTE", restart_from_lte, false);
 
-  // TODO(swh): must be a better way to do this...
-  //???
-  /*
-  io.registerIOFamily("Species", "/species", &YnFull_gf_, false);
-  io.registerIOVar("/species", "Spec1", 0);
-  if (nSpecies_ >= 2) io.registerIOVar("/species", "Spec2", 1);
-  if (nSpecies_ >= 3) io.registerIOVar("/species", "Spec3", 2);
-  if (nSpecies_ >= 4) io.registerIOVar("/species", "Spec4", 3);
-  if (nSpecies_ == 5) io.registerIOVar("/species", "Spec5", 4);
-  */
+  // If restarting from LTE, we don't expect to find species in the restart file
+  const bool species_in_restart_file = !restart_from_lte;
+
+  io.registerIOFamily("Species", "/species", &YnFull_gf_, false, species_in_restart_file);
+  for (int sp = 0; sp < nSpecies_; sp++) {
+    std::string speciesName = std::to_string(sp);
+    io.registerIOVar("/species", "Y_" + speciesName, sp, species_in_restart_file);
+  }
 }
 
 void ReactingFlow::initializeViz(ParaViewDataCollection &pvdc) {
   pvdc.RegisterField("temperature", &Tn_gf_);
   pvdc.RegisterField("density", &rn_gf_);
+  pvdc.RegisterField("sigma", &sigma_gf_);
   pvdc.RegisterField("kappa", &kappa_gf_);
   pvdc.RegisterField("mu", &visc_gf_);
   pvdc.RegisterField("Qt", &Qt_gf_);
+  pvdc.RegisterField("Rmix", &Rmix_gf_);
+  pvdc.RegisterField("CpMix", &CpMix_gf_);
+  pvdc.RegisterField("Sjoule", &jh_gf_);
+  pvdc.RegisterField("epsilon_rad", &radiation_sink_gf_);
+  pvdc.RegisterField("weff", &weff_gf_);
 
   // this method is broken in that it assumes 3 entries
   pvdc.RegisterField("species", &YnFull_gf_);
@@ -1874,7 +2187,6 @@ void ReactingFlow::updateMixture() {
 
     for (int i = 0; i < sDofInt_; i++) {
       double cpMix;
-      double cpY;
 
       // Set up conserved state (just the mass densities, which is all we need here)
       state[0] = d_Rho[i];
@@ -1898,8 +2210,11 @@ void ReactingFlow::updateMixture() {
       d_CMix[i] = cpMix / d_Rho[i];
 
       for (int sp = 0; sp < nSpecies_; sp++) {
-        mixture_->GetSpeciesCp(n_sp, d_Rho[i], sp, cpY);
-        d_Cp[i + sp * sDofInt_] = cpY / std::max(d_Rho[i] * d_Yn[i + sp * sDofInt_], 1.0e-14);
+        double molarCV = speciesMolarCv_[sp];
+        molarCV *= UNIVERSALGASCONSTANT;
+        double molarCP = molarCV + UNIVERSALGASCONSTANT;
+        const double cp_sp = molarCP / gasParams_(sp, GasParams::SPECIES_MW);
+        d_Cp[i + sp * sDofInt_] = cp_sp;
       }
     }
   }
@@ -2021,10 +2336,68 @@ void ReactingFlow::updateDiffusivity() {
 
       mixture_->GetConservativesFromPrimitives(state, conservedState);
       transport_->GetThermalConductivities(conservedState, state, kappa);
-      dataKappa[i] = kappa[0];
+      dataKappa[i] = kappa[0] + kappa[1];  // for single temperature, transport includes both heavy and electron kappa
     }
   }
-  kappa_gf_.SetFromTrueDofs(visc_);
+  kappa_gf_.SetFromTrueDofs(kappa_);
+
+  // electrical conductivity
+  {
+    double *h_sig = sigma_.HostReadWrite();
+    for (int i = 0; i < sDofInt_; i++) {
+      // int nEq = dim_ + 2 + nActiveSpecies_;
+      double state[gpudata::MAXEQUATIONS];
+      double conservedState[gpudata::MAXEQUATIONS];
+
+      // Populate *primitive* state vector = [rho, velocity, temperature, species mole densities]
+      state[0] = dataRho[i];
+      for (int eq = 0; eq < dim_; eq++) {
+        state[eq + 1] = dataU[i + eq * sDofInt_];
+      }
+      state[dim_ + 1] = dataTemp[i];
+      for (int sp = 0; sp < nActiveSpecies_; sp++) {
+        state[dim_ + 2 + sp] = dataRho[i] * Yn_[i + sp * sDofInt_] / mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
+      }
+
+      mixture_->GetConservativesFromPrimitives(state, conservedState);
+
+      double sig;
+      transport_->ComputeElectricalConductivity(conservedState, sig);
+      h_sig[i] = sig;
+    }
+  }
+  sigma_gf_.SetFromTrueDofs(sigma_);
+}
+
+void ReactingFlow::evaluatePlasmaConductivityGF() {
+  (flow_interface_->velocity)->GetTrueDofs(tmpR1_);
+  const double *dataTemp = Tn_.HostRead();
+  const double *dataRho = rn_.HostRead();
+  const double *dataU = tmpR1_.HostRead();
+
+  double *h_sig = sigma_.HostReadWrite();
+  for (int i = 0; i < sDofInt_; i++) {
+    // int nEq = dim_ + 2 + nActiveSpecies_;
+    double state[gpudata::MAXEQUATIONS];
+    double conservedState[gpudata::MAXEQUATIONS];
+
+    // Populate *primitive* state vector = [rho, velocity, temperature, species mole densities]
+    state[0] = dataRho[i];
+    for (int eq = 0; eq < dim_; eq++) {
+      state[eq + 1] = dataU[i + eq * sDofInt_];
+    }
+    state[dim_ + 1] = dataTemp[i];
+    for (int sp = 0; sp < nActiveSpecies_; sp++) {
+      state[dim_ + 2 + sp] = dataRho[i] * Yn_[i + sp * sDofInt_] / mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
+    }
+
+    mixture_->GetConservativesFromPrimitives(state, conservedState);
+
+    double sig;
+    transport_->ComputeElectricalConductivity(conservedState, sig);
+    h_sig[i] = sig;
+  }
+  sigma_gf_.SetFromTrueDofs(sigma_);
 }
 
 void ReactingFlow::updateDensity(double tStep) {
@@ -2052,6 +2425,16 @@ void ReactingFlow::updateDensity(double tStep) {
     }
   } else {
     rn_ = static_rho_;
+  }
+
+  const double min_rho = rn_.Min();
+  if (min_rho < 0.0) {
+    for (int i = 0; i < rn_.Size(); i++) {
+      if (rn_[i] < 0.0) {
+        printf("i = %d, Tn = %.6e, Tnext = %.6e, rho = %.6e\n", i, Tn_[i], Tn_next_[i], rn_[i]);
+        fflush(stdout);
+      }
+    }
   }
   rn_gf_.SetFromTrueDofs(rn_);
 
@@ -2127,7 +2510,6 @@ void ReactingFlow::AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr) {
 }
 
 void ReactingFlow::computeQtTO() {
-  // TODO(trevilo): This method isn't sufficiently general
   tmpR0_ = 0.0;
   LQ_bdry_->Update();
   LQ_bdry_->Assemble();
@@ -2140,10 +2522,22 @@ void ReactingFlow::computeQtTO() {
   LQ_form_->FormSystemMatrix(empty, LQ_);
   LQ_->AddMult(Tn_next_, tmpR0_);  // tmpR0_ += LQ{Tn_next}
 
+  // Joule heating (and radiation sink)
+  jh_form_->Update();
+  jh_form_->Assemble();
+  jh_form_->ParallelAssemble(jh_);
+  tmpR0_ -= jh_;
+
+  // heat of formation
+  Ms_->AddMult(hw_, tmpR0_, -1.0);
+
+  // species-temp diffusion term, already in int-weak form
+  tmpR0_.Add(-1.0, crossDiff_);
+
   sfes_->GetRestrictionMatrix()->MultTranspose(tmpR0_, resT_gf_);
 
   Qt_ = 0.0;
-  Qt_gf_.SetFromTrueDofs(tmpR0_);
+  Qt_gf_.SetFromTrueDofs(Qt_);
 
   Vector Xqt, Bqt;
   Mq_form_->FormLinearSystem(Qt_ess_tdof_, Qt_gf_, resT_gf_, Mq_, Xqt, Bqt, 1);
@@ -2151,9 +2545,10 @@ void ReactingFlow::computeQtTO() {
   MqInv_->Mult(Bqt, Xqt);
   Mq_form_->RecoverFEMSolution(Xqt, resT_gf_, Qt_gf_);
 
-  Qt_gf_.GetTrueDofs(Qt_);
-  Qt_ *= -Rgas_ / thermo_pressure_;
-  Qt_gf_.SetFromTrueDofs(Qt_);
+  Qt_gf_ *= Rmix_gf_;
+  Qt_gf_ /= CpMix_gf_;
+  Qt_gf_ /= thermo_pressure_;
+  Qt_gf_.Neg();
 }
 
 /// identifySpeciesType and identifyCollisionType copies from M2ulPhyS
