@@ -81,6 +81,11 @@ void Qms2Flow1d::initialize(int n_1d_) {
   qmsa->initialize();
 }
 
+void Qms2Flow1d::solve() {
+  set_plasma_conductivity();
+  qmsa->solve();
+}
+
 void Qms2Flow1d::print_all_1d() {
   std::cout << "---\n1d Coordinates:\n---" << endl;
   z_coords_1d->Print();
@@ -150,19 +155,22 @@ void Qms2Flow1d::set_plasma_conductivity() {
   ParFiniteElementSpace *fes = qmsa->getFESpace();
   ParMesh *pmesh = qmsa->getMesh();
 
-  ParGridFunction *coordsDof = new ParGridFunction(fes);
+  ParFiniteElementSpace *coord_fes = new ParFiniteElementSpace(pmesh, fes->FEColl(), 2);
+  ParGridFunction *coordsDof = new ParGridFunction(coord_fes);
   pmesh->GetNodes(*coordsDof);
 
   ParGridFunction *pc = qmsa->getPlasmaConductivityGF();
   double *plasma_conductivity_gf = pc->HostWrite();
 
-  const int n_nodes = pc->FESpace()->GetNDofs();
+  const int n_nodes = fes->GetNDofs();
+  double r, z;
   for (int i = 0; i < n_nodes; i++) {
-    const double r = (*coordsDof)[i];
-    const double z = (*coordsDof)[i + n_nodes];
+    r = coordsDof->Elem(i);
+    z = coordsDof->Elem(i + n_nodes);
     plasma_conductivity_gf[i] = expand_cond_2d(r, z);
   }
 
+  delete coord_fes;
   delete coordsDof;
 }
 
@@ -176,14 +184,15 @@ void qms2flow1d(py::module &m) {
   py::class_<TPS::Qms2Flow1d>(m, "Qms2Flow1d")
       .def(py::init<TPS::Tps *>())
       .def("initialize", &TPS::Qms2Flow1d::initialize)
+      .def("solve", &TPS::Qms2Flow1d::solve)
       .def("print_all", &TPS::Qms2Flow1d::print_all_1d)
       .def("Coordinates1d",
           [](TPS::Qms2Flow1d &interface) {
             return std::unique_ptr<TPS::CPUData>(new TPS::CPUData(interface.Coordinates1d(), false));
           })
-      .def("Radius1d",
+      .def("TorchRadius1d",
           [](TPS::Qms2Flow1d &interface) {
-            return std::unique_ptr<TPS::CPUData>(new TPS::CPUData(interface.Radius1d(), false));
+            return std::unique_ptr<TPS::CPUData>(new TPS::CPUData(interface.TorchRadius1d(), false));
           })
       .def("PlasmaConductivity1d",
           [](TPS::Qms2Flow1d &interface) {

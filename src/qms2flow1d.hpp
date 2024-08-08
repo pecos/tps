@@ -46,7 +46,7 @@ namespace TPS {
 // [X] - Form vector of that size in C++
 //       (To receive plasma conductivity/send Joule heating)
 // [X] - Receive 1D plasma conductivity from Python
-// [ ] - Expand to 2D plasma conductivity in C++
+// [X] - Expand to 2D plasma conductivity in C++
 // [ ] - Solve for 2D Joule heating with axisymmetric solver
 // [ ] - Reduce to 1D Joule heating in C++
 // [X] - Send 1D Joule heating to Python
@@ -56,6 +56,7 @@ class Qms2Flow1d {
   Qms2Flow1d(Tps *tps);
   ~Qms2Flow1d();
   void initialize(int n_1d_);
+  void solve();  //  Set the plasma conductivity and solve the EM field
   void print_all_1d();
 
   const Vector &PlasmaConductivity1d() const { return *cond_1d; }
@@ -67,8 +68,8 @@ class Qms2Flow1d {
   const Vector &Coordinates1d() const { return *z_coords_1d; }
   Vector &Coordinates1d() { return *z_coords_1d; }
 
-  const Vector &Radius1d() const { return *radius_1d; }
-  Vector &Radius1d() { return *radius_1d; }
+  const Vector &TorchRadius1d() const { return *radius_1d; }
+  Vector &TorchRadius1d() { return *radius_1d; }
 
  private:
   Tps *tpsP_;
@@ -87,6 +88,7 @@ class Qms2Flow1d {
   int find_z_interval(double z) const;
   //  Interpolation of 1d values along centerline
   double interpolate_z(double z, const Vector &values) const;
+
   double expand_cond_2d(double r, double z) const;
 
   void set_plasma_conductivity();
