@@ -110,4 +110,26 @@ class PlaneInterpolator : public InterpolatorBase {
   void writeAscii(std::string oname, bool rank0 = true) const final;
 };
 
+class LineInterpolator : public InterpolatorBase {
+ private:
+  //  Endpoints of line
+  mfem::Vector start_;
+  mfem::Vector end_;
+
+  //  Number of points on line
+  int n_;
+
+ public:
+  LineInterpolator();
+  LineInterpolator(mfem::Vector start, mfem::Vector end, int n);
+  virtual ~LineInterpolator();
+
+  /** Sets evenly spaced interpolation points
+   * 
+   * point_i = start_ + (end_ - start_)*i/(n_ - 1)
+   */
+  void setInterpolationPoints() final;
+  void writeAscii(std::string oname, bool rank0 = true) const final;
+};
+
 #endif  // GSLIB_INTERPOLATOR_HPP_

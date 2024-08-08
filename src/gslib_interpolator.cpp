@@ -204,3 +204,48 @@ void PlaneInterpolator::writeAscii(std::string oname, bool rank0) const {
   // Rest of the write is handled by the base class
   InterpolatorBase::writeAscii(oname, rank0);
 }
+
+LineInterpolator::LineInterpolator() : InterpolatorBase() {
+  start_.SetSize(0);
+  end_.SetSize(0);
+}
+
+LineInterpolator::LineInterpolator(mfem::Vector start, mfem::Vector end, int n)
+    : InterpolatorBase(), start_(start), end_(end), n_(n) {}
+
+LineInterpolator::~LineInterpolator() {}
+
+void LineInterpolator::setInterpolationPoints() {
+  xyz_.SetSize(n_*dim_);
+
+  //  Vector step along line
+  mfem::Vector step = end_;
+  step -= start_;
+  step /= n_ - 1;
+
+  mfem::Vector point = start_;
+
+  for (int i = 0; i < n_; i++) {
+    xyz_[i + 0*n_] = point[0];
+    xyz_[i + 1*n_] = point[1];
+    if (dim_ == 3) {
+      xyz_[i + 2*n_] = point[2];
+    }
+    point += step;
+  }
+}
+
+void LineInterpolator::writeAscii(std::string oname, bool rank0) const {
+  if (rank0) {
+    std::cout << " Writing line data to " << oname << endl;
+
+    // First write a little info about the line
+    std::ofstream outfile;
+    outfile.open(oname, std::ios_base::app);
+    outfile << "#line start " << start_[0] << " " << start_[1] << " " << start_[2] << endl;
+    outfile << "#line end " << end_[0] << " " << end_[1] << " " << end_[2] << endl;
+    outfile.close();
+  }
+  // Rest of the write is handled by the base class
+  InterpolatorBase::writeAscii(oname, rank0);
+}
