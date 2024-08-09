@@ -295,6 +295,8 @@ class ReactingFlow : public ThermoChemModelBase {
   Vector TnStar_, temp_buffer_;
   bool operator_split_ = false;
   int nSub_;
+  bool dynamic_substepping_ = true;
+  int stabFrac_;
 
   // Parameters and objects used in filter-based stabilization
   bool filter_temperature_ = false;
@@ -309,6 +311,8 @@ class ReactingFlow : public ThermoChemModelBase {
   double Pnm1_, Pnm2_, Pnm3_;
 
   std::list<mfem::DenseMatrix> tableHost_;
+  std::vector<ParGridFunction *> vizSpecFields_;
+  std::vector<std::string> vizSpecNames_;
 
  public:
   ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff, TPS::Tps *tps);
@@ -375,6 +379,7 @@ class ReactingFlow : public ThermoChemModelBase {
   void AddQtDirichletBC(Coefficient *coeff, Array<int> &attr);
   void AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr);
 
+  void evalSubstepNumber();
   void readTableWrapper(std::string inputPath, TableInput &result);
 };
 #endif  // REACTINGFLOW_HPP_

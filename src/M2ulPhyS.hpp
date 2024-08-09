@@ -294,12 +294,12 @@ class M2ulPhyS : public TPS::PlasmaSolver {
   // a serial mesh, finite element space, and grid function
   // for use if we want to write a serial file
   Mesh *serial_mesh;
-  
+
   // I/O organizer
   IODataOrganizer ioData;
 
   std::list<mfem::DenseMatrix> tableHost_;
-  
+
 #ifdef HAVE_MASA
   VectorFunctionCoefficient *DenMMS_, *VelMMS_, *PreMMS_;
   VectorFunctionCoefficient *stateMMS_;

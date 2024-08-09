@@ -1240,8 +1240,7 @@ void makeContinuous(ParGridFunction &u) {
 }
 
 void readTable(MPI_Comm TPSCommWorld, std::string filename, bool xLogScale, bool fLogScale, int order,
-	       std::list<mfem::DenseMatrix> &tableHost, TableInput &result) {
-
+               std::list<mfem::DenseMatrix> &tableHost, TableInput &result) {
   int myrank;
   MPI_Comm_rank(TPSCommWorld, &myrank);
   const bool rank0 = (myrank == 0);
