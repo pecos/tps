@@ -40,17 +40,6 @@
 
 namespace TPS {
 
-// Need to:
-// [X] - Initialize vector of integer size with argument given in Python
-//       (Number of 1D grid points)
-// [X] - Form vector of that size in C++
-//       (To receive plasma conductivity/send Joule heating)
-// [X] - Receive 1D plasma conductivity from Python
-// [X] - Expand to 2D plasma conductivity in C++
-// [ ] - Solve for 2D Joule heating with axisymmetric solver
-// [ ] - Reduce to 1D Joule heating in C++
-// [X] - Send 1D Joule heating to Python
-
 class Qms2Flow1d {
  public:
   Qms2Flow1d(Tps *tps);
@@ -82,8 +71,12 @@ class Qms2Flow1d {
   Vector *z_coords_1d;  //  1d coordinates are assumed to be sorted
   Vector *radius_1d;  //  Torch radius at z coordinates
 
-  //  r is radial location, R is torch radius, r_c is modeling parameter
-  double radial_profile(double r, double R, double r_c) const;
+  /** 
+   * r: radial location
+   * torch_r: torch radius
+   * r_c: modeling parameter, 0 <= r_c <= R
+   */
+  double radial_profile(double r, double torch_r, double r_c) const;
   //  Binary search to find interval
   int find_z_interval(double z) const;
   //  Interpolation of 1d values along centerline
@@ -91,7 +84,10 @@ class Qms2Flow1d {
 
   double expand_cond_2d(double r, double z) const;
 
-  void set_plasma_conductivity();
+  void set_plasma_conductivity_2d();
+
+  int n_interp;
+  void set_joule_heating_1d(const int n_interp);
 };
 
 }  // namespace TPS

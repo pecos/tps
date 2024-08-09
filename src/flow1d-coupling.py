@@ -11,12 +11,9 @@ import libtps
 comm = MPI.COMM_WORLD
 # TPS solver
 tps = libtps.Tps(comm)
-
 tps.parseCommandLineArgs(sys.argv)
 tps.parseInput()
 tps.chooseDevices()
-#tps.chooseSolver()
-#tps.initialize()
 
 print('-'*40, '\nCreating 1d interface instance\n', '-'*40)
 interface = libtps.Qms2Flow1d(tps)
@@ -31,7 +28,7 @@ joule_1d = np.array(interface.JouleHeating1d(), copy = False)
 radius_1d = np.array(interface.TorchRadius1d(), copy = False)
 z_1d = np.array(interface.Coordinates1d(), copy = False)
 
-R_TORCH = 2.75e-2
+R_TORCH = 2.75e-1
 print('-'*40, '\nSetting vector values\n', '-'*40)
 z_1d[0:n_points] = np.linspace(0, 0.5, n_points)
 cond_1d[0:n_points] = np.ones(n_points)
@@ -40,3 +37,4 @@ interface.print_all()
 
 print('-'*40, '\nSolving EM field\n', '-'*40)
 interface.solve()
+interface.print_all()

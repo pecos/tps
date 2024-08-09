@@ -210,10 +210,21 @@ LineInterpolator::LineInterpolator() : InterpolatorBase() {
   end_.SetSize(0);
 }
 
+LineInterpolator::LineInterpolator(int n) : InterpolatorBase(), n_(n) {
+  start_.SetSize(0);
+  end_.SetSize(0);
+}
+
 LineInterpolator::LineInterpolator(mfem::Vector start, mfem::Vector end, int n)
     : InterpolatorBase(), start_(start), end_(end), n_(n) {}
 
 LineInterpolator::~LineInterpolator() {}
+
+void LineInterpolator::initializeFinder(mfem::ParMesh *mesh) {
+  InterpolatorBase::initializeFinder(mesh);
+  start_.SetSize(dim_);
+  end_.SetSize(dim_);
+}
 
 void LineInterpolator::setInterpolationPoints() {
   xyz_.SetSize(n_*dim_);

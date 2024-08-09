@@ -32,6 +32,7 @@
 
 #include "qms2flow1d.hpp"
 #include "data_exchange_utils.hpp"
+#include "gslib_interpolator.hpp"
 
 #ifdef HAVE_PYTHON
 #include <pybind11/numpy.h>
@@ -79,11 +80,14 @@ void Qms2Flow1d::initialize(int n_1d_) {
 
   qmsa->parseSolverOptions();
   qmsa->initialize();
+  //  Ensuring nodes is required for GSLib interpolation
+  qmsa->getMesh()->EnsureNodes();
 }
 
 void Qms2Flow1d::solve() {
-  set_plasma_conductivity();
+  set_plasma_conductivity_2d();
   qmsa->solve();
+  set_joule_heating_1d(10);
 }
 
 void Qms2Flow1d::print_all_1d() {
@@ -97,15 +101,15 @@ void Qms2Flow1d::print_all_1d() {
   joule_1d->Print();
 }
 
-double Qms2Flow1d::radial_profile(double r, double R, double r_c) const {
-  //  Constant over [0, r_c]. Zero beyond torch radius R
+double Qms2Flow1d::radial_profile(double r, double torch_r, double r_c) const {
+  //  Constant over [0, r_c]. Zero beyond torch_r
   //  Cosine for cont. connection between the two
-  assert(0 <= r && 0 <= R && 0 <= r_c);
+  assert(0 <= r && 0 <= torch_r && 0 <= r_c);
   double out = 0;
   if (0 <= r && r <= r_c) {
     out = 1;
-  } else if (r_c < r && r < R) {
-    out = 1 + cos(M_PI*(r - r_c)/(R - r_c));
+  } else if (r_c < r && r < torch_r) {
+    out = 1 + cos(M_PI*(r - r_c)/(torch_r - r_c));
     out *= 0.5;
   }
   return out;
@@ -146,12 +150,12 @@ double Qms2Flow1d::interpolate_z(double z, const Vector &values) const {
 double Qms2Flow1d::expand_cond_2d(double r, double z) const {
   const double sigma_1d = interpolate_z(z, *cond_1d);
   const double torch_radius = interpolate_z(z, *radius_1d);
-  double sigma = radial_profile(r, torch_radius, 0.9*torch_radius);
+  double sigma = radial_profile(r, torch_radius, 0.7*torch_radius);
   sigma *= sigma_1d;
   return sigma;
 }
 
-void Qms2Flow1d::set_plasma_conductivity() {
+void Qms2Flow1d::set_plasma_conductivity_2d() {
   ParFiniteElementSpace *fes = qmsa->getFESpace();
   ParMesh *pmesh = qmsa->getMesh();
 
@@ -172,6 +176,57 @@ void Qms2Flow1d::set_plasma_conductivity() {
 
   delete coord_fes;
   delete coordsDof;
+}
+
+//  Trapezoidal rule
+double radial_integral(Vector &values, Vector &r_coords) {
+  assert(values.Size() == r_coords.Size());
+  const int n_minus_one = values.Size() - 1;
+
+  //  r_i - r_i-1
+  Vector diff = Vector(r_coords, 0, n_minus_one);
+  diff -= Vector(r_coords, 1, n_minus_one);
+
+  //  v_i*r_i
+  values *= r_coords;
+
+  //  (v_i*r_i + v_i-1*r_i-1)(r_i - r_i-1)
+  Vector sum = Vector(values, 0, n_minus_one);
+  sum += Vector(values, 1, n_minus_one);
+  sum *= diff;
+
+  //  Factor of 2pi for angles and division by 2 in trap. rule cancel
+  double integral = M_PI*sum.Sum();
+
+  return integral;
+}
+
+void Qms2Flow1d::set_joule_heating_1d(const int n_interp) {
+  const int dim = 2;
+  double z, torch_r;
+  Vector start = Vector(dim), end = Vector(dim);
+  LineInterpolator l_interp = LineInterpolator(n_interp);
+  l_interp.initializeFinder(qmsa->getMesh());
+
+  for (int i = 0; i < n_1d; i++) {
+    z = z_coords_1d->Elem(i);
+    torch_r = radius_1d->Elem(i);
+
+    start[0] = 0;
+    start[1] = z;
+    end[0] = torch_r;
+    end[1] = z;
+
+    l_interp.setStart(start);
+    l_interp.setEnd(end);
+    l_interp.setInterpolationPoints();
+    l_interp.interpolate(qmsa->getJouleHeatingGF());
+
+    Vector values = l_interp.getSolution();
+    Vector r_coords = Vector(l_interp.getInterpolationPoints(), 0, n_interp);
+
+    joule_1d->Elem(i) = radial_integral(values, r_coords);
+  }
 }
 
 }  // namespace TPS

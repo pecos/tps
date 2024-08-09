@@ -86,6 +86,9 @@ class InterpolatorBase {
 
   /** Write the data to an ascii file */
   virtual void writeAscii(std::string oname, bool rank0 = true) const;
+
+  mfem::Vector &getSolution() { return soln_; }
+  mfem::Vector &getInterpolationPoints() { return xyz_; }
 };
 
 class PlaneInterpolator : public InterpolatorBase {
@@ -121,14 +124,21 @@ class LineInterpolator : public InterpolatorBase {
 
  public:
   LineInterpolator();
+  LineInterpolator(int n);
   LineInterpolator(mfem::Vector start, mfem::Vector end, int n);
   virtual ~LineInterpolator();
+
+  void initializeFinder(mfem::ParMesh *mesh);
+
+  void setStart(mfem::Vector start) { start_ = start; }
+  void setEnd(mfem::Vector end) { end_ = end; }
 
   /** Sets evenly spaced interpolation points
    * 
    * point_i = start_ + (end_ - start_)*i/(n_ - 1)
    */
   void setInterpolationPoints() final;
+
   void writeAscii(std::string oname, bool rank0 = true) const final;
 };
 
