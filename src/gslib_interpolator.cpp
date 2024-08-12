@@ -46,6 +46,8 @@ InterpolatorBase::InterpolatorBase() {
 
 InterpolatorBase::~InterpolatorBase() {
 #ifdef HAVE_GSLIB
+  //  Frees internal data used by FindPointsGSLIB
+  finder_->FreeData();
   delete finder_;
 #endif
 }
@@ -203,11 +205,6 @@ void PlaneInterpolator::writeAscii(std::string oname, bool rank0) const {
   }
   // Rest of the write is handled by the base class
   InterpolatorBase::writeAscii(oname, rank0);
-}
-
-LineInterpolator::LineInterpolator() : InterpolatorBase() {
-  start_.SetSize(0);
-  end_.SetSize(0);
 }
 
 LineInterpolator::LineInterpolator(int n) : InterpolatorBase(), n_(n) {

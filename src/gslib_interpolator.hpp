@@ -123,15 +123,17 @@ class LineInterpolator : public InterpolatorBase {
   int n_;
 
  public:
-  LineInterpolator();
-  LineInterpolator(int n);
+  LineInterpolator(int n = 10);
   LineInterpolator(mfem::Vector start, mfem::Vector end, int n);
   virtual ~LineInterpolator();
 
   void initializeFinder(mfem::ParMesh *mesh);
 
+  void setn(int n) { n_ = n; }
   void setStart(mfem::Vector start) { start_ = start; }
+  mfem::Vector *getStart() { return &start_; }
   void setEnd(mfem::Vector end) { end_ = end; }
+  mfem::Vector *getEnd() { return &end_; }
 
   /** Sets evenly spaced interpolation points
    * 

@@ -37,6 +37,7 @@
 #include "tps.hpp"
 #include "em_options.hpp"
 #include "quasimagnetostatic.hpp"
+#include "gslib_interpolator.hpp"
 
 namespace TPS {
 
@@ -44,8 +45,11 @@ class Qms2Flow1d {
  public:
   Qms2Flow1d(Tps *tps);
   ~Qms2Flow1d();
-  void initialize(int n_1d_);
-  void solve();  //  Set the plasma conductivity and solve the EM field
+  //  Creates vectors of required size for 1d flow and initializes EM solver
+  void initialize(const int n_1d_);
+  //  Expands 1d conductivity, solves EM, and reduces 2d Joule heating
+  void solve();
+  //  Prints the four 1d vectors
   void print_all_1d();
 
   const Vector &PlasmaConductivity1d() const { return *cond_1d; }
@@ -60,34 +64,53 @@ class Qms2Flow1d {
   const Vector &TorchRadius1d() const { return *radius_1d; }
   Vector &TorchRadius1d() { return *radius_1d; }
 
+  void set_n_interp(const int n_interp_) { n_interp = n_interp_; }
+  void set_length(const double length_) { length = length_; }
+
+  //  Reduces 2d Joule heating by taking radial totals at 1d coordinates
+  void set_joule_heating_1d();
+
+  //  Useful for comparison/convergence
+  double total_joule_heating_1d() { return linear_integral(*joule_1d, *z_coords_1d); }
+  double total_joule_heating_2d() { return qmsa->totalJouleHeating(); }
+
  private:
   Tps *tpsP_;
   ElectromagneticOptions *em_opts;
   QuasiMagnetostaticSolverAxiSym *qmsa;
-
+  //  Number of points in 1d flow solver
   int n_1d;
   Vector *cond_1d;
   Vector *joule_1d;
-  Vector *z_coords_1d;  //  1d coordinates are assumed to be sorted
-  Vector *radius_1d;  //  Torch radius at z coordinates
+  //  1d coordinates are assumed to be sorted
+  Vector *z_coords_1d;
+  //  Torch radius at z coordinates
+  Vector *radius_1d;
+  //  Plasma torch length [m]. Joule heating is zero for z > L
+  double length = 0.315;
 
-  /** 
-   * r: radial location
-   * torch_r: torch radius
-   * r_c: modeling parameter, 0 <= r_c <= R
-   */
+  //  GSLib based interpolator from FE solution
+  LineInterpolator *l_interp;
+    //  Number of interpolation points for radial integrals
+  int n_interp;
+  //  Trapezoidal rule
+  double linear_integral(Vector values, Vector coords);
+  double radial_integral(Vector values, Vector r_coords);
+
+  //  r: radial location, torch_r: torch radius
+  //  r_c: modeling parameter 0 <= r_c <= R
   double radial_profile(double r, double torch_r, double r_c) const;
   //  Binary search to find interval
   int find_z_interval(double z) const;
-  //  Interpolation of 1d values along centerline
+  //  Interpolation of 1d values along centerline via binary search
+  //  Unrelated to GSLib interpolation of FE solution
   double interpolate_z(double z, const Vector &values) const;
-
+  //  Multiplies interpolant by radial profile
   double expand_cond_2d(double r, double z) const;
 
+  //  Expands 1d conductivity into 2d via linear interpolation
+  //  along z-axis multiplied by a radial profile
   void set_plasma_conductivity_2d();
-
-  int n_interp;
-  void set_joule_heating_1d(const int n_interp);
 };
 
 }  // namespace TPS

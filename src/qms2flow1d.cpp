@@ -32,7 +32,6 @@
 
 #include "qms2flow1d.hpp"
 #include "data_exchange_utils.hpp"
-#include "gslib_interpolator.hpp"
 
 #ifdef HAVE_PYTHON
 #include <pybind11/numpy.h>
@@ -50,12 +49,14 @@ Qms2Flow1d::Qms2Flow1d(Tps *tps) {
   tpsP_ = tps;
   em_opts = nullptr;
   qmsa = nullptr;
+  l_interp = nullptr;
 
   n_1d = 0;
   cond_1d = nullptr;
   joule_1d = nullptr;
   z_coords_1d = nullptr;
   radius_1d = nullptr;
+  n_interp = 0;
 }
 
 Qms2Flow1d::~Qms2Flow1d() {
@@ -66,17 +67,21 @@ Qms2Flow1d::~Qms2Flow1d() {
 
   delete em_opts;
   delete qmsa;
+  delete l_interp;
 }
 
-void Qms2Flow1d::initialize(int n_1d_) {
+void Qms2Flow1d::initialize(const int n_1d_) {
   n_1d = n_1d_;
-  cond_1d = new Vector(n_1d_);
-  joule_1d = new Vector(n_1d_);
-  z_coords_1d = new Vector(n_1d_);
-  radius_1d = new Vector(n_1d_);
+  cond_1d = new Vector(n_1d);
+  joule_1d = new Vector(n_1d);
+  z_coords_1d = new Vector(n_1d);
+  radius_1d = new Vector(n_1d);
 
   em_opts = new ElectromagneticOptions();
   qmsa = new QuasiMagnetostaticSolverAxiSym(*em_opts, tpsP_);
+  l_interp = new LineInterpolator();
+
+  n_interp = 100;
 
   qmsa->parseSolverOptions();
   qmsa->initialize();
@@ -87,23 +92,23 @@ void Qms2Flow1d::initialize(int n_1d_) {
 void Qms2Flow1d::solve() {
   set_plasma_conductivity_2d();
   qmsa->solve();
-  set_joule_heating_1d(10);
+  set_joule_heating_1d();
 }
 
 void Qms2Flow1d::print_all_1d() {
-  std::cout << "---\n1d Coordinates:\n---" << endl;
+  std::cout << "\n--- 1d Coordinates ---" << endl;
   z_coords_1d->Print();
-  std::cout << "---\nTorch Radius:\n---" << endl;
+  std::cout << "\n--- Torch Radius ---" << endl;
   radius_1d->Print();
-  std::cout << "---\n1d Plasma Conductivity:\n---" << endl;
+  std::cout << "\n--- 1d Plasma Conductivity ---" << endl;
   cond_1d->Print();
-  std::cout << "---\n1d Joule Heating:\n---" << endl;
+  std::cout << "\n--- 1d Joule Heating ---" << endl;
   joule_1d->Print();
 }
 
 double Qms2Flow1d::radial_profile(double r, double torch_r, double r_c) const {
   //  Constant over [0, r_c]. Zero beyond torch_r
-  //  Cosine for cont. connection between the two
+  //  Cosine for continuous connection between the two
   assert(0 <= r && 0 <= torch_r && 0 <= r_c);
   double out = 0;
   if (0 <= r && r <= r_c) {
@@ -178,54 +183,60 @@ void Qms2Flow1d::set_plasma_conductivity_2d() {
   delete coordsDof;
 }
 
-//  Trapezoidal rule
-double radial_integral(Vector &values, Vector &r_coords) {
-  assert(values.Size() == r_coords.Size());
+double Qms2Flow1d::linear_integral(Vector values, Vector coords) {
+  assert(values.Size() == coords.Size());
   const int n_minus_one = values.Size() - 1;
 
-  //  r_i - r_i-1
-  Vector diff = Vector(r_coords, 0, n_minus_one);
-  diff -= Vector(r_coords, 1, n_minus_one);
+  //  x_i - x_i-1
+  Vector temp = Vector(coords, 1, n_minus_one);
+  Vector diff = temp;
+  temp = Vector(coords, 0, n_minus_one);
+  diff -= temp;
 
-  //  v_i*r_i
-  values *= r_coords;
+  //  (v_i + v_i-1)/2 * (x_i - x_i-1)
+  temp = Vector(values, 0, n_minus_one);
+  Vector summands = temp;
+  temp = Vector(values, 1, n_minus_one);
+  summands += temp;
+  summands *= 0.5;
+  summands *= diff;
 
-  //  (v_i*r_i + v_i-1*r_i-1)(r_i - r_i-1)
-  Vector sum = Vector(values, 0, n_minus_one);
-  sum += Vector(values, 1, n_minus_one);
-  sum *= diff;
-
-  //  Factor of 2pi for angles and division by 2 in trap. rule cancel
-  double integral = M_PI*sum.Sum();
-
-  return integral;
+  return summands.Sum();
 }
 
-void Qms2Flow1d::set_joule_heating_1d(const int n_interp) {
-  const int dim = 2;
+//  Includes 2pi r Jacobian
+double Qms2Flow1d::radial_integral(Vector values, Vector r_coords) {
+  Vector input = values;
+  input *= r_coords;
+  return 2*M_PI*linear_integral(input, r_coords);
+}
+
+void Qms2Flow1d::set_joule_heating_1d() {
   double z, torch_r;
-  Vector start = Vector(dim), end = Vector(dim);
-  LineInterpolator l_interp = LineInterpolator(n_interp);
-  l_interp.initializeFinder(qmsa->getMesh());
+  l_interp->setn(n_interp);
+  l_interp->initializeFinder(qmsa->getMesh());
 
   for (int i = 0; i < n_1d; i++) {
     z = z_coords_1d->Elem(i);
-    torch_r = radius_1d->Elem(i);
 
-    start[0] = 0;
-    start[1] = z;
-    end[0] = torch_r;
-    end[1] = z;
+    if (z > length) {
+      joule_1d->Elem(i) = 0;
+    } else {
+      torch_r = radius_1d->Elem(i);
 
-    l_interp.setStart(start);
-    l_interp.setEnd(end);
-    l_interp.setInterpolationPoints();
-    l_interp.interpolate(qmsa->getJouleHeatingGF());
+      l_interp->getStart()->Elem(0) = 0;
+      l_interp->getStart()->Elem(1) = z;
+      l_interp->getEnd()->Elem(0) = torch_r;
+      l_interp->getEnd()->Elem(1) = z;
 
-    Vector values = l_interp.getSolution();
-    Vector r_coords = Vector(l_interp.getInterpolationPoints(), 0, n_interp);
+      l_interp->setInterpolationPoints();
+      l_interp->interpolate(qmsa->getJouleHeatingGF());
 
-    joule_1d->Elem(i) = radial_integral(values, r_coords);
+      Vector values = l_interp->getSolution();
+      Vector r_coords = Vector(l_interp->getInterpolationPoints(), 0, n_interp);
+
+      joule_1d->Elem(i) = radial_integral(values, r_coords);
+    }
   }
 }
 
@@ -238,25 +249,39 @@ namespace tps_wrappers {
 void qms2flow1d(py::module &m) {
   py::class_<TPS::Qms2Flow1d>(m, "Qms2Flow1d")
       .def(py::init<TPS::Tps *>())
-      .def("initialize", &TPS::Qms2Flow1d::initialize)
-      .def("solve", &TPS::Qms2Flow1d::solve)
-      .def("print_all", &TPS::Qms2Flow1d::print_all_1d)
+      .def("initialize", &TPS::Qms2Flow1d::initialize, "Initialize the 1d flow-axisymmetric EM interface",
+          py::arg("n_1d"))
+      .def("solve", &TPS::Qms2Flow1d::solve, "Solve the 1d Joule heating based on the 1d plasma conductivity")
+      .def("print_all", &TPS::Qms2Flow1d::print_all_1d,
+          "Print the 1d z coordinates, torch radius, plasma conductivity, and Joule heating from C++")
+      .def("total_joule_2d", &TPS::Qms2Flow1d::total_joule_heating_2d,
+          "Calculate the total Joule heating from the 2d solution")
+      .def("total_joule_1d", &TPS::Qms2Flow1d::total_joule_heating_1d,
+          "Calculate the total Joule heating from the 1d solution")
+      .def("calculate_joule", &TPS::Qms2Flow1d::set_joule_heating_1d,
+          "Calculates the 1d Joule heating without resolving the EM problem")
+      .def("set_n_interp", &TPS::Qms2Flow1d::set_n_interp,
+          "Sets number of interpolation points for radial integrals",
+          py::arg("n_interp"))
+      .def("set_length", &TPS::Qms2Flow1d::set_length,
+          "Set length of plasma torch (Joule heating is zero in the plume)",
+          py::arg("length"))
       .def("Coordinates1d",
           [](TPS::Qms2Flow1d &interface) {
             return std::unique_ptr<TPS::CPUData>(new TPS::CPUData(interface.Coordinates1d(), false));
-          })
+          }, "1d z coordinates memory location buffered read/write access")
       .def("TorchRadius1d",
           [](TPS::Qms2Flow1d &interface) {
             return std::unique_ptr<TPS::CPUData>(new TPS::CPUData(interface.TorchRadius1d(), false));
-          })
+          }, "1d torch radius memory location buffered read/write access")
       .def("PlasmaConductivity1d",
           [](TPS::Qms2Flow1d &interface) {
             return std::unique_ptr<TPS::CPUData>(new TPS::CPUData(interface.PlasmaConductivity1d(), false));
-          })
+          }, "1d plasma conductivity memory location buffered read/write access")
       .def("JouleHeating1d",
           [](TPS::Qms2Flow1d &interface) {
             return std::unique_ptr<TPS::CPUDataRead>(new TPS::CPUDataRead(interface.JouleHeating1d()));
-          });
+          }, "1d Joule heating memory location buffered read access");
 }
 
 }  // namespace tps_wrappers
