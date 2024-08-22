@@ -1,0 +1,41 @@
+#!./bats
+# -*- mode: sh -*-
+
+TEST="flow1d-coupling"
+RUNFILE="inputs/qms-axisym.flow1dcoupling.ini"
+EXE="./test_flow1d_coupling.py"
+
+setup() {
+    SOLN_FILE=flow1d_coupling.sol.h5
+    REF_FILE=ref_solns/flow1d_coupling.h5
+}
+
+@test "[$TEST] check for input file $RUNFILE" {
+    test -s $RUNFILE
+}
+
+@test "[$TEST] run interface with input -> $RUNFILE" {
+    rm -f $SOLN_FILE
+    $EXE --runFile $RUNFILE
+    test -s $SOLN_FILE
+}
+
+@test "[$TEST] verify interface output with input -> $RUNFILE" {
+    test -s $SOLN_FILE
+    test -s $REF_FILE
+    h5diff --report --relative=1e-12 $SOLN_FILE $REF_FILE /output/joule_heating
+}
+
+@test "[$TEST] verify Joule heating is read only" {
+    # Should raise error
+    run WRITE_JOULE=True $EXE --runFile $RUNFILE
+    [ "$status" -ne 0 ]
+}
+
+@test "[$TEST] verify total power input is 20 kW with input -> $RUNFILE {
+    TOTAL_POWER=True $EXE --runFile $RUNFILE
+}
+
+@test "[$TEST] verify 1d and 2d total power inputs are equal with input -> $RUNFILE {
+    COMPARE_JOULE=True $EXE --runFile $RUNFILE
+}
