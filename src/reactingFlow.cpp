@@ -56,8 +56,6 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   rank0_ = (pmesh_->GetMyRank() == 0);
   order_ = loMach_opts->order;
 
-  // if (rank0_) std::cout << "Constructing ReactingFlow!" << endl;
-
   /// Basic input information
   tpsP_->getInput("loMach/ambientPressure", ambient_pressure_, 101325.0);
   thermo_pressure_ = ambient_pressure_;
@@ -335,8 +333,6 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     tpsP_->getRequiredInput((basepath + "/reaction_energy").c_str(), energy);
     reactionEnergies[r - 1] = energy;
 
-    // TODO(trevilo): Add 'tabulated' option.  Not supported yet b/c
-    // table read functionality is buried in M2ulPhyS.
     if (model == "arrhenius") {
       reactionModels[r - 1] = ARRHENIUS;
 
@@ -358,40 +354,6 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
       reactionModels[r - 1] = TABULATED_RXN;
       std::string inputPath(basepath + "/tabulated");
       readTableWrapper(inputPath, chemistryInput_.reactionInputs[r - 1].tableInput);
-
-      /*
-  std::string filename;
-  tpsP_->getInput((inputPath + "/x_log").c_str(), chemistryInput_.reactionInputs[r - 1].tableInput.xLogScale, false);
-  tpsP_->getInput((inputPath + "/f_log").c_str(), chemistryInput_.reactionInputs[r - 1].tableInput.fLogScale, false);
-  tpsP_->getInput((inputPath + "/order").c_str(), chemistryInput_.reactionInputs[r - 1].tableInput.order, 1);
-  tpsP_->getRequiredInput((inputPath + "/filename").c_str(), filename);
-  readTable(MPI_COMM_WORLD, filename, chemistryInput_.reactionInputs[r - 1].tableInput.xLogScale,
-  chemistryInput_.reactionInputs[r - 1].tableInput.fLogScale, chemistryInput_.reactionInputs[r - 1].tableInput.order,
-  tableHost_, chemistryInput_.reactionInputs[r - 1].tableInput);
-      */
-
-      /*
-      std::cout << "Table input dump from filename: " << filename << endl;
-      std::cout << "+ Ndata: " << chemistryInput_.reactionInputs[r - 1].tableInput.Ndata << endl;
-      std::cout << "+ xLogScale: " << chemistryInput_.reactionInputs[r - 1].tableInput.xLogScale << endl;
-      std::cout << "+ fLogScale: " << chemistryInput_.reactionInputs[r - 1].tableInput.fLogScale << endl;
-      std::cout << "+ order: " << chemistryInput_.reactionInputs[r - 1].tableInput.order << endl;
-     for (int i = 0; i < chemistryInput_.reactionInputs[r - 1].tableInput.Ndata; i++) {
-        std::cout << "   " << i << ". " << chemistryInput_.reactionInputs[r - 1].tableInput.xdata[i] << " " <<
-     chemistryInput_.reactionInputs[r - 1].tableInput.fdata[i] << endl;
-      }
-      */
-
-      /*
-  std::cout << "+ Ndata: " << chemistryInput_.reactionInputs[r - 1].tableInput.Ndata << endl;
-  std::cout << "+ xLogScale: " << chemistryInput_.reactionInputs[r - 1].tableInput.xLogScale << endl;
-  std::cout << "+ fLogScale: " << chemistryInput_.reactionInputs[r - 1].tableInput.fLogScale << endl;
-  std::cout << "+ order: " << chemistryInput_.reactionInputs[r - 1].tableInput.order << endl;
-  for (int i = 0; i < chemistryInput_.reactionInputs[r - 1].tableInput.Ndata; i++) {
-    std::cout << "   " << i << ". " << chemistryInput_.reactionInputs[r - 1].tableInput.xdata[i] << " " <<
-  chemistryInput_.reactionInputs[r - 1].tableInput.fdata[i] << endl;
-  }
-      */
 
     } else {
       grvy_printf(GRVY_ERROR, "\nUnknown reaction_model -> %s", model.c_str());
@@ -801,23 +763,6 @@ void ReactingFlow::initializeSelf() {
   Yn_next_gf_ = Yn_gf_;
   YnFull_gf_.SetFromTrueDofs(Yn_);
 
-  {
-    double *d_Yn = Yn_.HostReadWrite();
-    double *d_Rho = rn_.HostReadWrite();
-    Vector state(gpudata::MAXEQUATIONS);
-    state = 0.0;
-
-    for (int i = 0; i < sDofInt_; i++) {
-      state[0] = d_Rho[i];
-      for (int sp = 0; sp < nActiveSpecies_; sp++) {
-        // for (int sp = 0; sp < nSpecies_; sp++) {
-        //  state[dim_ + 1 + sp + 1] = d_Rho[i] * d_Yn[i + sp * sDofInt_];
-        state[dim_ + sp + 1] = d_Rho[i] * d_Yn[i + sp * sDofInt_];
-        // std::cout << "*state[" << dim_ + sp + 1 << "] <= Yn:" << d_Yn[i + sp * sDofInt_] << endl;
-      }
-    }
-  }
-
   ConstantCoefficient t_ic_coef;
   t_ic_coef.constant = T_ic_;
   Tn_gf_.ProjectCoefficient(t_ic_coef);
@@ -988,7 +933,6 @@ void ReactingFlow::initializeOperators() {
   rhoCp_coeff_ = new ProductCoefficient(*cpMix_coeff_, *rhon_next_coeff_);
   rhouCp_coeff_ = new ScalarVectorProductCoefficient(*rhoCp_coeff_, *un_next_coeff_);
   rhou_coeff_ = new ScalarVectorProductCoefficient(*rhon_next_coeff_, *un_next_coeff_);
-  // if (rank0_) std::cout << "Operator coefficients set" << endl;
 
   At_form_ = new ParBilinearForm(sfes_);
   auto *at_blfi = new ConvectionIntegrator(*rhouCp_coeff_);
@@ -1001,7 +945,6 @@ void ReactingFlow::initializeOperators() {
   }
   At_form_->Assemble();
   At_form_->FormSystemMatrix(empty, At_);
-  // if (rank0_) std::cout << "ReactingFlow At operator set" << endl;
 
   Ay_form_ = new ParBilinearForm(sfes_);
   auto *ay_blfi = new ConvectionIntegrator(*rhou_coeff_);
@@ -1014,7 +957,6 @@ void ReactingFlow::initializeOperators() {
   }
   Ay_form_->Assemble();
   Ay_form_->FormSystemMatrix(empty, Ay_);
-  // if (rank0_) std::cout << "ReactingFlow Ay operator set" << endl;
 
   // mass matrix
   Ms_form_ = new ParBilinearForm(sfes_);
@@ -1041,7 +983,6 @@ void ReactingFlow::initializeOperators() {
   }
   MsRho_form_->Assemble();
   MsRho_form_->FormSystemMatrix(empty, MsRho_);
-  // if (rank0_) std::cout << "ReactingFlow MsRho operator set" << endl;
 
   // mass matrix with rho and Cp
   MsRhoCp_form_ = new ParBilinearForm(sfes_);
@@ -1055,7 +996,6 @@ void ReactingFlow::initializeOperators() {
   }
   MsRhoCp_form_->Assemble();
   MsRhoCp_form_->FormSystemMatrix(empty, MsRhoCp_);
-  // if (rank0_) std::cout << "ReactingFlow MsRhoCp operator set" << endl;
 
   // temperature Helmholtz
   Ht_form_ = new ParBilinearForm(sfes_);
@@ -1073,7 +1013,6 @@ void ReactingFlow::initializeOperators() {
   }
   Ht_form_->Assemble();
   Ht_form_->FormSystemMatrix(temp_ess_tdof_, Ht_);
-  // if (rank0_) std::cout << "ReactingFlow Ht operator set" << endl;
 
   // species Helmholtz
   Hy_form_ = new ParBilinearForm(sfes_);
@@ -1091,7 +1030,6 @@ void ReactingFlow::initializeOperators() {
   }
   Hy_form_->Assemble();
   Hy_form_->FormSystemMatrix(spec_ess_tdof_, Hy_);
-  // if (rank0_) std::cout << "ReactingFlow Hy operator set" << endl;
 
   if (partial_assembly_) {
     Vector diag_pa(sfes_->GetTrueVSize());
@@ -1125,7 +1063,6 @@ void ReactingFlow::initializeOperators() {
   HtInv_->SetPrintLevel(pl_solve_);
   HtInv_->SetRelTol(rtol_);
   HtInv_->SetMaxIter(max_iter_);
-  // if (rank0_) std::cout << "Temperature operators set" << endl;
 
   if (partial_assembly_) {
     Vector diag_pa(sfes_->GetTrueVSize());
@@ -1143,7 +1080,6 @@ void ReactingFlow::initializeOperators() {
   HyInv_->SetPrintLevel(pl_solve_);
   HyInv_->SetRelTol(rtol_);
   HyInv_->SetMaxIter(max_iter_);
-  // if (rank0_) std::cout << "Species operators set" << endl;
 
   // Vector space mass matrix (used in gradient calcs)
   Mv_form_ = new ParBilinearForm(vfes_);
@@ -1189,7 +1125,6 @@ void ReactingFlow::initializeOperators() {
   }
   Mq_form_->Assemble();
   Mq_form_->FormSystemMatrix(Qt_ess_tdof_, Mq_);
-  // if (rank0_) std::cout << "ReactingFlow Mq operator set" << endl;
 
   if (partial_assembly_) {
     Vector diag_pa(sfes_->GetTrueVSize());
@@ -1225,7 +1160,6 @@ void ReactingFlow::initializeOperators() {
     lq_bdry_lfi->SetIntRule(&ir_di);
   }
   LQ_bdry_->AddBoundaryIntegrator(lq_bdry_lfi, temp_ess_attr_);
-  // if (rank0_) std::cout << "ReactingFlow LQ operator set" << endl;
 
   // for explicit species-diff source term in energy (inv not needed)
   LY_form_ = new ParBilinearForm(sfes_);
@@ -1252,7 +1186,6 @@ void ReactingFlow::initializeOperators() {
   }
   G_form_->Assemble();
   G_form_->FormRectangularSystemMatrix(empty, empty, G_);
-  // if (rank0_) std::cout << "Gradient operator set" << endl;
 
   // copy IC to other temp containers
   Tn_gf_.GetTrueDofs(Tn_);
@@ -1723,35 +1656,21 @@ void ReactingFlow::speciesProduction() {
     // species (mass) densities are used and need to be filled
     state[0] = dataRho[i];
     for (int sp = 0; sp < nActiveSpecies_; sp++) {
-      // for (int sp = 0; sp < nSpecies_; sp++) {
       state[dim_ + 1 + sp + 1] = dataRho[i] * dataY[i + sp * sDofInt_];
     }
 
     // Evaluate the mole densities (from mass densities)
     mixture_->computeNumberDensities(state, n_sp);
-    // for (int sp = 0; sp < nSpecies_; sp++) {
-    //   std::cout << "mole density at species " << sp << ": " << n_sp[sp] << endl;
-    // }
 
     // Evaluate the chemical source terms
     chemistry_->computeForwardRateCoeffs(Th, Te, i, kfwd.HostWrite());
-    // for (int sp = 0; sp < nReactions_; sp++) {
-    //   std::cout << "kfwd(" << sp << "):" << kfwd[sp] << endl;
-    // }
     chemistry_->computeEquilibriumConstants(Th, Te, keq.HostWrite());
-    // for (int sp = 0; sp < nReactions_; sp++) {
-    //   std::cout << "keq(" << sp << "):" << keq[sp] << endl;
-    // }
     chemistry_->computeProgressRate(n_sp, kfwd, keq, progressRate);
-    // for (int sp = 0; sp < nReactions_; sp++) {
-    //   std::cout << "progressRate(" << sp << "):" << progressRate[sp] << endl;
-    // }
     chemistry_->computeCreationRate(progressRate, creationRate);
 
     // Place sources into storage for use in speciesStep
     for (int sp = 0; sp < nSpecies_; sp++) {
       dataProd[i + sp * sDofInt_] = creationRate[sp];
-      // std::cout << "P_Yn(" << sp << "):" << creationRate[sp] << endl;
     }
   }
 }
@@ -1776,7 +1695,6 @@ void ReactingFlow::heatOfFormation() {
       hspecies = (molarCP * T + gasParams_(n, GasParams::FORMATION_ENERGY)) / gasParams_(n, GasParams::SPECIES_MW);
       h_hw[i] -= hspecies * h_prodY[i + n * sDofInt_];
     }
-    // std::cout << "HoF: " << h_hw[i] << endl;
   }
 }
 
@@ -1874,9 +1792,6 @@ void ReactingFlow::initializeViz(ParaViewDataCollection &pvdc) {
   pvdc.RegisterField("kappa", &kappa_gf_);
   pvdc.RegisterField("mu", &visc_gf_);
   pvdc.RegisterField("Qt", &Qt_gf_);
-
-  // this method is broken in that it assumes 3 entries
-  // pvdc.RegisterField("species", &YnFull_gf_);
 
   vizSpecFields_.clear();
   vizSpecNames_.clear();
@@ -1994,22 +1909,10 @@ void ReactingFlow::updateMixture() {
       // Set up conserved state (just the mass densities, which is all we need here)
       state[0] = d_Rho[i];
       for (int sp = 0; sp < nActiveSpecies_; sp++) {
-        // for (int sp = 0; sp < nSpecies_; sp++) {
         state[dim_ + 1 + sp + 1] = d_Rho[i] * d_Yn[i + sp * sDofInt_];
-        // state[dim_ + sp + 1] = d_Rho[i] * d_Yn[i + sp * sDofInt_];
-        // std::cout << "state[" << dim_ + sp + 1 << "] <= Yn:" << d_Yn[i + sp * sDofInt_] << endl;
       }
 
       // Evaluate the mole densities (from mass densities)
-      /*
-      if (rank0_) {
-        std::cout << "calling compute number density..." << endl;
-        for (int sp = 0; sp <= nActiveSpecies_ + dim_; sp++) {
-        // for (int sp = 0; sp <= nSpecies_ + dim_; sp++) {
-          std::cout << "state[" << sp << "]: " << state[sp] << endl;
-        }
-      }
-      */
       mixture_->computeNumberDensities(state, n_sp);
 
       // GetMixtureCp returns cpMix = sum_s X_s Cp_s, where X_s is
@@ -2181,10 +2084,6 @@ void ReactingFlow::updateDensity(double tStep) {
     rn_ = static_rho_;
   }
   rn_gf_.SetFromTrueDofs(rn_);
-
-  // for (int i = 0; i < sDofInt_; i++) {
-  //   std::cout << "density: "<< rn_(i) << endl;
-  // }
 
   MsRho_form_->Update();
   MsRho_form_->Assemble();
@@ -2363,17 +2262,6 @@ void ReactingFlow::readTableWrapper(std::string inputPath, TableInput &result) {
   tpsP_->getInput((inputPath + "/order").c_str(), result.order, 1);
   tpsP_->getRequiredInput((inputPath + "/filename").c_str(), filename);
   readTable(MPI_COMM_WORLD, filename, result.xLogScale, result.fLogScale, result.order, tableHost_, result);
-
-  /*
-  std::cout << "Table input dump from filename: " << filename << endl;
-  std::cout << "+ Ndata: " << result.Ndata << endl;
-  std::cout << "+ xLogScale: " << result.xLogScale << endl;
-  std::cout << "+ fLogScale: " << result.fLogScale << endl;
-  std::cout << "+ order: " << result.order << endl;
-  for (int i = 0; i < result.Ndata; i++) {
-    std::cout << "   " << i << ". " << result.xdata[i] << " " << result.fdata[i] << endl;
-  }
-  */
 }
 
 void ReactingFlow::identifyCollisionType(const Array<ArgonSpcs> &speciesType, ArgonColl *collisionIndex) {
