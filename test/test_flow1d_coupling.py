@@ -58,8 +58,9 @@ if 'COMPARE_JOULE' in os.environ:
     error = np.abs(power_1d - power_2d)/np.abs(power_2d)
     assert error < 1e-5, '1d and 2d Joule heating integrals should match'
 
+SOLN_FILE = "flow1d_coupling.sol.h5"
 # Save output with hdf5
-with h5py.File("flow1d_coupling.sol.h5", "w") as f:
+with h5py.File(SOLN_FILE, "w") as f:
     _ = f.create_dataset('input/axial_coordinates', data=z_1d)
     _ = f.create_dataset('input/torch_radius', data=radius_1d)
     _ = f.create_dataset('input/plasma_conductivity', data=cond_1d)
