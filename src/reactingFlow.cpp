@@ -1995,8 +1995,8 @@ void ReactingFlow::updateMixture() {
       state[0] = d_Rho[i];
       for (int sp = 0; sp < nActiveSpecies_; sp++) {
         // for (int sp = 0; sp < nSpecies_; sp++) {
-        // state[dim_ + 1 + sp + 1] = d_Rho[i] * d_Yn[i + sp * sDofInt_];
-        state[dim_ + sp + 1] = d_Rho[i] * d_Yn[i + sp * sDofInt_];
+        state[dim_ + 1 + sp + 1] = d_Rho[i] * d_Yn[i + sp * sDofInt_];
+        // state[dim_ + sp + 1] = d_Rho[i] * d_Yn[i + sp * sDofInt_];
         // std::cout << "state[" << dim_ + sp + 1 << "] <= Yn:" << d_Yn[i + sp * sDofInt_] << endl;
       }
 
