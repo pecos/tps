@@ -1371,7 +1371,7 @@ void ReactingFlow::evalSubstepNumber() {
       }
     }
   }
-  MPI_Reduce(&myMaxProd, &maxProd, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+  MPI_Reduce(&myMaxProd, &maxProd, 1, MPI_DOUBLE, MPI_MAX, 0, tpsP_->getTPSCommWorld());
   deltaYn = maxProd * time_coeff_.dt;
 
   // want: dYsub < 1/100
@@ -1954,7 +1954,7 @@ void ReactingFlow::updateThermoP() {
     tmpR0_ /= tmpR0a_;
     Ms_->Mult(tmpR0_, tmpR0b_);
     myMass = tmpR0b_.Sum();
-    MPI_Allreduce(&myMass, &allMass, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    MPI_Allreduce(&myMass, &allMass, 1, MPI_DOUBLE, MPI_SUM, tpsP_->getTPSCommWorld());
 
     // update Po so mass is conserved given the new temperature
     thermo_pressure_ = system_mass_ / allMass * Pnm1_;
@@ -2102,7 +2102,7 @@ void ReactingFlow::computeSystemMass() {
   rn_ /= Tn_;
   Ms_->Mult(rn_, tmpR0_);
   myMass = tmpR0_.Sum();
-  MPI_Allreduce(&myMass, &system_mass_, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+  MPI_Allreduce(&myMass, &system_mass_, 1, MPI_DOUBLE, MPI_SUM, tpsP_->getTPSCommWorld());
   if (rank0_ == true) std::cout << " Closed system mass: " << system_mass_ << " [kg]" << endl;
 }
 
@@ -2255,13 +2255,12 @@ void ReactingFlow::identifySpeciesType(Array<ArgonSpcs> &speciesType) {
 }
 
 void ReactingFlow::readTableWrapper(std::string inputPath, TableInput &result) {
-  // MPI_Comm TPSCommWorld = this->groupsMPI->getTPSCommWorld();
   std::string filename;
   tpsP_->getInput((inputPath + "/x_log").c_str(), result.xLogScale, false);
   tpsP_->getInput((inputPath + "/f_log").c_str(), result.fLogScale, false);
   tpsP_->getInput((inputPath + "/order").c_str(), result.order, 1);
   tpsP_->getRequiredInput((inputPath + "/filename").c_str(), filename);
-  readTable(MPI_COMM_WORLD, filename, result.xLogScale, result.fLogScale, result.order, tableHost_, result);
+  readTable(tpsP_->getTPSCommWorld(), filename, result.xLogScale, result.fLogScale, result.order, tableHost_, result);
 }
 
 void ReactingFlow::identifyCollisionType(const Array<ArgonSpcs> &speciesType, ArgonColl *collisionIndex) {
@@ -2369,7 +2368,7 @@ double species_uniform(const Vector &coords, double t) {
 #if 0
 void ReactingFlow::uniformInlet() {
   int myRank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
+  MPI_Comm_rank(tpsP_->getTPSCommWorld(), &myRank);
 
   ParGridFunction coordsDof(vfes);
   pmesh_->GetNodes(coordsDof);
