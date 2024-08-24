@@ -4,6 +4,7 @@
 TEST="singleReaction"
 RUNFILE="inputs/input.reactSingleRx.ini"
 RUNFILE_STIFF="inputs/input.reactStiffRx.ini"
+RUNFILE_TORCH="inputs/lomach.torch.reacting.ini"
 EXE="../src/tps"
 RESTART="ref_solns/reactSingleRx/restart_output.sol.h5"
 
@@ -13,6 +14,10 @@ setup() {
 
     SOLN_FILE_STIFF=restart_output-stiff.sol.h5
     REF_FILE_STIFF=ref_solns/reactSingleRx/restart_output-stiff.sol.h5
+
+    RESTRT_FILE_TORCH=ref_solns/reactSingleRx/restart_output-torch.sol.IC.h5
+    SOLN_FILE_TORCH=restart_output-torch.sol.h5
+    REF_FILE_TORCH=ref_solns/reactSingleRx/restart_output-torch.sol.10.h5
 }
 
 @test "[$TEST] check for input file $RUNFILE" {
@@ -48,4 +53,25 @@ setup() {
     test -s $REF_FILE_STIFF
     h5diff -r --relative=1e-12 $SOLN_FILE_STIFF $REF_FILE_STIFF /species
     h5diff -r --relative=1e-12 $SOLN_FILE_STIFF $REF_FILE_STIFF /temperature/temperature
+}
+
+@test "[$TEST] check for input file $RUNFILE_TORCH" {
+    test -s $RUNFILE
+    rm -rf $SOLN_FILE_TORCH
+    cp $RESTRT_FILE_TORCH $SOLN_FILE_TORCH
+}
+
+@test "[$TEST] run tps with input -> $RUNFILE_TORCH" {
+    rm -rf output-torch
+    $EXE --runFile $RUNFILE_TORCH
+    test -s $SOLN_FILE_TORCH
+}
+
+@test "[$TEST] verify tps output with input -> $RUNFILE_TORCH" {
+    test -s $SOLN_FILE_TORCH
+    test -s $REF_FILE_TORCH
+    h5diff -r --relative=1e-12 $SOLN_FILE_TORCH $REF_FILE_TORCH /velocity
+    h5diff -r --relative=1e-12 $SOLN_FILE_TORCH $REF_FILE_TORCH /swirl
+    h5diff -r --relative=1e-12 $SOLN_FILE_TORCH $REF_FILE_TORCH /species
+    h5diff -r --relative=1e-12 $SOLN_FILE_TORCH $REF_FILE_TORCH /temperature/temperature
 }
