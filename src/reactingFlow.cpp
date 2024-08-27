@@ -355,6 +355,11 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
       std::string inputPath(basepath + "/tabulated");
       readTableWrapper(inputPath, chemistryInput_.reactionInputs[r - 1].tableInput);
 
+    } else if (model == "radiative_decay") {
+      reactionModels[r - 1] = RADIATIVE_DECAY;
+      std::string inputPath(basepath + "/tabulated");
+      readTableWrapper(inputPath, chemistryInput_.reactionInputs[r - 1].tableInput);
+      
     } else {
       grvy_printf(GRVY_ERROR, "\nUnknown reaction_model -> %s", model.c_str());
       exit(ERROR);
