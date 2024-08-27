@@ -1517,12 +1517,12 @@ void ReactingFlow::step() {
 
     // Y_electron = sum_{i \in active species} (m_electron / m_i) * q_i * Y_i
     for (int iSpecies = 0; iSpecies < nActiveSpecies_; iSpecies++) {
-      setScalarFromVector(Yn_next_, iSpecies, &tmpR1_);
+      setScalarFromVector(Yn_next_, iSpecies, &tmpR0a_);
       const double q_sp = mixture_->GetGasParams(iSpecies, GasParams::SPECIES_CHARGES);
       const double m_sp = mixture_->GetGasParams(iSpecies, GasParams::SPECIES_MW);
       const double fac = q_sp / m_sp;
-      tmpR1_ *= fac;
-      tmpR0_ += tmpR1_;
+      tmpR0a_ *= fac;
+      tmpR0_ += tmpR0a_;
     }
     const int iElectron = nSpecies_ - 2;  // TODO(trevilo): check me!
     const double m_electron = mixture_->GetGasParams(iElectron, GasParams::SPECIES_MW);
@@ -1593,12 +1593,12 @@ void ReactingFlow::step() {
 
         // Y_electron = sum_{i \in active species} (m_electron / m_i) * q_i * Y_i
         for (int iSpecies = 0; iSpecies < nActiveSpecies_; iSpecies++) {
-          setScalarFromVector(Yn_, iSpecies, &tmpR1_);
+          setScalarFromVector(Yn_, iSpecies, &tmpR0a_);
           const double q_sp = mixture_->GetGasParams(iSpecies, GasParams::SPECIES_CHARGES);
           const double m_sp = mixture_->GetGasParams(iSpecies, GasParams::SPECIES_MW);
           const double fac = q_sp / m_sp;
-          tmpR1_ *= fac;
-          tmpR0_ += tmpR1_;
+          tmpR0a_ *= fac;
+          tmpR0_ += tmpR0a_;
         }
         const int iElectron = nSpecies_ - 2;  // TODO(trevilo): check me!
         const double m_electron = mixture_->GetGasParams(iElectron, GasParams::SPECIES_MW);
