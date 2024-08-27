@@ -33,15 +33,32 @@ void testTableInterpolator1D(TPS::Tps &tps, int rank) {
   TableInterpolator *table = new LinearTable(input);
 
   // test findInterval routine.
+
+  // Some random locations
   const int Ntest = 100;
   for (int k = 0; k < Ntest; k++) {
     double xEval = input.xdata[0] + (input.xdata[Ndata-1] - input.xdata[0]) * uniformRandomNumber();
     int index = table->findInterval(xEval);
+    assert(index >= 0);
+    assert(index <= Ndata-1);
     if ((input.xdata[index] > xEval) || (input.xdata[index+1] < xEval)) {
       grvy_printf(GRVY_ERROR, "findIndex failed!: %.5f < xEval: %.5f < %.5f\n", input.xdata[index], xEval, input.xdata[index+1]);
       exit(ERROR);
     }
   }
+
+  // First point
+  {
+    double xEval = input.xdata[0];
+    int index = table->findInterval(xEval);
+    assert(index >= 0);
+    assert(index <= Ndata-1);
+    if ((input.xdata[index] > xEval) || (input.xdata[index+1] < xEval)) {
+      grvy_printf(GRVY_ERROR, "findIndex failed!: %.5f < xEval: %.5f < %.5f\n", input.xdata[index], xEval, input.xdata[index+1]);
+      exit(ERROR);
+    }
+  }
+
   // Check the values outside the range.
   double xEval = input.xdata[0] - 0.1 * (input.xdata[Ndata-1] - input.xdata[0]);
   int index = table->findInterval(xEval);
@@ -93,6 +110,7 @@ void testTableInterpolator1D(TPS::Tps &tps, int rank) {
     double error = abs((fref - ftest[0]) / fref);
     if (error >= scalarErrorThreshold) {
       grvy_printf(GRVY_ERROR, "Rank %d - %.5E: %.5E\n", rank, xtest, abs((fref - ftest[0]) / fref));
+      grvy_printf(GRVY_ERROR, "Rank %d - %.5E: %.5E\n", rank, ftest[0], fref);
       exit(ERROR);
     }
   }

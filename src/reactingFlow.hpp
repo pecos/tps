@@ -62,6 +62,7 @@ using ScalarFuncT = double(const Vector &x, double t);
 
 class LoMachOptions;
 struct temporalSchemeCoefficients;
+class Radiation;
 
 /**
    Energy/species class specific for temperature solves with loMach flows
@@ -91,6 +92,7 @@ class ReactingFlow : public ThermoChemModelBase {
   GasModel gasModel_;
   TransportModel transportModel_;
   ChemistryModel chemistryModel_;
+  Radiation *radiation_ = nullptr;
 
   // packaged inputs
   PerfectMixtureInput mixtureInput_;
@@ -110,10 +112,11 @@ class ReactingFlow : public ThermoChemModelBase {
   // Flags
   bool rank0_;                      /**< true if this is rank 0 */
   bool partial_assembly_ = false;   /**< Enable/disable partial assembly of forms. */
-  bool numerical_integ_ = true;     /**< Enable/disable numerical integration rules of forms. */
+  bool numerical_integ_ = false;    // true;     /**< Enable/disable numerical integration rules of forms. */
   bool constant_viscosity_ = false; /**< Enable/disable constant viscosity */
   bool constant_density_ = false;   /**< Enable/disable constant density */
   bool domain_is_open_ = false;     /**< true if domain is open */
+  bool axisym_ = false;             /**< true if simulation is axisymmetric */
 
   // Linear-solver-related options
   int pl_solve_ = 0;    /**< Verbosity level passed to mfem solvers */
@@ -174,6 +177,7 @@ class ReactingFlow : public ThermoChemModelBase {
   ParGridFunction Tn_gf_, Tn_next_gf_, Text_gf_, resT_gf_;
   ParGridFunction rn_gf_;
   ParGridFunction rhoDt_gf_;
+  ParGridFunction weff_gf_;
 
   // additions for species
   ParGridFunction Ynm1_gf_, Ynm2_gf_;
@@ -190,6 +194,12 @@ class ReactingFlow : public ThermoChemModelBase {
   ParGridFunction diffY_gf_;
   ParGridFunction R0PM0_gf_;
   ParGridFunction Qt_gf_;
+
+  ParGridFunction radiation_sink_gf_;
+
+  // Interface with EM
+  ParGridFunction sigma_gf_;
+  ParGridFunction jh_gf_;
 
   // ParGridFunction *buffer_tInlet_ = nullptr;
   GridFunctionCoefficient *temperature_bc_field_ = nullptr;
@@ -218,6 +228,21 @@ class ReactingFlow : public ThermoChemModelBase {
   GridFunctionCoefficient *species_Cp_coeff_ = nullptr;
   ProductCoefficient *species_diff_Cp_coeff_ = nullptr;
 
+  GridFunctionCoefficient *jh_coeff_ = nullptr;
+  GridFunctionCoefficient *radiation_sink_coeff_ = nullptr;
+
+  ProductCoefficient *rad_rho_coeff_ = nullptr;
+  ProductCoefficient *rad_rho_Cp_coeff_ = nullptr;
+  ScalarVectorProductCoefficient *rad_rho_u_coeff_ = nullptr;
+  ScalarVectorProductCoefficient *rad_rho_Cp_u_coeff_ = nullptr;
+  ProductCoefficient *rad_rho_over_dt_coeff_ = nullptr;
+  ProductCoefficient *rad_species_diff_total_coeff_ = nullptr;
+  ProductCoefficient *rad_rho_Cp_over_dt_coeff_ = nullptr;
+  ProductCoefficient *rad_thermal_diff_total_coeff_ = nullptr;
+  ProductCoefficient *rad_jh_coeff_ = nullptr;
+  ProductCoefficient *rad_radiation_sink_coeff_ = nullptr;
+  ScalarVectorProductCoefficient *rad_kap_gradT_coeff_ = nullptr;
+
   // operators and solvers
   ParBilinearForm *At_form_ = nullptr;
   ParBilinearForm *Ay_form_ = nullptr;
@@ -232,6 +257,8 @@ class ReactingFlow : public ThermoChemModelBase {
   ParBilinearForm *LY_form_ = nullptr;
   ParMixedBilinearForm *G_form_ = nullptr;
   ParBilinearForm *Mv_form_ = nullptr;
+
+  ParLinearForm *jh_form_ = nullptr;
 
   OperatorHandle LQ_;
   OperatorHandle LY_;
@@ -266,6 +293,8 @@ class ReactingFlow : public ThermoChemModelBase {
   Vector tmpR0a_, tmpR0b_, tmpR0c_;
   Vector tmpR1_;
   Vector tmpR1a_, tmpR1b_, tmpR1c_;
+  Vector jh_;
+  Vector radiation_sink_;
 
   // additions for species
   Vector Yn_, Yn_next_, Ynm1_, Ynm2_;
@@ -289,12 +318,15 @@ class ReactingFlow : public ThermoChemModelBase {
   Vector diffY_;
   Vector kappa_;
   Vector visc_;
+  Vector sigma_;
 
   // time-splitting
   Vector YnStar_, spec_buffer_;
   Vector TnStar_, temp_buffer_;
   bool operator_split_ = false;
   int nSub_;
+  bool dynamic_substepping_ = true;
+  int stabFrac_;
 
   // Parameters and objects used in filter-based stabilization
   bool filter_temperature_ = false;
@@ -308,6 +340,10 @@ class ReactingFlow : public ThermoChemModelBase {
 
   double Pnm1_, Pnm2_, Pnm3_;
 
+  std::list<mfem::DenseMatrix> tableHost_;
+  std::vector<ParGridFunction *> vizSpecFields_;
+  std::vector<std::string> vizSpecNames_;
+
  public:
   ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff, TPS::Tps *tps);
   virtual ~ReactingFlow();
@@ -318,6 +354,7 @@ class ReactingFlow : public ThermoChemModelBase {
   void step() final;
   void initializeIO(IODataOrganizer &io) final;
   void initializeViz(ParaViewDataCollection &pvdc) final;
+  void evaluatePlasmaConductivityGF() final;
 
   // Functions added here
   void speciesLastStep();
@@ -372,5 +409,8 @@ class ReactingFlow : public ThermoChemModelBase {
   void AddTempDirichletBC(ScalarFuncT *f, Array<int> &attr);
   void AddQtDirichletBC(Coefficient *coeff, Array<int> &attr);
   void AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr);
+
+  void evalSubstepNumber();
+  void readTableWrapper(std::string inputPath, TableInput &result);
 };
 #endif  // REACTINGFLOW_HPP_

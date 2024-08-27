@@ -298,6 +298,8 @@ class M2ulPhyS : public TPS::PlasmaSolver {
   // I/O organizer
   IODataOrganizer ioData;
 
+  std::list<mfem::DenseMatrix> tableHost_;
+
 #ifdef HAVE_MASA
   VectorFunctionCoefficient *DenMMS_, *VelMMS_, *PreMMS_;
   VectorFunctionCoefficient *stateMMS_;
@@ -393,6 +395,7 @@ class M2ulPhyS : public TPS::PlasmaSolver {
   void parsePostProcessVisualizationInputs();
   void parseRadiationInputs();
   void parsePlaneDump();
+  void readTableWrapper(std::string inputPath, TableInput &result);
 
   void packUpGasMixtureInput();
   void identifySpeciesType(Array<ArgonSpcs> &speciesType);
@@ -467,8 +470,6 @@ class M2ulPhyS : public TPS::PlasmaSolver {
   int getMaximumIterations() const { return MaxIters; }
   int getCurrentIterations() const { return iter; }
   void setMaximumIterations(int value) { MaxIters = value; }
-
-  void readTable(const std::string &inputPath, TableInput &result);
 };
 
 #endif  // M2ULPHYS_HPP_

@@ -2036,86 +2036,21 @@ void PerfectMixture::GetSpeciesFromLTE(double *conserv, double *primit, TableInt
   // Compute the pressure and the total mol density
   const double R = R_table->eval(T, rho);
   const double p_0 = rho * R * T;
-  const double n_0 = p_0 / T / UNIVERSALGASCONSTANT;  // [mol/m^3] Number density based on bulk temperature
 
-  // Given the total number density, the equilibrium electron number
-  // density may be obtained from the Saha equation, which can be
-  // derived from the equilibrium constant for the ionization
-  // reaction.
-
-  //  Calculate the necessary partition functions...
-
-  // ... first for the neutral, considering all energy levels
-  double Q_n = 1.0;  // Add contribution of ground state.
-  const int nPop = ambipolar ? (numActiveSpecies - 1) : (numActiveSpecies - 2);
-  for (int sp = 0; sp < nPop; sp++) {
-    const double gsp = GetGasParams(sp, GasParams::SPECIES_DEGENERACY);
-    const double E0 = GetGasParams(sp, GasParams::FORMATION_ENERGY);
-    Q_n += gsp * exp(-E0 / UNIVERSALGASCONSTANT / T);  // E0 in J/mol, so e/kT = E0/NA/RT
-  }
-
-  // ... second for the ion, where all levels are lumped into one
-  const double Q_i = GetGasParams(iIon1, GasParams::SPECIES_DEGENERACY);
-
-  // ... finally for the electron, which is simply 2 (b/c spin)
-  const double Q_e = 2.0;
-
-  const double mw_neu = GetGasParams(iBackground, GasParams::SPECIES_MW);
-  const double mw_ion = GetGasParams(iIon1, GasParams::SPECIES_MW);
-  const double massratio = mw_ion / mw_neu;
-  const double mr32 = massratio * sqrt(massratio);
-
-  const double lame = PLANCKCONSTANT / (sqrt(2 * PI * ELECTRONMASS * BOLTZMANNCONSTANT * T));
-  const double lame3 = lame * lame * lame;
-  const double Qrat = Q_e * Q_i / Q_n;
-  const double EF_ion = GetGasParams(iIon1, GasParams::FORMATION_ENERGY);  // in J/mol
-  const double tempSaha = mr32 * (Qrat / lame3) * exp(-EF_ion / UNIVERSALGASCONSTANT / T) / AVOGADRONUMBER;
-  const double n_e = -tempSaha + sqrt(tempSaha * tempSaha + n_0 * tempSaha);
-
-  const double n_neutral = n_0 - 2 * n_e;  // 2 b/c charge-neutrality
-
-  // Now that we know the neutral number density, the distribution
-  // over energy levels is given by the Boltzmann distribution
-
-  // Vector to store all mol densities [mol/m^3]
+  // Given the pressure and temperature, compute the number densities
   Vector n_sp(numSpecies);
-
-  // Boltzmann Distribution - Excited level populations
-  for (int sp = 0; sp < nPop; sp++) {
-    const double gsp = GetGasParams(sp, GasParams::SPECIES_DEGENERACY);
-    const double E0 = GetGasParams(sp, GasParams::FORMATION_ENERGY);
-    n_sp[sp] = n_neutral * gsp * exp(-E0 / UNIVERSALGASCONSTANT / T) / Q_n;
-  }
-
-  n_sp[iIon1] = n_e;
-  n_sp[iElectron] = n_e;
-  n_sp[iBackground] = n_neutral / Q_n;
-
-  if (n_e < 0.0) {
-    printf("n_e = %.6e < 0!!!!!!!!!!!!!!", n_e);
-    fflush(stdout);
-  }
-
-  // Total number molar density should be (nearly) preserved
-  double n_0_check = 0.0;
-  double rho_update = 0.0;
-  for (int isp = 0; isp < numSpecies; isp++) {
-    n_0_check += n_sp[isp];
-    rho_update += n_sp[isp] * GetGasParams(isp, GasParams::SPECIES_MW);
-  }
-
-  assert(abs(n_0 - n_0_check) / n_0 < 1e-14);
-  assert(n_e >= 0.0);
-
-  for (int isp = 0; isp < numSpecies; isp++) {
-    assert(n_sp[isp] >= 0.0);
-  }
+  GetSpeciesFromLTE(T, p_0, n_sp.HostWrite());
+  const double n_e = n_sp[iElectron];
 
   //--------------------------------------------------------------------------
   // Fill in the state
 
   // First, update the mixture density and momentum.
-  //
+  double rho_update = 0.0;
+  for (int isp = 0; isp < numSpecies; isp++) {
+    rho_update += n_sp[isp] * GetGasParams(isp, GasParams::SPECIES_MW);
+  }
+
   // We note that the density may change, very slightly, say a few
   // tenths of a percent, due to inconsistency between the excited
   // levels used in generating the LTE tables and the excited levels
@@ -2162,4 +2097,97 @@ void PerfectMixture::GetSpeciesFromLTE(double *conserv, double *primit, TableInt
 
   conserv[iTh] = totalEnergy;
   primit[iTh] = T;
+}
+
+void PerfectMixture::GetSpeciesFromLTE(const double T, const double p, double *n_sp) {
+  // This routine makes the following assumptions:
+  //
+  // 1) There is only 1 charged specie and it is a positive ion with
+  //    charge +e
+  //
+  // 2) Only atomic species and electrons are in the mixture, because
+  //    we don't evaluate vibrational or rotational partition function
+  //    contributions
+  //
+  // 3) The plasma is "weakly" ionized---the results used here assume
+  //    we have a mixture of perfect gases, so no interatomic forces
+  //    are considered, which means we neglect Coulomb effects.
+  //
+  // TODO(trevilo): Relax these assumptions
+
+  // Indexing:
+  // 0            1           2            3           4           5
+  // Ar(m)       Ar(r)      Ar(4p)        Ar+          E          Ar(g)
+  // n/a         n/a         n/a         iIon1      iElectron  iBackground
+
+  // Number density based on bulk temperature [mol/m^3]
+  const double n_0 = p / T / UNIVERSALGASCONSTANT;
+
+  // Given the total number density, the equilibrium electron number
+  // density may be obtained from the Saha equation, which can be
+  // derived from the equilibrium constant for the ionization
+  // reaction.
+
+  //  Calculate the necessary partition functions...
+
+  // ... first for the neutral, considering all energy levels
+  double Q_n = 1.0;  // Add contribution of ground state.
+  const int nPop = ambipolar ? (numActiveSpecies - 1) : (numActiveSpecies - 2);
+  for (int sp = 0; sp < nPop; sp++) {
+    const double gsp = GetGasParams(sp, GasParams::SPECIES_DEGENERACY);
+    const double E0 = GetGasParams(sp, GasParams::FORMATION_ENERGY);
+    Q_n += gsp * exp(-E0 / UNIVERSALGASCONSTANT / T);  // E0 in J/mol, so e/kT = E0/NA/RT
+  }
+
+  // ... second for the ion, where all levels are lumped into one
+  const double Q_i = GetGasParams(iIon1, GasParams::SPECIES_DEGENERACY);
+
+  // ... finally for the electron, which is simply 2 (b/c spin)
+  const double Q_e = 2.0;
+
+  const double mw_neu = GetGasParams(iBackground, GasParams::SPECIES_MW);
+  const double mw_ion = GetGasParams(iIon1, GasParams::SPECIES_MW);
+  const double massratio = mw_ion / mw_neu;
+  const double mr32 = massratio * sqrt(massratio);
+
+  const double lame = PLANCKCONSTANT / (sqrt(2 * PI * ELECTRONMASS * BOLTZMANNCONSTANT * T));
+  const double lame3 = lame * lame * lame;
+  const double Qrat = Q_e * Q_i / Q_n;
+  const double EF_ion = GetGasParams(iIon1, GasParams::FORMATION_ENERGY);  // in J/mol
+  const double tempSaha = mr32 * (Qrat / lame3) * exp(-EF_ion / UNIVERSALGASCONSTANT / T) / AVOGADRONUMBER;
+  const double n_e = -tempSaha + sqrt(tempSaha * tempSaha + n_0 * tempSaha);
+
+  const double n_neutral = n_0 - 2 * n_e;  // 2 b/c charge-neutrality
+
+  // Now that we know the neutral number density, the distribution
+  // over energy levels is given by the Boltzmann distribution
+
+  // Boltzmann Distribution - Excited level populations
+  for (int sp = 0; sp < nPop; sp++) {
+    const double gsp = GetGasParams(sp, GasParams::SPECIES_DEGENERACY);
+    const double E0 = GetGasParams(sp, GasParams::FORMATION_ENERGY);
+    n_sp[sp] = n_neutral * gsp * exp(-E0 / UNIVERSALGASCONSTANT / T) / Q_n;
+  }
+
+  n_sp[iIon1] = n_e;
+  n_sp[iElectron] = n_e;
+  n_sp[iBackground] = n_neutral / Q_n;
+
+  if (n_e < 0.0) {
+    printf("n_e = %.6e < 0!!!!!!!!!!!!!!", n_e);
+    fflush(stdout);
+  }
+
+  // Total number molar density should be (nearly) preserved
+  double n_0_check = 0.0;
+  for (int isp = 0; isp < numSpecies; isp++) {
+    n_0_check += n_sp[isp];
+  }
+
+  assert(abs(n_0 - n_0_check) / n_0 < 1e-14);
+  assert(n_e >= 0.0);
+
+  for (int isp = 0; isp < numSpecies; isp++) {
+    assert(n_sp[isp] >= 0.0);
+  }
 }
