@@ -30,30 +30,39 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
 
-#include <sys/types.h>
-#include <tps_config.h>
-#include <unistd.h>
+#include "data_exchange_utils.hpp"
 
 #ifdef HAVE_PYTHON
+#include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
 namespace py = pybind11;
 
 namespace tps_wrappers {
-void tps(py::module& m);
-void tps2bolzmann(py::module& m);
-void data_exchange_utils(py::module& m);
-void qms2flow1d(py::module& m);
-}  // namespace tps_wrappers
+void data_exchange_utils(py::module &m) {
+  // Can by read in numpy as np.array(data_instance, copy = False)
+  py::class_<TPS::CPUDataRead>(m, "CPUDataRead", py::buffer_protocol())
+      .def_buffer([](TPS::CPUDataRead &d) -> py::buffer_info {
+        return py::buffer_info(d.data(),                                /*pointer to buffer*/
+                               sizeof(double),                          /*size of one element*/
+                               py::format_descriptor<double>::format(), /*python struct-style format descriptor*/
+                               1,                                       /*number of dimensions*/
+                               {d.size()},                              /*buffer dimension(s)*/
+                               {d.stride() * sizeof(const double)},     /*Stride in bytes for each index*/
+                               true /*read only*/);
+      });
 
-PYBIND11_MODULE(libtps, m) {
-  m.doc() = "TPS Python Interface";
-
-  tps_wrappers::tps(m);
-  tps_wrappers::tps2bolzmann(m);
-  tps_wrappers::data_exchange_utils(m);
-  tps_wrappers::qms2flow1d(m);
+  py::class_<TPS::CPUData>(m, "CPUData", py::buffer_protocol()).def_buffer([](TPS::CPUData &d) -> py::buffer_info {
+    return py::buffer_info(d.data(),                                /*pointer to buffer*/
+                           sizeof(double),                          /*size of one element*/
+                           py::format_descriptor<double>::format(), /*python struct-style format descriptor*/
+                           1,                                       /*number of dimensions*/
+                           {d.size()},                              /*buffer dimension(s)*/
+                           {d.stride() * sizeof(const double)},     /*Stride in bytes for each index*/
+                           false /*writetable*/);
+  });
 }
+}  // namespace tps_wrappers
 
 #endif
