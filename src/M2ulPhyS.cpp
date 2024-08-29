@@ -4224,7 +4224,9 @@ void M2ulPhyS::updateVisualizationVariables() {
       Th = prim[1 + _nvel];
       Te = (in_mix->IsTwoTemperature()) ? prim[_num_equation - 1] : Th;
       double kfwd[gpudata::MAXREACTIONS], kC[gpudata::MAXREACTIONS];
-      in_chem->computeForwardRateCoeffs(Th, Te, n, kfwd);
+      // Vector n_sp;
+      // mixture->computeNumberDensities(state, n_sp);
+      in_chem->computeForwardRateCoeffs(nsp, Th, Te, n, kfwd);
       in_chem->computeEquilibriumConstants(Th, Te, kC);
       // get reaction rates
       double progressRates[gpudata::MAXREACTIONS];

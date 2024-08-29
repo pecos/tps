@@ -659,7 +659,8 @@ struct ChemistryInput {
   ReactionModel reactionModels[gpudata::MAXREACTIONS];
   double equilibriumConstantParams[gpudata::MAXCHEMPARAMS * gpudata::MAXREACTIONS];
   ReactionInput reactionInputs[gpudata::MAXREACTIONS];
-
+  std::vector<std::string> speciesNames;
+  std::map<std::string, int> speciesMapping;
   double minimumTemperature;
 };
 

@@ -89,6 +89,12 @@ MFEM_HOST_DEVICE Chemistry::Chemistry(GasMixture *mixture, const ChemistryInput 
       case GRIDFUNCTION_RXN: {
         reactions_[r] = new GridFunctionReaction(inputs.reactionInputs[r].indexInput);
       } break;
+      case RADIATIVE_DECAY: {
+        assert(inputs.reactionInputs[r].modelParams != NULL);
+        double R = inputs.reactionInputs[r].modelParams[0];
+        reactions_[r] = new RadiativeDecay(R, &inputs.speciesMapping, &inputs.speciesNames, &numSpecies_,
+                                           reactantStoich_, productStoich_);
+      } break;
       default:
         printf("Unknown reactionModel.");
         assert(false);
@@ -128,13 +134,13 @@ void Chemistry::setGridFunctionRates(mfem::GridFunction &f) {
 }
 
 #if 0
-void Chemistry::computeForwardRateCoeffs(const double &T_h, const double &T_e, Vector &kfwd) {
+void Chemistry::computeForwardRateCoeffs(const mfem::Vector &ns, const double &T_h, const double &T_e, Vector &kfwd) {
   kfwd.SetSize(numReactions_);
 
   const double Thlim = max(T_h, min_temperature_);
   const double Telim = max(T_e, min_temperature_);
 
-  computeForwardRateCoeffs(Thlim, Telim, &kfwd[0]);
+  computeForwardRateCoeffs(&ns[0], Thlim, Telim, &kfwd[0]);
   // kfwd = 0.0;
   //
   // for (int r = 0; r < numReactions_; r++) {
@@ -146,8 +152,8 @@ void Chemistry::computeForwardRateCoeffs(const double &T_h, const double &T_e, V
 }
 #endif
 
-MFEM_HOST_DEVICE void Chemistry::computeForwardRateCoeffs(const double &T_h, const double &T_e, const int &dofindex,
-                                                          double *kfwd) {
+MFEM_HOST_DEVICE void Chemistry::computeForwardRateCoeffs(const double *ns, const double &T_h, const double &T_e,
+                                                          const int &dofindex, double *kfwd) {
   // kfwd.SetSize(numReactions_);
   for (int r = 0; r < numReactions_; r++) kfwd[r] = 0.0;
 
@@ -156,7 +162,7 @@ MFEM_HOST_DEVICE void Chemistry::computeForwardRateCoeffs(const double &T_h, con
 
   for (int r = 0; r < numReactions_; r++) {
     bool isElectronInvolved = isElectronInvolvedAt(r);
-    kfwd[r] = reactions_[r]->computeRateCoefficient(Thlim, Telim, dofindex, isElectronInvolved);
+    kfwd[r] = reactions_[r]->computeRateCoefficient(Thlim, Telim, dofindex, isElectronInvolved, ns);
   }
 
   return;

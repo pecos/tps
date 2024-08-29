@@ -335,7 +335,6 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
 
     if (model == "arrhenius") {
       reactionModels[r - 1] = ARRHENIUS;
-
       double A, b, E;
       tpsP_->getRequiredInput((basepath + "/arrhenius/A").c_str(), A);
       tpsP_->getRequiredInput((basepath + "/arrhenius/b").c_str(), b);
@@ -357,9 +356,10 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
 
     } else if (model == "radiative_decay") {
       reactionModels[r - 1] = RADIATIVE_DECAY;
-      std::string inputPath(basepath + "/tabulated");
-      readTableWrapper(inputPath, chemistryInput_.reactionInputs[r - 1].tableInput);
-      
+      double R;
+      tpsP_->getRequiredInput((basepath + "/radius").c_str(), R);
+      rxnModelParamsHost.push_back(Vector({R}));
+
     } else {
       grvy_printf(GRVY_ERROR, "\nUnknown reaction_model -> %s", model.c_str());
       exit(ERROR);
@@ -423,6 +423,22 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
       chemistryInput_.reactionInputs[r].modelParams = rxnModelParamsHost[rxn_param_idx].Read();
       rxn_param_idx += 1;
     }
+  }
+
+  // radiative decay needs this information as well
+  chemistryInput_.speciesNames.resize(nSpecies_);
+  paramIdx = 0;
+  for (int sp = 0; sp < nSpecies_; sp++) {
+    if (sp == backgroundIndex - 1) {
+      targetIdx = nSpecies_ - 1;
+    } else if (InputSpeciesNames[sp] == "E") {
+      targetIdx = nSpecies_ - 2;
+    } else {
+      targetIdx = paramIdx;
+      paramIdx++;
+    }
+    chemistryInput_.speciesMapping[InputSpeciesNames[sp]] = targetIdx;
+    chemistryInput_.speciesNames[targetIdx] = InputSpeciesNames[sp];
   }
 
   chemistry_ = new Chemistry(mixture_, chemistryInput_);
@@ -1971,7 +1987,7 @@ void ReactingFlow::speciesProduction() {
     mixture_->computeNumberDensities(state, n_sp);
 
     // Evaluate the chemical source terms
-    chemistry_->computeForwardRateCoeffs(Th, Te, i, kfwd.HostWrite());
+    chemistry_->computeForwardRateCoeffs(n_sp, Th, Te, i, kfwd.HostWrite());
     chemistry_->computeEquilibriumConstants(Th, Te, keq.HostWrite());
     chemistry_->computeProgressRate(n_sp, kfwd, keq, progressRate);
     chemistry_->computeCreationRate(progressRate, creationRate);
