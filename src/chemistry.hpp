@@ -89,6 +89,8 @@ class Chemistry {
 
   double min_temperature_;
 
+  ReactionModel reactionModels_[gpudata::MAXREACTIONS];
+  
  public:
   Chemistry(GasMixture *mixture, RunConfiguration &config);
   MFEM_HOST_DEVICE Chemistry(GasMixture *mixture, const ChemistryInput &inputs);
@@ -125,8 +127,8 @@ class Chemistry {
   void computeProgressRate(const Vector &ns, const Vector &kfwd, const Vector &keq, Vector &progressRate);
   MFEM_HOST_DEVICE void computeProgressRate(const double *ns, const double *kfwd, const double *keq,
                                             double *progressRate);
-  void computeCreationRate(const Vector &progressRate, Vector &creationRate);
-  MFEM_HOST_DEVICE void computeCreationRate(const double *progressRate, double *creationRate);
+  void computeCreationRate(const Vector &progressRate, Vector &creationRate, Vector &emmisionRate);
+  MFEM_HOST_DEVICE void computeCreationRate(const double *progressRate, double *creationRate, double *emmisionRate);
 
   MFEM_HOST_DEVICE double getReactionEnergy(const int &reactionIndex) { return reactionEnergies_[reactionIndex]; }
   int getNumReactions() { return numReactions_; }

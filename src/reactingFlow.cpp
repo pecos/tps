@@ -738,6 +738,12 @@ void ReactingFlow::initializeSelf() {
   prodY_gf_.SetSpace(sfes_);
   prodY_gf_ = 0.0;
 
+  prodE_.SetSize(yDofInt_);
+  prodE_ = 1.0e-12;
+
+  emission_gf_.SetSpace(sfes_);
+  emission_gf_ = 0.0;
+  
   sigma_gf_.SetSpace(sfes_);
   sigma_gf_ = 0.0;
 
@@ -1955,6 +1961,7 @@ void ReactingFlow::speciesProduction() {
   const double *dataRho = rn_.HostRead();
   const double *dataY = Yn_.HostRead();
   double *dataProd = prodY_.HostWrite();
+  double *dataEmit = prodE_.HostWrite();  
 
   // const int nEq = dim_ + 2 + nActiveSpecies_;
   Vector state(gpudata::MAXEQUATIONS);
@@ -1966,6 +1973,7 @@ void ReactingFlow::speciesProduction() {
   Vector keq;           // set to size nReactions_ in computeEquilibriumConstants
   Vector progressRate;  // set to size nReactions_ in computeProgressRate
   Vector creationRate;  // set to size nSpecies_ in computeCreationRate
+  Vector emissionRate;  // set to size nSpecies_ in computeCreationRate  
 
   kfwd.SetSize(chemistry_->getNumReactions());
   keq.SetSize(chemistry_->getNumReactions());
@@ -1990,21 +1998,25 @@ void ReactingFlow::speciesProduction() {
     chemistry_->computeForwardRateCoeffs(n_sp, Th, Te, i, kfwd.HostWrite());
     chemistry_->computeEquilibriumConstants(Th, Te, keq.HostWrite());
     chemistry_->computeProgressRate(n_sp, kfwd, keq, progressRate);
-    chemistry_->computeCreationRate(progressRate, creationRate);
+    chemistry_->computeCreationRate(progressRate, creationRate, emissionRate);
 
     // Place sources into storage for use in speciesStep
     for (int sp = 0; sp < nSpecies_; sp++) {
       dataProd[i + sp * sDofInt_] = creationRate[sp];
+      dataEmit[i + sp * sDofInt_] = emissionRate[sp];
     }
   }
 }
 
 void ReactingFlow::heatOfFormation() {
   hw_ = 0.0;
+  tmpR0_ = 0.0;
   double *h_hw = hw_.HostReadWrite();
+  double *h_em = tmpR0_.HostReadWrite();  
 
   const double *dataT = Tn_.HostRead();
   const double *h_prodY = prodY_.HostRead();
+  const double *h_prodE = prodE_.HostRead();  
 
   double hspecies;
   for (int i = 0; i < sDofInt_; i++) {
@@ -2017,9 +2029,11 @@ void ReactingFlow::heatOfFormation() {
       double molarCP = molarCV + UNIVERSALGASCONSTANT;
 
       hspecies = (molarCP * T + gasParams_(n, GasParams::FORMATION_ENERGY)) / gasParams_(n, GasParams::SPECIES_MW);
-      h_hw[i] -= hspecies * h_prodY[i + n * sDofInt_];
+      h_hw[i] -= hspecies * (h_prodY[i + n * sDofInt_] - h_prodE[i + n * sDofInt_]);
+      h_em[i] = hspecies * h_prodE[i + n * sDofInt_]; // not sure of sign
     }
   }
+  emission_gf_.SetFromTrueDofs(tmpR0_);  
 }
 
 void ReactingFlow::crossDiffusion() {
@@ -2124,6 +2138,7 @@ void ReactingFlow::initializeViz(ParaViewDataCollection &pvdc) {
   pvdc.RegisterField("Sjoule", &jh_gf_);
   pvdc.RegisterField("epsilon_rad", &radiation_sink_gf_);
   pvdc.RegisterField("weff", &weff_gf_);
+  pvdc.RegisterField("emission", &emission_gf_);  
 
   vizSpecFields_.clear();
   vizSpecNames_.clear();
