@@ -95,7 +95,7 @@ MFEM_HOST_DEVICE Chemistry::Chemistry(GasMixture *mixture, const ChemistryInput 
         assert(inputs.reactionInputs[r].modelParams != NULL);
         double R = inputs.reactionInputs[r].modelParams[0];
         reactions_[r] = new RadiativeDecay(R, &inputs.speciesMapping, &inputs.speciesNames, &numSpecies_,
-                                           reactantStoich_, productStoich_);
+                                           &reactantStoich_[r * numSpecies_], &productStoich_[r * numSpecies_]);
       } break;
       default:
         printf("Unknown reactionModel.");

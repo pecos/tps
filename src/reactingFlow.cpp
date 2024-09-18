@@ -382,8 +382,8 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     }
 
     Array<double> stoich(nSpecies_);
-    tpsP_->getRequiredVec((basepath + "/reactant_stoichiometry").c_str(), stoich, nSpecies_);
-
+    tpsP_->getRequiredVec((basepath + "/reactant_stoichiometry").c_str(), stoich, nSpecies_);    
+ 
     for (int sp = 0; sp < nSpecies_; sp++) {
       int inputSp = mixtureToInputMap[sp];
       reactantStoich(sp, r - 1) = stoich[inputSp];
