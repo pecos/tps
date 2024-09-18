@@ -117,13 +117,12 @@ MFEM_HOST_DEVICE double GridFunctionReaction::computeRateCoefficient([[maybe_unu
 }
 
 // Radiative decay portion: extracted from commit (de27f14)
-// should this be pulled out?
 MFEM_HOST_DEVICE RadiativeDecay::RadiativeDecay(const double _R, const std::map<std::string, int> *_speciesMapping,
                                                 const std::vector<std::string> *_speciesNames, const int *numSpecies,
                                                 const double *_reactantStoich, const double *_productStoich)
-    : Reaction(RADIATIVE_DECAY), R(_R) {
+    : Reaction(RADIATIVE_DECAY), Rcyl(_R) {
   rank0_ = Mpi::Root();
-  L = 2.0 * R;
+  Lcyl = 2.0 * Rcyl;
   numSpecies_ = *numSpecies;
 
   int numOfReactants = 0, numOfProducts = 0;
@@ -144,9 +143,10 @@ MFEM_HOST_DEVICE RadiativeDecay::RadiativeDecay(const double _R, const std::map<
 
   bool flag =
       ((upper_sp_name == "Ar_r" && lower_sp_name == "Ar") || (upper_sp_name == "Ar_p" && lower_sp_name == "Ar_r") ||
-       (upper_sp_name == "Ar_p" && lower_sp_name == "Ar_m"));
+       (upper_sp_name == "Ar_p" && lower_sp_name == "Ar_m") || upper_sp_name == "Ar");
   assert(flag);
 
+  // this is bizarre...
   if (upper_sp_name == "Ar_r" || upper_sp_name == "Ar") {
     NumOfInteral_lvl_u = E_lvl_r.size();
     E_lvl_u = &E_lvl_r;
@@ -174,6 +174,19 @@ MFEM_HOST_DEVICE RadiativeDecay::RadiativeDecay(const double _R, const std::map<
     g_lvl_l = &g_lvl_r;
     n_sp_lvl_l.resize(E_lvl_r.size());
     Aji = &Aji_4p_r;
+
+  } else if (upper_sp_name == "Ar") {
+    NumOfInteral_lvl_u = E_lvl_4p.size();
+    E_lvl_u = &E_lvl_4p;
+    g_lvl_u = &g_lvl_4p;
+    n_sp_lvl_u.resize(E_lvl_4p.size());
+
+    // these are the different bits but this section makes no sense
+    E_lvl_l = &E_lvl_g;
+    g_lvl_l = &g_lvl_g;
+    n_sp_lvl_l.resize(E_lvl_g.size());
+    Aji = &Aji_r_g;
+    
   } else {
     if (rank0_) std::cout << " Species " << upper_sp_name.c_str() << " not recognized for this reactive. " << std::endl;
     MPI_Barrier(MPI_COMM_WORLD);
@@ -267,21 +280,27 @@ MFEM_HOST_DEVICE double RadiativeDecay::escapeFactCalc(const double &n_i, const 
   double k0 = pow(lambda_0, 3) * (n_i * AVOGADRONUMBER) * g_j * A_ji * sqrt(M_Ar) /
               (8.0 * PI * g_i * sqrt(2.0 * BOLTZMANNCONSTANT * PI * T_g));
 
-  double q0 = R;
-  double Lq = L / (2 * q0);
+  double q0 = Rcyl;
+  double Lq = Lcyl / (2 * q0);
 
-  // compute escape factor
+  /// compute escape factor
+  
   // Mewe (1967)
-  // eta = ( 2.0 - exp(-1e-3 * k0 * R) ) / (1.0 + k0*R) ;
-  if ((k0 * (L / 2) > 1) && (k0 * q0 > 1)) {
+  // eta = ( 2.0 - exp(-1e-3 * k0 * Rcyl) ) / (1.0 + k0*Rcyl) ;
+  
+  if ((k0 * (Lcyl / 2) > 1) && (k0 * q0 > 1)) {
+    
     // Chai & Kwon Doppler lineshape
-    eta = (2.0 / (sqrt(PI * log(k0 * L / 2.0)) * k0 * L) / (2.0 * pow(Lq, 2) + 2.0) +
+    eta = (2.0 / (sqrt(PI * log(k0 * Lcyl / 2.0)) * k0 * Lcyl) / (2.0 * pow(Lq, 2) + 2.0) +
            1.0 / (sqrt(PI * log(k0 * q0)) * k0 * 2.0 * q0) * (Lq / (pow(Lq, 2) + 1) + atan(Lq)));
+    
     // Iordanova/Holstein
     // eta = 1.6 / (k0*R * pow((PI * log(k0*R)),2) ) ;
+    
     // Golubovskii et al. Lorentz lineshape
-    // eta = (1.0 / ( sqrt(PI*k0*L/2) ) * (2.0/3.0 - 2.0 * pow(Lq,1.5) / (3.0 * pow((pow(Lq,2) + 1),0.75)) )
+    // eta = (1.0 / ( sqrt(PI*k0*Lcyl/2) ) * (2.0/3.0 - 2.0 * pow(Lq,1.5) / (3.0 * pow((pow(Lq,2) + 1),0.75)) )
     //  + 1.0/(2.0*sqrt(PI*k0*q0))* 4.0*Lq*sqrt(Lq) / (3.0 * pow((pow(Lq,2) + 1),0.75)));
+    
   } else {
     eta = 1.0;
   }

@@ -149,8 +149,8 @@ class RadiativeDecay : public Reaction {
   const double small = 1.0e-50;
 
   // Length parameters used for the evaluation of the escape factors
-  const double R;  // Radius of a cylinder
-  double L;        // Length of a cylinder
+  const double Rcyl;  // Radius of a cylinder
+  double Lcyl;        // Length of a cylinder
 
   std::string upper_sp_name;
   std::string lower_sp_name;
