@@ -187,7 +187,7 @@ class RadiativeDecay : public Reaction {
                                  1131113.0237639823};  // [J/mol] // {11.54835442, 11.72316039}; // [eV]
   std::vector<double> g_lvl_m = {5.0, 1.0};
 
-  // 4s resonacne
+  // 4s resonance
   std::vector<double> E_lvl_r = {1121506.2040552883,
                                  1141235.3742507447};  // [J/mol] // {11.62359272, 11.82807116}; // [eV]
   std::vector<double> g_lvl_r = {3.0, 3.0};
