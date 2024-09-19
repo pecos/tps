@@ -146,7 +146,7 @@ MFEM_HOST_DEVICE RadiativeDecay::RadiativeDecay(const double _R, const std::map<
        (upper_sp_name == "Ar_p" && lower_sp_name == "Ar_m") || upper_sp_name == "Ar");
   assert(flag);
 
-  // this is bizarre...
+  // Allowed radiative transitions
   if (upper_sp_name == "Ar_r" || upper_sp_name == "Ar") {
     NumOfInteral_lvl_u = E_lvl_r.size();
     E_lvl_u = &E_lvl_r;
@@ -174,18 +174,6 @@ MFEM_HOST_DEVICE RadiativeDecay::RadiativeDecay(const double _R, const std::map<
     g_lvl_l = &g_lvl_r;
     n_sp_lvl_l.resize(E_lvl_r.size());
     Aji = &Aji_4p_r;
-
-  } else if (upper_sp_name == "Ar") {
-    NumOfInteral_lvl_u = E_lvl_4p.size();
-    E_lvl_u = &E_lvl_4p;
-    g_lvl_u = &g_lvl_4p;
-    n_sp_lvl_u.resize(E_lvl_4p.size());
-
-    // these are the different bits but this section makes no sense
-    E_lvl_l = &E_lvl_g;
-    g_lvl_l = &g_lvl_g;
-    n_sp_lvl_l.resize(E_lvl_g.size());
-    Aji = &Aji_r_g;
     
   } else {
     if (rank0_) std::cout << " Species " << upper_sp_name.c_str() << " not recognized for this reactive. " << std::endl;
