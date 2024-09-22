@@ -272,12 +272,12 @@ void Chemistry::computeCreationRate(const mfem::Vector &progressRate, mfem::Vect
 MFEM_HOST_DEVICE void Chemistry::computeCreationRate(const double *progressRate, double *creationRate, double *emissionRate) {
   // creationRate.SetSize(numSpecies_);
   for (int sp = 0; sp < numSpecies_; sp++) creationRate[sp] = 0.;
+  for (int sp = 0; sp < numSpecies_; sp++) emissionRate[sp] = 0.;  
   for (int sp = 0; sp < numSpecies_; sp++) {
     for (int r = 0; r < numReactions_; r++) {
       creationRate[sp] +=
           progressRate[r] * (productStoich_[sp + r * numSpecies_] - reactantStoich_[sp + r * numSpecies_]);
-      // if (reactionModels_[r] == RADIATIVE_DECAY) {
-      if (reactions_[r]->reactionModel == RADIATIVE_DECAY) {	
+      if (reactions_[r]->reactionModel == RADIATIVE_DECAY) {
         emissionRate[sp] +=
             progressRate[r] * (productStoich_[sp + r * numSpecies_] - reactantStoich_[sp + r * numSpecies_]);	
       }
