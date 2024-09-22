@@ -1670,7 +1670,7 @@ void ReactingFlow::step() {
 void ReactingFlow::evalSubstepNumber() {
   double myMaxProd = 0.0;
   double maxProd = 0.0;
-  double deltaYn;
+  double tmp, myDeltaYn, deltaYn;
 
   updateMixture();
   updateThermoP();
@@ -1679,9 +1679,24 @@ void ReactingFlow::evalSubstepNumber() {
 
   {
     const double *dataProd = prodY_.HostRead();
+    const double *dataYn = Yn_.HostRead();    
     for (int i = 0; i < sDofInt_; i++) {
       for (int sp = 0; sp < nSpecies_; sp++) {
-        myMaxProd = std::max(std::abs(dataProd[i + sp * sDofInt_]), myMaxProd);
+	
+	// basic based on max production
+        //myMaxProd = std::max(std::abs(dataProd[i + sp * sDofInt_]), myMaxProd);
+
+	// modified to amplify production if species could go negative or exceed unity
+	tmp = dataYn[i + sp * sDofInt_] + dataProd[i + sp * sDofInt_] * time_coeff_.dt;
+	if(tmp >= 1.0) {
+	  tmp = tmp - 1.0;
+	} else if(tmp >= 0.0) {
+	  tmp = 0.0;
+	} else {
+	  tmp = std::abs(tmp);
+	}
+	tmp /= 0.5*time_coeff_.dt;
+        myMaxProd = std::max(std::abs(dataProd[i + sp * sDofInt_]) + tmp, myMaxProd);	
       }
     }
   }
