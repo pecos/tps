@@ -632,6 +632,7 @@ void ReactingFlow::initializeSelf() {
   yDofInt_ = yfes_->GetTrueVSize();
 
   weff_gf_.SetSpace(vfes_);
+  weff_gf_ = 0.0;
 
   Qt_.SetSize(sDofInt_);
   Qt_ = 0.0;
@@ -1518,6 +1519,11 @@ void ReactingFlow::step() {
 
   updateDensity(1.0);
   updateDiffusivity();
+  Array<int> empty;  
+  MsRho_form_->Update();
+  MsRho_form_->Assemble();
+  MsRho_form_->FormSystemMatrix(empty, MsRho_);
+  
 
   // PART I: Form and solve implicit systems for species and temperature.
   //
@@ -1596,22 +1602,26 @@ void ReactingFlow::step() {
     // Evaluate (Yn_next_ - Yn_)/nSub and store in YnStar_, and analog
     // for TnStar_.
     substepState();
+    std::cout << "here 1..." << endl;
 
     // number of substeps
     if (dynamic_substepping_) evalSubstepNumber();
+    std::cout << "here 2..." << endl;    
 
     for (int iSub = 0; iSub < nSub_; iSub++) {
       // update wdot quantities at full substep in Yn/Tn state
-      updateMixture();
+      updateMixture();      
       updateThermoP();
       updateDensity(0.0);
       speciesProduction();
       heatOfFormation();
+      std::cout << iSub << ") here 3..." << endl;      
 
       // advance over substep
       for (int iSpecies = 0; iSpecies < nActiveSpecies_; iSpecies++) {
         speciesSubstep(iSpecies, iSub);
       }
+      std::cout << iSub << ") here 4..." << endl;      
       if (mixtureInput_.ambipolar) {
         // Evaluate electron mass fraction based on quasi-neutrality
 
@@ -1632,13 +1642,15 @@ void ReactingFlow::step() {
         tmpR0_ *= m_electron;
         setVectorFromScalar(tmpR0_, iElectron, &Yn_);
       }
+      std::cout << iSub << ") here 5..." << endl;      
       speciesLastSubstep();
       Yn_gf_.SetFromTrueDofs(Yn_);
 
       temperatureSubstep(iSub);
       Tn_gf_.SetFromTrueDofs(Tn_);
     }
-
+    std::cout << "here 6..." << endl;
+    
     // set register to correct full step fields
     Yn_next_ = Yn_;
     Tn_next_ = Tn_;
@@ -1650,15 +1662,19 @@ void ReactingFlow::step() {
     Tn_ = temp_buffer_;
     Tn_gf_.SetFromTrueDofs(Tn_);
   }
-
+  std::cout << "here 7..." << endl;
+  
   /// PART III: prepare for external use
   updateDensity(1.0);
+  std::cout << "here 7a..." << endl;  
   computeQtTO();
+  std::cout << "here 8..." << endl;  
 
   UpdateTimestepHistory(dt_);
 
   updateMixture();
   updateDiffusivity();
+  std::cout << "here 9..." << endl;  
 }
 
 void ReactingFlow::evalSubstepNumber() {
@@ -2502,10 +2518,6 @@ void ReactingFlow::updateDensity(double tStep) {
   }
   rn_gf_.SetFromTrueDofs(rn_);
 
-  MsRho_form_->Update();
-  MsRho_form_->Assemble();
-  MsRho_form_->FormSystemMatrix(empty, MsRho_);
-
   // project to p-space in case not same as vel-temp
   R0PM0_gf_.SetFromTrueDofs(rn_);
 }
@@ -2579,35 +2591,46 @@ void ReactingFlow::computeQtTO() {
   LQ_bdry_->Assemble();
   LQ_bdry_->ParallelAssemble(tmpR0_);
   tmpR0_.Neg();
+  std::cout << "here 7b..." << endl;    
 
   Array<int> empty;
   LQ_form_->Update();
+  std::cout << "here 7c..." << endl;      
   LQ_form_->Assemble();
+  std::cout << "here 7d..." << endl;      
   LQ_form_->FormSystemMatrix(empty, LQ_);
+  std::cout << "here 7e..." << endl;      
   LQ_->AddMult(Tn_next_, tmpR0_);  // tmpR0_ += LQ{Tn_next}
+  std::cout << "here 7f..." << endl;      
+
 
   // Joule heating (and radiation sink)
   jh_form_->Update();
   jh_form_->Assemble();
   jh_form_->ParallelAssemble(jh_);
   tmpR0_ -= jh_;
+  std::cout << "here 7g..." << endl;    
 
   // heat of formation
   Ms_->AddMult(hw_, tmpR0_, -1.0);
+  std::cout << "here 7h..." << endl;    
 
   // species-temp diffusion term, already in int-weak form
   tmpR0_.Add(-1.0, crossDiff_);
 
   sfes_->GetRestrictionMatrix()->MultTranspose(tmpR0_, resT_gf_);
+  std::cout << "here 7i..." << endl;    
 
   Qt_ = 0.0;
   Qt_gf_.SetFromTrueDofs(Qt_);
 
   Vector Xqt, Bqt;
   Mq_form_->FormLinearSystem(Qt_ess_tdof_, Qt_gf_, resT_gf_, Mq_, Xqt, Bqt, 1);
+  std::cout << "here 7j..." << endl;    
 
   MqInv_->Mult(Bqt, Xqt);
   Mq_form_->RecoverFEMSolution(Xqt, resT_gf_, Qt_gf_);
+  std::cout << "here 7k..." << endl;  
 
   Qt_gf_ *= Rmix_gf_;
   Qt_gf_ /= CpMix_gf_;
