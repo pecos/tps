@@ -187,7 +187,7 @@ jobs:
        - name: Dist
          run:  make dist
        - name: Archive tarball
-         uses: actions/upload-artifact@v3
+         uses: actions/upload-artifact@v4.4.0
          with:
            name: tarball-${{ github.event.pull_request.head.sha }}
            path: tps-*.tar.gz
@@ -204,7 +204,7 @@ jobs:
          with:
            access_token: ${{ github.token }}     
        - name: Access tarball
-         uses: actions/download-artifact@v3
+         uses: actions/download-artifact@v4.1.7
          with:
            name: tarball-${{ github.event.pull_request.head.sha }}
        - name: Expand
@@ -237,7 +237,7 @@ jobs:
          with:
            access_token: ${{ github.token }}    
        - name: Access tarball
-         uses: actions/download-artifact@v3
+         uses: actions/download-artifact@v4.1.7
          with:
            name: tarball-${{ github.event.pull_request.head.sha }}
        - name: Expand
