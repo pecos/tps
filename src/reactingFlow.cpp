@@ -2017,7 +2017,7 @@ void ReactingFlow::speciesProduction() {
     mixture_->computeNumberDensities(state, n_sp);
 
     // Evaluate the chemical source terms
-    chemistry_->computeForwardRateCoeffs(n_sp, Th, Te, i, kfwd.HostWrite());
+    chemistry_->computeForwardRateCoeffs(n_sp.Read(), Th, Te, i, kfwd.HostWrite());
     chemistry_->computeEquilibriumConstants(Th, Te, keq.HostWrite());
     chemistry_->computeProgressRate(n_sp, kfwd, keq, progressRate);
     chemistry_->computeCreationRate(progressRate, creationRate, emissionRate);
