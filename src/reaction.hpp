@@ -218,16 +218,16 @@ class RadiativeDecay : public Reaction {
   // Ar(4s[3/2]1)     1s4       0       1st resonacne
   // Ar(4s'[1/2]0)    1s3       1       2nd metastable
   // Ar(4s'[1/2]1)    1s2       1       2nd resonacne
-  // Ar(4p[1/2]1)     2p10	    0       4p states
-  // Ar(4p[5/2]3)     2p9	      1
-  // Ar(4p[5/2]2)     2p8	      2
-  // Ar(4p[3/2]1)     2p7	      3
-  // Ar(4p[3/2]2)     2p6	      4
-  // Ar(4p[1/2]0)     2p5	      5
-  // Ar(4p'[3/2]1)    2p4	      6
-  // Ar(4p'[3/2]2)    2p3	      7
-  // Ar(4p'[1/2]1)    2p2       8
-  // Ar(4p'[1/2]0)    2p1       9
+  // Ar(4p[1/2]1)     2p10     0       4p states
+  // Ar(4p[5/2]3)     2p9      1
+  // Ar(4p[5/2]2)     2p8      2
+  // Ar(4p[3/2]1)     2p7      3
+  // Ar(4p[3/2]2)     2p6      4
+  // Ar(4p[1/2]0)     2p5      5
+  // Ar(4p'[3/2]1)    2p4      6
+  // Ar(4p'[3/2]2)    2p3      7
+  // Ar(4p'[1/2]1)    2p2      8
+  // Ar(4p'[1/2]0)    2p1      9
 
   // Transitions based on NIST database
   // wavelength   upper level             lower level       A coef
