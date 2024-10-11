@@ -90,7 +90,7 @@ class Chemistry {
   double min_temperature_;
 
   ReactionModel reactionModels_[gpudata::MAXREACTIONS];
-  
+
  public:
   Chemistry(GasMixture *mixture, RunConfiguration &config);
   MFEM_HOST_DEVICE Chemistry(GasMixture *mixture, const ChemistryInput &inputs);

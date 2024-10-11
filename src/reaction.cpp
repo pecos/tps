@@ -174,7 +174,7 @@ MFEM_HOST_DEVICE RadiativeDecay::RadiativeDecay(const double _R, const std::map<
     g_lvl_l = &g_lvl_r;
     n_sp_lvl_l.resize(E_lvl_r.size());
     Aji = &Aji_4p_r;
-    
+
   } else {
     if (rank0_) std::cout << " Species " << upper_sp_name.c_str() << " not recognized for this reactive. " << std::endl;
     MPI_Barrier(MPI_COMM_WORLD);
@@ -272,23 +272,22 @@ MFEM_HOST_DEVICE double RadiativeDecay::escapeFactCalc(const double &n_i, const 
   double Lq = Lcyl / (2 * q0);
 
   /// compute escape factor
-  
+
   // Mewe (1967)
   // eta = ( 2.0 - exp(-1e-3 * k0 * Rcyl) ) / (1.0 + k0*Rcyl) ;
-  
+
   if ((k0 * (Lcyl / 2) > 1) && (k0 * q0 > 1)) {
-    
     // Chai & Kwon Doppler lineshape
     eta = (2.0 / (sqrt(PI * log(k0 * Lcyl / 2.0)) * k0 * Lcyl) / (2.0 * pow(Lq, 2) + 2.0) +
            1.0 / (sqrt(PI * log(k0 * q0)) * k0 * 2.0 * q0) * (Lq / (pow(Lq, 2) + 1) + atan(Lq)));
-    
+
     // Iordanova/Holstein
     // eta = 1.6 / (k0*R * pow((PI * log(k0*R)),2) ) ;
-    
+
     // Golubovskii et al. Lorentz lineshape
     // eta = (1.0 / ( sqrt(PI*k0*Lcyl/2) ) * (2.0/3.0 - 2.0 * pow(Lq,1.5) / (3.0 * pow((pow(Lq,2) + 1),0.75)) )
     //  + 1.0/(2.0*sqrt(PI*k0*q0))* 4.0*Lq*sqrt(Lq) / (3.0 * pow((pow(Lq,2) + 1),0.75)));
-    
+
   } else {
     eta = 1.0;
   }

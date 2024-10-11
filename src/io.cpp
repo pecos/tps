@@ -876,7 +876,7 @@ void IODataOrganizer::write(hid_t file, bool serial) {
     const int rank = fam.pfunc_->ParFESpace()->GetMyRank();
     const bool rank0 = (rank == 0);
 
-    assert(nprocs_max > 0);    
+    assert(nprocs_max > 0);
 
     if (rank0) {
       grvy_printf(ginfo, "\nCreating HDF5 group for defined IO families\n");
