@@ -867,7 +867,6 @@ void IODataOrganizer::write(hid_t file, bool serial) {
       nprocs_max = nprocs_tmp;
     }
   }
-  assert(nprocs_max > 0);
 
   // Do we need to serialize the data prior to the write?
   const bool require_serialization = (serial && nprocs_max > 1);
@@ -876,6 +875,8 @@ void IODataOrganizer::write(hid_t file, bool serial) {
   for (auto fam : families_) {
     const int rank = fam.pfunc_->ParFESpace()->GetMyRank();
     const bool rank0 = (rank == 0);
+
+    assert(nprocs_max > 0);    
 
     if (rank0) {
       grvy_printf(ginfo, "\nCreating HDF5 group for defined IO families\n");

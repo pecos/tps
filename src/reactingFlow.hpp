@@ -108,6 +108,7 @@ class ReactingFlow : public ThermoChemModelBase {
   DenseMatrix speciesComposition_;
   DenseMatrix gasParams_;
   double const_plasma_conductivity_;
+  bool radiative_decay_NECincluded_;
 
   // Flags
   bool rank0_;                      /**< true if this is rank 0 */
