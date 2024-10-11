@@ -249,9 +249,10 @@ MFEM_HOST_DEVICE void Chemistry::computeProgressRate(const double *ns, const dou
 }
 
 // compute creation rate based on progress rates.
-void Chemistry::computeCreationRate(const mfem::Vector &progressRate, mfem::Vector &creationRate, mfem::Vector &emissionRate) {
+void Chemistry::computeCreationRate(const mfem::Vector &progressRate, mfem::Vector &creationRate,
+                                    mfem::Vector &emissionRate) {
   creationRate.SetSize(numSpecies_);
-  emissionRate.SetSize(numSpecies_);  
+  emissionRate.SetSize(numSpecies_);
   computeCreationRate(&progressRate[0], &creationRate[0], &emissionRate[0]);
   // creationRate = 0.;
   // for (int sp = 0; sp < numSpecies_; sp++) {
@@ -269,21 +270,22 @@ void Chemistry::computeCreationRate(const mfem::Vector &progressRate, mfem::Vect
   // //   assert(fabs(totMass) < 1e-7);
 }
 
-MFEM_HOST_DEVICE void Chemistry::computeCreationRate(const double *progressRate, double *creationRate, double *emissionRate) {
+MFEM_HOST_DEVICE void Chemistry::computeCreationRate(const double *progressRate, double *creationRate,
+                                                     double *emissionRate) {
   // creationRate.SetSize(numSpecies_);
   for (int sp = 0; sp < numSpecies_; sp++) creationRate[sp] = 0.;
-  for (int sp = 0; sp < numSpecies_; sp++) emissionRate[sp] = 0.;  
+  for (int sp = 0; sp < numSpecies_; sp++) emissionRate[sp] = 0.;
   for (int sp = 0; sp < numSpecies_; sp++) {
     for (int r = 0; r < numReactions_; r++) {
       creationRate[sp] +=
           progressRate[r] * (productStoich_[sp + r * numSpecies_] - reactantStoich_[sp + r * numSpecies_]);
       if (reactions_[r]->reactionModel == RADIATIVE_DECAY) {
         emissionRate[sp] +=
-            progressRate[r] * (productStoich_[sp + r * numSpecies_] - reactantStoich_[sp + r * numSpecies_]);	
+            progressRate[r] * (productStoich_[sp + r * numSpecies_] - reactantStoich_[sp + r * numSpecies_]);
       }
     }
     creationRate[sp] *= mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
-    emissionRate[sp] *= mixture_->GetGasParams(sp, GasParams::SPECIES_MW);    
+    emissionRate[sp] *= mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
   }
 
   // check total created mass is 0

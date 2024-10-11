@@ -161,7 +161,7 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
 
     double progressRates[gpudata::MAXREACTIONS];
     double creationRates[gpudata::MAXSPECIES];
-    double emissionRates[gpudata::MAXSPECIES];    
+    double emissionRates[gpudata::MAXSPECIES];
     if (_numSpecies > 1 && _numReactions > 0) {
       double kfwd[gpudata::MAXREACTIONS], kC[gpudata::MAXREACTIONS];
       _chemistry->computeForwardRateCoeffs(ns, Th, Te, n, kfwd);

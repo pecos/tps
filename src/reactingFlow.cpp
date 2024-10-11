@@ -99,7 +99,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   // tpsP_->getInput("plasma_models/includeElectron", mixtureInput_.isElectronIncluded, true);
   tpsP_->getInput("plasma_models/two_temperature", mixtureInput_.twoTemperature, false);
   tpsP_->getInput("plasma_models/const_plasma_conductivity", const_plasma_conductivity_, 0.0);
-  tpsP_->getInput("plasma_models/is_rad_decay_in_NEC", radiative_decay_NECincluded_, true);  
+  tpsP_->getInput("plasma_models/is_rad_decay_in_NEC", radiative_decay_NECincluded_, true);
 
   if (mixtureInput_.twoTemperature) {
     if (rank0_) std::cout << "Two temperature is not yet supported in low Mach reacting flow." << std::endl;
@@ -177,7 +177,8 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   tpsP_->getRequiredInput("species/background_index", backgroundIndex);
   tpsP_->getInput("plasma_models/transport_model/argon_minimal/third_order_thermal_conductivity",
                   argonInput_.thirdOrderkElectron, true);
-  if(!(argonInput_.thirdOrderkElectron) && rank0_) std::cout << "Notice: Using 1st order electron thermal conductivity." << endl;
+  if (!(argonInput_.thirdOrderkElectron) && rank0_)
+    std::cout << "Notice: Using 1st order electron thermal conductivity." << endl;
   tpsP_->getInput("plasma_models/transport_model/artificial_multiplier/enabled", argonInput_.multiply, false);
   if (argonInput_.multiply) {
     tpsP_->getInput("plasma_models/transport_model/artificial_multiplier/viscosity",
@@ -384,8 +385,8 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     }
 
     Array<double> stoich(nSpecies_);
-    tpsP_->getRequiredVec((basepath + "/reactant_stoichiometry").c_str(), stoich, nSpecies_);    
- 
+    tpsP_->getRequiredVec((basepath + "/reactant_stoichiometry").c_str(), stoich, nSpecies_);
+
     for (int sp = 0; sp < nSpecies_; sp++) {
       int inputSp = mixtureToInputMap[sp];
       reactantStoich(sp, r - 1) = stoich[inputSp];
@@ -746,7 +747,7 @@ void ReactingFlow::initializeSelf() {
 
   emission_gf_.SetSpace(sfes_);
   emission_gf_ = 0.0;
-  
+
   sigma_gf_.SetSpace(sfes_);
   sigma_gf_ = 0.0;
 
@@ -1521,11 +1522,10 @@ void ReactingFlow::step() {
 
   updateDensity(1.0);
   updateDiffusivity();
-  Array<int> empty;  
+  Array<int> empty;
   MsRho_form_->Update();
   MsRho_form_->Assemble();
   MsRho_form_->FormSystemMatrix(empty, MsRho_);
-  
 
   // PART I: Form and solve implicit systems for species and temperature.
   //
@@ -1610,7 +1610,7 @@ void ReactingFlow::step() {
 
     for (int iSub = 0; iSub < nSub_; iSub++) {
       // update wdot quantities at full substep in Yn/Tn state
-      updateMixture();      
+      updateMixture();
       updateThermoP();
       updateDensity(0.0);
       speciesProduction();
@@ -1646,7 +1646,7 @@ void ReactingFlow::step() {
       temperatureSubstep(iSub);
       Tn_gf_.SetFromTrueDofs(Tn_);
     }
-    
+
     // set register to correct full step fields
     Yn_next_ = Yn_;
     Tn_next_ = Tn_;
@@ -1658,7 +1658,7 @@ void ReactingFlow::step() {
     Tn_ = temp_buffer_;
     Tn_gf_.SetFromTrueDofs(Tn_);
   }
-  
+
   /// PART III: prepare for external use
   updateDensity(1.0);
   computeQtTO();
@@ -1681,24 +1681,23 @@ void ReactingFlow::evalSubstepNumber() {
 
   {
     const double *dataProd = prodY_.HostRead();
-    const double *dataYn = Yn_.HostRead();    
+    const double *dataYn = Yn_.HostRead();
     for (int i = 0; i < sDofInt_; i++) {
       for (int sp = 0; sp < nSpecies_; sp++) {
-	
-	// basic based on max production
-        //myMaxProd = std::max(std::abs(dataProd[i + sp * sDofInt_]), myMaxProd);
+        // basic based on max production
+        // myMaxProd = std::max(std::abs(dataProd[i + sp * sDofInt_]), myMaxProd);
 
-	// modified to amplify production if species could go negative or exceed unity
-	tmp = dataYn[i + sp * sDofInt_] + dataProd[i + sp * sDofInt_] * time_coeff_.dt;
-	if(tmp >= 1.0) {
-	  tmp = tmp - 1.0;
-	} else if(tmp > 0.0) {
-	  tmp = 0.0;
-	} else {
-	  tmp = std::abs(tmp);
-	}
-	tmp /= 0.5*time_coeff_.dt;
-        myMaxProd = std::max(std::abs(dataProd[i + sp * sDofInt_]) + tmp, myMaxProd);	
+        // modified to amplify production if species could go negative or exceed unity
+        tmp = dataYn[i + sp * sDofInt_] + dataProd[i + sp * sDofInt_] * time_coeff_.dt;
+        if (tmp >= 1.0) {
+          tmp = tmp - 1.0;
+        } else if (tmp > 0.0) {
+          tmp = 0.0;
+        } else {
+          tmp = std::abs(tmp);
+        }
+        tmp /= 0.5 * time_coeff_.dt;
+        myMaxProd = std::max(std::abs(dataProd[i + sp * sDofInt_]) + tmp, myMaxProd);
       }
     }
   }
@@ -1984,7 +1983,7 @@ void ReactingFlow::speciesProduction() {
   const double *dataRho = rn_.HostRead();
   const double *dataY = Yn_.HostRead();
   double *dataProd = prodY_.HostWrite();
-  double *dataEmit = prodE_.HostWrite();  
+  double *dataEmit = prodE_.HostWrite();
 
   // const int nEq = dim_ + 2 + nActiveSpecies_;
   Vector state(gpudata::MAXEQUATIONS);
@@ -1996,7 +1995,7 @@ void ReactingFlow::speciesProduction() {
   Vector keq;           // set to size nReactions_ in computeEquilibriumConstants
   Vector progressRate;  // set to size nReactions_ in computeProgressRate
   Vector creationRate;  // set to size nSpecies_ in computeCreationRate
-  Vector emissionRate;  // set to size nSpecies_ in computeCreationRate  
+  Vector emissionRate;  // set to size nSpecies_ in computeCreationRate
 
   kfwd.SetSize(chemistry_->getNumReactions());
   keq.SetSize(chemistry_->getNumReactions());
@@ -2035,17 +2034,16 @@ void ReactingFlow::heatOfFormation() {
   hw_ = 0.0;
   tmpR0_ = 0.0;
   double *h_hw = hw_.HostReadWrite();
-  double *h_em = tmpR0_.HostReadWrite();  
+  double *h_em = tmpR0_.HostReadWrite();
 
   const double *dataT = Tn_.HostRead();
   const double *h_prodY = prodY_.HostRead();
-  const double *h_prodE = prodE_.HostRead();  
+  const double *h_prodE = prodE_.HostRead();
 
   double hspecies;
 
   // NOTE: not very elegant but dont want to nest an if
   if (radiative_decay_NECincluded_) {
-    
     for (int i = 0; i < sDofInt_; i++) {
       const double T = dataT[i];
 
@@ -2057,12 +2055,11 @@ void ReactingFlow::heatOfFormation() {
 
         hspecies = (molarCP * T + gasParams_(n, GasParams::FORMATION_ENERGY)) / gasParams_(n, GasParams::SPECIES_MW);
         h_hw[i] -= hspecies * (h_prodY[i + n * sDofInt_] - h_prodE[i + n * sDofInt_]);
-        h_em[i] = hspecies * h_prodE[i + n * sDofInt_]; // not sure of sign
+        h_em[i] = hspecies * h_prodE[i + n * sDofInt_];  // not sure of sign
       }
     }
 
   } else {
-    
     for (int i = 0; i < sDofInt_; i++) {
       const double T = dataT[i];
 
@@ -2074,14 +2071,12 @@ void ReactingFlow::heatOfFormation() {
 
         hspecies = (molarCP * T + gasParams_(n, GasParams::FORMATION_ENERGY)) / gasParams_(n, GasParams::SPECIES_MW);
         h_hw[i] -= hspecies * h_prodY[i + n * sDofInt_];
-        h_em[i] = hspecies * h_prodE[i + n * sDofInt_]; // not sure of sign
+        h_em[i] = hspecies * h_prodE[i + n * sDofInt_];  // not sure of sign
       }
     }
-    
   }
 
-    
-  emission_gf_.SetFromTrueDofs(tmpR0_);  
+  emission_gf_.SetFromTrueDofs(tmpR0_);
 }
 
 void ReactingFlow::crossDiffusion() {
@@ -2186,7 +2181,7 @@ void ReactingFlow::initializeViz(ParaViewDataCollection &pvdc) {
   pvdc.RegisterField("Sjoule", &jh_gf_);
   pvdc.RegisterField("epsilon_rad", &radiation_sink_gf_);
   pvdc.RegisterField("weff", &weff_gf_);
-  pvdc.RegisterField("emission", &emission_gf_);  
+  pvdc.RegisterField("emission", &emission_gf_);
 
   vizSpecFields_.clear();
   vizSpecNames_.clear();
@@ -2626,7 +2621,7 @@ void ReactingFlow::computeQtTO() {
 
   Array<int> empty;
   LQ_form_->Update();
-  LQ_form_->Assemble(); 
+  LQ_form_->Assemble();
   LQ_form_->FormSystemMatrix(empty, LQ_);
   LQ_->AddMult(Tn_next_, tmpR0_);  // tmpR0_ += LQ{Tn_next}
 

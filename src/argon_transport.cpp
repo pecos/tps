@@ -1097,11 +1097,12 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::GetThermalConductivities(const doub
                collisionIntegral(electronIndex_, electronIndex_, 2, 2, collInputs);
   }
 
-    kappa[1] = viscosityFactor_ * kOverEtaFactor_ * sqrt(collInputs.Te / mw_[electronIndex_]) * X_sp[electronIndex_] /
-               collisionIntegral(electronIndex_, electronIndex_, 2, 2, collInputs);
-  
-  //  std::cout << "good v bad:" << computeThirdOrderElectronThermalConductivity(X_sp, collInputs) << " <-> " << viscosityFactor_ * kOverEtaFactor_ * sqrt(collInputs.Te / mw_[electronIndex_]) * X_sp[electronIndex_] / collisionIntegral(electronIndex_, electronIndex_, 2, 2, collInputs) << endl;
-  
+  kappa[1] = viscosityFactor_ * kOverEtaFactor_ * sqrt(collInputs.Te / mw_[electronIndex_]) * X_sp[electronIndex_] /
+             collisionIntegral(electronIndex_, electronIndex_, 2, 2, collInputs);
+
+  //  std::cout << "good v bad:" << computeThirdOrderElectronThermalConductivity(X_sp, collInputs) << " <-> " <<
+  //  viscosityFactor_ * kOverEtaFactor_ * sqrt(collInputs.Te / mw_[electronIndex_]) * X_sp[electronIndex_] /
+  //  collisionIntegral(electronIndex_, electronIndex_, 2, 2, collInputs) << endl;
 }
 
 void ArgonMixtureTransport::computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield,
