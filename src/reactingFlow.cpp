@@ -1672,7 +1672,7 @@ void ReactingFlow::step() {
 void ReactingFlow::evalSubstepNumber() {
   double myMaxProd = 0.0;
   double maxProd = 0.0;
-  double tmp, myDeltaYn, deltaYn;
+  double tmp, deltaYn;
 
   updateMixture();
   updateThermoP();
