@@ -214,13 +214,10 @@ class RadiativeDecay : public Reaction {
   // Excited levels based on NIST database
   // Racah          Paschen   index
   // Ar               1s1       n/a     Ground state
-
   // Ar(4s[3/2]2)     1s5       0       1st metastable
   // Ar(4s[3/2]1)     1s4       0       1st resonacne
-
   // Ar(4s'[1/2]0)    1s3       1       2nd metastable
   // Ar(4s'[1/2]1)    1s2       1       2nd resonacne
-
   // Ar(4p[1/2]1)     2p10	    0       4p states
   // Ar(4p[5/2]3)     2p9	      1
   // Ar(4p[5/2]2)     2p8	      2
