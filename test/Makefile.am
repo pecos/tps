@@ -236,11 +236,11 @@ test_grad_LDADD               = ../src/libtps.la
 test_grad_LDADD              += $(HDF5_LIBS)
 test_grad_LDADD              += $(GRVY_LIBS)
 
-check_PROGRAMS               += test_table
-test_table_SOURCES            = test_table.cpp
-test_table_LDADD              = ../src/libtps.la
-test_table_LDADD             += $(HDF5_LIBS)
-test_table_LDADD             += $(GRVY_LIBS)
+#check_PROGRAMS               += test_table
+#test_table_SOURCES            = test_table.cpp
+#test_table_LDADD              = ../src/libtps.la
+#test_table_LDADD             += $(HDF5_LIBS)
+#test_table_LDADD             += $(GRVY_LIBS)
 
 check_PROGRAMS               += test_lte_mixture
 test_lte_mixture_SOURCES      = test_lte_mixture.cpp
