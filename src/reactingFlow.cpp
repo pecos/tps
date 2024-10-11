@@ -99,6 +99,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   // tpsP_->getInput("plasma_models/includeElectron", mixtureInput_.isElectronIncluded, true);
   tpsP_->getInput("plasma_models/two_temperature", mixtureInput_.twoTemperature, false);
   tpsP_->getInput("plasma_models/const_plasma_conductivity", const_plasma_conductivity_, 0.0);
+  tpsP_->getInput("plasma_models/is_rad_decay_in_NEC", radiative_decay_NECincluded_, true);  
 
   if (mixtureInput_.twoTemperature) {
     if (rank0_) std::cout << "Two temperature is not yet supported in low Mach reacting flow." << std::endl;
@@ -176,6 +177,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   tpsP_->getRequiredInput("species/background_index", backgroundIndex);
   tpsP_->getInput("plasma_models/transport_model/argon_minimal/third_order_thermal_conductivity",
                   argonInput_.thirdOrderkElectron, true);
+  if(!(argonInput_.thirdOrderkElectron) && rank0_) std::cout << "Notice: Using 1st order electron thermal conductivity." << endl;
   tpsP_->getInput("plasma_models/transport_model/artificial_multiplier/enabled", argonInput_.multiply, false);
   if (argonInput_.multiply) {
     tpsP_->getInput("plasma_models/transport_model/artificial_multiplier/viscosity",
@@ -1690,7 +1692,7 @@ void ReactingFlow::evalSubstepNumber() {
 	tmp = dataYn[i + sp * sDofInt_] + dataProd[i + sp * sDofInt_] * time_coeff_.dt;
 	if(tmp >= 1.0) {
 	  tmp = tmp - 1.0;
-	} else if(tmp >= 0.0) {
+	} else if(tmp > 0.0) {
 	  tmp = 0.0;
 	} else {
 	  tmp = std::abs(tmp);
@@ -2040,20 +2042,45 @@ void ReactingFlow::heatOfFormation() {
   const double *h_prodE = prodE_.HostRead();  
 
   double hspecies;
-  for (int i = 0; i < sDofInt_; i++) {
-    const double T = dataT[i];
 
-    // Sum over species to get enthalpy term
-    for (int n = 0; n < nSpecies_; n++) {
-      double molarCV = speciesMolarCv_[n];
-      molarCV *= UNIVERSALGASCONSTANT;
-      double molarCP = molarCV + UNIVERSALGASCONSTANT;
+  // NOTE: not very elegant but dont want to nest an if
+  if (radiative_decay_NECincluded_) {
+    
+    for (int i = 0; i < sDofInt_; i++) {
+      const double T = dataT[i];
 
-      hspecies = (molarCP * T + gasParams_(n, GasParams::FORMATION_ENERGY)) / gasParams_(n, GasParams::SPECIES_MW);
-      h_hw[i] -= hspecies * (h_prodY[i + n * sDofInt_] - h_prodE[i + n * sDofInt_]);
-      h_em[i] = hspecies * h_prodE[i + n * sDofInt_]; // not sure of sign
+      // Sum over species to get enthalpy term
+      for (int n = 0; n < nSpecies_; n++) {
+        double molarCV = speciesMolarCv_[n];
+        molarCV *= UNIVERSALGASCONSTANT;
+        double molarCP = molarCV + UNIVERSALGASCONSTANT;
+
+        hspecies = (molarCP * T + gasParams_(n, GasParams::FORMATION_ENERGY)) / gasParams_(n, GasParams::SPECIES_MW);
+        h_hw[i] -= hspecies * (h_prodY[i + n * sDofInt_] - h_prodE[i + n * sDofInt_]);
+        h_em[i] = hspecies * h_prodE[i + n * sDofInt_]; // not sure of sign
+      }
     }
+
+  } else {
+    
+    for (int i = 0; i < sDofInt_; i++) {
+      const double T = dataT[i];
+
+      // Sum over species to get enthalpy term
+      for (int n = 0; n < nSpecies_; n++) {
+        double molarCV = speciesMolarCv_[n];
+        molarCV *= UNIVERSALGASCONSTANT;
+        double molarCP = molarCV + UNIVERSALGASCONSTANT;
+
+        hspecies = (molarCP * T + gasParams_(n, GasParams::FORMATION_ENERGY)) / gasParams_(n, GasParams::SPECIES_MW);
+        h_hw[i] -= hspecies * h_prodY[i + n * sDofInt_];
+        h_em[i] = hspecies * h_prodE[i + n * sDofInt_]; // not sure of sign
+      }
+    }
+    
   }
+
+    
   emission_gf_.SetFromTrueDofs(tmpR0_);  
 }
 
