@@ -319,7 +319,7 @@ MFEM_HOST_DEVICE double RadiativeDecay::computeRateCoefficient(const double &T_h
                                                                const int &dofindex,
                                                                [[maybe_unused]] const bool isElectronInvolved,
                                                                const double *nsp) {
-  effAcoef = 0.0;
+  double effAcoef = 0.0;
   return effAcoef;
 }
 
@@ -331,7 +331,7 @@ MFEM_HOST_DEVICE void RadiativeDecay::GetEinsteinACoefficient(const double &T_h,
 MFEM_HOST_DEVICE double RadiativeDecay::escapeFactCalc(const double &n_i, const double &E_j, const double &E_i,
                                                        const double &g_j, const double &g_i, const double &A_ji,
                                                        const double &T_g) {
-  eta = 1.0;
+  double eta = 1.0;
   return eta;
 }
 #endif
