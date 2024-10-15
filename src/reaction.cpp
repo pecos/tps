@@ -176,7 +176,9 @@ MFEM_HOST_DEVICE RadiativeDecay::RadiativeDecay(const double _R, const std::map<
     Aji = &Aji_4p_r;
 
   } else {
-    if (rank0_) std::cout << " Species " << upper_sp_name.c_str() << " not recognized for this reactive. " << std::endl;
+    if (rank0_) {
+      printf("Specified radiative reaction no supported!");
+    }
     MPI_Barrier(MPI_COMM_WORLD);
     assert(false);
   }
