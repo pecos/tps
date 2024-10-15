@@ -304,10 +304,9 @@ MFEM_HOST_DEVICE double RadiativeDecay::escapeFactCalc(const double &n_i, const 
 // Radiative decay portion: extracted from commit (de27f14)
 MFEM_HOST_DEVICE RadiativeDecay::RadiativeDecay(const double _R, const std::map<std::string, int> *_speciesMapping,
                                                 const std::vector<std::string> *_speciesNames, const int *numSpecies,
-                                                const double *_reactantStoich, const double *_productStoich)
-    : Reaction(RADIATIVE_DECAY), Rcyl(_R) {
+                                                const double *_reactantStoich, const double *_productStoich) {
+// : Reaction(RADIATIVE_DECAY), Rcyl(_R) {
   rank0_ = Mpi::Root();
-
   if (rank0_) {
     printf("Radiative decay not supported on GPU yet!");
   }
