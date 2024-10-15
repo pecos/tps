@@ -116,6 +116,7 @@ MFEM_HOST_DEVICE double GridFunctionReaction::computeRateCoefficient([[maybe_unu
   }
 }
 
+#ifndef _GPU_
 // Radiative decay portion: extracted from commit (de27f14)
 MFEM_HOST_DEVICE RadiativeDecay::RadiativeDecay(const double _R, const std::map<std::string, int> *_speciesMapping,
                                                 const std::vector<std::string> *_speciesNames, const int *numSpecies,
@@ -298,3 +299,4 @@ MFEM_HOST_DEVICE double RadiativeDecay::escapeFactCalc(const double &n_i, const 
 
   return eta;
 }
+#endif
