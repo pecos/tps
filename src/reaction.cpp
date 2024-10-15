@@ -296,41 +296,6 @@ MFEM_HOST_DEVICE double RadiativeDecay::escapeFactCalc(const double &n_i, const 
   }
 
   eta = min(eta, 1.0);
-
-  return eta;
-}
-
-#else
-// Radiative decay portion: extracted from commit (de27f14)
-MFEM_HOST_DEVICE RadiativeDecay::RadiativeDecay(const double _R, const std::map<std::string, int> *_speciesMapping,
-                                                const std::vector<std::string> *_speciesNames, const int *numSpecies,
-                                                const double *_reactantStoich, const double *_productStoich) {
-// : Reaction(RADIATIVE_DECAY), Rcyl(_R) {
-  rank0_ = Mpi::Root();
-  if (rank0_) {
-    printf("Radiative decay not supported on GPU yet!");
-  }
-}
-
-MFEM_HOST_DEVICE RadiativeDecay::~RadiativeDecay() {}
-
-MFEM_HOST_DEVICE double RadiativeDecay::computeRateCoefficient(const double &T_h, const double &T_e,
-                                                               const int &dofindex,
-                                                               [[maybe_unused]] const bool isElectronInvolved,
-                                                               const double *nsp) {
-  double effAcoef = 0.0;
-  return effAcoef;
-}
-
-MFEM_HOST_DEVICE void RadiativeDecay::GetNumDensityOfInteralLevels(const int NumOfInteral_lvl, const double &n_sp,
-                                                                   const double &T_e, double *n_sp_internal) {}
-
-MFEM_HOST_DEVICE void RadiativeDecay::GetEinsteinACoefficient(const double &T_h, const double &T_e, double *effAcoef) {}
-
-MFEM_HOST_DEVICE double RadiativeDecay::escapeFactCalc(const double &n_i, const double &E_j, const double &E_i,
-                                                       const double &g_j, const double &g_i, const double &A_ji,
-                                                       const double &T_g) {
-  double eta = 1.0;
   return eta;
 }
 #endif
