@@ -94,12 +94,12 @@ MFEM_HOST_DEVICE Chemistry::Chemistry(GasMixture *mixture, const ChemistryInput 
       case RADIATIVE_DECAY: {
         assert(inputs.reactionInputs[r].modelParams != NULL);
 #ifndef _GPU_
-        double R = inputs.reactionInputs[r].modelParams[0];	
+        double R = inputs.reactionInputs[r].modelParams[0];
         reactions_[r] = new RadiativeDecay(R, &inputs.speciesMapping, &inputs.speciesNames, &numSpecies_,
                                            &reactantStoich_[r * numSpecies_], &productStoich_[r * numSpecies_]);
 #else
         printf("Radiative decay not currently supported for GPU execution.");
-	assert(false);
+        assert(false);
         break;
 #endif
       } break;
