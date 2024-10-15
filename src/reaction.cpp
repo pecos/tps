@@ -116,7 +116,6 @@ MFEM_HOST_DEVICE double GridFunctionReaction::computeRateCoefficient([[maybe_unu
   }
 }
 
-
 #ifndef _GPU_
 // Radiative decay portion: extracted from commit (de27f14)
 MFEM_HOST_DEVICE RadiativeDecay::RadiativeDecay(const double _R, const std::map<std::string, int> *_speciesMapping,
@@ -309,10 +308,9 @@ MFEM_HOST_DEVICE RadiativeDecay::RadiativeDecay(const double _R, const std::map<
     : Reaction(RADIATIVE_DECAY), Rcyl(_R) {
   rank0_ = Mpi::Root();
 
-    if (rank0_) {
-      printf("Radiative decay not supported on GPU yet!");
-    }
-
+  if (rank0_) {
+    printf("Radiative decay not supported on GPU yet!");
+  }
 }
 
 MFEM_HOST_DEVICE RadiativeDecay::~RadiativeDecay() {}
@@ -326,11 +324,9 @@ MFEM_HOST_DEVICE double RadiativeDecay::computeRateCoefficient(const double &T_h
 }
 
 MFEM_HOST_DEVICE void RadiativeDecay::GetNumDensityOfInteralLevels(const int NumOfInteral_lvl, const double &n_sp,
-                                                                   const double &T_e, double *n_sp_internal) {
-}
+                                                                   const double &T_e, double *n_sp_internal) {}
 
-MFEM_HOST_DEVICE void RadiativeDecay::GetEinsteinACoefficient(const double &T_h, const double &T_e, double *effAcoef) {
-}
+MFEM_HOST_DEVICE void RadiativeDecay::GetEinsteinACoefficient(const double &T_h, const double &T_e, double *effAcoef) {}
 
 MFEM_HOST_DEVICE double RadiativeDecay::escapeFactCalc(const double &n_i, const double &E_j, const double &E_i,
                                                        const double &g_j, const double &g_i, const double &A_ji,
