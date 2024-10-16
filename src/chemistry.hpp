@@ -89,6 +89,8 @@ class Chemistry {
 
   double min_temperature_;
 
+  ReactionModel reactionModels_[gpudata::MAXREACTIONS];
+
  public:
   Chemistry(GasMixture *mixture, RunConfiguration &config);
   MFEM_HOST_DEVICE Chemistry(GasMixture *mixture, const ChemistryInput &inputs);
@@ -102,9 +104,10 @@ class Chemistry {
   // return Vector of reaction rate coefficients, with the size of numReaction_.
   // WARNING(marc) I have removed "virtual" qualifier here assuming these functions will not
   // change for child classes. Correct if wrong
-  // void computeForwardRateCoeffs(const double &T_h, const double &T_e, Vector &kfwd);
-  MFEM_HOST_DEVICE void computeForwardRateCoeffs(const double &T_h, const double &T_e, const int &dofindex,
-                                                 double *kfwd);
+
+  void computeForwardRateCoeffs(const Vector &ns, const double &T_h, const double &T_e, Vector &kfwd);
+  MFEM_HOST_DEVICE void computeForwardRateCoeffs(const double *ns, const double &T_h, const double &T_e,
+                                                 const int &dofindex, double *kfwd);
 
   // void computeEquilibriumConstants(const double &T_h, const double &T_e, Vector &kC);
   MFEM_HOST_DEVICE void computeEquilibriumConstants(const double &T_h, const double &T_e, double *kC);
@@ -124,8 +127,8 @@ class Chemistry {
   void computeProgressRate(const Vector &ns, const Vector &kfwd, const Vector &keq, Vector &progressRate);
   MFEM_HOST_DEVICE void computeProgressRate(const double *ns, const double *kfwd, const double *keq,
                                             double *progressRate);
-  void computeCreationRate(const Vector &progressRate, Vector &creationRate);
-  MFEM_HOST_DEVICE void computeCreationRate(const double *progressRate, double *creationRate);
+  void computeCreationRate(const Vector &progressRate, Vector &creationRate, Vector &emmisionRate);
+  MFEM_HOST_DEVICE void computeCreationRate(const double *progressRate, double *creationRate, double *emmisionRate);
 
   MFEM_HOST_DEVICE double getReactionEnergy(const int &reactionIndex) { return reactionEnergies_[reactionIndex]; }
   int getNumReactions() { return numReactions_; }
