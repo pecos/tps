@@ -10056,8 +10056,8 @@ double temp_ic(const Vector &coords, double t)
 
 double temp_wall(const Vector &coords, double t)  
 {
-   double Thi = 400.0;  
-   double Tlo = 200.0;
+   double Thi = 350.0;  
+   double Tlo = 250.0;
    double Tmean, tRamp, wt;
    double x = coords(0);
    double y = coords(1);
@@ -10078,8 +10078,8 @@ double temp_wall(const Vector &coords, double t)
 
 double temp_wallBox(const Vector &coords, double t)  
 {
-   double Thi = 480.0;  
-   double Tlo = 120.0;
+  double Thi = 400.0; //480.0;  
+  double Tlo = 200.0; //120.0;
    double Tmean, tRamp, wt;
    double x = coords(0);
    double y = coords(1);
@@ -10094,7 +10094,7 @@ double temp_wallBox(const Vector &coords, double t)
    temp = Tmean + x * (Thi-Tlo);   
 
    // hack
-   //temp = 310.0;
+   temp = 310.0;
 
    //std::cout << " *** temp_wallBox: " << temp << " at " << x << endl;
    
