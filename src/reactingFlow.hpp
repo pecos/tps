@@ -366,7 +366,7 @@ class ReactingFlow : public ThermoChemModelBase {
   void updateMixture();
   void updateThermoP();
   void extrapolateState();
-  void updateDensity(double tStep);
+  void updateDensity(double tStep, bool update_mass_matrix = true);
   void updateBC(int current_step);
   void updateDiffusivity();
   void computeSystemMass();

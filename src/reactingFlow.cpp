@@ -1608,7 +1608,7 @@ void ReactingFlow::step() {
       // update wdot quantities at full substep in Yn/Tn state
       updateMixture();
       updateThermoP();
-      updateDensity(0.0);
+      updateDensity(0.0, false);
       speciesProduction();
       heatOfFormation();
 
@@ -2503,7 +2503,7 @@ void ReactingFlow::evaluatePlasmaConductivityGF() {
   sigma_gf_.SetFromTrueDofs(sigma_);
 }
 
-void ReactingFlow::updateDensity(double tStep) {
+void ReactingFlow::updateDensity(double tStep, bool update_mass_matrix) {
   Array<int> empty;
   Rmix_gf_.GetTrueDofs(tmpR0a_);
 
@@ -2541,9 +2541,11 @@ void ReactingFlow::updateDensity(double tStep) {
   }
   rn_gf_.SetFromTrueDofs(rn_);
 
-  MsRho_form_->Update();
-  MsRho_form_->Assemble();
-  MsRho_form_->FormSystemMatrix(empty, MsRho_);
+  if (update_mass_matrix) {
+    MsRho_form_->Update();
+    MsRho_form_->Assemble();
+    MsRho_form_->FormSystemMatrix(empty, MsRho_);
+  }
 
   // project to p-space in case not same as vel-temp
   R0PM0_gf_.SetFromTrueDofs(rn_);
