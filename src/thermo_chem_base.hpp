@@ -56,6 +56,9 @@ struct thermoChemToFlow {
   const mfem::ParGridFunction *density = nullptr;
   const mfem::ParGridFunction *viscosity = nullptr;
   const mfem::ParGridFunction *thermal_divergence = nullptr;
+  const mfem::ParGridFunction *pressure_divergence = nullptr;  
+  const mfem::ParGridFunction *pressure = nullptr;
+  const mfem::ParGridFunction *temperature = nullptr;  
 };
 
 /**
@@ -216,6 +219,9 @@ class ConstantPropertyThermoChem final : public ThermoChemModelBase {
   mfem::ParGridFunction *density_ = nullptr;
   mfem::ParGridFunction *viscosity_ = nullptr;
   mfem::ParGridFunction *thermal_divergence_ = nullptr;
+  mfem::ParGridFunction *pressure_divergence_ = nullptr;  
+  mfem::ParGridFunction *pressure_ = nullptr;
+  mfem::ParGridFunction *temperature_ = nullptr;    
 
  public:
   /**

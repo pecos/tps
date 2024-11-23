@@ -163,6 +163,9 @@ class Tomboulides final : public FlowBase {
   double hsolve_rtol_;
   double hsolve_atol_;
 
+  double Rgas_;
+  double unsP_;
+
   // To use "numerical integration", quadrature rule must persist
   mfem::IntegrationRules gll_rules;
 
@@ -234,6 +237,11 @@ class Tomboulides final : public FlowBase {
   mfem::ParGridFunction *resp_gf_ = nullptr;
   mfem::ParGridFunction *pp_div_rad_comp_gf_ = nullptr;
 
+  mfem::ParGridFunction *p_next_gf_ = nullptr;  
+  mfem::ParGridFunction *pn_gf_ = nullptr;
+
+  mfem::ParGridFunction *divu_gf_ = nullptr;  
+  
   /// Swirl
   mfem::ParGridFunction *utheta_gf_ = nullptr;
   mfem::ParGridFunction *utheta_next_gf_ = nullptr;
@@ -286,6 +294,18 @@ class Tomboulides final : public FlowBase {
   mfem::VectorArrayCoefficient *utheta_vec_coeff_ = nullptr;
   mfem::InnerProductCoefficient *swirl_var_viscosity_coeff_ = nullptr;
 
+  mfem::ConstantCoefficient beta_dt_coeff_;
+  mfem::ConstantCoefficient beta_dt2_coeff_;
+  mfem::ConstantCoefficient Rgas_coeff_;    
+  mfem::VectorGridFunctionCoefficient *vel_coeff_ = nullptr;
+  mfem::GridFunctionCoefficient *temp_coeff_ = nullptr;  
+  // mfem::GridFunctionCoefficient *press_coeff_ = nullptr;
+  mfem::ProductCoefficient *press_coeff_ = nullptr;
+  mfem::ProductCoefficient *RT_coeff_ = nullptr;   
+  mfem::RatioCoefficient *invP_coeff_ = nullptr;
+  mfem::RatioCoefficient *invPdt2_coeff_ = nullptr;  
+  mfem::ScalarVectorProductCoefficient *p_conv_coeff_ = nullptr;  
+  
   // mfem "form" objects used to create operators
   mfem::ParBilinearForm *L_iorho_form_ = nullptr;  // \int (1/\rho) \nabla \phi_i \cdot \nabla \phi_j
   mfem::ParLinearForm *forcing_form_ = nullptr;    // \int \phi_i f
@@ -326,7 +346,11 @@ class Tomboulides final : public FlowBase {
   mfem::HypreBoomerAMG *L_iorho_inv_pc_ = nullptr;
   mfem::OrthoSolver *L_iorho_inv_ortho_pc_ = nullptr;
   mfem::CGSolver *L_iorho_inv_ = nullptr;
+  // mfem::GMRESSolver *L_iorho_inv_ = nullptr;
 
+  mfem::Solver *Ms_inv_pc_ = nullptr;
+  mfem::CGSolver *Ms_inv_ = nullptr;
+  
   mfem::Solver *Mv_inv_pc_ = nullptr;
   mfem::CGSolver *Mv_inv_ = nullptr;
 
@@ -357,12 +381,17 @@ class Tomboulides final : public FlowBase {
   mfem::Vector p_vec_;
   mfem::Vector resu_vec_;
   mfem::Vector tmpR0_;
+  mfem::Vector tmpR0a_;
+  mfem::Vector tmpR0b_;  
   mfem::Vector tmpR1_;
+  mfem::Vector tmpR1a_;
+  mfem::Vector tmpR1b_;  
   mfem::Vector gradU_;
   mfem::Vector gradV_;
   mfem::Vector gradW_;
   mfem::Vector Qt_vec_;
   mfem::Vector grad_Qt_vec_;
+  mfem::Vector Qp_vec_;  
   mfem::Vector rho_vec_;
   mfem::Vector mu_vec_;
   mfem::Vector ress_vec_;
@@ -374,8 +403,11 @@ class Tomboulides final : public FlowBase {
   mfem::Vector utheta_m2_vec_;
   mfem::Vector utheta_next_vec_;
 
+  mfem::Vector pn_, pnm1_, pnm2_;  
+  
   // miscellaneous
   double volume_;
+  double ambient_pressure_;
   mfem::ParLinearForm *mass_lform_ = nullptr;
 
   // helper functions

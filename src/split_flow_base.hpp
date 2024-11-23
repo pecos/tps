@@ -46,9 +46,10 @@ struct extDataToFlow;
 
 struct flowToThermoChem {
   const mfem::ParGridFunction *velocity = nullptr;
-
-  bool swirl_supported = false;
+  const mfem::ParGridFunction *pressure = nullptr;
+  const mfem::ParGridFunction *divu = nullptr;  
   const mfem::ParGridFunction *swirl = nullptr;
+  bool swirl_supported = false;  
 };
 
 struct flowToTurbModel {
@@ -150,6 +151,8 @@ class ZeroFlow final : public FlowBase {
   mfem::FiniteElementCollection *fec_ = nullptr;
   mfem::ParFiniteElementSpace *fes_ = nullptr;
   mfem::ParGridFunction *velocity_ = nullptr;
+  mfem::ParGridFunction *pressure_ = nullptr;
+  mfem::ParGridFunction *divu_ = nullptr;    
 
  public:
   /// Constructor

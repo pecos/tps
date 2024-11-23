@@ -38,6 +38,8 @@ ZeroFlow::ZeroFlow(mfem::ParMesh *pmesh, int vorder) : pmesh_(pmesh), vorder_(vo
 
 ZeroFlow::~ZeroFlow() {
   delete velocity_;
+  delete pressure_;
+  delete divu_;    
   delete fes_;
   delete fec_;
 }
@@ -45,10 +47,18 @@ ZeroFlow::~ZeroFlow() {
 void ZeroFlow::initializeSelf() {
   fec_ = new H1_FECollection(vorder_, dim_);
   fes_ = new ParFiniteElementSpace(pmesh_, fec_, dim_);
-  velocity_ = new ParGridFunction(fes_);
+  velocity_ = new ParGridFunction(fes_);  
   *velocity_ = 0.0;
 
-  toThermoChem_interface_.velocity = velocity_;
+  pressure_ = new ParGridFunction(fes_);
+  *pressure_ = 1.01e6;
+
+  divu_ = new ParGridFunction(fes_);
+  *divu_ = 0.0;
+  
+  toThermoChem_interface_.velocity = velocity_;  
+  toThermoChem_interface_.pressure = pressure_;
+  toThermoChem_interface_.divu = divu_;  
   toThermoChem_interface_.swirl_supported = false;
 
   // no need to create additional zero vectors

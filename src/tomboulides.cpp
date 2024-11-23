@@ -128,7 +128,10 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
     tps->getInput("loMach/tomboulides/psolve-maxIters", pressure_solve_max_iter_, default_max_iter_);
     tps->getInput("loMach/tomboulides/hsolve-maxIters", hsolve_max_iter_, default_max_iter_);
     tps->getInput("loMach/tomboulides/msolve-maxIters", mass_inverse_max_iter_, default_max_iter_);
+
+    tps->getInput("loMach/calperfect/Rgas", Rgas_, 287.0);      
   }
+  
 }
 
 Tomboulides::~Tomboulides() {
@@ -155,12 +158,13 @@ Tomboulides::~Tomboulides() {
   delete Mv_rho_form_;
   delete G_form_;
   delete D_form_;
+  delete Ms_inv_;  
   delete Mv_rho_inv_;
-  delete Mv_rho_inv_pc_;
+  delete Mv_rho_inv_pc_;  
   delete Mv_inv_;
   delete Mv_inv_pc_;
   delete Mv_form_;
-  delete Ms_form_;
+  delete Ms_form_;  
   delete Nconv_form_;
   delete forcing_form_;
   delete L_iorho_inv_;
@@ -204,6 +208,14 @@ Tomboulides::~Tomboulides() {
   delete iorho_coeff_;
   delete rho_coeff_;
 
+  delete vel_coeff_;
+  delete temp_coeff_;  
+  delete press_coeff_;  
+  delete invP_coeff_;
+  delete invPdt2_coeff_;  
+  delete p_conv_coeff_;
+  
+  
   // objects allocated by initalizeSelf
   if (axisym_) delete gravity_vec_;
   delete utheta_next_gf_;
@@ -256,6 +268,11 @@ void Tomboulides::initializeSelf() {
 
   mu_total_gf_ = new ParGridFunction(pfes_);
 
+  pn_gf_ = new ParGridFunction(pfes_);    
+  p_next_gf_ = new ParGridFunction(pfes_);    
+
+  divu_gf_ = new ParGridFunction(pfes_);      
+  
   // pp_div_rad_comp_gf_ = new ParGridFunction(pfes_, *pp_div_gf_);
   // u_next_rad_comp_gf_ = new ParGridFunction(pfes_, *u_next_gf_);
 
@@ -283,16 +300,24 @@ void Tomboulides::initializeSelf() {
 
   *epsi_gf_ = 0.0;
 
+  *pn_gf_ = 0.0;
+  *p_next_gf_ = 0.0;
+
+  *divu_gf_ = 0.0;  
+  
   if (axisym_) {
     *utheta_gf_ = 0.0;
     *utheta_next_gf_ = 0.0;
   }
 
+  // exports
   toThermoChem_interface_.velocity = u_next_gf_;
+  toThermoChem_interface_.divu = divu_gf_;  
   if (axisym_) {
     toThermoChem_interface_.swirl_supported = true;
     toThermoChem_interface_.swirl = utheta_next_gf_;
   }
+  toThermoChem_interface_.pressure = p_next_gf_;
 
   toTurbModel_interface_.velocity = u_next_gf_;
   if (axisym_) {
@@ -331,6 +356,7 @@ void Tomboulides::initializeSelf() {
   pp_div_bdr_vec_.SetSize(pfes_truevsize);
   u_bdr_vec_.SetSize(pfes_truevsize);
   Qt_vec_.SetSize(pfes_truevsize);
+  Qp_vec_.SetSize(pfes_truevsize);  
   rho_vec_.SetSize(pfes_truevsize);
   mu_vec_.SetSize(pfes_truevsize);
   Faxi_poisson_vec_.SetSize(pfes_truevsize);
@@ -342,8 +368,16 @@ void Tomboulides::initializeSelf() {
   }
 
   tmpR0_.SetSize(sfes_truevsize);
+  tmpR0a_.SetSize(sfes_truevsize);
+  tmpR0b_.SetSize(sfes_truevsize);  
   tmpR1_.SetSize(vfes_truevsize);
+  tmpR1a_.SetSize(vfes_truevsize);
+  tmpR1b_.SetSize(vfes_truevsize);    
 
+  pn_.SetSize(pfes_truevsize);
+  pnm1_.SetSize(pfes_truevsize);
+  pnm2_.SetSize(pfes_truevsize);    
+  
   gradU_.SetSize(vfes_truevsize);
   gradV_.SetSize(vfes_truevsize);
   gradW_.SetSize(vfes_truevsize);
@@ -369,6 +403,7 @@ void Tomboulides::initializeSelf() {
   pp_div_bdr_vec_ = 0.0;
   u_bdr_vec_ = 0.0;
   Qt_vec_ = 0.0;
+  Qp_vec_ = 0.0;  
   rho_vec_ = 0.0;
   mu_vec_ = 0.0;
 
@@ -388,6 +423,15 @@ void Tomboulides::initializeSelf() {
   gravity_vec_ = new VectorConstantCoefficient(gravity_);
   Array<int> domain_attr(pmesh_->attributes.Max());
   domain_attr = 1;
+
+  // use ambient pressure for initial condition
+  tpsP_->getInput("loMach/ambientPressure", ambient_pressure_, 101325.0);
+  pn_ = ambient_pressure_;
+  pnm1_ = ambient_pressure_;
+  pnm2_ = ambient_pressure_;
+  *pn_gf_ = ambient_pressure_;
+  *p_next_gf_ = ambient_pressure_;
+  if(rank0_) std::cout << "okay a..." << ambient_pressure_ << endl;  
 
   if (axisym_) {
     rad_gravity_vec_ = new ScalarVectorProductCoefficient(radius_coeff, *gravity_vec_);
@@ -626,6 +670,27 @@ void Tomboulides::initializeOperators() {
   S_poisson_coeff_ = new VectorSumCoefficient(*twoS_gradmu_coeff_, *gradmu_Qt_coeff_, 1.0, -2. / 3);
   S_mom_coeff_ = new VectorSumCoefficient(*graduT_gradmu_coeff_, *gradmu_Qt_coeff_, 1.0, -1.0);
 
+  // coefficients for DtP portion of all-mach lhs <jump>
+  beta_dt_coeff_.constant = -coeff_.bd0 / coeff_.dt; 
+  beta_dt2_coeff_.constant = -coeff_.bd0 / ((coeff_.dt)*(coeff_.dt));
+  Rgas_coeff_.constant = Rgas_;   
+  temp_coeff_ = new GridFunctionCoefficient(thermo_interface_->temperature);
+  RT_coeff_ = new ProductCoefficient(Rgas_coeff_,*temp_coeff_);
+  //press_coeff_ =  new GridFunctionCoefficient(p_next_gf_);
+  press_coeff_ =  new ProductCoefficient(*RT_coeff_,*rho_coeff_);    
+  vel_coeff_ =  new VectorGridFunctionCoefficient(u_next_gf_);
+  invP_coeff_ = new RatioCoefficient(beta_dt_coeff_, *press_coeff_);
+  invPdt2_coeff_ = new RatioCoefficient(beta_dt2_coeff_, *press_coeff_);    
+  p_conv_coeff_ = new ScalarVectorProductCoefficient(*invP_coeff_, *vel_coeff_);
+  // TODO: 
+  //       add p{n+1}, p{n}, p{n-1}, p{n-2} in tomb
+  //       calc p{ext} in temperature solver
+  //       import p{ext} to p{n+1}
+  //       part of Qt part of diffusion, div{nu(grad(Qt{n+1}))}, in u* should also be moved into lhs as well
+  // CHECK:
+  //       does low-mach work with div(u{ext}) in Qt part of diffusion???
+  //       if not, all-mach is hosed (unless only thermal-div part is necessary there? => not crazy as region where this is not true, visc diff wont matter)
+
   // Coefficients for axisymmetric
   if (axisym_) {
     rad_rho_coeff_ = new ProductCoefficient(radius_coeff, *rho_coeff_);
@@ -688,6 +753,20 @@ void Tomboulides::initializeOperators() {
     L_iorho_blfi->SetIntRule(&ir_ni_p);
   }
   L_iorho_form_->AddDomainIntegrator(L_iorho_blfi);
+
+  // additional operators for all-mach. fix for axisymm...
+  // when inverse is constructed, CANNOT USE PCG < jump>
+  /*
+  MixedScalarWeakDivergenceIntegrator *c_mblfi;  
+  c_mblfi = new MixedScalarWeakDivergenceIntegrator(*p_conv_coeff_);
+  c_mblfi->SetIntRule(&ir_ni_v);
+  L_iorho_form_->AddDomainIntegrator(c_mblfi);  
+  MassIntegrator *cmv_blfi;
+  cmv_blfi = new MassIntegrator(*invPdt2_coeff_);  
+  cmv_blfi->SetIntRule(&ir_ni_v);
+  L_iorho_form_->AddDomainIntegrator(cmv_blfi);
+  */
+  
   L_iorho_form_->Assemble();
   L_iorho_form_->FormSystemMatrix(pres_ess_tdof_, L_iorho_op_);
 
@@ -699,6 +778,7 @@ void Tomboulides::initializeOperators() {
   L_iorho_inv_ortho_pc_->SetSolver(*L_iorho_inv_pc_);
 
   L_iorho_inv_ = new CGSolver(pfes_->GetComm());
+  // L_iorho_inv_ = new GMRESSolver(pfes_->GetComm());
   L_iorho_inv_->iterative_mode = true;
   L_iorho_inv_->SetOperator(*L_iorho_op_);
   if (pres_dbcs_.empty()) {
@@ -845,6 +925,26 @@ void Tomboulides::initializeOperators() {
   Mv_rho_inv_->SetRelTol(mass_inverse_rtol_);
   Mv_rho_inv_->SetMaxIter(mass_inverse_max_iter_);
 
+  if (partial_assembly_) {
+    Vector diag_pa(sfes_->GetTrueVSize());
+    Ms_form_->AssembleDiagonal(diag_pa);
+    Ms_inv_pc_ = new OperatorJacobiSmoother(diag_pa, empty);
+  } else {
+    Ms_inv_pc_ = new HypreSmoother(*Ms_op_.As<HypreParMatrix>());
+    dynamic_cast<HypreSmoother *>(Ms_inv_pc_)->SetType(smoother_type_, smoother_passes_);
+    dynamic_cast<HypreSmoother *>(Ms_inv_pc_)->SetSOROptions(smoother_relax_weight_, smoother_relax_omega_);
+    dynamic_cast<HypreSmoother *>(Ms_inv_pc_)
+        ->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_, smoother_eig_est_);
+  }
+  Ms_inv_ = new CGSolver(sfes_->GetComm());
+  Ms_inv_->iterative_mode = false;
+  Ms_inv_->SetOperator(*Ms_op_);
+  Ms_inv_->SetPreconditioner(*Ms_inv_pc_);
+  Ms_inv_->SetPrintLevel(mass_inverse_pl_);
+  Ms_inv_->SetAbsTol(mass_inverse_atol_);
+  Ms_inv_->SetRelTol(mass_inverse_rtol_);
+  Ms_inv_->SetMaxIter(mass_inverse_max_iter_);
+  
   // Divergence operator
   D_form_ = new ParMixedBilinearForm(vfes_, pfes_);
   VectorDivergenceIntegrator *vd_mblfi;
@@ -881,7 +981,7 @@ void Tomboulides::initializeOperators() {
   }
   G_form_->Assemble();
   G_form_->FormRectangularSystemMatrix(empty, empty, G_op_);
-
+  
   // Helmholtz
   Hv_form_ = new ParBilinearForm(vfes_);
   VectorMassIntegrator *hmv_blfi;
@@ -962,7 +1062,7 @@ void Tomboulides::initializeOperators() {
     s_rhs_dlfi->SetIntRule(&ir_ni_v);
   }
   S_poisson_form_->AddDomainIntegrator(s_rhs_dlfi);
-
+  
   S_mom_form_ = new ParLinearForm(vfes_);
   VectorDomainLFIntegrator *s_mom_dlfi;
   if (axisym_) {
@@ -1217,13 +1317,16 @@ void Tomboulides::step() {
   // Step 1: Update any operators invalidated by changing data
   // external to this class
   // ------------------------------------------------------------------------
-
+  
   // Update total viscosity field
   updateTotalViscosity();
 
   // Update the variable coefficient Laplacian to account for change
   // in density
   sw_press_.Start();
+  // <jump>
+  //beta_dt_coeff_.constant = -coeff_.bd0 / coeff_.dt;
+  //beta_dt2_coeff_.constant = -coeff_.bd0 / ((coeff_.dt)*(coeff_.dt));  
   L_iorho_form_->Update();
   L_iorho_form_->Assemble();
   L_iorho_form_->FormSystemMatrix(pres_ess_tdof_, L_iorho_op_);
@@ -1252,6 +1355,7 @@ void Tomboulides::step() {
   L_iorho_inv_ortho_pc_->SetSolver(*L_iorho_inv_pc_);
 
   L_iorho_inv_ = new CGSolver(pfes_->GetComm());
+  // L_iorho_inv_ = new GMRESSolver(pfes_->GetComm());
   L_iorho_inv_->iterative_mode = true;
   L_iorho_inv_->SetOperator(*L_iorho_op_);
   if (pres_dbcs_.empty()) {
@@ -1400,7 +1504,17 @@ void Tomboulides::step() {
   // Compute and add grad(Qt) contribution
   assert(thermo_interface_->thermal_divergence != nullptr);
   thermo_interface_->thermal_divergence->GetTrueDofs(Qt_vec_);
-  G_op_->Mult(Qt_vec_, resu_vec_);
+  //G_op_->Mult(Qt_vec_, resu_vec_);  
+
+  // okay to use div(u(ext)) instead here?
+  D_op_->Mult(uext_vec_,tmpR0_); // replace these with laplacian?
+  Ms_inv_->Mult(tmpR0_,tmpR0b_);
+  G_op_->Mult(tmpR0b_, resu_vec_);
+
+  // Qp <jump>
+  thermo_interface_->pressure_divergence->GetTrueDofs(Qp_vec_);
+  //Qp_vec_ = 0.0;
+  
   Mv_inv_->Mult(resu_vec_, grad_Qt_vec_);
   if (!Mv_inv_->GetConverged()) {
     if (rank0_) std::cout << "ERROR: Mv inverse did not converge (grad Qt calc)." << std::endl;
@@ -1451,6 +1565,36 @@ void Tomboulides::step() {
   // Add Qt term (rhs += -bd0 * Qt / dt)
   Ms_op_->AddMult(Qt_vec_, resp_vec_, -coeff_.bd0 / dt);
 
+  // Add Qp term (rhs += +bd0 * Qp / dt)
+  Ms_op_->AddMult(Qp_vec_, resp_vec_, +coeff_.bd0 / dt);
+  
+  // add explicit part of unsteady P term to rhs <jump>
+  /*
+  {
+    const double bd0idt = coeff_.bd0 / dt;    
+    const double bd1idt = coeff_.bd1 / dt;
+    const double bd2idt = coeff_.bd2 / dt;
+    const double bd3idt = coeff_.bd3 / dt;
+    const auto d_p = pn_.Read();
+    const auto d_pm1 = pnm1_.Read();
+    const auto d_pm2 = pnm2_.Read();
+    auto d_dPsrc = tmpR0_.ReadWrite();
+      MFEM_FORALL(i, tmpR0_.Size(), {
+	d_dPsrc[i] = (bd1idt*d_p[i] + bd2idt*d_pm1[i] + bd3idt*d_pm2[i]);
+      });    
+  }
+  Ms_op_->AddMult(tmpR0_, resp_vec_, +coeff_.bd0 / dt);
+  */
+  /*
+  tmpR0a_.Set(coeff_.bd1/dt, pn_);
+  tmpR0a_.Add(coeff_.bd2/dt, pnm1_);
+  tmpR0a_.Add(coeff_.bd3/dt, pnm2_);
+  tmpR0a_ *= (coeff_.bd0/dt);
+  Ms_op_->Mult(tmpR0a_,tmpR0b_);
+  resp_vec_ -= tmpR0b_;
+  */
+  
+  
   // Add axisymmetric "forcing" term to rhs
   if (axisym_) {
     pp_div_gf_->HostRead();
@@ -1559,16 +1703,43 @@ void Tomboulides::step() {
 
   // Rotate values in solution history
   um2_vec_ = um1_vec_;
-  um1_vec_ = u_vec_;
-
+  um1_vec_ = u_vec_;  
+  
   // Update the current solution and corresponding GridFunction
   u_next_gf_->GetTrueDofs(u_next_vec_);
   u_vec_ = u_next_vec_;
   u_curr_gf_->SetFromTrueDofs(u_vec_);
 
-  // update gradients for turbulence model
-  evaluateVelocityGradient();
+  // set for export 
+  p_next_gf_->SetFromTrueDofs(p_vec_);
+  //tmpR0_.Set(1.0,p_vec_);
+  //tmpR0_ += ambient_pressure_;
+  //p_next_gf_->SetFromTrueDofs(tmpR0_);  
 
+  // rotate pressure storage <jump>
+  pnm2_ = pnm1_;
+  pnm1_ = pn_;
+  pn_ = p_vec_;
+  
+  // update gradients for turbulence model
+  evaluateVelocityGradient();  
+
+  // Extrapolate the velocity field for div at next step
+  // to be used by p-solve in therm-chem at next step
+  {
+    const auto d_u = u_vec_.Read();
+    const auto d_um1 = um1_vec_.Read();
+    const auto d_um2 = um2_vec_.Read();
+    auto d_uext = uext_vec_.Write();
+    const auto ab1 = coeff_.ab1;
+    const auto ab2 = coeff_.ab2;
+    const auto ab3 = coeff_.ab3;
+    MFEM_FORALL(i, uext_vec_.Size(), { d_uext[i] = ab1 * d_u[i] + ab2 * d_um1[i] + ab3 * d_um2[i]; });
+  }
+  D_op_->Mult(uext_vec_,tmpR0_);
+  Ms_inv_->Mult(tmpR0_,tmpR0b_);
+  divu_gf_->SetFromTrueDofs(tmpR0b_);
+  
   if (axisym_) {
     u_next_gf_->HostRead();
     {

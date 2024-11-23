@@ -48,6 +48,7 @@ ConstantPropertyThermoChem::ConstantPropertyThermoChem(ParMesh *pmesh, int sorde
 
 ConstantPropertyThermoChem::~ConstantPropertyThermoChem() {
   delete thermal_divergence_;
+  delete pressure_divergence_;  
   delete viscosity_;
   delete density_;
   delete fes_;
@@ -61,14 +62,22 @@ void ConstantPropertyThermoChem::initializeSelf() {
   density_ = new ParGridFunction(fes_);
   viscosity_ = new ParGridFunction(fes_);
   thermal_divergence_ = new ParGridFunction(fes_);
+  pressure_divergence_ = new ParGridFunction(fes_);  
+  pressure_ = new ParGridFunction(fes_);
+  temperature_ = new ParGridFunction(fes_);    
 
   *density_ = rho_;
   *viscosity_ = mu_;
   *thermal_divergence_ = 0.0;
+  *pressure_divergence_ = 0.0;  
+  *pressure_ = thermo_pressure_;
+  *temperature_ = 300.0;
 
   toFlow_interface_.density = density_;
+  toFlow_interface_.temperature = temperature_;    
   toFlow_interface_.viscosity = viscosity_;
   toFlow_interface_.thermal_divergence = thermal_divergence_;
+  toFlow_interface_.pressure_divergence = pressure_divergence_;  
 
   toTurbModel_interface_.density = density_;
 }
