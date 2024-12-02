@@ -35,6 +35,7 @@ EXTRA_DIST  = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes lte-
               ref_solns/reactBinDiff/*.h5 \
               ref_solns/reactSingleRx/*.h5 \
               ref_solns/reactTable/*.h5 \
+			  ref_solns/flow1d_coupling.h5 \
 		      vpath.sh die.sh count_gpus.sh sniff_mpirun.sh \
 		      cyl3d.gpu.test cyl3d.mflow.gpu.test wedge.gpu.test \
 	          averaging.gpu.test cyl3d.test cyl3d.gpu.python.test cyl3d.mflow.test cyl3d.dtconst.test \
@@ -50,8 +51,8 @@ EXTRA_DIST  = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes lte-
               sgsSmag.test sgsSigma.test heatEq.test sponge.test plate.test pipe.mix.test lte2noneq-restart.test \
               coupled-3d.interface.test plasma.axisym.test plasma.axisym.lte1d.test \
 	      lomach-flow.test lomach-lequere.test interpInlet.test sgsLoMach.test autoPeriodic.test aveLoMach.test \
-              reactFlow-binDiff.test reactFlow-singleRx.test reactFlow-table.test
-
+              reactFlow-binDiff.test reactFlow-singleRx.test reactFlow-table.test \
+			  test_flow1d_coupling.py flow1d-coupling.python.test
 
 TESTS = vpath.sh
 XFAIL_TESTS =
@@ -129,6 +130,11 @@ if PYTHON_ENABLED
 TESTS += cyl3d.python.test \
          cyl3d.python.splitcomm.test \
 		 coupled-3d.py-loop.test
+
+if GSLIB_ENABLED
+TESTS += flow1d-coupling.python.test
+endif
+
 endif
 
 endif
