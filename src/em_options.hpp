@@ -69,6 +69,8 @@ class ElectromagneticOptions {
 
   bool eval_Rplasma;
 
+  int print_level;
+
   ElectromagneticOptions() {
     order = 1;
     ref_levels = 0;
@@ -86,6 +88,7 @@ class ElectromagneticOptions {
     current_frequency = 1.0;
     mu0 = 1.0;
     eval_Rplasma = false;
+    print_level = 0;
   }
 
   void print(std::ostream &out) {
@@ -108,6 +111,7 @@ class ElectromagneticOptions {
     out << "  current_frequency = " << current_frequency << std::endl;
     out << "  mu0 = " << mu0 << std::endl;
     out << "  eval_Rplasma = " << eval_Rplasma << std::endl;
+    out << "  print_level = " << print_level << std::endl;
     out << std::endl;
   }
 };

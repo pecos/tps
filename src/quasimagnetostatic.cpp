@@ -336,6 +336,7 @@ void QuasiMagnetostaticSolver3D::parseSolverOptions() {
   tpsP_->getVec("em/current_axis", em_opts_.current_axis, 3, default_axis);
 
   tpsP_->getInput("em/eval_Rplasma", em_opts_.eval_Rplasma, false);
+  tpsP_->getInput("em/print_level", em_opts_.print_level, 0);
 
   // dump options to screen for user inspection
   if (rank0_) {
@@ -449,7 +450,7 @@ void QuasiMagnetostaticSolver3D::solveStep() {
   solver.SetRelTol(em_opts_.rtol);
   solver.SetAbsTol(em_opts_.atol);
   solver.SetMaxIter(em_opts_.max_iter);
-  solver.SetPrintLevel(1);
+  solver.SetPrintLevel(em_opts_.print_level);
 
   solver.Mult(rhs, Avec);
 
@@ -498,7 +499,7 @@ void QuasiMagnetostaticSolver3D::solveStep() {
 
   { /*open scope so that ParaViewDataCollection is destroyed before Ereal_, Eimag_ if needed*/
     // 3) Output A and B fields for visualization using paraview
-    if (verbose) grvy_printf(ginfo, "Writing solution to paraview output.\n");
+    if (verbose && em_opts_.print_level > 0) grvy_printf(ginfo, "Writing solution to paraview output.\n");
     ParaViewDataCollection paraview_dc("magnetostatic", pmesh_);
     paraview_dc.SetPrefixPath("ParaView");
     paraview_dc.SetLevelsOfDetail(em_opts_.order);
@@ -777,7 +778,7 @@ void QuasiMagnetostaticSolverAxiSym::initialize() {
   //-----------------------------------------------------
 
   // 1a) Read the serial mesh (on each mpi rank)
-  std::cout << "Reading mesh = " << em_opts_.mesh_file.c_str() << std::endl;
+  if (verbose) grvy_printf(ginfo, "Reading EM mesh file: %s\n", em_opts_.mesh_file.c_str());
   Mesh *mesh = new Mesh(em_opts_.mesh_file.c_str(), 1, 1);
   dim_ = mesh->Dimension();
   if (dim_ != 2) {
@@ -1007,6 +1008,8 @@ void QuasiMagnetostaticSolverAxiSym::solveStep() {
   Kpre->FormSystemMatrix(ess_bdr_tdofs_, KpreOp);
 
   std::unique_ptr<HypreBoomerAMG> prec(new HypreBoomerAMG(*KpreOp.As<HypreParMatrix>()));
+  prec->SetPrintLevel(em_opts_.print_level);
+
   BlockDiagonalPreconditioner BDP(offsets_);
   BDP.SetDiagonalBlock(0, prec.get());
   BDP.SetDiagonalBlock(1, prec.get());
@@ -1019,7 +1022,7 @@ void QuasiMagnetostaticSolverAxiSym::solveStep() {
   solver.SetRelTol(em_opts_.rtol);
   solver.SetAbsTol(em_opts_.atol);
   solver.SetMaxIter(em_opts_.max_iter);
-  solver.SetPrintLevel(1);
+  solver.SetPrintLevel(em_opts_.print_level);
 
   solver.Mult(rhs_vec, Atheta_vec);
 
@@ -1051,7 +1054,7 @@ void QuasiMagnetostaticSolverAxiSym::solveStep() {
   }
 
   // 3) Output A and B fields for visualization using paraview
-  if (verbose) grvy_printf(ginfo, "Writing solution to paraview output.\n");
+  if (verbose && em_opts_.print_level > 0) grvy_printf(ginfo, "Writing solution to paraview output.\n");
   ParaViewDataCollection paraview_dc("magnetostatic", pmesh_);
   paraview_dc.SetPrefixPath("ParaView");
   paraview_dc.SetLevelsOfDetail(em_opts_.order);
