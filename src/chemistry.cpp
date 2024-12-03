@@ -56,8 +56,6 @@ MFEM_HOST_DEVICE Chemistry::Chemistry(GasMixture *mixture, const ChemistryInput 
     detailedBalance_[r] = inputs.detailedBalance[r];
   }
 
-  // reactionModels_ = inputs.reactionModels;
-
   for (int r = 0; r < numReactions_; r++)
     for (int p = 0; p < 3; p++) equilibriumConstantParams_[p + r * gpudata::MAXCHEMPARAMS] = 0.0;
 
