@@ -1522,10 +1522,6 @@ void ReactingFlow::step() {
 
   updateDensity(1.0);
   updateDiffusivity();
-  Array<int> empty;
-  MsRho_form_->Update();
-  MsRho_form_->Assemble();
-  MsRho_form_->FormSystemMatrix(empty, MsRho_);
 
   // PART I: Form and solve implicit systems for species and temperature.
   //
@@ -2544,6 +2540,10 @@ void ReactingFlow::updateDensity(double tStep) {
     }
   }
   rn_gf_.SetFromTrueDofs(rn_);
+
+  MsRho_form_->Update();
+  MsRho_form_->Assemble();
+  MsRho_form_->FormSystemMatrix(empty, MsRho_);
 
   // project to p-space in case not same as vel-temp
   R0PM0_gf_.SetFromTrueDofs(rn_);
