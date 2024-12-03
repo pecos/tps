@@ -453,7 +453,7 @@ void LteThermoChem::initializeSelf() {
 
   // outlet bc
   {
-    // Assumed homogeneous Nuemann on T, so nothing to do
+      // Assumed homogeneous Nuemann on T, so nothing to do
   }
 
   // Wall BCs
