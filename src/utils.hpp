@@ -105,7 +105,7 @@ bool h5ReadBcastMultiColumnTable(const std::string &fileName, const std::string 
                                  mfem::DenseMatrix &output, std::vector<TableInput> &tables);
 
 void readTable(MPI_Comm TPSCommWorld, std::string filename, bool xLogScale, bool fLogScale, int order,
-               std::list<mfem::DenseMatrix> &tableHost, TableInput &result);
+               std::list<mfem::DenseMatrix> &tableHost, TableInput &result, bool useDevice = true);
 
 // MFEM extensions
 

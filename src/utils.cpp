@@ -523,9 +523,12 @@ void multConstScalar(double A, Vector B, Vector *C) {
 
 void multConstScalarInv(double A, Vector B, Vector *C) {
   {
-    double *dataB = B.HostReadWrite();
-    double *dataC = C->HostReadWrite();
-    MFEM_FORALL(i, B.Size(), { dataC[i] = A / dataB[i]; });
+    const double a = A;
+    //double *dataB = B.HostReadWrite();
+    //double *dataC = C->HostReadWrite();
+    const double *dataB = B.Read();
+    double *dataC = C->Write();
+    MFEM_FORALL(i, B.Size(), { dataC[i] = a / dataB[i]; });
   }
 }
 
@@ -560,16 +563,16 @@ void multConstVectorIP(double A, Vector *C) {
 }
 
 void multScalarScalar(Vector A, Vector B, Vector *C) {
-  double *dataA = A.HostReadWrite();
-  double *dataB = B.HostReadWrite();
-  double *dataC = C->HostReadWrite();
+  const double *dataA = A.Read();
+  const double *dataB = B.Read();
+  double *dataC = C->Write();
   MFEM_FORALL(i, A.Size(), { dataC[i] = dataA[i] * dataB[i]; });
 }
 
 void multScalarScalarInv(Vector A, Vector B, Vector *C) {
-  double *dataA = A.HostReadWrite();
-  double *dataB = B.HostReadWrite();
-  double *dataC = C->HostReadWrite();
+  const double *dataA = A.Read();
+  const double *dataB = B.Read();
+  double *dataC = C->Write();
   MFEM_FORALL(i, A.Size(), { dataC[i] = dataA[i] / dataB[i]; });
 }
 
@@ -675,7 +678,7 @@ void multScalarInvScalarIP(Vector A, Vector *C) {
 
 void multScalarVectorIP(Vector A, Vector *C, int dim) {
   int Ndof = A.Size();
-  double *dataA = A.HostReadWrite();
+  const double *dataA = A.HostReadWrite();
   double *dataB = C->HostReadWrite();
   for (int eq = 0; eq < dim; eq++) {
     for (int i = 0; i < Ndof; i++) {
@@ -1240,7 +1243,7 @@ void makeContinuous(ParGridFunction &u) {
 }
 
 void readTable(MPI_Comm TPSCommWorld, std::string filename, bool xLogScale, bool fLogScale, int order,
-               std::list<mfem::DenseMatrix> &tableHost, TableInput &result) {
+               std::list<mfem::DenseMatrix> &tableHost, TableInput &result, bool useDevice) {
   int myrank;
   MPI_Comm_rank(TPSCommWorld, &myrank);
   const bool rank0 = (myrank == 0);
@@ -1275,8 +1278,13 @@ void readTable(MPI_Comm TPSCommWorld, std::string filename, bool xLogScale, bool
   MPI_Bcast(d_table, dims[0] * dims[1], MPI_DOUBLE, 0, TPSCommWorld);
 
   result.Ndata = Ndata;
-  result.xdata = tableHost.back().Read();
-  result.fdata = tableHost.back().Read() + Ndata;
+  if (useDevice) {
+    result.xdata = tableHost.back().Read();
+    result.fdata = tableHost.back().Read() + Ndata;
+  } else {
+    result.xdata = tableHost.back().HostRead();
+    result.fdata = tableHost.back().HostRead() + Ndata;
+  }
 
   return;
 }
