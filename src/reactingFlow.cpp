@@ -423,7 +423,8 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
 
     if (reactionModels[r] != TABULATED_RXN) {
       assert(rxn_param_idx < rxnModelParamsHost.size());
-      chemistryInput_.reactionInputs[r].modelParams = rxnModelParamsHost[rxn_param_idx].Read();
+      //chemistryInput_.reactionInputs[r].modelParams = rxnModelParamsHost[rxn_param_idx].Read();
+      chemistryInput_.reactionInputs[r].modelParams = rxnModelParamsHost[rxn_param_idx].HostRead();
       rxn_param_idx += 1;
     }
   }
@@ -1713,10 +1714,16 @@ void ReactingFlow::temperatureStep() {
 
   // Update radiation sink
   if (radiation_ != nullptr) {
-    const double *d_T = Tn_next_.Read();
-    double *d_rad = radiation_sink_.Write();
+    // const double *d_T = Tn_next_.Read();
+    // double *d_rad = radiation_sink_.Write();
+    // Radiation *rmodel = radiation_;
+    // MFEM_FORALL(i, Tn_next_.Size(), { d_rad[i] = rmodel->computeEnergySink(d_T[i]); });
+    const double *d_T = Tn_next_.HostRead();
+    double *d_rad = radiation_sink_.HostWrite();
     Radiation *rmodel = radiation_;
-    MFEM_FORALL(i, Tn_next_.Size(), { d_rad[i] = rmodel->computeEnergySink(d_T[i]); });
+    for (int i = 0; i < Tn_next_.Size(); i++) {
+      d_rad[i] = rmodel->computeEnergySink(d_T[i]);
+    }
   }
   radiation_sink_gf_.SetFromTrueDofs(radiation_sink_);
 
@@ -2013,7 +2020,7 @@ void ReactingFlow::speciesProduction() {
     mixture_->computeNumberDensities(state, n_sp);
 
     // Evaluate the chemical source terms
-    chemistry_->computeForwardRateCoeffs(n_sp.Read(), Th, Te, i, kfwd.HostWrite());
+    chemistry_->computeForwardRateCoeffs(n_sp.HostRead(), Th, Te, i, kfwd.HostWrite());
     chemistry_->computeEquilibriumConstants(Th, Te, keq.HostWrite());
     chemistry_->computeProgressRate(n_sp, kfwd, keq, progressRate);
     chemistry_->computeCreationRate(progressRate, creationRate, emissionRate);
@@ -2240,14 +2247,16 @@ void ReactingFlow::substepState() {
 
 void ReactingFlow::updateMixture() {
   {
-    double *dataY = Yn_gf_.HostReadWrite();
+    Mmix_gf_ = 0.0;
+
     double *dataR = Rmix_gf_.HostReadWrite();
     double *dataM = Mmix_gf_.HostReadWrite();
-    Mmix_gf_ = 0.0;
 
     for (int sp = 0; sp < nSpecies_; sp++) {
       setScalarFromVector(Yn_, sp, &tmpR0_);
       Yn_gf_.SetFromTrueDofs(tmpR0_);
+
+      double *dataY = Yn_gf_.HostReadWrite();
       for (int i = 0; i < sDof_; i++) {
         dataM[i] += dataY[i] / gasParams_(sp, GasParams::SPECIES_MW);
       }
@@ -2360,6 +2369,7 @@ void ReactingFlow::updateDiffusivity() {
   (flow_interface_->velocity)->GetTrueDofs(tmpR1_);
   const double *dataTemp = Tn_.HostRead();
   const double *dataRho = rn_.HostRead();
+  const double *h_Yn = Yn_.HostRead();
   const double *dataU = tmpR1_.HostRead();
   double diffY_min = 1.0e-8;  // make readable
 
@@ -2381,7 +2391,7 @@ void ReactingFlow::updateDiffusivity() {
       }
       state[dim_ + 1] = dataTemp[i];
       for (int sp = 0; sp < nActiveSpecies_; sp++) {
-        state[dim_ + 2 + sp] = dataRho[i] * Yn_[i + sp * sDofInt_] / mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
+        state[dim_ + 2 + sp] = dataRho[i] * h_Yn[i + sp * sDofInt_] / mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
       }
 
       mixture_->GetConservativesFromPrimitives(state, conservedState);
@@ -2408,7 +2418,7 @@ void ReactingFlow::updateDiffusivity() {
       }
       state[dim_ + 1] = dataTemp[i];
       for (int sp = 0; sp < nActiveSpecies_; sp++) {
-        state[dim_ + 2 + sp] = dataRho[i] * Yn_[i + sp * sDofInt_] / mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
+        state[dim_ + 2 + sp] = dataRho[i] * h_Yn[i + sp * sDofInt_] / mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
       }
 
       mixture_->GetConservativesFromPrimitives(state, conservedState);
@@ -2434,7 +2444,7 @@ void ReactingFlow::updateDiffusivity() {
       }
       state[dim_ + 1] = dataTemp[i];
       for (int sp = 0; sp < nActiveSpecies_; sp++) {
-        state[dim_ + 2 + sp] = dataRho[i] * Yn_[i + sp * sDofInt_] / mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
+        state[dim_ + 2 + sp] = dataRho[i] * h_Yn[i + sp * sDofInt_] / mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
       }
 
       mixture_->GetConservativesFromPrimitives(state, conservedState);
@@ -2459,7 +2469,7 @@ void ReactingFlow::updateDiffusivity() {
       }
       state[dim_ + 1] = dataTemp[i];
       for (int sp = 0; sp < nActiveSpecies_; sp++) {
-        state[dim_ + 2 + sp] = dataRho[i] * Yn_[i + sp * sDofInt_] / mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
+        state[dim_ + 2 + sp] = dataRho[i] * h_Yn[i + sp * sDofInt_] / mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
       }
 
       mixture_->GetConservativesFromPrimitives(state, conservedState);
@@ -2467,6 +2477,7 @@ void ReactingFlow::updateDiffusivity() {
       double sig;
       transport_->ComputeElectricalConductivity(conservedState, sig);
       h_sig[i] = sig;
+
     }
   }
   sigma_gf_.SetFromTrueDofs(sigma_);
@@ -2477,6 +2488,7 @@ void ReactingFlow::evaluatePlasmaConductivityGF() {
   const double *dataTemp = Tn_.HostRead();
   const double *dataRho = rn_.HostRead();
   const double *dataU = tmpR1_.HostRead();
+  const double *h_Yn = Yn_.HostRead();
 
   double *h_sig = sigma_.HostReadWrite();
   for (int i = 0; i < sDofInt_; i++) {
@@ -2491,7 +2503,7 @@ void ReactingFlow::evaluatePlasmaConductivityGF() {
     }
     state[dim_ + 1] = dataTemp[i];
     for (int sp = 0; sp < nActiveSpecies_; sp++) {
-      state[dim_ + 2 + sp] = dataRho[i] * Yn_[i + sp * sDofInt_] / mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
+      state[dim_ + 2 + sp] = dataRho[i] * h_Yn[i + sp * sDofInt_] / mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
     }
 
     mixture_->GetConservativesFromPrimitives(state, conservedState);
@@ -2730,7 +2742,7 @@ void ReactingFlow::readTableWrapper(std::string inputPath, TableInput &result) {
   tpsP_->getInput((inputPath + "/f_log").c_str(), result.fLogScale, false);
   tpsP_->getInput((inputPath + "/order").c_str(), result.order, 1);
   tpsP_->getRequiredInput((inputPath + "/filename").c_str(), filename);
-  readTable(tpsP_->getTPSCommWorld(), filename, result.xLogScale, result.fLogScale, result.order, tableHost_, result);
+  readTable(tpsP_->getTPSCommWorld(), filename, result.xLogScale, result.fLogScale, result.order, tableHost_, result, false);
 }
 
 void ReactingFlow::identifyCollisionType(const Array<ArgonSpcs> &speciesType, ArgonColl *collisionIndex) {
