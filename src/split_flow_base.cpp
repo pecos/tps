@@ -58,7 +58,10 @@ void ZeroFlow::initializeSelf() {
   
   toThermoChem_interface_.velocity = velocity_;  
   toThermoChem_interface_.pressure = pressure_;
+  //toThermoChem_interface_.divu_next = divu_;    
   toThermoChem_interface_.divu = divu_;  
+  toThermoChem_interface_.divuPos = divu_;
+  toThermoChem_interface_.divuNeg = divu_;    
   toThermoChem_interface_.swirl_supported = false;
 
   // no need to create additional zero vectors

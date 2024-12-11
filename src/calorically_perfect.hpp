@@ -96,7 +96,7 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   int max_iter_; /**< Maximum number of linear solver iterations */
   double rtol_;  /**< Linear solver relative tolerance */
 
-  int default_max_iter_ = 1000;
+  int default_max_iter_ = 10000;
   double default_rtol_ = 1.0e-10;
   double default_atol_ = 1.0e-12;
 
@@ -161,7 +161,8 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   ParGridFunction rhoDt;
 
   ParGridFunction Pnm1_gf_,Pnm2_gf_;
-  ParGridFunction Pn_gf_, Pn_next_gf_, Pext_gf_, resP_gf_;  
+  ParGridFunction Pn_gf_, Pn_next_gf_, Pext_gf_, resP_gf_;
+  ParGridFunction divu_last_gf_;    
 
   ParGridFunction visc_gf_;
   ParGridFunction kappa_gf_;
@@ -172,7 +173,8 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   // ParGridFunction *buffer_tInlet_ = nullptr;
   GridFunctionCoefficient *temperature_bc_field_ = nullptr;
 
-  ConstantCoefficient beta_dt_coeff_;  
+  ConstantCoefficient beta_dt_coeff_;
+  // ConstantCoefficient gamma_coeff_;    
   VectorGridFunctionCoefficient *un_next_coeff_ = nullptr;
   GridFunctionCoefficient *rhon_next_coeff_ = nullptr;
   ScalarVectorProductCoefficient *rhou_coeff_ = nullptr;
@@ -218,7 +220,8 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   mfem::Solver *HtInvPC_ = nullptr;
   mfem::CGSolver *HtInv_ = nullptr;
   mfem::Solver *SpInvPC_ = nullptr;
-  mfem::GMRESSolver *SpInv_ = nullptr;  
+  //mfem::GMRESSolver *SpInv_ = nullptr;
+  mfem::BiCGSTABSolver *SpInv_ = nullptr;  
 
   // Vectors
   Vector Tn_, Tn_next_, Tnm1_, Tnm2_;
@@ -231,7 +234,7 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   Vector Pext_;
   Vector resP_;
   
-  Vector tmpR0_, tmpR0a_, tmpR0b_;
+  Vector tmpR0_, tmpR0a_, tmpR0b_, tmpR0c_;
 
   Vector Qt_;
   Vector Qp_;  

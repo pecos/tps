@@ -171,8 +171,9 @@ void MeshBase::initializeMesh() {
 
     // read partitioning info from original decomposition (unless restarting from serial soln)
     nelemGlobal_ = serial_mesh_->GetNE();
-    // nelemGlobal_ = mesh->GetNE();
-    if (rank0_) grvy_printf(ginfo, "Total # of mesh elements = %i\n", nelemGlobal_);
+    if (rank0_) {
+        std::cout << "Total # of mesh elements = " << nelemGlobal_ << std::endl;      
+    }
 
     string restartDir;
     restartDir = loMach_opts_->io_opts_.restart_dir_;
@@ -205,6 +206,14 @@ void MeshBase::initializeMesh() {
         std::cout << "Uniform refinement number " << l << std::endl;
       }
       serial_mesh_->UniformRefinement();
+    }
+
+    // read partitioning info from original decomposition (unless restarting from serial soln)
+    nelemGlobal_ = serial_mesh_->GetNE();
+    double elesPerRank = ((double)nelemGlobal_) / ((double)nprocs_);    
+    if (rank0_) {
+        std::cout << "Total # of mesh elements = " << nelemGlobal_ << std::endl;
+        std::cout << "Average elements per rank: " << elesPerRank << std::endl;	
     }
 
     string restartDir;
@@ -262,6 +271,21 @@ void MeshBase::initializeMesh() {
 
   // used in loMach to remove need to create local sfes
   sDof_ = fes_->GetNDofs();
+  int dofsTotal;
+  MPI_Allreduce(&sDof_, &dofsTotal, 1, MPI_INTEGER, MPI_SUM, pmesh_->GetComm());
+  double dofsPerRank = ((double)dofsTotal) / ((double)nprocs_);
+  if(rank0_) {
+    std::cout << "Average DoFs per rank: " << dofsPerRank << std::endl;
+  }
+  if(dofsPerRank<minDofsPerRank_) {
+    if(rank0_) {
+      std::cout << std::endl;      
+      std::cout << "ERROR: Over-partitioned for impicit convection solvers.  Reduce total ranks" << std::endl;
+      std::cout << "       Exiting simulation...." << std::endl;       
+      std::cout << std::endl;      
+    }
+    assert(false);
+  }
 
   // scalar measure of mesh size
   computeGridScale();

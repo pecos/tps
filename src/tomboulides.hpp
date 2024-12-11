@@ -240,7 +240,10 @@ class Tomboulides final : public FlowBase {
   mfem::ParGridFunction *p_next_gf_ = nullptr;  
   mfem::ParGridFunction *pn_gf_ = nullptr;
 
+  mfem::ParGridFunction *divu_next_gf_ = nullptr;    
   mfem::ParGridFunction *divu_gf_ = nullptr;  
+  mfem::ParGridFunction *divuPos_gf_ = nullptr;
+  mfem::ParGridFunction *divuNeg_gf_ = nullptr;    
   
   /// Swirl
   mfem::ParGridFunction *utheta_gf_ = nullptr;
@@ -294,8 +297,10 @@ class Tomboulides final : public FlowBase {
   mfem::VectorArrayCoefficient *utheta_vec_coeff_ = nullptr;
   mfem::InnerProductCoefficient *swirl_var_viscosity_coeff_ = nullptr;
 
+  mfem::ConstantCoefficient dt_coeff_;    
+  mfem::ConstantCoefficient minus_coeff_;  
   mfem::ConstantCoefficient beta_dt_coeff_;
-  mfem::ConstantCoefficient beta_dt2_coeff_;
+  // mfem::ConstantCoefficient beta_dt2_coeff_;
   mfem::ConstantCoefficient Rgas_coeff_;    
   mfem::VectorGridFunctionCoefficient *vel_coeff_ = nullptr;
   mfem::GridFunctionCoefficient *temp_coeff_ = nullptr;  
@@ -303,8 +308,10 @@ class Tomboulides final : public FlowBase {
   mfem::ProductCoefficient *press_coeff_ = nullptr;
   mfem::ProductCoefficient *RT_coeff_ = nullptr;   
   mfem::RatioCoefficient *invP_coeff_ = nullptr;
-  mfem::RatioCoefficient *invPdt2_coeff_ = nullptr;  
-  mfem::ScalarVectorProductCoefficient *p_conv_coeff_ = nullptr;  
+  mfem::RatioCoefficient *invPdt_coeff_ = nullptr;  
+  mfem::ScalarVectorProductCoefficient *p_conv_coeff_ = nullptr;
+  mfem::ProductCoefficient *minP_conv_coeff_ = nullptr;
+  mfem::RatioCoefficient *dtorho_coeff_ = nullptr;  
   
   // mfem "form" objects used to create operators
   mfem::ParBilinearForm *L_iorho_form_ = nullptr;  // \int (1/\rho) \nabla \phi_i \cdot \nabla \phi_j
@@ -345,8 +352,8 @@ class Tomboulides final : public FlowBase {
   mfem::ParLORDiscretization *L_iorho_lor_ = nullptr;
   mfem::HypreBoomerAMG *L_iorho_inv_pc_ = nullptr;
   mfem::OrthoSolver *L_iorho_inv_ortho_pc_ = nullptr;
-  mfem::CGSolver *L_iorho_inv_ = nullptr;
-  // mfem::GMRESSolver *L_iorho_inv_ = nullptr;
+  // mfem::CGSolver *L_iorho_inv_ = nullptr;
+  mfem::GMRESSolver *L_iorho_inv_ = nullptr;
 
   mfem::Solver *Ms_inv_pc_ = nullptr;
   mfem::CGSolver *Ms_inv_ = nullptr;

@@ -79,6 +79,9 @@ class MeshBase {
   double xmin_, ymin_, zmin_;
   double xmax_, ymax_, zmax_;
 
+  // catch to prevent over-partitioning with implicit convection pre-conditioners
+  double minDofsPerRank_ = 170.0;
+  
   mfem::FiniteElementCollection *fec_ = nullptr;
   mfem::ParFiniteElementSpace *fes_ = nullptr;
   mfem::ParGridFunction *gridScale_ = nullptr;

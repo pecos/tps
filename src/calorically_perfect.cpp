@@ -264,6 +264,9 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
   Pnm1_gf_.SetSpace(sfes_);
   Pnm2_gf_.SetSpace(sfes_);
 
+  divu_last_gf_.SetSpace(sfes_);
+  divu_last_gf_ = 0.0;
+  
   // density-related  
   rn_.SetSize(sfes_truevsize);
   rn_ = 1.0;
@@ -284,7 +287,9 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
   visc_gf_ = 0.0;
 
   tmpR0_.SetSize(sfes_truevsize);
+  tmpR0a_.SetSize(sfes_truevsize);  
   tmpR0b_.SetSize(sfes_truevsize);
+  tmpR0c_.SetSize(sfes_truevsize);  
 
   R0PM0_gf_.SetSpace(sfes_);
 
@@ -505,12 +510,16 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   rhou_coeff_ = new ScalarVectorProductCoefficient(*rhon_next_coeff_, *un_next_coeff_);
 
   // pressure-solve
+  //gamma_coeff_.constant = gamma_;
   beta_dt_coeff_.constant = time_coeff_.bd0 / time_coeff_.dt;
-  const double c2oR = (sos_ * sos_) / Rgas_;
+  const double c2oR = (sos_ * sos_) / Rgas_; // c2oR should be positive on lhs
   divu_coeff_ = new GridFunctionCoefficient(flow_interface_->divu);
+  //divu_coeff_ = new GridFunctionCoefficient(&Qt_gf_);
   temp_coeff_ = new GridFunctionCoefficient(&Tn_next_gf_);  
   divUoT_coeff_ = new RatioCoefficient(*divu_coeff_, *temp_coeff_);
-  Pdiag_coeff_ = new SumCoefficient(beta_dt_coeff_, *divUoT_coeff_, 1.0, -c2oR);  
+  Pdiag_coeff_ = new SumCoefficient(beta_dt_coeff_, *divUoT_coeff_, 1.0, c2oR); 
+  // (?): can express c^2*rho*divu as gamma*P*divu instead of c^2*P/(RT)*divu
+  //Pdiag_coeff_ = new SumCoefficient(beta_dt_coeff_, *divu_coeff_, 1.0, gamma_);
 
   // convection
   At_form_ = new ParBilinearForm(sfes_);
@@ -574,8 +583,8 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   Sp_form_ = new ParBilinearForm(sfes_);
   //auto *smp_blfi = new MassIntegrator(beta_dt_coeff_);
   auto *smp_blfi = new MassIntegrator(*Pdiag_coeff_);
-  auto *suc_blfi = new ConvectionIntegrator(*un_next_coeff_);  
-  // auto *suc_blfi = new MixedScalarWeakDivergenceIntegrator(*un_next_coeff_);
+  auto *suc_blfi = new ConvectionIntegrator(*un_next_coeff_,-1.0);
+  //auto *suc_blfi = new ConservativeConvectionIntegrator(*un_next_coeff_,1.0);  
   if (numerical_integ_) {
     smp_blfi->SetIntRule(&ir_di);
     suc_blfi->SetIntRule(&ir_di);    
@@ -585,7 +594,6 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   Sp_form_->Assemble();
   Sp_form_->FormSystemMatrix(empty, Sp_);
   if (rank0_) std::cout << "CaloricallyPerfectThermoChem Sp operator set" << endl;
-
   
   if (partial_assembly_) {
     Vector diag_pa(sfes_->GetTrueVSize());
@@ -623,15 +631,21 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   HtInv_->SetMaxIter(hsolve_max_iter_);
   if (rank0_) std::cout << "Temperature operators set" << endl;
 
+
+  //  Options: Jacobi, l1Jacobi, l1GS, l1GStr, lumpedJacobi,
+  //           GS, OPFS, Chebyshev, Taubin, FIR 
+  //mfem::HypreSmoother::Type smoother_type_ = HypreSmoother::Jacobi;  
   
   SpInvPC_ = new HypreSmoother(*Sp_.As<HypreParMatrix>());
   dynamic_cast<HypreSmoother *>(SpInvPC_)->SetType(HypreSmoother::Jacobi, smoother_passes_);
+  //dynamic_cast<HypreSmoother *>(SpInvPC_)->SetType(HypreSmoother::GS, smoother_passes_);
   dynamic_cast<HypreSmoother *>(SpInvPC_)->SetSOROptions(hsmoother_relax_weight_, hsmoother_relax_omega_);
   dynamic_cast<HypreSmoother *>(SpInvPC_)->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_,
                                                           smoother_eig_est_);
 
   //SpInv_ = new CGSolver(sfes_->GetComm());
-  SpInv_ = new GMRESSolver(sfes_->GetComm());
+  //SpInv_ = new GMRESSolver(sfes_->GetComm());
+  SpInv_ = new BiCGSTABSolver(sfes_->GetComm());  
   SpInv_->iterative_mode = true;
   SpInv_->SetOperator(*Sp_);
   SpInv_->SetPreconditioner(*HtInvPC_);
@@ -739,7 +753,8 @@ void CaloricallyPerfectThermoChem::UpdateTimestepHistory(double dt) {
   Tn_ = Tn_next_;
   Tn_gf_.SetFromTrueDofs(Tn_);
 
-  // temperature
+  // pressure
+  /*
   NPnm2_ = NPnm1_;
   NPnm1_ = NPn_;
   Pnm2_ = Pnm1_;
@@ -747,6 +762,7 @@ void CaloricallyPerfectThermoChem::UpdateTimestepHistory(double dt) {
   Pn_next_gf_.GetTrueDofs(Pn_next_);
   Pn_ = Pn_next_;
   Pn_gf_.SetFromTrueDofs(Pn_);
+  */
   
 }
 
@@ -760,10 +776,51 @@ void CaloricallyPerfectThermoChem::step() {
     temp_dbc.coeff->SetTime(time_ + dt_);
   }
 
-  // Prepare for residual calc <jump>
+  // modify thermo pressure with vel-solve?
   //(flow_interface_->pressure)->GetTrueDofs(tmpR0_);
   //Pn_.Add(1.0,tmpR0_);
   //Pn_gf_.SetFromTrueDofs(Pn_);
+
+  /*
+  divu_last_gf_.GetTrueDofs(tmpR0_); // extrap at previous
+  //(flow_interface_->divu)->GetTrueDofs(tmpR0b_);
+  (flow_interface_->divuPos)->GetTrueDofs(tmpR0b_); // true at previous
+  tmpR0c_ = 1.0;  
+  tmpR0c_.Add(+1.0*gamma_*dt_,tmpR0_); // remove contribution from previous extrap
+  tmpR0c_.Add(-1.0*gamma_*dt_,tmpR0b_); // add contribution from true at previous
+  Pn_ *= tmpR0c_;
+  Pn_gf_.SetFromTrueDofs(Pn_);
+  */
+  /*
+  tmpR0c_ = 1.0;  
+  tmpR0c_.Add(0.25*gamma_*dt_,tmpR0_);
+  tmpR0a_ = 1.0;  
+  tmpR0a_.Add(-0.25*gamma_*dt_,tmpR0b_); // careful here, large div and dt can make denom =< 0
+  Pn_ *= tmpR0c_;
+  Pn_ /= tmpR0a_;
+  Pn_gf_.SetFromTrueDofs(Pn_);
+  */
+  
+
+  // update this container AFTER patching Pn
+  //(flow_interface_->divu_next)->GetTrueDofs(tmpR0_);
+  (flow_interface_->divu)->GetTrueDofs(tmpR0_); // new extrap at n+1
+  divu_last_gf_.SetFromTrueDofs(tmpR0_);
+
+  
+  // correct previous calculated pressure with divu
+  //double c2oR;
+  //c2oR = -(343.0*343.0) / Rgas_;    
+  //(flow_interface_->divuNeg)->GetTrueDofs(tmpR0_);
+  //(flow_interface_->divuPos)->GetTrueDofs(tmpR0b_);
+  //tmpR0_ += tmpR0b_;
+  //tmpR0_ *= c2oR * dt_;
+  //tmpR0_ *= gamma_ * dt_;
+  //tmpR0_ *= Pn_;
+  //Pn_.Add(1.0,tmpR0_);
+  //Pn_gf_.SetFromTrueDofs(Pn_);  
+  
+  // Prepare for residual calc <jump>  
   extrapolateState();
   updateBC(0);  // NB: can't ramp right now
   updateThermoP();
@@ -784,8 +841,11 @@ void CaloricallyPerfectThermoChem::step() {
 
   MsRho_->AddMult(tmpR0_, resT_, -1.0);
 
-  // dPo/dt
-  tmpR0_ = (dtP_ / Cp_);
+  // dPo/dt => update this...
+  tmpR0_ = (dtP_ / Cp_);  
+  //tmpR0_.Set(1.0 / dt_, Pn_);
+  //tmpR0_.Add(-1.0 / dt_, Pnm1_);
+  //tmpR0_ /= Cp_;
   Ms_->AddMult(tmpR0_, resT_);
 
   // Add natural boundary terms here later
@@ -828,13 +888,7 @@ void CaloricallyPerfectThermoChem::step() {
     Tn_next_gf_.GetTrueDofs(Tn_next_);
   }
 
-  // prepare for external use
-  updateDensity(1.0);
-  // computeQt();
-  // computeQtTO();
-  computeQtFromDT();
-
-
+  /*
   //... Begin Pressure Step ...// <jump>
   
   // Build the right-hand-side
@@ -844,8 +898,38 @@ void CaloricallyPerfectThermoChem::step() {
   tmpR0_.Set(time_coeff_.bd1 / dt_, Pn_);
   tmpR0_.Add(time_coeff_.bd2 / dt_, Pnm1_);
   tmpR0_.Add(time_coeff_.bd3 / dt_, Pnm2_);
-
   Ms_->AddMult(tmpR0_, resP_, -1.0);
+
+  //double c2oR = -(sos_*sos_) / Rgas_;  
+  //(flow_interface_->divuNeg)->GetTrueDofs(tmpR0b_);
+  //tmpR0b_ *= Pext_;
+  //tmpR0b_ *= c2oR;
+  //Ms_->AddMult(tmpR0b_, resP_, +1.0);
+
+  ///... temp laplacian portion
+  tmpR0_ = 0.0;
+  LQ_bdry_->Update();
+  LQ_bdry_->Assemble();
+  LQ_bdry_->ParallelAssemble(tmpR0_);
+  tmpR0_.Neg();
+  LQ_form_->Update();
+  LQ_form_->Assemble();
+  LQ_form_->FormSystemMatrix(empty, LQ_);
+  LQ_->AddMult(Tn_next_, tmpR0_);  // tmpR0_ += LQ{Tn_next}
+  sfes_->GetRestrictionMatrix()->MultTranspose(tmpR0_, resT_gf_);
+  Qt_ = 0.0;
+  Qt_gf_.SetFromTrueDofs(tmpR0_);
+  Vector Xqt, Bqt;
+  Mq_form_->FormLinearSystem(Qt_ess_tdof_, Qt_gf_, resT_gf_, Mq_, Xqt, Bqt, 1);
+  MqInv_->Mult(Bqt, Xqt);
+  Mq_form_->RecoverFEMSolution(Xqt, resT_gf_, Qt_gf_);
+  Qt_gf_.GetTrueDofs(tmpR0_);
+  //tmpR0_ *= Cp_ * (gamma_ - 1.0); // R or Cp?
+  tmpR0_ *= Rgas_ * (gamma_ - 1.0);
+  rn_gf_.GetTrueDofs(tmpR0a_);
+  tmpR0_ *= tmpR0a_;  
+  Ms_->AddMult(tmpR0_, resP_, +1.0);
+  ///...
 
   // Add natural boundary terms here later
   // NB: adiabatic natural BC is handled, but don't have ability to impose non-zero heat flux yet
@@ -873,9 +957,16 @@ void CaloricallyPerfectThermoChem::step() {
 
   Sp_form_->RecoverFEMSolution(Xt2p, resP_gf_, Pn_next_gf_);
   Pn_next_gf_.GetTrueDofs(Pn_next_);
+  */
 
   // prepare for external use
-  computeQpFromDP();
+  updateDensity(1.0);
+  // computeQt();
+  computeQtTO();
+  /////>>>>computeQtFromDT();
+  
+  // prepare for external use
+  /////>>>>  computeQpFromDP();
   
   //.... End Pressure Step ....//
 
@@ -960,6 +1051,10 @@ void CaloricallyPerfectThermoChem::extrapolateState() {
   // store ext in _next containers, remove Text_, Uext completely later
   Tn_next_gf_.SetFromTrueDofs(Text_);
   Tn_next_gf_.GetTrueDofs(Tn_next_);
+
+  Pext_.Set(time_coeff_.ab1, Pn_);
+  Pext_.Add(time_coeff_.ab2, Pnm1_);
+  Pext_.Add(time_coeff_.ab3, Pnm2_);  
 }
 
 // update thermodynamic pressure
@@ -1062,9 +1157,14 @@ void CaloricallyPerfectThermoChem::updateDensity(double tStep) {
     // <jump>
     //pn_gf_ = *(flow_interface_->pressure);
     //Pn_gf_ = ambient_pressure_;
-    //(flow_interface_->pressure)->GetTrueDofs(rn_);    
-    Pn_gf_.GetTrueDofs(rn_);
+    
+    (flow_interface_->pressure)->GetTrueDofs(Pn_); 
+    Pn_ += thermo_pressure_;
+    Pn_gf_.SetFromTrueDofs(Pn_);
+    rn_.Set(1.0,Pn_);
+    
     //rn_ = ambient_pressure_;
+    //rn_ = thermo_pressure_;    
     rn_ /= Tn_next_;
     rn_ /= Rgas_;
 

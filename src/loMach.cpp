@@ -139,11 +139,9 @@ void LoMachSolver::initialize() {
 
   // Instantiate sponge
   sponge_ = new GeometricSponge(pmesh_, &loMach_opts_, tpsP_);
-  if(rank0_) std::cout << "okay 1..." << endl;
 
   // Instantiate external data
   extData_ = new GaussianInterpExtData(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_);
-  if(rank0_) std::cout << "okay 2..." << endl;  
 
   // Instantiate turbulence model
   if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::SMAGORINSKY) {
@@ -163,7 +161,6 @@ void LoMachSolver::initialize() {
     }
     exit(ERROR);
   }
-  if(rank0_) std::cout << "okay 3..." << endl;  
 
   // Instantiate thermochemical model
   if (loMach_opts_.thermo_solver == "constant-property") {
@@ -181,7 +178,6 @@ void LoMachSolver::initialize() {
     }
     exit(ERROR);
   }
-  if(rank0_) std::cout << "okay 4..." << endl;
   
   // Instantiate flow solver
   if (loMach_opts_.flow_solver == "zero-flow") {
@@ -197,7 +193,6 @@ void LoMachSolver::initialize() {
     }
     exit(ERROR);
   }
-  if(rank0_) std::cout << "okay 5..." << endl;  
 
   // Instantiate averaging
   avg_opts_ = new AveragingOptions();
@@ -238,17 +233,12 @@ void LoMachSolver::initialize() {
   extData_->setup();
   flow_->initializeFromExtData(&extData_->toFlow_interface_);
   thermo_->initializeFromExtData(&extData_->toThermoChem_interface_);
-  if(rank0_) std::cout << "okay 6..." << endl;    
 
   // Initialize model-owned data
   sponge_->initializeSelf();
-  if(rank0_) std::cout << "okay 6a..." << endl;      
   turbModel_->initializeSelf();
-  if(rank0_) std::cout << "okay 6b..." << endl;      
   flow_->initializeSelf();
-  if(rank0_) std::cout << "okay 6c..." << endl;      
   thermo_->initializeSelf();
-  if(rank0_) std::cout << "okay 7..." << endl;    
 
   // Exchange interface information
   turbModel_->initializeFromThermoChem(&thermo_->toTurbModel_interface_);
@@ -259,7 +249,6 @@ void LoMachSolver::initialize() {
   thermo_->initializeFromFlow(&flow_->toThermoChem_interface_);
   flow_->initializeFromSponge(&sponge_->toFlow_interface_);
   thermo_->initializeFromSponge(&sponge_->toThermoChem_interface_);
-  if(rank0_) std::cout << "okay 8..." << endl;    
 
   // Initialize restart read/write capability
   flow_->initializeIO(ioData);
@@ -284,14 +273,12 @@ void LoMachSolver::initialize() {
 
   // static sponge
   sponge_->setup();
-  if(rank0_) std::cout << "okay 9..." << endl;    
 
   // Finish initializing operators
   flow_->initializeOperators();
   turbModel_->setup();
   turbModel_->initializeOperators();
   thermo_->initializeOperators();
-  if(rank0_) std::cout << "okay 10..." << endl;    
 
   // Initialize visualization
   pvdc_ = new ParaViewDataCollection(loMach_opts_.io_opts_.output_dir_, pmesh_);

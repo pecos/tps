@@ -212,9 +212,12 @@ Tomboulides::~Tomboulides() {
   delete temp_coeff_;  
   delete press_coeff_;  
   delete invP_coeff_;
-  delete invPdt2_coeff_;  
+  delete RT_coeff_;
+  //delete invPdt2_coeff_;
+  delete invPdt_coeff_;  
   delete p_conv_coeff_;
-  
+  // delete minP_conv_coeff_;
+  delete dtorho_coeff_;
   
   // objects allocated by initalizeSelf
   if (axisym_) delete gravity_vec_;
@@ -271,7 +274,10 @@ void Tomboulides::initializeSelf() {
   pn_gf_ = new ParGridFunction(pfes_);    
   p_next_gf_ = new ParGridFunction(pfes_);    
 
-  divu_gf_ = new ParGridFunction(pfes_);      
+  //divu_next_gf_ = new ParGridFunction(pfes_);    
+  divu_gf_ = new ParGridFunction(pfes_);  
+  divuPos_gf_ = new ParGridFunction(pfes_);
+  divuNeg_gf_ = new ParGridFunction(pfes_);        
   
   // pp_div_rad_comp_gf_ = new ParGridFunction(pfes_, *pp_div_gf_);
   // u_next_rad_comp_gf_ = new ParGridFunction(pfes_, *u_next_gf_);
@@ -299,11 +305,14 @@ void Tomboulides::initializeSelf() {
   *mu_total_gf_ = 0.0;
 
   *epsi_gf_ = 0.0;
-
+  
   *pn_gf_ = 0.0;
   *p_next_gf_ = 0.0;
 
+  //*divu_next_gf_ = 0.0;    
   *divu_gf_ = 0.0;  
+  *divuPos_gf_ = 0.0;
+  *divuNeg_gf_ = 0.0;    
   
   if (axisym_) {
     *utheta_gf_ = 0.0;
@@ -312,7 +321,10 @@ void Tomboulides::initializeSelf() {
 
   // exports
   toThermoChem_interface_.velocity = u_next_gf_;
+  //toThermoChem_interface_.divu_next = divu_next_gf_;    
   toThermoChem_interface_.divu = divu_gf_;  
+  toThermoChem_interface_.divuPos = divuPos_gf_;
+  toThermoChem_interface_.divuNeg = divuNeg_gf_;    
   if (axisym_) {
     toThermoChem_interface_.swirl_supported = true;
     toThermoChem_interface_.swirl = utheta_next_gf_;
@@ -431,7 +443,6 @@ void Tomboulides::initializeSelf() {
   pnm2_ = ambient_pressure_;
   *pn_gf_ = ambient_pressure_;
   *p_next_gf_ = ambient_pressure_;
-  if(rank0_) std::cout << "okay a..." << ambient_pressure_ << endl;  
 
   if (axisym_) {
     rad_gravity_vec_ = new ScalarVectorProductCoefficient(radius_coeff, *gravity_vec_);
@@ -671,17 +682,26 @@ void Tomboulides::initializeOperators() {
   S_mom_coeff_ = new VectorSumCoefficient(*graduT_gradmu_coeff_, *gradmu_Qt_coeff_, 1.0, -1.0);
 
   // coefficients for DtP portion of all-mach lhs <jump>
-  beta_dt_coeff_.constant = -coeff_.bd0 / coeff_.dt; 
-  beta_dt2_coeff_.constant = -coeff_.bd0 / ((coeff_.dt)*(coeff_.dt));
-  Rgas_coeff_.constant = Rgas_;   
+  // C/dt * P{n+1} + C * u \cdot grad(P{n+1}) - dt * div(1/rho * grad(P{n+1}))
+  // = C/dt * P{n} - div(u{ext}) + Qt
+  // with: C = 1 / (rho{n}*Rgas*T{n+1})
+  // note: assuming euler time int for now, fix betas later
+  minus_coeff_.constant = -1.0;  
+  dt_coeff_.constant = coeff_.dt;
+  beta_dt_coeff_.constant = -coeff_.bd0 / coeff_.dt;   
+  // beta_dt2_coeff_.constant = -coeff_.bd0 / ((coeff_.dt)*(coeff_.dt));
+  vel_coeff_ =  new VectorGridFunctionCoefficient(u_next_gf_);  
+  Rgas_coeff_.constant = Rgas_;  
   temp_coeff_ = new GridFunctionCoefficient(thermo_interface_->temperature);
   RT_coeff_ = new ProductCoefficient(Rgas_coeff_,*temp_coeff_);
-  //press_coeff_ =  new GridFunctionCoefficient(p_next_gf_);
   press_coeff_ =  new ProductCoefficient(*RT_coeff_,*rho_coeff_);    
-  vel_coeff_ =  new VectorGridFunctionCoefficient(u_next_gf_);
-  invP_coeff_ = new RatioCoefficient(beta_dt_coeff_, *press_coeff_);
-  invPdt2_coeff_ = new RatioCoefficient(beta_dt2_coeff_, *press_coeff_);    
+  invP_coeff_ = new RatioCoefficient(1.0, *press_coeff_);
+  
+  invPdt_coeff_ = new RatioCoefficient(beta_dt_coeff_, *press_coeff_);    
   p_conv_coeff_ = new ScalarVectorProductCoefficient(*invP_coeff_, *vel_coeff_);
+  // minP_conv_coeff_ = new ProductCoefficient(minus_coeff_,*p_conv_coeff_);
+  dtorho_coeff_ = new RatioCoefficient(coeff_.dt, *rho_coeff_);  
+  
   // TODO: 
   //       add p{n+1}, p{n}, p{n-1}, p{n-2} in tomb
   //       calc p{ext} in temperature solver
@@ -746,9 +766,15 @@ void Tomboulides::initializeOperators() {
 
   // Create the operators
 
+  //invPdt_coeff_ = new RatioCoefficient(beta_dt_coeff_, *press_coeff_);    
+  //p_conv_coeff_ = new ScalarVectorProductCoefficient(*invP_coeff_, *vel_coeff_);
+  //minP_conv_coeff_ = new ProductCoefficient(minus_coeff_,*p_conv_coeff_);  
+  //dtorho_coeff_ = new RatioCoefficient(coeff_.dt, *rho_coeff_);  
+  
   // Variable coefficient Laplacian: \nabla \cdot ( (1/\rho) \nabla )
   L_iorho_form_ = new ParBilinearForm(pfes_);
-  auto *L_iorho_blfi = new DiffusionIntegrator(*iorho_coeff_);
+  ////>>>> auto *L_iorho_blfi = new DiffusionIntegrator(*iorho_coeff_);
+  auto *L_iorho_blfi = new DiffusionIntegrator(*dtorho_coeff_); // minus on lhs and minus from ibp
   if (numerical_integ_) {
     L_iorho_blfi->SetIntRule(&ir_ni_p);
   }
@@ -756,16 +782,16 @@ void Tomboulides::initializeOperators() {
 
   // additional operators for all-mach. fix for axisymm...
   // when inverse is constructed, CANNOT USE PCG < jump>
-  /*
-  MixedScalarWeakDivergenceIntegrator *c_mblfi;  
-  c_mblfi = new MixedScalarWeakDivergenceIntegrator(*p_conv_coeff_);
+  //MixedScalarWeakDivergenceIntegrator *c_mblfi;  
+  //c_mblfi = new MixedScalarWeakDivergenceIntegrator(*p_conv_coeff_);
+  ConvectionIntegrator *c_mblfi;  
+  c_mblfi = new ConvectionIntegrator(*p_conv_coeff_,+1.0); // pos on lhs and minus from ibp
   c_mblfi->SetIntRule(&ir_ni_v);
-  L_iorho_form_->AddDomainIntegrator(c_mblfi);  
+  L_iorho_form_->AddDomainIntegrator(c_mblfi);
   MassIntegrator *cmv_blfi;
-  cmv_blfi = new MassIntegrator(*invPdt2_coeff_);  
+  cmv_blfi = new MassIntegrator(*invPdt_coeff_);  
   cmv_blfi->SetIntRule(&ir_ni_v);
   L_iorho_form_->AddDomainIntegrator(cmv_blfi);
-  */
   
   L_iorho_form_->Assemble();
   L_iorho_form_->FormSystemMatrix(pres_ess_tdof_, L_iorho_op_);
@@ -777,8 +803,8 @@ void Tomboulides::initializeOperators() {
   L_iorho_inv_ortho_pc_ = new OrthoSolver(pfes_->GetComm());
   L_iorho_inv_ortho_pc_->SetSolver(*L_iorho_inv_pc_);
 
-  L_iorho_inv_ = new CGSolver(pfes_->GetComm());
-  // L_iorho_inv_ = new GMRESSolver(pfes_->GetComm());
+  // L_iorho_inv_ = new CGSolver(pfes_->GetComm());
+  L_iorho_inv_ = new GMRESSolver(pfes_->GetComm());
   L_iorho_inv_->iterative_mode = true;
   L_iorho_inv_->SetOperator(*L_iorho_op_);
   if (pres_dbcs_.empty()) {
@@ -1326,7 +1352,11 @@ void Tomboulides::step() {
   sw_press_.Start();
   // <jump>
   //beta_dt_coeff_.constant = -coeff_.bd0 / coeff_.dt;
-  //beta_dt2_coeff_.constant = -coeff_.bd0 / ((coeff_.dt)*(coeff_.dt));  
+  //beta_dt2_coeff_.constant = -coeff_.bd0 / ((coeff_.dt)*(coeff_.dt));
+  
+  dt_coeff_.constant = coeff_.dt;
+  beta_dt_coeff_.constant = coeff_.bd0 / coeff_.dt;   
+  
   L_iorho_form_->Update();
   L_iorho_form_->Assemble();
   L_iorho_form_->FormSystemMatrix(pres_ess_tdof_, L_iorho_op_);
@@ -1354,8 +1384,8 @@ void Tomboulides::step() {
   L_iorho_inv_ortho_pc_ = new OrthoSolver(pfes_->GetComm());
   L_iorho_inv_ortho_pc_->SetSolver(*L_iorho_inv_pc_);
 
-  L_iorho_inv_ = new CGSolver(pfes_->GetComm());
-  // L_iorho_inv_ = new GMRESSolver(pfes_->GetComm());
+  // L_iorho_inv_ = new CGSolver(pfes_->GetComm());
+  L_iorho_inv_ = new GMRESSolver(pfes_->GetComm());
   L_iorho_inv_->iterative_mode = true;
   L_iorho_inv_->SetOperator(*L_iorho_op_);
   if (pres_dbcs_.empty()) {
@@ -1475,7 +1505,8 @@ void Tomboulides::step() {
     const auto ab2 = coeff_.ab2;
     const auto ab3 = coeff_.ab3;
     MFEM_FORALL(i, uext_vec_.Size(), { d_uext[i] = ab1 * d_u[i] + ab2 * d_um1[i] + ab3 * d_um2[i]; });
-  }
+    //MFEM_FORALL(i, uext_vec_.Size(), { d_uext[i] = 0.5 *(ab1 * d_u[i] + ab2 * d_um1[i] + ab3 * d_um2[i]) + 0.5*d_u[i]; });
+  }  
   u_next_gf_->SetFromTrueDofs(uext_vec_);
 
   // Evaluate the double curl of the extrapolated velocity field
@@ -1500,20 +1531,25 @@ void Tomboulides::step() {
   // assumes that mu is constant (i.e., there are terms that are
   // proportional to grad(mu) that are not included below).  Relax
   // this assumption by adding the necessary terms!
-
+  
   // Compute and add grad(Qt) contribution
   assert(thermo_interface_->thermal_divergence != nullptr);
   thermo_interface_->thermal_divergence->GetTrueDofs(Qt_vec_);
-  //G_op_->Mult(Qt_vec_, resu_vec_);  
-
-  // okay to use div(u(ext)) instead here?
-  D_op_->Mult(uext_vec_,tmpR0_); // replace these with laplacian?
-  Ms_inv_->Mult(tmpR0_,tmpR0b_);
-  G_op_->Mult(tmpR0b_, resu_vec_);
 
   // Qp <jump>
-  thermo_interface_->pressure_divergence->GetTrueDofs(Qp_vec_);
-  //Qp_vec_ = 0.0;
+  //thermo_interface_->pressure_divergence->GetTrueDofs(Qp_vec_);
+  Qp_vec_ = 0.0;
+  
+  // okay to use div(u(ext)) instead here?
+  //D_op_->Mult(u_vec_,tmpR0_); // replace these with laplacian?
+  //Ms_inv_->Mult(tmpR0_,tmpR0b_);
+  //G_op_->Mult(tmpR0b_, resu_vec_);
+
+  // otherwise, use Qt and Qp
+  ////G_op_->Mult(Qt_vec_, resu_vec_);      
+  tmpR0a_.Set(1.0,Qt_vec_);
+  tmpR0a_.Add(-1.0,Qp_vec_);
+  G_op_->Mult(tmpR0a_, resu_vec_);      
   
   Mv_inv_->Mult(resu_vec_, grad_Qt_vec_);
   if (!Mv_inv_->GetConverged()) {
@@ -1548,9 +1584,23 @@ void Tomboulides::step() {
     });
   }
 
-  // Add ustar/dt contribution
-  pp_div_vec_ += ustar_vec_;
 
+
+  // additions for integrated p-p poisson 
+  // coefficients for DtP portion of all-mach lhs <jump>
+  // C/dt * P{n+1} + C * u \cdot grad(P{n+1}) - dt * div(1/rho * grad(P{n+1}))
+  // = C/dt * P{n} - div(u{ext}) + Qt
+  // with: C = 1 / (rho{n}*Rgas*T{n+1})
+  // note: assuming euler time int for now, fix betas later
+
+
+  
+  // Add ustar/dt contribution (ustar_vec_ has dt included)
+  ////>>>> pp_div_vec_ += ustar_vec_;
+
+  ustar_vec_ *= dt;
+  pp_div_vec_ += ustar_vec_;
+  
   // Evaluate and add variable viscosity terms
   S_poisson_form_->Assemble();
   S_poisson_form_->ParallelAssemble(ress_vec_);
@@ -1562,13 +1612,40 @@ void Tomboulides::step() {
   // rhs = div(pp_div_vec_)
   D_op_->Mult(pp_div_vec_, resp_vec_);
 
+  ////>>> ONLY FOR combined p-p poisson!!!
+  //??? resp_vec_ *= -1.0;  
+
   // Add Qt term (rhs += -bd0 * Qt / dt)
   Ms_op_->AddMult(Qt_vec_, resp_vec_, -coeff_.bd0 / dt);
+  //??? Ms_op_->AddMult(Qt_vec_, resp_vec_, +coeff_.bd0);
 
   // Add Qp term (rhs += +bd0 * Qp / dt)
-  Ms_op_->AddMult(Qp_vec_, resp_vec_, +coeff_.bd0 / dt);
+  ////>>>> Ms_op_->AddMult(Qp_vec_, resp_vec_, +coeff_.bd0 / dt);
+
+  // trying extrap divu instead of Qt-Qp
+  //D_op_->Mult(uext_vec_,tmpR0_);
+  //resp_vec_.Add(-coeff_.bd0 / dt, tmpR0_);
   
   // add explicit part of unsteady P term to rhs <jump>
+  {
+    //const double bd1idt = coeff_.bd1 / dt;
+    //const double bd2idt = coeff_.bd2 / dt;
+    //const double bd3idt = coeff_.bd3 / dt;
+    const double bd1idt = 1.0 / dt;
+    const auto d_rho = (thermo_interface_->density)->Read();
+    const auto d_temp = (thermo_interface_->temperature)->Read();    
+    const auto d_p = pn_.Read();
+    //const auto d_pm1 = pnm1_.Read();
+    //const auto d_pm2 = pnm2_.Read();
+    auto d_dPsrc = tmpR0_.ReadWrite();
+      MFEM_FORALL(i, tmpR0_.Size(), {
+	  //d_dPsrc[i] = (bd1idt*d_p[i] + bd2idt*d_pm1[i] + bd3idt*d_pm2[i]);
+	  d_dPsrc[i] = bd1idt/(Rgas_*d_rho[i]*d_temp[i])*d_p[i]; 
+      });    
+  }
+  Ms_op_->Mult(tmpR0a_,tmpR0b_);
+  resp_vec_ -= tmpR0b_;
+  
   /*
   {
     const double bd0idt = coeff_.bd0 / dt;    
@@ -1624,10 +1701,12 @@ void Tomboulides::step() {
   pp_div_bdr_form_->Assemble();
   pp_div_bdr_form_->ParallelAssemble(pp_div_bdr_vec_);
   resp_vec_.Add(1.0, pp_div_bdr_vec_);
+  //??? resp_vec_.Add(-1.0, pp_div_bdr_vec_);
 
   u_bdr_form_->Assemble();
   u_bdr_form_->ParallelAssemble(u_bdr_vec_);
   resp_vec_.Add(-coeff_.bd0 / dt, u_bdr_vec_);
+  //??? resp_vec_.Add(coeff_.bd0 / dt, u_bdr_vec_);
 
   // Orthogonalize rhs if no Dirichlet BCs on pressure
   sw_press_.Start();
@@ -1664,6 +1743,12 @@ void Tomboulides::step() {
   }
   p_gf_->GetTrueDofs(p_vec_);
 
+
+  // possible iterations here, with p_gf_, calc DtP,
+  // set to rhs of P-solver (in therm-chem), advance to P{n+1}
+  // for use in finding rho
+
+  
   //------------------------------------------------------------------------
   // Step 4: Helmholtz solve for the velocity
   //------------------------------------------------------------------------
@@ -1717,9 +1802,9 @@ void Tomboulides::step() {
   //p_next_gf_->SetFromTrueDofs(tmpR0_);  
 
   // rotate pressure storage <jump>
-  pnm2_ = pnm1_;
-  pnm1_ = pn_;
-  pn_ = p_vec_;
+  pnm2_.Set(1.0,pnm1_);
+  pnm1_.Set(1.0,pn_);
+  pn_.Set(1.0,p_vec_);
   
   // update gradients for turbulence model
   evaluateVelocityGradient();  
@@ -1736,9 +1821,35 @@ void Tomboulides::step() {
     const auto ab3 = coeff_.ab3;
     MFEM_FORALL(i, uext_vec_.Size(), { d_uext[i] = ab1 * d_u[i] + ab2 * d_um1[i] + ab3 * d_um2[i]; });
   }
-  D_op_->Mult(uext_vec_,tmpR0_);
+  //D_op_->Mult(uext_vec_,tmpR0_);  
+  //D_op_->Mult(u_vec_,tmpR0_);
+  tmpR0b_.Set(0.5,uext_vec_);
+  tmpR0b_.Add(0.5,u_vec_);  
+  D_op_->Mult(tmpR0b_,tmpR0_);
   Ms_inv_->Mult(tmpR0_,tmpR0b_);
-  divu_gf_->SetFromTrueDofs(tmpR0b_);
+  //divu_next_gf_->SetFromTrueDofs(tmpR0b_);
+  divu_gf_->SetFromTrueDofs(tmpR0b_);  
+
+  D_op_->Mult(u_vec_,tmpR0_);
+  Ms_inv_->Mult(tmpR0_,tmpR0b_);  
+  divuPos_gf_->SetFromTrueDofs(tmpR0b_); // problem with using divu_next_gf_, no idea why...
+
+  /*
+  tmpR0_ = 0.0;  
+  {
+    const auto d_divu = tmpR0b_.Read();
+    auto d_divuPos = tmpR0_.Write();
+    MFEM_FORALL(i, tmpR0_.Size(), { d_divuPos[i] = std::max(d_divu[i],0.0); });
+  }
+  divuPos_gf_->SetFromTrueDofs(tmpR0_);
+  tmpR0_ = 0.0;  
+  {
+    const auto d_divu = tmpR0b_.Read();
+    auto d_divuNeg = tmpR0_.Write();
+    MFEM_FORALL(i, tmpR0_.Size(), { d_divuNeg[i] = std::min(d_divu[i],0.0); });
+  }  
+  divuNeg_gf_->SetFromTrueDofs(tmpR0_);
+  */
   
   if (axisym_) {
     u_next_gf_->HostRead();
