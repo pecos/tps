@@ -1738,9 +1738,11 @@ void Tomboulides::step() {
   // nullspace by removing the mean of the pressure solution. This is also
   // ensured by the OrthoSolver wrapper for the preconditioner which removes
   // the nullspace after every application.
+  // TODO: must support pressure dirichlet bc's! (outlets/inlets...)
   if (pres_dbcs_.empty()) {
     meanZero(*p_gf_);
   }
+  
   p_gf_->GetTrueDofs(p_vec_);
 
 

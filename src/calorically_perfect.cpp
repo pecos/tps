@@ -1159,7 +1159,7 @@ void CaloricallyPerfectThermoChem::updateDensity(double tStep) {
     //Pn_gf_ = ambient_pressure_;
     
     (flow_interface_->pressure)->GetTrueDofs(Pn_); 
-    Pn_ += thermo_pressure_;
+    Pn_ += thermo_pressure_; // add mean pressure
     Pn_gf_.SetFromTrueDofs(Pn_);
     rn_.Set(1.0,Pn_);
     
