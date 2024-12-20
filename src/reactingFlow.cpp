@@ -88,8 +88,20 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   // plasma conditions. ???
   workFluid_ = USER_DEFINED;
   gasModel_ = PERFECT_MIXTURE;
-  transportModel_ = ARGON_MIXTURE;
   chemistryModel_ = NUM_CHEMISTRYMODEL;
+
+  tpsP_->getInput("plasma_models/gas", gasType_, "Ar");
+  if (gasType_=="argon") {
+    gasType_=="Ar"
+  }
+  if (gasType_=="nitrogen") {
+    gasType_=="Ni"
+  }  
+  if (gasType_=="Ar") {
+    transportModel_ = ARGON_MIXTURE;
+  } else if (gasType == "Ni") {
+    transportModel_ = NITROGEN_MIXTURE;    
+  }
 
   /// Minimal amount of info for mixture input struct
   mixtureInput_.f = workFluid_;
@@ -217,8 +229,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     std::string basepath("species/species" + std::to_string(i));
 
     tpsP_->getRequiredInput((basepath + "/name").c_str(), speciesName);
-
-    // valgrind is mad at this line...
+    
     tpsP_->getRequiredPairs((basepath + "/composition").c_str(), composition);
 
     for (size_t c = 0; c < composition.size(); c++) {
@@ -233,14 +244,27 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   }
 
   Vector speciesCharge(nSpecies_);
-  for (int sp = 0; sp < nSpecies_; sp++) {
-    if (speciesNames_[sp] == "Ar.+1") {
-      speciesCharge[sp] = +1.0;
-    } else if (speciesNames_[sp] == "E") {
-      speciesCharge[sp] = -1.0;
-    } else {
-      speciesCharge[sp] = 0.0;
+  if (gasType_ == "Ar") {
+    for (int sp = 0; sp < nSpecies_; sp++) {
+      if (speciesNames_[sp] == "Ar.+1") {
+        speciesCharge[sp] = +1.0;
+      } else if (speciesNames_[sp] == "E") {
+        speciesCharge[sp] = -1.0;
+      } else {
+        speciesCharge[sp] = 0.0;
+      }
     }
+  // do we need an Ni2.+1?
+  } else if (gasType_ == "Ni") {
+    for (int sp = 0; sp < nSpecies_; sp++) {
+      if (speciesNames_[sp] == "Ni.+1") {
+        speciesCharge[sp] = +1.0;
+      } else if (speciesNames_[sp] == "E") {
+        speciesCharge[sp] = -1.0;
+      } else {
+        speciesCharge[sp] = 0.0;
+      }
+    }    
   }
   gasParams_.SetCol(GasParams::SPECIES_CHARGES, speciesCharge);
 
@@ -276,31 +300,51 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     speciesMolarCp_[sp] = specificHeatRatios_[sp] * speciesMolarCv_[sp];
   }
 
-  if (speciesMapping.count("Ar")) {
-    argonInput_.neutralIndex = speciesMapping["Ar"];
-  } else {
-    grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar' !\n");
-    exit(ERROR);
-  }
-  if (speciesMapping.count("Ar.+1")) {
-    argonInput_.ionIndex = speciesMapping["Ar.+1"];
-  } else {
-    grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar.+1' !\n");
-    exit(ERROR);
-  }
-  if (speciesMapping.count("E")) {
-    argonInput_.electronIndex = speciesMapping["E"];
-  } else {
-    grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'E' !\n");
-    exit(ERROR);
+  if (gasType_ == "Ar") {
+    if (speciesMapping.count("Ar")) {
+      gasInput_.neutralIndex = speciesMapping["Ar"];
+    } else {
+      grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar' !\n");
+      exit(ERROR);
+    }
+    if (speciesMapping.count("Ar.+1")) {
+      gasInput_.ionIndex = speciesMapping["Ar.+1"];
+    } else {
+      grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar.+1' !\n");
+      exit(ERROR);
+    }
+    if (speciesMapping.count("E")) {
+      gasInput_.electronIndex = speciesMapping["E"];
+    } else {
+      grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'E' !\n");
+      exit(ERROR);
+    }
   }
 
-  Array<ArgonSpcs> speciesType(nSpecies_);
+  if (gasType_ == "Ni") {  
+    if (speciesMapping.count("Ni")) {
+      gasInput_.neutralIndex = speciesMapping["Ni"];
+    } else if (speciesMapping.count("N2")) {
+      gasInput_.neutralIndex = speciesMapping["N2"];
+    } else if (speciesMapping.count("Ni.+1")) {
+      gasInput_.ionIndex = speciesMapping["Ni.+1"];    
+    } else if (speciesMapping.count("E")) {
+      gasInput_.electronIndex = speciesMapping["E"];
+    } else {
+      grvy_printf(GRVY_ERROR, "\nNitrogen transport missing required species!\n");
+      exit(ERROR);      
+    }
+  }
+    
+  //Array<ArgonSpcs> speciesType(nSpecies_);
+  Array<GasSpcs> speciesType(nSpecies_);
   identifySpeciesType(speciesType);
-  identifyCollisionType(speciesType, argonInput_.collisionIndex);
+  //identifyCollisionType(speciesType, argonInput_.collisionIndex);
+  identifyCollisionType(speciesType, gasInput_.collisionIndex);
 
   mixture_ = new PerfectMixture(mixtureInput_, dim_, dim_, const_plasma_conductivity_);
-  transport_ = new ArgonMixtureTransport(mixture_, argonInput_);
+  //transport_ = new ArgonMixtureTransport(mixture_, argonInput_);
+  transport_ = new GasMixtureTransport(mixture_, gasInput_);  
 
   /// Minimal amount of info for chemistry input struct
   chemistryInput_.model = chemistryModel_;
@@ -2580,68 +2624,137 @@ void ReactingFlow::computeQtTO() {
 }
 
 /// identifySpeciesType and identifyCollisionType copies from M2ulPhyS
-void ReactingFlow::identifySpeciesType(Array<ArgonSpcs> &speciesType) {
+//void ReactingFlow::identifySpeciesType(Array<ArgonSpcs> &speciesType) {
+// note: this is rather convoluted and messy, is it even used?
+void ReactingFlow::identifySpeciesType(Array<GasSpcs> &speciesType) {
   speciesType.SetSize(nSpecies_);
 
-  for (int sp = 0; sp < nSpecies_; sp++) {
-    speciesType[sp] = NONE_ARGSPCS;
+  if (gasType_ == "Ar") {
+    
+    for (int sp = 0; sp < nSpecies_; sp++) {
+      speciesType[sp] = NONE_ARGSPCS;
+      Vector spComp(nAtoms_);
+      speciesComposition_.GetRow(sp, spComp);
 
-    Vector spComp(nAtoms_);
-    speciesComposition_.GetRow(sp, spComp);
-
-    if (spComp(atomMap_["Ar"]) == 1.0) {
-      if (spComp(atomMap_["E"]) == -1.0) {
-        speciesType[sp] = AR1P;
-      } else {
-        bool argonMonomer = true;
+      if (spComp(atomMap_["Ar"]) == 1.0) {
+        if (spComp(atomMap_["E"]) == -1.0) {
+          speciesType[sp] = AR1P; // Ar.+1
+        } else {
+          bool argonMonomer = true;
+          for (int a = 0; a < nAtoms_; a++) {
+            if (a == atomMap_["Ar"]) continue;
+            if (spComp(a) != 0.0) { // more than just Ar
+              argonMonomer = false;
+              break;
+            }
+          }
+          if (argonMonomer) {
+            speciesType[sp] = AR; // just Ar
+          } else {
+            std::string name = speciesNames_[sp];
+            grvy_printf(GRVY_ERROR, "The atom composition of species %s is not supported by ArgonMixtureTransport! \n",
+                        name.c_str());
+            exit(-1);
+          }
+        }
+      } else if (spComp(atomMap_["E"]) == 1.0) {
+        bool electron = true;
         for (int a = 0; a < nAtoms_; a++) {
-          if (a == atomMap_["Ar"]) continue;
+          if (a == atomMap_["E"]) continue;
           if (spComp(a) != 0.0) {
-            argonMonomer = false;
+            electron = false;
             break;
           }
         }
-        if (argonMonomer) {
-          speciesType[sp] = AR;
+        if (electron) {
+          speciesType[sp] = ELECTRON;
         } else {
           std::string name = speciesNames_[sp];
           grvy_printf(GRVY_ERROR, "The atom composition of species %s is not supported by ArgonMixtureTransport! \n",
                       name.c_str());
           exit(-1);
         }
-      }
-    } else if (spComp(atomMap_["E"]) == 1.0) {
-      bool electron = true;
-      for (int a = 0; a < nAtoms_; a++) {
-        if (a == atomMap_["E"]) continue;
-        if (spComp(a) != 0.0) {
-          electron = false;
-          break;
-        }
-      }
-      if (electron) {
-        speciesType[sp] = ELECTRON;
       } else {
         std::string name = speciesNames_[sp];
         grvy_printf(GRVY_ERROR, "The atom composition of species %s is not supported by ArgonMixtureTransport! \n",
                     name.c_str());
         exit(-1);
       }
-    } else {
-      std::string name = speciesNames_[sp];
-      grvy_printf(GRVY_ERROR, "The atom composition of species %s is not supported by ArgonMixtureTransport! \n",
-                  name.c_str());
-      exit(-1);
-    }
-  }
+    }    
 
-  // Check all species are identified.
-  for (int sp = 0; sp < nSpecies_; sp++) {
-    if (speciesType[sp] == NONE_ARGSPCS) {
-      std::string name = speciesNames_[sp];
-      grvy_printf(GRVY_ERROR, "The species %s is not identified in ArgonMixtureTransport! \n", name.c_str());
-      exit(-1);
+    // Check all species are identified.
+    for (int sp = 0; sp < nSpecies_; sp++) {
+      if (speciesType[sp] == NONE_ARGSPCS) {
+        std::string name = speciesNames_[sp];
+        grvy_printf(GRVY_ERROR, "The species %s is not identified in ArgonMixtureTransport! \n", name.c_str());
+        exit(-1);
+      }
     }
+
+  } else if (gasType_ == "Ni") {
+
+    for (int sp = 0; sp < nSpecies_; sp++) {
+      speciesType[sp] = NONE_NITSPCS;
+      Vector spComp(nAtoms_);
+      speciesComposition_.GetRow(sp, spComp);
+
+      if (spComp(atomMap_["Ni"]) == 2.0) {
+        speciesType[sp] = N2; // Ni2
+      } else if (spComp(atomMap_["Ni"]) == 1.0) {
+        if (spComp(atomMap_["E"]) == -1.0) {
+          speciesType[sp] = NI1P; // Ni.+1
+        } else {
+          bool nitrogenMonomer = true;
+          for (int a = 0; a < nAtoms_; a++) {
+            if (a == atomMap_["Ni"]) continue;
+            if (spComp(a) != 0.0) {
+              nitrogenMonomer = false;
+              break;
+            }
+          }
+          if (nitrogenMonomer) {
+            speciesType[sp] = NI;
+          } else {
+            std::string name = speciesNames_[sp];
+            grvy_printf(GRVY_ERROR, "The atom composition of species %s is not supported by GasMixtureTransport! \n",
+                        name.c_str());
+            exit(-1);
+          }
+        }
+      } else if (spComp(atomMap_["E"]) == 1.0) {
+        bool electron = true;
+        for (int a = 0; a < nAtoms_; a++) {
+          if (a == atomMap_["E"]) continue;
+          if (spComp(a) != 0.0) {
+            electron = false;
+            break;
+          }
+        }
+        if (electron) {
+          speciesType[sp] = ELECTRON;
+        } else {
+          std::string name = speciesNames_[sp];
+          grvy_printf(GRVY_ERROR, "The atom composition of species %s is not supported by GasMixtureTransport! \n",
+                      name.c_str());
+          exit(-1);
+        }
+      } else {
+        std::string name = speciesNames_[sp];
+        grvy_printf(GRVY_ERROR, "The atom composition of species %s is not supported by GasMixtureTransport! \n",
+                    name.c_str());
+        exit(-1);
+      }
+    }    
+
+    // Check all species are identified.
+    for (int sp = 0; sp < nSpecies_; sp++) {
+      if (speciesType[sp] == NONE_NITSPCS) {
+        std::string name = speciesNames_[sp];
+        grvy_printf(GRVY_ERROR, "The species %s is not identified in GasMixtureTransport! \n", name.c_str());
+        exit(-1);
+      }
+    }
+    
   }
 
   return;
@@ -2656,7 +2769,9 @@ void ReactingFlow::readTableWrapper(std::string inputPath, TableInput &result) {
   readTable(tpsP_->getTPSCommWorld(), filename, result.xLogScale, result.fLogScale, result.order, tableHost_, result);
 }
 
-void ReactingFlow::identifyCollisionType(const Array<ArgonSpcs> &speciesType, ArgonColl *collisionIndex) {
+//void ReactingFlow::identifyCollisionType(const Array<ArgonSpcs> &speciesType, ArgonColl *collisionIndex) {
+void ReactingFlow::identifyCollisionType(const Array<GasSpcs> &speciesType, GasColl *collisionIndex) {
+  
   for (int spI = 0; spI < nSpecies_; spI++) {
     for (int spJ = spI; spJ < nSpecies_; spJ++) {
       // If not initialized, will raise an error.
@@ -2668,21 +2783,53 @@ void ReactingFlow::identifyCollisionType(const Array<ArgonSpcs> &speciesType, Ar
       } else if (pairType < 0.0) {  // Attractive screened Coulomb potential
         collisionIndex[spI + spJ * nSpecies_] = CLMB_ATT;
       } else {  // determines collision type by species pairs.
-        if ((speciesType[spI] == AR) && (speciesType[spJ] == AR)) {
-          collisionIndex[spI + spJ * nSpecies_] = AR_AR;
-        } else if (((speciesType[spI] == AR) && (speciesType[spJ] == AR1P)) ||
-                   ((speciesType[spI] == AR1P) && (speciesType[spJ] == AR))) {
-          collisionIndex[spI + spJ * nSpecies_] = AR_AR1P;
-        } else if (((speciesType[spI] == AR) && (speciesType[spJ] == ELECTRON)) ||
-                   ((speciesType[spI] == ELECTRON) && (speciesType[spJ] == AR))) {
-          collisionIndex[spI + spJ * nSpecies_] = AR_E;
-        } else {
-          std::string name1 = speciesNames_[spI];
-          std::string name2 = speciesNames_[spJ];
-          grvy_printf(GRVY_ERROR, "1. %s - %s is not supported in ArgonMixtureTransport! \n", name1.c_str(),
-                      name2.c_str());
-          exit(-1);
-        }
+
+	if (gasType_ == "Ar") {
+          if ((speciesType[spI] == AR) && (speciesType[spJ] == AR)) {
+            collisionIndex[spI + spJ * nSpecies_] = AR_AR;
+          } else if (((speciesType[spI] == AR) && (speciesType[spJ] == AR1P)) ||
+                     ((speciesType[spI] == AR1P) && (speciesType[spJ] == AR))) {
+            collisionIndex[spI + spJ * nSpecies_] = AR_AR1P;
+          } else if (((speciesType[spI] == AR) && (speciesType[spJ] == ELECTRON)) ||
+                     ((speciesType[spI] == ELECTRON) && (speciesType[spJ] == AR))) {
+            collisionIndex[spI + spJ * nSpecies_] = AR_E;
+          } else {
+            std::string name1 = speciesNames_[spI];
+            std::string name2 = speciesNames_[spJ];
+            grvy_printf(GRVY_ERROR, "1. %s - %s is not supported in ArgonMixtureTransport! \n", name1.c_str(),
+                        name2.c_str());
+            exit(-1);
+          }
+
+	} else if (gasType_ == "Ni") {
+	  if ((speciesType[spI] == N2) && (speciesType[spJ] == N2)) {
+            collisionIndex[spI + spJ * nSpecies_] = N2_N2;
+          } else if (((speciesType[spI] == N2) && (speciesType[spJ] == NI)) ||
+                     ((speciesType[spI] == NI) && (speciesType[spJ] == N2))) {
+            collisionIndex[spI + spJ * nSpecies_] = N2_NI;
+          } else if (((speciesType[spI] == N2) && (speciesType[spJ] == NI1P)) ||
+                     ((speciesType[spI] == NI1P) && (speciesType[spJ] == N2))) {
+            collisionIndex[spI + spJ * nSpecies_] = N2_NI1P;
+          } else if (((speciesType[spI] == N2) && (speciesType[spJ] == ELECTRON)) ||
+                     ((speciesType[spI] == ELECTRON) && (speciesType[spJ] == N2))) {
+            collisionIndex[spI + spJ * nSpecies_] = N2_E;    	    
+  	  } else if ((speciesType[spI] == NI) && (speciesType[spJ] == NI)) {
+            collisionIndex[spI + spJ * nSpecies_] = NI_NI;
+          } else if (((speciesType[spI] == NI) && (speciesType[spJ] == NI1P)) ||
+                     ((speciesType[spI] == NI1P) && (speciesType[spJ] == NI))) {
+            collisionIndex[spI + spJ * nSpecies_] = NI_NI1P;
+          } else if (((speciesType[spI] == NI) && (speciesType[spJ] == ELECTRON)) ||
+                     ((speciesType[spI] == ELECTRON) && (speciesType[spJ] == NI))) {
+            collisionIndex[spI + spJ * nSpecies_] = NI_E;
+          } else {
+            std::string name1 = speciesNames_[spI];
+            std::string name2 = speciesNames_[spJ];
+            grvy_printf(GRVY_ERROR, "1. %s - %s is not supported in MixtureTransport! \n", name1.c_str(),
+                        name2.c_str());
+            exit(-1);
+          }	  
+	}
+	
       }
     }
   }
@@ -2690,12 +2837,13 @@ void ReactingFlow::identifyCollisionType(const Array<ArgonSpcs> &speciesType, Ar
   // Check all collision types are initialized.
   for (int spI = 0; spI < nSpecies_; spI++) {
     for (int spJ = spI; spJ < nSpecies_; spJ++) {
-      if (collisionIndex[spI + spJ * nSpecies_] == NONE_ARGCOLL) {
+      if (collisionIndex[spI + spJ * nSpecies_] == NONE_ARGCOLL ||
+	  collisionIndex[spI + spJ * nSpecies_] == NONE_NITCOLL) {
         // std::string name1 = speciesNames_[(*mixtureToInputMap_)[spI]];
         // std::string name2 = speciesNames_[(*mixtureToInputMap_)[spJ]];
         std::string name1 = speciesNames_[spI];
         std::string name2 = speciesNames_[spJ];
-        grvy_printf(GRVY_ERROR, "2. %s - %s is not initialized in ArgonMixtureTransport! \n", name1.c_str(),
+        grvy_printf(GRVY_ERROR, "2. %s - %s is not initialized in MixtureTransport! \n", name1.c_str(),
                     name2.c_str());
         exit(-1);
       }
