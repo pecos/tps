@@ -89,6 +89,7 @@ class ReactingFlow : public ThermoChemModelBase {
   int yDof_, yDofInt_;
 
   WorkingFluid workFluid_;
+  GasType gasType_;  
   GasModel gasModel_;
   TransportModel transportModel_;
   ChemistryModel chemistryModel_;
@@ -96,7 +97,8 @@ class ReactingFlow : public ThermoChemModelBase {
 
   // packaged inputs
   PerfectMixtureInput mixtureInput_;
-  ArgonTransportInput argonInput_;
+  //ArgonTransportInput argonInput_;
+  GasTransportInput gasInput_;
   ChemistryInput chemistryInput_;
 
   PerfectMixture *mixture_ = NULL;
