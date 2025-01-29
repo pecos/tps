@@ -365,10 +365,10 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
       rxnModelParamsHost.push_back(Vector({R}));
 
     } else if (model == "bte") {
-      config.reactionModels[r - 1] = GRIDFUNCTION_RXN;
+      reactionModels[r - 1] = GRIDFUNCTION_RXN;
       int index;
-      tpsP->getRequiredInput((basepath + "/bte/index").c_str(), index);
-      config.chemistryInput.reactionInputs[r - 1].indexInput = index;
+      tpsP_->getRequiredInput((basepath + "/bte/index").c_str(), index);
+      chemistryInput_.reactionInputs[r - 1].indexInput = index;
     } else {
       grvy_printf(GRVY_ERROR, "\nUnknown reaction_model -> %s", model.c_str());
       exit(ERROR);
@@ -2844,7 +2844,7 @@ double species_uniform(const Vector &coords, double t) {
 void ReactingFlow::push(TPS::Tps2Boltzmann &interface) {
   assert(interface.IsInitialized());
 
-  const int nscalardofs(vfes->GetNDofs());
+  const int nscalardofs(vfes_->GetNDofs());
 
   mfem::ParGridFunction *species =
       new mfem::ParGridFunction(&interface.NativeFes(TPS::Tps2Boltzmann::Index::SpeciesDensities));
@@ -2859,7 +2859,7 @@ void ReactingFlow::push(TPS::Tps2Boltzmann &interface) {
 
   for (int i = 0; i < nscalardofs; i++) {
     for (int asp = 0; asp < nActiveSpecies_; asp++)
-      state_local[asp] =dataRho[i]*dataY[i+asp*nscalardofs];
+      state_local[asp] = dataRho[i]*dataY[i+asp*nscalardofs];
 
     mixture_->computeNumberDensities(state_local, species_local);
 
@@ -2876,8 +2876,6 @@ void ReactingFlow::push(TPS::Tps2Boltzmann &interface) {
   interface.setCurrentTime(this->time_);
 
   delete species;
-  delete heavyTemperature;
-  delete electronTemperature;
 }
 
 void ReactingFlow::fetch(TPS::Tps2Boltzmann &interface) {
