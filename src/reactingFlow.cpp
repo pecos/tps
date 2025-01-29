@@ -41,6 +41,7 @@
 #include "loMach.hpp"
 #include "loMach_options.hpp"
 #include "radiation.hpp"
+#include "tps2Boltzmann.hpp"
 
 using namespace mfem;
 using namespace mfem::common;
@@ -363,6 +364,11 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
       tpsP_->getRequiredInput((basepath + "/radius").c_str(), R);
       rxnModelParamsHost.push_back(Vector({R}));
 
+    } else if (model == "bte") {
+      config.reactionModels[r - 1] = GRIDFUNCTION_RXN;
+      int index;
+      tpsP->getRequiredInput((basepath + "/bte/index").c_str(), index);
+      config.chemistryInput.reactionInputs[r - 1].indexInput = index;
     } else {
       grvy_printf(GRVY_ERROR, "\nUnknown reaction_model -> %s", model.c_str());
       exit(ERROR);
@@ -2834,6 +2840,60 @@ double species_uniform(const Vector &coords, double t) {
   yn = 1.0e-12;
   return yn;
 }
+
+void ReactingFlow::push(TPS::Tps2Boltzmann &interface) {
+  assert(interface.IsInitialized());
+
+  const int nscalardofs(vfes->GetNDofs());
+
+  mfem::ParGridFunction *species =
+      new mfem::ParGridFunction(&interface.NativeFes(TPS::Tps2Boltzmann::Index::SpeciesDensities));
+
+  double *species_data = species->HostWrite();
+
+  const double *dataRho = rn_.HostRead();
+  const double *dataY = Yn_.HostRead();
+
+  double state_local[gpudata::MAXEQUATIONS];
+  double species_local[gpudata::MAXSPECIES];
+
+  for (int i = 0; i < nscalardofs; i++) {
+    for (int asp = 0; asp < nActiveSpecies_; asp++)
+      state_local[asp] =dataRho[i]*dataY[i+asp*nscalardofs];
+
+    mixture_->computeNumberDensities(state_local, species_local);
+
+
+    for (int sp = 0; sp < interface.Nspecies(); sp++)
+      species_data[i + sp * nscalardofs] = AVOGADRONUMBER * species_local[sp];
+  }
+
+  interface.interpolateFromNativeFES(*species, TPS::Tps2Boltzmann::Index::SpeciesDensities);
+  interface.interpolateFromNativeFES(Tn_gf_, TPS::Tps2Boltzmann::Index::HeavyTemperature);
+  interface.interpolateFromNativeFES(Tn_gf_, TPS::Tps2Boltzmann::Index::ElectronTemperature);
+
+  interface.setTimeStep(this->dt_);
+  interface.setCurrentTime(this->time_);
+
+  delete species;
+  delete heavyTemperature;
+  delete electronTemperature;
+}
+
+void ReactingFlow::fetch(TPS::Tps2Boltzmann &interface) {
+  mfem::ParFiniteElementSpace *reaction_rates_fes(&(interface.NativeFes(TPS::Tps2Boltzmann::Index::ReactionRates)));
+  externalReactionRates_.reset(new mfem::ParGridFunction(reaction_rates_fes));
+  interface.interpolateToNativeFES(*externalReactionRates_, TPS::Tps2Boltzmann::Index::ReactionRates);
+#if defined(_CUDA_) || defined(_HIP_)
+  const double *data(externalReactionRates_->Read());
+  int size(externalReactionRates_->FESpace()->GetNDofs());
+  assert(externalReactionRates_->FESpace()->GetOrdering() == mfem::Ordering::byNODES);
+  gpu::deviceSetChemistryReactionData<<<1, 1>>>(data, size, chemistry_);
+#else
+  chemistry_->setGridFunctionRates(*externalReactionRates_);
+#endif
+}
+
 
 #if 0
 void ReactingFlow::uniformInlet() {
