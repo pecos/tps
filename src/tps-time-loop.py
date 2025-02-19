@@ -5,6 +5,38 @@ import numpy as np
 
 from mpi4py import MPI
 
+class NullSolver:
+    def __init__(self):
+        self.species_densities = None
+        self.efield = None
+        self.heavy_temperature = None
+        #Reaction 1: 'Ar + E => Ar.+1 + 2 E', 
+        #Reaction 2: 'Ar.+1 + 2 E => Ar + E'
+
+
+    def fetch(self, interface):
+        n_reactions =interface.nComponents(libtps.t2bIndex.ReactionRates)
+        for r in range(n_reactions):
+            print("Reaction ", r+1, ": ", interface.getReactionEquation(r))
+        self.species_densities = np.array(interface.HostRead(libtps.t2bIndex.SpeciesDensities), copy=False)
+        self.efield = np.array(interface.HostRead(libtps.t2bIndex.ElectricField), copy=False)
+        self.heavy_temperature = np.array(interface.HostRead(libtps.t2bIndex.HeavyTemperature), copy=False)
+
+        efieldAngularFreq = interface.EfieldAngularFreq()
+        print("Species densities:", self.species_densities.min(), " ", self.species_densities.max())
+        print("Heavy Temp:", self.heavy_temperature.min(), " ", self.heavy_temperature.max())
+        print("Efield:", self.efield.min(), " ", self.efield.max())
+        print("Electric field angular frequency: ", efieldAngularFreq)
+
+
+
+    def solve(self):
+        pass
+
+    def push(self, interface):
+        rates =  np.array(interface.HostWrite(libtps.t2bIndex.ReactionRates), copy=False)
+        rates[:] = 0.
+
 class ArrheniusSolver:
     def __init__(self):
         self.UNIVERSALGASCONSTANT = 8.3144598;  # J * mol^(-1) * K^(-1)
@@ -61,7 +93,7 @@ tps.chooseDevices()
 tps.chooseSolver()
 tps.initialize()
 
-boltzmann = ArrheniusSolver()
+boltzmann = NullSolver()
 
 interface = libtps.Tps2Boltzmann(tps)
 tps.initInterface(interface)

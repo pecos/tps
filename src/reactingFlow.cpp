@@ -2858,11 +2858,10 @@ void ReactingFlow::push(TPS::Tps2Boltzmann &interface) {
   double species_local[gpudata::MAXSPECIES];
 
   for (int i = 0; i < nscalardofs; i++) {
+    state_local[0] = dataRho[i];
     for (int asp = 0; asp < nActiveSpecies_; asp++)
-      state_local[asp] = dataRho[i]*dataY[i+asp*nscalardofs];
-
+      state_local[dim_ + 2 + asp] = dataRho[i]*dataY[i+asp*nscalardofs];
     mixture_->computeNumberDensities(state_local, species_local);
-
 
     for (int sp = 0; sp < interface.Nspecies(); sp++)
       species_data[i + sp * nscalardofs] = AVOGADRONUMBER * species_local[sp];
