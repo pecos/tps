@@ -2887,16 +2887,21 @@ void ReactingFlow::push(TPS::Tps2Boltzmann &interface) {
 }
 
 void ReactingFlow::fetch(TPS::Tps2Boltzmann &interface) {
+  //NOTE: Chemistry is only address by truedofs indexes.
   mfem::ParFiniteElementSpace *reaction_rates_fes(&(interface.NativeFes(TPS::Tps2Boltzmann::Index::ReactionRates)));
-  externalReactionRates_.reset(new mfem::ParGridFunction(reaction_rates_fes));
-  interface.interpolateToNativeFES(*externalReactionRates_, TPS::Tps2Boltzmann::Index::ReactionRates);
+  externalReactionRates_gf_.reset(new mfem::ParGridFunction(reaction_rates_fes));
+  interface.interpolateToNativeFES(*externalReactionRates_gf_, TPS::Tps2Boltzmann::Index::ReactionRates);
+  externalReactionRates_gf_->GetTrueDofs(externalReactionRates_);
+  int size = sDofInt_;
 #if defined(_CUDA_) || defined(_HIP_)
-  const double *data(externalReactionRates_->Read());
-  int size(externalReactionRates_->FESpace()->GetNDofs());
-  assert(externalReactionRates_->FESpace()->GetOrdering() == mfem::Ordering::byNODES);
+  const double *data(externalReactionRates_.Read());
+  //int size(externalReactionRates_->FESpace()->GetNDofs());
+  assert(externalReactionRates_gf_->FESpace()->GetOrdering() == mfem::Ordering::byNODES);
   gpu::deviceSetChemistryReactionData<<<1, 1>>>(data, size, chemistry_);
 #else
-  chemistry_->setGridFunctionRates(*externalReactionRates_);
+  //chemistry_->setGridFunctionRates(*externalReactionRates_gf_);
+  const double *data(externalReactionRates_.HostRead());
+  chemistry_->setRates(data, size);
 #endif
 }
 
