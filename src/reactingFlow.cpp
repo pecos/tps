@@ -2844,7 +2844,7 @@ double species_uniform(const Vector &coords, double t) {
 void ReactingFlow::push(TPS::Tps2Boltzmann &interface) {
   assert(interface.IsInitialized());
 
-  //const int nscalardofs(vfes_->GetNDofs());
+  // const int nscalardofs(vfes_->GetNDofs());
 
   mfem::ParGridFunction *species =
       new mfem::ParGridFunction(&interface.NativeFes(TPS::Tps2Boltzmann::Index::SpeciesDensities));

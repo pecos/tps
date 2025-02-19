@@ -104,8 +104,8 @@ class ReactingFlow : public ThermoChemModelBase {
   ArgonMixtureTransport *transport_ = NULL;
   Chemistry *chemistry_ = NULL;
   // External reaction rates when chemistry is implemented using the BTE option
-  std::unique_ptr<ParGridFunction> externalReactionRates_gf_; //Has repeated interface dofs.
-  Vector externalReactionRates_; //Only true data
+  std::unique_ptr<ParGridFunction> externalReactionRates_gf_; // Has repeated interface dofs.
+  Vector externalReactionRates_; // Only true data
 
   std::vector<std::string> speciesNames_;
   std::map<std::string, int> atomMap_;
