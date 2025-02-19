@@ -2844,12 +2844,15 @@ double species_uniform(const Vector &coords, double t) {
 void ReactingFlow::push(TPS::Tps2Boltzmann &interface) {
   assert(interface.IsInitialized());
 
-  const int nscalardofs(vfes_->GetNDofs());
+  //const int nscalardofs(vfes_->GetNDofs());
 
   mfem::ParGridFunction *species =
       new mfem::ParGridFunction(&interface.NativeFes(TPS::Tps2Boltzmann::Index::SpeciesDensities));
 
-  double *species_data = species->HostWrite();
+  std::cout << sDofInt_ << " " << interface.Nspecies() << std::endl << std::flush;
+  MPI_Barrier(pmesh_->GetComm());
+  mfem::Vector speciesInt(sDofInt_*interface.Nspecies());
+  double *species_data = speciesInt.HostWrite();
 
   const double *dataRho = rn_.HostRead();
   const double *dataY = Yn_.HostRead();
@@ -2857,16 +2860,28 @@ void ReactingFlow::push(TPS::Tps2Boltzmann &interface) {
   double state_local[gpudata::MAXEQUATIONS];
   double species_local[gpudata::MAXSPECIES];
 
-  for (int i = 0; i < nscalardofs; i++) {
+  for (int i = 0; i < gpudata::MAXEQUATIONS; ++i)
+    state_local[i] = 0.;
+
+  for (int i = 0; i < gpudata::MAXSPECIES; ++i)
+    species_local[i] = 0.;
+
+  for (int i = 0; i < sDofInt_; i++) {
     state_local[0] = dataRho[i];
     for (int asp = 0; asp < nActiveSpecies_; asp++)
-      state_local[dim_ + 2 + asp] = dataRho[i]*dataY[i+asp*nscalardofs];
+      state_local[dim_ + 2 + asp] = dataRho[i]*dataY[i+asp*sDofInt_];
     mixture_->computeNumberDensities(state_local, species_local);
 
     for (int sp = 0; sp < interface.Nspecies(); sp++)
-      species_data[i + sp * nscalardofs] = AVOGADRONUMBER * species_local[sp];
+      species_data[i + sp * sDofInt_] = AVOGADRONUMBER * species_local[sp];
   }
 
+  std::cout << "species->SetFromTrueDofs(speciesInt);" << std::endl << std::flush;
+  MPI_Barrier(pmesh_->GetComm());
+  species->SetFromTrueDofs(speciesInt);
+  std::cout << "Tn_gf_.SetFromTrueDofs(Tn_);" << std::endl << std::flush;
+  MPI_Barrier(pmesh_->GetComm());
+  Tn_gf_.SetFromTrueDofs(Tn_);
   interface.interpolateFromNativeFES(*species, TPS::Tps2Boltzmann::Index::SpeciesDensities);
   interface.interpolateFromNativeFES(Tn_gf_, TPS::Tps2Boltzmann::Index::HeavyTemperature);
   interface.interpolateFromNativeFES(Tn_gf_, TPS::Tps2Boltzmann::Index::ElectronTemperature);
