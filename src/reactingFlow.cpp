@@ -427,7 +427,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
           equilibriumConstantParams[p + r * gpudata::MAXCHEMPARAMS];
     }
 
-    if (reactionModels[r] != TABULATED_RXN) {
+    if (reactionModels[r] != TABULATED_RXN && reactionModels[r] != GRIDFUNCTION_RXN) {
       assert(rxn_param_idx < rxnModelParamsHost.size());
       chemistryInput_.reactionInputs[r].modelParams = rxnModelParamsHost[rxn_param_idx].Read();
       rxn_param_idx += 1;

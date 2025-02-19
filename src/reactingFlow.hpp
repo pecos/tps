@@ -419,7 +419,7 @@ class ReactingFlow : public ThermoChemModelBase {
   void evalSubstepNumber();
   void readTableWrapper(std::string inputPath, TableInput &result);
 
-  void push(TPS::Tps2Boltzmann &interface);
-  void fetch(TPS::Tps2Boltzmann &interface);
+  void push(TPS::Tps2Boltzmann &interface) override;
+  void fetch(TPS::Tps2Boltzmann &interface) override;
 };
 #endif  // REACTINGFLOW_HPP_
