@@ -5,8 +5,13 @@ import numpy as np
 
 from mpi4py import MPI
 
+def master_print(comm: MPI.Comm, *args, **kwargs) -> None:
+    if comm.rank == 0:
+        print(*args, **kwargs)
+
 class NullSolver:
-    def __init__(self):
+    def __init__(self, comm):
+        self.comm = comm
         self.species_densities = None
         self.efield = None
         self.heavy_temperature = None
@@ -17,16 +22,16 @@ class NullSolver:
     def fetch(self, interface):
         n_reactions =interface.nComponents(libtps.t2bIndex.ReactionRates)
         for r in range(n_reactions):
-            print("Reaction ", r+1, ": ", interface.getReactionEquation(r))
+            master_print(self.comm, "Reaction ", r+1, ": ", interface.getReactionEquation(r))
         self.species_densities = np.array(interface.HostRead(libtps.t2bIndex.SpeciesDensities), copy=False)
         self.efield = np.array(interface.HostRead(libtps.t2bIndex.ElectricField), copy=False)
         self.heavy_temperature = np.array(interface.HostRead(libtps.t2bIndex.HeavyTemperature), copy=False)
 
         efieldAngularFreq = interface.EfieldAngularFreq()
-        print("Species densities:", self.species_densities.min(), " ", self.species_densities.max())
-        print("Heavy Temp:", self.heavy_temperature.min(), " ", self.heavy_temperature.max())
-        print("Efield:", self.efield.min(), " ", self.efield.max())
-        print("Electric field angular frequency: ", efieldAngularFreq)
+        master_print(self.comm,"Species densities:", self.species_densities.min(), " ", self.species_densities.max())
+        master_print(self.comm,"Heavy Temp:", self.heavy_temperature.min(), " ", self.heavy_temperature.max())
+        master_print(self.comm,"Efield:", self.efield.min(), " ", self.efield.max())
+        master_print(self.comm,"Electric field angular frequency: ", efieldAngularFreq)
 
 
 
@@ -38,7 +43,8 @@ class NullSolver:
         rates[:] = 0.
 
 class ArrheniusSolver:
-    def __init__(self):
+    def __init__(self,comm):
+        self.comm = comm
         self.UNIVERSALGASCONSTANT = 8.3144598;  # J * mol^(-1) * K^(-1)
         self.species_densities = None
         self.efield = None
@@ -53,13 +59,13 @@ class ArrheniusSolver:
     def fetch(self, interface):
         n_reactions =interface.nComponents(libtps.t2bIndex.ReactionRates)
         for r in range(n_reactions):
-            print("Reaction ", r+1, ": ", interface.getReactionEquation(r))
+            master_print(self.comm,"Reaction ", r+1, ": ", interface.getReactionEquation(r))
         self.species_densities = np.array(interface.HostRead(libtps.t2bIndex.SpeciesDensities), copy=False)
         self.efield = np.array(interface.HostRead(libtps.t2bIndex.ElectricField), copy=False)
         self.heavy_temperature = np.array(interface.HostRead(libtps.t2bIndex.HeavyTemperature), copy=False)
 
         efieldAngularFreq = interface.EfieldAngularFreq()
-        print("Electric field angular frequency: ", efieldAngularFreq)
+        master_print(self.comm,"Electric field angular frequency: ", efieldAngularFreq)
 
 
 
@@ -93,14 +99,14 @@ tps.chooseDevices()
 tps.chooseSolver()
 tps.initialize()
 
-boltzmann = NullSolver()
+boltzmann = NullSolver(comm)
 
 interface = libtps.Tps2Boltzmann(tps)
 tps.initInterface(interface)
 
 it = 0
 max_iters = tps.getRequiredInput("cycle-avg-joule-coupled/max-iters")
-print("Max Iters: ", max_iters)
+master_print(comm,"Max Iters: ", max_iters)
 tps.solveBegin()
 
 while it < max_iters:
@@ -113,7 +119,7 @@ while it < max_iters:
     tps.fetch(interface)
     
     it = it+1
-    print("it, ", it)
+    master_print(comm, "it, ", it)
 
 tps.solveEnd()
 

@@ -118,7 +118,6 @@ int Tps2Boltzmann::_countBTEReactions() {
 }
 
 void Tps2Boltzmann::init(TPS::PlasmaSolver *flowSolver) {
-  std::cout << "Tps2Boltzmann::init is called" << std::endl;
   mfem::ParMesh *pmesh(flowSolver->getMesh());
   if (use_h1fec_)
     fec_ = new mfem::H1_FECollection(order_, pmesh->Dimension(), basis_type_);

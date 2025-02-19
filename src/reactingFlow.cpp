@@ -2849,8 +2849,6 @@ void ReactingFlow::push(TPS::Tps2Boltzmann &interface) {
   mfem::ParGridFunction *species =
       new mfem::ParGridFunction(&interface.NativeFes(TPS::Tps2Boltzmann::Index::SpeciesDensities));
 
-  std::cout << sDofInt_ << " " << interface.Nspecies() << std::endl << std::flush;
-  MPI_Barrier(pmesh_->GetComm());
   mfem::Vector speciesInt(sDofInt_*interface.Nspecies());
   double *species_data = speciesInt.HostWrite();
 
@@ -2876,11 +2874,7 @@ void ReactingFlow::push(TPS::Tps2Boltzmann &interface) {
       species_data[i + sp * sDofInt_] = AVOGADRONUMBER * species_local[sp];
   }
 
-  std::cout << "species->SetFromTrueDofs(speciesInt);" << std::endl << std::flush;
-  MPI_Barrier(pmesh_->GetComm());
   species->SetFromTrueDofs(speciesInt);
-  std::cout << "Tn_gf_.SetFromTrueDofs(Tn_);" << std::endl << std::flush;
-  MPI_Barrier(pmesh_->GetComm());
   Tn_gf_.SetFromTrueDofs(Tn_);
   interface.interpolateFromNativeFES(*species, TPS::Tps2Boltzmann::Index::SpeciesDensities);
   interface.interpolateFromNativeFES(Tn_gf_, TPS::Tps2Boltzmann::Index::HeavyTemperature);
