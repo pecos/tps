@@ -40,7 +40,10 @@ class NullSolver:
 
     def push(self, interface):
         rates =  np.array(interface.HostWrite(libtps.t2bIndex.ReactionRates), copy=False)
-        rates[:] = 0.
+
+        n_reactions =interface.nComponents(libtps.t2bIndex.ReactionRates)
+        for r in range(n_reactions):
+            rates[r*self.heavy_temperature.shape[0]:(r+1)*self.heavy_temperature.shape[0]] = (10.**(-r))*1e-6*self.heavy_temperature
 
 class ArrheniusSolver:
     def __init__(self,comm):
