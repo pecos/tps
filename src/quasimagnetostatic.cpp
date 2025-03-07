@@ -895,15 +895,15 @@ void QuasiMagnetostaticSolverAxiSym::InitializeCurrent() {
     J0(3) = J0(4) = mu0J;
   }
 
-  if(em_opts_.variable_current){
+  if (em_opts_.variable_current) {
     J0(1) = em_opts_.mu0 * em_opts_.varcurrent_amplitude(1) * 0.5;
     J0(2) = em_opts_.mu0 * em_opts_.varcurrent_amplitude(2) * 0.5;
     J0(3) = em_opts_.mu0 * em_opts_.varcurrent_amplitude(3) * 0.5;
     J0(4) = em_opts_.mu0 * em_opts_.varcurrent_amplitude(4) * 0.5;
   }
 
-  if(rank0_){
-    std::cout << "J0 = " << J0(0) << ", " << J0(1) 
+  if (rank0_) {
+    std::cout << "J0 = " << J0(0) << ", " << J0(1)
               << ", " << J0(2) << ", " << J0(3)
               << ", " << J0(4) << endl;
   }
