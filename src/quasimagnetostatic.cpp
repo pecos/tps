@@ -338,7 +338,7 @@ void QuasiMagnetostaticSolver3D::parseSolverOptions() {
   tpsP_->getInput("em/top_only", em_opts_.top_only, false);
   tpsP_->getInput("em/bot_only", em_opts_.bot_only, false);
 
-  // FLAG TO SET IF THE COILS WILL HAVE DIFFERENT CURRENT 
+  // FLAG TO SET IF THE COILS WILL HAVE DIFFERENT CURRENT
   tpsP_->getInput("em/variable_current", em_opts_.variable_current, false);
 
   // EACH RING HAS DIFFERENT CURRENT AMPLITUDE
