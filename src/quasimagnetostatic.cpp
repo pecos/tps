@@ -264,6 +264,19 @@ void QuasiMagnetostaticSolver3D::InitializeCurrent() {
     J0(3) = J0(4) = mu0J;
   }
 
+  if (em_opts_.variable_current) {
+    J0(1) = em_opts_.mu0 * em_opts_.varcurrent_amplitude(1) * 0.5;
+    J0(2) = em_opts_.mu0 * em_opts_.varcurrent_amplitude(2) * 0.5;
+    J0(3) = em_opts_.mu0 * em_opts_.varcurrent_amplitude(3) * 0.5;
+    J0(4) = em_opts_.mu0 * em_opts_.varcurrent_amplitude(4) * 0.5;
+  }
+
+  if (rank0_) {
+    std::cout << "J0 = " << J0(0) << ", " << J0(1)
+              << ", " << J0(2) << ", " << J0(3)
+              << ", " << J0(4) << endl;
+  }
+
   PWConstCoefficient J0coef(J0);
   VectorFunctionCoefficient current(dim_, JFun, &J0coef);
 
@@ -324,6 +337,14 @@ void QuasiMagnetostaticSolver3D::parseSolverOptions() {
   tpsP_->getInput("em/By_file", em_opts_.By_file, std::string("By.h5"));
   tpsP_->getInput("em/top_only", em_opts_.top_only, false);
   tpsP_->getInput("em/bot_only", em_opts_.bot_only, false);
+
+  // FLAG TO SET IF THE COILS WILL HAVE DIFFERENT CURRENT 
+  tpsP_->getInput("em/variable_current", em_opts_.variable_current, false);
+
+  // EACH RING HAS DIFFERENT CURRENT AMPLITUDE
+  Vector default_current(5);
+  default_current = 0.0;
+  tpsP_->getVec("em/varcurrent_amplitude", em_opts_.varcurrent_amplitude, 5, default_current);
 
   tpsP_->getInput("em/current_amplitude", em_opts_.current_amplitude, 1.0);
   tpsP_->getInput("em/current_frequency", em_opts_.current_frequency, 1.0);
@@ -938,15 +959,13 @@ void QuasiMagnetostaticSolverAxiSym::parseSolverOptions() {
 
   tpsP_->getInput("em/variable_current", em_opts_.variable_current, false);
 
-
-  // CONSTANT CURRENT AMPLITUDE FOR ALL RINGS OF THE COIL
-  tpsP_->getInput("em/current_amplitude", em_opts_.current_amplitude, 1.0);
-
   // EACH RING HAS DIFFERENT CURRENT AMPLITUDE
   Vector default_current(5);
   default_current = 0.0;
   tpsP_->getVec("em/varcurrent_amplitude", em_opts_.varcurrent_amplitude, 5, default_current);
 
+  // CONSTANT CURRENT AMPLITUDE FOR ALL RINGS OF THE COIL
+  tpsP_->getInput("em/current_amplitude", em_opts_.current_amplitude, 1.0);
   tpsP_->getInput("em/current_frequency", em_opts_.current_frequency, 1.0);
   tpsP_->getInput("em/permeability", em_opts_.mu0, 1.0);
 
