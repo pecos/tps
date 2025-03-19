@@ -1072,7 +1072,7 @@ void Tomboulides::initializeViz(mfem::ParaViewDataCollection &pvdc) const {
 void Tomboulides::initializeStats(Averaging &average, IODataOrganizer &io, bool continuation) const {
   if (average.ComputeMean()) {
     // fields for averaging
-    average.registerField(std::string("velocity"), u_curr_gf_, true, 0, nvel_);
+    average.registerField(std::string("velocity"), u_curr_gf_, true, 0, dim_);
     average.registerField(std::string("pressure"), p_gf_, false, 0, 1);
     average.registerField(std::string("dissipation"), epsi_gf_, false, 0, 1);
 
