@@ -1054,6 +1054,7 @@ void LteThermoChem::initializeViz(ParaViewDataCollection &pvdc) {
   pvdc.RegisterField("temperature", &Tn_gf_);
   pvdc.RegisterField("density", &rn_gf_);
   pvdc.RegisterField("kappa", &kappa_gf_);
+  pvdc.RegisterField("mu", &mu_gf_);
   pvdc.RegisterField("sigma", &sigma_gf_);
   pvdc.RegisterField("kappaT", &thermal_diff_total_gf_);
   pvdc.RegisterField("Qt", &Qt_gf_);
