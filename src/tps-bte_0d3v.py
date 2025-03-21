@@ -15,6 +15,7 @@ import scipy.interpolate
 import scipy.cluster
 import threading
 import datetime
+import h5py
 # Use asynchronous stream ordered memory
 #cp.cuda.set_allocator(cp.cuda.MemoryAsyncPool().malloc)
 
@@ -139,7 +140,7 @@ class TPSINDEX():
     # in future we need to setup this methodically
     # here key denotes the idx running from 0, nreactions-1
     # value denotes the reaction index in the qoi array
-    RR_IDX    = {0 : 2 , 1 : 3 , 2 : 1}
+    RR_IDX    = {0 : 2 , 1 : 4 , 2 : 1, 3 : 3}
     
     ION_IDX  = 1
     ELE_IDX  = 2
@@ -858,7 +859,7 @@ class Boltzmann0D2VBactchedSolver:
         tps_npts    = len(heavy_temp)
         
         n_reactions = interface.nComponents(libtps.t2bIndex.ReactionRates)
-        rates       = np.array(interface.HostWrite(libtps.t2bIndex.ReactionRates), copy=False).reshape((n_reactions, tps_npts))
+        rates       = np.array(interface.HostWrite(libtps.t2bIndex.ReactionRates), copy=False).reshape((n_reactions, tps_npts), copy=False)
         
         if (use_interp==True):
             if(n_reactions>0):
@@ -886,9 +887,17 @@ class Boltzmann0D2VBactchedSolver:
                     
                     with cp.cuda.Device(dev_id):
                         t1()
-                        
-                rates = rates.reshape((-1))
+
+                rates = rates.reshape((-1), copy=False)
                 rates[rates<0] = 0.0
+
+                # fname = self.param.out_fname+"_push_rank_%d_npes_%d.h5"%(self.rankG, self.npesG)
+                # with h5py.File(fname, 'w') as F:
+                #     F.create_dataset("Tg[K]"    , data=heavy_temp)
+                #     F.create_dataset("rates"    , data=rates)
+                #     F.create_dataset("rates2"   , data=np.array(interface.HostWrite(libtps.t2bIndex.ReactionRates), copy=False))
+                # F.close()
+
         else:
             if(n_reactions>0):
                 rates[:,:] = 0.0
@@ -909,7 +918,7 @@ class Boltzmann0D2VBactchedSolver:
                     with cp.cuda.Device(dev_id):
                         t1()
                         
-                rates = rates.reshape((-1))
+                rates = rates.reshape((-1), copy=False)
                 rates[rates<0] = 0.0
         return 
     
@@ -1284,7 +1293,7 @@ class Boltzmann0D2VBactchedSolver:
         tps_npts    = len(heavy_temp)
         
         n_reactions = interface.nComponents(libtps.t2bIndex.ReactionRates)
-        rates       = np.array(interface.HostWrite(libtps.t2bIndex.ReactionRates), copy=False).reshape((n_reactions, tps_npts))
+        rates       = np.array(interface.HostWrite(libtps.t2bIndex.ReactionRates), copy=False).reshape((n_reactions, tps_npts), copy=False)
         
         if (use_interp==True):
             if(n_reactions>0):
@@ -1819,8 +1828,8 @@ def driver_wo_parla(comm):
                 print("tps steps per cycle : ", tps_sper_cycle, "bte_steps per cycle", bte_sper_cycle, flush=True)
                 
             while (iter<max_iters):
-                if (iter%cycle_freq==0):
-                    interface.saveDataCollection(cycle=(iter//cycle_freq), time=iter)
+                # if (iter%cycle_freq==0):
+                #     interface.saveDataCollection(cycle=(iter//cycle_freq), time=iter)
                 
                 # ########################## BTE solve ##################################################
                 profile_tt[pp.BTE_FETCH].start()
@@ -1851,7 +1860,13 @@ def driver_wo_parla(comm):
                                 boltzmann.io_output_data(grid_idx, u_vec, plot_data=True, export_csv=True, fname=boltzmann.param.out_fname+"_grid_%02d_rank_%d_npes_%d"%(grid_idx, rank, npes))
                 
                 else:
-                    
+                    # boltzmann.param.solver_type = "steady-state"
+                    # boltzmann.solve()
+                    # for grid_idx in boltzmann.active_grid_idx:
+                    #     def t1():
+                    #         boltzmann.bte_solver.set_boltzmann_parameter(grid_idx, "u0", boltzmann.ff[grid_idx])
+                    #     t1()
+                    # boltzmann.param.solver_type = "transient"
                     assert boltzmann.param.solver_type == "transient", "unknown BTE solver type"
                     tt_bte       = 0
                     bte_u        = [0 for i in range(n_grids)]
@@ -1949,6 +1964,9 @@ def driver_wo_parla(comm):
                 profile_tt[pp.TPS_FETCH].start()
                 tps.fetch(interface)
                 profile_tt[pp.TPS_FETCH].stop()
+
+                if (iter%cycle_freq==0):
+                    interface.saveDataCollection(cycle=(iter//cycle_freq), time=iter)
                 
                 tps_u  = 0
                 tps_v  = 0
