@@ -168,28 +168,31 @@ enum GasColl {
   NI_NI1P,       // Ni - Ni.1+ (include excited states)
   NI_E,          // Ni - E (include excited states)
   NI_NI,         // Ni - Ni (include excited states)
-  NI2_NI1P,      // Ni2 - Ni.1+ (include excited states)
-  NI2_E,         // Ni2 - E (include excited states)
-  NI2_NI2,       // Ni2 - Ni2 (include excited states)
-  NI2_NI,        // Ni2 - Ni (include excited states)  
+  NI_N21P,       // Ni - Ni2.1+ (include excited states)  
+  N2_NI1P,       // Ni2 - Ni.1+ (include excited states)
+  N2_E,          // Ni2 - E (include excited states)
+  N2_N2,         // Ni2 - Ni2 (include excited states)
+  N2_NI,         // Ni2 - Ni (include excited states)
+  N2_N21P,       // Ni2 - Ni2.1+ (include excited states)  
   NONE_NITCOLL
   
 };
 
 enum GasSpcs {
-
+  
   // Argon
   AR,        // Monomer Argon neutral, including excited states
   AR1P,      // Ar.1+, including excited states
-  ELECTRON,  // Electron
   NONE_ARGSPCS,
 
   // Nitrogen
   N2,        // Ni2, including excited states
   NI,        // Monomer Nitrogen neutral, including excited states
   NI1P,      // Ni.1+, including excited states
-  ELECTRON,  // Electron
-  NONE_NITSPCS
+  N21P,      // Ni2.1+, including excited states  
+  NONE_NITSPCS,
+
+  ELECTRON  // Electron  
   
 };
 
@@ -681,13 +684,14 @@ struct GasTransportInput {
   int neutralIndex;
   int ionIndex;
   int electronIndex;
-
+  
   bool thirdOrderkElectron;
 
   // ArgonMixtureTransport
   //ArgonColl collisionIndex[gpudata::MAXSPECIES * gpudata::MAXSPECIES];
 
   GasColl collisionIndex[gpudata::MAXSPECIES * gpudata::MAXSPECIES];
+  std::string gas;
 
   // artificial multipliers
   bool multiply;

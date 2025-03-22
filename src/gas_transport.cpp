@@ -30,69 +30,81 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
 
-#include "argon_transport.hpp"
+#include "gas_transport.hpp"
 
 //////////////////////////////////////////////////////
-//////// Argon Minimal Transport (ternary mixture)
+//////// Gas Minimal Transport (ternary mixture)
 //////////////////////////////////////////////////////
 
-ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixture, RunConfiguration &_runfile)
-    : ArgonMinimalTransport(_mixture, _runfile.gasTransportInput) {}
+GasMinimalTransport::GasMinimalTransport(GasMixture *_mixture, RunConfiguration &_runfile)
+    : GasMinimalTransport(_mixture, _runfile.gasTransportInput) {}
 
-MFEM_HOST_DEVICE ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixture, const GasTransportInput &inputs)
+MFEM_HOST_DEVICE GasMinimalTransport::GasMinimalTransport(GasMixture *_mixture, const GasTransportInput &inputs)
     : MolecularTransport(_mixture) {
   viscosityFactor_ = 5. / 16. * sqrt(PI_ * kB_);
   kOverEtaFactor_ = 15. / 4. * kB_;
   diffusivityFactor_ = 3. / 16. * sqrt(2.0 * PI_ * kB_) / AVOGADRONUMBER;
   mfFreqFactor_ = 4. / 3. * AVOGADRONUMBER * sqrt(8. * kB_ / PI_);
 
+  // TODO: add gas type in inputs and reinstate checks here
+  //gasType_ = inputs.gas;
+
+  if (inputs.gas=="Ar" || inputs.gas=="argon") {
+    gasType_ = Ar;
+  } else if (inputs.gas=="Ni" || inputs.gas=="nitrogen") {
+    gasType_ = Ni;
+  } else {
+   printf("Unknown gasType.");
+   assert(false);
+  }  
+  
   // if (!ambipolar) {
-  //   grvy_printf(GRVY_ERROR, "\nArgon ternary transport currently supports ambipolar condition only. Set
+  //   grvy_printf(GRVY_ERROR, "\nGas ternary transport currently supports ambipolar condition only. Set
   //   plasma_models/ambipolar = true.\n"); exit(ERROR);
   // }
-  if (numSpecies != 3) {
-    // grvy_printf(GRVY_ERROR, "\nArgon ternary transport only supports ternary mixture of Ar, Ar.+1, and E !\n");
-    // exit(ERROR);
-    printf("\nArgon ternary transport only supports ternary mixture of Ar, Ar.+1, and E !\n");
-    assert(false);
-  }
+  
+  //if (numSpecies != 3) {
+  //  printf("\nGas ternary transport only supports ternary mixture of Ar, Ar.+1, and E !\n");
+  //  assert(false);
+  //}
 
   // std::map<std::string, int> *speciesMapping = mixture->getSpeciesMapping();
   // if (speciesMapping->count("Ar")) {
   //   neutralIndex_ = (*speciesMapping)["Ar"];
   // } else {
-  //   grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar' !\n");
+  //   grvy_printf(GRVY_ERROR, "\nGas ternary transport requires the species 'Ar' !\n");
   //   exit(ERROR);
   // }
   // if (speciesMapping->count("Ar.+1")) {
   //   ionIndex_ = (*speciesMapping)["Ar.+1"];
   // } else {
-  //   grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar.+1' !\n");
+  //   grvy_printf(GRVY_ERROR, "\nGas ternary transport requires the species 'Ar.+1' !\n");
   //   exit(ERROR);
   // }
   // if (speciesMapping->count("E")) {
   //   electronIndex_ = (*speciesMapping)["E"];
   // } else {
-  //   grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'E' !\n");
+  //   grvy_printf(GRVY_ERROR, "\nGas ternary transport requires the species 'E' !\n");
   //   exit(ERROR);
   // }
+
+  /*
   neutralIndex_ = inputs.neutralIndex;
   if (neutralIndex_ < 0) {
-    // grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar' !\n");
-    // exit(ERROR);
-    printf("\nArgon ternary transport requires the species 'Ar' !\n");
+    printf("\nGas ternary transport requires the species 'Ar' !\n");
     assert(false);
   }
   ionIndex_ = inputs.ionIndex;
   if (ionIndex_ < 0) {
-    printf("\nArgon ternary transport requires the species 'Ar.+1' !\n");
+    printf("\nGas ternary transport requires the species 'Ar.+1' !\n");
     assert(false);
   }
   electronIndex_ = inputs.electronIndex;
   if (electronIndex_ < 0) {
-    printf("\nArgon ternary transport requires the species 'E' !\n");
+    printf("\nGas ternary transport requires the species 'E' !\n");
     assert(false);
   }
+  */
 
   // TODO(kevin): need to factor out avogadro numbers throughout all transport property.
   // multiplying/dividing big numbers are risky of losing precision.
@@ -114,15 +126,15 @@ MFEM_HOST_DEVICE ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixtu
   setArtificialMultipliers(inputs);
 }
 
-MFEM_HOST_DEVICE ArgonMinimalTransport::ArgonMinimalTransport(GasMixture *_mixture) : MolecularTransport(_mixture) {
+MFEM_HOST_DEVICE GasMinimalTransport::GasMinimalTransport(GasMixture *_mixture) : MolecularTransport(_mixture) {
   viscosityFactor_ = 5. / 16. * sqrt(PI_ * kB_);
   kOverEtaFactor_ = 15. / 4. * kB_;
   diffusivityFactor_ = 3. / 16. * sqrt(2.0 * PI_ * kB_) / AVOGADRONUMBER;
   mfFreqFactor_ = 4. / 3. * AVOGADRONUMBER * sqrt(8. * kB_ / PI_);
 }
 
-// void ArgonMinimalTransport::computeEffectiveMass(const Vector &mw, DenseSymmetricMatrix &muw) {
-MFEM_HOST_DEVICE void ArgonMinimalTransport::computeEffectiveMass(const double *mw, double *muw) {
+// void GasMinimalTransport::computeEffectiveMass(const Vector &mw, DenseSymmetricMatrix &muw) {
+MFEM_HOST_DEVICE void GasMinimalTransport::computeEffectiveMass(const double *mw, double *muw) {
   // muw.SetSize(numSpecies);
   // muw = 0.0;
 
@@ -134,7 +146,7 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::computeEffectiveMass(const double *
   }
 }
 
-MFEM_HOST_DEVICE void ArgonMinimalTransport::setArtificialMultipliers(const GasTransportInput &inputs) {
+MFEM_HOST_DEVICE void GasMinimalTransport::setArtificialMultipliers(const GasTransportInput &inputs) {
   multiply_ = inputs.multiply;
   if (multiply_) {
     for (int t = 0; t < FluxTrns::NUM_FLUX_TRANS; t++) fluxTrnsMultiplier_[t] = inputs.fluxTrnsMultiplier[t];
@@ -144,11 +156,11 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::setArtificialMultipliers(const GasT
   }
 }
 
-collisionInputs ArgonMinimalTransport::computeCollisionInputs(const Vector &primitive, const Vector &n_sp) {
+collisionInputs GasMinimalTransport::computeCollisionInputs(const Vector &primitive, const Vector &n_sp) {
   return computeCollisionInputs(&primitive[0], &n_sp[0]);
 }
 
-MFEM_HOST_DEVICE collisionInputs ArgonMinimalTransport::computeCollisionInputs(const double *primitive,
+MFEM_HOST_DEVICE collisionInputs GasMinimalTransport::computeCollisionInputs(const double *primitive,
                                                                                const double *n_sp) {
   collisionInputs collInputs;
   collInputs.Te = (twoTemperature_) ? primitive[num_equation - 1] : primitive[nvel_ + 1];
@@ -169,7 +181,7 @@ MFEM_HOST_DEVICE collisionInputs ArgonMinimalTransport::computeCollisionInputs(c
   return collInputs;
 }
 
-MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeFluxMolecularTransport(const double *state, const double *gradUp,
+MFEM_HOST_DEVICE void GasMinimalTransport::ComputeFluxMolecularTransport(const double *state, const double *gradUp,
                                                                            const double *Efield,
                                                                            double *transportBuffer,
                                                                            double *diffusionVelocity) {
@@ -199,7 +211,21 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeFluxMolecularTransport(const
   double speciesViscosity[gpudata::MAXSPECIES], speciesHvyThrmCnd[gpudata::MAXSPECIES];
   speciesViscosity[ionIndex_] =
       viscosityFactor_ * sqrt(mw_[ionIndex_] * Th) / (collision::charged::rep22(nondimTh) * debyeCircle);
-  speciesViscosity[neutralIndex_] = viscosityFactor_ * sqrt(mw_[neutralIndex_] * Th) / collision::argon::ArAr22(Th);
+
+  switch (gasType_) {
+    case Ar: 
+      speciesViscosity[neutralIndex_] = viscosityFactor_ * sqrt(mw_[neutralIndex_] * Th) / collision::argon::ArAr22(Th);
+      break;
+    case Ni:
+      //speciesViscosity[neutralIndex_] = viscosityFactor_ * sqrt(mw_[neutralIndex_] * Th) / collision::nitrogen::NiNi22(Th);   
+      speciesViscosity[neutralIndex_] = viscosityFactor_ * sqrt(mw_[neutralIndex_] * Th) / collision::nitrogen::N2N222(Th);    
+      break;
+    default:
+      printf("Unknown gasType.");
+      assert(false);
+      break;
+  }
+  
   speciesViscosity[electronIndex_] = 0.0;
   // speciesViscosity(0) = 5. / 16. * sqrt(PI_ * mI_ * kB_ * Th) / (collision::charged::rep22(nondimTe) * PI_ *
   // debyeLength * debyeLength);
@@ -218,15 +244,47 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeFluxMolecularTransport(const
                                                                sqrt(Te / mw_[electronIndex_]) * X_sp[electronIndex_] /
                                                                (collision::charged::rep22(nondimTe) * debyeCircle);
   }
-  assert(transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] >= 0.);
 
   double binaryDiff[3 * 3];
   for (int i = 0; i < 3 * 3; i++) binaryDiff[i] = 0.0;
-  binaryDiff[electronIndex_ + neutralIndex_ * numSpecies] =
-      diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / collision::argon::eAr11(Te);
+
+
+  switch (gasType_) {
+    case Ar: 
+      binaryDiff[electronIndex_ + neutralIndex_ * numSpecies] =
+        diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / collision::argon::eAr11(Te);
+      break;
+    case Ni:
+      //binaryDiff[electronIndex_ + neutralIndex_ * numSpecies] =
+      //  diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / collision::nitrogen::eNi11(Te);     
+      binaryDiff[electronIndex_ + neutralIndex_ * numSpecies] =
+        diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / collision::nitrogen::eN211(Te);       
+      break;
+    default:
+      printf("Unknown gasType.");
+      assert(false);
+      break;
+  }
+
   binaryDiff[neutralIndex_ + electronIndex_ * numSpecies] = binaryDiff[electronIndex_ + neutralIndex_ * numSpecies];
-  binaryDiff[neutralIndex_ + ionIndex_ * numSpecies] =
-      diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
+
+  switch (gasType_) {
+    case Ar: 
+      binaryDiff[neutralIndex_ + ionIndex_ * numSpecies] =
+        diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
+      break;
+    case Ni:
+      //binaryDiff[neutralIndex_ + ionIndex_ * numSpecies] =
+      //  diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::nitrogen::NiNi1P11(Th);
+      binaryDiff[neutralIndex_ + ionIndex_ * numSpecies] =
+        diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::nitrogen::N2N21P11(Th); 
+      break;
+    default:
+      printf("Unknown gasType.");
+      assert(false);
+      break;
+  }  
+  
   binaryDiff[ionIndex_ + neutralIndex_ * numSpecies] = binaryDiff[neutralIndex_ + ionIndex_ * numSpecies];
   binaryDiff[electronIndex_ + ionIndex_ * numSpecies] = diffusivityFactor_ *
                                                         sqrt(Te / getMuw(ionIndex_, electronIndex_)) / nTotal /
@@ -286,10 +344,14 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeFluxMolecularTransport(const
   // std::cout << "max diff. vel: " << charSpeed << std::endl;
 }
 
-MFEM_HOST_DEVICE double ArgonMinimalTransport::computeThirdOrderElectronThermalConductivity(const double *X_sp,
+// HERE HERE HERE
+MFEM_HOST_DEVICE double GasMinimalTransport::computeThirdOrderElectronThermalConductivity(const double *X_sp,
                                                                                             const double debyeLength,
                                                                                             const double Te,
                                                                                             const double nondimTe) {
+  // Q1: momentum-transfer cross-section
+  // Q2: thermal-conductivity / viscosity cross-section
+  
   double debyeCircle = PI_ * debyeLength * debyeLength;
   // std::cout << "LD: " << debyeLength << std::endl;
   double Q2[3];
@@ -314,6 +376,7 @@ MFEM_HOST_DEVICE double ArgonMinimalTransport::computeThirdOrderElectronThermalC
   Q1Neutral[2] = collision::argon::eAr13(Te);
   Q1Neutral[3] = collision::argon::eAr14(Te);
   Q1Neutral[4] = collision::argon::eAr15(Te);
+  
   //   std::cout << "Q1A: ";
   // for (int i = 0; i < 5; i++) std::cout << Q1Neutral(i) << ",\t";
   // std::cout << std::endl;
@@ -321,12 +384,15 @@ MFEM_HOST_DEVICE double ArgonMinimalTransport::computeThirdOrderElectronThermalC
   double L11 = sqrt(2.0) * X_sp[electronIndex_] * L11ee(Q2);
   L11 += X_sp[ionIndex_] * L11ea(Q1Ion);
   L11 += X_sp[neutralIndex_] * L11ea(Q1Neutral);
+  
   double L12 = sqrt(2.0) * X_sp[electronIndex_] * L12ee(Q2);
   L12 += X_sp[ionIndex_] * L12ea(Q1Ion);
   L12 += X_sp[neutralIndex_] * L12ea(Q1Neutral);
+  
   double L22 = sqrt(2.0) * X_sp[electronIndex_] * L22ee(Q2);
   L22 += X_sp[ionIndex_] * L22ea(Q1Ion);
   L22 += X_sp[neutralIndex_] * L22ea(Q1Neutral);
+  
   // std::cout << "L11: " << L11 << std::endl;
   // std::cout << "L12: " << L12 << std::endl;
   // std::cout << "L22: " << L22 << std::endl;
@@ -335,7 +401,7 @@ MFEM_HOST_DEVICE double ArgonMinimalTransport::computeThirdOrderElectronThermalC
          (L11 - L12 * L12 / L22);
 }
 
-void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield,
+void GasMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield,
                                                              Vector &diffusivity, bool unused) {
   diffusivity.SetSize(3);
   diffusivity = 0.0;
@@ -363,10 +429,10 @@ void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state
   // DenseMatrix binaryDiff(3);
   // binaryDiff = 0.0;
   // binaryDiff(electronIndex_, neutralIndex_) =
-  //     diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / collision::argon::eAr11(Te);
+  //     diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / collision::gas::eAr11(Te);
   // binaryDiff(neutralIndex_, electronIndex_) = binaryDiff(electronIndex_, neutralIndex_);
   // binaryDiff(ionIndex_, neutralIndex_) =
-  //     diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
+  //     diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::gas::ArAr1P11(Th);
   // binaryDiff(neutralIndex_, ionIndex_) = binaryDiff(ionIndex_, neutralIndex_);
   // binaryDiff(electronIndex_, ionIndex_) = diffusivityFactor_ * sqrt(Te / getMuw(ionIndex_, electronIndex_)) / nTotal
   // /
@@ -378,7 +444,7 @@ void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state
   // CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
 }
 
-MFEM_HOST_DEVICE void ArgonMinimalTransport::computeMixtureAverageDiffusivity(const double *state, const double *Efield,
+MFEM_HOST_DEVICE void GasMinimalTransport::computeMixtureAverageDiffusivity(const double *state, const double *Efield,
                                                                               double *diffusivity, bool unused) {
   double primitiveState[gpudata::MAXEQUATIONS];
   mixture->GetPrimitivesFromConservatives(state, primitiveState);
@@ -401,11 +467,43 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::computeMixtureAverageDiffusivity(co
 
   double binaryDiff[3 * 3];
   for (int i = 0; i < 3 * 3; i++) binaryDiff[i] = 0.0;
-  binaryDiff[electronIndex_ + neutralIndex_ * numSpecies] =
-      diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / collision::argon::eAr11(Te);
+
+  switch (gasType_) {
+    case Ar: 
+      binaryDiff[electronIndex_ + neutralIndex_ * numSpecies] =
+        diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / collision::argon::eAr11(Te);
+      break;
+    case Ni:
+      //binaryDiff[electronIndex_ + neutralIndex_ * numSpecies] =
+      //  diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / collision::nitrogen::eNi11(Te);
+      binaryDiff[electronIndex_ + neutralIndex_ * numSpecies] =
+        diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / collision::nitrogen::eN211(Te);     
+      break;
+    default:
+      printf("Unknown gasType.");
+      assert(false);
+      break;
+  }  
+  
   binaryDiff[neutralIndex_ + electronIndex_ * numSpecies] = binaryDiff[electronIndex_ + neutralIndex_ * numSpecies];
-  binaryDiff[neutralIndex_ + ionIndex_ * numSpecies] =
-      diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
+
+  switch (gasType_) {
+    case Ar: 
+      binaryDiff[neutralIndex_ + ionIndex_ * numSpecies] =
+        diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
+      break;
+    case Ni:
+      //binaryDiff[neutralIndex_ + ionIndex_ * numSpecies] =
+      //  diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::nitrogen::NiNi1P11(Th);
+      binaryDiff[neutralIndex_ + ionIndex_ * numSpecies] =
+        diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::nitrogen::N2N21P11(Th);      
+      break;
+    default:
+      printf("Unknown gasType.");
+      assert(false);
+      break;
+  }  
+  
   binaryDiff[ionIndex_ + neutralIndex_ * numSpecies] = binaryDiff[neutralIndex_ + ionIndex_ * numSpecies];
   binaryDiff[electronIndex_ + ionIndex_ * numSpecies] = diffusivityFactor_ *
                                                         sqrt(Te / getMuw(ionIndex_, electronIndex_)) / nTotal /
@@ -417,7 +515,7 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::computeMixtureAverageDiffusivity(co
   CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
 }
 
-MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeSourceMolecularTransport(const double *state, const double *Up,
+MFEM_HOST_DEVICE void GasMinimalTransport::ComputeSourceMolecularTransport(const double *state, const double *Up,
                                                                              const double *gradUp, const double *Efield,
                                                                              double *globalTransport,
                                                                              double *speciesTransport,
@@ -443,17 +541,65 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeSourceMolecularTransport(con
   double nondimTe = debyeLength * 4.0 * PI_ * debyeFactor_ * Te;
   // double nondimTh = debyeLength * 4.0 * PI_ * debyeFactor_ * Th;
 
-  double Qea = collision::argon::eAr11(Te);
-  // double Qai = collision::argon::ArAr1P11(Th);
+  double Qea, Qea2;
+
+  switch (gasType_) {
+    case Ar: 
+      Qea = collision::argon::eAr11(Te);
+      break;
+    case Ni:
+      Qea = collision::nitrogen::eNi11(Te);    
+      Qea2 = collision::nitrogen::eN211(Te);
+      break;
+    default:
+      printf("Unknown gasType.");
+      assert(false);
+      break;
+  }  
+
+  // double Qai = collision::gas::ArAr1P11(Th);
   double Qie = collision::charged::att11(nondimTe) * debyeCircle;
 
   double binaryDiff[3 * 3];
   for (int i = 0; i < 3 * 3; i++) binaryDiff[i] = 0.0;
-  binaryDiff[electronIndex_ + neutralIndex_ * numSpecies] =
-      diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / collision::argon::eAr11(Te);
+
+  switch (gasType_) {
+    case Ar: 
+      binaryDiff[electronIndex_ + neutralIndex_ * numSpecies] =
+        diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / collision::argon::eAr11(Te);
+      break;
+    case Ni:
+      //binaryDiff[electronIndex_ + neutralIndex_ * numSpecies] =
+      //  diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / collision::nitrogen::eNi11(Te);
+      binaryDiff[electronIndex_ + neutralIndex_ * numSpecies] =
+        diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / collision::nitrogen::eN211(Te);        
+      break;
+    default:
+      printf("Unknown gasType.");
+      assert(false);
+      break;
+  }  
+  
   binaryDiff[neutralIndex_ + electronIndex_ * numSpecies] = binaryDiff[electronIndex_ + neutralIndex_ * numSpecies];
-  binaryDiff[neutralIndex_ + ionIndex_ * numSpecies] =
-      diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
+
+
+  switch (gasType_) {
+    case Ar: 
+      binaryDiff[neutralIndex_ + ionIndex_ * numSpecies] =
+        diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
+      break;
+    case Ni:
+      //binaryDiff[neutralIndex_ + ionIndex_ * numSpecies] =
+      //  diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::nitrogen::NiNi1P11(Th);
+      binaryDiff[neutralIndex_ + ionIndex_ * numSpecies] =
+        diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::nitrogen::N2N21P11(Th);  
+      break;
+    default:
+      printf("Unknown gasType.");
+      assert(false);
+      break;
+  }  
+  
   binaryDiff[ionIndex_ + neutralIndex_ * numSpecies] = binaryDiff[neutralIndex_ + ionIndex_ * numSpecies];
   binaryDiff[electronIndex_ + ionIndex_ * numSpecies] = diffusivityFactor_ *
                                                         sqrt(Te / getMuw(ionIndex_, electronIndex_)) / nTotal /
@@ -519,7 +665,7 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeSourceMolecularTransport(con
   // std::cout << "max diff. vel: " << charSpeed << std::endl;
 }
 
-MFEM_HOST_DEVICE void ArgonMinimalTransport::GetViscosities(const double *conserved, const double *primitive,
+MFEM_HOST_DEVICE void GasMinimalTransport::GetViscosities(const double *conserved, const double *primitive,
                                                             double *visc) {
   double n_sp[3], X_sp[3], Y_sp[3];
   mixture->computeSpeciesPrimitives(conserved, X_sp, Y_sp, n_sp);
@@ -540,7 +686,21 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::GetViscosities(const double *conser
   double speciesViscosity[3];
   speciesViscosity[ionIndex_] =
       viscosityFactor_ * sqrt(mw_[ionIndex_] * Th) / (collision::charged::rep22(nondimTh) * debyeCircle);
-  speciesViscosity[neutralIndex_] = viscosityFactor_ * sqrt(mw_[neutralIndex_] * Th) / collision::argon::ArAr22(Th);
+
+  switch (gasType_) {
+    case Ar: 
+      speciesViscosity[neutralIndex_] = viscosityFactor_ * sqrt(mw_[neutralIndex_] * Th) / collision::argon::ArAr22(Th);
+      break;
+    case Ni:
+      //speciesViscosity[neutralIndex_] = viscosityFactor_ * sqrt(mw_[neutralIndex_] * Th) / collision::nitrogen::NiNi22(Th);
+      speciesViscosity[neutralIndex_] = viscosityFactor_ * sqrt(mw_[neutralIndex_] * Th) / collision::nitrogen::N2N222(Th);  
+      break;
+    default:
+      printf("Unknown gasType.");
+      assert(false);
+      break;
+  }  
+  
   speciesViscosity[electronIndex_] = 0.0;
 
   visc[0] = linearAverage(X_sp, speciesViscosity);
@@ -554,7 +714,7 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::GetViscosities(const double *conser
 }
 
 /*
-MFEM_HOST_DEVICE void ArgonMinimalTransport::GetThermalConductivities(const double *conserved, const double *primitive,
+MFEM_HOST_DEVICE void GasMinimalTransport::GetThermalConductivities(const double *conserved, const double *primitive,
 double *kappa) { double n_sp[gpudata::MAXSPECIES], X_sp[gpudata::MAXSPECIES], Y_sp[gpudata::MAXSPECIES];
   mixture->computeSpeciesPrimitives(conserved, X_sp, Y_sp, n_sp);
   // double nTotal = 0.0;
@@ -594,15 +754,26 @@ collInputs); kappa[1] = computeThirdOrderElectronThermalConductivity(X_sp, collI
 */
 
 //////////////////////////////////////////////////////
-//////// Argon Mixture Transport
+//////// Gas Mixture Transport
 //////////////////////////////////////////////////////
 
-ArgonMixtureTransport::ArgonMixtureTransport(GasMixture *_mixture, RunConfiguration &_runfile)
-    : ArgonMixtureTransport(_mixture, _runfile.gasTransportInput) {}
+GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, RunConfiguration &_runfile)
+    : GasMixtureTransport(_mixture, _runfile.gasTransportInput) {}
 
-MFEM_HOST_DEVICE ArgonMixtureTransport::ArgonMixtureTransport(GasMixture *_mixture, const GasTransportInput &inputs)
-    : ArgonMinimalTransport(_mixture) {
+MFEM_HOST_DEVICE GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, const GasTransportInput &inputs)
+    : GasMinimalTransport(_mixture) {
   ionIndex_ = inputs.ionIndex;
+
+  //gasType_ = inputs.gas;
+  if (inputs.gas=="Ar" || inputs.gas=="argon") {
+    gasType_ = Ar;
+  } else if (inputs.gas=="Ni" || inputs.gas=="nitrogen") {
+    gasType_ = Ni;
+  } else {
+   printf("Unknown gasType.");
+   assert(false);
+  }  
+  
   // numAtoms_(_runfile.numAtoms),
   // atomMap_(_runfile.atomMap),
   // speciesNames_(_runfile.speciesNames) {
@@ -610,16 +781,17 @@ MFEM_HOST_DEVICE ArgonMixtureTransport::ArgonMixtureTransport(GasMixture *_mixtu
   // if (speciesMapping->count("E")) {
   //   electronIndex_ = (*speciesMapping)["E"];
   // } else {
-  //   grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'E' !\n");
+  //   grvy_printf(GRVY_ERROR, "\nGas ternary transport requires the species 'E' !\n");
   //   exit(ERROR);
   // }
+
+  /*
   electronIndex_ = inputs.electronIndex;
   if (electronIndex_ < 0) {
-    // grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'E' !\n");
-    // exit(ERROR);
-    printf("\nArgon ternary transport requires the species 'E' !\n");
+    printf("\nGas ternary transport requires the species 'E' !\n");
     assert(false);
   }
+  */
 
   // composition_.SetSize(numSpecies, numAtoms_);
   // // mixtureToInputMap_ = mixture->getMixtureToInputMap();
@@ -653,7 +825,8 @@ MFEM_HOST_DEVICE ArgonMixtureTransport::ArgonMixtureTransport(GasMixture *_mixtu
   setArtificialMultipliers(inputs);
 }
 
-MFEM_HOST_DEVICE double ArgonMixtureTransport::collisionIntegral(const int _spI, const int _spJ, const int l,
+// HERE HERE HERE check if att stuff is argon hard-coded, Ar eAr def is...
+MFEM_HOST_DEVICE double GasMixtureTransport::collisionIntegral(const int _spI, const int _spJ, const int l,
                                                                  const int r, const collisionInputs collInputs) {
   const int spI = (_spI > _spJ) ? _spJ : _spI;
   const int spJ = (_spI > _spJ) ? _spI : _spJ;
@@ -688,7 +861,7 @@ MFEM_HOST_DEVICE double ArgonMixtureTransport::collisionIntegral(const int _spI,
           default:
             printf(
                 "(%d, %d)-collision integral for attractive Coulomb potential is not supported in "
-                "ArgonMixtureTransport! \n",
+                "GasMixtureTransport! \n",
                 l, r);
             assert(false);
             break;
@@ -707,7 +880,7 @@ MFEM_HOST_DEVICE double ArgonMixtureTransport::collisionIntegral(const int _spI,
           default:
             printf(
                 "(%d, %d)-collision integral for attractive Coulomb potential is not supported in "
-                "ArgonMixtureTransport! \n",
+                "GasMixtureTransport! \n",
                 l, r);
             assert(false);
             break;
@@ -735,7 +908,7 @@ MFEM_HOST_DEVICE double ArgonMixtureTransport::collisionIntegral(const int _spI,
           default:
             printf(
                 "(%d, %d)-collision integral for repulsive Coulomb potential is not supported in "
-                "ArgonMixtureTransport! \n",
+                "GasMixtureTransport! \n",
                 l, r);
             assert(false);
             break;
@@ -754,7 +927,7 @@ MFEM_HOST_DEVICE double ArgonMixtureTransport::collisionIntegral(const int _spI,
           default:
             printf(
                 "(%d, %d)-collision integral for repulsive Coulomb potential is not supported in "
-                "ArgonMixtureTransport! \n",
+                "GasMixtureTransport! \n",
                 l, r);
             assert(false);
             break;
@@ -765,7 +938,7 @@ MFEM_HOST_DEVICE double ArgonMixtureTransport::collisionIntegral(const int _spI,
       if ((l == 1) && (r == 1)) {
         return collision::argon::ArAr1P11(temp);
       } else {
-        printf("(%d, %d)-collision integral for Ar-Ar.1+ pair is not supported in ArgonMixtureTransport! \n", l, r);
+        printf("(%d, %d)-collision integral for Ar-Ar.1+ pair is not supported in GasMixtureTransport! \n", l, r);
         assert(false);
       }
     } break;
@@ -790,13 +963,13 @@ MFEM_HOST_DEVICE double ArgonMixtureTransport::collisionIntegral(const int _spI,
           default:
             printf(
                 "(%d, %d)-collision integral for repulsive Coulomb potential is not supported in "
-                "ArgonMixtureTransport! \n",
+                "GasMixtureTransport! \n",
                 l, r);
             assert(false);
             break;
         }
       } else {
-        printf("(%d, %d)-collision integral for Ar-E pair is not supported in ArgonMixtureTransport! \n", l, r);
+        printf("(%d, %d)-collision integral for Ar-E pair is not supported in GasMixtureTransport! \n", l, r);
         assert(false);
       }
     } break;
@@ -806,7 +979,7 @@ MFEM_HOST_DEVICE double ArgonMixtureTransport::collisionIntegral(const int _spI,
       } else if ((l == 2) && (r == 2)) {
         return collision::argon::ArAr22(temp);
       } else {
-        printf("(%d, %d)-collision integral for Ar-Ar pair is not supported in ArgonMixtureTransport! \n", l, r);
+        printf("(%d, %d)-collision integral for Ar-Ar pair is not supported in GasMixtureTransport! \n", l, r);
         assert(false);
       }
     } break;
@@ -816,7 +989,7 @@ MFEM_HOST_DEVICE double ArgonMixtureTransport::collisionIntegral(const int _spI,
   return -1;
 }
 
-MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeFluxMolecularTransport(const double *state, const double *gradUp,
+MFEM_HOST_DEVICE void GasMixtureTransport::ComputeFluxMolecularTransport(const double *state, const double *gradUp,
                                                                            const double *Efield,
                                                                            double *transportBuffer,
                                                                            double *diffusionVelocity) {
@@ -855,7 +1028,6 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeFluxMolecularTransport(const
         viscosityFactor_ * kOverEtaFactor_ * sqrt(collInputs.Te / mw_[electronIndex_]) * X_sp[electronIndex_] /
         collisionIntegral(electronIndex_, electronIndex_, 2, 2, collInputs);
   }
-  assert(transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] >= 0.);
 
   double binaryDiff[gpudata::MAXSPECIES * gpudata::MAXSPECIES];
   // binaryDiff = 0.0;
@@ -921,7 +1093,7 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeFluxMolecularTransport(const
   // std::cout << "max diff. vel: " << charSpeed << std::endl;
 }
 
-MFEM_HOST_DEVICE double ArgonMixtureTransport::computeThirdOrderElectronThermalConductivity(
+MFEM_HOST_DEVICE double GasMixtureTransport::computeThirdOrderElectronThermalConductivity(
     const double *X_sp, const collisionInputs &collInputs) {
   double Q2[3];
   for (int r = 0; r < 3; r++) Q2[r] = collisionIntegral(electronIndex_, electronIndex_, 2, r + 2, collInputs);
@@ -942,7 +1114,7 @@ MFEM_HOST_DEVICE double ArgonMixtureTransport::computeThirdOrderElectronThermalC
          (L11 - L12 * L12 / L22);
 }
 
-MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeSourceMolecularTransport(const double *state, const double *Up,
+MFEM_HOST_DEVICE void GasMixtureTransport::ComputeSourceMolecularTransport(const double *state, const double *Up,
                                                                              const double *gradUp, const double *Efield,
                                                                              double *globalTransport,
                                                                              double *speciesTransport,
@@ -1032,7 +1204,7 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeSourceMolecularTransport(con
   // std::cout << "max diff. vel: " << charSpeed << std::endl;
 }
 
-MFEM_HOST_DEVICE void ArgonMixtureTransport::GetViscosities(const double *conserved, const double *primitive,
+MFEM_HOST_DEVICE void GasMixtureTransport::GetViscosities(const double *conserved, const double *primitive,
                                                             double *visc) {
   double n_sp[gpudata::MAXSPECIES], X_sp[gpudata::MAXSPECIES], Y_sp[gpudata::MAXSPECIES];
   mixture->computeSpeciesPrimitives(conserved, X_sp, Y_sp, n_sp);
@@ -1062,7 +1234,7 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::GetViscosities(const double *conser
   return;
 }
 
-MFEM_HOST_DEVICE void ArgonMixtureTransport::GetThermalConductivities(const double *conserved, const double *primitive,
+MFEM_HOST_DEVICE void GasMixtureTransport::GetThermalConductivities(const double *conserved, const double *primitive,
                                                                       double *kappa) {
   double n_sp[gpudata::MAXSPECIES], X_sp[gpudata::MAXSPECIES], Y_sp[gpudata::MAXSPECIES];
   mixture->computeSpeciesPrimitives(conserved, X_sp, Y_sp, n_sp);
@@ -1085,7 +1257,6 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::GetThermalConductivities(const doub
   // transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = linearAverage(X_sp, speciesHvyThrmCnd);
   // transportBuffer[FluxTrns::BULK_VISCOSITY] = 0.0;
   kappa[0] = linearAverage(X_sp, speciesHvyThrmCnd);
-  assert(kappa[0] > 0.0);
 
   if (thirdOrderkElectron_) {
     // transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] =
@@ -1099,10 +1270,9 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::GetThermalConductivities(const doub
     kappa[1] = viscosityFactor_ * kOverEtaFactor_ * sqrt(collInputs.Te / mw_[electronIndex_]) * X_sp[electronIndex_] /
                collisionIntegral(electronIndex_, electronIndex_, 2, 2, collInputs);
   }
-  assert(kappa[1] >= 0.0);
 }
 
-void ArgonMixtureTransport::computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield,
+void GasMixtureTransport::computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield,
                                                              Vector &diffusivity, bool unused) {
   diffusivity.SetSize(3);
   diffusivity = 0.0;
@@ -1110,7 +1280,7 @@ void ArgonMixtureTransport::computeMixtureAverageDiffusivity(const Vector &state
 }
 
 /*
-MFEM_HOST_DEVICE void ArgonMixtureTransport::computeMixtureAverageDiffusivity(const double *state, double *diffusivity)
+MFEM_HOST_DEVICE void GasMixtureTransport::computeMixtureAverageDiffusivity(const double *state, double *diffusivity)
 { double primitiveState[gpudata::MAXEQUATIONS]; mixture->GetPrimitivesFromConservatives(state, primitiveState);
 
   double n_sp[3], X_sp[3], Y_sp[3];
@@ -1138,10 +1308,10 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::computeMixtureAverageDiffusivity(co
   double binaryDiff[3 *3];
   for (int i = 0; i < 3 * 3; i++) binaryDiff[i] = 0.0;
   binaryDiff[electronIndex_ + neutralIndex_ * numSpecies] =
-    diffusivityFactor_ * std::sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / collision::argon::eAr11(Te);
+    diffusivityFactor_ * std::sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / collision::gas::eAr11(Te);
   binaryDiff[neutralIndex_ + electronIndex_ * numSpecies] = binaryDiff[electronIndex_ + neutralIndex_ * numSpecies];
   binaryDiff[neutralIndex_ + ionIndex_ * numSpecies] =
-    diffusivityFactor_ * std::sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
+    diffusivityFactor_ * std::sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::gas::ArAr1P11(Th);
   binaryDiff[ionIndex_ + neutralIndex_ * numSpecies] = binaryDiff[neutralIndex_ + ionIndex_ * numSpecies];
   binaryDiff[electronIndex_ + ionIndex_ * numSpecies] = diffusivityFactor_ *
     std::sqrt(Te / getMuw(ionIndex_, electronIndex_)) / nTotal /
@@ -1156,7 +1326,7 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::computeMixtureAverageDiffusivity(co
 }
 */
 
-MFEM_HOST_DEVICE void ArgonMixtureTransport::computeMixtureAverageDiffusivity(const double *state, const double *Efield,
+MFEM_HOST_DEVICE void GasMixtureTransport::computeMixtureAverageDiffusivity(const double *state, const double *Efield,
                                                                               double *diffusivity, bool unused) {
   double primitiveState[gpudata::MAXEQUATIONS];
   mixture->GetPrimitivesFromConservatives(state, primitiveState);
@@ -1200,7 +1370,7 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::computeMixtureAverageDiffusivity(co
   }
 }
 
-MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeElectricalConductivity(const double *state, double &sigma) {
+MFEM_HOST_DEVICE void GasMixtureTransport::ComputeElectricalConductivity(const double *state, double &sigma) {
   double X_sp[gpudata::MAXSPECIES], Y_sp[gpudata::MAXSPECIES], n_sp[gpudata::MAXSPECIES];
   for (int sp = 0; sp < numSpecies; sp++) n_sp[sp] = X_sp[sp] = Y_sp[sp] = 0.0;
   mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);

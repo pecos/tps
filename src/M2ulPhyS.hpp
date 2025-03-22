@@ -51,7 +51,8 @@ class Tps;
 #include <mfem/general/forall.hpp>
 
 #include "BCintegrator.hpp"
-#include "argon_transport.hpp"
+//#include "argon_transport.hpp"
+#include "gas_transport.hpp"
 #include "averaging.hpp"
 #include "chemistry.hpp"
 #include "dataStructures.hpp"
@@ -398,8 +399,8 @@ class M2ulPhyS : public TPS::PlasmaSolver {
   void readTableWrapper(std::string inputPath, TableInput &result);
 
   void packUpGasMixtureInput();
-  void identifySpeciesType(Array<ArgonSpcs> &speciesType);
-  void identifyCollisionType(const Array<ArgonSpcs> &speciesType, ArgonColl *collisionIndex);
+  void identifySpeciesType(Array<GasSpcs> &speciesType);
+  void identifyCollisionType(const Array<GasSpcs> &speciesType, GasColl *collisionIndex);
 
   void checkSolverOptions() const;
   void projectInitialSolution();
