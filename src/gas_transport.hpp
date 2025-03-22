@@ -29,8 +29,8 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
-#ifndef ARGON_TRANSPORT_HPP_
-#define ARGON_TRANSPORT_HPP_
+#ifndef GAS_TRANSPORT_HPP_
+#define GAS_TRANSPORT_HPP_
 
 /*
  * Implementation of the equation of state and some
@@ -52,13 +52,13 @@
 using namespace mfem;
 // using namespace std;
 // using namespace charged;
-// using namespace argon;
+// using namespace gas;
 
 //////////////////////////////////////////////////////
-//////// Argon Minimal Transport (ternary mixture)
+//////// Gas Minimal Transport (ternary mixture)
 //////////////////////////////////////////////////////
 
-class ArgonMinimalTransport : public MolecularTransport {
+class GasMinimalTransport : public MolecularTransport {
  protected:
   int electronIndex_ = -1;
   int ionIndex_ = -1;
@@ -74,6 +74,8 @@ class ArgonMinimalTransport : public MolecularTransport {
   const double PI_ = PI;
   const double qeOverkB_ = qe_ / kB_;
 
+  GasType gasType_;
+  
   // standard Chapman-Enskog coefficients
   // evaluated in ctor to avoid confusing hip about sqrt
   double viscosityFactor_;
@@ -95,11 +97,11 @@ class ArgonMinimalTransport : public MolecularTransport {
   double mobilMult_;
 
  public:
-  ArgonMinimalTransport(GasMixture *_mixture, RunConfiguration &_runfile);
-  MFEM_HOST_DEVICE ArgonMinimalTransport(GasMixture *_mixture, const GasTransportInput &inputs);
-  MFEM_HOST_DEVICE ArgonMinimalTransport(GasMixture *_mixture);
+  GasMinimalTransport(GasMixture *_mixture, RunConfiguration &_runfile);
+  MFEM_HOST_DEVICE GasMinimalTransport(GasMixture *_mixture, const GasTransportInput &inputs);
+  MFEM_HOST_DEVICE GasMinimalTransport(GasMixture *_mixture);
 
-  MFEM_HOST_DEVICE virtual ~ArgonMinimalTransport() {}
+  MFEM_HOST_DEVICE virtual ~GasMinimalTransport() {}
 
   MFEM_HOST_DEVICE double getMuw(const int &spI, const int &spJ) { return muw_[spI + spJ * numSpecies]; }
 
@@ -150,30 +152,30 @@ class ArgonMinimalTransport : public MolecularTransport {
 };
 
 //////////////////////////////////////////////////////
-//////// Argon Mixture Transport
+//////// Gas Mixture Transport
 //////////////////////////////////////////////////////
 
-class ArgonMixtureTransport : public ArgonMinimalTransport {
+class GasMixtureTransport : public GasMinimalTransport {
  private:
   // int numAtoms_;
   // DenseMatrix composition_;
   // std::map<std::string, int> atomMap_;
-  // Array<ArgonSpcs> speciesType_;
+  // Array<GasSpcs> speciesType_;
   // std::vector<std::string> speciesNames_;
   // std::map<int, int> *mixtureToInputMap_;
 
   // integer matrix. only upper triangular part will be used.
-  // std::vector<std::vector<ArgonColl>> collisionIndex_;
+  // std::vector<std::vector<GasColl>> collisionIndex_;
   GasColl collisionIndex_[gpudata::MAXSPECIES * gpudata::MAXSPECIES];
 
   // void identifySpeciesType();
   // void identifyCollisionType();
 
  public:
-  ArgonMixtureTransport(GasMixture *_mixture, RunConfiguration &_runfile);
-  MFEM_HOST_DEVICE ArgonMixtureTransport(GasMixture *_mixture, const GasTransportInput &inputs);
+  GasMixtureTransport(GasMixture *_mixture, RunConfiguration &_runfile);
+  MFEM_HOST_DEVICE GasMixtureTransport(GasMixture *_mixture, const GasTransportInput &inputs);
 
-  MFEM_HOST_DEVICE virtual ~ArgonMixtureTransport() {}
+  MFEM_HOST_DEVICE virtual ~GasMixtureTransport() {}
 
   MFEM_HOST_DEVICE double collisionIntegral(const int _spI, const int _spJ, const int l, const int r,
                                             const collisionInputs collInputs);
@@ -187,7 +189,7 @@ class ArgonMixtureTransport : public ArgonMinimalTransport {
                                                         double *n_sp) final;
 
   // NOTE(kevin): only for AxisymmetricSource
-  using ArgonMinimalTransport::GetViscosities;
+  using GasMinimalTransport::GetViscosities;
   MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) final;
 
   MFEM_HOST_DEVICE double computeThirdOrderElectronThermalConductivity(const double *X_sp,
@@ -203,4 +205,4 @@ class ArgonMixtureTransport : public ArgonMinimalTransport {
   MFEM_HOST_DEVICE void ComputeElectricalConductivity(const double *state, double &sigma);
 };
 
-#endif  // ARGON_TRANSPORT_HPP_
+#endif  // GAS_TRANSPORT_HPP_

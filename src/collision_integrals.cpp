@@ -198,4 +198,163 @@ MFEM_HOST_DEVICE double eAr15(const double &T) {
 
 }  // namespace argon
 
+// Nitrogen collision integrals
+// Q_(species, species)^(l,r)
+// Takes T in Kelvin, returns in unit of m^2.
+// NOTE: NOT UPDATED FROM ARGON, only names
+namespace nitrogen {
+
+MFEM_HOST_DEVICE double NiNi11(const double &T) {
+  // Reference : fitted from tabulated data of Amdur, I., & Mason, E. A. (1958). Properties of gases at very high
+  // temperatures. Physics of Fluids, 1(5), 370–383. https://doi.org/10.1063/1.1724353
+  return 2.2910e-18 * pow(T, -0.3032);
+}
+
+MFEM_HOST_DEVICE double NiNi22(const double &T) {
+  // Reference : Liu, W. S., Whitten, B. T., & Glass, I. I. (1978). Ionizing argon boundary layers. Part 1. Quasi-steady
+  // flat-plate laminar boundary-layer flows. Journal of Fluid Mechanics, 87(4), 609–640.
+  // https://doi.org/10.1017/S0022112078001792
+  return 1.7e-18 * pow(T, -0.25);
+}
+
+// argon neutral (Ar) - argon positive ion (Ar1P)
+MFEM_HOST_DEVICE double NiNi1P11(const double &T) {
+  // Reference: fitted from tabulated data of Devoto, R. S. (1973). Transport coefficients of ionized argon. Physics of
+  // Fluids, 16(5), 616–623. https://doi.org/10.1063/1.1694396
+  return 4.574321e-18 * pow(T, -0.1805);
+}
+
+MFEM_HOST_DEVICE double N2N211(const double &T) {
+  // Reference : fitted from tabulated data of Amdur, I., & Mason, E. A. (1958). Properties of gases at very high
+  // temperatures. Physics of Fluids, 1(5), 370–383. https://doi.org/10.1063/1.1724353
+  return 2.2910e-18 * pow(T, -0.3032);
+}
+
+MFEM_HOST_DEVICE double N2N222(const double &T) {
+  // Reference : Liu, W. S., Whitten, B. T., & Glass, I. I. (1978). Ionizing argon boundary layers. Part 1. Quasi-steady
+  // flat-plate laminar boundary-layer flows. Journal of Fluid Mechanics, 87(4), 609–640.
+  // https://doi.org/10.1017/S0022112078001792
+  return 1.7e-18 * pow(T, -0.25);
+}
+
+// argon neutral (Ar) - argon positive ion (Ar1P)
+MFEM_HOST_DEVICE double N2N21P11(const double &T) {
+  // Reference: fitted from tabulated data of Devoto, R. S. (1973). Transport coefficients of ionized argon. Physics of
+  // Fluids, 16(5), 616–623. https://doi.org/10.1063/1.1694396
+  return 4.574321e-18 * pow(T, -0.1805);
+}
+  
+/*
+  e-Ar (l,r) are fitted over numerical quadrature of definitions.
+  Q_{e,Ar}^(1), elastic momentum transfer cross section, is determined by a 7-parameter shifted MERT model,
+  fitted over BSR LXCat dataset.
+*/
+MFEM_HOST_DEVICE double eNi11(const double &T) {
+  const double logT = log(T);
+  if (T < 1.2e4) {
+    return 5.8664e-22 * logT * logT * logT - 6.3417e-21 * logT * logT + 3.2083e-21 * logT + 9.0686e-20;
+  } else {
+    double tmp = logT - 10.9082;
+    return 12.1818e-20 * exp(-0.4186 * tmp * tmp) + 8.6949e-22;
+  }
+}
+
+MFEM_HOST_DEVICE double eNi12(const double &T) {
+  const double logT = log(T);
+  if (T < 1.0e4) {
+    return 5.0435e-22 * logT * logT * logT - 4.0041e-21 * logT * logT - 1.3234e-20 * logT + 1.1966e-19;
+  } else {
+    double tmp = logT - 10.5348;
+    return 12.5836e-20 * exp(-0.5116 * tmp * tmp) + 8.7254e-22;
+  }
+}
+
+MFEM_HOST_DEVICE double eNi13(const double &T) {
+  const double logT = log(T);
+  if (T < 8.2e3) {
+    return 4.3150e-22 * logT * logT * logT - 2.1312e-21 * logT * logT - 2.5311e-20 * logT + 1.3866e-19;
+  } else {
+    double tmp = logT - 10.2802;
+    return 12.9711e-20 * exp(-0.5725 * tmp * tmp) + 1.6371e-21;
+  }
+}
+
+MFEM_HOST_DEVICE double eNi14(const double &T) {
+  const double logT = log(T);
+  if (T < 7.1e3) {
+    return 3.9545e-22 * logT * logT * logT - 1.1198e-21 * logT * logT - 3.1302e-20 * logT + 1.4507e-19;
+  } else {
+    double tmp = logT - 10.0853;
+    return 13.2903e-20 * exp(-0.6150 * tmp * tmp) + 1.7854e-21;
+  }
+}
+
+MFEM_HOST_DEVICE double eNi15(const double &T) {
+  const double logT = log(T);
+  if (T < 6.0e3) {
+    return 2.8521e-22 * logT * logT * logT + 9.9567e-22 * logT * logT - 4.2614e-20 * logT + 1.6026e-19;
+  } else {
+    double tmp = logT - 9.9275;
+    return 13.4901e-20 * exp(-0.6295 * tmp * tmp) + 4.6041e-22;
+  }
+}
+
+/*
+  e-Ar (l,r) are fitted over numerical quadrature of definitions.
+  Q_{e,Ar}^(1), elastic momentum transfer cross section, is determined by a 7-parameter shifted MERT model,
+  fitted over BSR LXCat dataset.
+*/
+MFEM_HOST_DEVICE double eN211(const double &T) {
+  const double logT = log(T);
+  if (T < 1.2e4) {
+    return 5.8664e-22 * logT * logT * logT - 6.3417e-21 * logT * logT + 3.2083e-21 * logT + 9.0686e-20;
+  } else {
+    double tmp = logT - 10.9082;
+    return 12.1818e-20 * exp(-0.4186 * tmp * tmp) + 8.6949e-22;
+  }
+}
+
+MFEM_HOST_DEVICE double eN212(const double &T) {
+  const double logT = log(T);
+  if (T < 1.0e4) {
+    return 5.0435e-22 * logT * logT * logT - 4.0041e-21 * logT * logT - 1.3234e-20 * logT + 1.1966e-19;
+  } else {
+    double tmp = logT - 10.5348;
+    return 12.5836e-20 * exp(-0.5116 * tmp * tmp) + 8.7254e-22;
+  }
+}
+
+MFEM_HOST_DEVICE double eN213(const double &T) {
+  const double logT = log(T);
+  if (T < 8.2e3) {
+    return 4.3150e-22 * logT * logT * logT - 2.1312e-21 * logT * logT - 2.5311e-20 * logT + 1.3866e-19;
+  } else {
+    double tmp = logT - 10.2802;
+    return 12.9711e-20 * exp(-0.5725 * tmp * tmp) + 1.6371e-21;
+  }
+}
+
+MFEM_HOST_DEVICE double eN214(const double &T) {
+  const double logT = log(T);
+  if (T < 7.1e3) {
+    return 3.9545e-22 * logT * logT * logT - 1.1198e-21 * logT * logT - 3.1302e-20 * logT + 1.4507e-19;
+  } else {
+    double tmp = logT - 10.0853;
+    return 13.2903e-20 * exp(-0.6150 * tmp * tmp) + 1.7854e-21;
+  }
+}
+
+MFEM_HOST_DEVICE double eN215(const double &T) {
+  const double logT = log(T);
+  if (T < 6.0e3) {
+    return 2.8521e-22 * logT * logT * logT + 9.9567e-22 * logT * logT - 4.2614e-20 * logT + 1.6026e-19;
+  } else {
+    double tmp = logT - 9.9275;
+    return 13.4901e-20 * exp(-0.6295 * tmp * tmp) + 4.6041e-22;
+  }
+}
+  
+}  // namespace nitrogen
+
+  
 }  // namespace collision

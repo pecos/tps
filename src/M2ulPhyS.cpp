@@ -124,18 +124,24 @@ void M2ulPhyS::initMixtureAndTransportModels() {
       switch (config.GetTranportModel()) {
         case ARGON_MINIMAL:
 #if defined(_CUDA_) || defined(_HIP_)
-          tpsGpuMalloc((void **)&transportPtr, sizeof(ArgonMinimalTransport));
-          gpu::instantiateDeviceArgonMinimalTransport<<<1, 1>>>(d_mixture, config.argonTransportInput, transportPtr);
+          //tpsGpuMalloc((void **)&transportPtr, sizeof(ArgonMinimalTransport));
+          //gpu::instantiateDeviceArgonMinimalTransport<<<1, 1>>>(d_mixture, config.gasTransportInput, transportPtr);
+          tpsGpuMalloc((void **)&transportPtr, sizeof(GasMinimalTransport));
+          gpu::instantiateDeviceGasMinimalTransport<<<1, 1>>>(d_mixture, config.gasTransportInput, transportPtr);	  
 #else
-          transportPtr = new ArgonMinimalTransport(mixture, config);
+          //transportPtr = new ArgonMinimalTransport(mixture, config);
+          transportPtr = new GasMinimalTransport(mixture, config);	  
 #endif
           break;
         case ARGON_MIXTURE:
 #if defined(_CUDA_) || defined(_HIP_)
-          tpsGpuMalloc((void **)&transportPtr, sizeof(ArgonMixtureTransport));
-          gpu::instantiateDeviceArgonMixtureTransport<<<1, 1>>>(d_mixture, config.argonTransportInput, transportPtr);
+          //tpsGpuMalloc((void **)&transportPtr, sizeof(ArgonMixtureTransport));
+          //gpu::instantiateDeviceArgonMixtureTransport<<<1, 1>>>(d_mixture, config.gasTransportInput, transportPtr);	
+          tpsGpuMalloc((void **)&transportPtr, sizeof(GasMixtureTransport));
+          gpu::instantiateDeviceGasMixtureTransport<<<1, 1>>>(d_mixture, config.gasTransportInput, transportPtr);  
 #else
-          transportPtr = new ArgonMixtureTransport(mixture, config);
+          //transportPtr = new ArgonMixtureTransport(mixture, config);
+          transportPtr = new GasMixtureTransport(mixture, config);	  
 #endif
           break;
         case CONSTANT:
@@ -2942,6 +2948,8 @@ void M2ulPhyS::parsePlasmaModels() {
     config.transportModel = ARGON_MINIMAL;
   } else if (transportModelStr == "argon_mixture") {
     config.transportModel = ARGON_MIXTURE;
+  } else if (transportModelStr == "nitrogen_mixture") {
+    config.transportModel = NITROGEN_MIXTURE;    
   } else if (transportModelStr == "constant") {
     config.transportModel = CONSTANT;
   }
@@ -3141,45 +3149,45 @@ void M2ulPhyS::parseTransportInputs() {
       // pack up argon minimal transport input.
       {
         if (config.speciesMapping.count("Ar")) {
-          config.argonTransportInput.neutralIndex = config.speciesMapping["Ar"];
+          config.gasTransportInput.neutralIndex = config.speciesMapping["Ar"];
         } else {
           grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar' !\n");
           exit(ERROR);
         }
         if (config.speciesMapping.count("Ar.+1")) {
-          config.argonTransportInput.ionIndex = config.speciesMapping["Ar.+1"];
+          config.gasTransportInput.ionIndex = config.speciesMapping["Ar.+1"];
         } else {
           grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar.+1' !\n");
           exit(ERROR);
         }
         if (config.speciesMapping.count("E")) {
-          config.argonTransportInput.electronIndex = config.speciesMapping["E"];
+          config.gasTransportInput.electronIndex = config.speciesMapping["E"];
         } else {
           grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'E' !\n");
           exit(ERROR);
         }
 
-        config.argonTransportInput.thirdOrderkElectron = config.thirdOrderkElectron;
+        config.gasTransportInput.thirdOrderkElectron = config.thirdOrderkElectron;
 
         // inputs for artificial transport multipliers.
         {
           tpsP->getInput("plasma_models/transport_model/artificial_multiplier/enabled",
-                         config.argonTransportInput.multiply, false);
-          if (config.argonTransportInput.multiply) {
+                         config.gasTransportInput.multiply, false);
+          if (config.gasTransportInput.multiply) {
             tpsP->getInput("plasma_models/transport_model/artificial_multiplier/viscosity",
-                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::VISCOSITY], 1.0);
+                           config.gasTransportInput.fluxTrnsMultiplier[FluxTrns::VISCOSITY], 1.0);
             tpsP->getInput("plasma_models/transport_model/artificial_multiplier/bulk_viscosity",
-                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::BULK_VISCOSITY], 1.0);
+                           config.gasTransportInput.fluxTrnsMultiplier[FluxTrns::BULK_VISCOSITY], 1.0);
             tpsP->getInput("plasma_models/transport_model/artificial_multiplier/heavy_thermal_conductivity",
-                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY], 1.0);
+                           config.gasTransportInput.fluxTrnsMultiplier[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY], 1.0);
             tpsP->getInput("plasma_models/transport_model/artificial_multiplier/electron_thermal_conductivity",
-                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY], 1.0);
+                           config.gasTransportInput.fluxTrnsMultiplier[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY], 1.0);
             tpsP->getInput("plasma_models/transport_model/artificial_multiplier/momentum_transfer_frequency",
-                           config.argonTransportInput.spcsTrnsMultiplier[SpeciesTrns::MF_FREQUENCY], 1.0);
+                           config.gasTransportInput.spcsTrnsMultiplier[SpeciesTrns::MF_FREQUENCY], 1.0);
             tpsP->getInput("plasma_models/transport_model/artificial_multiplier/diffusivity",
-                           config.argonTransportInput.diffMult, 1.0);
+                           config.gasTransportInput.diffMult, 1.0);
             tpsP->getInput("plasma_models/transport_model/artificial_multiplier/mobility",
-                           config.argonTransportInput.mobilMult, 1.0);
+                           config.gasTransportInput.mobilMult, 1.0);
           }
         }
       }
@@ -3191,37 +3199,37 @@ void M2ulPhyS::parseTransportInputs() {
       // pack up argon transport input.
       {
         if (config.speciesMapping.count("E")) {
-          config.argonTransportInput.electronIndex = config.speciesMapping["E"];
+          config.gasTransportInput.electronIndex = config.speciesMapping["E"];
         } else {
           grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'E' !\n");
           exit(ERROR);
         }
 
-        config.argonTransportInput.thirdOrderkElectron = config.thirdOrderkElectron;
+        config.gasTransportInput.thirdOrderkElectron = config.thirdOrderkElectron;
 
-        Array<ArgonSpcs> speciesType(config.numSpecies);
+        Array<GasSpcs> speciesType(config.numSpecies);
         identifySpeciesType(speciesType);
-        identifyCollisionType(speciesType, config.argonTransportInput.collisionIndex);
+        identifyCollisionType(speciesType, config.gasTransportInput.collisionIndex);
 
         // inputs for artificial transport multipliers.
         {
           tpsP->getInput("plasma_models/transport_model/artificial_multiplier/enabled",
-                         config.argonTransportInput.multiply, false);
-          if (config.argonTransportInput.multiply) {
+                         config.gasTransportInput.multiply, false);
+          if (config.gasTransportInput.multiply) {
             tpsP->getInput("plasma_models/transport_model/artificial_multiplier/viscosity",
-                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::VISCOSITY], 1.0);
+                           config.gasTransportInput.fluxTrnsMultiplier[FluxTrns::VISCOSITY], 1.0);
             tpsP->getInput("plasma_models/transport_model/artificial_multiplier/bulk_viscosity",
-                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::BULK_VISCOSITY], 1.0);
+                           config.gasTransportInput.fluxTrnsMultiplier[FluxTrns::BULK_VISCOSITY], 1.0);
             tpsP->getInput("plasma_models/transport_model/artificial_multiplier/heavy_thermal_conductivity",
-                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY], 1.0);
+                           config.gasTransportInput.fluxTrnsMultiplier[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY], 1.0);
             tpsP->getInput("plasma_models/transport_model/artificial_multiplier/electron_thermal_conductivity",
-                           config.argonTransportInput.fluxTrnsMultiplier[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY], 1.0);
+                           config.gasTransportInput.fluxTrnsMultiplier[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY], 1.0);
             tpsP->getInput("plasma_models/transport_model/artificial_multiplier/momentum_transfer_frequency",
-                           config.argonTransportInput.spcsTrnsMultiplier[SpeciesTrns::MF_FREQUENCY], 1.0);
+                           config.gasTransportInput.spcsTrnsMultiplier[SpeciesTrns::MF_FREQUENCY], 1.0);
             tpsP->getInput("plasma_models/transport_model/artificial_multiplier/diffusivity",
-                           config.argonTransportInput.diffMult, 1.0);
+                           config.gasTransportInput.diffMult, 1.0);
             tpsP->getInput("plasma_models/transport_model/artificial_multiplier/mobility",
-                           config.argonTransportInput.mobilMult, 1.0);
+                           config.gasTransportInput.mobilMult, 1.0);
           }
         }
       }
@@ -3826,7 +3834,7 @@ void M2ulPhyS::packUpGasMixtureInput() {
   }
 }
 
-void M2ulPhyS::identifySpeciesType(Array<ArgonSpcs> &speciesType) {
+void M2ulPhyS::identifySpeciesType(Array<GasSpcs> &speciesType) {
   speciesType.SetSize(config.numSpecies);
 
   for (int sp = 0; sp < config.numSpecies; sp++) {
@@ -3897,7 +3905,7 @@ void M2ulPhyS::identifySpeciesType(Array<ArgonSpcs> &speciesType) {
   return;
 }
 
-void M2ulPhyS::identifyCollisionType(const Array<ArgonSpcs> &speciesType, ArgonColl *collisionIndex) {
+void M2ulPhyS::identifyCollisionType(const Array<GasSpcs> &speciesType, GasColl *collisionIndex) {
   // collisionIndex_.resize(numSpecies);
   for (int spI = 0; spI < config.numSpecies; spI++) {
     // collisionIndex_[spI].resize(numSpecies - spI);

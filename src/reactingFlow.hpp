@@ -44,7 +44,8 @@ class Tps;
 #include <fstream>
 #include <iostream>
 
-#include "argon_transport.hpp"
+//#include "argon_transport.hpp"
+#include "gas_transport.hpp"
 #include "chemistry.hpp"
 #include "dataStructures.hpp"
 #include "dirichlet_bc_helper.hpp"
@@ -102,7 +103,8 @@ class ReactingFlow : public ThermoChemModelBase {
   ChemistryInput chemistryInput_;
 
   PerfectMixture *mixture_ = NULL;
-  ArgonMixtureTransport *transport_ = NULL;
+  //ArgonMixtureTransport *transport_ = NULL;
+  GasMixtureTransport *transport_ = NULL;
   Chemistry *chemistry_ = NULL;
 
   std::vector<std::string> speciesNames_;
@@ -384,8 +386,8 @@ class ReactingFlow : public ThermoChemModelBase {
   void temperatureSubstep(int iSub);
 
   /// for creation of structs to interface with old plasma/chem stuff
-  void identifySpeciesType(Array<ArgonSpcs> &speciesType);
-  void identifyCollisionType(const Array<ArgonSpcs> &speciesType, ArgonColl *collisionIndex);
+  void identifySpeciesType(Array<GasSpcs> &speciesType);
+  void identifyCollisionType(const Array<GasSpcs> &speciesType, GasColl *collisionIndex);
 
   /// Return a pointer to the current temperature ParGridFunction.
   ParGridFunction *GetCurrentTemperature() { return &Tn_gf_; }
