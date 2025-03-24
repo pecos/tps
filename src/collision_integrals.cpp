@@ -247,6 +247,20 @@ MFEM_HOST_DEVICE double N2N21P11(const double &T) {
   // Fluids, 16(5), 616–623. https://doi.org/10.1063/1.1694396
   return 4.574321e-18 * pow(T, -0.1805);
 }
+
+MFEM_HOST_DEVICE double N2Ni1P11(const double &T) {
+  // Reference: fitted from tabulated data of Devoto, R. S. (1973). Transport coefficients of ionized argon. Physics of
+  // Fluids, 16(5), 616–623. https://doi.org/10.1063/1.1694396
+  return 4.574321e-18 * pow(T, -0.1805);
+}
+
+MFEM_HOST_DEVICE double NiN21P11(const double &T) {
+  // Reference: fitted from tabulated data of Devoto, R. S. (1973). Transport coefficients of ionized argon. Physics of
+  // Fluids, 16(5), 616–623. https://doi.org/10.1063/1.1694396
+  return 4.574321e-18 * pow(T, -0.1805);
+}
+
+  
   
 /*
   e-Ar (l,r) are fitted over numerical quadrature of definitions.

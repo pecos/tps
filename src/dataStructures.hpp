@@ -683,6 +683,8 @@ struct LteMixtureInput {
 struct GasTransportInput {
   int neutralIndex;
   int ionIndex;
+  int neutralIndex2;
+  int ionIndex2;  
   int electronIndex;
   
   bool thirdOrderkElectron;

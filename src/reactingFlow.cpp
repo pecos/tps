@@ -352,11 +352,11 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
       if (speciesMapping.count("Ni")) {
         gasInput_.neutralIndex = speciesMapping["Ni"];
       } else if (speciesMapping.count("N2")) {
-        gasInput_.neutralIndex = speciesMapping["N2"];
+        gasInput_.neutralIndex2 = speciesMapping["N2"];
       } else if (speciesMapping.count("Ni.+1")) {
         gasInput_.ionIndex = speciesMapping["Ni.+1"];
-    } else if (speciesMapping.count("Ni2.+1")) {
-        gasInput_.ionIndex = speciesMapping["Ni2.+1"];    	
+      } else if (speciesMapping.count("N2.+1")) {
+        gasInput_.ionIndex2 = speciesMapping["N2.+1"];    	
       } else if (speciesMapping.count("E")) {
         gasInput_.electronIndex = speciesMapping["E"];
       } else {
