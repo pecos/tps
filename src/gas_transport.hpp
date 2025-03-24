@@ -63,7 +63,9 @@ class GasMinimalTransport : public MolecularTransport {
   int electronIndex_ = -1;
   int ionIndex_ = -1;
   int neutralIndex_ = -1;
-
+  int ionIndex2_ = -1;
+  int neutralIndex2_ = -1;
+  
   const double kB_ = BOLTZMANNCONSTANT;
   const double eps0_ = VACUUMPERMITTIVITY;
   const double qe_ = ELECTRONCHARGE;
