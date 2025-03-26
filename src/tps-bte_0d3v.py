@@ -859,7 +859,7 @@ class Boltzmann0D2VBactchedSolver:
         tps_npts    = len(heavy_temp)
         
         n_reactions = interface.nComponents(libtps.t2bIndex.ReactionRates)
-        rates       = np.array(interface.HostWrite(libtps.t2bIndex.ReactionRates), copy=False).reshape((n_reactions, tps_npts), copy=False)
+        rates       = np.array(interface.HostWrite(libtps.t2bIndex.ReactionRates), copy=False).reshape((n_reactions, tps_npts))
         
         if (use_interp==True):
             if(n_reactions>0):
@@ -888,7 +888,7 @@ class Boltzmann0D2VBactchedSolver:
                     with cp.cuda.Device(dev_id):
                         t1()
 
-                rates = rates.reshape((-1), copy=False)
+                rates = rates.reshape((-1))
                 rates[rates<0] = 0.0
 
                 # fname = self.param.out_fname+"_push_rank_%d_npes_%d.h5"%(self.rankG, self.npesG)
@@ -918,7 +918,7 @@ class Boltzmann0D2VBactchedSolver:
                     with cp.cuda.Device(dev_id):
                         t1()
                         
-                rates = rates.reshape((-1), copy=False)
+                rates = rates.reshape((-1))
                 rates[rates<0] = 0.0
         return 
     
@@ -1293,7 +1293,7 @@ class Boltzmann0D2VBactchedSolver:
         tps_npts    = len(heavy_temp)
         
         n_reactions = interface.nComponents(libtps.t2bIndex.ReactionRates)
-        rates       = np.array(interface.HostWrite(libtps.t2bIndex.ReactionRates), copy=False).reshape((n_reactions, tps_npts), copy=False)
+        rates       = np.array(interface.HostWrite(libtps.t2bIndex.ReactionRates), copy=False).reshape((n_reactions, tps_npts))
         
         if (use_interp==True):
             if(n_reactions>0):
@@ -1781,7 +1781,8 @@ def driver_wo_parla(comm):
         def __main__():
             # TPS solver
             profile_tt[pp.TPS_SETUP].start()
-            tps = libtps.Tps(comm)
+            #tps = libtps.Tps(comm)
+            tps = libtps.Tps()
             tps.parseCommandLineArgs(sys.argv)
             tps.parseInput()
             tps.chooseDevices()
