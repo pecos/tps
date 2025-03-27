@@ -58,7 +58,8 @@ MFEM_HOST_DEVICE GasMinimalTransport::GasMinimalTransport(GasMixture *_mixture, 
     // TODO:
     // if this works, replace all "collision::argon::" and "collision::nitrogen" with "gas::"
     // and then create an array of pointers to the collision functions with indexing
-    // matching the binary diffusivity indexing
+    // matching the binary diffusivity indexing, for each namespace in collision.
+    // Would allow for generic index-based computation of all binary-diffs
     namespace gas = collision::argon;
 
     neutralIndex_ = inputs.neutralIndex;
