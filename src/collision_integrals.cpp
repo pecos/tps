@@ -206,26 +206,25 @@ MFEM_HOST_DEVICE double eAr15(const double &T) {
 // Q_(species, species)^(l,r)
 // Takes T in Kelvin, returns in unit of m^2.
 // NOTE: NOT UPDATED FROM ARGON, only names
+// All r=2 uses "isotropic scattering assumption", see: Sherman, M. P. (1965). Transport properties of partially ionized nitrogen. NASA: R65SD43.
 namespace nitrogen {
 
 MFEM_HOST_DEVICE double NiNi11(const double &T) {
+  //levin 1990
   // Reference : fitted from tabulated data of Amdur, I., & Mason, E. A. (1958). Properties of gases at very high
   // temperatures. Physics of Fluids, 1(5), 370–383. https://doi.org/10.1063/1.1724353
   return 2.2910e-18 * pow(T, -0.3032);
 }
 
 MFEM_HOST_DEVICE double NiNi22(const double &T) {
-  // Reference : Liu, W. S., Whitten, B. T., & Glass, I. I. (1978). Ionizing argon boundary layers. Part 1. Quasi-steady
-  // flat-plate laminar boundary-layer flows. Journal of Fluid Mechanics, 87(4), 609–640.
-  // https://doi.org/10.1017/S0022112078001792
-  return 1.7e-18 * pow(T, -0.25);
+  //levin 1990
+  // Reference : 
+  return 2.2910e-18 * pow(T, -0.3032);
 }
 
-// argon neutral (Ar) - argon positive ion (Ar1P)
 MFEM_HOST_DEVICE double NiNi1P11(const double &T) {
-  // Reference: fitted from tabulated data of Devoto, R. S. (1973). Transport coefficients of ionized argon. Physics of
-  // Fluids, 16(5), 616–623. https://doi.org/10.1063/1.1694396
-  return 4.574321e-18 * pow(T, -0.1805);
+
+  return  2.2910e-18 * pow(T, -0.3032);
 }
 
 MFEM_HOST_DEVICE double N2N211(const double &T) {
@@ -241,7 +240,6 @@ MFEM_HOST_DEVICE double N2N222(const double &T) {
   return 1.7e-18 * pow(T, -0.25);
 }
 
-// argon neutral (Ar) - argon positive ion (Ar1P)
 MFEM_HOST_DEVICE double N2N21P11(const double &T) {
   // Reference: fitted from tabulated data of Devoto, R. S. (1973). Transport coefficients of ionized argon. Physics of
   // Fluids, 16(5), 616–623. https://doi.org/10.1063/1.1694396
@@ -249,9 +247,8 @@ MFEM_HOST_DEVICE double N2N21P11(const double &T) {
 }
 
 MFEM_HOST_DEVICE double N2Ni1P11(const double &T) {
-  // Reference: fitted from tabulated data of Devoto, R. S. (1973). Transport coefficients of ionized argon. Physics of
-  // Fluids, 16(5), 616–623. https://doi.org/10.1063/1.1694396
-  return 4.574321e-18 * pow(T, -0.1805);
+  // Reference : Sherman, M. P. (1965). Transport properties of partially ionized nitrogen. NASA: R65SD43.
+  return 558.0 / sqrt(T);  
 }
 
 MFEM_HOST_DEVICE double NiN21P11(const double &T) {

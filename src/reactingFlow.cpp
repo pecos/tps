@@ -592,7 +592,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   if (dynamic_substepping_) nSub_ = 2;
 
   // default value is purely empirical atm
-  tpsP_->getInput("loMach/reactingFlow/dynamic-fraction", stabFrac_, 100);
+  tpsP_->getInput("loMach/reactingFlow/dynamic-fraction", stabFrac_, 4);
 
   // Check time marching order.  Operator split (i.e., nSub_ > 1) not supported for order > 1.
   if ((nSub_ > 1) && (time_coeff_.order > 1)) {
@@ -1831,6 +1831,8 @@ void ReactingFlow::step() {
   updateDiffusivity();
 }
 
+
+// should be Nsub s.t.: 1 > dt/Nsub*Prod_Y{n}/rho{n}/Yn{n}
 void ReactingFlow::evalSubstepNumber() {
   double myMaxProd = 0.0;
   double maxProd = 0.0;
@@ -1864,14 +1866,11 @@ void ReactingFlow::evalSubstepNumber() {
     }
   }
   MPI_Reduce(&myMaxProd, &maxProd, 1, MPI_DOUBLE, MPI_MAX, 0, tpsP_->getTPSCommWorld());
-  deltaYn = maxProd * time_coeff_.dt;
 
-  // want: dYsub < 1/100
-  // dYsub = deltaYn/nSub
-  // deltaYn/nSub < 1/100
-  // nSub > deltaYn * 100
+  deltaYn = maxProd * time_coeff_.dt;
   nSub_ = stabFrac_ * std::ceil(deltaYn);
-  nSub_ = std::max(nSub_, 2);
+  nSub_ = std::max(nSub_, 4);    
+
 }
 
 void ReactingFlow::temperatureStep() {
@@ -1984,10 +1983,36 @@ void ReactingFlow::temperatureSubstep(int iSub) {
   tmpR0_ /= CpMix_;
   tmpR0_ *= dtSub;
 
-  // TnStar has star state at substep here
-  tmpR0_.Add(1.0, TnStar_);
-  tmpR0_.Add(1.0, Tn_);
+  double *data = tmpR0_.HostReadWrite();
+  double *dTstar = TnStar_.HostReadWrite();
+  double *dTn = Tn_.HostReadWrite();      
+  for (int i = 0; i < sDofInt_; i++) {
+  
+    // increasing T  
+    if(data[i] > 0.0) {
 
+      //tmpR0_.Add(1.0, TnStar_);
+      //tmpR0_.Add(1.0, Tn_);
+      data[i] += dTstar[i];
+      data[i] += dTn[i];      
+    
+    // reducing T
+    } else {
+
+      //tmpR0_ /= Tn_; // dtsub*Pt/rho/Cp/Tn{n+(substep)}    
+      //tmpR0a_ = 1.0;
+      //tmpR0a_.Add(-1.0,tmpR0_); // 1 - dtsub*Pt/rho/Cp/Tn{n+(substep)}
+      //tmpR0b_ = Tn_;
+      //tmpR0b_ /= tmpR0a_; // Tn{n+(substep)}/(1 - dtsub*Pt/rho/Cp/Tn{n+(substep)})
+      //tmpR0b_.Add(1.0, TnStar_);  // + deltaTn*    
+      //tmpR0_.Set(1.0,tmpR0b_);
+
+      double tmp = 1.0 - data[i]/dTn[i];
+      data[i] = dTn[i] / tmp + dTstar[i];
+      
+    }
+  }
+  
   // Tn now has full state at substep
   Tn_.Set(1.0, tmpR0_);
 }
@@ -2111,7 +2136,18 @@ void ReactingFlow::speciesStep(int iSpec) {
   setVectorFromScalar(tmpR0_, iSpec, &Yn_next_);
 }
 
-// Y{n + (substep+1)} = dt * wdot(Y{n + (substep)} + Y{n + (substep+1)}*
+// Summary of substepping:
+// (Y*{n+(substep+1)} - Y{n+(substep)}) / dtsub = ProdY{n+(substep)}/rho
+// Y{n+(substep+1)} = Y*{n+(substep+1)} + deltaY*
+// - Yn holds full Y{n+(substep)}
+// - YnStar holds deltaY*, ie delta due to transport eq for the substep (not full step)
+// - Y{n} held in spec_buffer
+// explicit:
+//   Y{n+(substep+1)} = dtsub*ProdY{n+(substep)}/rho + Y{n+(substep)} + deltaY*
+// implicit:
+//   (Y*{n+(substep+1)} - Y{n+(substep)}) / dtsub = ProdY{n+(substep)}/rho/Y{n+(substep)} * Y*{n+(substep+1)}
+//   (1 - dtsub * ProdY{n+(substep)}/rho/Y{n+(substep)}) * Y*{n+(substep+1)} = Y{n+(substep)}
+//   Y{n+(substep+1)} = Y{n+(substep)} / (1 - dtsub * ProdY{n+(substep)}/rho/Y{n+(substep)}) + deltaY*
 void ReactingFlow::speciesSubstep(int iSpec, int iSub) {
   // substep dt
   double dtSub = dt_ / (double)nSub_;
@@ -2119,15 +2155,42 @@ void ReactingFlow::speciesSubstep(int iSpec, int iSub) {
   // production of iSpec
   setScalarFromVector(prodY_, iSpec, &tmpR0_);
   tmpR0_ /= rn_;
-  tmpR0_ *= dtSub;
+  tmpR0_ *= dtSub;  
 
-  // YnStar has star state at substep here
-  setScalarFromVector(YnStar_, iSpec, &tmpR0a_);
-  tmpR0_.Add(1.0, tmpR0a_);
+  const double *dYstar = YnStar_.HostRead();
+  const double *dYn = Yn_.HostRead();
+  const double *dRho = rn_.HostRead();
+  double *data = tmpR0_.HostReadWrite();
+  for (int i = 0; i < sDofInt_; i++) {
+  
+    // increasing Y(sp)
+    if(data[i] > 0.0) {
 
-  setScalarFromVector(Yn_, iSpec, &tmpR0a_);
-  tmpR0_.Add(1.0, tmpR0a_);
+      //setScalarFromVector(YnStar_, iSpec, &tmpR0a_);    
+      //tmpR0_.Add(1.0, tmpR0a_);
+      //setScalarFromVector(Yn_, iSpec, &tmpR0a_);
+      //tmpR0_.Add(1.0, tmpR0a_);
+      data[i] += dYstar[i];
+      data[i] += dYn[i];
 
+    // reducing Y(sp)
+    } else {
+
+      //setScalarFromVector(Yn_, iSpec, &tmpR0b_); // Y{n+(substep)}    
+      //tmpR0_ /= tmpR0b_; // dtsub*Py/rho/Yn{n+(substep)}
+      //tmpR0a_ = 1.0;
+      //tmpR0a_.Add(-1.0,tmpR0_); // 1 - dtsub*Py/rho/Yn{n+(substep)}
+      //tmpR0b_ /= tmpR0a_; // Y{n+(substep)}/(1 - dtsub*Py/rho/Yn{n+(substep)})
+      //setScalarFromVector(YnStar_, iSpec, &tmpR0a_); // deltaY*
+      //tmpR0a_.Add(1.0, tmpR0b_);  // Y{n+(substep+1)}
+      //tmpR0_.Set(1.0,tmpR0a_);
+
+      double tmp = 1.0 - data[i]/dYn[i];
+      data[i] = dYn[i] / tmp + dYstar[i];
+    
+    }
+  }
+  
   // clip any small negative values
   {
     double *data = tmpR0_.HostReadWrite();
