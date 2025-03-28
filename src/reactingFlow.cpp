@@ -1831,7 +1831,6 @@ void ReactingFlow::step() {
   updateDiffusivity();
 }
 
-
 // should be Nsub s.t.: 1 > dt/Nsub*Prod_Y{n}/rho{n}/Yn{n}
 void ReactingFlow::evalSubstepNumber() {
   double myMaxProd = 0.0;
@@ -1983,6 +1982,11 @@ void ReactingFlow::temperatureSubstep(int iSub) {
   tmpR0_ /= CpMix_;
   tmpR0_ *= dtSub;
 
+  // OLD: TnStar has star state at substep here
+  //tmpR0_.Add(1.0, TnStar_);
+  //tmpR0_.Add(1.0, Tn_);
+  
+
   double *data = tmpR0_.HostReadWrite();
   double *dTstar = TnStar_.HostReadWrite();
   double *dTn = Tn_.HostReadWrite();      
@@ -1995,7 +1999,7 @@ void ReactingFlow::temperatureSubstep(int iSub) {
       //tmpR0_.Add(1.0, Tn_);
       data[i] += dTstar[i];
       data[i] += dTn[i];      
-    
+
     // reducing T
     } else {
 
@@ -2011,6 +2015,7 @@ void ReactingFlow::temperatureSubstep(int iSub) {
       data[i] = dTn[i] / tmp + dTstar[i];
       
     }
+
   }
   
   // Tn now has full state at substep
@@ -2157,6 +2162,14 @@ void ReactingFlow::speciesSubstep(int iSpec, int iSub) {
   tmpR0_ /= rn_;
   tmpR0_ *= dtSub;  
 
+  // OLD:
+  // YnStar has star state at substep here
+  //setScalarFromVector(YnStar_, iSpec, &tmpR0a_);
+  //tmpR0_.Add(1.0, tmpR0a_);
+  //setScalarFromVector(Yn_, iSpec, &tmpR0a_);
+  //tmpR0_.Add(1.0, tmpR0a_);
+
+  
   const double *dYstar = YnStar_.HostRead();
   const double *dYn = Yn_.HostRead();
   const double *dRho = rn_.HostRead();
@@ -2170,9 +2183,9 @@ void ReactingFlow::speciesSubstep(int iSpec, int iSub) {
       //tmpR0_.Add(1.0, tmpR0a_);
       //setScalarFromVector(Yn_, iSpec, &tmpR0a_);
       //tmpR0_.Add(1.0, tmpR0a_);
-      data[i] += dYstar[i];
-      data[i] += dYn[i];
-
+      data[i] += dYstar[i + iSpec * sDofInt_];
+      data[i] += dYn[i + iSpec * sDofInt_];
+      
     // reducing Y(sp)
     } else {
 
@@ -2185,10 +2198,10 @@ void ReactingFlow::speciesSubstep(int iSpec, int iSub) {
       //tmpR0a_.Add(1.0, tmpR0b_);  // Y{n+(substep+1)}
       //tmpR0_.Set(1.0,tmpR0a_);
 
-      double tmp = 1.0 - data[i]/dYn[i];
-      data[i] = dYn[i] / tmp + dYstar[i];
+      double tmp = 1.0 - data[i]/dYn[i + iSpec * sDofInt_];
+      data[i] = dYn[i + iSpec * sDofInt_] / tmp + dYstar[i + iSpec * sDofInt_];
     
-    }
+      }
   }
   
   // clip any small negative values
