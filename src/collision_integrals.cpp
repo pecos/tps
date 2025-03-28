@@ -201,168 +201,242 @@ MFEM_HOST_DEVICE double eAr15(const double &T) {
 // Nitrogen collision integrals
 // Q_(species, species)^(l,r)
 // Takes T in Kelvin, returns in unit of m^2.
-// NOTE: NOT UPDATED FROM ARGON, only names
 // All r=2 uses "isotropic scattering assumption", see: Sherman, M. P. (1965). Transport properties of partially ionized nitrogen. NASA: R65SD43.
 namespace nitrogen {
 
 MFEM_HOST_DEVICE double NiNi11(const double &T) {
-  //levin 1990
-  // Reference : fitted from tabulated data of Amdur, I., & Mason, E. A. (1958). Properties of gases at very high
-  // temperatures. Physics of Fluids, 1(5), 370–383. https://doi.org/10.1063/1.1724353
-  return 2.2910e-18 * pow(T, -0.3032);
+  // Reference : Levin et. al. (1990). "Collision Integrals and High Temperature Transport Properties for N-N, O-O, and N-O".
+  double logT = log(T);
+  double c[5];
+  c[0] = -43.674589506069054;
+  c[1] = -1.894798783975738;
+  c[2] = -0.003096113560006;
+  c[3] = -12.737655547787776;
+  c[4] = 2.673418610304956;  
+  double expOmega = c[0] + c[1]*pow(logT,c[3]) + c[2]*pow(logT,c[4]);
+  return log(expOmega);
 }
 
 MFEM_HOST_DEVICE double NiNi22(const double &T) {
-  //levin 1990
-  // Reference : 
-  return 2.2910e-18 * pow(T, -0.3032);
+  // Reference : Levin et. al. (1990). "Collision Integrals and High Temperature Transport Properties for N-N, O-O, and N-O".  
+  double logT = log(T);
+  double c[5];
+  c[0] = -43.501008926336119;
+  c[1] = -0.184736895556468;
+  c[2] = -0.005592899012521;
+  c[3] = -11.604191683888978;
+  c[4] = 2.417462743199025;
+  double expOmega = c[0] + c[1]*pow(logT,c[3]) + c[2]*pow(logT,c[4]);
+  return log(expOmega);
 }
 
+// N-N+: NO DATA (using N-N)
 MFEM_HOST_DEVICE double NiNi1P11(const double &T) {
-
-  return  2.2910e-18 * pow(T, -0.3032);
+  double logT = log(T);
+  double c[5];
+  c[0] = -43.674589506069054;
+  c[1] = -1.894798783975738;
+  c[2] = -0.003096113560006;
+  c[3] = -12.737655547787776;
+  c[4] = 2.673418610304956;  
+  double expOmega = c[0] + c[1]*pow(logT,c[3]) + c[2]*pow(logT,c[4]);
+  return log(expOmega);  
 }
 
 MFEM_HOST_DEVICE double N2N211(const double &T) {
-  // Reference : fitted from tabulated data of Amdur, I., & Mason, E. A. (1958). Properties of gases at very high
-  // temperatures. Physics of Fluids, 1(5), 370–383. https://doi.org/10.1063/1.1724353
-  return 2.2910e-18 * pow(T, -0.3032);
+  // Reference : A. V. Phelps. (1991). "Cross Sections and Swarm Coefficients for Nitrogen Ions and Neutrals in N2 and Argon Ions and Neutrals in Ar for Energies from 0.1 eV to 10 keV"
+  double logT = log(T);
+  double c[3];
+  c[0] = -47.866523949904071;
+  c[1] = 0.531494355003653;
+  c[2] = 0.010748072674994;
+  double expOmega = c[0] + c[1]*logT + c[2]*logT*logT;      
+  return log(expOmega);  
 }
 
 MFEM_HOST_DEVICE double N2N222(const double &T) {
-  // Reference : Liu, W. S., Whitten, B. T., & Glass, I. I. (1978). Ionizing argon boundary layers. Part 1. Quasi-steady
-  // flat-plate laminar boundary-layer flows. Journal of Fluid Mechanics, 87(4), 609–640.
-  // https://doi.org/10.1017/S0022112078001792
-  return 1.7e-18 * pow(T, -0.25);
+  // Reference : A. V. Phelps. (1991). "Cross Sections and Swarm Coefficients for Nitrogen Ions and Neutrals in N2 and Argon Ions and Neutrals in Ar for Energies from 0.1 eV to 10 keV"
+  double logT = log(T);
+  double c[3];
+  c[0] = -47.200458725512135;
+  c[1] = 0.544720304287795;
+  c[2] = 0.010160903112939;
+  double expOmega = c[0] + c[1]*logT + c[2]*logT*logT;    
+  return log(expOmega);  
 }
 
 MFEM_HOST_DEVICE double N2N21P11(const double &T) {
-  // Reference: fitted from tabulated data of Devoto, R. S. (1973). Transport coefficients of ionized argon. Physics of
-  // Fluids, 16(5), 616–623. https://doi.org/10.1063/1.1694396
-  return 4.574321e-18 * pow(T, -0.1805);
+  // Reference : A. V. Phelps. (1991). "Cross Sections and Swarm Coefficients for Nitrogen Ions and Neutrals in N2 and Argon Ions and Neutrals in Ar for Energies from 0.1 eV to 10 keV"
+  double logT = log(T);
+  double c[3];
+  c[0] = -47.318323876430846;
+  c[1] = 0.661701532231132;
+  c[2] = 0.011601814193470;
+  double expOmega = c[0] + c[1]*logT + c[2]*logT*logT;  
+  return log(expOmega);  
 }
 
 MFEM_HOST_DEVICE double N2Ni1P11(const double &T) {
-  // Reference : Sherman, M. P. (1965). Transport properties of partially ionized nitrogen. NASA: R65SD43.
-  return 558.0 / sqrt(T);  
+  // Reference : A. V. Phelps. (1991). "Cross Sections and Swarm Coefficients for Nitrogen Ions and Neutrals in N2 and Argon Ions and Neutrals in Ar for Energies from 0.1 eV to 10 keV"
+  double logT = log(T);
+  double c[3];
+  c[0] = -47.855538582567668;
+  c[1] = 0.856571008228926;
+  c[2] = -0.018389550018588;
+  double expOmega = c[0] + c[1]*logT + c[2]*logT*logT;
+  return log(expOmega);  
 }
 
+// N-N2+ : NO DATA (using N2-Ni+)
 MFEM_HOST_DEVICE double NiN21P11(const double &T) {
-  // Reference: fitted from tabulated data of Devoto, R. S. (1973). Transport coefficients of ionized argon. Physics of
-  // Fluids, 16(5), 616–623. https://doi.org/10.1063/1.1694396
-  return 4.574321e-18 * pow(T, -0.1805);
+  double logT = log(T);
+  double c[3];
+  c[0] = -47.855538582567668;
+  c[1] = 0.856571008228926;
+  c[2] = -0.018389550018588;
+  double expOmega = c[0] + c[1]*logT + c[2]*logT*logT;
+  return log(expOmega);  
 }
-
   
   
 /*
   e-Ar (l,r) are fitted over numerical quadrature of definitions.
-  Q_{e,Ar}^(1), elastic momentum transfer cross section, is determined by a 7-parameter shifted MERT model,
-  fitted over BSR LXCat dataset.
+  Q_{e,Ar}^(1), elastic momentum transfer cross section, 
+  fitted over IAA LXCat dataset.
 */
 MFEM_HOST_DEVICE double eNi11(const double &T) {
-  const double logT = log(T);
-  if (T < 1.2e4) {
-    return 5.8664e-22 * logT * logT * logT - 6.3417e-21 * logT * logT + 3.2083e-21 * logT + 9.0686e-20;
-  } else {
-    double tmp = logT - 10.9082;
-    return 12.1818e-20 * exp(-0.4186 * tmp * tmp) + 8.6949e-22;
-  }
+  double logT = log(T);
+  double c[8];
+  c[0] = -2.003882301835628;
+  c[1] = 1.532253343478155;
+  c[2] = -0.505597421163568;
+  c[3] = 0.091480325046587;
+  c[4] = -0.009821686553564;
+  c[5] = 0.000626838643976;
+  c[6] = -0.000022046833696;
+  c[7] = 0.000000329903530;   
+  for(int i=0; i<8; i++) c[i] *= 1000.0;
+  double expOmega = c[0] + c[1]*logT + c[2]*logT*logT + c[2]*pow(logT,3) + c[3]*pow(logT,4) + c[4]*pow(logT,5) + c[5]*pow(logT,6) + c[6]*pow(logT,7) + c[7]*pow(logT,8);
+  return log(expOmega);  
 }
 
 MFEM_HOST_DEVICE double eNi12(const double &T) {
-  const double logT = log(T);
-  if (T < 1.0e4) {
-    return 5.0435e-22 * logT * logT * logT - 4.0041e-21 * logT * logT - 1.3234e-20 * logT + 1.1966e-19;
-  } else {
-    double tmp = logT - 10.5348;
-    return 12.5836e-20 * exp(-0.5116 * tmp * tmp) + 8.7254e-22;
-  }
+  double logT = log(T);
+  double c[8];
+  c[0] = -1.956159066307375;
+  c[1] = 1.557221870910142;
+  c[2] = -0.533922416988002;
+  c[3] = 0.100141637408542;
+  c[4] = -0.011119131479736;
+  c[5] = 0.000732252201714;
+  c[6] = -0.000026518334060;
+  c[7] = 0.000000407775769;
+  for(int i=0; i<8; i++) c[i] *= 1000.0;  
+  double expOmega = c[0] + c[1]*logT + c[2]*logT*logT + c[2]*pow(logT,3) + c[3]*pow(logT,4) + c[4]*pow(logT,5) + c[5]*pow(logT,6) + c[6]*pow(logT,7) + c[7]*pow(logT,8);
+  return log(expOmega);  
 }
 
 MFEM_HOST_DEVICE double eNi13(const double &T) {
-  const double logT = log(T);
-  if (T < 8.2e3) {
-    return 4.3150e-22 * logT * logT * logT - 2.1312e-21 * logT * logT - 2.5311e-20 * logT + 1.3866e-19;
-  } else {
-    double tmp = logT - 10.2802;
-    return 12.9711e-20 * exp(-0.5725 * tmp * tmp) + 1.6371e-21;
-  }
+  double logT = log(T);
+  double c[8];
+  c[0] = -4.514549781113058;
+  c[1] = 3.776124850464214;
+  c[2] = -1.427950653286536;
+  c[3] = 0.289498661175164;
+  c[4] = -0.034291085489797;
+  c[5] = 0.002389263184571;
+  c[6] = -0.000091052188327;
+  c[7] = 0.000001467616631;
+  for(int i=0; i<8; i++) c[i] *= 100.0;    
+  double expOmega = c[0] + c[1]*logT + c[2]*logT*logT + c[2]*pow(logT,3) + c[3]*pow(logT,4) + c[4]*pow(logT,5) + c[5]*pow(logT,6) + c[6]*pow(logT,7) + c[7]*pow(logT,8);
+  return log(expOmega);  
 }
 
 MFEM_HOST_DEVICE double eNi14(const double &T) {
-  const double logT = log(T);
-  if (T < 7.1e3) {
-    return 3.9545e-22 * logT * logT * logT - 1.1198e-21 * logT * logT - 3.1302e-20 * logT + 1.4507e-19;
-  } else {
-    double tmp = logT - 10.0853;
-    return 13.2903e-20 * exp(-0.6150 * tmp * tmp) + 1.7854e-21;
-  }
+  double logT = log(T);
+  double c[8];
+  c[0] = 7.850307064335757;
+  c[1] = -6.131538141527012;
+  c[2] = 1.925885314608013;
+  c[3] = -0.333041600780530;
+  c[4] = 0.034213058505903;
+  c[5] = -0.002083820862016;
+  c[6] = 0.000069580148773;
+  c[7] = -0.000000982075309;
+  for(int i=0; i<8; i++) c[i] *= 100.0;  
+  double expOmega = c[0] + c[1]*logT + c[2]*logT*logT + c[2]*pow(logT,3) + c[3]*pow(logT,4) + c[4]*pow(logT,5) + c[5]*pow(logT,6) + c[6]*pow(logT,7) + c[7]*pow(logT,8);
+  return log(expOmega);  
 }
 
 MFEM_HOST_DEVICE double eNi15(const double &T) {
-  const double logT = log(T);
-  if (T < 6.0e3) {
-    return 2.8521e-22 * logT * logT * logT + 9.9567e-22 * logT * logT - 4.2614e-20 * logT + 1.6026e-19;
-  } else {
-    double tmp = logT - 9.9275;
-    return 13.4901e-20 * exp(-0.6295 * tmp * tmp) + 4.6041e-22;
-  }
+  double logT = log(T);
+  double c[8];
+  c[0] = 9.350737481569830;  
+  c[1] = -7.411741684073336;
+  c[2] = 2.380778500283301;
+  c[3] = -0.420842759318950;
+  c[4] = 0.044194959058462;
+  c[5] = -0.002753071048199;
+  c[6] = 0.000094064763399;
+  c[7] = -0.000001358467597;
+  for(int i=0; i<8; i++) c[i] *= 100.0;    
+  double expOmega = c[0] + c[1]*logT + c[2]*logT*logT + c[2]*pow(logT,3) + c[3]*pow(logT,4) + c[4]*pow(logT,5) + c[5]*pow(logT,6) + c[6]*pow(logT,7) + c[7]*pow(logT,8);
+  return log(expOmega);  
 }
 
 /*
   e-Ar (l,r) are fitted over numerical quadrature of definitions.
-  Q_{e,Ar}^(1), elastic momentum transfer cross section, is determined by a 7-parameter shifted MERT model,
-  fitted over BSR LXCat dataset.
+  Q_{e,Ar}^(1), elastic momentum transfer cross section,
+  fitted over IAA LXCat dataset.
 */
 MFEM_HOST_DEVICE double eN211(const double &T) {
-  const double logT = log(T);
-  if (T < 1.2e4) {
-    return 5.8664e-22 * logT * logT * logT - 6.3417e-21 * logT * logT + 3.2083e-21 * logT + 9.0686e-20;
-  } else {
-    double tmp = logT - 10.9082;
-    return 12.1818e-20 * exp(-0.4186 * tmp * tmp) + 8.6949e-22;
-  }
+  double logT = log(T);
+  double c[3];
+  c[0] = -57.365347800354527;
+  c[1] = 2.237881478639873;
+  c[2] = -0.064095690853854;
+  double expOmega = c[0] + c[1]*logT + c[2]*logT*logT;
+  return log(expOmega);  
 }
 
 MFEM_HOST_DEVICE double eN212(const double &T) {
-  const double logT = log(T);
-  if (T < 1.0e4) {
-    return 5.0435e-22 * logT * logT * logT - 4.0041e-21 * logT * logT - 1.3234e-20 * logT + 1.1966e-19;
-  } else {
-    double tmp = logT - 10.5348;
-    return 12.5836e-20 * exp(-0.5116 * tmp * tmp) + 8.7254e-22;
-  }
+  double logT = log(T);
+  double c[3];
+  c[0] = -57.103935279579566;
+  c[1] = 2.310012393118432;
+  c[2] = -0.069886269572701;
+  double expOmega = c[0] + c[1]*logT + c[2]*logT*logT;
+  return log(expOmega);  
 }
 
 MFEM_HOST_DEVICE double eN213(const double &T) {
-  const double logT = log(T);
-  if (T < 8.2e3) {
-    return 4.3150e-22 * logT * logT * logT - 2.1312e-21 * logT * logT - 2.5311e-20 * logT + 1.3866e-19;
-  } else {
-    double tmp = logT - 10.2802;
-    return 12.9711e-20 * exp(-0.5725 * tmp * tmp) + 1.6371e-21;
-  }
+  double logT = log(T);
+  double c[3];
+  c[0] = -57.352822536318413;
+  c[1] = 2.444566251016784;
+  c[2] = -0.078578082485722;
+  double expOmega = c[0] + c[1]*logT + c[2]*logT*logT;
+  return log(expOmega);  
 }
 
 MFEM_HOST_DEVICE double eN214(const double &T) {
-  const double logT = log(T);
-  if (T < 7.1e3) {
-    return 3.9545e-22 * logT * logT * logT - 1.1198e-21 * logT * logT - 3.1302e-20 * logT + 1.4507e-19;
-  } else {
-    double tmp = logT - 10.0853;
-    return 13.2903e-20 * exp(-0.6150 * tmp * tmp) + 1.7854e-21;
-  }
+  double logT = log(T);
+  double c[3];
+  c[0] = -57.643870857111693;
+  c[1] = 2.561369597252678;
+  c[2] = -0.086168461442770;
+  double expOmega = c[0] + c[1]*logT + c[2]*logT*logT;
+  return log(expOmega);  
 }
 
 MFEM_HOST_DEVICE double eN215(const double &T) {
-  const double logT = log(T);
-  if (T < 6.0e3) {
-    return 2.8521e-22 * logT * logT * logT + 9.9567e-22 * logT * logT - 4.2614e-20 * logT + 1.6026e-19;
-  } else {
-    double tmp = logT - 9.9275;
-    return 13.4901e-20 * exp(-0.6295 * tmp * tmp) + 4.6041e-22;
-  }
+  double logT = log(T);
+  double c[3];
+  c[0] = -57.774233348256821;
+  c[1] = 2.632018476967198;
+  c[2] = -0.091227910380667;
+  double expOmega = c[0] + c[1]*logT + c[2]*logT*logT;
+  return log(expOmega);  
 }
   
 }  // namespace nitrogen
