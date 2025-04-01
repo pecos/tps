@@ -93,6 +93,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   std::string gas;
   tpsP_->getRequiredInput("plasma_models/gas", gas);
   gasInput_.gas = gas;
+  std::cout << " got gas: " << gas << endl;
 
   if (gas=="Ar" || gas=="argon") {
     gasType_ = Ar;    
@@ -102,6 +103,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
    printf("Unknown gasType.");
    assert(false);    
   }
+  std::cout << " got gas type: " << gasType_ << endl;  
 
   switch (gasType_) {
     case Ar: 
@@ -230,6 +232,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     }
     speciesMapping[InputSpeciesNames[sp]] = targetIdx;
     speciesNames_[targetIdx] = InputSpeciesNames[sp];
+    std::cout << "sp: " << sp << " "  << targetIdx << " " << InputSpeciesNames[sp] << endl;
     mixtureToInputMap[targetIdx] = sp;
   }
 
@@ -273,7 +276,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
       for (int sp = 0; sp < nSpecies_; sp++) {
         if (speciesNames_[sp] == "Ni.+1") {
           speciesCharge[sp] = +1.0;
-        } else if (speciesNames_[sp] == "Ni2.+1") {
+        } else if (speciesNames_[sp] == "N2.+1") {
           speciesCharge[sp] = +1.0;	  
         } else if (speciesNames_[sp] == "E") {
           speciesCharge[sp] = -1.0;
@@ -346,20 +349,35 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
       break;
       
     case Ni:
+      printf("Setting nitrogen indices...");
+      std::cout << "mapping: " << endl;
+        for (int sp = 0; sp < nSpecies_; sp++) {
+	  std::cout << speciesNames_[sp] << " : " << speciesMapping[InputSpeciesNames[sp]] << endl;
+	}
+      
       if (speciesMapping.count("Ni")) {
-        gasInput_.neutralIndex = speciesMapping["Ni"];
-      } else if (speciesMapping.count("N2")) {
-        gasInput_.neutralIndex2 = speciesMapping["N2"];
-      } else if (speciesMapping.count("Ni.+1")) {
-        gasInput_.ionIndex = speciesMapping["Ni.+1"];
-      } else if (speciesMapping.count("N2.+1")) {
-        gasInput_.ionIndex2 = speciesMapping["N2.+1"];    	
-      } else if (speciesMapping.count("E")) {
+        gasInput_.neutralIndex2 = speciesMapping["Ni"];
+	std::cout << "nI2: " << speciesMapping["Ni"] << endl;
+      }
+      if (speciesMapping.count("N2")) {
+        gasInput_.neutralIndex = speciesMapping["N2"];
+	std::cout << "nI1: " << speciesMapping["N2"] << endl;	
+      }
+      if (speciesMapping.count("Ni.+1")) {
+        gasInput_.ionIndex2 = speciesMapping["Ni.+1"];
+	std::cout << "iI2: " << speciesMapping["Ni.+1"] << endl;	
+      }
+      if (speciesMapping.count("N2.+1")) {
+        gasInput_.ionIndex = speciesMapping["N2.+1"];
+	std::cout << "iI1: " << speciesMapping["N2.+1"] << endl;		
+      }
+      if (speciesMapping.count("E")) {
         gasInput_.electronIndex = speciesMapping["E"];
+	std::cout << "eI: " << speciesMapping["E"] << endl;		
       } else {
         grvy_printf(GRVY_ERROR, "\nNitrogen transport missing required species!\n");
         exit(ERROR);      
-      }    
+      }      
       break;
       
     default:
@@ -375,8 +393,10 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   identifyCollisionType(speciesType, gasInput_.collisionIndex);
 
   mixture_ = new PerfectMixture(mixtureInput_, dim_, dim_, const_plasma_conductivity_);
+ if (rank0_) std::cout << "mixture good!" << std::endl;  
   //transport_ = new ArgonMixtureTransport(mixture_, gasInput_);
-  transport_ = new GasMixtureTransport(mixture_, gasInput_);  
+  transport_ = new GasMixtureTransport(mixture_, gasInput_);
+ if (rank0_) std::cout << "transport good!" << std::endl;    
 
   /// Minimal amount of info for chemistry input struct
   chemistryInput_.model = chemistryModel_;
@@ -430,6 +450,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
       reactionModels[r - 1] = TABULATED_RXN;
       std::string inputPath(basepath + "/tabulated");
       readTableWrapper(inputPath, chemistryInput_.reactionInputs[r - 1].tableInput);
+      //std::cout << " table input :" << chemistryInput_.reactionInputs[r - 1].tableInput << endl;
 
     } else {
       grvy_printf(GRVY_ERROR, "\nUnknown reaction_model -> %s", model.c_str());
@@ -466,6 +487,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
       productStoich(sp, r - 1) = stoich[inputSp];
     }
   }
+  std::cout << " stoichiometry good..." <<  endl;
 
   if (speciesMapping.count("E")) {
     chemistryInput_.electronIndex = speciesMapping["E"];
@@ -495,8 +517,10 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
       rxn_param_idx += 1;
     }
   }
+  std::cout << "chemistry input good..." <<  endl;  
 
   chemistry_ = new Chemistry(mixture_, chemistryInput_);
+ if (rank0_) std::cout << "chemistry good!" << std::endl;      
 
   // Initialize radiation (just NEC for now) model
   std::string type;
@@ -538,6 +562,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
       rad_model_input.necTableInput.fdata = rad_tables[0].fdata;
 
       radiation_ = new NetEmission(rad_model_input);
+      if (rank0_) std::cout << "radiation good!" << std::endl;          
     } else {
       grvy_printf(GRVY_ERROR, "\nUnknown net emission coefficient type -> %s\n", coefficient_type.c_str());
       exit(ERROR);
@@ -2885,6 +2910,7 @@ void ReactingFlow::readTableWrapper(std::string inputPath, TableInput &result) {
   tpsP_->getInput((inputPath + "/f_log").c_str(), result.fLogScale, false);
   tpsP_->getInput((inputPath + "/order").c_str(), result.order, 1);
   tpsP_->getRequiredInput((inputPath + "/filename").c_str(), filename);
+  std::cout << " Attempting to read table: " << filename << endl;
   readTable(tpsP_->getTPSCommWorld(), filename, result.xLogScale, result.fLogScale, result.order, tableHost_, result);
 }
 

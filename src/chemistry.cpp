@@ -55,16 +55,19 @@ MFEM_HOST_DEVICE Chemistry::Chemistry(GasMixture *mixture, const ChemistryInput 
     reactionEnergies_[r] = inputs.reactionEnergies[r];
     detailedBalance_[r] = inputs.detailedBalance[r];
   }
+  std::cout << "chemistry check 1..." << endl;
 
   for (int r = 0; r < numReactions_; r++)
     for (int p = 0; p < 3; p++) equilibriumConstantParams_[p + r * gpudata::MAXCHEMPARAMS] = 0.0;
-
+  std::cout << "chemistry check 2..." << endl;
+  
   for (int r = 0; r < numReactions_; r++) {
     for (int mixSp = 0; mixSp < numSpecies_; mixSp++) {
       // int inputSp = (*mixtureToInputMap_)[mixSp];
       reactantStoich_[mixSp + r * numSpecies_] = inputs.reactantStoich[mixSp + r * numSpecies_];
       productStoich_[mixSp + r * numSpecies_] = inputs.productStoich[mixSp + r * numSpecies_];
     }
+    std::cout << "chemistry check 2a: " << r << endl;    
 
     switch (inputs.reactionModels[r]) {
       case ARRHENIUS: {
@@ -84,7 +87,9 @@ MFEM_HOST_DEVICE Chemistry::Chemistry(GasMixture *mixture, const ChemistryInput 
         reactions_[r] = new HoffertLien(A, b, E);
       } break;
       case TABULATED_RXN: {
+        std::cout << "chemistry check 2b: " << r << endl;    	
         reactions_[r] = new Tabulated(inputs.reactionInputs[r].tableInput);
+        std::cout << "chemistry check 2c: " << r << endl;	
       } break;
       case GRIDFUNCTION_RXN: {
         reactions_[r] = new GridFunctionReaction(inputs.reactionInputs[r].indexInput);
@@ -99,8 +104,10 @@ MFEM_HOST_DEVICE Chemistry::Chemistry(GasMixture *mixture, const ChemistryInput 
         equilibriumConstantParams_[d + r * gpudata::MAXCHEMPARAMS] =
             inputs.equilibriumConstantParams[d + r * gpudata::MAXCHEMPARAMS];
       }
+      std::cout << "chemistry check 2d:" << r << endl;          
     }
   }
+  std::cout << "chemistry check 3..." << endl;  
 }
 
 MFEM_HOST_DEVICE Chemistry::~Chemistry() {
