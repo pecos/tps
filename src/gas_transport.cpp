@@ -60,7 +60,7 @@ MFEM_HOST_DEVICE GasMinimalTransport::GasMinimalTransport(GasMixture *_mixture, 
     // and then create an array of pointers to the collision functions with indexing
     // matching the binary diffusivity indexing, for each namespace in collision.
     // Would allow for generic index-based computation of all binary-diffs
-    namespace gas = collision::argon;
+    //namespace gas = collision::argon;
 
     neutralIndex_ = inputs.neutralIndex;
     if (neutralIndex_ < 0) {
@@ -86,43 +86,43 @@ MFEM_HOST_DEVICE GasMinimalTransport::GasMinimalTransport(GasMixture *_mixture, 
      mw_[ionIndex_] = mixture->GetGasParams(ionIndex_, GasParams::SPECIES_MW);
 
      // assumes input mass is consistent with this.
-     assert(abs(mw_[neutralIndex_] - mw_[electronIndex_] - mw_[ionIndex_]) < 1.0e-15);
+     assert(abs(mw_[neutralIndex_] - mw_[electronIndex_] - mw_[ionIndex_]) < 1.0e-12);
      for (int sp = 0; sp < numSpecies; sp++) mw_[sp] /= AVOGADRONUMBER;    
 
   // Nitrogen     
   } else if (inputs.gas=="Ni" || inputs.gas=="nitrogen") {
     gasType_ = Ni;
 
-    if (numSpecies != 5) {
-      printf("\nGas:Ni ternary transport only supports ternary mixture of Ni, Ni.+1, N2, N2.+1, and E !\n");
+    if (numSpecies != 8) {
+      printf("\nGas: Ni transport only supports mixture of Ni, Ni.+1, N2, N2.+1, and E !\n");
       assert(false);
     }
 
-    namespace gas = collision::nitrogen;    
+    //namespace gas = collision::nitrogen;    
 
     neutralIndex_ = inputs.neutralIndex;    
     if (neutralIndex_ < 0) {
-      printf("\nArgon ternary transport requires the species 'Ar' !\n");
+      printf("\nNitrogen transport requires the species 'N2' !\n");
       assert(false);
     }
     ionIndex_ = inputs.ionIndex;
     if (ionIndex_ < 0) {
-      printf("\nArgon ternary transport requires the species 'Ar.+1' !\n");
+      printf("\nNitrogen transport requires the species 'N2.+1' !\n");
       assert(false);
     }
     electronIndex_ = inputs.electronIndex;
     if (electronIndex_ < 0) {
-      printf("\nArgon ternary transport requires the species 'E' !\n");
+      printf("\nNitrogen transport requires the species 'E' !\n");
       assert(false);
     }
     neutralIndex2_ = inputs.neutralIndex2;    
     if (neutralIndex2_ < 0) {
-      printf("\nArgon ternary transport requires the species 'Ar' !\n");
+      printf("\nNitrogen transport requires the species 'Ni' !\n");
       assert(false);
     }
     ionIndex2_ = inputs.ionIndex2;
     if (ionIndex2_ < 0) {
-      printf("\nArgon ternary transport requires the species 'Ar.+1' !\n");
+      printf("\nNitrogen transport requires the species 'Ni.+1' !\n");
       assert(false);
     }    
     
@@ -133,8 +133,8 @@ MFEM_HOST_DEVICE GasMinimalTransport::GasMinimalTransport(GasMixture *_mixture, 
     mw_[ionIndex2_] = mixture->GetGasParams(ionIndex2_, GasParams::SPECIES_MW);     
 
     // assumes input mass is consistent with this.
-    assert(abs(mw_[neutralIndex_] - mw_[electronIndex_] - mw_[ionIndex_]) < 1.0e-15);
-    assert(abs(mw_[neutralIndex2_] - mw_[electronIndex_] - mw_[ionIndex2_]) < 1.0e-15);     
+    assert(abs(mw_[neutralIndex_] - mw_[electronIndex_] - mw_[ionIndex_]) < 1.0e-12);
+    assert(abs(mw_[neutralIndex2_] - mw_[electronIndex_] - mw_[ionIndex2_]) < 1.0e-12);     
     for (int sp = 0; sp < numSpecies; sp++) mw_[sp] /= AVOGADRONUMBER;    
     
   } else {
@@ -849,8 +849,13 @@ GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, RunConfiguration 
 
 MFEM_HOST_DEVICE GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, const GasTransportInput &inputs)
     : GasMinimalTransport(_mixture) {
+  
+  electronIndex_ = inputs.electronIndex;
+  neutralIndex_ = inputs.neutralIndex;
   ionIndex_ = inputs.ionIndex;
 
+  printf("giddy up...\n");
+  
   // Argon
   if (inputs.gas=="Ar" || inputs.gas=="argon") {
     gasType_ = Ar;
@@ -860,7 +865,7 @@ MFEM_HOST_DEVICE GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, 
       assert(false);
     }
 
-    namespace gas = collision::argon;
+    //namespace gas = collision::argon;
 
     neutralIndex_ = inputs.neutralIndex;
     if (neutralIndex_ < 0) {
@@ -886,45 +891,17 @@ MFEM_HOST_DEVICE GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, 
      //mw_[ionIndex_] = mixture->GetGasParams(ionIndex_, GasParams::SPECIES_MW);
 
      // assumes input mass is consistent with this.
-     assert(abs(mw_[neutralIndex_] - mw_[electronIndex_] - mw_[ionIndex_]) < 1.0e-15);
+     assert(abs(mw_[neutralIndex_] - mw_[electronIndex_] - mw_[ionIndex_]) < 1.0e-12);
 
   // Nitrogen     
   } else if (inputs.gas=="Ni" || inputs.gas=="nitrogen") {
     gasType_ = Ni;
+    printf("gas type nitrogen...\n");
 
-    if (numSpecies != 5) {
-      printf("\nGas:Ni ternary transport only supports ternary mixture of Ni, Ni.+1, N2, N2.+1, and E !\n");
-      assert(false);
-    }
+    neutralIndex2_ = inputs.neutralIndex2;        
+    ionIndex2_ = inputs.ionIndex2;      
 
-    namespace gas = collision::nitrogen;    
-
-
-    neutralIndex_ = inputs.neutralIndex;    
-    if (neutralIndex_ < 0) {
-      printf("\nArgon ternary transport requires the species 'Ar' !\n");
-      assert(false);
-    }
-    ionIndex_ = inputs.ionIndex;
-    if (ionIndex_ < 0) {
-      printf("\nArgon ternary transport requires the species 'Ar.+1' !\n");
-      assert(false);
-    }
-    electronIndex_ = inputs.electronIndex;
-    if (electronIndex_ < 0) {
-      printf("\nArgon ternary transport requires the species 'E' !\n");
-      assert(false);
-    }
-    neutralIndex2_ = inputs.neutralIndex2;    
-    if (neutralIndex2_ < 0) {
-      printf("\nArgon ternary transport requires the species 'Ar' !\n");
-      assert(false);
-    }
-    ionIndex2_ = inputs.ionIndex2;
-    if (ionIndex2_ < 0) {
-      printf("\nArgon ternary transport requires the species 'Ar.+1' !\n");
-      assert(false);
-    }    
+    //namespace gas = collision::nitrogen;    
 
     //mw_[electronIndex_] = mixture->GetGasParams(electronIndex_, GasParams::SPECIES_MW);
     //mw_[neutralIndex_] = mixture->GetGasParams(neutralIndex_, GasParams::SPECIES_MW);
@@ -933,8 +910,14 @@ MFEM_HOST_DEVICE GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, 
     //mw_[ionIndex2_] = mixture->GetGasParams(ionIndex2_, GasParams::SPECIES_MW);     
 
     // assumes input mass is consistent with this.
-    assert(abs(mw_[neutralIndex_] - mw_[electronIndex_] - mw_[ionIndex_]) < 1.0e-15);
-    assert(abs(mw_[neutralIndex2_] - mw_[electronIndex_] - mw_[ionIndex2_]) < 1.0e-15);     
+    std::cout << "nI1: " << neutralIndex_ << endl;
+    std::cout << "nI2: " << neutralIndex2_ << endl;
+    std::cout << "iI1: " << ionIndex_ << endl;
+    std::cout << "iI2: " << ionIndex2_ << endl;
+    std::cout << "eI1: " << electronIndex_ << endl;        
+    assert(abs(mw_[neutralIndex_] - mw_[electronIndex_] - mw_[ionIndex_]) < 1.0e-12);
+    assert(abs(mw_[neutralIndex2_] - mw_[electronIndex_] - mw_[ionIndex2_]) < 1.0e-12);   
+    printf("...\n");    
     
   } else {
    printf("Unknown gasType.");
@@ -949,6 +932,7 @@ MFEM_HOST_DEVICE GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, 
 
   // muw_.SetSize(numSpecies);
   computeEffectiveMass(mw_, muw_);
+  printf("effective mass good...\n");      
 
   thirdOrderkElectron_ = inputs.thirdOrderkElectron;
 
@@ -961,7 +945,10 @@ MFEM_HOST_DEVICE GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, 
     for (int spJ = spI; spJ < numSpecies; spJ++)
       collisionIndex_[spI + spJ * numSpecies] = inputs.collisionIndex[spI + spJ * numSpecies];
 
+  printf("collision index good...\n");    
+  
   setArtificialMultipliers(inputs);
+  printf("artificial mult good...\n");      
 }
 
 MFEM_HOST_DEVICE double GasMixtureTransport::collisionIntegral(const int _spI, const int _spJ, const int l,

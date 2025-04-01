@@ -44,7 +44,7 @@ const int MAXINTPOINTS = 64;  // corresponding to HEX face with p=5
 const int MAXDOFS = 216;      // corresponding to HEX with p=5
 
 const int MAXDIM = 3;
-const int MAXSPECIES = 7;
+const int MAXSPECIES = 8;
 const int MAXEQUATIONS = MAXDIM + 2 + MAXSPECIES;  // momentum + two energies + species
 // NOTE: (presumably from marc) lets make sure we don't have more than 20 eq.
 // NOTE(kevin): with MAXEQUATIONS=20, marvin fails with out-of-memery with 3 MPI process.
@@ -52,7 +52,8 @@ const int MAXEQUATIONS = MAXDIM + 2 + MAXSPECIES;  // momentum + two energies + 
 const int MAXREACTIONS = 34;
 const int MAXCHEMPARAMS = 3;
 
-const int MAXTABLE = 512;
+//const int MAXTABLE = 512;
+const int MAXTABLE = 1000;  
 const int MAXTABLEDIM = 2;
 
 const int MAXVISUAL = 128;
