@@ -2782,6 +2782,158 @@ void ReactingFlow::identifyCollisionType(const Array<ArgonSpcs> &speciesType, Ar
   return;
 }
 
+void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, double *omega) {
+  // This function allows us evaluate the reacting flow source terms
+  // at a given state (i.e., at a point in the grid) which is
+  // necessary for a nonlinear solve for an implicit time step at each
+  // point.  The sequence of calls that does this for the full field
+  // is below:
+  //
+  // updateMixture();
+  // updateThermoP();
+  // updateDensity(0.0, false);
+  // speciesProduction();
+  // heatOfFormation();
+  //
+
+  // Extract data from incoming state
+  std::vector<double> Y(nSpecies_);  // mass fractions
+  std::vector<double> X(nSpecies_);  // mole fractions
+  double T = 0.0;                    // temperature
+
+  // Set the species we are carrying, and evaluate charge density as we go
+  double ne = 0.0;
+  double sumy = 0.0;
+  for (int sp = 0; sp < nActiveSpecies_; sp++) {
+    Y[sp] = YT[sp];
+
+    sumy += Y[sp];
+
+    const double q_sp = mixture_->GetGasParams(sp, GasParams::SPECIES_CHARGES);
+    const double m_sp = mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
+    const double fac = q_sp / m_sp;
+    ne += fac * Y[sp];
+  }
+
+  if (mixtureInput_.ambipolar) {
+    // Electron density is determined from charge neutrality
+    const int iElectron = nSpecies_ - 2;
+    const double m_electron = mixture_->GetGasParams(iElectron, GasParams::SPECIES_MW);
+    Y[iElectron] = ne * m_electron;
+    sumy += Y[iElectron];
+  }
+
+  // 'Background' species density is 1 - sum of the rest
+  Y[nSpecies_ - 1] = 1.0 - sumy;
+
+  // Temperature is the last element of the incoming state
+  T = YT[nActiveSpecies_];
+
+  double Rmix = 0;
+  double Mmix = 0;
+  double Cpmix = 0;
+
+  // Evaluate mixture molecular weight and gas constant
+  for (int sp = 0; sp < nSpecies_; sp++) {
+    Mmix += Y[sp] / gasParams_(sp, GasParams::SPECIES_MW);
+  }
+  Mmix = 1.0 / Mmix;
+  Rmix = Rgas_ / Mmix;
+
+  // Evaluate mole fractions
+  for (int sp = 0; sp < nSpecies_; sp++) {
+    X[sp] = Y[sp] * Mmix / gasParams_(sp, GasParams::SPECIES_MW);
+  }
+
+  // Compute mixture density
+  assert(domain_is_open_);  // TODO(trevilo): handle variable pressure case!!
+  double rho = thermo_pressure_ / (Rmix * T);
+
+  // int nEq = dim_ + 2 + nActiveSpecies_;
+  Vector state(gpudata::MAXEQUATIONS);
+  state = 0.0;
+
+  Vector n_sp;
+
+  // Set up conserved state (just the mass densities, which is all we need here)
+  state[0] = rho;
+  for (int sp = 0; sp < nActiveSpecies_; sp++) {
+    state[dim_ + 1 + sp + 1] = rho * Y[sp];
+  }
+
+  // Evaluate the mole densities (from mass densities)
+  mixture_->computeNumberDensities(state, n_sp);
+
+  // GetMixtureCp returns cpMix = sum_s X_s Cp_s, where X_s is
+  // mole density of species s and Cp_s is molar specific heat
+  // (constant pressure) of species s, so cpMix at this point
+  // (units J/m^3), which is rho*Cp, where rho is the mixture
+  // density (kg/m^3) and Cp is the is the mixture mass specific
+  // heat (units J/(kg*K).
+  mixture_->GetMixtureCp(n_sp, rho, Cpmix);
+
+  // Everything else expects CpMix_gf_ to be the mixture mass Cp
+  // (with units J/(kg*K)), so divide by mixture density
+  Cpmix /= rho;
+
+  // Vectors used in computing chemical sources at each point
+  Vector kfwd;          // set to size nReactions_ in computeForwardRareCoeffs
+  Vector keq;           // set to size nReactions_ in computeEquilibriumConstants
+  Vector progressRate;  // set to size nReactions_ in computeProgressRate
+  Vector creationRate;  // set to size nSpecies_ in computeCreationRate
+  Vector emissionRate;  // set to size nSpecies_ in computeCreationRate
+
+  kfwd.SetSize(chemistry_->getNumReactions());
+  keq.SetSize(chemistry_->getNumReactions());
+
+  // Get temperature
+  const double Th = T;
+  const double Te = Th;  // single temperature model
+
+  // Evaluate the chemical source terms
+  chemistry_->computeForwardRateCoeffs(n_sp.Read(), Th, Te, dofindex, kfwd.HostWrite());
+  chemistry_->computeEquilibriumConstants(Th, Te, keq.HostWrite());
+  chemistry_->computeProgressRate(n_sp, kfwd, keq, progressRate);
+  chemistry_->computeCreationRate(progressRate, creationRate, emissionRate);
+
+  // And store in returned variable
+  for (int sp = 0; sp < nActiveSpecies_; sp++) {
+    omega[sp] = creationRate[sp] / rho;
+  }
+
+  // And finally, handle the temperature source term
+  double hw = 0.0;
+  // hw_em = 0.0;
+
+  double hspecies;
+
+  // NOTE: not very elegant but dont want to nest an if
+  if (radiative_decay_NECincluded_) {
+    // Sum over species to get enthalpy term
+    for (int sp = 0; sp < nSpecies_; sp++) {
+      double molarCV = speciesMolarCv_[sp];
+      molarCV *= UNIVERSALGASCONSTANT;
+      double molarCP = molarCV + UNIVERSALGASCONSTANT;
+
+      hspecies = (molarCP * T + gasParams_(sp, GasParams::FORMATION_ENERGY)) / gasParams_(sp, GasParams::SPECIES_MW);
+      hw -= hspecies * (creationRate[sp] - emissionRate[sp]);
+      // hw_em = hspecies * emissionRate[sp];  // not sure of sign
+    }
+  } else {
+    // Sum over species to get enthalpy term
+    for (int sp = 0; sp < nSpecies_; sp++) {
+      double molarCV = speciesMolarCv_[sp];
+      molarCV *= UNIVERSALGASCONSTANT;
+      double molarCP = molarCV + UNIVERSALGASCONSTANT;
+
+      hspecies = (molarCP * T + gasParams_(sp, GasParams::FORMATION_ENERGY)) / gasParams_(sp, GasParams::SPECIES_MW);
+      hw -= hspecies * creationRate[sp];
+    }
+  }
+
+  omega[nActiveSpecies_] = hw / rho / Cpmix;
+}
+
 double binaryTest(const Vector &coords, double t) {
   double x = coords(0);
   double y = coords(1);
