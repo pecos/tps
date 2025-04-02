@@ -893,36 +893,26 @@ MFEM_HOST_DEVICE GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, 
      // assumes input mass is consistent with this.
      assert(abs(mw_[neutralIndex_] - mw_[electronIndex_] - mw_[ionIndex_]) < 1.0e-12);
 
-  // Nitrogen     
+  // Nitrogen
   } else if (inputs.gas=="Ni" || inputs.gas=="nitrogen") {
     gasType_ = Ni;
     printf("gas type nitrogen...\n");
-
-    neutralIndex2_ = inputs.neutralIndex2;        
-    ionIndex2_ = inputs.ionIndex2;      
-
-    //namespace gas = collision::nitrogen;    
-
-    //mw_[electronIndex_] = mixture->GetGasParams(electronIndex_, GasParams::SPECIES_MW);
-    //mw_[neutralIndex_] = mixture->GetGasParams(neutralIndex_, GasParams::SPECIES_MW);
-    //mw_[ionIndex_] = mixture->GetGasParams(ionIndex_, GasParams::SPECIES_MW);
-    //mw_[neutralIndex2_] = mixture->GetGasParams(neutralIndex2_, GasParams::SPECIES_MW);
-    //mw_[ionIndex2_] = mixture->GetGasParams(ionIndex2_, GasParams::SPECIES_MW);     
-
-    // assumes input mass is consistent with this.
-    assert(abs(mw_[neutralIndex_] - mw_[electronIndex_] - mw_[ionIndex_]) < 1.0e-12);
-    assert(abs(mw_[neutralIndex2_] - mw_[electronIndex_] - mw_[ionIndex2_]) < 1.0e-12);   
-    
+    neutralIndex2_ = inputs.neutralIndex2;
+    ionIndex2_ = inputs.ionIndex2;
   } else {
    printf("Unknown gasType.");
    assert(false);
-  }  
+  }
 
   // TODO(kevin): need to factor out avogadro numbers throughout all transport property.
   // multiplying/dividing big numbers are risky of losing precision.
   // mw_.SetSize(numSpecies);
   for (int sp = 0; sp < numSpecies; sp++) mw_[sp] = mixture->GetGasParams(sp, GasParams::SPECIES_MW);
   for (int sp = 0; sp < numSpecies; sp++) mw_[sp] /= AVOGADRONUMBER;
+
+  // check mass consistency
+  assert(abs(mw_[neutralIndex_] - mw_[electronIndex_] - mw_[ionIndex_]) < 1.0e-12);
+  assert(abs(mw_[neutralIndex2_] - mw_[electronIndex_] - mw_[ionIndex2_]) < 1.0e-12);
 
   // muw_.SetSize(numSpecies);
   computeEffectiveMass(mw_, muw_);
