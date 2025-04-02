@@ -59,10 +59,8 @@ MFEM_HOST_DEVICE double HoffertLien::computeRateCoefficient(const double &T_h, c
 }
 
 MFEM_HOST_DEVICE Tabulated::Tabulated(const TableInput &input) : Reaction(TABULATED_RXN) {
-  std::cout<< "Tabulated: " << input.order << endl;
   switch (input.order) {
     case 1: {
-      std::cout<< "Tabulated: case 1" << endl;      
       table_ = new LinearTable(input);
     } break;
     default: {
