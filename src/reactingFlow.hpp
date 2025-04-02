@@ -378,6 +378,8 @@ class ReactingFlow : public ThermoChemModelBase {
   void heatOfFormation();
   void crossDiffusion();
 
+  void evaluateReactingSource(const double *YT, const int dofindex, double *omega);
+
   // time-splitting
   void substepState();
   void speciesLastSubstep();
