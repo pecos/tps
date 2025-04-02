@@ -910,14 +910,8 @@ MFEM_HOST_DEVICE GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, 
     //mw_[ionIndex2_] = mixture->GetGasParams(ionIndex2_, GasParams::SPECIES_MW);     
 
     // assumes input mass is consistent with this.
-    std::cout << "nI1: " << neutralIndex_ << endl;
-    std::cout << "nI2: " << neutralIndex2_ << endl;
-    std::cout << "iI1: " << ionIndex_ << endl;
-    std::cout << "iI2: " << ionIndex2_ << endl;
-    std::cout << "eI1: " << electronIndex_ << endl;        
     assert(abs(mw_[neutralIndex_] - mw_[electronIndex_] - mw_[ionIndex_]) < 1.0e-12);
     assert(abs(mw_[neutralIndex2_] - mw_[electronIndex_] - mw_[ionIndex2_]) < 1.0e-12);   
-    printf("...\n");    
     
   } else {
    printf("Unknown gasType.");
@@ -932,7 +926,6 @@ MFEM_HOST_DEVICE GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, 
 
   // muw_.SetSize(numSpecies);
   computeEffectiveMass(mw_, muw_);
-  printf("effective mass good...\n");      
 
   thirdOrderkElectron_ = inputs.thirdOrderkElectron;
 
@@ -944,11 +937,8 @@ MFEM_HOST_DEVICE GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, 
   for (int spI = 0; spI < numSpecies; spI++)
     for (int spJ = spI; spJ < numSpecies; spJ++)
       collisionIndex_[spI + spJ * numSpecies] = inputs.collisionIndex[spI + spJ * numSpecies];
-
-  printf("collision index good...\n");    
   
   setArtificialMultipliers(inputs);
-  printf("artificial mult good...\n");      
 }
 
 MFEM_HOST_DEVICE double GasMixtureTransport::collisionIntegral(const int _spI, const int _spJ, const int l,
