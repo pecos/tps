@@ -141,10 +141,12 @@ class LoMachOptions {
 
   LoMachOptions() {
     order = 1;
+    scale_mesh = 1.0;
     ref_levels = 0;
     max_iter = 100;
     rtol = 1.0e-8;
     atol = 1.0e-12;
+    compute_wallDistance = false;
   }
 
   void print(std::ostream &out) {
