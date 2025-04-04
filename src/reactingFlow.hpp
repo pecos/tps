@@ -327,6 +327,7 @@ class ReactingFlow : public ThermoChemModelBase {
   Vector YnStar_, spec_buffer_;
   Vector TnStar_, temp_buffer_;
   bool operator_split_ = false;
+  bool implicit_chemistry_ = false;
   int nSub_;
   bool dynamic_substepping_ = true;
   int stabFrac_;
@@ -379,6 +380,7 @@ class ReactingFlow : public ThermoChemModelBase {
   void crossDiffusion();
 
   void evaluateReactingSource(const double *YT, const int dofindex, double *omega);
+  void solveChemistryStep(double *YT, const int dofindex, const double dt);
 
   // time-splitting
   void substepState();
