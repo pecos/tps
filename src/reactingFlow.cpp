@@ -500,6 +500,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   tpsP_->getInput("loMach/reactingFlow/ic", ic_string_, std::string(""));
 
   // will be over-written if dynamic is active
+  tpsP_->getInput("loMach/reactingFlow/implicit-chemistry", implicit_chemistry_, false);
   tpsP_->getInput("loMach/reactingFlow/sub-steps", nSub_, 1);
   tpsP_->getInput("loMach/reactingFlow/dynamic-substep", dynamic_substepping_, false);
   if (dynamic_substepping_) nSub_ = 2;
@@ -521,6 +522,11 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   operator_split_ = false;
   if (nSub_ > 1) {
     operator_split_ = true;
+    assert(!implicit_chemistry_);
+  }
+  if (implicit_chemistry_) {
+    operator_split_ = true;
+    assert(nSub_ == 1);
   }
 }
 
@@ -1597,55 +1603,78 @@ void ReactingFlow::step() {
     spec_buffer_.Set(1.0, Yn_);
     temp_buffer_.Set(1.0, Tn_);
 
-    // Evaluate (Yn_next_ - Yn_)/nSub and store in YnStar_, and analog
-    // for TnStar_.
-    substepState();
-
-    // number of substeps
-    if (dynamic_substepping_) evalSubstepNumber();
-
-    for (int iSub = 0; iSub < nSub_; iSub++) {
-      // update wdot quantities at full substep in Yn/Tn state
-      updateMixture();
-      updateThermoP();
-      updateDensity(0.0, false);
-      speciesProduction();
-      heatOfFormation();
-
-      // advance over substep
-      for (int iSpecies = 0; iSpecies < nActiveSpecies_; iSpecies++) {
-        speciesSubstep(iSpecies, iSub);
-      }
-      if (mixtureInput_.ambipolar) {
-        // Evaluate electron mass fraction based on quasi-neutrality
-
-        // temporary storage for electron mass fraction
-        tmpR0_ = 0.0;
-
-        // Y_electron = sum_{i \in active species} (m_electron / m_i) * q_i * Y_i
-        for (int iSpecies = 0; iSpecies < nActiveSpecies_; iSpecies++) {
-          setScalarFromVector(Yn_, iSpecies, &tmpR0a_);
-          const double q_sp = mixture_->GetGasParams(iSpecies, GasParams::SPECIES_CHARGES);
-          const double m_sp = mixture_->GetGasParams(iSpecies, GasParams::SPECIES_MW);
-          const double fac = q_sp / m_sp;
-          tmpR0a_ *= fac;
-          tmpR0_ += tmpR0a_;
+    if (implicit_chemistry_) {
+      auto h_Yn = Yn_next_.HostReadWrite();
+      auto h_Tn = Tn_next_.HostReadWrite();
+      double *YT = new double[nActiveSpecies_ + 1];
+      for (int i = 0; i < sDofInt_; i++) {
+        // Extract point state
+        for (int sp = 0; sp < nActiveSpecies_; sp++) {
+          YT[sp] = h_Yn[sp * sDofInt_ + i];
         }
-        const int iElectron = nSpecies_ - 2;  // TODO(trevilo): check me!
-        const double m_electron = mixture_->GetGasParams(iElectron, GasParams::SPECIES_MW);
-        tmpR0_ *= m_electron;
-        setVectorFromScalar(tmpR0_, iElectron, &Yn_);
+        YT[nActiveSpecies_] = h_Tn[i];
+
+        // Solve backward Euler update
+        solveChemistryStep(YT, i, dt_);
+
+        // Overwrite point state data
+        for (int sp = 0; sp < nActiveSpecies_; sp++) {
+          h_Yn[sp * sDofInt_ + i] = YT[sp];
+        }
+        h_Tn[i] = YT[nActiveSpecies_];
       }
-      speciesLastSubstep();
-      Yn_gf_.SetFromTrueDofs(Yn_);
+      delete[] YT;
+    } else {
+      // Evaluate (Yn_next_ - Yn_)/nSub and store in YnStar_, and analog
+      // for TnStar_.
+      substepState();
 
-      temperatureSubstep(iSub);
-      Tn_gf_.SetFromTrueDofs(Tn_);
+      // number of substeps
+      if (dynamic_substepping_) evalSubstepNumber();
+
+      for (int iSub = 0; iSub < nSub_; iSub++) {
+        // update wdot quantities at full substep in Yn/Tn state
+        updateMixture();
+        updateThermoP();
+        updateDensity(0.0, false);
+        speciesProduction();
+        heatOfFormation();
+
+        // advance over substep
+        for (int iSpecies = 0; iSpecies < nActiveSpecies_; iSpecies++) {
+          speciesSubstep(iSpecies, iSub);
+        }
+        if (mixtureInput_.ambipolar) {
+          // Evaluate electron mass fraction based on quasi-neutrality
+
+          // temporary storage for electron mass fraction
+          tmpR0_ = 0.0;
+
+          // Y_electron = sum_{i \in active species} (m_electron / m_i) * q_i * Y_i
+          for (int iSpecies = 0; iSpecies < nActiveSpecies_; iSpecies++) {
+            setScalarFromVector(Yn_, iSpecies, &tmpR0a_);
+            const double q_sp = mixture_->GetGasParams(iSpecies, GasParams::SPECIES_CHARGES);
+            const double m_sp = mixture_->GetGasParams(iSpecies, GasParams::SPECIES_MW);
+            const double fac = q_sp / m_sp;
+            tmpR0a_ *= fac;
+            tmpR0_ += tmpR0a_;
+          }
+          const int iElectron = nSpecies_ - 2;  // TODO(trevilo): check me!
+          const double m_electron = mixture_->GetGasParams(iElectron, GasParams::SPECIES_MW);
+          tmpR0_ *= m_electron;
+          setVectorFromScalar(tmpR0_, iElectron, &Yn_);
+        }
+        speciesLastSubstep();
+        Yn_gf_.SetFromTrueDofs(Yn_);
+
+        temperatureSubstep(iSub);
+        Tn_gf_.SetFromTrueDofs(Tn_);
+      }
+
+      // set register to correct full step fields
+      Yn_next_ = Yn_;
+      Tn_next_ = Tn_;
     }
-
-    // set register to correct full step fields
-    Yn_next_ = Yn_;
-    Tn_next_ = Tn_;
 
     YnFull_gf_.SetFromTrueDofs(Yn_next_);
     Tn_next_gf_.SetFromTrueDofs(Tn_next_);
@@ -2903,11 +2932,8 @@ void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, 
 
   // And finally, handle the temperature source term
   double hw = 0.0;
-  // hw_em = 0.0;
-
   double hspecies;
 
-  // NOTE: not very elegant but dont want to nest an if
   if (radiative_decay_NECincluded_) {
     // Sum over species to get enthalpy term
     for (int sp = 0; sp < nSpecies_; sp++) {
@@ -2917,7 +2943,6 @@ void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, 
 
       hspecies = (molarCP * T + gasParams_(sp, GasParams::FORMATION_ENERGY)) / gasParams_(sp, GasParams::SPECIES_MW);
       hw -= hspecies * (creationRate[sp] - emissionRate[sp]);
-      // hw_em = hspecies * emissionRate[sp];  // not sure of sign
     }
   } else {
     // Sum over species to get enthalpy term
@@ -2932,6 +2957,122 @@ void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, 
   }
 
   omega[nActiveSpecies_] = hw / rho / Cpmix;
+}
+
+void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const double dt) {
+  const int nState = nActiveSpecies_ + 1;  // Number of variables in YT
+  const double eps = 1e-7;                 // Perturbation for finite difference Jacobian
+
+  double *YT1 = new double[nState];
+  double *YT0 = new double[nState];
+  double *rhs1 = new double[nState];
+  double *rhs = new double[nState];
+
+  mfem::DenseMatrix Jac(nState);
+
+  // Store state at beginning of the step
+  for (int i = 0; i < nState; i++) {
+    YT0[i] = YT[i];
+  }
+
+  // Before starting the Newton iteration, evaluate the rhs and
+  // Jacobian for a backward Euler step
+
+  // Evaluate RHS...
+  this->evaluateReactingSource(YT, dofindex, rhs);
+
+  // ... and Jacobian (via finite difference)
+  for (int i = 0; i < nState; i++) {
+    for (int j = 0; j < nState; j++) {
+      YT1[j] = YT[j];
+    }
+    if (YT[i] < 1e-10) {
+      YT1[i] = 1e-17;
+    } else {
+      YT1[i] *= (1 + eps);
+    }
+
+    this->evaluateReactingSource(YT1, dofindex, rhs1);
+
+    for (int j = 0; j < nState; j++) {
+      Jac(j, i) = (rhs1[j] - rhs[j]) / (YT1[i] - YT[i]);
+    }
+  }
+
+  for (int i = 0; i < nState; i++) {
+    rhs[i] *= -dt;
+
+    for (int j = 0; j < nState; j++) {
+      Jac(j, i) *= -dt;
+    }
+    Jac(i, i) += 1.0;
+  }
+
+  double res_norm0 = 0;
+  for (int i = 0; i < nState; i++) {
+    res_norm0 += rhs[i] * rhs[i];
+  }
+  res_norm0 = sqrt(res_norm0);
+
+  const int IMAX = 200;
+  int iiter = 0;
+  double res_norm = res_norm0;
+
+  // Newton solver loop
+  while (iiter < IMAX && res_norm > 1e-12 && (res_norm / res_norm0) > 1e-8) {
+    mfem::LinearSolve(Jac, rhs, 1.e-9);
+
+    // Update the solution
+    for (int i = 0; i < nState; i++) {
+      YT[i] += -rhs[i];
+    }
+
+    // Compute rhs and Jacobian, in preparation for next step
+    this->evaluateReactingSource(YT, dofindex, rhs);
+
+    for (int i = 0; i < nState; i++) {
+      for (int j = 0; j < nState; j++) {
+        YT1[j] = YT[j];
+      }
+      if (YT[i] < 1e-10) {
+        YT1[i] = 1e-17;
+      } else {
+        YT1[i] *= (1 + eps);
+      }
+
+      this->evaluateReactingSource(YT1, dofindex, rhs1);
+      for (int j = 0; j < nState; j++) {
+        Jac(j, i) = (rhs1[j] - rhs[j]) / (YT1[i] - YT[i]);
+      }
+    }
+
+    for (int i = 0; i < nState; i++) {
+      rhs[i] *= -dt;
+      rhs[i] += YT[i] - YT0[i];
+
+      for (int j = 0; j < nState; j++) {
+        Jac(j, i) *= -dt;
+      }
+      Jac(i, i) += 1.0;
+    }
+
+    res_norm = 0;
+    for (int i = 0; i < nState; i++) {
+      res_norm += rhs[i] * rhs[i];
+    }
+    res_norm = sqrt(res_norm);
+    iiter += 1;
+  }
+
+  if (iiter >= IMAX) {
+    std::cout << "WARNING: Newton solve did not converge." << std::endl;
+    std::cout << "    YT =";
+    for (int i = 0; i < nState; i++) {
+      std::cout << " " << YT[i];
+    }
+    std::cout << std::endl;
+    std::cout << "    iiter = " << iiter << ", r0 = " << res_norm0 << ", r/r0 = " << res_norm / res_norm0 << std::endl;
+  }
 }
 
 double binaryTest(const Vector &coords, double t) {

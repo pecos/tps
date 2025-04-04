@@ -62,7 +62,6 @@ int main(int argc, char *argv[]) {
   int nState = nActiveSpecies + 1;
 
   double *YT = new double[nState];
-  double *rhs = new double[nState];
 
   for (int sp = 0; sp < nActiveSpecies; sp++) {
     YT[sp] = Y0[sp];
@@ -97,14 +96,7 @@ int main(int argc, char *argv[]) {
   // Backward Euler (fully implicit---i.e., nonlinearly implicit)
   int max_iters;
   tps.getInput("time/steps", max_iters, 10000);
-  double *dYT = new double[nState];
-  double *YT1 = new double[nState];
-  double *YT0 = new double[nState];
-  double *rhs1 = new double[nState];
 
-  mfem::DenseMatrix Jac(nState);
-
-  double eps = 1e-7;
   for(int step = 0; step < max_iters; ++step) {
     std::cout << step << " " << time;
     for (int i = 0; i < nState; i++) {
@@ -112,110 +104,7 @@ int main(int argc, char *argv[]) {
     }
     std::cout << std::endl;
 
-    for (int i = 0; i < nState; i++) {
-      dYT[i] = 0.0;
-      YT0[i] = YT[i];
-    }
-
-    // Evaluate RHS and Jacobian (via finite difference)
-    thermo->evaluateReactingSource(YT, 0, rhs);
-    for (int i = 0; i < nState; i++) {
-
-      for (int j = 0; j < nState; j++) {
-        YT1[j] = YT[j];
-      }
-      YT1[i] *= (1 + eps);
-
-      thermo->evaluateReactingSource(YT1, 0, rhs1);
-
-      for (int j = 0; j < nState; j++) {
-        Jac(j,i) = (rhs1[j] - rhs[j]) / (YT1[i] - YT[i]);
-      }
-    }
-
-    for (int i = 0; i < nState; i++) {
-      rhs[i] *= -dt;
-
-      for (int j = 0; j < nState; j++) {
-        Jac(j,i) *= -dt;
-      }
-      Jac(i,i) += 1.0;
-    }
-
-    double res_norm0 = 0;
-    for (int i = 0; i < nState; i++) {
-      res_norm0 += rhs[i] * rhs[i];
-    }
-    res_norm0 = sqrt(res_norm0);
-
-    std::cout << "Beginning Newton iteration with r0 = " << res_norm0 << std::endl;
-
-    bool converged = false;
-    const int IMAX = 200;
-    //for (int iiter = 0; iiter < IMAX; iiter++) {
-    int iiter = 0;
-
-    double res_norm = res_norm0;
-    while (iiter < IMAX && res_norm > 1e-12 && (res_norm / res_norm0) > 1e-9) {
-      // Solve the system, afterward, rhs contains the solution
-      mfem::LinearSolve(Jac, rhs, 1.e-9);
-
-      for (int i = 0; i < nState; i++) {
-        if (iiter < 100) {
-          //dYT[i] = -0.1 * rhs[i];
-          dYT[i] = -rhs[i];
-        } else {
-          dYT[i] = -rhs[i];
-        }
-        YT[i] += dYT[i];
-      }
-
-      // Evaluate RHS and Jacobian (via finite difference)
-      thermo->evaluateReactingSource(YT, 0, rhs);
-      for (int i = 0; i < nState; i++) {
-
-        for (int j = 0; j < nState; j++) {
-          YT1[j] = YT[j];
-        }
-        YT1[i] *= (1 + eps);
-
-        thermo->evaluateReactingSource(YT1, 0, rhs1);
-
-        for (int j = 0; j < nState; j++) {
-          Jac(j,i) = (rhs1[j] - rhs[j]) / (YT1[i] - YT[i]);
-        }
-      }
-
-      for (int i = 0; i < nState; i++) {
-        rhs[i] *= -dt;
-        rhs[i] += YT[i] - YT0[i];
-
-        for (int j = 0; j < nState; j++) {
-          Jac(j,i) *= -dt;
-        }
-        Jac(i,i) += 1.0;
-      }
-
-      res_norm = 0;
-      for (int i = 0; i < nState; i++) {
-        res_norm += rhs[i] * rhs[i];
-      }
-      res_norm = sqrt(res_norm);
-
-      std::cout << iiter << ": r = " << res_norm << ", r/r0 = " << res_norm / res_norm0 << std::endl;
-
-      // if (res_norm < 1e-14 || (res_norm / res_norm0 < 1e-7)) {
-      //   converged = true;
-      //   break;
-      // }
-      iiter += 1;
-    }
-    if (iiter >= IMAX) {
-      std::cout << "WARNING: Newton solve did not converge." << std::endl;
-      for (int i = 0; i < nState; i++) {
-        std::cout << "YT[" << i << "] = " << YT[i] << std::endl;
-      }
-    }
+    thermo->solveChemistryStep(YT, 0, dt);
     time += dt;
   }
 
