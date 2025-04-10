@@ -531,6 +531,10 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
 }
 
 ReactingFlow::~ReactingFlow() {
+  for (unsigned int i = 0; i < vizSpecFields_.size(); i++) {
+    delete vizSpecFields_[i];
+  }
+
   // allocated in initializeOperators
   delete sfes_filter_;
   delete sfec_filter_;
@@ -552,6 +556,7 @@ ReactingFlow::~ReactingFlow() {
   delete jh_form_;
 
   delete rhou_coeff_;
+  delete species_Cp_coeff_;
   delete rhon_next_coeff_;
   delete un_next_coeff_;
   delete kap_gradT_coeff_;
@@ -566,6 +571,7 @@ ReactingFlow::~ReactingFlow() {
   // delete rho_coeff_;
   delete cpMix_coeff_;
   delete rhoCp_coeff_;
+  delete rhouCp_coeff_;
 
   delete jh_coeff_;
   delete radiation_sink_coeff_;
@@ -582,9 +588,18 @@ ReactingFlow::~ReactingFlow() {
   delete rad_kap_gradT_coeff_;
 
   delete Ay_form_;
+
   delete HyInv_;
   delete HyInvPC_;
   delete Hy_form_;
+
+  delete Mv_inv_pc_;
+  delete Mv_inv_;
+  delete Mv_form_;
+
+  delete LY_form_;
+
+  delete species_diff_Cp_coeff_;
   delete species_diff_coeff_;
   delete species_diff_sum_coeff_;
   delete species_diff_total_coeff_;
@@ -3073,6 +3088,11 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
     std::cout << std::endl;
     std::cout << "    iiter = " << iiter << ", r0 = " << res_norm0 << ", r/r0 = " << res_norm / res_norm0 << std::endl;
   }
+
+  delete[] YT1;
+  delete[] YT0;
+  delete[] rhs1;
+  delete[] rhs;
 }
 
 double binaryTest(const Vector &coords, double t) {
