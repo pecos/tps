@@ -195,6 +195,10 @@ class ReactingFlow : public ThermoChemModelBase {
   ParGridFunction Mmix_gf_;
   ParGridFunction emission_gf_;
 
+
+  // additions for reaction progress rates
+  ParGridFunction reacR_gf_;
+
   ParGridFunction visc_gf_;
   ParGridFunction kappa_gf_;
   ParGridFunction diffY_gf_;
@@ -320,6 +324,9 @@ class ReactingFlow : public ThermoChemModelBase {
   Vector atomMW_;
   Vector CpMix_;
 
+  // additions for reaction progress rates
+  Vector reacR_;
+
   Vector Qt_;
   Vector rn_;
   Vector diffY_;
@@ -350,6 +357,13 @@ class ReactingFlow : public ThermoChemModelBase {
   std::list<mfem::DenseMatrix> tableHost_;
   std::vector<ParGridFunction *> vizSpecFields_;
   std::vector<std::string> vizSpecNames_;
+
+  std::vector<ParGridFunction *> vizProdFields_;
+  std::vector<std::string> vizProdNames_;
+
+  // PARGRID FUNCTION AND STRING FOR REACTION PROGRESS RATES
+  std::vector<ParGridFunction *> vizReacFields_;
+  std::vector<std::string> vizReacNames_;
 
  public:
   ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff, TPS::Tps *tps);

@@ -711,6 +711,14 @@ void ReactingFlow::initializeSelf() {
   YnFull_gf_.SetSpace(yfes_);
   YnFull_gf_ = 0.0;
 
+  // prodY for plotting
+  prodY_gf_.SetSpace(yfes_);
+  prodY_gf_ = 0.0;
+
+  // reaction progress rates for plotting
+  reacR_gf_.SetSpace(yfes_);
+  reacR_gf_ = 0.0;
+
   // rest can just be sfes
   Yn_gf_.SetSpace(sfes_);
   Yext_gf_.SetSpace(sfes_);
@@ -745,8 +753,12 @@ void ReactingFlow::initializeSelf() {
   prodY_.SetSize(yDofInt_);
   prodY_ = 1.0e-12;
 
-  prodY_gf_.SetSpace(sfes_);
-  prodY_gf_ = 0.0;
+  // reaction progress rates to be passed to reacR_gf
+  reacR_.SetSize(yDofInt_);
+  reacR_ = 1.0e-12;
+
+  // prodY_gf_.SetSpace(sfes_);
+  // prodY_gf_ = 0.0;
 
   prodE_.SetSize(yDofInt_);
   prodE_ = 1.0e-12;
@@ -1987,6 +1999,8 @@ void ReactingFlow::speciesProduction() {
   double *dataProd = prodY_.HostWrite();
   double *dataEmit = prodE_.HostWrite();
 
+  double *dataReac = reacR_.HostWrite();
+
   // const int nEq = dim_ + 2 + nActiveSpecies_;
   Vector state(gpudata::MAXEQUATIONS);
   state = 0.0;
@@ -2029,7 +2043,17 @@ void ReactingFlow::speciesProduction() {
       dataProd[i + sp * sDofInt_] = creationRate[sp];
       dataEmit[i + sp * sDofInt_] = emissionRate[sp];
     }
+
+    // Write the reaction progress rates into dataReac
+    for(int nr = 0; nr < nReactions_; nr++){
+      dataReac[i + nr * sDofInt_] = progressRate[nr];
+    }
   }
+
+  // prodY_gf stores the species production rates for each species
+  // reacR_gf stores the reaction progress rates for each reaction
+  prodY_gf_.SetFromTrueDofs(prodY_);
+  reacR_gf_.SetFromTrueDofs(reacR_);
 }
 
 void ReactingFlow::heatOfFormation() {
@@ -2191,6 +2215,25 @@ void ReactingFlow::initializeViz(ParaViewDataCollection &pvdc) {
     vizSpecFields_.push_back(new ParGridFunction(sfes_, YnFull_gf_, (sp * sDof_)));
     vizSpecNames_.push_back(std::string("Yn_" + speciesNames_[sp]));
     pvdc.RegisterField(vizSpecNames_[sp], vizSpecFields_[sp]);
+  }
+
+  // WRITING THE REACTION PRODUCT TERMS TO THE PARAVIEW FILE
+  vizProdFields_.clear();
+  vizProdNames_.clear();
+  for (int sp = 0; sp < nSpecies_; sp++) {
+    vizProdFields_.push_back(new ParGridFunction(sfes_, prodY_gf_, (sp * sDof_)));
+    vizProdNames_.push_back(std::string("prodYn_" + speciesNames_[sp]));
+    pvdc.RegisterField(vizProdNames_[sp], vizProdFields_[sp]);
+  }
+
+  // WRITING THE REACTION PROGRESS RATES TO THE PARAVIEW FILE
+  vizReacFields_.clear();
+  vizReacNames_.clear();
+  for (int nr = 0; nr < nReactions_; nr++) {
+    auto sr = std::to_string(nr);
+    vizReacFields_.push_back(new ParGridFunction(sfes_, reacR_gf_, (nr * sDof_)));
+    vizReacNames_.push_back(std::string("reacR_" + sr));
+    pvdc.RegisterField(vizReacNames_[nr], vizReacFields_[nr]);
   }
 }
 
