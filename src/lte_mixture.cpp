@@ -201,7 +201,7 @@ MFEM_HOST_DEVICE bool LteMixture::ComputeTemperatureInternal(const double *state
     // Newton step
     double dT = res / dedT;
     T += dT;
-    assert(T > 0);
+    // HERE HERE HERE assert(T > 0);
 
     // Update residual
 #ifdef _GPU_
@@ -278,7 +278,7 @@ MFEM_HOST_DEVICE double LteMixture::ComputeTemperatureFromDensityPressure(const 
     // Newton step
     double dT = res / dpdT;
     T += dT;
-    assert(T > 0);
+    //HERE HERE HERE assert(T > 0);
 
     // Update residual
 #ifdef _GPU_

@@ -56,12 +56,30 @@ static double sigmaTorchStartUp(const Vector &pos) {
   const double y = pos[1];  // axial location
 
   const double r0 = 0.005;
-  const double y0 = 0.135;
-  const double ysig = 0.015;
+  //const double y0 = 0.135;
+  //const double ysig = 0.015;
 
+  /*
   const double sigma =
       2000. * std::exp(-0.5 * (x / r0) * (x / r0)) * std::exp(-0.5 * ((y - y0) / ysig) * ((y - y0) / ysig));
+  */
+  
 
+  // additions for 3d, this should just use "SetConstantPlasmaConductivity" in equation_of_state.cpp
+  const double z = pos[2];
+  const double rCyl = 0.029;
+  const double rsig = 0.005; // 5mm
+  const double ysig = 0.01;       
+  const double y0 = 0.15; // step location
+
+  double radius = std::sqrt(x*x + z*z);
+  double rwgt, hwgt;
+  double sigma;
+  rwgt = std::exp(-0.5 * (radius / rsig) * (radius / rsig));
+  hwgt = std::exp(-0.5 * ((y - y0) / ysig) * ((y - y0) / ysig));
+  if (radius >= rCyl) rwgt = 0.0;       
+  sigma = 2000. * rwgt * hwgt;
+ 
   return sigma;
 }
 
@@ -217,7 +235,9 @@ void LteThermoChem::initializeSelf() {
   // 1) Prepare the required finite element objects
   //-----------------------------------------------------
   sfec_ = new H1_FECollection(order_);
+  if (rank0_) grvy_printf(ginfo, "...okay 1\n");  
   sfes_ = new ParFiniteElementSpace(pmesh_, sfec_);
+  if (rank0_) grvy_printf(ginfo, "...okay 2\n");    
 
   // Check if fully periodic mesh
   if (!(pmesh_->bdr_attributes.Size() == 0)) {
@@ -227,7 +247,7 @@ void LteThermoChem::initializeSelf() {
     Qt_ess_attr_.SetSize(pmesh_->bdr_attributes.Max());
     Qt_ess_attr_ = 0;
   }
-  if (rank0_) grvy_printf(ginfo, "LteThermoChem paces constructed...\n");
+  if (rank0_) grvy_printf(ginfo, "LteThermoChem spaces constructed...\n");
 
   int sfes_truevsize = sfes_->GetTrueVSize();
 
@@ -419,6 +439,17 @@ void LteThermoChem::initializeSelf() {
         }
         AddTempDirichletBC(temperature_value, inlet_attr);
 
+      } else if (type == "normal") {
+        Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
+        inlet_attr = 0;
+        inlet_attr[patch - 1] = 1;
+        double temperature_value;
+        tpsP_->getRequiredInput((basepath + "/temperature").c_str(), temperature_value);
+        if (rank0_) {
+          std::cout << "Calorically Perfect: Setting uniform Dirichlet temperature on patch = " << patch << std::endl;
+        }
+        AddTempDirichletBC(temperature_value, inlet_attr);
+	
       } else if (type == "interpolate") {
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
         inlet_attr = 0;
@@ -909,7 +940,7 @@ void LteThermoChem::step() {
   jh_form_->Update();
   jh_form_->Assemble();
   jh_form_->ParallelAssemble(jh_);
-  resT_ += jh_;
+  resT_ += jh_;  
 
   // Update Helmholtz operator to account for changing dt, rho, and kappa
   bd0_over_dt.constant = (time_coeff_.bd0 / dt_);
@@ -959,6 +990,14 @@ void LteThermoChem::step() {
     Tn_next_gf_.GetTrueDofs(Tn_next_);
   }
 
+  // Horrible hack: clip temp  
+  {
+    double *d_T = Tn_next_.ReadWrite();
+    const double Tcutoff = 280.0;
+    MFEM_FORALL(i, Tn_next_.Size(), { d_T[i] = max(d_T[i],Tcutoff); });
+    Tn_next_gf_.SetFromTrueDofs(Tn_next_);    
+  }
+  
   // prepare for external use and next step
   updateProperties();
   updateDensity();
@@ -1208,6 +1247,7 @@ void LteThermoChem::computeQt() {
   LQ_->AddMult(Tn_next_, tmpR0_);  // tmpR0_ += LQ{Tn_next}
 
   // Joule heating (and radiation sink)
+  // jh_gf_.GetTrueDofs(jh_); // swh: adding this line, seems to have been missing?  
   jh_form_->Update();
   jh_form_->Assemble();
   jh_form_->ParallelAssemble(jh_);

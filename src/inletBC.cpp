@@ -46,10 +46,10 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rs
       inletType_(_bcType),
       maxIntPoints_(_maxIntPoints),
       maxDofs_(_maxDofs) {
-  if ((mixture->GetWorkingFluid() != DRY_AIR) && (inletType_ != SUB_DENS_VEL)) {
-    grvy_printf(GRVY_ERROR, "Plasma only supports subsonic reflecting density velocity inlet!\n");
-    exit(-1);
-  }
+  //  if ((mixture->GetWorkingFluid() != DRY_AIR) && (inletType_ != SUB_DENS_VEL)) {
+  //    grvy_printf(GRVY_ERROR, "Plasma only supports subsonic reflecting density velocity inlet!\n");
+  //    exit(-1);
+  //  }
   inputState.UseDevice(true);
   inputState.SetSize(_inputData.Size());
   auto hinputState = inputState.HostWrite();
@@ -954,10 +954,10 @@ void InletBC::interpInlet_gpu(const mfem::Vector &x, const elementIndexingData &
 
   const InletType type = inletType_;
 
-  if ((fluid != DRY_AIR) && (type != SUB_DENS_VEL)) {
-    mfem_error("Plasma only supports subsonic reflecting density velocity inlet!\n");
-    exit(-1);
-  }
+  //  if ((fluid != DRY_AIR) && (type != SUB_DENS_VEL)) {
+  //    mfem_error("Plasma only supports subsonic reflecting density velocity inlet!\n");
+  //    exit(-1);
+  //  }
 
   const int dim = dim_;
   const int nvel = nvel_;

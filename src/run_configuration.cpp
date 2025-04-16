@@ -47,6 +47,7 @@ RunConfiguration::RunConfiguration() {
 
   integrationRule = 1;
   basisType = 1;
+  //basisType = 0;
 
   cflNum = 0.12;
   constantTimeStep = false;

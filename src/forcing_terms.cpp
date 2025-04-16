@@ -560,6 +560,7 @@ SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_or
     for (int d = 0; d < dim; d++) Xn[d] = coords[n + d * ndofs];
 
     hSigma[n] = 0.0;
+    
     if (szData.szType == SpongeZoneType::PLANAR) {
       // distance to the mix-out plane
       double distInit = 0.;
@@ -575,11 +576,12 @@ SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_or
         double planeDistance = distF + distInit;
         hSigma[n] = distInit / planeDistance / planeDistance;
       }
+      
     } else if (szData.szType == SpongeZoneType::ANNULUS) {
       double distInit = 0.;
       for (int d = 0; d < dim; d++) distInit -= szData.normal[d] * (Xn[d] - szData.pointInit[d]);
 
-      // dadial distance to axis
+      // radial distance to axis
       double R = 0.;
       Vector tmp(dim);
       {
@@ -601,7 +603,7 @@ SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_or
         for (int d = 0; d < dim; d++) radialNormalsVec.push_back(tmp(d) / R);
         nodesInAnnulus[n] = radialNormalsVec.size() / dim - 1;
       }
-    }
+    }    
   }
 
   radialNormal.SetSize(radialNormalsVec.size());

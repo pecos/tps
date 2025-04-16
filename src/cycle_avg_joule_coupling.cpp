@@ -145,7 +145,7 @@ void CycleAvgJouleCoupling::initializeInterpolationData() {
   ParMesh *em_mesh = qmsa_solver_->getMesh();
   assert(flow_mesh != NULL);
   assert(em_mesh != NULL);
-
+  
   assert(flow_mesh->GetNodes() != NULL);
   if (em_mesh->GetNodes() == NULL) {
     em_mesh->SetCurvature(1, false, -1, 0);
@@ -171,6 +171,7 @@ void CycleAvgJouleCoupling::initializeInterpolationData() {
   for (int i = 0; i < flow_mesh->GetNE(); i++) {
     n_flow_interp_nodes_ += flow_fespace->GetFE(i)->GetNodes().GetNPoints();
   }
+  if (verbose) grvy_printf(ginfo, "Completed em-flow interpolation setup.\n");  
 
 #else
   mfem_error("Cannot initialize interpolation without GSLIB support.");
@@ -409,7 +410,7 @@ void CycleAvgJouleCoupling::solveStep() {
   if (current_iter_ % solve_em_every_n_ == 0) {
     // update the power if necessary
     double delta_power = 0;
-    if (input_power_ > 0) {
+    if (input_power_ > 0 && initial_input_power_ > -1.0e-8) {
       delta_power = (input_power_ - initial_input_power_) * static_cast<double>(solve_em_every_n_) /
                     static_cast<double>(max_iters_);
     }
@@ -450,13 +451,18 @@ void CycleAvgJouleCoupling::solveStep() {
 
     // scale the Joule heating (if we are controlling the power input)
     if (input_power_ > 0) {
-      const double target_power = initial_input_power_ + (current_iter_ / solve_em_every_n_ + 1) * delta_power;
-      const double ratio = target_power / tot_jh;
+      double ratio;      
+      if (initial_input_power_ > -1.0e-8) {
+        double target_power = initial_input_power_ + (current_iter_ / solve_em_every_n_ + 1) * delta_power;
+        ratio = target_power / tot_jh;
+      } else {
+        ratio = input_power_ / tot_jh;
+      }
       qmsa_solver_->scaleJouleHeating(ratio);
-      const double upd_jh = qmsa_solver_->totalJouleHeating();
+      const double upd_jh = qmsa_solver_->totalJouleHeating();      
       if (rank0_) {
         grvy_printf(GRVY_INFO, "The total input Joule heating after scaling = %.6e\n", upd_jh);
-      }
+      }            
     }
 
     // interpolate the Joule heating to the flow mesh

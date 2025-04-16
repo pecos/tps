@@ -730,10 +730,42 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
 // This is more or less right formulation even for two-temperature case.
 void OutletBC::subsonicReflectingPressure(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
   Vector state2(num_equation_);
+  //Vector stateInTmp(num_equation_);
+  //stateInTmp = stateIn;
 
-  mixture->modifyEnergyForPressure(stateIn, state2, inputState[0]);
+  // HERE HERE HERE
+  // modify stateInTmp s.t. there is no in-flow
 
+  // outward facing normal
+  /*
+  Vector unitNorm = normal;
+  {
+    double mod = 0.;
+    for (int d = 0; d < dim_; d++) mod += normal[d] * normal[d];
+    unitNorm *= 1. / sqrt(mod);
+  }
+
+  // vel in face normal direction
+  double normVel = 0.;    
+  for (int d = 0; d < dim_; d++) normVel += stateInTmp[1 + d] * unitNorm[d];
+  normVel /= stateInTmp[0];
+
+  // if normVel negative, resist inflow at outlet. for now, also kill tangents
+  //if (normVel < 0.0) {
+  //  //for (int d = 0; d < dim_; d++) stateInTmp[1 + d] = -1.0 * stateInTmp[1 + d];
+  //  for (int d = 0; d < dim_; d++) stateInTmp[1 + d] = 0.0; // more gentle
+  // }
+
+  // CHEATING with known y-norm exit for torch
+  if (stateInTmp[2]<0.0) stateInTmp[2] = 0.0;
+
+  mixture->modifyEnergyForPressure(stateInTmp, state2, inputState[0]);
+  */
+ 
+  mixture->modifyEnergyForPressure(stateIn, state2, inputState[0]); 
+  
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
+  
 }
 
 void OutletBC::subsonicNonRefMassFlow(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux) {

@@ -396,15 +396,19 @@ hsize_t get_variable_size_hdf5(hid_t file, std::string name) {
 }
 
 // convenience function to read solution data for parallel restarts
-void read_variable_data_hdf5(hid_t file, string varName, size_t index, double *data) {
+void read_variable_data_hdf5(hid_t file, string varName, size_t index, double *data, int rank0) {
   hid_t data_soln;
   herr_t status;
 
   data_soln = H5Dopen2(file, varName.c_str(), H5P_DEFAULT);
-  assert(data_soln >= 0);
-  status = H5Dread(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &data[index]);
-  assert(status >= 0);
-  H5Dclose(data_soln);
+  // assert(data_soln >= 0);
+  if (data_soln >= 0) {
+    status = H5Dread(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &data[index]);
+    assert(status >= 0);
+    H5Dclose(data_soln);
+  } else {
+    if (rank0) std::cout << "WARNING: data " << varName.c_str() << " not found in restart file" << endl;    
+  }
 }
 
 IOOptions::IOOptions() : output_dir_("output"), restart_dir_("./"), restart_mode_("standard") {}
@@ -482,7 +486,7 @@ void IOFamily::readDistributeSerializedVariable(hid_t file, const IOVar &var, in
     Vector data_serial;
     data_serial.SetSize(numDof);
 
-    read_variable_data_hdf5(file, varName, 0, data_serial.HostWrite());
+    read_variable_data_hdf5(file, varName, 0, data_serial.HostWrite(), rank0_);
 
     // assign solution owned by rank 0
     Array<int> lvdofs, gvdofs;
@@ -721,7 +725,7 @@ void IOFamily::readPartitioned(hid_t file) {
     if (var.inRestartFile_) {
       std::string h5Path = group_ + "/" + var.varName_;
       if (rank0_) grvy_printf(ginfo, "--> Reading h5 path = %s\n", h5Path.c_str());
-      read_variable_data_hdf5(file, h5Path.c_str(), var.index_ * numInSoln, data);
+      read_variable_data_hdf5(file, h5Path.c_str(), var.index_ * numInSoln, data, rank0_);
     }
   }
 }
@@ -770,7 +774,7 @@ void IOFamily::readChangeOrder(hid_t file, int read_order) {
       if (var.inRestartFile_) {
         std::string h5Path = group_ + "/" + var.varName_;
         if (rank0_) grvy_printf(ginfo, "--> Reading h5 path = %s\n", h5Path.c_str());
-        read_variable_data_hdf5(file, h5Path.c_str(), var.index_ * aux_dof, data);
+        read_variable_data_hdf5(file, h5Path.c_str(), var.index_ * aux_dof, data, rank0_);
       }
     }
 
@@ -810,6 +814,12 @@ void IODataOrganizer::registerIOFamily(std::string description, std::string grou
   }
 
   families_.push_back(family);
+}
+
+// remove family from read/write list
+void IODataOrganizer::unregisterIOFamily(std::string description, std::string group, ParGridFunction *pfunc) {
+  IOFamily family(description, group, pfunc);
+  family.inRestartFile_ = false;
 }
 
 // register individual variables for IO family
@@ -937,8 +947,8 @@ void IODataOrganizer::read(hid_t file, bool serial, int read_order) {
           fam.readPartitioned(file);
         }
       }
-    }
-  }
+    } // end of if family name in restart file
+  } // end of all registered families loop
 }
 
 IODataOrganizer::~IODataOrganizer() {

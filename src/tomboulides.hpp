@@ -226,6 +226,7 @@ class Tomboulides final : public FlowBase {
   // mfem::ParGridFunction *buffer_uInlet_ = nullptr;
   mfem::VectorGridFunctionCoefficient *velocity_field_ = nullptr;
   mfem::ParGridFunction *epsi_gf_ = nullptr;
+  mfem::ParGridFunction *uface_gf_ = nullptr;  
 
   /// Pressure FEM objects and fields
   mfem::FiniteElementCollection *pfec_ = nullptr;
@@ -286,6 +287,8 @@ class Tomboulides final : public FlowBase {
   mfem::VectorArrayCoefficient *utheta_vec_coeff_ = nullptr;
   mfem::InnerProductCoefficient *swirl_var_viscosity_coeff_ = nullptr;
 
+  mfem::VectorGridFunctionCoefficient *uface_coeff_ = nullptr;
+  
   // mfem "form" objects used to create operators
   mfem::ParBilinearForm *L_iorho_form_ = nullptr;  // \int (1/\rho) \nabla \phi_i \cdot \nabla \phi_j
   mfem::ParLinearForm *forcing_form_ = nullptr;    // \int \phi_i f

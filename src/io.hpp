@@ -260,6 +260,7 @@ class IODataOrganizer {
    */
   void registerIOFamily(std::string description, std::string group, mfem::ParGridFunction *pfunc,
                         bool auxRestart = true, bool inRestartFile = true, mfem::FiniteElementCollection *fec = NULL);
+  void unregisterIOFamily(std::string description, std::string group, mfem::ParGridFunction *pfunc);  
   /** Destructor */
   ~IODataOrganizer();
 
@@ -339,7 +340,7 @@ hsize_t get_variable_size_hdf5(hid_t file, std::string name);
  * @param index Starting location within data buffer
  * @param data Data buffer
  */
-void read_variable_data_hdf5(hid_t file, std::string varName, size_t index, double *data);
+void read_variable_data_hdf5(hid_t file, std::string varName, size_t index, double *data, int rank0);
 
 /**
  * @brief Write data to an hdf5 file
