@@ -270,15 +270,13 @@ void MeshBase::initializeMesh() {
   if (loMach_opts_->compute_wallDistance) {
     computeWallDistance();
   }
-
+  
   // This line is necessary to ensure that GetNodes does not return
   // NULL, which is required when we set up interpolation between
   // meshes.  We do it here b/c waiting until later (e.g., right
   // before interpolation set up) leads to a seg fault when running in
   // parallel, which is not yet understood.  
-  //if (pmesh_->GetNodes() == NULL) {
-  //  pmesh_->SetCurvature(1);
-  //}
+  if (pmesh_->GetNodes() == NULL) pmesh_->SetCurvature(1);
   
 }
 

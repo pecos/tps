@@ -165,7 +165,8 @@ class Tomboulides final : public FlowBase {
 
   // To use "numerical integration", quadrature rule must persist
   mfem::IntegrationRules gll_rules;
-
+  mfem::IntegrationRules *intRules;
+  
   // Options-related structures
   TPS::Tps *tpsP_ = nullptr;
 

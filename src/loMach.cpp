@@ -127,6 +127,9 @@ void LoMachSolver::initialize() {
   pmesh_ = meshData_->getMesh();
   partitioning_ = meshData_->getPartition();
 
+  //fec_ = meshData_->getFec();
+  //fes_ = meshData_->getFes();    
+
   // Stash mesh dimension (convenience)
   dim_ = serial_mesh_->Dimension();
 
@@ -168,7 +171,7 @@ void LoMachSolver::initialize() {
   } else if (loMach_opts_.thermo_solver == "calorically-perfect") {
     thermo_ = new CaloricallyPerfectThermoChem(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_);
   } else if (loMach_opts_.thermo_solver == "lte-thermo-chem") {
-    thermo_ = new LteThermoChem(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_);
+    thermo_ = new LteThermoChem(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_); //, fec_, fes_);
   } else if (loMach_opts_.thermo_solver == "reacting-flow") {
     thermo_ = new ReactingFlow(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_);
   } else {

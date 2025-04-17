@@ -241,7 +241,7 @@ class LteThermoChem final : public ThermoChemModelBase {
   ParGridFunction Tn_filtered_gf_;
 
  public:
-  LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff, TPS::Tps *tps);
+  LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff, TPS::Tps *tps); //, mfem::FiniteElementCollection *fec, mfem::ParFiniteElementSpace *fes);
   virtual ~LteThermoChem();
 
   // Functions overriden from base class

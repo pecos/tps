@@ -86,11 +86,14 @@ static double sigmaTorchStartUp(const Vector &pos) {
 static FunctionCoefficient sigma_start_up(sigmaTorchStartUp);
 
 LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &time_coeff,
-                             TPS::Tps *tps)
+                             TPS::Tps *tps) //, mfem::FiniteElementCollection *fec, mfem::ParFiniteElementSpace *fes)
     : tpsP_(tps), pmesh_(pmesh), time_coeff_(time_coeff) {
   rank0_ = (pmesh_->GetMyRank() == 0);
   order_ = loMach_opts->order;
 
+  //sfec_ = fec;
+  //sfes_ = fes;  
+  
   tps->getInput("loMach/axisymmetric", axisym_, false);
 
   // Initialize thermo TableInput (data read below)
@@ -230,14 +233,14 @@ LteThermoChem::~LteThermoChem() {
 
 void LteThermoChem::initializeSelf() {
   if (rank0_) grvy_printf(ginfo, "Initializing LteThermoChem solver.\n");
-
+  
   //-----------------------------------------------------
   // 1) Prepare the required finite element objects
   //-----------------------------------------------------
   sfec_ = new H1_FECollection(order_);
-  if (rank0_) grvy_printf(ginfo, "...okay 1\n");  
+  //if (rank0_) grvy_printf(ginfo, "...okay 1 %i\n",order_);  
   sfes_ = new ParFiniteElementSpace(pmesh_, sfec_);
-  if (rank0_) grvy_printf(ginfo, "...okay 2\n");    
+  //if (rank0_) grvy_printf(ginfo, "...okay 2\n");    
 
   // Check if fully periodic mesh
   if (!(pmesh_->bdr_attributes.Size() == 0)) {
@@ -353,6 +356,8 @@ void LteThermoChem::initializeSelf() {
   plasma_conductivity_gf_ = &sigma_gf_;
   joule_heating_gf_ = &jh_gf_;
 
+  if (rank0_) grvy_printf(ginfo, "LteThermoChem exports established...\n");  
+
   //-----------------------------------------------------
   // 2) Set the initial condition
   //-----------------------------------------------------
@@ -372,8 +377,11 @@ void LteThermoChem::initializeSelf() {
 
   ConstantCoefficient t_ic_coef;
   t_ic_coef.constant = T_ic_;
-  Tn_gf_.ProjectCoefficient(t_ic_coef);
 
+  //if (rank0_) grvy_printf(ginfo, "attempting project coefficient...\n");    
+  Tn_gf_.ProjectCoefficient(t_ic_coef);
+  //if (rank0_) grvy_printf(ginfo, "...and done\n");    
+  
   Tn_gf_.GetTrueDofs(Tn_);
   Tn_next_ = Tn_;
 

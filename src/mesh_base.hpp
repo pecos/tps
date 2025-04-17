@@ -105,6 +105,9 @@ class MeshBase {
   virtual Array<int> getPartition() { return partitioning_; }
   // virtual int getDim() final { return dim_; }
 
+  virtual FiniteElementCollection *getFec() {return fec_; }
+  virtual ParFiniteElementSpace *getFes() {return fes_; }  
+  
   int *getLocalToGlobalElementMap() const { return local_to_global_element_; }
 };
 #endif  // MESH_BASE_HPP_

@@ -234,7 +234,7 @@ Tomboulides::~Tomboulides() {
 void Tomboulides::initializeSelf() {
   // Initialize minimal state and interface
   vfec_ = new H1_FECollection(vorder_, dim_);
-  vfes_ = new ParFiniteElementSpace(pmesh_, vfec_, dim_);
+  vfes_ = new ParFiniteElementSpace(pmesh_, vfec_, dim_);  
   u_curr_gf_ = new ParGridFunction(vfes_);
   u_next_gf_ = new ParGridFunction(vfes_);
   curl_gf_ = new ParGridFunction(vfes_);
@@ -473,13 +473,16 @@ void Tomboulides::initializeSelf() {
       zero = 0.0;      
       tpsP_->getVec((basepath + "/velocity").c_str(), velocity_value, dim_, zero);
 
-      // face coords
+      // face coord system
       Vector normal;
-      normal.SetSize(dim_);
+      Vector nTmp;
       Vector tangent1;
+      Vector tangent2;      
+      normal.SetSize(dim_);
+      nTmp.SetSize(dim_);      
       tangent1.SetSize(dim_);
-      Vector tangent2;
       tangent2.SetSize(dim_);
+      
       Vector one(dim_);
       one = 0.0;
       one[0] = 1.0;
@@ -493,15 +496,26 @@ void Tomboulides::initializeSelf() {
       
       // loop over all boundary elements
       double *data = tmpR1_.HostWrite();      
-      for (int bel = 0; bel < vfes_->GetNBE(); bel++) {
+      //for (int bel = 0; bel < vfes_->GetNBE(); bel++) {
+      for (int bel = 0; bel < vfes_->GetNFbyType(FaceType::Boundary); bel++) {
         int attr = vfes_->GetBdrAttribute(bel);
 
 	// bndry eles with patch tag
         if (attr == patch) {
 
-	  // face normal
-          FaceElementTransformations *Tr = vfes_->GetMesh()->GetBdrFaceTransformations(bel);
-          CalcOrtho(Tr->Jacobian(), normal);
+          FaceElementTransformations *Tr = vfes_->GetMesh()->GetBdrFaceTransformations(bel);	  
+          const IntegrationRule ir = gll_rules.Get(Tr->GetGeometryType(), 2 * vorder_ - 1);
+	  
+          for (int i = 0; i < ir.GetNPoints(); i++) {
+	    
+            IntegrationPoint ip = ir.IntPoint(i);
+            Tr->SetAllIntPoints(&ip);
+	  
+  	    // face normal
+            CalcOrtho(Tr->Jacobian(), nTmp);
+	    normal += nTmp;
+	  }
+
   	  nMag = 0.0;
           for (int ii = 0; ii < dim_; ii++) nMag += normal[ii]*normal[ii];
 	  normal /= -1.0*sqrt(nMag); //inward-facing normal
@@ -517,52 +531,48 @@ void Tomboulides::initializeSelf() {
             for (int d = 0; d < dim_; d++) projt2[d] = (tn / tmag) * tangent2[d];
             for (int d = 0; d < dim_; d++) normal[d] -= projt2[d];
           }
+	  // std::cout << "*inlet patch normal: (" << normal[0] << ", " << normal[1] << ", " << normal[2] << ")" << endl;	  
 	  
-	  // check if face-normal is consistent with specified tangent
-	  double dot = 0.0;
-          for (int ii = 0; ii < dim_; ii++) dot += normal[ii]*tangent2[ii];
-	  if (dot >= 1.0e-12) {
-	    std::cout << "Normal: " << normal[0] << ", " << normal[1] << ", " << normal[2] << endl;
-	    std::cout << "Tangent: " << tangent2[0] << ", " << tangent2[1] << ", " << tangent2[2] << endl;	    
-	  }
-          assert(dot<1.0e-12);
-	  
-	  // unspecified tangent
+          // unspecified tangent
           tangent1[0] = normal[1] * tangent2[2] - normal[2] * tangent2[1];
           tangent1[1] = normal[2] * tangent2[0] - normal[0] * tangent2[2];
           tangent1[2] = normal[0] * tangent2[1] - normal[1] * tangent2[0];
-  	  nMag = 0.0;
+          nMag = 0.0;
           for (int ii = 0; ii < dim_; ii++) nMag += tangent1[ii]*tangent1[ii];
-	  tangent1 /= sqrt(nMag);	  
+          tangent1 /= sqrt(nMag);
+	  // std::cout << "*inlet patch tangent: (" << tangent1[0] << ", " << tangent1[1] << ", " << tangent1[2] << ")" << endl;	  
 	  
-	  // transform to global	  
+          // transform to global	  
           Vector uGlobal;
           uGlobal.SetSize(dim_);
-	  uGlobal = 0.0;	  
+          uGlobal = 0.0;	  
           DenseMatrix M(dim_, dim_);
           for (int d = 0; d < dim_; d++) {
             M(0, d) = normal[d];
             M(1, d) = tangent1[d];
             M(2, d) = tangent2[d];
           } 
-          for (int i = 0; i < dim_; i++) {
-            for (int j = 0; j < dim_; j++) {
-	      uGlobal[i] = uGlobal[i] + M(i,j) * velocity_value[j];
-	    }
-	  }
-	  	  
-	  // dofs of element
+          for (int ii = 0; ii < dim_; ii++) {
+            for (int jj = 0; jj < dim_; jj++) {
+              uGlobal[ii] = uGlobal[ii] + M(jj,ii) * velocity_value[jj];	      
+            }
+          }
+	    
+          // dofs of element
           Array<int> dofs;
-          vfes_->GetElementVDofs(Tr->Elem1No, dofs);
-	  int nDofs = sizeof(dofs)/sizeof(dofs[0]);
-	  int sDofInt = sfes_->GetTrueVSize();
-	  for (int eq = 0; eq < nvel_; eq++) {
-	    for (int ii = 0; ii < nDofs ; ii++) {
-	      int idof = dofs[ii];	    
+          //vfes_->GetElementVDofs(Tr->Elem1No, dofs);
+	  vfes_->GetFaceVDofs(bel, dofs);
+          int nDofs = sizeof(dofs)/sizeof(dofs[0]);
+	  nDofs /= dim_;
+          int sDofInt = sfes_->GetTrueVSize();
+          for (int eq = 0; eq < nvel_; eq++) {
+            //std::cout << "*inlet patch normal vel: " << uGlobal[0]*normal[0] + uGlobal[1]*normal[1] + uGlobal[2]*normal[2] << endl;
+            for (int ii = 0; ii < nDofs ; ii++) {
+              int idof = dofs[ii];	    
               data[idof + eq*sDofInt] = uGlobal[eq];
 	    }
 	  }
-	  
+
 	}
       }
       uface_gf_->SetFromTrueDofs(tmpR1_);      

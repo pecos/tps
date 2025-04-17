@@ -2656,8 +2656,8 @@ void M2ulPhyS::clipOutflow() {
   double neckStart = 0.324;
   double neckEnd = 0.355;
   double neckRad = 0.0155;
-  double leak = -1.0;  
-  //double leak = -0.5;  
+  //double leak = -1.0;  
+  double leak = -0.5;  
   //double leak = 0.05; // from approx control-volume analysis at 2kW
   //double leak = 0.25;  
   //double leak = 3.0;

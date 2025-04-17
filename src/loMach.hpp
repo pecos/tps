@@ -164,6 +164,9 @@ class LoMachSolver : public TPS::PlasmaSolver {
   /// Scalar \f$H^1\f$ finite element space.
   ParFiniteElementSpace *sfes_ = nullptr;
 
+  //mfem::FiniteElementCollection *fec_ = nullptr;
+  //mfem::ParFiniteElementSpace *fes_ = nullptr;
+  
   /*
   Vector gridScaleSml;
   Vector gridScaleXSml;
