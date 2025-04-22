@@ -98,12 +98,15 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
   posDofInvM.SetSize(2 * vfes->GetNE());
   auto hposDofInvM = posDofInvM.HostWrite();
 
+  //std::cout << "okay RHSop 1 "  << std::endl;
+  
   forcing.DeleteAll();
 
   if (_config.thereIsForcing()) {
     forcing.Append(new ConstantPressureGradient(dim_, num_equation_, _order, intRuleType, intRules, vfes, U_, Up,
                                                 gradUp, gpu_precomputed_data_, _config, mixture));
   }
+  //std::cout << "okay RHSop 2 "  << std::endl;  
   if (_config.GetPassiveScalarData().Size() > 0)
     forcing.Append(new PassiveScalar(dim_, num_equation_, _order, intRuleType, intRules, vfes, mixture, U_, Up, gradUp,
                                      gpu_precomputed_data_, _config));
@@ -113,6 +116,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
                                     Up, gradUp, gpu_precomputed_data_, _config, sz));
     }
   }
+  //std::cout << "okay RHSop 3 "  << std::endl;  
   if (_config.numHeatSources > 0) {
     for (int s = 0; s < _config.numHeatSources; s++) {
       if (_config.heatSource[s].isEnabled) {
@@ -121,12 +125,14 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
       }
     }
   }
-
+  //std::cout << "okay RHSop 4 "  << std::endl;
   if (_config.GetWorkingFluid() != WorkingFluid::DRY_AIR) {
     forcing.Append(new SourceTerm(dim_, num_equation_, _order, intRuleType, intRules, vfes, U_, Up, gradUp,
                                   gpu_precomputed_data_, _config, mixture, d_mixture_, _transport, _chemistry,
                                   _radiation, plasma_conductivity_, distance_));
   }
+  //std::cout << "okay RHSop 5 "  << std::endl;
+  
 #ifdef HAVE_MASA
   if (config_.use_mms_) {
     masaForcingIndex_ = forcing.Size();
@@ -135,11 +141,14 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
   }
 #endif
 
+  //std::cout << "okay RHSop 5a "  << std::endl;    
+
   // not just for axisymmetric
   const FiniteElementCollection *fec = vfes->FEColl();
   dfes = new ParFiniteElementSpace(mesh, fec, dim_, Ordering::byNODES);
   coordsDof = new ParGridFunction(dfes);
   mesh->GetNodes(*coordsDof);
+  //std::cout << "okay RHSop 5b "  << std::endl;  
 
   // element size by dof index
   elSize = new ParGridFunction(fes);
@@ -154,18 +163,21 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
       h_elSize[idx] = mesh->GetElementSize(j, 1) / fes->GetElementOrder(j);
     }
   }
+  //std::cout << "okay RHSop 5c "  << std::endl;  
 
   if (config_.isAxisymmetric()) {
     forcing.Append(new AxisymmetricSource(dim_, num_equation_, _order, d_mixture_, transport_, eqSystem, intRuleType,
                                           intRules, vfes, U_, Up, gradUp, spaceVaryViscMult, gpu_precomputed_data_,
                                           _config, distance_));
   }
+  //std::cout << "okay RHSop 6 "  << std::endl;  
 
   if (joule_heating_ != NULL) {
     forcing.Append(new JouleHeating(dim_, num_equation_, _order, mixture, eqSystem, intRuleType, intRules, vfes, U_, Up,
                                     gradUp, gpu_precomputed_data_, _config, joule_heating_));
   }
-
+  //std::cout << "okay RHSop 7 "  << std::endl;
+  
   std::vector<double> temp, temp_rad;
   temp.clear();
   temp_rad.clear();
@@ -222,6 +234,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
       }
     }
   }
+  //std::cout << "okay RHSop 8 "  << std::endl;  
 
   invMArray.UseDevice(true);
   invMArray.SetSize(temp.size());
@@ -249,6 +262,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
   local_timeDerivatives.UseDevice(true);
   local_timeDerivatives.SetSize(num_equation_);
   local_timeDerivatives = 0.;
+  //std::cout << "okay RHSop 9 "  << std::endl;  
 
 #ifdef DEBUG
   {
@@ -319,6 +333,9 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
     }
   }
 #endif
+
+  //std::cout << "okay RHSop 10 "  << std::endl;  
+  
 }
 
 RHSoperator::~RHSoperator() {
@@ -547,6 +564,7 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
     }
 
     // Update max char speed
+    //std::cout << "ComputeMCS rhs_op 1" << endl;
     const double mcs = mixture->ComputeMaxCharSpeed(state);
     if (mcs > max_char_speed) {
       max_char_speed = mcs;

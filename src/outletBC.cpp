@@ -606,6 +606,7 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
   // gradient of pressure in normal direction
   double dpdn = mixture->ComputePressureDerivative(normGrad, stateIn, false);
 
+  std::cout << "ComputeSoS outletBC 1" << endl;
   const double speedSound = mixture->ComputeSpeedOfSound(meanUp);
 
   double meanK = 0.;
@@ -724,6 +725,7 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
   for (int eq = 0; eq < num_equation_; eq++) boundaryU[eq + bdrN * num_equation_] = newU[eq];
   bdrN++;
 
+  //std::cout << " Eval oBC 1" << endl;
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }
 
@@ -763,7 +765,8 @@ void OutletBC::subsonicReflectingPressure(Vector &normal, Vector &stateIn, Vecto
   */
  
   mixture->modifyEnergyForPressure(stateIn, state2, inputState[0]); 
-  
+
+  //std::cout << " Eval oBC 2" << endl;  
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
   
 }
@@ -802,6 +805,7 @@ void OutletBC::subsonicNonRefMassFlow(Vector &normal, Vector &stateIn, DenseMatr
   // gradient of pressure in normal direction
   double dpdn = mixture->ComputePressureDerivative(normGrad, stateIn, false);
 
+  std::cout << "ComputeSoS outletBC 2" << endl;  
   const double speedSound = mixture->ComputeSpeedOfSound(meanUp);
 
   double meanK = 0.;
@@ -920,6 +924,7 @@ void OutletBC::subsonicNonRefMassFlow(Vector &normal, Vector &stateIn, DenseMatr
   for (int eq = 0; eq < num_equation_; eq++) boundaryU[eq + bdrN * num_equation_] = newU[eq];
   bdrN++;
 
+  //std::cout << " Eval oBC 3" << endl;  
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }
 
@@ -957,6 +962,7 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal, Vector &stateIn, DenseMa
   // gradient of pressure in normal direction
   double dpdn = mixture->ComputePressureDerivative(normGrad, stateIn, false);
 
+  std::cout << "ComputeSoS outletBC 3" << endl;  
   const double speedSound = mixture->ComputeSpeedOfSound(meanUp);
 
   double normVel = 0.;
@@ -1055,6 +1061,7 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal, Vector &stateIn, DenseMa
   for (int eq = 0; eq < num_equation_; eq++) boundaryU[eq + bdrN * num_equation_] = newU[eq];
   bdrN++;
 
+  //std::cout << " Eval oBC 4" << endl;  
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }
 
@@ -1270,6 +1277,7 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const elementIndexingData
       }
 
       // compute flux
+      //std::cout << " Eval_LF outletBC 1" << endl;
       d_rsolver->Eval_LF(u1, u2, nor, Rflux);
 
       if (d_rsolver->isAxisymmetric()) {

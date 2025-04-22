@@ -298,6 +298,7 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gr
   if (dim_ == 3) stateMirror[3] = stateIn[0] * (vel[2] - 2. * vn * unitN[2]);
   if ((nvel_ == 3) && (dim_ == 2)) stateMirror[3] = stateIn[0] * vel[2];
 
+  //std::cout << "  Eval wBC 1" << endl;
   rsolver->Eval(stateIn, stateMirror, normal, bdrFlux);
 
   Vector wallViscF(num_equation_);
@@ -424,6 +425,7 @@ void WallBC::computeSlipWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &g
   if (dim_ == 3) state2[3] = stateIn[0] * nVel[2];
 
   // now send to Reimann solver
+  //std::cout << "  Eval wBC 2" << endl;  
   rsolver->Eval(stateIn, state2, normal, bdrFlux);
 }
 
@@ -433,6 +435,7 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
   mixture->computeStagnationState(stateIn, wallState);
 
   // Normal convective flux
+  //std::cout << "  Eval wBC 3" << endl;  
   rsolver->Eval(stateIn, wallState, normal, bdrFlux, true);
   if (eqSystem == NS_PASSIVE) bdrFlux[num_equation_ - 1] = 0.;
 
@@ -482,6 +485,7 @@ void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMat
   }
 
   // Normal convective flux
+  //std::cout << "  Eval wBC 4" << endl;  
   rsolver->Eval(stateIn, wallState, normal, bdrFlux, true);
 
   // unit normal vector
@@ -515,6 +519,7 @@ void WallBC::computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix
   mixture->modifyStateFromPrimitive(stateIn, bcState_, wallState);
 
   // Normal convective flux
+  //std::cout << "  Eval wBC 5" << endl;  
   rsolver->Eval(stateIn, wallState, normal, bdrFlux, true);
 
   // unit normal vector
@@ -769,6 +774,7 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
             d_mix->modifyStateFromPrimitive(u1, bcState, u2);
           }
         }
+	//std::cout << " Eval_LF wallBC 1" << endl;
         d_rsolver->Eval_LF(u1, u2, nor, Rflux);
 
         if (type != WallType::SLIP) {

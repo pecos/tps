@@ -68,6 +68,8 @@ class FaceIntegrator : public NonlinearFormIntegrator {
 
   IntegrationRules *intRules;
 
+  int rank_;
+  
   DenseMatrix *faceMassMatrix1, *faceMassMatrix2;
   int faceNum;
   bool faceMassMatrixComputed;
@@ -108,7 +110,7 @@ class FaceIntegrator : public NonlinearFormIntegrator {
  public:
   FaceIntegrator(IntegrationRules *_intRules, RiemannSolver *rsolver_, Fluxes *_fluxClass, ParFiniteElementSpace *_vfes,
                  bool _useLinear, const int _dim, const int _num_equation, ParGridFunction *_gradUp,
-                 ParFiniteElementSpace *_gradUpfes, double &_max_char_speed, bool axisym, ParGridFunction *distance);
+                 ParFiniteElementSpace *_gradUpfes, double &_max_char_speed, bool axisym, ParGridFunction *distance, int rank);
   ~FaceIntegrator();
 
   virtual void AssembleFaceVector(const FiniteElement &el1, const FiniteElement &el2, FaceElementTransformations &Tr,

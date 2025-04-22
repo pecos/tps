@@ -36,13 +36,14 @@ using namespace mfem;
 
 // Implementation of class RiemannSolver
 MFEM_HOST_DEVICE RiemannSolver::RiemannSolver(int _num_equation, GasMixture *_mixture, Equations _eqSystem,
-                                              Fluxes *_fluxClass, bool _useRoe, bool axisym)
+                                              Fluxes *_fluxClass, bool _useRoe, bool axisym, int rank)
     : num_equation(_num_equation),
       mixture(_mixture),
       eqSystem(_eqSystem),
       fluxClass(_fluxClass),
       useRoe(_useRoe),
-      axisymmetric_(axisym) {}
+      axisymmetric_(axisym),
+      rank_(rank) {}
 
 // Compute the scalar F(u).n
 void RiemannSolver::ComputeFluxDotN(const Vector &state, const Vector &nor, Vector &fluxN) {
@@ -61,6 +62,30 @@ MFEM_HOST_DEVICE void RiemannSolver::ComputeFluxDotN(const double *state, const 
       fluxN[eq] += fluxes[eq + d * num_equation] * nor[d];
     }
   }
+}
+
+void RiemannSolver::EvalCheck(const double s10, const double s11, const double s12, const double s13, const double s14, const double s20, const double s21, const double s22, const double s23, const double s24, const Vector &nor, Vector &flux, bool LF) {
+  
+    if (s24>1.0e10) {
+      std::cout << rank_ << ") BAD s24 in EvalCheck 1: " << s24 << endl;
+    }
+
+    Vector state1;
+    Vector state2;
+    state1.SetSize(5);
+    state2.SetSize(5);
+    state1[0] = s10;
+    state1[1] = s11;
+    state1[2] = s12;
+    state1[3] = s13;
+    state1[4] = s14;
+    state2[0] = s20;
+    state2[1] = s21;
+    state2[2] = s22;
+    state2[3] = s23;
+    state2[4] = s24;
+    
+    Eval_LF(state1, state2, nor, flux);
 }
 
 void RiemannSolver::Eval(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux, bool LF) {
@@ -89,7 +114,8 @@ void RiemannSolver::Eval_LF(const Vector &state1, const Vector &state2, const Ve
 MFEM_HOST_DEVICE void RiemannSolver::Eval_LF(const double *state1, const double *state2, const double *nor,
                                              double *flux) const {
   const int dim = mixture->GetDimension();
-
+  
+  //std::cout << "ComputeMCS eval_lf 1" << endl;
   const double maxE1 = mixture->ComputeMaxCharSpeed(state1);
   const double maxE2 = mixture->ComputeMaxCharSpeed(state2);
 

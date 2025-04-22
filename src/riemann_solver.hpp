@@ -59,16 +59,20 @@ class RiemannSolver {
   bool useRoe;
   const bool axisymmetric_;
 
+  int rank_;
+
   void Eval_Roe(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux);
 
  public:
   MFEM_HOST_DEVICE RiemannSolver(int _num_equation, GasMixture *mixture, Equations _eqSystem, Fluxes *_fluxClass,
-                                 bool _useRoe, bool axisym);
+                                 bool _useRoe, bool axisym, int rank);
 
   void Eval(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux, bool LF = false);
   MFEM_HOST_DEVICE void Eval(const double *state1, const double *state2, const double *nor, double *flux,
                              bool LF = false);
 
+  void EvalCheck(const double s10, const double s11, const double s12, const double s13, const double s14, const double s20, const double s21, const double s22, const double s23, const double s24, const Vector &nor, Vector &flux, bool LF = false);
+  
   void ComputeFluxDotN(const Vector &state, const Vector &nor, Vector &fluxN);
 
   MFEM_HOST_DEVICE void ComputeFluxDotN(const double *state, const double *nor, double *fluxN) const;

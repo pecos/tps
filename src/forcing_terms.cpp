@@ -562,19 +562,19 @@ SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_or
     hSigma[n] = 0.0;
     
     if (szData.szType == SpongeZoneType::PLANAR) {
-      // distance to the mix-out plane
-      double distInit = 0.;
+      // distance to the mix-out plane (wtf)
+      double distInit = 0.; // minus -> assumes pointInt is ABOVE Xn
       for (int d = 0; d < dim; d++) distInit -= szData.normal[d] * (Xn[d] - szData.pointInit[d]);
 
       if (fabs(distInit) < szData.tol) nodesVec.push_back(n);
 
-      // dist end plane
-      double distF = 0.;
+      // dist end plane (wtf)
+      double distF = 0.; // positive -> assume point0 is BELOW Xn
       for (int d = 0; d < dim; d++) distF += szData.normal[d] * (Xn[d] - szData.point0[d]);
 
       if (distInit > 0. && distF > 0.) {
-        double planeDistance = distF + distInit;
-        hSigma[n] = distInit / planeDistance / planeDistance;
+        double planeDistance = distF + distInit; // this is just the distance from pointInit to point0 WTF
+        hSigma[n] = distInit / planeDistance / planeDistance; // this makes no sense!
       }
       
     } else if (szData.szType == SpongeZoneType::ANNULUS) {
@@ -651,11 +651,12 @@ void SpongeZone::addSpongeZoneForcing(Vector &in) {
   targetCyl = targetU;
 
   // compute speed of sound
-  // double gamma = mixture->GetSpecificHeatRatio();
-  // double Rg = mixture->GetGasConstant();
+  //double gamma = mixture->GetSpecificHeatRatio();
+  //double Rg = mixture->GetGasConstant();
   mixture->GetPrimitivesFromConservatives(targetU, Up);
 
-  // double speedSound = sqrt(gamma * Rg * Up[1 + nvel]);
+  std::cout << "CompyteSoS forcing_terms 1" << endl;
+  //double speedSound = sqrt(gamma * Rg * Up[1 + nvel]);
   double speedSound = mixture->ComputeSpeedOfSound(Up, true);
 
   // add forcing to RHS, i.e., @in

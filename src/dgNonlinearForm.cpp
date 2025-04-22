@@ -309,6 +309,7 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
       // problem seems to have something to do with virtual functions
       // and pointer arguments, but I don't understand it.  However,
       // this approach is working.
+      //std::cout << "Eval_LF dgNonlin 1" << endl;
       d_rsolver->Eval_LF(d_uk_el1 + k * num_equation + iface * maxIntPoints * num_equation,
                          d_uk_el2 + k * num_equation + iface * maxIntPoints * num_equation,
                          d_normal + offset + k * dim,
@@ -703,6 +704,7 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
         double d2 = d_dist2[f * maxIntPoints + k];
 
         // evaluate flux
+	//std::cout << "Eval_LF dgNonlin 2" << endl;	
         d_rsolver->Eval_LF(u1, u2, nor, Rflux);
         d_flux->ComputeViscousFluxes(u1, gradUp1, xyz, d_delta_el1[f], d1, vFlux1);
         d_flux->ComputeViscousFluxes(u2, gradUp2, xyz, d_delta_el2[f], d2, vFlux2);

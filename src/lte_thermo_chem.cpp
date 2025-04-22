@@ -497,7 +497,7 @@ void LteThermoChem::initializeSelf() {
 
   // Wall BCs
   {
-    std::cout << "There are " << pmesh_->bdr_attributes.Max() << " boundary attributes!" << std::endl;
+    if (rank0_) std::cout << "There are " << pmesh_->bdr_attributes.Max() << " boundary attributes" << std::endl;
     Array<int> attr_wall(pmesh_->bdr_attributes.Max());
     attr_wall = 0;
 
@@ -510,7 +510,7 @@ void LteThermoChem::initializeSelf() {
       tpsP_->getRequiredInput((basepath + "/type").c_str(), type);
 
       if (type == "viscous_isothermal") {
-        std::cout << "Adding patch = " << patch << " to isothermal wall list!" << std::endl;
+        if (rank0_) std::cout << "Adding patch = " << patch << " to isothermal wall list" << std::endl;
 
         attr_wall = 0;
         attr_wall[patch - 1] = 1;

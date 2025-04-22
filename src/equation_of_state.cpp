@@ -1386,6 +1386,7 @@ MFEM_HOST_DEVICE double PerfectMixture::ComputeMaxCharSpeed(const double *state)
   }
   den_vel2 /= den;
 
+  std::cout << "EOS CSoS 2" << endl;  
   const double sound = ComputeSpeedOfSound(state, false);
   const double vel = sqrt(den_vel2 / den);
 

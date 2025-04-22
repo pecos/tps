@@ -617,7 +617,7 @@ void M2ulPhyS::initVariables() {
   d_fluxClass = fluxClass;
 
   rsolver = new RiemannSolver(num_equation, mixture, eqSystem, d_fluxClass, config.RoeRiemannSolver(),
-                              config.isAxisymmetric());
+                              config.isAxisymmetric(), rank_);
 #endif
 
 #ifdef _GPU_
@@ -681,6 +681,7 @@ void M2ulPhyS::initVariables() {
 
   ioData.initializeSerial(rank0_, config.isRestartSerialized("either"), serial_mesh, locToGlobElem, &partitioning_);
   projectInitialSolution();
+  //if (rank0_) std::cout << "okay 1 "  << std::endl;  
 
   // Boundary attributes in present partition
   Array<int> local_attr;
@@ -697,6 +698,7 @@ void M2ulPhyS::initVariables() {
   }
 
   // A->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+  //if (rank0_) std::cout << "okay 2 "  << std::endl;    
 
   A = new DGNonLinearForm(rsolver, d_fluxClass, vfes, gradUpfes, gradUp, bcIntegrator, intRules, dim, num_equation,
                           mixture, gpu_precomputed_data_, maxIntPoints, maxDofs);
@@ -707,9 +709,10 @@ void M2ulPhyS::initVariables() {
     //    if( basisType==1 && intRuleType==1 ) useLinearIntegration = true;
 
     faceIntegrator = new FaceIntegrator(intRules, rsolver, d_fluxClass, vfes, useLinearIntegration, dim, num_equation,
-                                        gradUp, gradUpfes, max_char_speed, config.isAxisymmetric(), distance_);
+                                        gradUp, gradUpfes, max_char_speed, config.isAxisymmetric(), distance_, rank_);
   }
   A->AddInteriorFaceIntegrator(faceIntegrator);
+  //if (rank0_) std::cout << "okay 3 "  << std::endl;    
 
   Aflux = new MixedBilinearForm(dfes, fes);
   domainIntegrator =
@@ -717,6 +720,7 @@ void M2ulPhyS::initVariables() {
   Aflux->AddDomainIntegrator(domainIntegrator);
   Aflux->Assemble();
   Aflux->Finalize();
+  //if (rank0_) std::cout << "okay 4 "  << std::endl;    
 
   switch (config.GetTimeIntegratorType()) {
     case 1:
@@ -741,16 +745,18 @@ void M2ulPhyS::initVariables() {
   gradUp_A = new GradNonLinearForm(gradUpfes, intRules, dim, num_equation);
   gradUp_A->AddInteriorFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation));
   gradUp_A->AddBdrFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation, bcIntegrator, config.useBCinGrad));
-
+  //if (rank0_) std::cout << "okay 5 "  << std::endl;  
+  
   rhsOperator =
       new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType, d_fluxClass,
                       mixture, d_mixture, chemistry_, transportPtr, radiation_, vfes, fes, gpu_precomputed_data_,
                       maxIntPoints, maxDofs, A, Aflux, mesh, spaceVaryViscMult, U, Up, gradUp, gradUpfes, gradUp_A,
                       bcIntegrator, config, plasma_conductivity_, joule_heating_, distance_);
-
+  //if (rank0_) std::cout << "okay 5a "  << std::endl;    
   CFL = config.GetCFLNumber();
   rhsOperator->SetTime(time);
   timeIntegrator->Init(*rhsOperator);
+  //if (rank0_) std::cout << "okay 6 "  << std::endl;    
 
   // Determine the minimum element size.
   {
@@ -1952,6 +1958,8 @@ void M2ulPhyS::projectInitialSolution() {
     // TODO: move to separate subroutine
     } else {
 
+      if (rank0_) std::cout << "restarting from low-Mach field..." << std::endl;      
+
       // create continuous FE space used in loMach
       vfecTmp = new H1_FECollection(order, dim);
       vfesTmp = new ParFiniteElementSpace(mesh, vfecTmp, dim);
@@ -1969,14 +1977,18 @@ void M2ulPhyS::projectInitialSolution() {
       ioData.registerIOVar("/velocity", "y-comp", 1);
       ioData.registerIOVar("/velocity", "z-comp", 2);
       ioData.registerIOFamily("Temperature", "/temperature", T_gf, true, true, sfecTmp);
-      ioData.registerIOVar("/temperature", "temperature", 0);  
+      ioData.registerIOVar("/temperature", "temperature", 0);
+
+      if (rank0_) std::cout << "...attempting read" << std::endl;            
 
       // read data, will throw a warning for all compressible-type data not in restart
       restart_files_hdf5("read");
 
+      if (rank0_) std::cout << "...constructing density" << std::endl; 
+      
       // compute density
       double constantP = config.restartFromLoMachPressure;
-      double constantR = config.restartFromLoMachRgas; 
+      double constantR = config.restartFromLoMachRgas;
       TnTmp.SetSize(sfesTmp->GetTrueVSize());
       rhoTmp.SetSize(sfesTmp->GetTrueVSize());      
       T_gf->GetTrueDofs(TnTmp);  
@@ -1987,53 +1999,72 @@ void M2ulPhyS::projectInitialSolution() {
       // project to DG space.  These guys already point to the correct location in Up
       vel->ProjectGridFunction(*u_gf);
       temperature->ProjectGridFunction(*T_gf);
-      dens->ProjectGridFunction(*rho_gf);      
+      dens->ProjectGridFunction(*rho_gf);
+      
+      // Exchange before computing conserved state
+      Up->ParFESpace()->ExchangeFaceNbrData();
+      Up->ExchangeFaceNbrData();      
 
+      if (rank0_) std::cout << "...computing conserved state " << fes->GetNDofs() << " " << dfes->GetNDofs() << std::endl; 
       // compute conserved state
       {      
-        const double *dataTemp = temperature->HostRead();
-        const double *dataRho = dens->HostRead();
-        const double *dataU = vel->HostRead();
-        double *data = U->HostReadWrite();
-	int sDofInt = sfesTmp->GetTrueVSize();
+        //const double *dataTemp = temperature->HostRead();
+        //const double *dataRho = dens->HostRead();
+        //const double *dataU = vel->HostRead();
+        const double *dataPrim = Up->HostRead();		
+        double *dataCons = U->HostWrite();	
+	int nDof = fes->GetNDofs();
 
-        for (int i = 0; i < sDofInt; i++) {
+        for (int i = 0; i < nDof; i++) {
 
           double state[gpudata::MAXEQUATIONS];
           double conservedState[gpudata::MAXEQUATIONS];
     
           // primitive state vector = [rho, velocity, temperature, species mole densities]
-          state[0] = dataRho[i];
-          for (int eq = 0; eq < dim; eq++) {
-            state[eq + 1] = dataU[i + eq * sDofInt];
-          }
-          state[dim + 1] = dataTemp[i];
+          //state[0] = dataRho[i];
+          //for (int eq = 0; eq < dim; eq++) {
+          //  state[eq + 1] = dataU[i + eq * nDof];
+          //}
+          //state[dim + 1] = dataTemp[i];
+          for (int eq = 0; eq <= dim+1; eq++) state[eq] = dataPrim[i + eq * nDof];
+	  
+	  //if(state[4] > 300.0) {
+	  //  std::cout << "bad temp: " << state[4] << endl;
+	  //}
 
+	  // copy to Up
+          //for (int eq = 0; eq <= dim+1; eq++) {
+          //  dataPrim[i + eq * sDofInt] = state[eq];
+          //}
+	  
 	  // conserved state
           mixture->GetConservativesFromPrimitives(state, conservedState);
 
-	  // copy to U
-          for (int eq = 0; eq < dim+1; eq++) {
-            data[i + eq * sDofInt] = state[eq];
-          }
-	  
+	  // copy to U => cant use sDofInt here
+          for (int eq = 0; eq <= dim+1; eq++) dataCons[i + eq * nDof] = conservedState[eq];
+
+	  //if(conservedState[4] > 1.0e8) {
+	  //  std::cout << "bad CS: " << conservedState[4] << endl;
+	  // }
+	  	  
         }
       }      
-      
-      // remove loMach data from write-list
+
+      if (rank0_) std::cout << "...cleaning up" << std::endl;       
+      // remove loMach data from write list
       ioData.unregisterIOFamily("Velocity", "/velocity", u_gf);
       ioData.unregisterIOFamily("Temperature", "/temperature", T_gf);
 
       // cleanup (should be fine as long as actual data never accessed via ioData again)
-      //delete TnTmp;
-      //delete rhoTmp;
-      delete u_gf;
-      delete T_gf;
-      delete rho_gf;
-      delete sfesTmp;
-      delete sfecTmp;      
-      delete vfesTmp;
-      delete vfecTmp;  
+      //delete u_gf;
+      //delete T_gf;
+      //delete rho_gf;
+      //delete sfesTmp;
+      //delete sfecTmp;      
+      //delete vfesTmp;
+      //delete vfecTmp;  
+
+      if (rank0_) std::cout << "...and done with restart from low-Mach!" << std::endl;             
       
     }    
     
@@ -2052,12 +2083,16 @@ void M2ulPhyS::projectInitialSolution() {
   // Exchange before computing primitives
   U->ParFESpace()->ExchangeFaceNbrData();
   U->ExchangeFaceNbrData();
+  //if (rank0_) std::cout << "...restart nbr exhange done" << std::endl;   
 
-  updatePrimitives();
+  //  if ( config.restartFromLoMach == false) updatePrimitives();
+  updatePrimitives();  
+  //if (rank0_) std::cout << "...update primitives done" << std::endl;     
 
   // update pressure grid function
   mixture->UpdatePressureGridFunction(press, Up);
-
+  //if (rank0_) std::cout << "...restart p-grid done" << std::endl;   
+  
   // update plasma electrical conductivity
   if (tpsP->isFlowEMCoupled()) {
     ParGridFunction *coordsDof = new ParGridFunction(dfes);
@@ -2072,6 +2107,7 @@ void M2ulPhyS::projectInitialSolution() {
     // overwrite existing paraview data for the current iteration.
     if (!(tpsP->isVisualizationMode())) paraviewColl->Save();
   }
+  //if (rank0_) std::cout << "...load form aux sol done" << std::endl;     
 
   // if restarting from LTE, write paraview and restart h5 immediately
   if (config.io_opts_.enable_restart_from_lte_ && !tpsP->isVisualizationMode()) {
@@ -2079,6 +2115,10 @@ void M2ulPhyS::projectInitialSolution() {
     paraviewColl->Save();
     restart_files_hdf5("write");
   }
+
+  if ( config.restartFromLoMach == true) paraviewColl->Save();
+  //if (rank0_) std::cout << "...done with restart!" << std::endl;  
+  
 }
 
 void M2ulPhyS::solveBegin() {
@@ -2657,10 +2697,10 @@ void M2ulPhyS::clipOutflow() {
   double neckEnd = 0.355;
   double neckRad = 0.0155;
   //double leak = -1.0;  
-  double leak = -0.5;  
+  //double leak = -0.5;  
   //double leak = 0.05; // from approx control-volume analysis at 2kW
   //double leak = 0.25;  
-  //double leak = 3.0;
+  double leak = 3.0;
   //double neckMid = neckStart + 0.5*(neckEnd-neckStart);
 
   // based on h = 0.026, d = 0.03m, A = 0.00283 m^2
@@ -2727,6 +2767,8 @@ void M2ulPhyS::initialTimeStep() {
   for (int n = 0; n < dof; n++) {
     Vector state(num_equation);
     for (int eq = 0; eq < num_equation; eq++) state[eq] = dataU[n + eq * dof];
+
+    //std::cout << "ComputeMCS M2 1" << endl;
     double iC = mixture->ComputeMaxCharSpeed(state);
     if (iC > max_char_speed) max_char_speed = iC;
   }
