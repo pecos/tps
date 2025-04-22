@@ -2827,11 +2827,10 @@ void ReactingFlow::identifyCollisionType(const Array<ArgonSpcs> &speciesType, Ar
 }
 
 void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, double *omega) {
-  // This function allows us evaluate the reacting flow source terms
-  // at a given state (i.e., at a point in the grid) which is
-  // necessary for a nonlinear solve for an implicit time step at each
-  // point.  The sequence of calls that does this for the full field
-  // is below:
+  // This function evaluates the reacting flow source terms at a given
+  // state (i.e., at a point in the grid) which is necessary for a
+  // nonlinear solve for an implicit time step at each point.  The
+  // sequence of calls that does this for the full field is below:
   //
   // updateMixture();
   // updateThermoP();
@@ -2840,7 +2839,7 @@ void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, 
   // heatOfFormation();
   //
 
-  // Extract data from incoming state
+  // Extract data from incoming state and populate full set of mass & mole fractions
   std::vector<double> Y(nSpecies_);  // mass fractions
   std::vector<double> X(nSpecies_);  // mole fractions
   double T = 0.0;                    // temperature
@@ -2875,7 +2874,6 @@ void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, 
 
   double Rmix = 0;
   double Mmix = 0;
-  double Cpmix = 0;
 
   // Evaluate mixture molecular weight and gas constant
   for (int sp = 0; sp < nSpecies_; sp++) {
@@ -2914,6 +2912,7 @@ void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, 
   // (units J/m^3), which is rho*Cp, where rho is the mixture
   // density (kg/m^3) and Cp is the is the mixture mass specific
   // heat (units J/(kg*K).
+  double Cpmix = 0;
   mixture_->GetMixtureCp(n_sp, rho, Cpmix);
 
   // Everything else expects CpMix_gf_ to be the mixture mass Cp
@@ -2930,9 +2929,8 @@ void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, 
   kfwd.SetSize(chemistry_->getNumReactions());
   keq.SetSize(chemistry_->getNumReactions());
 
-  // Get temperature
   const double Th = T;
-  const double Te = Th;  // single temperature model
+  const double Te = Th;
 
   // Evaluate the chemical source terms
   chemistry_->computeForwardRateCoeffs(n_sp.Read(), Th, Te, dofindex, kfwd.HostWrite());

@@ -379,7 +379,30 @@ class ReactingFlow : public ThermoChemModelBase {
   void heatOfFormation();
   void crossDiffusion();
 
+  /**
+   * @brief Evaluate reaction source terms at single point
+   *
+   * Given the mass fractions and temperature at a point, evaluate the
+   * reaction source terms.  This functionality is used in building
+   * the residual needed for nonlinear, implicit thermochemistry
+   * within the operator split paradigm where the local-in-space terms
+   * are split from the convection-diffusion terms.
+   *
+   * The incoming YT must contain the nActiveSpecies_ mass fractions
+   * for the active species and temperature.
+   */
   void evaluateReactingSource(const double *YT, const int dofindex, double *omega);
+
+  /**
+   * @brief Solve the thermochemistry update
+   *
+   * Given the mass fractions and temperature at a point, the backward
+   * Euler update for the local thermochemistry solve.
+   *
+   * The incoming YT must contain the nActiveSpecies_ mass fractions
+   * for the active species and temperature.  This state is
+   * overwritten with the new local state at the end of the time step.
+   */
   void solveChemistryStep(double *YT, const int dofindex, const double dt);
 
   // time-splitting
