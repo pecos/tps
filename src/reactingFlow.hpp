@@ -334,7 +334,7 @@ class ReactingFlow : public ThermoChemModelBase {
   bool implicit_chemistry_ = false;
   int nSub_;
   bool dynamic_substepping_ = true;
-  int stabFrac_;
+  double stabFrac_;
 
   bool implicit_chemistry_verbose_ = false;
   int implicit_chemistry_maxiter_ = 200;

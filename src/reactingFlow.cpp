@@ -615,7 +615,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   if (dynamic_substepping_) nSub_ = 2;
 
   // default value is purely empirical atm
-  tpsP_->getInput("loMach/reactingFlow/dynamic-fraction", stabFrac_, 4);
+  tpsP_->getInput("loMach/reactingFlow/dynamic-fraction", stabFrac_, 1.0);
 
   // Check time marching order.  Operator split (i.e., nSub_ > 1) not supported for order > 1.
   if ((nSub_ > 1) && (time_coeff_.order > 1)) {
@@ -1854,7 +1854,7 @@ void ReactingFlow::step() {
   updateDiffusivity();
 }
 
-// should be Nsub s.t.: 1 > dt/Nsub*Prod_Y{n}/rho{n}/Yn{n}
+// should be Nsub s.t.: Nsub > dt * [Prod_Y{n}/rho{n}/Yn{n}]
 void ReactingFlow::evalSubstepNumber() {
   double myMaxProd = 0.0;
   double maxProd = 0.0;
@@ -1891,7 +1891,8 @@ void ReactingFlow::evalSubstepNumber() {
 
   deltaYn = maxProd * time_coeff_.dt;
   nSub_ = stabFrac_ * std::ceil(deltaYn);
-  nSub_ = std::max(nSub_, 4);    
+  nSub_ = std::max(nSub_, 4);
+  nSub_ = std::min(nSub_, 10000);
 
 }
 
@@ -1953,6 +1954,8 @@ void ReactingFlow::temperatureStep() {
   rhoDt_gf_ = rn_gf_;
   rhoDt_gf_ *= (time_coeff_.bd0 / dt_);
 
+  // HACK HACK HACK ...for testing only commenting out...    
+  /*
   Ht_form_->Update();
   Ht_form_->Assemble();
   Ht_form_->FormSystemMatrix(temp_ess_tdof_, Ht_);
@@ -1986,6 +1989,13 @@ void ReactingFlow::temperatureStep() {
 
   Ht_form_->RecoverFEMSolution(Xt2, resT_gf_, Tn_next_gf_);
   Tn_next_gf_.GetTrueDofs(Tn_next_);
+  */
+
+  Tn_ = T_ic_;
+  Tn_next_ = T_ic_;
+  Tn_gf_.SetFromTrueDofs(Tn_);    
+  Tn_next_gf_.SetFromTrueDofs(Tn_next_);  
+  
 }
 
 void ReactingFlow::temperatureSubstep(int iSub) {
@@ -2289,6 +2299,13 @@ void ReactingFlow::speciesProduction() {
       dataEmit[i + sp * sDofInt_] = emissionRate[sp];
     }
   }
+
+  // if Yn + P_Y*(dt*N) > 1 (or < 0) can we clip the value?
+  // N = 4 or something (maybe nSub?)
+  // P_Y*(dt_remaining), dt_remaining = dt - N * dt/nSub
+  // N is currently substep number
+  // Yn(nSub) + P_Y * (1-N/nSub)*dt > 1 (or < 0) => clip as P_Y = (1-Yn(nSub))/[(1-N/nSub)*dt] (or P_Y = -Yn(nSub)/[(1-N/nSub)*dt])
+  
 }
 
 void ReactingFlow::heatOfFormation() {
