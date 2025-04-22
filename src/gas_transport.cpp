@@ -853,8 +853,6 @@ MFEM_HOST_DEVICE GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, 
   electronIndex_ = inputs.electronIndex;
   neutralIndex_ = inputs.neutralIndex;
   ionIndex_ = inputs.ionIndex;
-
-  printf("giddy up...\n");
   
   // Argon
   if (inputs.gas=="Ar" || inputs.gas=="argon") {
@@ -896,7 +894,7 @@ MFEM_HOST_DEVICE GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, 
   // Nitrogen
   } else if (inputs.gas=="Ni" || inputs.gas=="nitrogen") {
     gasType_ = Ni;
-    printf("gas type nitrogen...\n");
+    //printf("gas type nitrogen...\n");
     neutralIndex2_ = inputs.neutralIndex2;
     ionIndex2_ = inputs.ionIndex2;
   } else {

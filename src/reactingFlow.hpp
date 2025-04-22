@@ -330,7 +330,7 @@ class ReactingFlow : public ThermoChemModelBase {
   bool operator_split_ = false;
   int nSub_;
   bool dynamic_substepping_ = true;
-  int stabFrac_;
+  double stabFrac_;
 
   // Parameters and objects used in filter-based stabilization
   bool filter_temperature_ = false;
