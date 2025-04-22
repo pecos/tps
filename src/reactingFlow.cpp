@@ -501,6 +501,16 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
 
   // will be over-written if dynamic is active
   tpsP_->getInput("loMach/reactingFlow/implicit-chemistry", implicit_chemistry_, false);
+
+  if (implicit_chemistry_) {
+    tpsP_->getInput("loMach/reactingFlow/implicit-chemistry/verbose", implicit_chemistry_verbose_, false);
+    tpsP_->getInput("loMach/reactingFlow/implicit-chemistry/maxiter", implicit_chemistry_maxiter_, 200);
+    tpsP_->getInput("loMach/reactingFlow/implicit-chemistry/fd-epsilon", implicit_chemistry_fd_eps_, 1e-7);
+    tpsP_->getInput("loMach/reactingFlow/implicit-chemistry/rtol", implicit_chemistry_rtol_, 1e-8);
+    tpsP_->getInput("loMach/reactingFlow/implicit-chemistry/atol", implicit_chemistry_atol_, 1e-12);
+    tpsP_->getInput("loMach/reactingFlow/implicit-chemistry/species-min", implicit_chemistry_smin_, 1e-12);
+  }
+
   tpsP_->getInput("loMach/reactingFlow/sub-steps", nSub_, 1);
   tpsP_->getInput("loMach/reactingFlow/dynamic-substep", dynamic_substepping_, false);
   if (dynamic_substepping_) nSub_ = 2;
@@ -2973,8 +2983,8 @@ void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, 
 }
 
 void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const double dt) {
-  const int nState = nActiveSpecies_ + 1;  // Number of variables in YT
-  const double eps = 1e-7;                 // Perturbation for finite difference Jacobian
+  const int nState = nActiveSpecies_ + 1;         // Number of variables in YT
+  const double eps = implicit_chemistry_fd_eps_;  // Perturbation for finite difference Jacobian
 
   double *YT1 = new double[nState];
   double *YT0 = new double[nState];
@@ -2999,8 +3009,8 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
     for (int j = 0; j < nState; j++) {
       YT1[j] = YT[j];
     }
-    if (YT[i] < 1e-10) {
-      YT1[i] = 1e-17;
+    if (YT[i] < implicit_chemistry_smin_) {
+      YT1[i] = implicit_chemistry_smin_ * (1 + eps);
     } else {
       YT1[i] *= (1 + eps);
     }
@@ -3027,12 +3037,12 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
   }
   res_norm0 = sqrt(res_norm0);
 
-  const int IMAX = 200;
   int iiter = 0;
   double res_norm = res_norm0;
 
   // Newton solver loop
-  while (iiter < IMAX && res_norm > 1e-12 && (res_norm / res_norm0) > 1e-8) {
+  while (iiter < implicit_chemistry_maxiter_ && res_norm > implicit_chemistry_atol_ &&
+         (res_norm / res_norm0) > implicit_chemistry_rtol_) {
     mfem::LinearSolve(Jac, rhs, 1.e-9);
 
     // Update the solution
@@ -3077,8 +3087,8 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
     iiter += 1;
   }
 
-  if (iiter >= IMAX) {
-    std::cout << "WARNING: Newton solve did not converge." << std::endl;
+  if (iiter >= implicit_chemistry_maxiter_ && implicit_chemistry_verbose_) {
+    std::cout << "WARNING: Implicit chemistry Newton solve did not converge." << std::endl;
     std::cout << "    YT =";
     for (int i = 0; i < nState; i++) {
       std::cout << " " << YT[i];
