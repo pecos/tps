@@ -89,6 +89,9 @@ class ReactingFlow : public ThermoChemModelBase {
   int sDof_, sDofInt_;
   int yDof_, yDofInt_;
 
+  // Number of reactions and dofs
+  int rDof_, rDofInt_;
+
   WorkingFluid workFluid_;
   GasModel gasModel_;
   TransportModel transportModel_;
@@ -176,6 +179,12 @@ class ReactingFlow : public ThermoChemModelBase {
 
   // Vector \f$H^1\f$ finite element space.
   ParFiniteElementSpace *vfes_ = nullptr;
+
+  // Reactions \f$H^1\f$ finite element collection.
+  FiniteElementCollection *rfec_ = nullptr;
+
+  // Reactions \f$H^1\f$ finite element space.
+  ParFiniteElementSpace *rfes_ = nullptr;
 
   // Fields
   ParGridFunction Tnm1_gf_, Tnm2_gf_;

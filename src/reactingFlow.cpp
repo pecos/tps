@@ -600,6 +600,8 @@ ReactingFlow::~ReactingFlow() {
   delete sfec_;
   delete yfes_;
   delete yfec_;
+  delete rfes_;
+  delete rfec_;
 }
 
 void ReactingFlow::initializeSelf() {
@@ -623,6 +625,10 @@ void ReactingFlow::initializeSelf() {
   vfec_ = new H1_FECollection(order_, dim_);
   vfes_ = new ParFiniteElementSpace(pmesh_, vfec_, dim_);
 
+  // PREPARING FINITE ELEMENT SPACE FOR REACTION PROGRESS RATES
+  rfec_ = new H1_FECollection(order_, dim_);
+  rfes_ = new ParFiniteElementSpace(pmesh_, yfec_, nReactions_);
+
   // Check if fully periodic mesh
   if (!(pmesh_->bdr_attributes.Size() == 0)) {
     temp_ess_attr_.SetSize(pmesh_->bdr_attributes.Max());
@@ -639,6 +645,10 @@ void ReactingFlow::initializeSelf() {
   yDof_ = yfes_->GetVSize();
   sDofInt_ = sfes_->GetTrueVSize();
   yDofInt_ = yfes_->GetTrueVSize();
+
+  // SETTING Dof PARAMETERS FOR REACTION PROGRESS RATES
+  rDof_ = rfes_->GetVSize();
+  rDofInt_ = rfes_->GetTrueVSize();
 
   weff_gf_.SetSpace(vfes_);
   weff_gf_ = 0.0;
@@ -716,7 +726,7 @@ void ReactingFlow::initializeSelf() {
   prodY_gf_ = 0.0;
 
   // reaction progress rates for plotting
-  reacR_gf_.SetSpace(yfes_);
+  reacR_gf_.SetSpace(rfes_);
   reacR_gf_ = 0.0;
 
   // rest can just be sfes
@@ -754,7 +764,7 @@ void ReactingFlow::initializeSelf() {
   prodY_ = 1.0e-12;
 
   // reaction progress rates to be passed to reacR_gf
-  reacR_.SetSize(yDofInt_);
+  reacR_.SetSize(rDofInt_);
   reacR_ = 1.0e-12;
 
   // prodY_gf_.SetSpace(sfes_);
