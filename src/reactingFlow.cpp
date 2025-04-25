@@ -956,6 +956,8 @@ void ReactingFlow::initializeSelf() {
         }
         AddTempDirichletBC(temperature_value, inlet_attr);
 
+        // AddSpecDirichletBC(0.0, inlet_attr);
+
       } else if (type == "interpolate") {
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
         inlet_attr = 0;
@@ -1029,12 +1031,15 @@ void ReactingFlow::initializeSelf() {
         ConstantCoefficient *Qt_bc_coeff = new ConstantCoefficient();
         Qt_bc_coeff->constant = 0.0;
         AddQtDirichletBC(Qt_bc_coeff, attr_wall);
+
+        AddSpecDirichletBC(0.0, attr_wall);
       }
     }
     if (rank0_) std::cout << "Temp wall bc completed: " << numWalls << endl;
   }
 
   sfes_->GetEssentialTrueDofs(temp_ess_attr_, temp_ess_tdof_);
+  sfes_->GetEssentialTrueDofs(spec_ess_attr_, spec_ess_tdof_);
   sfes_->GetEssentialTrueDofs(Qt_ess_attr_, Qt_ess_tdof_);
 
   // with ic set, update Rmix
@@ -1649,6 +1654,29 @@ void ReactingFlow::step() {
         h_Tn[i] = YT[nActiveSpecies_];
       }
       delete[] YT;
+
+      if (mixtureInput_.ambipolar) {
+        // Evaluate electron mass fraction based on quasi-neutrality
+
+        // temporary storage for electron mass fraction
+        tmpR0_ = 0.0;
+
+        // Y_electron = sum_{i \in active species} (m_electron / m_i) * q_i * Y_i
+        for (int iSpecies = 0; iSpecies < nActiveSpecies_; iSpecies++) {
+          setScalarFromVector(Yn_next_, iSpecies, &tmpR0a_);
+          const double q_sp = mixture_->GetGasParams(iSpecies, GasParams::SPECIES_CHARGES);
+          const double m_sp = mixture_->GetGasParams(iSpecies, GasParams::SPECIES_MW);
+          const double fac = q_sp / m_sp;
+          tmpR0a_ *= fac;
+          tmpR0_ += tmpR0a_;
+        }
+        const int iElectron = nSpecies_ - 2;  // TODO(trevilo): check me!
+        const double m_electron = mixture_->GetGasParams(iElectron, GasParams::SPECIES_MW);
+        tmpR0_ *= m_electron;
+        setVectorFromScalar(tmpR0_, iElectron, &Yn_next_);
+      }
+      speciesLastStep();
+
     } else {
       // Evaluate (Yn_next_ - Yn_)/nSub and store in YnStar_, and analog
       // for TnStar_.
@@ -1658,6 +1686,7 @@ void ReactingFlow::step() {
       if (dynamic_substepping_) evalSubstepNumber();
 
       for (int iSub = 0; iSub < nSub_; iSub++) {
+
         // update wdot quantities at full substep in Yn/Tn state
         updateMixture();
         updateThermoP();
@@ -2625,6 +2654,16 @@ void ReactingFlow::AddTempDirichletBC(const double &temp, Array<int> &attr) {
     if (attr[i] == 1) {
       assert(!temp_ess_attr_[i]);
       temp_ess_attr_[i] = 1;
+    }
+  }
+}
+
+void ReactingFlow::AddSpecDirichletBC(const double &Y, Array<int> &attr) {
+  spec_dbcs_.emplace_back(attr, new ConstantCoefficient(Y));
+  for (int i = 0; i < attr.Size(); ++i) {
+    if (attr[i] == 1) {
+      assert(!spec_ess_attr_[i]);
+      spec_ess_attr_[i] = 1;
     }
   }
 }

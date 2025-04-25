@@ -447,6 +447,8 @@ class ReactingFlow : public ThermoChemModelBase {
   void AddQtDirichletBC(Coefficient *coeff, Array<int> &attr);
   void AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr);
 
+  void AddSpecDirichletBC(const double &Y, Array<int> &attr);
+
   void evalSubstepNumber();
   void readTableWrapper(std::string inputPath, TableInput &result);
 };
