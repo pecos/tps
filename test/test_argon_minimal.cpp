@@ -96,6 +96,7 @@ int main (int argc, char *argv[])
   DenseMatrix refValues;
   Array<int> dims1 = readTable(fileName, datasetName, refValues);
   grvy_printf(GRVY_INFO, "\n T\t Viscosity \t Thermal cond. (H) \t Thermal cond. (E) \t Ion. degree \n");
+  std::cout << "Reference data:" << std::endl;
   for (int i = 0; i < dims1[0]; i++) {
     for (int j = 0; j < dims1[1]; j++) {
       std::cout << refValues(i,j) << ",\t";
@@ -209,15 +210,19 @@ int main (int argc, char *argv[])
     if (i < 4) {
       error(2) = abs(refValues(i,3) - transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY]);
       if (error(2) > absErrorThreshold(2)) {
-        grvy_printf(GRVY_ERROR, "\n Heavy-species thermal conductivity deviates from the reference value.");
-        grvy_printf(GRVY_ERROR, "\n Absolute Error: %.15E", error(1));
+        grvy_printf(GRVY_ERROR, "\n Electron thermal conductivity deviates from the reference value.");
+        grvy_printf(GRVY_ERROR, "\n Computed = %.15E, Expected = %.15E", transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY],
+                    refValues(i,3));
+        grvy_printf(GRVY_ERROR, "\n Absolute Error: %.15E", error(2));
         exit(ERROR);
       }
     } else {
       error(2) = abs(refValues(i,3) - transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY]) / refValues(i,3);
       if (error(2) > relErrorThreshold(2)) {
-        grvy_printf(GRVY_ERROR, "\n Heavy-species thermal conductivity deviates from the reference value.");
-        grvy_printf(GRVY_ERROR, "\n Relative Error: %.15E", error(1));
+        grvy_printf(GRVY_ERROR, "\n Electron thermal conductivity deviates from the reference value.");
+        grvy_printf(GRVY_ERROR, "\n Computed = %.15E, Expected = %.15E", transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY],
+                    refValues(i,3));
+        grvy_printf(GRVY_ERROR, "\n Relative Error: %.15E", error(2));
         exit(ERROR);
       }
     }

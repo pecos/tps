@@ -53,3 +53,4 @@ ref_solns/spongeBox/restart_output.sol.h5 filter=lfs diff=lfs merge=lfs -text
 meshes/spongeBox.msh filter=lfs diff=lfs merge=lfs -text
 ref_solns/lequere-varmu/restart_output-lequere-varmu.sol.h5 filter=lfs diff=lfs merge=lfs -text
 ref_solns/lequere-varmu/reference-lequere-varmu.sol.h5 filter=lfs diff=lfs merge=lfs -text
+ref_solns/collisions/Oliver.fit.h5 filter=lfs diff=lfs merge=lfs -text
