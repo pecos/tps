@@ -1032,7 +1032,7 @@ void ReactingFlow::initializeSelf() {
         Qt_bc_coeff->constant = 0.0;
         AddQtDirichletBC(Qt_bc_coeff, attr_wall);
 
-        AddSpecDirichletBC(0.0, attr_wall);
+        // AddSpecDirichletBC(0.0, attr_wall);
       }
     }
     if (rank0_) std::cout << "Temp wall bc completed: " << numWalls << endl;
@@ -1740,6 +1740,14 @@ void ReactingFlow::step() {
 
   /// PART III: prepare for external use
   updateDensity(1.0);
+
+  if (operator_split_ && implicit_chemistry_) {
+    updateMixture();
+    updateThermoP();
+    speciesProduction();
+    heatOfFormation();
+  }
+
   computeQtTO();
 
   UpdateTimestepHistory(dt_);
