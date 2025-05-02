@@ -1686,7 +1686,6 @@ void ReactingFlow::step() {
       if (dynamic_substepping_) evalSubstepNumber();
 
       for (int iSub = 0; iSub < nSub_; iSub++) {
-
         // update wdot quantities at full substep in Yn/Tn state
         updateMixture();
         updateThermoP();
