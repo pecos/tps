@@ -254,4 +254,10 @@ test_distance_fcn_LDADD       = ../src/libtps.la
 test_distance_fcn_LDADD      += $(HDF5_LIBS)
 test_distance_fcn_LDADD      += $(GRVY_LIBS)
 
+check_PROGRAMS               += standalone_chemistry
+standalone_chemistry_SOURCES  = standalone_chemistry.cpp
+standalone_chemistry_LDADD    = ../src/libtps.la
+standalone_chemistry_LDADD   += $(HDF5_LIBS)
+standalone_chemistry_LDADD   += $(GRVY_LIBS)
+
 endif # if !GPU_ENABLED

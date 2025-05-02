@@ -327,9 +327,17 @@ class ReactingFlow : public ThermoChemModelBase {
   Vector YnStar_, spec_buffer_;
   Vector TnStar_, temp_buffer_;
   bool operator_split_ = false;
+  bool implicit_chemistry_ = false;
   int nSub_;
   bool dynamic_substepping_ = true;
   int stabFrac_;
+
+  bool implicit_chemistry_verbose_ = false;
+  int implicit_chemistry_maxiter_ = 200;
+  double implicit_chemistry_fd_eps_ = 1e-7;
+  double implicit_chemistry_rtol_ = 1e-8;
+  double implicit_chemistry_atol_ = 1e-12;
+  double implicit_chemistry_smin_ = 1e-12;
 
   // Parameters and objects used in filter-based stabilization
   bool filter_temperature_ = false;
@@ -378,6 +386,32 @@ class ReactingFlow : public ThermoChemModelBase {
   void heatOfFormation();
   void crossDiffusion();
 
+  /**
+   * @brief Evaluate reaction source terms at single point
+   *
+   * Given the mass fractions and temperature at a point, evaluate the
+   * reaction source terms.  This functionality is used in building
+   * the residual needed for nonlinear, implicit thermochemistry
+   * within the operator split paradigm where the local-in-space terms
+   * are split from the convection-diffusion terms.
+   *
+   * The incoming YT must contain the nActiveSpecies_ mass fractions
+   * for the active species and temperature.
+   */
+  void evaluateReactingSource(const double *YT, const int dofindex, double *omega);
+
+  /**
+   * @brief Solve the thermochemistry update
+   *
+   * Given the mass fractions and temperature at a point, the backward
+   * Euler update for the local thermochemistry solve.
+   *
+   * The incoming YT must contain the nActiveSpecies_ mass fractions
+   * for the active species and temperature.  This state is
+   * overwritten with the new local state at the end of the time step.
+   */
+  void solveChemistryStep(double *YT, const int dofindex, const double dt);
+
   // time-splitting
   void substepState();
   void speciesLastSubstep();
@@ -412,6 +446,8 @@ class ReactingFlow : public ThermoChemModelBase {
   void AddTempDirichletBC(ScalarFuncT *f, Array<int> &attr);
   void AddQtDirichletBC(Coefficient *coeff, Array<int> &attr);
   void AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr);
+
+  void AddSpecDirichletBC(const double &Y, Array<int> &attr);
 
   void evalSubstepNumber();
   void readTableWrapper(std::string inputPath, TableInput &result);
