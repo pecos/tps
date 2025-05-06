@@ -134,11 +134,13 @@ tps.initialize()
 ini_name = ''
 if '-run' in sys.argv:
     ini_name = sys.argv[sys.argv.index('-run') + 1 ]
-elif '-runFile' in sys.argv:
-    ini_name = sys.argv[sys.argv.index('-runFile') + 1 ]
+elif '--runFile' in sys.argv:
+    ini_name = sys.argv[sys.argv.index('--runFile') + 1 ]
 else:
+    print("Could not parse command line in python. GOOD BYE!")
     exit(-1)
 
+print(ini_name)
 config = configparser.ConfigParser()
 config.read(ini_name)
 
