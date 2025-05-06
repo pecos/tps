@@ -39,6 +39,7 @@
 
 namespace TPS {
 class Tps;
+class Tps2Boltzmann;
 }
 
 class IODataOrganizer;
@@ -194,6 +195,16 @@ class ThermoChemModelBase {
   mfem::ParGridFunction *getPlasmaConductivityGF() { return plasma_conductivity_gf_; }
   mfem::ParGridFunction *getJouleHeatingGF() { return joule_heating_gf_; }
   virtual void evaluatePlasmaConductivityGF() {
+    std::cout << "ERROR: " << __func__ << " remains unimplemented" << std::endl;
+    exit(1);
+  }
+
+  virtual void push(TPS::Tps2Boltzmann &interface) {
+    std::cout << "ERROR: " << __func__ << " remains unimplemented" << std::endl;
+    exit(1);
+  }
+
+  virtual void fetch(TPS::Tps2Boltzmann &interface) {
     std::cout << "ERROR: " << __func__ << " remains unimplemented" << std::endl;
     exit(1);
   }

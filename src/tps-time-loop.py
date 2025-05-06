@@ -2,47 +2,115 @@
 import sys
 import os
 import numpy as np
+import h5py
+import scipy
+import scipy.interpolate
+
+import configparser
 
 from mpi4py import MPI
 
-class ArrheniusSolver:
-    def __init__(self):
-        self.UNIVERSALGASCONSTANT = 8.3144598;  # J * mol^(-1) * K^(-1)
+def master_print(comm: MPI.Comm, *args, **kwargs) -> None:
+    if comm.rank == 0:
+        print(*args, **kwargs)
+
+class NullSolver:
+    def __init__(self, comm):
+        self.comm = comm
         self.species_densities = None
         self.efield = None
         self.heavy_temperature = None
-        self.reaction_rates = [None, None]
         #Reaction 1: 'Ar + E => Ar.+1 + 2 E', 
         #Reaction 2: 'Ar.+1 + 2 E => Ar + E'
-        self.A = [74072.331348, 5.66683445516e-20]
-        self.b = [1.511, 0.368]
-        self.E = [1176329.772504, -377725.908714] # [J/mol]
+
 
     def fetch(self, interface):
         n_reactions =interface.nComponents(libtps.t2bIndex.ReactionRates)
         for r in range(n_reactions):
-            print("Reaction ", r+1, ": ", interface.getReactionEquation(r))
+            master_print(self.comm, "Reaction ", r+1, ": ", interface.getReactionEquation(r))
         self.species_densities = np.array(interface.HostRead(libtps.t2bIndex.SpeciesDensities), copy=False)
         self.efield = np.array(interface.HostRead(libtps.t2bIndex.ElectricField), copy=False)
         self.heavy_temperature = np.array(interface.HostRead(libtps.t2bIndex.HeavyTemperature), copy=False)
 
         efieldAngularFreq = interface.EfieldAngularFreq()
-        print("Electric field angular frequency: ", efieldAngularFreq)
+        master_print(self.comm,"Species densities:", self.species_densities.min(), " ", self.species_densities.max())
+        master_print(self.comm,"Heavy Temp:", self.heavy_temperature.min(), " ", self.heavy_temperature.max())
+        master_print(self.comm,"Efield:", self.efield.min(), " ", self.efield.max())
+        master_print(self.comm,"Electric field angular frequency: ", efieldAngularFreq)
 
 
 
     def solve(self):
-        #A_ * pow(temp, b_) * exp(-E_ / UNIVERSALGASCONSTANT / temp);
-        self.reaction_rates = [A * np.power(self.heavy_temperature, b) * 
-                               np.exp(-E/(self.UNIVERSALGASCONSTANT * self.heavy_temperature))
-                               for A,b,E in zip(self.A, self.b, self.E) ]
+        pass
 
     def push(self, interface):
+        rates =  np.array(interface.HostWrite(libtps.t2bIndex.ReactionRates), copy=False)
+
         n_reactions =interface.nComponents(libtps.t2bIndex.ReactionRates)
-        if n_reactions >= 2:
-            rates =  np.array(interface.HostWrite(libtps.t2bIndex.ReactionRates), copy=False)
-            rates[0:self.heavy_temperature.shape[0]] = self.reaction_rates[0]
-            rates[self.heavy_temperature.shape[0]:] = self.reaction_rates[1]
+        for r in range(n_reactions):
+            rates[r*self.heavy_temperature.shape[0]:(r+1)*self.heavy_temperature.shape[0]] = (10.**(-r))*1e-6*self.heavy_temperature
+
+
+class TabulatedSolver:
+    def __init__(self, comm, config):
+        self.comm = comm
+        self.config = config
+        self.species_densities = None
+        self.efield = None
+        self.heavy_temperature = None
+
+        self.tables = self._read_tables()
+        self.rates = []
+
+    def _findPythonReactions(self):
+        filenames = []
+        nreactions = self.config.getint("reactions","number_of_reactions",fallback=0)
+        for ir in range(nreactions):
+            sublist = self.config["reactions/reaction{0:d}".format(ir+1)]
+            rtype = sublist["model"]
+            if rtype == "bte":
+                filenames.append(sublist["tabulated/filename"].strip("'"))
+
+        return filenames
+
+    def _read_tables(self):
+        filenames = self._findPythonReactions()
+        
+        #["./rate-coefficients/Ionization_Ground.h5",
+        #         "./rate-coefficients/Ionization_Lumped.h5",
+        #         "./rate-coefficients/Excitation_Lumped.h5"]
+        tables = []
+        for filename in filenames:
+            with h5py.File(filename, 'r') as fid:
+                Tcoeff = fid['table'][:]
+
+            tables.append(scipy.interpolate.interp1d(Tcoeff[:,0], Tcoeff[:,1], kind='linear',
+                                                     bounds_error=False, fill_value='extrapolate'))
+
+        return tables
+    
+    def fetch(self, interface):
+        n_reactions =interface.nComponents(libtps.t2bIndex.ReactionRates)
+        for r in range(n_reactions):
+            master_print(self.comm,"Reaction ", r+1, ": ", interface.getReactionEquation(r))
+        self.species_densities = np.array(interface.HostRead(libtps.t2bIndex.SpeciesDensities), copy=False)
+        self.efield = np.array(interface.HostRead(libtps.t2bIndex.ElectricField), copy=False)
+        self.heavy_temperature = np.array(interface.HostRead(libtps.t2bIndex.HeavyTemperature), copy=False)
+
+        efieldAngularFreq = interface.EfieldAngularFreq()
+        master_print(self.comm,"Electric field angular frequency: ", efieldAngularFreq)
+
+    def solve(self):
+        self.rates = []
+        for table in self.tables:
+            self.rates.append(table(self.heavy_temperature))
+
+    def push(self, interface):
+        rates =  np.array(interface.HostWrite(libtps.t2bIndex.ReactionRates), copy=False)
+        offset = 0
+        for rate in self.rates:
+            rates[offset:offset+rate.shape[0]] = rate
+            offset = offset+rate.shape[0]
 
 
 
@@ -55,33 +123,48 @@ comm = MPI.COMM_WORLD
 # TPS solver
 tps = libtps.Tps(comm)
 
+
+
 tps.parseCommandLineArgs(sys.argv)
 tps.parseInput()
 tps.chooseDevices()
 tps.chooseSolver()
 tps.initialize()
 
-boltzmann = ArrheniusSolver()
+ini_name = ''
+if '-run' in sys.argv:
+    ini_name = sys.argv[sys.argv.index('-run') + 1 ]
+elif '--runFile' in sys.argv:
+    ini_name = sys.argv[sys.argv.index('--runFile') + 1 ]
+else:
+    print("Could not parse command line in python. GOOD BYE!")
+    exit(-1)
+
+print(ini_name)
+config = configparser.ConfigParser()
+config.read(ini_name)
+
+boltzmann = TabulatedSolver(comm, config)
 
 interface = libtps.Tps2Boltzmann(tps)
 tps.initInterface(interface)
 
 it = 0
 max_iters = tps.getRequiredInput("cycle-avg-joule-coupled/max-iters")
-print("Max Iters: ", max_iters)
+master_print(comm,"Max Iters: ", max_iters)
 tps.solveBegin()
 
 while it < max_iters:
-    tps.solveStep()
     tps.push(interface)
     boltzmann.fetch(interface)
     boltzmann.solve()
     boltzmann.push(interface)
     interface.saveDataCollection(cycle=it, time=it)
     tps.fetch(interface)
+    tps.solveStep()
     
     it = it+1
-    print("it, ", it)
+    master_print(comm, "it, ", it)
 
 tps.solveEnd()
 

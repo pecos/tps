@@ -88,8 +88,8 @@ MFEM_HOST_DEVICE GridFunctionReaction::GridFunctionReaction(int comp)
 MFEM_HOST_DEVICE GridFunctionReaction::~GridFunctionReaction() {}
 
 MFEM_HOST_DEVICE void GridFunctionReaction::setData(const double *data, int size) {
-  data_ = data + comp_ * size_;
   size_ = size;
+  data_ = data + comp_ * size_;
 }
 
 void GridFunctionReaction::setGridFunction(const mfem::GridFunction &f) {
@@ -102,6 +102,7 @@ void GridFunctionReaction::setGridFunction(const mfem::GridFunction &f) {
   data_ = f.HostRead() + comp_ * size_;
 #endif
 }
+
 
 MFEM_HOST_DEVICE double GridFunctionReaction::computeRateCoefficient([[maybe_unused]] const double &T_h,
                                                                      [[maybe_unused]] const double &T_e,

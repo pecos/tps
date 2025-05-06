@@ -36,6 +36,7 @@
 // forward-declaration for Tps support class
 namespace TPS {
 class Tps;
+class Tps2Boltzmann;
 }
 
 #include <hdf5.h>
@@ -102,6 +103,9 @@ class ReactingFlow : public ThermoChemModelBase {
   PerfectMixture *mixture_ = NULL;
   ArgonMixtureTransport *transport_ = NULL;
   Chemistry *chemistry_ = NULL;
+  // External reaction rates when chemistry is implemented using the BTE option
+  std::unique_ptr<ParGridFunction> externalReactionRates_gf_;  // Has repeated interface dofs.
+  Vector externalReactionRates_;  // Only true data
 
   std::vector<std::string> speciesNames_;
   std::map<std::string, int> atomMap_;
@@ -415,5 +419,8 @@ class ReactingFlow : public ThermoChemModelBase {
 
   void evalSubstepNumber();
   void readTableWrapper(std::string inputPath, TableInput &result);
+
+  void push(TPS::Tps2Boltzmann &interface) override;
+  void fetch(TPS::Tps2Boltzmann &interface) override;
 };
 #endif  // REACTINGFLOW_HPP_
