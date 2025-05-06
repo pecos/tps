@@ -6,6 +6,8 @@ import h5py
 import scipy
 import scipy.interpolate
 
+import configparser
+
 from mpi4py import MPI
 
 def master_print(comm: MPI.Comm, *args, **kwargs) -> None:
@@ -50,8 +52,9 @@ class NullSolver:
 
 
 class TabulatedSolver:
-    def __init__(self, comm):
+    def __init__(self, comm, config):
         self.comm = comm
+        self.config = config
         self.species_densities = None
         self.efield = None
         self.heavy_temperature = None
@@ -59,10 +62,23 @@ class TabulatedSolver:
         self.tables = self._read_tables()
         self.rates = []
 
+    def _findPythonReactions(self):
+        filenames = []
+        nreactions = self.config.getint("reactions","number_of_reactions",fallback=0)
+        for ir in range(nreactions):
+            sublist = self.config["reactions/reaction{0:d}".format(ir+1)]
+            rtype = sublist["model"]
+            if rtype == "bte":
+                filenames.append(sublist["tabulated/filename"].strip("'"))
+
+        return filenames
+
     def _read_tables(self):
-        filenames = ["./rate-coefficients/Ionization_Ground.h5",
-                 "./rate-coefficients/Ionization_Lumped.h5",
-                 "./rate-coefficients/Excitation_Lumped.h5"]
+        filenames = self._findPythonReactions()
+        
+        #["./rate-coefficients/Ionization_Ground.h5",
+        #         "./rate-coefficients/Ionization_Lumped.h5",
+        #         "./rate-coefficients/Excitation_Lumped.h5"]
         tables = []
         for filename in filenames:
             with h5py.File(filename, 'r') as fid:
@@ -107,13 +123,26 @@ comm = MPI.COMM_WORLD
 # TPS solver
 tps = libtps.Tps(comm)
 
+
+
 tps.parseCommandLineArgs(sys.argv)
 tps.parseInput()
 tps.chooseDevices()
 tps.chooseSolver()
 tps.initialize()
 
-boltzmann = TabulatedSolver(comm)
+ini_name = ''
+if '-run' in sys.argv:
+    ini_name = sys.argv[sys.argv.index('-run') + 1 ]
+elif '-runFile' in sys.argv:
+    ini_name = sys.argv[sys.argv.index('-runFile') + 1 ]
+else:
+    exit(-1)
+
+config = configparser.ConfigParser()
+config.read(ini_name)
+
+boltzmann = TabulatedSolver(comm, config)
 
 interface = libtps.Tps2Boltzmann(tps)
 tps.initInterface(interface)
