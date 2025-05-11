@@ -78,6 +78,7 @@ class Tomboulides final : public FlowBase {
   // true if this is root rank
   bool rank0_;
   bool axisym_;
+  bool writePressure_;  
 
   // Options
   bool numerical_integ_ = false;

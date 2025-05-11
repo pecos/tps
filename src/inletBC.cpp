@@ -613,7 +613,7 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
   // gradient of pressure in normal direction
   double dpdn = mixture->ComputePressureDerivative(normGrad, stateIn, false);
 
-  std::cout << " ComputeSoS inletBC 1" << endl;
+  //std::cout << " ComputeSoS inletBC 1" << endl;
   const double speedSound = mixture->ComputeSpeedOfSound(meanUp);
 
   double meanK = 0.;

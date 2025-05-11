@@ -204,8 +204,10 @@ class M2ulPhyS : public TPS::PlasmaSolver {
   ParGridFunction *u_gf;
   ParGridFunction *T_gf;
   ParGridFunction *rho_gf;
+  ParGridFunction *P_gf;  
   Vector rhoTmp;
-  Vector TnTmp;  
+  Vector TnTmp;
+  Vector PnTmp;  
   
 
   // nodes IDs and indirection array

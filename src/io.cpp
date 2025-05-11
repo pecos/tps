@@ -112,14 +112,14 @@ void M2ulPhyS::read_restart_files_hdf5(hid_t file, bool serialized_read) {
   // -------------------------------------------------------------------
   // Attributes - read relevant solution metadata for this Solver
   // -------------------------------------------------------------------
-  if (rank0_) std::cout << " meta data read for file " << file << endl;
+  //if (rank0_) std::cout << " meta data read for file " << file << endl;
   
   if (rank0_ || !serialized_read) {
     h5_read_attribute(file, "iteration", iter);
     h5_read_attribute(file, "time", time);
     h5_read_attribute(file, "dt", dt);
     h5_read_attribute(file, "order", read_order);
-    if (rank0_) std::cout << " ...basic meta data success!" << endl;    
+    //if (rank0_) std::cout << " ...basic meta data success!" << endl;    
     if (average->ComputeMean() && config.GetRestartMean()) {
       int samplesMean, samplesRMS, intervals;
       h5_read_attribute(file, "samplesMean", samplesMean);
@@ -201,7 +201,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
   grvy_timer_begin(__func__);
 #endif
 
-  if (rank0_) cout << "...in io:restart_files_hdf5" << endl;
+  //if (rank0_) cout << "...in io:restart_files_hdf5" << endl;
   
   string serialName;
   if (inputFileName.length() > 0) {
@@ -966,6 +966,7 @@ void IODataOrganizer::read(hid_t file, bool serial, int read_order) {
         assert(!fam.pfunc_->ParFESpace()->IsVariableOrder());
         fam_order = fam.pfunc_->ParFESpace()->FEColl()->GetOrder();
         change_order = (fam_order != read_order);
+        if (rank0 && change_order) std::cout << "Going from " << read_order << " to " << fam_order << endl;	
       }
 
       // Read handled by appropriate method from IOFamily

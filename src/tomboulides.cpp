@@ -80,6 +80,7 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
 
   rank0_ = (pmesh_->GetMyRank() == 0);
   axisym_ = false;
+  writePressure_ = false;  
   nvel_ = dim_;
 
   // make sure there is room for BC attributes
@@ -107,6 +108,9 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
       swirl_ess_attr_ = 0;
     }
 
+    // Store pressure field in h5, primarily for restarting DG-compressible from low-mach
+    tps->getInput("loMach/write-pressure", writePressure_, false);
+    
     // Use "numerical integration" (i.e., under-integrate so that mass matrix is diagonal)
     // NOTE: this should default to false as it is generally not safe, but much of the
     // test results rely on it being true
@@ -1241,6 +1245,11 @@ void Tomboulides::initializeIO(IODataOrganizer &io) const {
   if (dim_ >= 2) io.registerIOVar("/velocity", "y-comp", 1);
   if (dim_ == 3) io.registerIOVar("/velocity", "z-comp", 2);
 
+  if (writePressure_) {
+    io.registerIOFamily("Pressure", "/pressure", p_gf_, false, false, sfec_);
+    io.registerIOVar("/pressure", "pressure", 0);
+  }  
+  
   if (axisym_) {
     io.registerIOFamily("Velocity azimuthal", "/swirl", utheta_gf_, true, true, pfec_);
     io.registerIOVar("/swirl", "swirl", 0);

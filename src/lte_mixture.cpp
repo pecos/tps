@@ -200,9 +200,9 @@ MFEM_HOST_DEVICE bool LteMixture::ComputeTemperatureInternal(const double *state
 
     // Newton step
     double dT = res / dedT;
-    T += dT;
+    T += dT;    
     // clip instead? assert(T > 0);
-    //if (T <= 280.0) {
+    //if (T <= 298.0) {
     //  printf("Iter %d: res = %.6e, T = %.6e\n", niter, res, T); fflush(stdout);
     //  std::cout << state[0] << " " << state[1] << " " << state[2] << " " <<state[3] << " " <<state[4] << endl;      
     //}
@@ -221,10 +221,10 @@ MFEM_HOST_DEVICE bool LteMixture::ComputeTemperatureInternal(const double *state
   }
 
   // clip
-  //if (!converged) {
-  //  converged = true;
-  //  T = 298.0;
-  //}
+  if (!converged) {
+    converged = true;
+    T = 298.0;
+  }
   
   if (!converged) {
     return false;

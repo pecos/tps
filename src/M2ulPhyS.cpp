@@ -1970,6 +1970,7 @@ void M2ulPhyS::projectInitialSolution() {
       u_gf = new ParGridFunction(vfesTmp);      
       T_gf = new ParGridFunction(sfesTmp);
       rho_gf = new ParGridFunction(sfesTmp);
+      P_gf = new ParGridFunction(sfesTmp);      
 
       // register fields to read-in
       ioData.registerIOFamily("Velocity", "/velocity", u_gf, true, true, vfecTmp);
@@ -1978,7 +1979,9 @@ void M2ulPhyS::projectInitialSolution() {
       ioData.registerIOVar("/velocity", "z-comp", 2);
       ioData.registerIOFamily("Temperature", "/temperature", T_gf, true, true, sfecTmp);
       ioData.registerIOVar("/temperature", "temperature", 0);
-
+      ioData.registerIOFamily("Pressure", "/pressure", P_gf, true, true, sfecTmp);
+      ioData.registerIOVar("/pressure", "pressure", 0);
+      
       if (rank0_) std::cout << "...attempting read" << std::endl;            
 
       // read data, will throw a warning for all compressible-type data not in restart
@@ -1986,20 +1989,36 @@ void M2ulPhyS::projectInitialSolution() {
 
       if (rank0_) std::cout << "...constructing density" << std::endl; 
       
-      // compute density
+      // compute density using ideal gas
       double constantP = config.restartFromLoMachPressure;
       double constantR = config.restartFromLoMachRgas;
       TnTmp.SetSize(sfesTmp->GetTrueVSize());
-      rhoTmp.SetSize(sfesTmp->GetTrueVSize());      
-      T_gf->GetTrueDofs(TnTmp);  
-      rhoTmp = (constantP / constantR);
+      rhoTmp.SetSize(sfesTmp->GetTrueVSize());
+      PnTmp.SetSize(sfesTmp->GetTrueVSize());      
+      T_gf->GetTrueDofs(TnTmp);
+      P_gf->GetTrueDofs(PnTmp);
+      PnTmp += constantP;
+      //rhoTmp = (constantP / constantR);
+      rhoTmp.Set(1.0/constantR,PnTmp);
       rhoTmp /= TnTmp;
-      rho_gf->SetFromTrueDofs(rhoTmp); 
+      rho_gf->SetFromTrueDofs(rhoTmp);
+
+      // modify temperature to prevent crazy pressures in small regions where gas is non-ideal
+      //{
+      //  const double *dataRho = rhoTmp.HostRead();
+      //  double *dataTemp = TnTmp.HostWrite();	
+      //  for (int i = 0; i < fes->GetNDofs(); i++) {      
+      //    double T_here = mixture->ComputeTemperatureFromDensityPressure(dataRho[i], constantP);
+      //  dataTemp[i] = T_here;
+      //  }
+      //  T_gf->SetFromTrueDofs(TnTmp);
+      //}
 
       // project to DG space.  These guys already point to the correct location in Up
       vel->ProjectGridFunction(*u_gf);
       temperature->ProjectGridFunction(*T_gf);
       dens->ProjectGridFunction(*rho_gf);
+      press->ProjectGridFunction(*P_gf);
       
       // Exchange before computing conserved state
       Up->ParFESpace()->ExchangeFaceNbrData();
@@ -2008,44 +2027,26 @@ void M2ulPhyS::projectInitialSolution() {
       if (rank0_) std::cout << "...computing conserved state " << fes->GetNDofs() << " " << dfes->GetNDofs() << std::endl; 
       // compute conserved state
       {      
-        //const double *dataTemp = temperature->HostRead();
-        //const double *dataRho = dens->HostRead();
-        //const double *dataU = vel->HostRead();
-        const double *dataPrim = Up->HostRead();		
+        const double *dataPrim = Up->HostRead();
+        const double *dataP = press->HostRead();	
         double *dataCons = U->HostWrite();	
 	int nDof = fes->GetNDofs();
-
         for (int i = 0; i < nDof; i++) {
 
           double state[gpudata::MAXEQUATIONS];
           double conservedState[gpudata::MAXEQUATIONS];
     
-          // primitive state vector = [rho, velocity, temperature, species mole densities]
-          //state[0] = dataRho[i];
-          //for (int eq = 0; eq < dim; eq++) {
-          //  state[eq + 1] = dataU[i + eq * nDof];
-          //}
-          //state[dim + 1] = dataTemp[i];
           for (int eq = 0; eq <= dim+1; eq++) state[eq] = dataPrim[i + eq * nDof];
-	  
-	  //if(state[4] > 300.0) {
-	  //  std::cout << "bad temp: " << state[4] << endl;
-	  //}
-
-	  // copy to Up
-          //for (int eq = 0; eq <= dim+1; eq++) {
-          //  dataPrim[i + eq * sDofInt] = state[eq];
-          //}
 	  
 	  // conserved state
           mixture->GetConservativesFromPrimitives(state, conservedState);
 
+	  // patch-up field for non-ideal regions
+          for (int eq = 0; eq <= dim+1; eq++) state[eq] = conservedState[eq];	  
+	  mixture->modifyEnergyForPressure(state, conservedState, dataP[i]);
+	  
 	  // copy to U => cant use sDofInt here
           for (int eq = 0; eq <= dim+1; eq++) dataCons[i + eq * nDof] = conservedState[eq];
-
-	  //if(conservedState[4] > 1.0e8) {
-	  //  std::cout << "bad CS: " << conservedState[4] << endl;
-	  // }
 	  	  
         }
       }      
@@ -2054,11 +2055,13 @@ void M2ulPhyS::projectInitialSolution() {
       // remove loMach data from write list
       ioData.unregisterIOFamily("Velocity", "/velocity", u_gf);
       ioData.unregisterIOFamily("Temperature", "/temperature", T_gf);
+      ioData.unregisterIOFamily("Pressure", "/pressure", P_gf);      
 
       // cleanup (should be fine as long as actual data never accessed via ioData again)
       //delete u_gf;
       //delete T_gf;
       //delete rho_gf;
+      //delete P_gf;      
       //delete sfesTmp;
       //delete sfecTmp;      
       //delete vfesTmp;
@@ -2085,8 +2088,8 @@ void M2ulPhyS::projectInitialSolution() {
   U->ExchangeFaceNbrData();
   //if (rank0_) std::cout << "...restart nbr exhange done" << std::endl;   
 
-  //  if ( config.restartFromLoMach == false) updatePrimitives();
-  updatePrimitives();  
+  if ( config.restartFromLoMach == false) updatePrimitives();
+  //updatePrimitives();  
   //if (rank0_) std::cout << "...update primitives done" << std::endl;     
 
   // update pressure grid function
