@@ -147,10 +147,12 @@ RUN pip3 install gcovr
 
 RUN yum -y install gsl-gnu9-ohpc
 
-RUN pip3 install "pybind11[global]"
-
 RUN . /etc/profile.d/lmod.sh \
+    && pip3 install "numpy<2.0" \
+    && pip3 install scipy \
     && pip3 install mpi4py
+
+RUN pip3 install "pybind11[global]"
 
 # Register new libs installed into /usr/local/lib with linker
 RUN echo "/usr/local/lib" > /etc/ld.so.conf.d/class.conf
