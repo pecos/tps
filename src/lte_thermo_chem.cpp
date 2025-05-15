@@ -1022,6 +1022,11 @@ void LteThermoChem::step() {
     Tn_next_gf_.GetTrueDofs(Tn_next_);
   }
 
+  auto d_Tn_gf = Tn_next_gf_.ReadWrite();
+  MFEM_FORALL(i, Tn_next_gf_.Size(),
+              { if (d_Tn_gf[i] < 270.0) d_Tn_gf[i] = 270.0; });
+  Tn_next_gf_.GetTrueDofs(Tn_next_);
+
   // prepare for external use and next step
   updateProperties();
   updateDensity();

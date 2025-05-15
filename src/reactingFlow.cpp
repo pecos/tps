@@ -2136,7 +2136,13 @@ void ReactingFlow::temperatureStep() {
   assert(HtInv_->GetConverged());
 
   Ht_form_->RecoverFEMSolution(Xt2, resT_gf_, Tn_next_gf_);
+
   Tn_next_gf_.GetTrueDofs(Tn_next_);
+  for (int i = 0; i < sDofInt_; i++) {
+    if (Tn_next_[i] < 270.0) tmpR0_[i] = 270.0;
+  }
+  Tn_next_gf_.SetFromTrueDofs(Tn_next_);
+
 }
 
 void ReactingFlow::temperatureSubstep(int iSub) {
@@ -3616,6 +3622,9 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
     std::cout << std::endl;
     std::cout << "    iiter = " << iiter << ", r0 = " << res_norm0 << ", r/r0 = " << res_norm / res_norm0 << std::endl;
   }
+
+  // clip T
+  if (YT[nState - 1] < 270.0) YT[nState - 1] = 270.0;
 
   delete[] YT1;
   delete[] YT0;
