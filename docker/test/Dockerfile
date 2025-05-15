@@ -29,7 +29,6 @@ RUN yum -y install valgrind-ohpc
 RUN yum -y install boost-gnu9-mpich-ohpc
 
 RUN yum -y install python38-pip
-RUN pip3 install matplotlib
 
 RUN yum -y install procps-ng
 RUN yum -y install diffutils
@@ -148,8 +147,9 @@ RUN pip3 install gcovr
 RUN yum -y install gsl-gnu9-ohpc
 
 RUN . /etc/profile.d/lmod.sh \
-    && pip3 install "numpy<2.0" \
+    && pip3 install "numpy<2" \
     && pip3 install scipy \
+    && pip3 install matplotlib \
     && pip3 install mpi4py
 
 RUN pip3 install "pybind11[global]"
