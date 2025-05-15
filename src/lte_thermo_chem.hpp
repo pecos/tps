@@ -126,6 +126,10 @@ class LteThermoChem final : public ThermoChemModelBase {
   double Prt_;
   double invPrt_;
 
+  bool Tclip_ = false;
+  double Tmin_ = 0.0;
+  double Tmax_ = 100000.0;
+
   // FEM related fields and objects
 
   // Scalar \f$H^1\f$ finite element collection.

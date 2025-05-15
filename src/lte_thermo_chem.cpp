@@ -165,6 +165,10 @@ LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, t
   tps->getInput("loMach/ltethermo/turb-Prandtl", Prt_, 0.9);
   invPrt_ = 1.0 / Prt_;
 
+  tps->getInput("loMach/ltethermo/clip-temperature", Tclip_, false);
+  tps->getInput("loMach/ltethermo/min-temperature", Tmin_, 0.0);
+  tps->getInput("loMach/ltethermo/max-temperature", Tmax_, 100000.0);
+
   tps->getInput("loMach/ltethermo/linear-solver-rtol", rtol_, 1e-12);
   tps->getInput("loMach/ltethermo/linear-solver-max-iter", max_iter_, 1000);
   tps->getInput("loMach/ltethermo/linear-solver-verbosity", pl_solve_, 0);
@@ -1088,6 +1092,17 @@ void LteThermoChem::step() {
     auto d_Tn_gf = Tn_next_gf_.ReadWrite();
     MFEM_FORALL(i, Tn_next_gf_.Size(),
                 { d_Tn_gf[i] = (1.0 - filter_alpha) * d_Tn_gf[i] + filter_alpha * d_Tn_filtered_gf[i]; });
+    Tn_next_gf_.GetTrueDofs(Tn_next_);
+  }
+
+  if (Tclip_) {
+    double Tmin = Tmin_;
+    double Tmax = Tmax_;
+    auto d_Tn_gf = Tn_next_gf_.ReadWrite();
+    MFEM_FORALL(i, Tn_next_gf_.Size(),
+                { if (d_Tn_gf[i] < Tmin) d_Tn_gf[i] = Tmin; });
+    MFEM_FORALL(i, Tn_next_gf_.Size(),
+                { if (d_Tn_gf[i] > Tmax) d_Tn_gf[i] = Tmax; });
     Tn_next_gf_.GetTrueDofs(Tn_next_);
   }
 

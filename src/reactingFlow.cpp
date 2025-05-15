@@ -86,6 +86,12 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   tpsP_->getInput("loMach/reacting/eddy-Pr", Pr_, 0.72);
   tpsP_->getInput("loMach/reacting/eddy-Sc", Sc_, 1.0);
 
+  tpsP_->getInput("loMach/reacting/clip-temperature", Tclip_, false);
+  tpsP_->getInput("loMach/reacting/min-temperature", Tmin_, 0.0);
+  tpsP_->getInput("loMach/reacting/max-temperature", Tmax_, 100000.0);
+
+
+
   workFluid_ = USER_DEFINED;
   gasModel_ = PERFECT_MIXTURE;
   chemistryModel_ = NUM_CHEMISTRYMODEL;
@@ -2137,6 +2143,19 @@ void ReactingFlow::temperatureStep() {
 
   Ht_form_->RecoverFEMSolution(Xt2, resT_gf_, Tn_next_gf_);
   Tn_next_gf_.GetTrueDofs(Tn_next_);
+
+  if (Tclip_) {
+    double Tmin = Tmin_;
+    double Tmax = Tmax_;
+    auto d_Tn_gf = Tn_next_gf_.ReadWrite();
+    MFEM_FORALL(i, Tn_next_gf_.Size(),
+                { if (d_Tn_gf[i] < Tmin) d_Tn_gf[i] = Tmin; });
+    MFEM_FORALL(i, Tn_next_gf_.Size(),
+                { if (d_Tn_gf[i] > Tmax) d_Tn_gf[i] = Tmax; });
+    Tn_next_gf_.GetTrueDofs(Tn_next_);
+  }
+
+  Tn_next_gf_.SetFromTrueDofs(Tn_next_);
 }
 
 void ReactingFlow::temperatureSubstep(int iSub) {
@@ -3615,6 +3634,12 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
     }
     std::cout << std::endl;
     std::cout << "    iiter = " << iiter << ", r0 = " << res_norm0 << ", r/r0 = " << res_norm / res_norm0 << std::endl;
+  }
+
+  // clip T
+  if (Tclip_) {
+    if (YT[nState - 1] < Tmin_) YT[nState - 1] = Tmin_;
+    if (YT[nState - 1] > Tmax_) YT[nState - 1] = Tmax_;
   }
 
   delete[] YT1;

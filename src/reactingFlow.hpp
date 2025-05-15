@@ -147,6 +147,10 @@ class ReactingFlow : public ThermoChemModelBase {
   double Sc_, invSc_;
   double static_rho_;
 
+  bool Tclip_ = false;
+  double Tmin_ = 0.0;
+  double Tmax_ = 100000.0;
+
   /// pressure-related, closed-system thermo pressure changes
   double ambient_pressure_, thermo_pressure_, system_mass_;
   double dtP_;
