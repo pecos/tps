@@ -125,6 +125,11 @@ void LoMachSolver::initialize() {
   // local pointers
   serial_mesh_ = meshData_->getSerialMesh();
   pmesh_ = meshData_->getMesh();
+
+  if (pmesh_->GetNodes() == NULL) {
+    pmesh_->SetCurvature(1);
+  }
+
   partitioning_ = meshData_->getPartition();
 
   // Stash mesh dimension (convenience)
