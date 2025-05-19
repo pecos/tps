@@ -140,7 +140,18 @@ class TPSINDEX():
     # in future we need to setup this methodically
     # here key denotes the idx running from 0, nreactions-1
     # value denotes the reaction index in the qoi array
-    RR_IDX    = {0 : 2 , 1 : 4 , 2 : 1, 3 : 3}
+    # in RR_IDX, the elements of the array are of the form "LEFT : RIGHT"
+    # "LEFT" denotes the bte/index parameter of a particular reaction in the input (ini) file
+    # "RIGHT" denotes the corresponding index of the same reaction in the cross-section file 
+    # RR_IDX needs to be modified according to the ini files and the corresponding cross-section file
+    # SANITY CHECK: The "RIGHT" parameter will never be zero as long as ELASTIC collision cross-sections are
+    # at the top of the cross-section file. This is because there is no mapping from TPS to BTE
+    # for elastic collisions
+ 
+    # RR_IDX    = {0 : 2 , 1 : 4 , 2 : 1, 3 : 3}
+    # RR_IDX    = {0 : 1 , 1 : 2} # WHEN ONLY Ground-ionization and Lumped/Step-ionization modeled by BTE
+    RR_IDX    = {0 : 2 , 1 : 3, 2 : 1} # WHEN Ground-ionization, Lumped/Step-ionization, Lumped/Step-Excitation modeled by BTE
+    # RR_IDX    = {0 : 2 , 1 : 3, 2 : 1} # WHEN ONLY Ground-ionization and Lumped/Step-ionization modeled by BTE
     
     ION_IDX  = 1
     ELE_IDX  = 2
