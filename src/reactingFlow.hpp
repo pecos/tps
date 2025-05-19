@@ -89,6 +89,9 @@ class ReactingFlow : public ThermoChemModelBase {
   int sDof_, sDofInt_;
   int yDof_, yDofInt_;
 
+  // Number of reactions and dofs
+  int rDof_, rDofInt_;
+
   WorkingFluid workFluid_;
   GasModel gasModel_;
   TransportModel transportModel_;
@@ -177,6 +180,12 @@ class ReactingFlow : public ThermoChemModelBase {
   // Vector \f$H^1\f$ finite element space.
   ParFiniteElementSpace *vfes_ = nullptr;
 
+  // Reactions \f$H^1\f$ finite element collection.
+  FiniteElementCollection *rfec_ = nullptr;
+
+  // Reactions \f$H^1\f$ finite element space.
+  ParFiniteElementSpace *rfes_ = nullptr;
+
   // Fields
   ParGridFunction Tnm1_gf_, Tnm2_gf_;
   ParGridFunction Tn_gf_, Tn_next_gf_, Text_gf_, resT_gf_;
@@ -194,6 +203,10 @@ class ReactingFlow : public ThermoChemModelBase {
   ParGridFunction Rmix_gf_;
   ParGridFunction Mmix_gf_;
   ParGridFunction emission_gf_;
+
+
+  // additions for reaction progress rates
+  ParGridFunction reacR_gf_;
 
   ParGridFunction visc_gf_;
   ParGridFunction kappa_gf_;
@@ -320,6 +333,9 @@ class ReactingFlow : public ThermoChemModelBase {
   Vector atomMW_;
   Vector CpMix_;
 
+  // additions for reaction progress rates
+  Vector reacR_;
+
   Vector Qt_;
   Vector rn_;
   Vector diffY_;
@@ -350,6 +366,13 @@ class ReactingFlow : public ThermoChemModelBase {
   std::list<mfem::DenseMatrix> tableHost_;
   std::vector<ParGridFunction *> vizSpecFields_;
   std::vector<std::string> vizSpecNames_;
+
+  std::vector<ParGridFunction *> vizProdFields_;
+  std::vector<std::string> vizProdNames_;
+
+  // PARGRID FUNCTION AND STRING FOR REACTION PROGRESS RATES
+  std::vector<ParGridFunction *> vizReacFields_;
+  std::vector<std::string> vizReacNames_;
 
  public:
   ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff, TPS::Tps *tps);
