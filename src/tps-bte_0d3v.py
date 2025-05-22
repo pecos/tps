@@ -1817,6 +1817,7 @@ def driver_wo_parla(comm):
             tabulatedSolver.fetch(interface)
             tabulatedSolver.solve()
             tabulatedSolver.push(interface)
+            tps.fetch(interface)
             # --- first TPS step is needed to initialize the EM fields
             tps.solveStep()
             tps.push(interface)
