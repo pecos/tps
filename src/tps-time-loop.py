@@ -38,7 +38,7 @@ config.read(ini_name)
 
 boltzmann = pytps.TabulatedSolver(comm, config)
 
-interface = pytps.Tps2Boltzmann(tps)
+interface = pytps.libtps.Tps2Boltzmann(tps)
 tps.initInterface(interface)
 
 it = 0
