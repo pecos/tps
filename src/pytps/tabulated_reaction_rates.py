@@ -1,6 +1,9 @@
 import h5py
 import scipy
 import scipy.interpolate
+import numpy as np
+from .utils import master_print, libtps
+
 
 class TabulatedSolver:
     def __init__(self, comm, config):
