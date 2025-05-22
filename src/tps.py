@@ -6,14 +6,13 @@ from mpi4py import MPI
 
 # set path to pyTPS library
 path = os.path.dirname( os.path.abspath(sys.argv[0]) )
-print(path)
-sys.path.append(path)
-import pytps
+sys.path.append(os.path.join(path, ".libs")
+import libtps
 
 
 comm = MPI.COMM_WORLD
 # TPS solver
-tps = pytps.libtps.Tps(comm)
+tps = libtps.Tps(comm)
 
 tps.parseCommandLineArgs(sys.argv)
 tps.parseInput()
