@@ -6,7 +6,7 @@ from mpi4py import MPI
 
 # set path to pyTPS library
 path = os.path.dirname( os.path.abspath(sys.argv[0]) )
-sys.path.append(os.path.join(path, ".libs")
+sys.path.append(os.path.join(path, ".libs"))
 import libtps
 
 
