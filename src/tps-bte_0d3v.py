@@ -160,9 +160,9 @@ class TPSINDEX():
     # at the top of the cross-section file. This is because there is no mapping from TPS to BTE
     # for elastic collisions
  
-    # RR_IDX    = {0 : 2 , 1 : 4 , 2 : 1, 3 : 3}
+    RR_IDX    = {0 : 2 , 1 : 4 , 2 : 1, 3 : 3}
     # RR_IDX    = {0 : 1 , 1 : 2} # WHEN ONLY Ground-ionization and Lumped/Step-ionization modeled by BTE
-    RR_IDX    = {0 : 2 , 1 : 3, 2 : 1} # WHEN Ground-ionization, Lumped/Step-ionization, Lumped/Step-Excitation modeled by BTE
+    # RR_IDX    = {0 : 2 , 1 : 3, 2 : 1} # WHEN Ground-ionization, Lumped/Step-ionization, Lumped/Step-Excitation modeled by BTE
     # RR_IDX    = {0 : 2 , 1 : 3, 2 : 1} # WHEN ONLY Ground-ionization and Lumped/Step-ionization modeled by BTE
     
     ION_IDX  = 1
