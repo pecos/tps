@@ -30,7 +30,7 @@ if [ ! -d ref_solns ];then
 fi
 
 # pytps
-if [ ! d ../src/pytps ];then
+if [ ! -d ../src/pytps ];then
     ln -s $testDir/../src/pytps ../src/pytps
 fi
 

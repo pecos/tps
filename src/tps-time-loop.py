@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import sys
-import pathlib
+import os
 import numpy as np
 
 import configparser
@@ -8,14 +8,15 @@ import configparser
 from mpi4py import MPI
 
 # set path to pyTPS library
-path = pathlib.Path(__file__).parent.resolve()
+path = os.path.dirname( os.path.abspath(sys.argv[0]) )
+print(path)
 sys.path.append(path)
 import pytps
 
 
 comm = MPI.COMM_WORLD
 # TPS solver
-tps = pytps.Tps(comm)
+tps = pytps.libtps.Tps(comm)
 
 tps.parseCommandLineArgs(sys.argv)
 tps.parseInput()
@@ -23,15 +24,7 @@ tps.chooseDevices()
 tps.chooseSolver()
 tps.initialize()
 
-ini_name = ''
-if '-run' in sys.argv:
-    ini_name = sys.argv[sys.argv.index('-run') + 1 ]
-elif '--runFile' in sys.argv:
-    ini_name = sys.argv[sys.argv.index('--runFile') + 1 ]
-else:
-    print("Could not parse command line in python. GOOD BYE!")
-    exit(-1)
-
+ini_name = pytps.resolve_runFile(sys.argv)
 print(ini_name)
 config = configparser.ConfigParser()
 config.read(ini_name)
