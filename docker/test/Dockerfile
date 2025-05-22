@@ -142,7 +142,7 @@ RUN . /etc/profile.d/lmod.sh \
 RUN rm /tmp/doxygen-1.9.5.src.tar.gz
 
 RUN yum -y install graphviz
-RUN pip3 install gcovr
+RUN . /etc/profile.d/lmod.sh \ && pip3 install gcovr
 
 RUN yum -y install gsl-gnu9-ohpc
 

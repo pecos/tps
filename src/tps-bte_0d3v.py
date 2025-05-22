@@ -58,7 +58,7 @@ def min_mean_max(a, comm: MPI.Comm):
 
 # set path to C++ TPS library
 path = os.path.abspath(os.path.dirname(sys.argv[0]))
-sys.path.append(path + "/.libs")
+sys.path.append(path)
 sys.path.append(path + "/../../torch-chemistry")
 import argon.scripts.synthetic_cs as synthetic_cs
 sys.path.append(path + "/../../boltzmann/BESolver/python")
@@ -66,8 +66,9 @@ sys.path.append(path + "/../../boltzmann/BESolver/python")
 crs_folder = path + "/../../torch-chemistry/argon/scripts/crs_lxcat"
 if not os.path.exists(crs_folder):
     os.makedirs(crs_folder)
-    
-import libtps
+
+import pytps    
+from pytps import libtps, TabulatedSolver
 from   bte_0d3v_batched import bte_0d3v_batched as BoltzmannSolver
 import utils as bte_utils
 print(bte_utils)
@@ -1815,6 +1816,19 @@ def driver_wo_parla(comm):
             interface = libtps.Tps2Boltzmann(tps)
             tps.initInterface(interface)
             tps.solveBegin()
+
+            ## Hack to set-up the correct initial condition
+            tps.push(interface)
+            ini_name = pytps.resolve_runFile(sys.argv)
+
+            print(ini_name)
+            config = configparser.ConfigParser()
+            config.read(ini_name)
+            tabulatedSolver = TabulatedSolver(comm, config)
+            tabulatedSolver.fetch(interface)
+            tabulatedSolver.solve()
+            tabulatedSolver.push(interface)
+            tps.fetch(interface)
             # --- first TPS step is needed to initialize the EM fields
             tps.solveStep()
             tps.push(interface)
