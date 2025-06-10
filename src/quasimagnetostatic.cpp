@@ -505,8 +505,11 @@ void QuasiMagnetostaticSolver3D::solveStep() {
   }
 
   // E = \grad phi + i omega A. Multiplication by i switches the real and imaginary part
-  div_free_->Mult(*Areal_, *(this->Eimag_));
-  div_free_->Mult(*Aimag_, *(this->Ereal_));
+  // div_free_->Mult(*Areal_, *(this->Eimag_));
+  // div_free_->Mult(*Aimag_, *(this->Ereal_));
+
+  *(this->Eimag_) = *Areal_;
+  *(this->Ereal_) = *Aimag_;
 
   // Compute Joule heating
   const double omega = (2 * M_PI * em_opts_.current_frequency);

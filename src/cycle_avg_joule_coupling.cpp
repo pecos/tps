@@ -157,7 +157,8 @@ void CycleAvgJouleCoupling::initializeInterpolationData() {
 
   // Set up GSLIB interpolators
   interp_flow_to_em_->Setup(*flow_mesh);
-  interp_flow_to_em_->SetDefaultInterpolationValue(0.0);
+  // interp_flow_to_em_->SetDefaultInterpolationValue(0.0);
+  interp_flow_to_em_->SetDefaultInterpolationValue(0.1);
 
   interp_em_to_flow_->Setup(*(qmsa_solver_->getMesh()));
   interp_em_to_flow_->SetDefaultInterpolationValue(0);
@@ -242,6 +243,9 @@ void CycleAvgJouleCoupling::interpConductivityFromFlowToEM() {
     elem_dof_vals.SetSize(nsp);
     for (int j = 0; j < nsp; j++) {
       elem_dof_vals(j) = conductivity_em(n0 + j);
+      if (elem_dof_vals(j) < 0.1) {
+        elem_dof_vals(j) = 0.1;
+      }
     }
     conductivity_em_gf->SetSubVector(vdofs, elem_dof_vals);
     n0 += nsp;
@@ -320,6 +324,9 @@ void CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow() {
       elem_dof_vals.SetSize(nsp);
       for (int j = 0; j < nsp; j++) {
         elem_dof_vals(j) = interp_vals(n0 + j);
+        if (elem_dof_vals(j) < 0.0) {
+          elem_dof_vals(j) = 0.0;
+        }
       }
       joule_heating_flow->SetSubVector(vdofs, elem_dof_vals);
       n0 += nsp;
