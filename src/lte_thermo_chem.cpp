@@ -86,6 +86,8 @@ LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, t
   std::string table_file;
   tps->getRequiredInput("loMach/ltethermo/table-file", table_file);
 
+  tps->getInput("loMach/ltethermo/filter-restart", filter_restart_, false);
+
   // Read data from hdf5 file containing 6 columns: T, mu, kappa, sigma, Rgas, Cp
   DenseMatrix table_data;
   bool success;
@@ -872,6 +874,59 @@ void LteThermoChem::initializeOperators() {
   Tn_next_gf_.SetFromTrueDofs(Tn_);
   Tn_next_gf_.GetTrueDofs(Tn_next_);
 
+
+  // Smooth the restart temperature field (if requested)
+  if (filter_restart_) {
+    if (rank0_) std::cout << "************ Filtering temperature restart ******************" << std::endl;
+
+    // Build the right-hand-side
+    resT_ = 0.0;
+    M_rho_Cp_->AddMult(Tn_, resT_);
+
+    bd0_over_dt.constant = 1.0;
+    kappa_gf_ = 0.01;
+
+    Ht_form_->Update();
+    Ht_form_->Assemble();
+    Ht_form_->FormSystemMatrix(temp_ess_tdof_, Ht_);
+
+    HtInv_->SetOperator(*Ht_);
+    if (partial_assembly_) {
+      delete HtInvPC_;
+      Vector diag_pa(sfes_->GetTrueVSize());
+      Ht_form_->AssembleDiagonal(diag_pa);
+      HtInvPC_ = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof_);
+      HtInv_->SetPreconditioner(*HtInvPC_);
+    }
+
+    // Prepare for the solve
+    for (auto &temp_dbc : temp_dbcs_) {
+      Tn_next_gf_.ProjectBdrCoefficient(*temp_dbc.coeff, temp_dbc.attr);
+    }
+    sfes_->GetRestrictionMatrix()->MultTranspose(resT_, resT_gf_);
+
+    Vector Xt2, Bt2;
+    if (partial_assembly_) {
+      auto *HC = Ht_.As<ConstrainedOperator>();
+      EliminateRHS(*Ht_form_, *HC, temp_ess_tdof_, Tn_next_gf_, resT_gf_, Xt2, Bt2, 1);
+    } else {
+      Ht_form_->FormLinearSystem(temp_ess_tdof_, Tn_next_gf_, resT_gf_, Ht_, Xt2, Bt2, 1);
+    }
+
+    // solve helmholtz eq for temp
+    HtInv_->Mult(Bt2, Xt2);
+    assert(HtInv_->GetConverged());
+
+    Ht_form_->RecoverFEMSolution(Xt2, resT_gf_, Tn_next_gf_);
+    Tn_next_gf_.GetTrueDofs(Tn_next_);
+
+    Tn_gf_.SetFromTrueDofs(Tn_next_);
+
+    Tn_gf_.GetTrueDofs(Tn_);
+    Tn_next_gf_.SetFromTrueDofs(Tn_);
+    Tn_next_gf_.GetTrueDofs(Tn_next_);
+  }
+
   // After IC is filled, compute density
   updateDensity();
 
@@ -894,6 +949,21 @@ void LteThermoChem::initializeOperators() {
 
   // and initialize system mass
   computeSystemMass();
+
+  // Get the initial props into the viz field at time 0
+  updateProperties();
+}
+
+void LteThermoChem::initializeStats(Averaging &average, IODataOrganizer &io, bool continuation) {
+  if (average.ComputeMean()) {
+    // fields for averaging
+    average.registerField(std::string("temperature"), &Tn_gf_, false, 0, 1);
+
+    // io init
+    io.registerIOFamily("Time-averaged temperature", "/meanTemp", average.GetMeanField(std::string("temperature")), false,
+                        continuation, sfec_);
+    io.registerIOVar("/meanTemp", "<T>", 0, true);
+  }
 }
 
 /**
@@ -1024,6 +1094,8 @@ void LteThermoChem::step() {
   auto d_Tn_gf = Tn_next_gf_.ReadWrite();
   MFEM_FORALL(i, Tn_next_gf_.Size(),
               { if (d_Tn_gf[i] < 270.0) d_Tn_gf[i] = 270.0; });
+  MFEM_FORALL(i, Tn_next_gf_.Size(),
+              { if (d_Tn_gf[i] > 12000.0) d_Tn_gf[i] = 12000.0; });
   Tn_next_gf_.GetTrueDofs(Tn_next_);
 
   // prepare for external use and next step
