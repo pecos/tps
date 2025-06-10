@@ -128,6 +128,8 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
     tps->getInput("loMach/tomboulides/psolve-maxIters", pressure_solve_max_iter_, default_max_iter_);
     tps->getInput("loMach/tomboulides/hsolve-maxIters", hsolve_max_iter_, default_max_iter_);
     tps->getInput("loMach/tomboulides/msolve-maxIters", mass_inverse_max_iter_, default_max_iter_);
+
+    tps->getInput("loMach/tomboulides/iorho_gf", use_iorho_gf_, false);
   }
 }
 
@@ -206,6 +208,7 @@ Tomboulides::~Tomboulides() {
 
   // objects allocated by initalizeSelf
   if (axisym_) delete gravity_vec_;
+  delete iorho_gf_;
   delete utheta_next_gf_;
   delete utheta_gf_;
   delete u_next_rad_comp_gf_;
@@ -250,6 +253,7 @@ void Tomboulides::initializeSelf() {
   pfec_ = new H1_FECollection(porder_);
   pfes_ = new ParFiniteElementSpace(pmesh_, pfec_);
   p_gf_ = new ParGridFunction(pfes_);
+  iorho_gf_ = new ParGridFunction(pfes_);
   resp_gf_ = new ParGridFunction(pfes_);
 
   epsi_gf_ = new ParGridFunction(sfes_);
@@ -596,10 +600,24 @@ void Tomboulides::initializeOperators() {
   // Create all the Coefficient objects we need
   rho_coeff_ = new GridFunctionCoefficient(thermo_interface_->density);
 
+  (*iorho_gf_) = 1.0;
+  (*iorho_gf_) /= (*thermo_interface_->density);
+
   if (axisym_) {
+    if (use_iorho_gf_) {
+      // TODO(trevilo): Extend this option to axisymmetric
+      if (pmesh_->GetMyRank() == 0) {
+        std::cout << "Tomboulides: use_iorho_gf not supported for axisymmetric" << std::endl;
+      }
+      assert(false);
+    }
     iorho_coeff_ = new RatioCoefficient(radius_coeff, *rho_coeff_);
   } else {
-    iorho_coeff_ = new RatioCoefficient(1.0, *rho_coeff_);
+    if (use_iorho_gf_) {
+      iorho_coeff_ = new GridFunctionCoefficient(iorho_gf_);
+    } else {
+      iorho_coeff_ = new RatioCoefficient(1.0, *rho_coeff_);
+    }
   }
 
   Hv_bdfcoeff_.constant = 1.0 / coeff_.dt;
@@ -1220,6 +1238,11 @@ void Tomboulides::step() {
 
   // Update total viscosity field
   updateTotalViscosity();
+
+  // Update 1/rho field
+  (*iorho_gf_) = 1.0;
+  (*iorho_gf_) /= (*thermo_interface_->density);
+
 
   // Update the variable coefficient Laplacian to account for change
   // in density

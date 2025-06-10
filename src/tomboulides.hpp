@@ -82,6 +82,7 @@ class Tomboulides final : public FlowBase {
   // Options
   bool numerical_integ_ = false;
   bool partial_assembly_ = false;
+  bool use_iorho_gf_ = false;
 
   // linear-solver options
   int smoother_poly_order_;
@@ -231,6 +232,7 @@ class Tomboulides final : public FlowBase {
   mfem::FiniteElementCollection *pfec_ = nullptr;
   mfem::ParFiniteElementSpace *pfes_ = nullptr;
   mfem::ParGridFunction *p_gf_ = nullptr;
+  mfem::ParGridFunction *iorho_gf_ = nullptr;
   mfem::ParGridFunction *resp_gf_ = nullptr;
   mfem::ParGridFunction *pp_div_rad_comp_gf_ = nullptr;
 
@@ -244,7 +246,9 @@ class Tomboulides final : public FlowBase {
 
   /// mfem::Coefficients used in forming necessary operators
   mfem::GridFunctionCoefficient *rho_coeff_ = nullptr;
-  mfem::RatioCoefficient *iorho_coeff_ = nullptr;
+  //mfem::RatioCoefficient *iorho_coeff_ = nullptr;
+  //mfem::GridFunctionCoefficient *iorho_coeff_ = nullptr;
+  mfem::Coefficient *iorho_coeff_ = nullptr;
   mfem::ConstantCoefficient nlcoeff_;
   mfem::ConstantCoefficient one_coeff_;
   mfem::ConstantCoefficient Hv_bdfcoeff_;
