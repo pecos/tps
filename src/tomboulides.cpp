@@ -250,6 +250,7 @@ void Tomboulides::initializeSelf() {
   pfec_ = new H1_FECollection(porder_);
   pfes_ = new ParFiniteElementSpace(pmesh_, pfec_);
   p_gf_ = new ParGridFunction(pfes_);
+  iorho_gf_ = new ParGridFunction(pfes_);
   resp_gf_ = new ParGridFunction(pfes_);
 
   epsi_gf_ = new ParGridFunction(sfes_);
@@ -596,10 +597,14 @@ void Tomboulides::initializeOperators() {
   // Create all the Coefficient objects we need
   rho_coeff_ = new GridFunctionCoefficient(thermo_interface_->density);
 
+  (*iorho_gf_) = 1.0;
+  (*iorho_gf_) /= (*thermo_interface_->density);
+
   if (axisym_) {
     iorho_coeff_ = new RatioCoefficient(radius_coeff, *rho_coeff_);
   } else {
-    iorho_coeff_ = new RatioCoefficient(1.0, *rho_coeff_);
+    // iorho_coeff_ = new RatioCoefficient(1.0, *rho_coeff_);
+    iorho_coeff_ = new GridFunctionCoefficient(iorho_gf_);
   }
 
   Hv_bdfcoeff_.constant = 1.0 / coeff_.dt;
@@ -1220,6 +1225,11 @@ void Tomboulides::step() {
 
   // Update total viscosity field
   updateTotalViscosity();
+
+  // Update 1/rho field
+  (*iorho_gf_) = 1.0;
+  (*iorho_gf_) /= (*thermo_interface_->density);
+
 
   // Update the variable coefficient Laplacian to account for change
   // in density
