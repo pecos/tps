@@ -89,6 +89,7 @@ class LteThermoChem final : public ThermoChemModelBase {
   bool numerical_integ_ = false;  /**< Enable/disable numerical integration rules of forms. */
   bool domain_is_open_ = false;   /**< true if domain is open */
   bool axisym_ = false;
+  bool filter_restart_ = false;
 
   // Linear-solver-related options
   int pl_solve_ = 0;    /**< Verbosity level passed to mfem solvers */
@@ -247,6 +248,7 @@ class LteThermoChem final : public ThermoChemModelBase {
   // Functions overriden from base class
   void initializeSelf() final;
   void initializeOperators() final;
+  void initializeStats(Averaging &average, IODataOrganizer &io, bool continuation) final;
   void step() final;
   void initializeIO(IODataOrganizer &io) final;
   void initializeViz(ParaViewDataCollection &pvdc) final;
