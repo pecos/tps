@@ -344,14 +344,22 @@ void Tps::getInput(const char *name, T &var, T varDefault) {
 void Tps::getVec(const char *name, Vector &vec, size_t numElems, const Vector &vdef) {
   if ((size_t)vdef.Size() < numElems) exit(ERROR);
   if ((size_t)vec.Size() < numElems) vec.SetSize(numElems);
+
+  // To avoid grvy chattiness from Read_Var_Vec, set log level to
+  // GRVY_NOLOG, just for this call.  Reset below to previous value.
+  const int grvy_log_level = grvy_log_getlevel();
+  grvy_log_setlevel(GRVY_NOLOG);
+
   if (!iparse_.Read_Var_Vec(name, vec.HostWrite(), numElems)) {
-    grvy_printf(GRVY_INFO, "Setting input vector %s to default.", name);
+    grvy_log_setlevel(grvy_log_level);
+    if (isRank0_) grvy_printf(GRVY_INFO, "Setting input vector %s to default.\n", name);
     double *hv = vec.HostWrite();
     const double *hd = vdef.HostRead();
     for (size_t i = 0; i < numElems; i++) {
       hv[i] = hd[i];
     }
   }
+  grvy_log_setlevel(grvy_log_level);
 }
 
 /** Read an input value for keyword [name] and store in var.  If
@@ -364,7 +372,6 @@ void Tps::getRequiredInput(const char *name, T &var) {
     std::cout << "ERROR: Unable to read required input variable -> " << name << std::endl;
     exit(ERROR);
   }
-  return;
 }
 
 /** \brief Input parsing for vector quantities that must be provided.

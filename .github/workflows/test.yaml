@@ -18,7 +18,7 @@ jobs:
        DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
        DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
    style:
-     runs-on: ubuntu-20.04
+     runs-on: ubuntu-22.04
      needs: [cpuimage]
      container:
        image: pecosut/tps_env:latest
@@ -38,7 +38,7 @@ jobs:
        - name: Style check
          run:  make style
    build:
-     runs-on: ubuntu-20.04
+     runs-on: ubuntu-22.04
      needs: [cpuimage]
      container:
        image: pecosut/tps_env:latest
@@ -165,7 +165,7 @@ jobs:
       - name: VPATH tests
         run:  cd build; module restore tps-gpu-cpu; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
    distbuild:
-     runs-on: ubuntu-20.04
+     runs-on: ubuntu-22.04
      needs: [cpuimage]
      container:
        image: pecosut/tps_env:latest
@@ -192,7 +192,7 @@ jobs:
            name: tarball-${{ github.event.pull_request.head.sha }}
            path: tps-*.tar.gz
    disttest-cpu:
-     runs-on: ubuntu-20.04
+     runs-on: ubuntu-22.04
      needs: [cpuimage,distbuild]
      container:
        image: pecosut/tps_env:latest

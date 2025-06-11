@@ -108,6 +108,7 @@ class ReactingFlow : public ThermoChemModelBase {
   DenseMatrix speciesComposition_;
   DenseMatrix gasParams_;
   double const_plasma_conductivity_;
+  bool radiative_decay_NECincluded_;
 
   // Flags
   bool rank0_;                      /**< true if this is rank 0 */
@@ -188,6 +189,7 @@ class ReactingFlow : public ThermoChemModelBase {
   ParGridFunction CpMix_gf_;
   ParGridFunction Rmix_gf_;
   ParGridFunction Mmix_gf_;
+  ParGridFunction emission_gf_;
 
   ParGridFunction visc_gf_;
   ParGridFunction kappa_gf_;
@@ -303,6 +305,7 @@ class ReactingFlow : public ThermoChemModelBase {
   Vector Xn_;
   Vector resY_;
   Vector prodY_;
+  Vector prodE_;
   Vector hw_;
   Vector CpY_;
   Vector crossDiff_;
@@ -363,7 +366,7 @@ class ReactingFlow : public ThermoChemModelBase {
   void updateMixture();
   void updateThermoP();
   void extrapolateState();
-  void updateDensity(double tStep);
+  void updateDensity(double tStep, bool update_mass_matrix = true);
   void updateBC(int current_step);
   void updateDiffusivity();
   void computeSystemMass();

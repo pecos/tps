@@ -141,6 +141,25 @@ MFEM_HOST_DEVICE double ArAr1P11(const double &T) {
   return 4.574321e-18 * pow(T, -0.1805);
 }
 
+// General form of the fit used for the e-Ar collision integrals
+MFEM_HOST_DEVICE double logT_fit(const double logT, const double coeff[9]) {
+  // Evaluate powers of log(T) from -1 through 7
+  double logT_power[9];
+  logT_power[0] = 1. / logT;
+  logT_power[1] = 1.;
+  for (int k = 0; k < 7; k++) {
+    logT_power[k + 2] = logT_power[k + 1] * logT;
+  }
+
+  // fit = sum_k c_k (log(T)^k) for k=-1 to 7
+  double fit = 0.0;
+  for (int k = 0; k < 9; k++) {
+    fit += coeff[k] * logT_power[k];
+  }
+
+  return fit;
+}
+
 /*
   e-Ar (l,r) are fitted over numerical quadrature of definitions.
   Q_{e,Ar}^(1), elastic momentum transfer cross section, is determined by a 7-parameter shifted MERT model,
@@ -148,52 +167,37 @@ MFEM_HOST_DEVICE double ArAr1P11(const double &T) {
 */
 MFEM_HOST_DEVICE double eAr11(const double &T) {
   const double logT = log(T);
-  if (T < 1.2e4) {
-    return 5.8664e-22 * logT * logT * logT - 6.3417e-21 * logT * logT + 3.2083e-21 * logT + 9.0686e-20;
-  } else {
-    double tmp = logT - 10.9082;
-    return 12.1818e-20 * exp(-0.4186 * tmp * tmp) + 8.6949e-22;
-  }
+  const double coeff[9] = {6.36254140e-18, 1.84835040e-18,  -5.87727093e-18, 3.20023027e-18, -8.50509054e-19,
+                           1.28163820e-19, -1.11712910e-20, 5.25649382e-22,  -1.03296658e-23};
+  return logT_fit(logT, coeff);
 }
 
 MFEM_HOST_DEVICE double eAr12(const double &T) {
   const double logT = log(T);
-  if (T < 1.0e4) {
-    return 5.0435e-22 * logT * logT * logT - 4.0041e-21 * logT * logT - 1.3234e-20 * logT + 1.1966e-19;
-  } else {
-    double tmp = logT - 10.5348;
-    return 12.5836e-20 * exp(-0.5116 * tmp * tmp) + 8.7254e-22;
-  }
+  const double coeff[9] = {1.91338172e-17, 5.45418129e-18,  -1.78361685e-17, 9.75657946e-18, -2.61115722e-18,
+                           3.98310268e-19, -3.53503678e-20, 1.70375066e-21,  -3.45211955e-23};
+  return logT_fit(logT, coeff);
 }
 
 MFEM_HOST_DEVICE double eAr13(const double &T) {
   const double logT = log(T);
-  if (T < 8.2e3) {
-    return 4.3150e-22 * logT * logT * logT - 2.1312e-21 * logT * logT - 2.5311e-20 * logT + 1.3866e-19;
-  } else {
-    double tmp = logT - 10.2802;
-    return 12.9711e-20 * exp(-0.5725 * tmp * tmp) + 1.6371e-21;
-  }
+  const double coeff[9] = {3.04685398e-17, 8.39750994e-18,  -2.88132528e-17, 1.60147037e-17, -4.34837891e-18,
+                           6.73136845e-19, -6.06704580e-20, 2.97216168e-21,  -6.12760944e-23};
+  return logT_fit(logT, coeff);
 }
 
 MFEM_HOST_DEVICE double eAr14(const double &T) {
   const double logT = log(T);
-  if (T < 7.1e3) {
-    return 3.9545e-22 * logT * logT * logT - 1.1198e-21 * logT * logT - 3.1302e-20 * logT + 1.4507e-19;
-  } else {
-    double tmp = logT - 10.0853;
-    return 13.2903e-20 * exp(-0.6150 * tmp * tmp) + 1.7854e-21;
-  }
+  const double coeff[9] = {3.90777949e-17, 1.04696956e-17,  -3.73774204e-17, 2.10610498e-17, -5.79029566e-18,
+                           9.07573157e-19, -8.28466766e-20, 4.11188110e-21,  -8.59225098e-23};
+  return logT_fit(logT, coeff);
 }
 
 MFEM_HOST_DEVICE double eAr15(const double &T) {
   const double logT = log(T);
-  if (T < 6.0e3) {
-    return 2.8521e-22 * logT * logT * logT + 9.9567e-22 * logT * logT - 4.2614e-20 * logT + 1.6026e-19;
-  } else {
-    double tmp = logT - 9.9275;
-    return 13.4901e-20 * exp(-0.6295 * tmp * tmp) + 4.6041e-22;
-  }
+  const double coeff[9] = {4.41333290e-17, 1.15696010e-17,  -4.25651305e-17, 2.42442440e-17, -6.73359258e-18,
+                           1.06641697e-18, -9.83933863e-20, 4.93775812e-21,  -1.04362372e-22};
+  return logT_fit(logT, coeff);
 }
 
 }  // namespace argon

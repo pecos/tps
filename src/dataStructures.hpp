@@ -74,7 +74,7 @@ enum TransportModel { ARGON_MINIMAL, ARGON_MIXTURE, CONSTANT, LTE_TRANSPORT, MIX
 
 enum ChemistryModel { /* CANTERA, */ NUM_CHEMISTRYMODEL };
 
-enum ReactionModel { ARRHENIUS, HOFFERTLIEN, TABULATED_RXN, GRIDFUNCTION_RXN, NUM_REACTIONMODEL };
+enum ReactionModel { ARRHENIUS, HOFFERTLIEN, TABULATED_RXN, GRIDFUNCTION_RXN, RADIATIVE_DECAY, NUM_REACTIONMODEL };
 
 enum RadiationModel { NONE_RAD, NET_EMISSION, NUM_RADIATIONMODEL };
 
@@ -659,7 +659,8 @@ struct ChemistryInput {
   ReactionModel reactionModels[gpudata::MAXREACTIONS];
   double equilibriumConstantParams[gpudata::MAXCHEMPARAMS * gpudata::MAXREACTIONS];
   ReactionInput reactionInputs[gpudata::MAXREACTIONS];
-
+  std::vector<std::string> speciesNames;
+  std::map<std::string, int> speciesMapping;
   double minimumTemperature;
 };
 
