@@ -1114,7 +1114,7 @@ void ReactingFlow::initializeSelf() {
         }
         AddTempDirichletBC(temperature_value, inlet_attr);
 
-        // AddSpecDirichletBC(0.0, inlet_attr);
+        AddSpecDirichletBC(0.0, inlet_attr);
 
       } else if (type == "interpolate") {
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
@@ -1198,7 +1198,7 @@ void ReactingFlow::initializeSelf() {
         Qt_bc_coeff->constant = 0.0;
         AddQtDirichletBC(Qt_bc_coeff, attr_wall);
 
-        // AddSpecDirichletBC(0.0, attr_wall);
+        AddSpecDirichletBC(0.0, attr_wall);
       }
     }
     if (rank0_) std::cout << "Temp wall bc completed: " << numWalls << endl;

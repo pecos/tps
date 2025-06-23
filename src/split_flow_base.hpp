@@ -35,6 +35,11 @@
  * @brief Contains base class and simplest possible variant of flow model
  */
 
+// forward-declaration for Tps support class (tps.hpp)
+namespace TPS {
+class Tps;
+}
+
 #include "tps_mfem_wrap.hpp"
 
 class IODataOrganizer;
@@ -143,6 +148,13 @@ class FlowBase {
 
 class ZeroFlow final : public FlowBase {
  protected:
+
+  // Options-related structures
+  TPS::Tps *tpsP_ = nullptr;
+
+  // Options
+  bool nonzero_flow_ = false;
+
   mfem::ParMesh *pmesh_;
   const int vorder_;
   const int dim_;
@@ -150,10 +162,11 @@ class ZeroFlow final : public FlowBase {
   mfem::FiniteElementCollection *fec_ = nullptr;
   mfem::ParFiniteElementSpace *fes_ = nullptr;
   mfem::ParGridFunction *velocity_ = nullptr;
+  mfem::ParGridFunction *zero_ = nullptr;
 
  public:
   /// Constructor
-  ZeroFlow(mfem::ParMesh *pmesh, int vorder);
+  ZeroFlow(mfem::ParMesh *pmesh, int vorder, TPS::Tps *tps = nullptr);
 
   /// Destructor
   ~ZeroFlow() final;
