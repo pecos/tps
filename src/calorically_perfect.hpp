@@ -155,6 +155,8 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   ParGridFunction R0PM0_gf_;
   ParGridFunction Qt_gf_;
 
+  ParGridFunction *gridScale_gf_ = nullptr;
+
   // ParGridFunction *buffer_tInlet_ = nullptr;
   GridFunctionCoefficient *temperature_bc_field_ = nullptr;
 
@@ -170,6 +172,20 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   ScalarVectorProductCoefficient *kap_gradT_coeff_ = nullptr;
   GridFunctionCoefficient *rho_over_dt_coeff_ = nullptr;
   GridFunctionCoefficient *rho_coeff_ = nullptr;
+
+  VectorMagnitudeCoefficient *umag_coeff_ = nullptr;
+  GridFunctionCoefficient *gscale_coeff_ = nullptr;
+  GridFunctionCoefficient *visc_coeff_ = nullptr;
+  PowerCoefficient *visc_inv_coeff_ = nullptr;
+  ProductCoefficient *reh1_coeff_  = nullptr;
+  ProductCoefficient *reh2_coeff_  = nullptr;
+  ProductCoefficient *Reh_coeff_  = nullptr;
+  TransformCoefficient *csupg_coeff_ = nullptr;
+  ProductCoefficient *uw1_coeff_  = nullptr;
+  ProductCoefficient *uw2_coeff_ = nullptr;
+  ProductCoefficient *upwind_coeff_  = nullptr;
+  TransformedMatrixVectorCoefficient *swdiff_coeff_  = nullptr;
+  ScalarMatrixProductCoefficient *supg_coeff_ = nullptr;
 
   // operators and solvers
   ParBilinearForm *At_form_ = nullptr;
@@ -233,7 +249,7 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
 
  public:
   CaloricallyPerfectThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff,
-                               TPS::Tps *tps);
+                               ParGridFunction *gridScale, TPS::Tps *tps);
   virtual ~CaloricallyPerfectThermoChem();
 
   // Functions overriden from base class
