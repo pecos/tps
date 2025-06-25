@@ -58,10 +58,11 @@ MFEM_HOST_DEVICE double Sutherland(const double T, const double mu_star, const d
 }
 
 CaloricallyPerfectThermoChem::CaloricallyPerfectThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts,
-                                                           temporalSchemeCoefficients &time_coeff, TPS::Tps *tps)
+                                                           temporalSchemeCoefficients &time_coeff, ParGridFunction *gridScale, TPS::Tps *tps)
     : tpsP_(tps), pmesh_(pmesh), time_coeff_(time_coeff) {
   rank0_ = (pmesh_->GetMyRank() == 0);
   order_ = loMach_opts->order;
+  gridScale_gf_ = gridScale;
 
   std::string visc_model;
   tpsP_->getInput("loMach/calperfect/viscosity-model", visc_model, std::string("sutherland"));
@@ -132,6 +133,9 @@ CaloricallyPerfectThermoChem::CaloricallyPerfectThermoChem(mfem::ParMesh *pmesh,
   tpsP_->getInput("loMach/calperfect/msolve-atol", mass_inverse_atol_, default_atol_);
   tpsP_->getInput("loMach/calperfect/msolve-max-iter", mass_inverse_max_iter_, max_iter_);
   tpsP_->getInput("loMach/calperfect/msolve-verbosity", mass_inverse_pl_, pl_solve_);
+
+  // artificial diffusion (SUPG)
+  tpsP_->getInput("loMach/calperfect/streamwise-stabilization", sw_stab_, false);
 }
 
 CaloricallyPerfectThermoChem::~CaloricallyPerfectThermoChem() {
@@ -163,6 +167,20 @@ CaloricallyPerfectThermoChem::~CaloricallyPerfectThermoChem() {
   delete thermal_diff_total_coeff_;
   delete rho_over_dt_coeff_;
   delete rho_coeff_;
+
+  delete umag_coeff_
+  delete gscale_coeff_ 
+  delete visc_coeff_
+  delete visc_inv_coeff_
+  delete reh1_coeff_ 
+  delete reh2_coeff_ 
+  delete Reh_coeff_ 
+  delete csupg_coeff_
+  delete uw1_coeff_ 
+  delete uw2_coeff_
+  delete upwind_coeff_ 
+  delete swdiff_coeff_ 
+  delete supg_coeff_
 
   // allocated in initializeSelf
   delete sfes_;
@@ -448,6 +466,33 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   rhon_next_coeff_ = new GridFunctionCoefficient(&rn_gf_);
   rhou_coeff_ = new ScalarVectorProductCoefficient(*rhon_next_coeff_, *un_next_coeff_);
 
+  // artifical diffusion coefficients
+  if(sw_stab_) {
+    umag_coeff_ = new VectorMagnitudeCoefficient(un_next_coeff_)
+    gscale_coeff_ = new GridFunctionCoefficient(gridScale)
+    visc_coeff_ = new GridFunctionCoefficient(visc_gf_)
+    visc_inv_coeff_ = new PowerCoefficient(visc_coeff_, -1)
+
+    // compute Reh
+    reh1_coeff_ = new ProductCoefficient(rho_coeff_, visc_inv_coeff_)
+    reh2_coeff_ = new ProductCoefficient(reh1_coeff_, gscale_coeff_)
+    Reh_coeff_ = new ProductCoefficient(reh1_coeff_, umag_coeff_)
+
+    // Csupg
+    csupg_coeff_ = new TransformCoefficient(Reh_coeff_, csupgFactor);
+
+    // compute upwind magnitude
+    uw1_coeff_ = new ProductCoefficient(rho_coeff_, csupg_coeff_)
+    uw2_coeff_ = new ProductCoefficient(uw1_coeff_, gscale_coeff_)
+    upwind_coeff_ = new ProductCoefficient(uw2_coeff_, umag_coeff_)
+
+    // streamwise diffusion direction
+    swdiff_coeff_ = new TransformedMatrixVectorCoefficient(un_next_coeff_, streamwiseTensor);
+
+    supg_coeff_ = new ScalarMatrixProductCoefficient(*upwind_coeff_, *swdiff_coeff)
+  }
+  
+
   At_form_ = new ParBilinearForm(sfes_);
   auto *at_blfi = new ConvectionIntegrator(*rhou_coeff_);
   if (numerical_integ_) {
@@ -483,6 +528,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   MsRho_form_->FormSystemMatrix(empty, MsRho_);
   if (rank0_) std::cout << "CaloricallyPerfectThermoChem MsRho operator set" << endl;
 
+  // Helmholtz
   Ht_form_ = new ParBilinearForm(sfes_);
   auto *hmt_blfi = new MassIntegrator(*rho_over_dt_coeff_);
   auto *hdt_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
@@ -491,6 +537,14 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
     hmt_blfi->SetIntRule(&ir_di);
     hdt_blfi->SetIntRule(&ir_di);
   }
+  // SUPG
+  if (sw_stab_)
+    // SUPG diffusion
+    auto *Sdt_blfi = new DiffusionIntegrator(*supg_coeff_);
+    if (numerical_integ_) {
+      Sdt_blfi->SetIntRule(&ir_di);
+    }
+    Ht_form_->AddDomainIntegrator(Sdt_blfi);
   Ht_form_->AddDomainIntegrator(hmt_blfi);
   Ht_form_->AddDomainIntegrator(hdt_blfi);
   Ht_form_->Assemble();

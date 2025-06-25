@@ -166,7 +166,7 @@ void LoMachSolver::initialize() {
   if (loMach_opts_.thermo_solver == "constant-property") {
     thermo_ = new ConstantPropertyThermoChem(pmesh_, loMach_opts_.order, tpsP_);
   } else if (loMach_opts_.thermo_solver == "calorically-perfect") {
-    thermo_ = new CaloricallyPerfectThermoChem(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_);
+    thermo_ = new CaloricallyPerfectThermoChem(pmesh_, &loMach_opts_, temporal_coeff_, (meshData_->getGridScale()), tpsP_);
   } else if (loMach_opts_.thermo_solver == "lte-thermo-chem") {
     thermo_ = new LteThermoChem(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_);
   } else if (loMach_opts_.thermo_solver == "reacting-flow") {

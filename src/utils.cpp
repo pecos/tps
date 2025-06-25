@@ -1133,23 +1133,108 @@ void scalarGrad3DV(FiniteElementSpace *fes, FiniteElementSpace *vfes, Vector u, 
   R1_gf.GetTrueDofs(*gu);
 }
 
-/*
-void vectorGrad3DV(FiniteElementSpace *fes, Vector u, Vector *gu, Vector *gv, Vector *gw) {
-  ParGridFunction R1_gf;
-  R1_gf.SetSpace(fes);
 
-  ParGridFunction R1a_gf, R1b_gf, R1c_gf;
-  R1a_gf.SetSpace(fes);
-  R1b_gf.SetSpace(fes);
-  R1c_gf.SetSpace(fes);
 
-  R1_gf.SetFromTrueDofs(u);
-  vectorGrad3D(R1_gf, R1a_gf, R1b_gf, R1c_gf);
-  R1a_gf.GetTrueDofs(*gu);
-  R1b_gf.GetTrueDofs(*gv);
-  R1c_gf.GetTrueDofs(*gw);
+void streamwiseTensor(Vector vel, DenseMatrix swMgbl) {
+
+  int dim = u.size()
+
+  // streamwise coordinate system
+  Vector unitNorm;
+  Vector unitT1;
+  Vector unitT2;
+  unitNorm.SetSize(dim);
+  unitT1.SetSize(dim);
+  unitT2.SetSize(dim);
+
+  // streamwise direction
+  for (int i = 0; i < dim; i++) unitNorm[i] = vel[i];
+  double mod = 0.0;
+  for (int i = 0; i < dim; i++) mod += unitNorm[i] * unitNorm[i];
+  mod = std::max(mod, 1.0e-18);
+  double Umag = std::sqrt(mod);
+  unitNorm /= Umag;
+
+  // for zero-flow
+  if (Umag < 1.0e-8) {
+    // for (int i = 0; i < dim; i++) {
+    //   for (int j = 0; j < dim; j++) {
+    //     swMgbl(i, j) = 0.0;
+    //   }
+    // }
+    swMgbl = 0.0;
+    return;
+  }
+
+  // tangent direction (not unique)
+  int maxInd, minusInd, plusInd;
+  if (unitNorm[0] * unitNorm[0] > unitNorm[1] * unitNorm[1]) {
+    maxInd = 0;
+  } else {
+    maxInd = 1;
+  }
+  if (dim == 3 && unitNorm[maxInd] * unitNorm[maxInd] < unitNorm[2] * unitNorm[2]) {
+    maxInd = 2;
+  }
+  minusInd = ((maxInd - 1) % dim + dim) % dim;
+  plusInd = (maxInd + 1) % dim;
+
+  unitT1[minusInd] = -unitNorm[maxInd];
+  unitT1[maxInd] = unitNorm[minusInd];
+  unitT1[plusInd] = 0.0;
+  mod = 0.0;
+  for (int i = 0; i < dim; i++) mod += unitT1[i] * unitT1[i];
+  unitT1 /= std::sqrt(mod);
+
+  // t2 is then orthogonal to both normal & t1
+  if (dim == 3) {
+    unitT2[0] = +(unitNorm[1] * unitT1[2] - unitNorm[2] * unitT1[1]);
+    unitT2[1] = -(unitNorm[0] * unitT1[2] - unitNorm[2] * unitT1[0]);
+    unitT2[2] = +(unitNorm[0] * unitT1[1] - unitNorm[1] * unitT1[0]);
+  }
+
+  // transform from streamwise coords to global
+  DenseMatrix M(dim, dim);
+  for (int d = 0; d < dim; d++) {
+    M(d, 0) = unitNorm[d];
+    M(d, 1) = unitT1[d];
+    if (dim == 3) M(d, 2) = unitT2[d];
+  }
+
+  // streamwise coeff
+  DenseMatrix swM(dim, dim);
+  swM = 0.0;
+  swM(0, 0) = 1.0;
+
+  /*
+  std::cout << " " << endl;
+  for (int i = 0; i < dim_; i++) {
+    for (int j = 0; j < dim_; j++) {
+      std::cout << M(i,j) << " " ;
+    }
+    std::cout << endl;
+  }
+  */
+
+  // M_{im} swM_{mn} M_{jn} or M*"mu"*M^T (with n,t1,t2 in columns of M)
+  // DenseMatrix swMgbl(dim, dim);
+  swMgbl = 0.0;
+  for (int i = 0; i < dim; i++) {
+    for (int j = 0; j < dim; j++) {
+      for (int m = 0; m < dim; m++) {
+        for (int n = 0; n < dim; n++) {
+          swMgbl(i, j) += M(i, m) * M(j, n) * swM(m, n);
+        }
+      }
+    }
+  }`
 }
-*/
+
+void csupgFactor(double Reh) {
+  // return  0.5 * (tanh(re_factor * Re - re_offset) + 1.0);
+  return 0.5 * (tanh(Reh) + 1.0);
+}
+
 
 void EliminateRHS(Operator &A, ConstrainedOperator &constrainedA, const Array<int> &ess_tdof_list, Vector &x, Vector &b,
                   Vector &X, Vector &B, int copy_interior) {
@@ -1270,7 +1355,7 @@ void readTable(MPI_Comm TPSCommWorld, std::string filename, bool xLogScale, bool
   assert(dims[1] == 2);
 
   // all not 0 ranks have not had matrix size set as in h5ReadTable
-  if (!rank0) tableHost.back().SetSize(dims[0], dims[1]);
+  iGradientVectorf (!rank0) tableHost.back().SetSize(dims[0], dims[1]);
   double *d_table = tableHost.back().HostReadWrite();
   MPI_Bcast(d_table, dims[0] * dims[1], MPI_DOUBLE, 0, TPSCommWorld);
 
@@ -1282,7 +1367,7 @@ void readTable(MPI_Comm TPSCommWorld, std::string filename, bool xLogScale, bool
 }
 
 namespace mfem {
-GradientVectorGridFunctionCoefficient::GradientVectorGridFunctionCoefficient(const GridFunction *gf)
+GridFunctionCoefficient::GradientVectorGridFunctionCoefficient(const GridFunction *gf)
     : MatrixCoefficient((gf) ? gf->VectorDim() : 0) {
   GridFunc = gf;
 }
@@ -1322,6 +1407,42 @@ void GradientVectorGridFunctionCoefficient::Eval(DenseMatrix &G, ElementTransfor
 
     GridFunc->GetVectorGradient(*coarse_T, G);
   }
+}
+
+
+VectorMagnitudeCoefficient::VectorMagnitudeCoefficient(VectorCoefficient &A)
+   : a(&A), va(A.GetVDim()) { }
+
+void VectorMagnitudeCoefficient::SetTime(double t)
+{
+  if (a) { a->SetTime(t); }
+  this->Coefficient::SetTime(t);
+}
+
+double VectorMagnitudeCoefficient::Eval(ElementTransformation &T,
+                                     const IntegrationPoint &ip)
+{
+  a->Eval(va, T, ip);
+  // double res = 0;
+  // for (int i = 0; i < va.size(); i++) { res += va[i] * va[i]}
+  // res = std::sqrt(res)
+  // return res;
+  double mod = std::max(std::sqrt(va * va), 1.0e-18);
+  return mod
+}
+
+void TransformedMatrixVectorCoefficient::SetTime(double t)
+{
+  Q1->SetTime(t);
+  this->Coefficient::SetTime(t);
+}
+
+void TransformedMatrixVectorCoefficient::Eval(DenseMatrix &G, ElementTransformation &T, const IntegrationPoint &ip) {
+  
+  Vector buf;
+  buf.SetSize(Q1->GetVDim());
+  Q1->Eval(buf, T, ip)
+  Function(buf, G);
 }
 
 }  // namespace mfem
