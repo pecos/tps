@@ -39,7 +39,7 @@ ZeroFlow::ZeroFlow(mfem::ParMesh *pmesh, int vorder, TPS::Tps *tps)
     : pmesh_(pmesh), vorder_(vorder), dim_(pmesh->Dimension()), tpsP_(tps) {
 
   // nonzero flow option
-  tpsP_->getInput("loMach/zero-flow/nonzero-flow", nonzero_flow_, false);
+  tpsP_->getInput("loMach/zeroflow/nonzero-flow", nonzero_flow_, false);
 
 }
 
@@ -57,13 +57,12 @@ void ZeroFlow::initializeSelf() {
   zero_ = new ParGridFunction(fes_);
   *velocity_ = 0.0;
   *zero_ = 0.0;
-
   // set background velocity if nonzero
   if (nonzero_flow_) {
     Vector zero(dim_);
     Vector velocity_value(dim_);
     zero = 0.0;
-    tpsP_->getVec("loMach/zero-flow/nonzero-vel", velocity_value, dim_, zero);
+    tpsP_->getVec("loMach/zeroflow/nonzero-vel", velocity_value, dim_, zero);
     VectorConstantCoefficient ub_coeff(velocity_value);
     velocity_->ProjectCoefficient(ub_coeff);
   }

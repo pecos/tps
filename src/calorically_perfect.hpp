@@ -48,6 +48,7 @@ class Tps;
 #include "io.hpp"
 #include "thermo_chem_base.hpp"
 #include "tps_mfem_wrap.hpp"
+#include "utils.hpp"
 
 using VecFuncT = void(const Vector &x, double t, Vector &u);
 using ScalarFuncT = double(const Vector &x, double t);
@@ -136,6 +137,9 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   // Initial temperature value (if constant IC)
   double T_ic_;
 
+  // streamwise-stabilization
+  bool sw_stab_;
+
   // FEM related fields and objects
 
   // Scalar \f$H^1\f$ finite element collection.
@@ -180,7 +184,7 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   ProductCoefficient *reh1_coeff_  = nullptr;
   ProductCoefficient *reh2_coeff_  = nullptr;
   ProductCoefficient *Reh_coeff_  = nullptr;
-  TransformCoefficient *csupg_coeff_ = nullptr;
+  TransformedCoefficient *csupg_coeff_ = nullptr;
   ProductCoefficient *uw1_coeff_  = nullptr;
   ProductCoefficient *uw2_coeff_ = nullptr;
   ProductCoefficient *upwind_coeff_  = nullptr;

@@ -153,7 +153,7 @@ class ZeroFlow final : public FlowBase {
   TPS::Tps *tpsP_ = nullptr;
 
   // Options
-  bool nonzero_flow_ = false;
+  bool nonzero_flow_;
 
   mfem::ParMesh *pmesh_;
   const int vorder_;
