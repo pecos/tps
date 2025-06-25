@@ -190,7 +190,7 @@ bool copyFile(const char *SRC, const char *DEST);
 
 /// upwind diffusion
 // double upwindDiffMag(Vector *state, double gridspace);
-void streamwiseTensor(DenseMatrix swMgbl, Vector vel);
+void streamwiseTensor(const Vector &vel, DenseMatrix &swMgbl);
 double csupgFactor(double Reh);
 
 /// Eliminate essential BCs in an Operator and apply to RHS.
@@ -256,22 +256,20 @@ public:
 
 /// Matrix coefficient computed from a function F(v(x)) of a dim-sized vector coefficient, v(x) 
 class TransformedMatrixVectorCoefficient : public MatrixCoefficient {
- private:
-  Coefficient * Q1;
+ protected:
+  VectorCoefficient *Q1;
   std::function<void(const Vector &, DenseMatrix &)> Function;
 
  public:
-  /** @brief Construct the coefficient with a scalar grid function @a gf. The
-      grid function is not owned by the coefficient. */
-  TransformedMatrixVectorCoefficient(const VectorCoefficient *vc, 
-    std::function<void(const Vector &, DenseMatrix &)> F)
-    : Q1(vc), Function(std::move(F)) { }
+  TransformedMatrixVectorCoefficient(VectorCoefficient *vc, 
+    std::function<void(const Vector &, DenseMatrix &)> F) : 
+    MatrixCoefficient(vc->GetVDim() ),
+    Q1(vc), Function(std::move(F)) { }
 
   /// Set the time for internally stored coefficients
   void SetTime(double t);
 
-  /// Evaluate the gradient vector coefficient at @a ip.
-  using MatrixCoefficient::Eval;
+  // using MatrixCoefficient::Eval;
   virtual void Eval(DenseMatrix &G, ElementTransformation &T, const IntegrationPoint &ip);
 
   virtual ~TransformedMatrixVectorCoefficient() {}

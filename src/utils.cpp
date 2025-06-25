@@ -1135,9 +1135,9 @@ void scalarGrad3DV(FiniteElementSpace *fes, FiniteElementSpace *vfes, Vector u, 
 
 
 
-void streamwiseTensor(Vector vel, DenseMatrix swMgbl) {
+void streamwiseTensor(const Vector &vel, DenseMatrix &swMgbl) {
 
-  int dim = u.size()
+  int dim = vel.Size();
 
   // streamwise coordinate system
   Vector unitNorm;
@@ -1154,6 +1154,8 @@ void streamwiseTensor(Vector vel, DenseMatrix swMgbl) {
   mod = std::max(mod, 1.0e-18);
   double Umag = std::sqrt(mod);
   unitNorm /= Umag;
+ 
+  // std::cout << Umag << " " << endl ;
 
   // for zero-flow
   if (Umag < 1.0e-8) {
@@ -1181,9 +1183,12 @@ void streamwiseTensor(Vector vel, DenseMatrix swMgbl) {
 
   unitT1[minusInd] = -unitNorm[maxInd];
   unitT1[maxInd] = unitNorm[minusInd];
-  unitT1[plusInd] = 0.0;
+  if (dim == 3) { // DOUBLE CHECK THIS WHEN TESTING 3D
+    unitT1[plusInd] = 0.0;
+  }
   mod = 0.0;
   for (int i = 0; i < dim; i++) mod += unitT1[i] * unitT1[i];
+  mod = std::max(mod, 1.0e-18);
   unitT1 /= std::sqrt(mod);
 
   // t2 is then orthogonal to both normal & t1
@@ -1206,15 +1211,15 @@ void streamwiseTensor(Vector vel, DenseMatrix swMgbl) {
   swM = 0.0;
   swM(0, 0) = 1.0;
 
-  /*
-  std::cout << " " << endl;
-  for (int i = 0; i < dim_; i++) {
-    for (int j = 0; j < dim_; j++) {
-      std::cout << M(i,j) << " " ;
-    }
-    std::cout << endl;
-  }
-  */
+  
+  // std::cout << " " << endl;
+  // for (int i = 0; i < dim; i++) {
+  //   for (int j = 0; j < dim; j++) {
+  //     std::cout << M(i,j) << " " ;
+  //   }
+  //   std::cout << endl;
+  // }
+  
 
   // M_{im} swM_{mn} M_{jn} or M*"mu"*M^T (with n,t1,t2 in columns of M)
   // DenseMatrix swMgbl(dim, dim);
@@ -1227,11 +1232,22 @@ void streamwiseTensor(Vector vel, DenseMatrix swMgbl) {
         }
       }
     }
-  }`
+  }
+
+  // std::cout << " " << endl;
+  // for (int i = 0; i < dim; i++) {
+  //   for (int j = 0; j < dim; j++) {
+  //     std::cout << swMgbl(i,j) << " " ;
+  //   }
+  //   std::cout << endl;
+  // }
+  
 }
 
-void csupgFactor(double Reh) {
+double csupgFactor(double Reh) {
   // return  0.5 * (tanh(re_factor * Re - re_offset) + 1.0);
+  // printf("%f\n", Reh);
+  // printf("%f\n", 0.5 * (tanh(Reh) + 1.0));
   return 0.5 * (tanh(Reh) + 1.0);
 }
 
@@ -1355,7 +1371,7 @@ void readTable(MPI_Comm TPSCommWorld, std::string filename, bool xLogScale, bool
   assert(dims[1] == 2);
 
   // all not 0 ranks have not had matrix size set as in h5ReadTable
-  iGradientVectorf (!rank0) tableHost.back().SetSize(dims[0], dims[1]);
+  if (!rank0) tableHost.back().SetSize(dims[0], dims[1]);
   double *d_table = tableHost.back().HostReadWrite();
   MPI_Bcast(d_table, dims[0] * dims[1], MPI_DOUBLE, 0, TPSCommWorld);
 
@@ -1367,7 +1383,7 @@ void readTable(MPI_Comm TPSCommWorld, std::string filename, bool xLogScale, bool
 }
 
 namespace mfem {
-GridFunctionCoefficient::GradientVectorGridFunctionCoefficient(const GridFunction *gf)
+GradientVectorGridFunctionCoefficient::GradientVectorGridFunctionCoefficient(const GridFunction *gf)
     : MatrixCoefficient((gf) ? gf->VectorDim() : 0) {
   GridFunc = gf;
 }
@@ -1428,21 +1444,30 @@ double VectorMagnitudeCoefficient::Eval(ElementTransformation &T,
   // res = std::sqrt(res)
   // return res;
   double mod = std::max(std::sqrt(va * va), 1.0e-18);
-  return mod
+  return mod;
 }
 
 void TransformedMatrixVectorCoefficient::SetTime(double t)
 {
   Q1->SetTime(t);
-  this->Coefficient::SetTime(t);
+  this->MatrixCoefficient::SetTime(t);
 }
 
 void TransformedMatrixVectorCoefficient::Eval(DenseMatrix &G, ElementTransformation &T, const IntegrationPoint &ip) {
   
   Vector buf;
   buf.SetSize(Q1->GetVDim());
-  Q1->Eval(buf, T, ip)
+  Q1->Eval(buf, T, ip);
   Function(buf, G);
+
+  // int dim = Q1->GetVDim();
+  // std::cout << " " << endl;
+  // for (int i = 0; i < dim; i++) {
+  //   for (int j = 0; j < dim; j++) {
+  //     std::cout << G(i,j) << " " ;
+  //   }
+  //   std::cout << endl;
+  // }
 }
 
 }  // namespace mfem
