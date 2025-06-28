@@ -170,7 +170,7 @@ void LoMachSolver::initialize() {
   } else if (loMach_opts_.thermo_solver == "lte-thermo-chem") {
     thermo_ = new LteThermoChem(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_);
   } else if (loMach_opts_.thermo_solver == "reacting-flow") {
-    thermo_ = new ReactingFlow(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_);
+    thermo_ = new ReactingFlow(pmesh_, &loMach_opts_, temporal_coeff_, (meshData_->getGridScale()), tpsP_);
   } else {
     // Unknown choice... die
     if (rank0_) {
@@ -185,7 +185,7 @@ void LoMachSolver::initialize() {
     flow_ = new ZeroFlow(pmesh_, 1, tpsP_);
   } else if (loMach_opts_.flow_solver == "tomboulides") {
     // Tomboulides flow solver
-    flow_ = new Tomboulides(pmesh_, loMach_opts_.order, loMach_opts_.order, temporal_coeff_, tpsP_);
+    flow_ = new Tomboulides(pmesh_, loMach_opts_.order, loMach_opts_.order, temporal_coeff_, (meshData_->getGridScale()), tpsP_);
   } else {
     // Unknown choice... die
     if (rank0_) {

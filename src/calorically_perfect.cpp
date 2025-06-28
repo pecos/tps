@@ -471,7 +471,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
     umag_coeff_ = new VectorMagnitudeCoefficient(*un_next_coeff_);
     gscale_coeff_ = new GridFunctionCoefficient(gridScale_gf_);
     visc_coeff_ = new GridFunctionCoefficient(&visc_gf_);
-    visc_inv_coeff_ = new PowerCoefficient(*visc_coeff_, -1);
+    visc_inv_coeff_ = new PowerCoefficient(*visc_coeff_, -1.0);
 
     // compute Reh
     reh1_coeff_ = new ProductCoefficient(*rho_coeff_, *visc_inv_coeff_);
@@ -538,13 +538,14 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
     hdt_blfi->SetIntRule(&ir_di);
   }
   // SUPG
-  auto *sdt_blfi = new DiffusionIntegrator(*supg_coeff_);
-  if (sw_stab_)
+  if (sw_stab_) {
+    auto *sdt_blfi = new DiffusionIntegrator(*supg_coeff_);
     // SUPG diffusion
     // if (numerical_integ_) {
     //   sdt_blfi->SetIntRule(&ir_di);
     // }
     Ht_form_->AddDomainIntegrator(sdt_blfi);
+  }
   Ht_form_->AddDomainIntegrator(hmt_blfi);
   Ht_form_->AddDomainIntegrator(hdt_blfi);
   Ht_form_->Assemble();
@@ -628,6 +629,15 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
     lqd_blfi->SetIntRule(&ir_di);
   }
   LQ_form_->AddDomainIntegrator(lqd_blfi);
+  
+  // auto *slqd_blfi = new DiffusionIntegrator(*supg_coeff_);
+  // if (sw_stab_)
+  //   // SUPG diffusion
+  //   // if (numerical_integ_) {
+  //   //   slqd_blfi->SetIntRule(&ir_di);
+  //   // }
+  //   LQ_form_->AddDomainIntegrator(slqd_blfi);
+
   if (partial_assembly_) {
     LQ_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   }
