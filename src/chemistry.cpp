@@ -89,6 +89,18 @@ MFEM_HOST_DEVICE Chemistry::Chemistry(GasMixture *mixture, const ChemistryInput 
       case GRIDFUNCTION_RXN: {
         reactions_[r] = new GridFunctionReaction(inputs.reactionInputs[r].indexInput);
       } break;
+      case RADIATIVE_DECAY: {
+        assert(inputs.reactionInputs[r].modelParams != NULL);
+#ifndef _GPU_
+        double R = inputs.reactionInputs[r].modelParams[0];
+        reactions_[r] = new RadiativeDecay(R, &inputs.speciesMapping, &inputs.speciesNames, &numSpecies_,
+                                           &reactantStoich_[r * numSpecies_], &productStoich_[r * numSpecies_]);
+#else
+        printf("Radiative decay not currently supported for GPU execution.");
+        assert(false);
+        break;
+#endif
+      } break;
       default:
         printf("Unknown reactionModel.");
         assert(false);
@@ -128,13 +140,13 @@ void Chemistry::setGridFunctionRates(mfem::GridFunction &f) {
 }
 
 #if 0
-void Chemistry::computeForwardRateCoeffs(const double &T_h, const double &T_e, Vector &kfwd) {
+void Chemistry::computeForwardRateCoeffs(const mfem::Vector &ns, const double &T_h, const double &T_e, Vector &kfwd) {
   kfwd.SetSize(numReactions_);
 
   const double Thlim = max(T_h, min_temperature_);
   const double Telim = max(T_e, min_temperature_);
 
-  computeForwardRateCoeffs(Thlim, Telim, &kfwd[0]);
+  computeForwardRateCoeffs(&ns[0], Thlim, Telim, &kfwd[0]);
   // kfwd = 0.0;
   //
   // for (int r = 0; r < numReactions_; r++) {
@@ -146,8 +158,8 @@ void Chemistry::computeForwardRateCoeffs(const double &T_h, const double &T_e, V
 }
 #endif
 
-MFEM_HOST_DEVICE void Chemistry::computeForwardRateCoeffs(const double &T_h, const double &T_e, const int &dofindex,
-                                                          double *kfwd) {
+MFEM_HOST_DEVICE void Chemistry::computeForwardRateCoeffs(const double *ns, const double &T_h, const double &T_e,
+                                                          const int &dofindex, double *kfwd) {
   // kfwd.SetSize(numReactions_);
   for (int r = 0; r < numReactions_; r++) kfwd[r] = 0.0;
 
@@ -156,7 +168,7 @@ MFEM_HOST_DEVICE void Chemistry::computeForwardRateCoeffs(const double &T_h, con
 
   for (int r = 0; r < numReactions_; r++) {
     bool isElectronInvolved = isElectronInvolvedAt(r);
-    kfwd[r] = reactions_[r]->computeRateCoefficient(Thlim, Telim, dofindex, isElectronInvolved);
+    kfwd[r] = reactions_[r]->computeRateCoefficient(Thlim, Telim, dofindex, isElectronInvolved, ns);
   }
 
   return;
@@ -241,9 +253,11 @@ MFEM_HOST_DEVICE void Chemistry::computeProgressRate(const double *ns, const dou
 }
 
 // compute creation rate based on progress rates.
-void Chemistry::computeCreationRate(const mfem::Vector &progressRate, mfem::Vector &creationRate) {
+void Chemistry::computeCreationRate(const mfem::Vector &progressRate, mfem::Vector &creationRate,
+                                    mfem::Vector &emissionRate) {
   creationRate.SetSize(numSpecies_);
-  computeCreationRate(&progressRate[0], &creationRate[0]);
+  emissionRate.SetSize(numSpecies_);
+  computeCreationRate(&progressRate[0], &creationRate[0], &emissionRate[0]);
   // creationRate = 0.;
   // for (int sp = 0; sp < numSpecies_; sp++) {
   //   for (int r = 0; r < numReactions_; r++) {
@@ -260,15 +274,22 @@ void Chemistry::computeCreationRate(const mfem::Vector &progressRate, mfem::Vect
   // //   assert(fabs(totMass) < 1e-7);
 }
 
-MFEM_HOST_DEVICE void Chemistry::computeCreationRate(const double *progressRate, double *creationRate) {
+MFEM_HOST_DEVICE void Chemistry::computeCreationRate(const double *progressRate, double *creationRate,
+                                                     double *emissionRate) {
   // creationRate.SetSize(numSpecies_);
   for (int sp = 0; sp < numSpecies_; sp++) creationRate[sp] = 0.;
+  for (int sp = 0; sp < numSpecies_; sp++) emissionRate[sp] = 0.;
   for (int sp = 0; sp < numSpecies_; sp++) {
     for (int r = 0; r < numReactions_; r++) {
       creationRate[sp] +=
           progressRate[r] * (productStoich_[sp + r * numSpecies_] - reactantStoich_[sp + r * numSpecies_]);
+      if (reactions_[r]->reactionModel == RADIATIVE_DECAY) {
+        emissionRate[sp] +=
+            progressRate[r] * (productStoich_[sp + r * numSpecies_] - reactantStoich_[sp + r * numSpecies_]);
+      }
     }
     creationRate[sp] *= mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
+    emissionRate[sp] *= mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
   }
 
   // check total created mass is 0

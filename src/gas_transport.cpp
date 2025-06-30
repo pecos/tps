@@ -929,6 +929,14 @@ MFEM_HOST_DEVICE GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, 
   setArtificialMultipliers(inputs);
 }
 
+// Current valid collision index tags (see reacting_flow.cpp):
+// ALL:  CLMB_REP, CLMB_ATT
+// Argon: AR_AR, AR_AR1P, AR_E
+// Nitrogen: N2_N2, N2_NI, N2_NI1P, N2_E, NI_NI, NI_NI1P, NI_E
+//
+//  Note: this is very messy and should be targetted for streamlining if
+//        we want to add support for more reacting gases
+//
 MFEM_HOST_DEVICE double GasMixtureTransport::collisionIntegral(const int _spI, const int _spJ, const int l,
                                                                  const int r, const collisionInputs collInputs) {
   const int spI = (_spI > _spJ) ? _spJ : _spI;
@@ -943,6 +951,8 @@ MFEM_HOST_DEVICE double GasMixtureTransport::collisionIntegral(const int _spI, c
   }
 
   switch (collIdx) {
+
+    // Generic charged-particle section
     case CLMB_ATT: {
       if (l == 1) {
         switch (r) {
@@ -968,7 +978,7 @@ MFEM_HOST_DEVICE double GasMixtureTransport::collisionIntegral(const int _spI, c
                 l, r);
             assert(false);
             break;
-        }
+        }	
       } else if (l == 2) {
         switch (r) {
           case 2:
@@ -988,8 +998,9 @@ MFEM_HOST_DEVICE double GasMixtureTransport::collisionIntegral(const int _spI, c
             assert(false);
             break;
         }
-      }
+      }      
     } break;
+      
     case CLMB_REP: {
       if (l == 1) {
         switch (r) {
@@ -1037,6 +1048,10 @@ MFEM_HOST_DEVICE double GasMixtureTransport::collisionIntegral(const int _spI, c
         }
       }
     } break;
+
+    // Argon specific section
+    // AR_AR, AR_AR1P, AR_E
+      
     case AR_AR1P: {
       if ((l == 1) && (r == 1)) {
         return collision::argon::ArAr1P11(temp);
@@ -1045,6 +1060,7 @@ MFEM_HOST_DEVICE double GasMixtureTransport::collisionIntegral(const int _spI, c
         assert(false);
       }
     } break;
+      
     case AR_E: {
       if (l == 1) {
         switch (r) {
@@ -1076,6 +1092,7 @@ MFEM_HOST_DEVICE double GasMixtureTransport::collisionIntegral(const int _spI, c
         assert(false);
       }
     } break;
+      
     case AR_AR: {
       if ((l == 1) && (r == 1)) {
         return collision::argon::ArAr11(temp);
@@ -1086,6 +1103,125 @@ MFEM_HOST_DEVICE double GasMixtureTransport::collisionIntegral(const int _spI, c
         assert(false);
       }
     } break;
+
+    // Nitrogen-specific section
+    // N2_N2, N2_NI, N2_NI1P, N2_E, NI_NI, NI_NI1P, NI_E
+      
+    case NI_NI1P: {
+      if ((l == 1) && (r == 1)) {
+        return collision::nitrogen::NiNi1P11(temp);
+      } else {
+        printf("(%d, %d)-collision integral for N-N.1+ pair is not supported in GasMixtureTransport! \n", l, r);
+        assert(false);
+      }
+    } break;
+
+    case N2_NI1P: {
+      if ((l == 1) && (r == 1)) {
+        return collision::nitrogen::N2Ni1P11(temp);
+      } else {
+        printf("(%d, %d)-collision integral for N2-N.1+ pair is not supported in GasMixtureTransport! \n", l, r);
+        assert(false);
+      }
+    } break;
+      
+    case N2_E: {
+      if (l == 1) {
+        switch (r) {
+          case 1:
+            return collision::nitrogen::eN211(temp);
+            break;
+          case 2:
+            return collision::nitrogen::eN212(temp);
+            break;
+          case 3:
+            return collision::nitrogen::eN213(temp);
+            break;
+          case 4:
+            return collision::nitrogen::eN214(temp);
+            break;
+          case 5:
+            return collision::nitrogen::eN215(temp);
+            break;
+          default:
+            printf(
+                "(%d, %d)-collision integral for repulsive Coulomb potential is not supported in "
+                "GasMixtureTransport! \n",
+                l, r);
+            assert(false);
+            break;
+        }
+      } else {
+        printf("(%d, %d)-collision integral for N2-E pair is not supported in GasMixtureTransport! \n", l, r);
+        assert(false);
+      }
+    } break;
+
+    case NI_E: {
+      if (l == 1) {
+        switch (r) {
+          case 1:
+            return collision::nitrogen::eNi11(temp);
+            break;
+          case 2:
+            return collision::nitrogen::eNi12(temp);
+            break;
+          case 3:
+            return collision::nitrogen::eNi13(temp);
+            break;
+          case 4:
+            return collision::nitrogen::eNi14(temp);
+            break;
+          case 5:
+            return collision::nitrogen::eNi15(temp);
+            break;
+          default:
+            printf(
+                "(%d, %d)-collision integral for repulsive Coulomb potential is not supported in "
+                "GasMixtureTransport! \n",
+                l, r);
+            assert(false);
+            break;
+        }
+      } else {
+        printf("(%d, %d)-collision integral for N-E pair is not supported in GasMixtureTransport! \n", l, r);
+        assert(false);
+      }
+    } break;
+            
+    case NI_NI: {
+      if ((l == 1) && (r == 1)) {
+        return collision::nitrogen::NiNi11(temp);
+      } else if ((l == 2) && (r == 2)) {
+        return collision::nitrogen::NiNi22(temp);
+      } else {
+        printf("(%d, %d)-collision integral for Ni-Ni pair is not supported in GasMixtureTransport! \n", l, r);
+        assert(false);
+      }
+    } break;
+
+    case N2_N2: {
+      if ((l == 1) && (r == 1)) {
+        return collision::nitrogen::N2N211(temp);
+      } else if ((l == 2) && (r == 2)) {
+        return collision::nitrogen::N2N222(temp);
+      } else {
+        printf("(%d, %d)-collision integral for N2-N2 pair is not supported in GasMixtureTransport! \n", l, r);
+        assert(false);
+      }
+    } break;
+      
+    case N2_NI: {
+      if ((l == 1) && (r == 1)) {
+        return collision::nitrogen::N2Ni11(temp);
+      } else if ((l == 2) && (r == 2)) {
+        return collision::nitrogen::N2Ni22(temp);
+      } else {
+        printf("(%d, %d)-collision integral for N2-N pair is not supported in GasMixtureTransport! \n", l, r);
+        assert(false);
+      }
+    } break;
+      
     default:
       break;
   }

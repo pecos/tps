@@ -93,7 +93,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   std::string gas;
   tpsP_->getRequiredInput("plasma_models/gas", gas);
   gasInput_.gas = gas;
-  std::cout << " got gas: " << gas << endl;
+  //std::cout << " got gas: " << gas << endl;
 
   if (gas=="Ar" || gas=="argon") {
     gasType_ = Ar;    
@@ -125,6 +125,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   // tpsP_->getInput("plasma_models/includeElectron", mixtureInput_.isElectronIncluded, true);
   tpsP_->getInput("plasma_models/two_temperature", mixtureInput_.twoTemperature, false);
   tpsP_->getInput("plasma_models/const_plasma_conductivity", const_plasma_conductivity_, 0.0);
+  tpsP_->getInput("plasma_models/is_rad_decay_in_NEC", radiative_decay_NECincluded_, true);
 
   if (mixtureInput_.twoTemperature) {
     if (rank0_) std::cout << "Two temperature is not yet supported in low Mach reacting flow." << std::endl;
@@ -201,9 +202,17 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
 
   tpsP_->getRequiredInput("species/background_index", backgroundIndex);
   tpsP_->getInput("plasma_models/transport_model/argon_minimal/third_order_thermal_conductivity",
+		  //<<<<<<< HEAD
+		  //                  gasInput_.thirdOrderkElectron, true);
+		  //  tpsP_->getInput("plasma_models/transport_model/artificial_multiplier/enabled", gasInput_.multiply, false);
+		  //  if (gasInput_.multiply) {
+		  //=======
                   gasInput_.thirdOrderkElectron, true);
+  if (!(gasInput_.thirdOrderkElectron) && rank0_)
+    std::cout << "Notice: Using 1st order electron thermal conductivity." << endl;
   tpsP_->getInput("plasma_models/transport_model/artificial_multiplier/enabled", gasInput_.multiply, false);
   if (gasInput_.multiply) {
+    //>>>>>>> implicit-nonlinear-chem
     tpsP_->getInput("plasma_models/transport_model/artificial_multiplier/viscosity",
                     gasInput_.fluxTrnsMultiplier[FluxTrns::VISCOSITY], 1.0);
     tpsP_->getInput("plasma_models/transport_model/artificial_multiplier/bulk_viscosity",
@@ -433,7 +442,6 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
 
     if (model == "arrhenius") {
       reactionModels[r - 1] = ARRHENIUS;
-
       double A, b, E;
       tpsP_->getRequiredInput((basepath + "/arrhenius/A").c_str(), A);
       tpsP_->getRequiredInput((basepath + "/arrhenius/b").c_str(), b);
@@ -452,6 +460,12 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
       reactionModels[r - 1] = TABULATED_RXN;
       std::string inputPath(basepath + "/tabulated");
       readTableWrapper(inputPath, chemistryInput_.reactionInputs[r - 1].tableInput);
+
+    } else if (model == "radiative_decay") {
+      reactionModels[r - 1] = RADIATIVE_DECAY;
+      double R;
+      tpsP_->getRequiredInput((basepath + "/radius").c_str(), R);
+      rxnModelParamsHost.push_back(Vector({R}));
 
     } else {
       grvy_printf(GRVY_ERROR, "\nUnknown reaction_model -> %s", model.c_str());
@@ -518,6 +532,22 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     }
   }
 
+  // radiative decay needs this information as well
+  chemistryInput_.speciesNames.resize(nSpecies_);
+  paramIdx = 0;
+  for (int sp = 0; sp < nSpecies_; sp++) {
+    if (sp == backgroundIndex - 1) {
+      targetIdx = nSpecies_ - 1;
+    } else if (InputSpeciesNames[sp] == "E") {
+      targetIdx = nSpecies_ - 2;
+    } else {
+      targetIdx = paramIdx;
+      paramIdx++;
+    }
+    chemistryInput_.speciesMapping[InputSpeciesNames[sp]] = targetIdx;
+    chemistryInput_.speciesNames[targetIdx] = InputSpeciesNames[sp];
+  }
+
   chemistry_ = new Chemistry(mixture_, chemistryInput_);
 
   // Initialize radiation (just NEC for now) model
@@ -575,6 +605,17 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   tpsP_->getInput("loMach/reactingFlow/ic", ic_string_, std::string(""));
 
   // will be over-written if dynamic is active
+  tpsP_->getInput("loMach/reactingFlow/implicit-chemistry", implicit_chemistry_, false);
+
+  if (implicit_chemistry_) {
+    tpsP_->getInput("loMach/reactingFlow/implicit-chemistry/verbose", implicit_chemistry_verbose_, false);
+    tpsP_->getInput("loMach/reactingFlow/implicit-chemistry/maxiter", implicit_chemistry_maxiter_, 200);
+    tpsP_->getInput("loMach/reactingFlow/implicit-chemistry/fd-epsilon", implicit_chemistry_fd_eps_, 1e-7);
+    tpsP_->getInput("loMach/reactingFlow/implicit-chemistry/rtol", implicit_chemistry_rtol_, 1e-8);
+    tpsP_->getInput("loMach/reactingFlow/implicit-chemistry/atol", implicit_chemistry_atol_, 1e-12);
+    tpsP_->getInput("loMach/reactingFlow/implicit-chemistry/species-min", implicit_chemistry_smin_, 1e-12);
+  }
+
   tpsP_->getInput("loMach/reactingFlow/sub-steps", nSub_, 1);
   tpsP_->getInput("loMach/reactingFlow/dynamic-substep", dynamic_substepping_, false);
   if (dynamic_substepping_) nSub_ = 2;
@@ -596,10 +637,19 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   operator_split_ = false;
   if (nSub_ > 1) {
     operator_split_ = true;
+    assert(!implicit_chemistry_);
+  }
+  if (implicit_chemistry_) {
+    operator_split_ = true;
+    assert(nSub_ == 1);
   }
 }
 
 ReactingFlow::~ReactingFlow() {
+  for (unsigned int i = 0; i < vizSpecFields_.size(); i++) {
+    delete vizSpecFields_[i];
+  }
+
   // allocated in initializeOperators
   delete sfes_filter_;
   delete sfec_filter_;
@@ -621,6 +671,7 @@ ReactingFlow::~ReactingFlow() {
   delete jh_form_;
 
   delete rhou_coeff_;
+  delete species_Cp_coeff_;
   delete rhon_next_coeff_;
   delete un_next_coeff_;
   delete kap_gradT_coeff_;
@@ -635,6 +686,7 @@ ReactingFlow::~ReactingFlow() {
   // delete rho_coeff_;
   delete cpMix_coeff_;
   delete rhoCp_coeff_;
+  delete rhouCp_coeff_;
 
   delete jh_coeff_;
   delete radiation_sink_coeff_;
@@ -651,9 +703,18 @@ ReactingFlow::~ReactingFlow() {
   delete rad_kap_gradT_coeff_;
 
   delete Ay_form_;
+
   delete HyInv_;
   delete HyInvPC_;
   delete Hy_form_;
+
+  delete Mv_inv_pc_;
+  delete Mv_inv_;
+  delete Mv_form_;
+
+  delete LY_form_;
+
+  delete species_diff_Cp_coeff_;
   delete species_diff_coeff_;
   delete species_diff_sum_coeff_;
   delete species_diff_total_coeff_;
@@ -710,6 +771,7 @@ void ReactingFlow::initializeSelf() {
   yDofInt_ = yfes_->GetTrueVSize();
 
   weff_gf_.SetSpace(vfes_);
+  weff_gf_ = 0.0;
 
   Qt_.SetSize(sDofInt_);
   Qt_ = 0.0;
@@ -815,6 +877,12 @@ void ReactingFlow::initializeSelf() {
 
   prodY_gf_.SetSpace(sfes_);
   prodY_gf_ = 0.0;
+
+  prodE_.SetSize(yDofInt_);
+  prodE_ = 1.0e-12;
+
+  emission_gf_.SetSpace(sfes_);
+  emission_gf_ = 0.0;
 
   sigma_gf_.SetSpace(sfes_);
   sigma_gf_ = 0.0;
@@ -1665,55 +1733,78 @@ void ReactingFlow::step() {
     spec_buffer_.Set(1.0, Yn_);
     temp_buffer_.Set(1.0, Tn_);
 
-    // Evaluate (Yn_next_ - Yn_)/nSub and store in YnStar_, and analog
-    // for TnStar_.
-    substepState();
-
-    // number of substeps
-    if (dynamic_substepping_) evalSubstepNumber();
-
-    for (int iSub = 0; iSub < nSub_; iSub++) {
-      // update wdot quantities at full substep in Yn/Tn state
-      updateMixture();
-      updateThermoP();
-      updateDensity(0.0);
-      speciesProduction();
-      heatOfFormation();
-
-      // advance over substep
-      for (int iSpecies = 0; iSpecies < nActiveSpecies_; iSpecies++) {
-        speciesSubstep(iSpecies, iSub);
-      }
-      if (mixtureInput_.ambipolar) {
-        // Evaluate electron mass fraction based on quasi-neutrality
-
-        // temporary storage for electron mass fraction
-        tmpR0_ = 0.0;
-
-        // Y_electron = sum_{i \in active species} (m_electron / m_i) * q_i * Y_i
-        for (int iSpecies = 0; iSpecies < nActiveSpecies_; iSpecies++) {
-          setScalarFromVector(Yn_, iSpecies, &tmpR0a_);
-          const double q_sp = mixture_->GetGasParams(iSpecies, GasParams::SPECIES_CHARGES);
-          const double m_sp = mixture_->GetGasParams(iSpecies, GasParams::SPECIES_MW);
-          const double fac = q_sp / m_sp;
-          tmpR0a_ *= fac;
-          tmpR0_ += tmpR0a_;
+    if (implicit_chemistry_) {
+      auto h_Yn = Yn_next_.HostReadWrite();
+      auto h_Tn = Tn_next_.HostReadWrite();
+      double *YT = new double[nActiveSpecies_ + 1];
+      for (int i = 0; i < sDofInt_; i++) {
+        // Extract point state
+        for (int sp = 0; sp < nActiveSpecies_; sp++) {
+          YT[sp] = h_Yn[sp * sDofInt_ + i];
         }
-        const int iElectron = nSpecies_ - 2;  // TODO(trevilo): check me!
-        const double m_electron = mixture_->GetGasParams(iElectron, GasParams::SPECIES_MW);
-        tmpR0_ *= m_electron;
-        setVectorFromScalar(tmpR0_, iElectron, &Yn_);
+        YT[nActiveSpecies_] = h_Tn[i];
+
+        // Solve backward Euler update
+        solveChemistryStep(YT, i, dt_);
+
+        // Overwrite point state data
+        for (int sp = 0; sp < nActiveSpecies_; sp++) {
+          h_Yn[sp * sDofInt_ + i] = YT[sp];
+        }
+        h_Tn[i] = YT[nActiveSpecies_];
       }
-      speciesLastSubstep();
-      Yn_gf_.SetFromTrueDofs(Yn_);
+      delete[] YT;
+    } else {
+      // Evaluate (Yn_next_ - Yn_)/nSub and store in YnStar_, and analog
+      // for TnStar_.
+      substepState();
 
-      temperatureSubstep(iSub);
-      Tn_gf_.SetFromTrueDofs(Tn_);
+      // number of substeps
+      if (dynamic_substepping_) evalSubstepNumber();
+
+      for (int iSub = 0; iSub < nSub_; iSub++) {
+        // update wdot quantities at full substep in Yn/Tn state
+        updateMixture();
+        updateThermoP();
+        updateDensity(0.0, false);
+        speciesProduction();
+        heatOfFormation();
+
+        // advance over substep
+        for (int iSpecies = 0; iSpecies < nActiveSpecies_; iSpecies++) {
+          speciesSubstep(iSpecies, iSub);
+        }
+        if (mixtureInput_.ambipolar) {
+          // Evaluate electron mass fraction based on quasi-neutrality
+
+          // temporary storage for electron mass fraction
+          tmpR0_ = 0.0;
+
+          // Y_electron = sum_{i \in active species} (m_electron / m_i) * q_i * Y_i
+          for (int iSpecies = 0; iSpecies < nActiveSpecies_; iSpecies++) {
+            setScalarFromVector(Yn_, iSpecies, &tmpR0a_);
+            const double q_sp = mixture_->GetGasParams(iSpecies, GasParams::SPECIES_CHARGES);
+            const double m_sp = mixture_->GetGasParams(iSpecies, GasParams::SPECIES_MW);
+            const double fac = q_sp / m_sp;
+            tmpR0a_ *= fac;
+            tmpR0_ += tmpR0a_;
+          }
+          const int iElectron = nSpecies_ - 2;  // TODO(trevilo): check me!
+          const double m_electron = mixture_->GetGasParams(iElectron, GasParams::SPECIES_MW);
+          tmpR0_ *= m_electron;
+          setVectorFromScalar(tmpR0_, iElectron, &Yn_);
+        }
+        speciesLastSubstep();
+        Yn_gf_.SetFromTrueDofs(Yn_);
+
+        temperatureSubstep(iSub);
+        Tn_gf_.SetFromTrueDofs(Tn_);
+      }
+
+      // set register to correct full step fields
+      Yn_next_ = Yn_;
+      Tn_next_ = Tn_;
     }
-
-    // set register to correct full step fields
-    Yn_next_ = Yn_;
-    Tn_next_ = Tn_;
 
     YnFull_gf_.SetFromTrueDofs(Yn_next_);
     Tn_next_gf_.SetFromTrueDofs(Tn_next_);
@@ -1737,7 +1828,7 @@ void ReactingFlow::step() {
 void ReactingFlow::evalSubstepNumber() {
   double myMaxProd = 0.0;
   double maxProd = 0.0;
-  double deltaYn;
+  double tmp, deltaYn;
 
   updateMixture();
   updateThermoP();
@@ -1747,21 +1838,45 @@ void ReactingFlow::evalSubstepNumber() {
   {
     const double *dataProd = prodY_.HostRead();
     const double *dataYn = Yn_.HostRead();
-    const double *dataRho = rn_.HostRead();        
+    //<<<<<<< HEAD
+    //    const double *dataRho = rn_.HostRead();        
+    //    for (int i = 0; i < sDofInt_; i++) {
+    //      for (int sp = 0; sp < nSpecies_; sp++) {
+    //	double check = dataProd[i + sp * sDofInt_] / dataRho[i];
+    //        check /= dataYn[i + sp * sDofInt_];
+    //        myMaxProd = std::max(std::abs(check), myMaxProd);
+    //=======
     for (int i = 0; i < sDofInt_; i++) {
       for (int sp = 0; sp < nSpecies_; sp++) {
-	double check = dataProd[i + sp * sDofInt_] / dataRho[i];
-        check /= dataYn[i + sp * sDofInt_];
-        myMaxProd = std::max(std::abs(check), myMaxProd);
+        // basic based on max production
+        // myMaxProd = std::max(std::abs(dataProd[i + sp * sDofInt_]), myMaxProd);
+
+        // modified to amplify production if species could go negative or exceed unity
+        tmp = dataYn[i + sp * sDofInt_] + dataProd[i + sp * sDofInt_] * time_coeff_.dt;
+        if (tmp >= 1.0) {
+          tmp = tmp - 1.0;
+        } else if (tmp > 0.0) {
+          tmp = 0.0;
+        } else {
+          tmp = std::abs(tmp);
+        }
+        tmp /= time_coeff_.dt;
+	tmp *= 10.0;
+        myMaxProd = std::max(std::abs(dataProd[i + sp * sDofInt_]) + tmp, myMaxProd);
+	//>>>>>>> implicit-nonlinear-chem
       }
     }
   }
   MPI_Reduce(&myMaxProd, &maxProd, 1, MPI_DOUBLE, MPI_MAX, 0, tpsP_->getTPSCommWorld());
 
   deltaYn = maxProd * time_coeff_.dt;
-  nSub_ = stabFrac_ * std::ceil(deltaYn);
-  nSub_ = std::max(nSub_, 4);
-  nSub_ = std::min(nSub_, 10000);
+  nSub_ = std::ceil( max(stabFrac_* deltaYn, 10.0) );
+  
+  //nSub_ = stabFrac_ * std::ceil(deltaYn);
+  //nSub_ = stabFrac_ * std::ceil(deltaYn);
+  //nSub_ = std::max(nSub_, 4);
+  //nSub_ = std::min(nSub_, 10000);
+  //if(rank0_) std::cout << " Dynamic substep: " << nSub_ << endl;
 
 }
 
@@ -1858,7 +1973,7 @@ void ReactingFlow::temperatureStep() {
 
   Ht_form_->RecoverFEMSolution(Xt2, resT_gf_, Tn_next_gf_);
   Tn_next_gf_.GetTrueDofs(Tn_next_);
-  */
+  */ //end comment out of temp solve hack
 
   Tn_ = T_ic_;
   Tn_next_ = T_ic_;
@@ -2123,6 +2238,7 @@ void ReactingFlow::speciesProduction() {
   const double *dataRho = rn_.HostRead();
   const double *dataY = Yn_.HostRead();
   double *dataProd = prodY_.HostWrite();
+  double *dataEmit = prodE_.HostWrite();
 
   // const int nEq = dim_ + 2 + nActiveSpecies_;
   Vector state(gpudata::MAXEQUATIONS);
@@ -2134,6 +2250,7 @@ void ReactingFlow::speciesProduction() {
   Vector keq;           // set to size nReactions_ in computeEquilibriumConstants
   Vector progressRate;  // set to size nReactions_ in computeProgressRate
   Vector creationRate;  // set to size nSpecies_ in computeCreationRate
+  Vector emissionRate;  // set to size nSpecies_ in computeCreationRate
 
   kfwd.SetSize(chemistry_->getNumReactions());
   keq.SetSize(chemistry_->getNumReactions());
@@ -2155,14 +2272,15 @@ void ReactingFlow::speciesProduction() {
     mixture_->computeNumberDensities(state, n_sp);
 
     // Evaluate the chemical source terms
-    chemistry_->computeForwardRateCoeffs(Th, Te, i, kfwd.HostWrite());
+    chemistry_->computeForwardRateCoeffs(n_sp.Read(), Th, Te, i, kfwd.HostWrite());
     chemistry_->computeEquilibriumConstants(Th, Te, keq.HostWrite());
     chemistry_->computeProgressRate(n_sp, kfwd, keq, progressRate);
-    chemistry_->computeCreationRate(progressRate, creationRate);
+    chemistry_->computeCreationRate(progressRate, creationRate, emissionRate);
 
     // Place sources into storage for use in speciesStep
     for (int sp = 0; sp < nSpecies_; sp++) {
       dataProd[i + sp * sDofInt_] = creationRate[sp];
+      dataEmit[i + sp * sDofInt_] = emissionRate[sp];
     }
   }
 
@@ -2176,25 +2294,51 @@ void ReactingFlow::speciesProduction() {
 
 void ReactingFlow::heatOfFormation() {
   hw_ = 0.0;
+  tmpR0_ = 0.0;
   double *h_hw = hw_.HostReadWrite();
+  double *h_em = tmpR0_.HostReadWrite();
 
   const double *dataT = Tn_.HostRead();
   const double *h_prodY = prodY_.HostRead();
+  const double *h_prodE = prodE_.HostRead();
 
   double hspecies;
-  for (int i = 0; i < sDofInt_; i++) {
-    const double T = dataT[i];
 
-    // Sum over species to get enthalpy term
-    for (int n = 0; n < nSpecies_; n++) {
-      double molarCV = speciesMolarCv_[n];
-      molarCV *= UNIVERSALGASCONSTANT;
-      double molarCP = molarCV + UNIVERSALGASCONSTANT;
+  // NOTE: not very elegant but dont want to nest an if
+  if (radiative_decay_NECincluded_) {
+    for (int i = 0; i < sDofInt_; i++) {
+      const double T = dataT[i];
 
-      hspecies = (molarCP * T + gasParams_(n, GasParams::FORMATION_ENERGY)) / gasParams_(n, GasParams::SPECIES_MW);
-      h_hw[i] -= hspecies * h_prodY[i + n * sDofInt_];
+      // Sum over species to get enthalpy term
+      for (int n = 0; n < nSpecies_; n++) {
+        double molarCV = speciesMolarCv_[n];
+        molarCV *= UNIVERSALGASCONSTANT;
+        double molarCP = molarCV + UNIVERSALGASCONSTANT;
+
+        hspecies = (molarCP * T + gasParams_(n, GasParams::FORMATION_ENERGY)) / gasParams_(n, GasParams::SPECIES_MW);
+        h_hw[i] -= hspecies * (h_prodY[i + n * sDofInt_] - h_prodE[i + n * sDofInt_]);
+        h_em[i] = hspecies * h_prodE[i + n * sDofInt_];  // not sure of sign
+      }
+    }
+
+  } else {
+    for (int i = 0; i < sDofInt_; i++) {
+      const double T = dataT[i];
+
+      // Sum over species to get enthalpy term
+      for (int n = 0; n < nSpecies_; n++) {
+        double molarCV = speciesMolarCv_[n];
+        molarCV *= UNIVERSALGASCONSTANT;
+        double molarCP = molarCV + UNIVERSALGASCONSTANT;
+
+        hspecies = (molarCP * T + gasParams_(n, GasParams::FORMATION_ENERGY)) / gasParams_(n, GasParams::SPECIES_MW);
+        h_hw[i] -= hspecies * h_prodY[i + n * sDofInt_];
+        h_em[i] = hspecies * h_prodE[i + n * sDofInt_];  // not sure of sign
+      }
     }
   }
+
+  emission_gf_.SetFromTrueDofs(tmpR0_);
 }
 
 void ReactingFlow::crossDiffusion() {
@@ -2299,6 +2443,7 @@ void ReactingFlow::initializeViz(ParaViewDataCollection &pvdc) {
   pvdc.RegisterField("Sjoule", &jh_gf_);
   pvdc.RegisterField("epsilon_rad", &radiation_sink_gf_);
   pvdc.RegisterField("weff", &weff_gf_);
+  pvdc.RegisterField("emission", &emission_gf_);
 
   vizSpecFields_.clear();
   vizSpecNames_.clear();
@@ -2624,7 +2769,7 @@ void ReactingFlow::evaluatePlasmaConductivityGF() {
   sigma_gf_.SetFromTrueDofs(sigma_);
 }
 
-void ReactingFlow::updateDensity(double tStep) {
+void ReactingFlow::updateDensity(double tStep, bool update_mass_matrix) {
   Array<int> empty;
   Rmix_gf_.GetTrueDofs(tmpR0a_);
 
@@ -2662,9 +2807,11 @@ void ReactingFlow::updateDensity(double tStep) {
   }
   rn_gf_.SetFromTrueDofs(rn_);
 
-  MsRho_form_->Update();
-  MsRho_form_->Assemble();
-  MsRho_form_->FormSystemMatrix(empty, MsRho_);
+  if (update_mass_matrix) {
+    MsRho_form_->Update();
+    MsRho_form_->Assemble();
+    MsRho_form_->FormSystemMatrix(empty, MsRho_);
+  }
 
   // project to p-space in case not same as vel-temp
   R0PM0_gf_.SetFromTrueDofs(rn_);
@@ -3018,6 +3165,273 @@ void ReactingFlow::identifyCollisionType(const Array<GasSpcs> &speciesType, GasC
   }
 
   return;
+}
+
+void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, double *omega) {
+  // This function evaluates the reacting flow source terms at a given
+  // state (i.e., at a point in the grid) which is necessary for a
+  // nonlinear solve for an implicit time step at each point.  The
+  // sequence of calls that does this for the full field is below:
+  //
+  // updateMixture();
+  // updateThermoP();
+  // updateDensity(0.0, false);
+  // speciesProduction();
+  // heatOfFormation();
+  //
+
+  // Extract data from incoming state and populate full set of mass & mole fractions
+  std::vector<double> Y(nSpecies_);  // mass fractions
+  std::vector<double> X(nSpecies_);  // mole fractions
+  double T = 0.0;                    // temperature
+
+  // Set the species we are carrying, and evaluate charge density as we go
+  double ne = 0.0;
+  double sumy = 0.0;
+  for (int sp = 0; sp < nActiveSpecies_; sp++) {
+    Y[sp] = YT[sp];
+
+    sumy += Y[sp];
+
+    const double q_sp = mixture_->GetGasParams(sp, GasParams::SPECIES_CHARGES);
+    const double m_sp = mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
+    const double fac = q_sp / m_sp;
+    ne += fac * Y[sp];
+  }
+
+  if (mixtureInput_.ambipolar) {
+    // Electron density is determined from charge neutrality
+    const int iElectron = nSpecies_ - 2;
+    const double m_electron = mixture_->GetGasParams(iElectron, GasParams::SPECIES_MW);
+    Y[iElectron] = ne * m_electron;
+    sumy += Y[iElectron];
+  }
+
+  // 'Background' species density is 1 - sum of the rest
+  Y[nSpecies_ - 1] = 1.0 - sumy;
+
+  // Temperature is the last element of the incoming state
+  T = YT[nActiveSpecies_];
+
+  double Rmix = 0;
+  double Mmix = 0;
+
+  // Evaluate mixture molecular weight and gas constant
+  for (int sp = 0; sp < nSpecies_; sp++) {
+    Mmix += Y[sp] / gasParams_(sp, GasParams::SPECIES_MW);
+  }
+  Mmix = 1.0 / Mmix;
+  Rmix = Rgas_ / Mmix;
+
+  // Evaluate mole fractions
+  for (int sp = 0; sp < nSpecies_; sp++) {
+    X[sp] = Y[sp] * Mmix / gasParams_(sp, GasParams::SPECIES_MW);
+  }
+
+  // Compute mixture density
+  assert(domain_is_open_);  // TODO(trevilo): handle variable pressure case!!
+  double rho = thermo_pressure_ / (Rmix * T);
+
+  // int nEq = dim_ + 2 + nActiveSpecies_;
+  Vector state(gpudata::MAXEQUATIONS);
+  state = 0.0;
+
+  Vector n_sp;
+
+  // Set up conserved state (just the mass densities, which is all we need here)
+  state[0] = rho;
+  for (int sp = 0; sp < nActiveSpecies_; sp++) {
+    state[dim_ + 1 + sp + 1] = rho * Y[sp];
+  }
+
+  // Evaluate the mole densities (from mass densities)
+  mixture_->computeNumberDensities(state, n_sp);
+
+  // GetMixtureCp returns cpMix = sum_s X_s Cp_s, where X_s is
+  // mole density of species s and Cp_s is molar specific heat
+  // (constant pressure) of species s, so cpMix at this point
+  // (units J/m^3), which is rho*Cp, where rho is the mixture
+  // density (kg/m^3) and Cp is the is the mixture mass specific
+  // heat (units J/(kg*K).
+  double Cpmix = 0;
+  mixture_->GetMixtureCp(n_sp, rho, Cpmix);
+
+  // Everything else expects CpMix_gf_ to be the mixture mass Cp
+  // (with units J/(kg*K)), so divide by mixture density
+  Cpmix /= rho;
+
+  // Vectors used in computing chemical sources at each point
+  Vector kfwd;          // set to size nReactions_ in computeForwardRareCoeffs
+  Vector keq;           // set to size nReactions_ in computeEquilibriumConstants
+  Vector progressRate;  // set to size nReactions_ in computeProgressRate
+  Vector creationRate;  // set to size nSpecies_ in computeCreationRate
+  Vector emissionRate;  // set to size nSpecies_ in computeCreationRate
+
+  kfwd.SetSize(chemistry_->getNumReactions());
+  keq.SetSize(chemistry_->getNumReactions());
+
+  const double Th = T;
+  const double Te = Th;
+
+  // Evaluate the chemical source terms
+  chemistry_->computeForwardRateCoeffs(n_sp.Read(), Th, Te, dofindex, kfwd.HostWrite());
+  chemistry_->computeEquilibriumConstants(Th, Te, keq.HostWrite());
+  chemistry_->computeProgressRate(n_sp, kfwd, keq, progressRate);
+  chemistry_->computeCreationRate(progressRate, creationRate, emissionRate);
+
+  // And store in returned variable
+  for (int sp = 0; sp < nActiveSpecies_; sp++) {
+    omega[sp] = creationRate[sp] / rho;
+  }
+
+  // And finally, handle the temperature source term
+  double hw = 0.0;
+  double hspecies;
+
+  if (radiative_decay_NECincluded_) {
+    // Sum over species to get enthalpy term
+    for (int sp = 0; sp < nSpecies_; sp++) {
+      double molarCV = speciesMolarCv_[sp];
+      molarCV *= UNIVERSALGASCONSTANT;
+      double molarCP = molarCV + UNIVERSALGASCONSTANT;
+
+      hspecies = (molarCP * T + gasParams_(sp, GasParams::FORMATION_ENERGY)) / gasParams_(sp, GasParams::SPECIES_MW);
+      hw -= hspecies * (creationRate[sp] - emissionRate[sp]);
+    }
+  } else {
+    // Sum over species to get enthalpy term
+    for (int sp = 0; sp < nSpecies_; sp++) {
+      double molarCV = speciesMolarCv_[sp];
+      molarCV *= UNIVERSALGASCONSTANT;
+      double molarCP = molarCV + UNIVERSALGASCONSTANT;
+
+      hspecies = (molarCP * T + gasParams_(sp, GasParams::FORMATION_ENERGY)) / gasParams_(sp, GasParams::SPECIES_MW);
+      hw -= hspecies * creationRate[sp];
+    }
+  }
+
+  omega[nActiveSpecies_] = hw / rho / Cpmix;
+}
+
+void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const double dt) {
+  const int nState = nActiveSpecies_ + 1;         // Number of variables in YT
+  const double eps = implicit_chemistry_fd_eps_;  // Perturbation for finite difference Jacobian
+
+  double *YT1 = new double[nState];
+  double *YT0 = new double[nState];
+  double *rhs1 = new double[nState];
+  double *rhs = new double[nState];
+
+  mfem::DenseMatrix Jac(nState);
+
+  // Store state at beginning of the step
+  for (int i = 0; i < nState; i++) {
+    YT0[i] = YT[i];
+  }
+
+  // Before starting the Newton iteration, evaluate the rhs and
+  // Jacobian for a backward Euler step
+
+  // Evaluate RHS...
+  this->evaluateReactingSource(YT, dofindex, rhs);
+
+  // ... and Jacobian (via finite difference)
+  for (int i = 0; i < nState; i++) {
+    for (int j = 0; j < nState; j++) {
+      YT1[j] = YT[j];
+    }
+    if (YT[i] < implicit_chemistry_smin_) {
+      YT1[i] = implicit_chemistry_smin_ * (1 + eps);
+    } else {
+      YT1[i] *= (1 + eps);
+    }
+
+    this->evaluateReactingSource(YT1, dofindex, rhs1);
+
+    for (int j = 0; j < nState; j++) {
+      Jac(j, i) = (rhs1[j] - rhs[j]) / (YT1[i] - YT[i]);
+    }
+  }
+
+  for (int i = 0; i < nState; i++) {
+    rhs[i] *= -dt;
+
+    for (int j = 0; j < nState; j++) {
+      Jac(j, i) *= -dt;
+    }
+    Jac(i, i) += 1.0;
+  }
+
+  double res_norm0 = 0;
+  for (int i = 0; i < nState; i++) {
+    res_norm0 += rhs[i] * rhs[i];
+  }
+  res_norm0 = sqrt(res_norm0);
+
+  int iiter = 0;
+  double res_norm = res_norm0;
+
+  // Newton solver loop
+  while (iiter < implicit_chemistry_maxiter_ && res_norm > implicit_chemistry_atol_ &&
+         (res_norm / res_norm0) > implicit_chemistry_rtol_) {
+    mfem::LinearSolve(Jac, rhs, 1.e-9);
+
+    // Update the solution
+    for (int i = 0; i < nState; i++) {
+      YT[i] += -rhs[i];
+    }
+
+    // Compute rhs and Jacobian, in preparation for next step
+    this->evaluateReactingSource(YT, dofindex, rhs);
+
+    for (int i = 0; i < nState; i++) {
+      for (int j = 0; j < nState; j++) {
+        YT1[j] = YT[j];
+      }
+      if (YT[i] < 1e-10) {
+        YT1[i] = 1e-17;
+      } else {
+        YT1[i] *= (1 + eps);
+      }
+
+      this->evaluateReactingSource(YT1, dofindex, rhs1);
+      for (int j = 0; j < nState; j++) {
+        Jac(j, i) = (rhs1[j] - rhs[j]) / (YT1[i] - YT[i]);
+      }
+    }
+
+    for (int i = 0; i < nState; i++) {
+      rhs[i] *= -dt;
+      rhs[i] += YT[i] - YT0[i];
+
+      for (int j = 0; j < nState; j++) {
+        Jac(j, i) *= -dt;
+      }
+      Jac(i, i) += 1.0;
+    }
+
+    res_norm = 0;
+    for (int i = 0; i < nState; i++) {
+      res_norm += rhs[i] * rhs[i];
+    }
+    res_norm = sqrt(res_norm);
+    iiter += 1;
+  }
+
+  if (iiter >= implicit_chemistry_maxiter_ && implicit_chemistry_verbose_) {
+    std::cout << "WARNING: Implicit chemistry Newton solve did not converge." << std::endl;
+    std::cout << "    YT =";
+    for (int i = 0; i < nState; i++) {
+      std::cout << " " << YT[i];
+    }
+    std::cout << std::endl;
+    std::cout << "    iiter = " << iiter << ", r0 = " << res_norm0 << ", r/r0 = " << res_norm / res_norm0 << std::endl;
+  }
+
+  delete[] YT1;
+  delete[] YT0;
+  delete[] rhs1;
+  delete[] rhs;
 }
 
 double binaryTest(const Vector &coords, double t) {

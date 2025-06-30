@@ -119,6 +119,8 @@ MFEM_HOST_DEVICE double N2N211(const double &T);
 MFEM_HOST_DEVICE double N2N222(const double &T);
 
 // mixed
+MFEM_HOST_DEVICE double N2Ni11(const double &T);
+MFEM_HOST_DEVICE double N2Ni22(const double &T);    
 MFEM_HOST_DEVICE double N2Ni1P11(const double &T);
 MFEM_HOST_DEVICE double NiN21P11(const double &T);    
   

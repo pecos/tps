@@ -54,6 +54,7 @@ class ElectromagneticOptions {
 
   bool top_only; /**< Flag to specify current in top rings only */
   bool bot_only; /**< Flag to specify current in bottom rings only */
+  bool variable_current; /**< Flag to specify variable current in each ring */
 
   bool evaluate_magnetic_field;
   std::string By_file; /**< Filename for vertical component of magnetic field on y-axis */
@@ -66,8 +67,11 @@ class ElectromagneticOptions {
   double mu0;               /**< Permeability of free space */
 
   mfem::Vector current_axis;
+  mfem::Vector varcurrent_amplitude; /*< Vector storing the current amplitude in each ring */
 
   bool eval_Rplasma;
+
+  int print_level;
 
   ElectromagneticOptions() {
     order = 1;
@@ -86,6 +90,9 @@ class ElectromagneticOptions {
     current_frequency = 1.0;
     mu0 = 1.0;
     eval_Rplasma = false;
+    print_level = 0;
+
+    variable_current = false;
   }
 
   void print(std::ostream &out) {
@@ -100,6 +107,7 @@ class ElectromagneticOptions {
     out << "  atol        = " << atol << std::endl;
     out << "  top_only    = " << top_only << std::endl;
     out << "  bot_only    = " << bot_only << std::endl;
+    out << "  variable_current    = " << variable_current << std::endl;
     out << "  By_file     = " << By_file << std::endl;
     out << "  nBy         = " << nBy << std::endl;
     out << "  yinterp_min = " << yinterp_min << std::endl;
@@ -108,6 +116,7 @@ class ElectromagneticOptions {
     out << "  current_frequency = " << current_frequency << std::endl;
     out << "  mu0 = " << mu0 << std::endl;
     out << "  eval_Rplasma = " << eval_Rplasma << std::endl;
+    out << "  print_level = " << print_level << std::endl;
     out << std::endl;
   }
 };

@@ -35,6 +35,7 @@ EXTRA_DIST  = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes lte-
               ref_solns/reactBinDiff/*.h5 \
               ref_solns/reactSingleRx/*.h5 \
               ref_solns/reactTable/*.h5 \
+              ref_solns/radDecay/*.h5 \
 		      vpath.sh die.sh count_gpus.sh sniff_mpirun.sh \
 		      cyl3d.gpu.test cyl3d.mflow.gpu.test wedge.gpu.test \
 	          averaging.gpu.test cyl3d.test cyl3d.gpu.python.test cyl3d.mflow.test cyl3d.dtconst.test \
@@ -50,7 +51,7 @@ EXTRA_DIST  = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes lte-
               sgsSmag.test sgsSigma.test heatEq.test sponge.test plate.test pipe.mix.test lte2noneq-restart.test \
               coupled-3d.interface.test plasma.axisym.test plasma.axisym.lte1d.test \
 	      lomach-flow.test lomach-lequere.test interpInlet.test sgsLoMach.test autoPeriodic.test aveLoMach.test \
-              reactFlow-binDiff.test reactFlow-singleRx.test reactFlow-table.test
+              reactFlow-binDiff.test reactFlow-singleRx.test reactFlow-table.test radiativeDecay.test
 
 
 TESTS = vpath.sh
@@ -123,7 +124,8 @@ TESTS += cyl3d.test \
          aveLoMach.test \
          reactFlow-binDiff.test \
          reactFlow-singleRx.test \
-         reactFlow-table.test
+         reactFlow-table.test \
+         radiativeDecay.test
 
 if PYTHON_ENABLED
 TESTS += cyl3d.python.test \
@@ -251,5 +253,11 @@ test_distance_fcn_SOURCES     = test_distance_fcn.cpp
 test_distance_fcn_LDADD       = ../src/libtps.la
 test_distance_fcn_LDADD      += $(HDF5_LIBS)
 test_distance_fcn_LDADD      += $(GRVY_LIBS)
+
+check_PROGRAMS               += standalone_chemistry
+standalone_chemistry_SOURCES  = standalone_chemistry.cpp
+standalone_chemistry_LDADD    = ../src/libtps.la
+standalone_chemistry_LDADD   += $(HDF5_LIBS)
+standalone_chemistry_LDADD   += $(GRVY_LIBS)
 
 endif # if !GPU_ENABLED

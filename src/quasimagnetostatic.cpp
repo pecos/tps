@@ -264,6 +264,19 @@ void QuasiMagnetostaticSolver3D::InitializeCurrent() {
     J0(3) = J0(4) = mu0J;
   }
 
+  if (em_opts_.variable_current) {
+    J0(1) = em_opts_.mu0 * em_opts_.varcurrent_amplitude(1) * 0.5;
+    J0(2) = em_opts_.mu0 * em_opts_.varcurrent_amplitude(2) * 0.5;
+    J0(3) = em_opts_.mu0 * em_opts_.varcurrent_amplitude(3) * 0.5;
+    J0(4) = em_opts_.mu0 * em_opts_.varcurrent_amplitude(4) * 0.5;
+  }
+
+  if (rank0_) {
+    std::cout << "J0 = " << J0(0) << ", " << J0(1)
+              << ", " << J0(2) << ", " << J0(3)
+              << ", " << J0(4) << endl;
+  }
+
   PWConstCoefficient J0coef(J0);
   VectorFunctionCoefficient current(dim_, JFun, &J0coef);
 
@@ -325,6 +338,14 @@ void QuasiMagnetostaticSolver3D::parseSolverOptions() {
   tpsP_->getInput("em/top_only", em_opts_.top_only, false);
   tpsP_->getInput("em/bot_only", em_opts_.bot_only, false);
 
+  // FLAG TO SET IF THE COILS WILL HAVE DIFFERENT CURRENT
+  tpsP_->getInput("em/variable_current", em_opts_.variable_current, false);
+
+  // EACH RING HAS DIFFERENT CURRENT AMPLITUDE
+  Vector default_current(5);
+  default_current = 0.0;
+  tpsP_->getVec("em/varcurrent_amplitude", em_opts_.varcurrent_amplitude, 5, default_current);
+
   tpsP_->getInput("em/current_amplitude", em_opts_.current_amplitude, 1.0);
   tpsP_->getInput("em/current_frequency", em_opts_.current_frequency, 1.0);
   tpsP_->getInput("em/permeability", em_opts_.mu0, 1.0);
@@ -336,6 +357,7 @@ void QuasiMagnetostaticSolver3D::parseSolverOptions() {
   tpsP_->getVec("em/current_axis", em_opts_.current_axis, 3, default_axis);
 
   tpsP_->getInput("em/eval_Rplasma", em_opts_.eval_Rplasma, false);
+  tpsP_->getInput("em/print_level", em_opts_.print_level, 0);
 
   // dump options to screen for user inspection
   if (rank0_) {
@@ -449,7 +471,7 @@ void QuasiMagnetostaticSolver3D::solveStep() {
   solver.SetRelTol(em_opts_.rtol);
   solver.SetAbsTol(em_opts_.atol);
   solver.SetMaxIter(em_opts_.max_iter);
-  solver.SetPrintLevel(1);
+  solver.SetPrintLevel(em_opts_.print_level);
 
   solver.Mult(rhs, Avec);
 
@@ -498,7 +520,7 @@ void QuasiMagnetostaticSolver3D::solveStep() {
 
   { /*open scope so that ParaViewDataCollection is destroyed before Ereal_, Eimag_ if needed*/
     // 3) Output A and B fields for visualization using paraview
-    if (verbose) grvy_printf(ginfo, "Writing solution to paraview output.\n");
+    if (verbose && em_opts_.print_level > 0) grvy_printf(ginfo, "Writing solution to paraview output.\n");
     ParaViewDataCollection paraview_dc("magnetostatic", pmesh_);
     paraview_dc.SetPrefixPath("ParaView");
     paraview_dc.SetLevelsOfDetail(em_opts_.order);
@@ -777,7 +799,7 @@ void QuasiMagnetostaticSolverAxiSym::initialize() {
   //-----------------------------------------------------
 
   // 1a) Read the serial mesh (on each mpi rank)
-  std::cout << "Reading mesh = " << em_opts_.mesh_file.c_str() << std::endl;
+  if (verbose) grvy_printf(ginfo, "Reading EM mesh file: %s\n", em_opts_.mesh_file.c_str());
   Mesh *mesh = new Mesh(em_opts_.mesh_file.c_str(), 1, 1);
   dim_ = mesh->Dimension();
   if (dim_ != 2) {
@@ -894,6 +916,19 @@ void QuasiMagnetostaticSolverAxiSym::InitializeCurrent() {
     J0(3) = J0(4) = mu0J;
   }
 
+  if (em_opts_.variable_current) {
+    J0(1) = em_opts_.mu0 * em_opts_.varcurrent_amplitude(1) * 0.5;
+    J0(2) = em_opts_.mu0 * em_opts_.varcurrent_amplitude(2) * 0.5;
+    J0(3) = em_opts_.mu0 * em_opts_.varcurrent_amplitude(3) * 0.5;
+    J0(4) = em_opts_.mu0 * em_opts_.varcurrent_amplitude(4) * 0.5;
+  }
+
+  if (rank0_) {
+    std::cout << "J0 = " << J0(0) << ", " << J0(1)
+              << ", " << J0(2) << ", " << J0(3)
+              << ", " << J0(4) << endl;
+  }
+
   FunctionCoefficient radius_coeff(radius);
 
   PWConstCoefficient J0coef(J0);
@@ -922,6 +957,14 @@ void QuasiMagnetostaticSolverAxiSym::parseSolverOptions() {
   tpsP_->getInput("em/top_only", em_opts_.top_only, false);
   tpsP_->getInput("em/bot_only", em_opts_.bot_only, false);
 
+  tpsP_->getInput("em/variable_current", em_opts_.variable_current, false);
+
+  // EACH RING HAS DIFFERENT CURRENT AMPLITUDE
+  Vector default_current(5);
+  default_current = 0.0;
+  tpsP_->getVec("em/varcurrent_amplitude", em_opts_.varcurrent_amplitude, 5, default_current);
+
+  // CONSTANT CURRENT AMPLITUDE FOR ALL RINGS OF THE COIL
   tpsP_->getInput("em/current_amplitude", em_opts_.current_amplitude, 1.0);
   tpsP_->getInput("em/current_frequency", em_opts_.current_frequency, 1.0);
   tpsP_->getInput("em/permeability", em_opts_.mu0, 1.0);
@@ -1007,6 +1050,8 @@ void QuasiMagnetostaticSolverAxiSym::solveStep() {
   Kpre->FormSystemMatrix(ess_bdr_tdofs_, KpreOp);
 
   std::unique_ptr<HypreBoomerAMG> prec(new HypreBoomerAMG(*KpreOp.As<HypreParMatrix>()));
+  prec->SetPrintLevel(em_opts_.print_level);
+
   BlockDiagonalPreconditioner BDP(offsets_);
   BDP.SetDiagonalBlock(0, prec.get());
   BDP.SetDiagonalBlock(1, prec.get());
@@ -1019,7 +1064,7 @@ void QuasiMagnetostaticSolverAxiSym::solveStep() {
   solver.SetRelTol(em_opts_.rtol);
   solver.SetAbsTol(em_opts_.atol);
   solver.SetMaxIter(em_opts_.max_iter);
-  solver.SetPrintLevel(1);
+  solver.SetPrintLevel(em_opts_.print_level);
 
   solver.Mult(rhs_vec, Atheta_vec);
 
@@ -1051,7 +1096,7 @@ void QuasiMagnetostaticSolverAxiSym::solveStep() {
   }
 
   // 3) Output A and B fields for visualization using paraview
-  if (verbose) grvy_printf(ginfo, "Writing solution to paraview output.\n");
+  if (verbose && em_opts_.print_level > 0) grvy_printf(ginfo, "Writing solution to paraview output.\n");
   ParaViewDataCollection paraview_dc("magnetostatic", pmesh_);
   paraview_dc.SetPrefixPath("ParaView");
   paraview_dc.SetLevelsOfDetail(em_opts_.order);
@@ -1183,6 +1228,14 @@ double QuasiMagnetostaticSolverAxiSym::coilCurrent() const {
   Vector J0(pmesh_->attributes.Max());
   J0 = 0.0;
   J0(1) = em_opts_.current_amplitude * 0.5;
+
+  // if(em_opts_.variable_current){
+  //   J0(1) = em_opts_.varcurrent_amplitude(1) * 0.5;
+  //   J0(2) = em_opts_.varcurrent_amplitude(2) * 0.5;
+  //   J0(3) = em_opts_.varcurrent_amplitude(3) * 0.5;
+  //   J0(4) = em_opts_.varcurrent_amplitude(4) * 0.5;
+  // }
+
   PWConstCoefficient J0coef(J0);
 
   // Integrate the current by looping over the elements.  Note that
