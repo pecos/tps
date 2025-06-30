@@ -630,13 +630,15 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   }
   LQ_form_->AddDomainIntegrator(lqd_blfi);
   
-  // auto *slqd_blfi = new DiffusionIntegrator(*supg_coeff_);
-  // if (sw_stab_)
-  //   // SUPG diffusion
-  //   // if (numerical_integ_) {
-  //   //   slqd_blfi->SetIntRule(&ir_di);
-  //   // }
-  //   LQ_form_->AddDomainIntegrator(slqd_blfi);
+  DiffusionIntegrator *slqd_blfi;
+  if (sw_stab_)
+    slqd_blfi = new DiffusionIntegrator(*supg_coeff_);
+    // SUPG diffusion
+    // if (numerical_integ_) {
+    //   slqd_blfi->SetIntRule(&ir_di);
+    // }
+    LQ_form_->AddDomainIntegrator(slqd_blfi);
+
 
   if (partial_assembly_) {
     LQ_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);

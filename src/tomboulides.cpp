@@ -210,7 +210,7 @@ Tomboulides::~Tomboulides() {
   delete rho_over_dt_coeff_;
   delete iorho_coeff_;
   delete rho_coeff_;
-
+  
   delete umag_coeff_;
   delete gscale_coeff_;
   delete visc_inv_coeff_;
@@ -223,6 +223,7 @@ Tomboulides::~Tomboulides() {
   delete upwind_coeff_; 
   delete swdiff_coeff_;
   delete supg_coeff_;
+  delete visc_coeff_;
 
   // objects allocated by initalizeSelf
   if (axisym_) delete gravity_vec_;
@@ -685,9 +686,11 @@ void Tomboulides::initializeOperators() {
 
   // artifical diffusion coefficients
   if(sw_stab_) {
+    visc_coeff_ = new GridFunctionCoefficient(thermo_interface_->viscosity);
     umag_coeff_ = new VectorMagnitudeCoefficient(*u_next_coeff_);
     gscale_coeff_ = new GridFunctionCoefficient(gridScale_gf_);
-    visc_inv_coeff_ = new PowerCoefficient(*mu_coeff_, -1.0);
+    visc_inv_coeff_ = new PowerCoefficient(*visc_coeff_, -1.0);
+    // visc_inv_coeff_ = new PowerCoefficient(*mu_coeff_, -1.0);
     
     // compute Reh
     reh1_coeff_ = new ProductCoefficient(*rho_coeff_, *visc_inv_coeff_);
@@ -1540,6 +1543,12 @@ void Tomboulides::step() {
   }
 
   if (sw_stab_) {
+
+    // Update matrix
+    Array<int> empty;
+    Mv_stab_form_->Update();
+    Mv_stab_form_->Assemble();
+    Mv_stab_form_->FormSystemMatrix(empty, Mv_stab_op_);
     /*
     for (int i = 0; i < dim_; i++) {
       setScalarFromVector(u_vec_, i, &tmpR0a_);
@@ -1558,7 +1567,7 @@ void Tomboulides::step() {
     Mv_rho_inv_->Mult(swDiff_vec_, tmpR1_);
     pp_div_vec_ += tmpR1_;
   }
-
+  // printf("%f\n", tmpR1_.Norml2());
   // Add ustar/dt contribution
   pp_div_vec_ += ustar_vec_;
 
