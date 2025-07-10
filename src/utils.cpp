@@ -787,6 +787,154 @@ void ComputeCurl3D(const ParGridFunction &u, ParGridFunction &cu) {
   }
 }
 
+void derivJump(const ParGridFunction &u, ParGridFunction &jump) {
+  const FiniteElementSpace *fes = u.FESpace();
+
+  // Force data copy to host (b/c host data used below)
+  u.HostRead();
+
+  // AccumulateAndCountZones.
+  Array<int> zones_per_vdof;
+  zones_per_vdof.SetSize(fes->GetVSize());
+  zones_per_vdof = 0;
+  
+  // Initialize jump
+  jump = 0.0;            // On device (if present)
+  jump.HostReadWrite();  // Copy to host and invalidate device data (b/c host written to below)
+
+  ParGridFunction maxJumpU(fes);
+  ParGridFunction minJumpU(fes);
+  //maxJumpU.SetSpace(fes);
+  //minJumpU.SetSpace(fes);
+  maxJumpU = -1.0e12;
+  minJumpU = +1.0e12;
+
+  ParGridFunction maxJumpV(fes);
+  ParGridFunction minJumpV(fes);
+  //maxJumpV.SetSpace(fes);
+  //minJumpV.SetSpace(fes);
+  maxJumpV = -1.0e12;
+  minJumpV = +1.0e12;
+
+  ParGridFunction maxJumpW(fes);
+  ParGridFunction minJumpW(fes);
+  //maxJumpW.SetSpace(fes);
+  //minJumpW.SetSpace(fes);
+  maxJumpW = -1.0e12;
+  minJumpW = +1.0e12;    
+
+  // Local interpolation.
+  int elndofs;
+  int vdim = fes->GetVDim();
+  int dim;
+  Array<int> vdofs;
+  Vector valsU;
+  Vector valsV;
+  Vector valsW;  
+  Vector loc_data;
+  DenseMatrix grad_hat;
+  DenseMatrix dshape;
+  DenseMatrix grad;
+
+  for (int e = 0; e < fes->GetNE(); ++e) {
+    
+    fes->GetElementVDofs(e, vdofs);
+    u.GetSubVector(vdofs, loc_data);
+    valsU.SetSize(vdofs.Size());
+    valsV.SetSize(vdofs.Size());
+    valsW.SetSize(vdofs.Size());    
+    ElementTransformation *tr = fes->GetElementTransformation(e);
+    const FiniteElement *el = fes->GetFE(e);
+    elndofs = el->GetDof();
+    dim = el->GetDim();
+    dshape.SetSize(elndofs, dim);
+
+    for (int dof = 0; dof < elndofs; ++dof) {
+      
+      // Get IP
+      const IntegrationPoint &ip = el->GetNodes().IntPoint(dof);
+      tr->SetIntPoint(&ip);
+
+      // Eval and GetVectorGradientHat.
+      el->CalcDShape(tr->GetIntPoint(), dshape);
+      grad_hat.SetSize(vdim, dim);
+      DenseMatrix loc_data_mat(loc_data.GetData(), elndofs, vdim);
+      MultAtB(loc_data_mat, dshape, grad_hat);
+
+      // gradient: g(comp,dir), generally discontinuous 
+      const DenseMatrix &Jinv = tr->InverseJacobian();
+      grad.SetSize(grad_hat.Height(), Jinv.Width());
+      Mult(grad_hat, Jinv, grad);
+            
+      for (int j = 0; j < dim; ++j) {
+        valsU(elndofs * j + dof) = grad(0,j);
+      }
+
+      for (int j = 0; j < dim; ++j) {
+        valsV(elndofs * j + dof) = grad(1,j);
+      }
+
+      for (int j = 0; j < dim; ++j) {
+        valsW(elndofs * j + dof) = grad(2,j);
+      }
+      
+    }
+
+    // Find max jump values in all dofs
+    for (int j = 0; j < vdofs.Size(); j++) {
+      int ldof = vdofs[j];
+      maxJumpU(ldof) = max(maxJumpU(ldof), valsU[j]);
+      minJumpU(ldof) = min(minJumpU(ldof), valsU[j]);
+      maxJumpV(ldof) = max(maxJumpV(ldof), valsV[j]);
+      minJumpV(ldof) = min(minJumpV(ldof), valsV[j]);
+      maxJumpW(ldof) = max(maxJumpW(ldof), valsW[j]);
+      minJumpW(ldof) = min(minJumpW(ldof), valsW[j]);
+      zones_per_vdof[ldof]++;      
+    }
+  }
+
+  // Communication............
+
+  // Count the zones globally.
+  GroupCommunicator &gcomm = u.ParFESpace()->GroupComm(); // SHOULD THIS BE "jump"
+  gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
+  gcomm.Bcast(zones_per_vdof);
+
+  // Accumulate for all vdofs.
+  gcomm.Reduce<double>(maxJumpU.GetData(), GroupCommunicator::Max);
+  gcomm.Bcast<double>(maxJumpU.GetData());
+  gcomm.Reduce<double>(maxJumpV.GetData(), GroupCommunicator::Max);
+  gcomm.Bcast<double>(maxJumpV.GetData());
+  gcomm.Reduce<double>(maxJumpW.GetData(), GroupCommunicator::Max);
+  gcomm.Bcast<double>(maxJumpW.GetData());  
+
+  gcomm.Reduce<double>(minJumpU.GetData(), GroupCommunicator::Min);
+  gcomm.Bcast<double>(minJumpU.GetData());
+  gcomm.Reduce<double>(minJumpV.GetData(), GroupCommunicator::Min);
+  gcomm.Bcast<double>(minJumpV.GetData());
+  gcomm.Reduce<double>(minJumpW.GetData(), GroupCommunicator::Min);
+  gcomm.Bcast<double>(minJumpW.GetData());  
+  
+  // Compute max jumps (conservative)
+  int jSize = jump.Size();
+  for (int i = 0; i < jSize; i++) {
+    const int nz = zones_per_vdof[i];
+    if (nz) {
+      double duJump = 0.0;
+      double dvJump = 0.0;
+      double dwJump = 0.0;
+      for (int j = 0; j < dim; j++) {
+        duJump += (maxJumpU(i + j*jSize) - minJumpU(i + j*jSize)) * (maxJumpU(i + j*jSize) - minJumpU(i + j*jSize));
+        dvJump += (maxJumpV(i + j*jSize) - minJumpV(i + j*jSize)) * (maxJumpV(i + j*jSize) - minJumpV(i + j*jSize));
+        dwJump += (maxJumpW(i + j*jSize) - minJumpW(i + j*jSize)) * (maxJumpW(i + j*jSize) - minJumpW(i + j*jSize));
+      }
+      jump(i) = duJump + dvJump + dwJump;
+    }
+    // else jump stays at zero
+  }
+}
+
+
 void vectorGrad3D(ParGridFunction &uSub, ParGridFunction &u, ParGridFunction &gu, ParGridFunction &gv,
                   ParGridFunction &gw) {
   // FiniteElementSpace *sfes = uSub.FESpace();
