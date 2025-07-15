@@ -156,6 +156,9 @@ class ReactingFlow : public ThermoChemModelBase {
 
   // streamwise-stabilization
   bool sw_stab_;
+  
+  // clip qt for diagnosis
+  bool clip_qt_;
 
   // FEM related fields and objects
 
@@ -208,6 +211,15 @@ class ReactingFlow : public ThermoChemModelBase {
   // Interface with EM
   ParGridFunction sigma_gf_;
   ParGridFunction jh_gf_;
+
+  // viz for qt rhs
+  ParGridFunction rhsqt_bd_;
+  ParGridFunction rhsqt_fo_;
+  ParGridFunction rhsqt_jh_;
+  ParGridFunction rhsqt_hf_;
+  ParGridFunction rhsqt_sd_;
+  ParGridFunction rhsqt_total_;
+  ParGridFunction Xqt_gf_;
 
   // ParGridFunction *buffer_tInlet_ = nullptr;
   GridFunctionCoefficient *temperature_bc_field_ = nullptr;
@@ -265,6 +277,7 @@ class ReactingFlow : public ThermoChemModelBase {
   ProductCoefficient *upwind_coeff_  = nullptr;
   TransformedMatrixVectorCoefficient *swdiff_coeff_  = nullptr;
   ScalarMatrixProductCoefficient *supg_coeff_ = nullptr;
+  ScalarMatrixProductCoefficient *supg_cp_coeff_ = nullptr;
 
   // operators and solvers
   ParBilinearForm *At_form_ = nullptr;
