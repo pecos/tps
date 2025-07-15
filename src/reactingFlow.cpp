@@ -542,6 +542,11 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
 
   // artificial diffusion (SUPG)
   tpsP_->getInput("loMach/reactingFlow/streamwise-stabilization", sw_stab_, false);
+  
+  // NOTE: clipping Qt for debugging
+  tpsP_->getInput("loMach/reactingFlow/clip-qt", clip_qt_, false);
+  
+
 }
 
 ReactingFlow::~ReactingFlow() {
@@ -635,6 +640,7 @@ ReactingFlow::~ReactingFlow() {
   delete upwind_coeff_; 
   delete swdiff_coeff_;
   delete supg_coeff_;
+  delete supg_cp_coeff_;
 
   // allocated in initializeSelf
   delete vfes_;
@@ -843,6 +849,22 @@ void ReactingFlow::initializeSelf() {
 
   Mmix_gf_.SetSpace(sfes_);
   Rmix_gf_.SetSpace(sfes_);
+
+  // qt rhs visualization
+  rhsqt_bd_.SetSpace(sfes_);
+  rhsqt_fo_.SetSpace(sfes_);
+  rhsqt_jh_.SetSpace(sfes_);
+  rhsqt_hf_.SetSpace(sfes_);
+  rhsqt_sd_.SetSpace(sfes_);
+  rhsqt_total_.SetSpace(sfes_);
+  Xqt_gf_.SetSpace(sfes_);
+  rhsqt_bd_ = 0.0;
+  rhsqt_fo_ = 0.0;
+  rhsqt_jh_ = 0.0;
+  rhsqt_hf_ = 0.0;
+  rhsqt_sd_ = 0.0;
+  rhsqt_total_ = 0.0;
+  Xqt_gf_ = 0.0;
 
   // exports
   toFlow_interface_.density = &rn_gf_;
@@ -1159,6 +1181,7 @@ void ReactingFlow::initializeOperators() {
       swdiff_coeff_ = new TransformedMatrixVectorCoefficient(un_next_coeff_, &streamwiseTensor);
 
       supg_coeff_ = new ScalarMatrixProductCoefficient(*upwind_coeff_, *swdiff_coeff_);
+      supg_cp_coeff_ = new ScalarMatrixProductCoefficient(*cpMix_coeff_, *supg_coeff_);
     }
     else {
       // compute upwind magnitude
@@ -1170,6 +1193,7 @@ void ReactingFlow::initializeOperators() {
       swdiff_coeff_ = new TransformedMatrixVectorCoefficient(un_next_coeff_, &streamwiseTensor);
 
       supg_coeff_ = new ScalarMatrixProductCoefficient(*upwind_coeff_, *swdiff_coeff_);
+      supg_cp_coeff_ = new ScalarMatrixProductCoefficient(*cpMix_coeff_, *supg_coeff_);
     }
   }
 
@@ -1283,7 +1307,7 @@ void ReactingFlow::initializeOperators() {
   DiffusionIntegrator *sdt_blfi; 
   if (sw_stab_) {
     // auto *sdt_blfi = new DiffusionIntegrator(*supg_coeff_);
-    sdt_blfi = new DiffusionIntegrator(*supg_coeff_);
+    sdt_blfi = new DiffusionIntegrator(*supg_cp_coeff_);
     // SUPG diffusion
     // if (numerical_integ_) {
     //   sdt_blfi->SetIntRule(&ir_di);
@@ -2371,7 +2395,16 @@ void ReactingFlow::initializeViz(ParaViewDataCollection &pvdc) {
   pvdc.RegisterField("epsilon_rad", &radiation_sink_gf_);
   pvdc.RegisterField("weff", &weff_gf_);
   pvdc.RegisterField("emission", &emission_gf_);
-
+  
+  // diagnose Qt issues, rhs contributions
+  pvdc.RegisterField("rhsqt_bd", &rhsqt_bd_); //boundary terms
+  pvdc.RegisterField("rhsqt_fo", &rhsqt_fo_); //bilinear form
+  pvdc.RegisterField("rhsqt_jh", &rhsqt_jh_); //joule heating
+  pvdc.RegisterField("rhsqt_hf", &rhsqt_hf_); //heat of formation
+  pvdc.RegisterField("rhsqt_sd", &rhsqt_sd_); ///species-temp diff
+  pvdc.RegisterField("rhsqt_total", &rhsqt_total_);
+  pvdc.RegisterField("Xqt", &Xqt_gf_);
+  
   vizSpecFields_.clear();
   vizSpecNames_.clear();
   for (int sp = 0; sp < nSpecies_; sp++) {
@@ -2819,43 +2852,85 @@ void ReactingFlow::AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr) {
 
 void ReactingFlow::computeQtTO() {
   tmpR0_ = 0.0;
+  rhsqt_bd_ = 0.0;
+  rhsqt_fo_ = 0.0;
+  rhsqt_jh_ = 0.0;
+  rhsqt_hf_ = 0.0;
+  rhsqt_sd_ = 0.0;
+  rhsqt_total_ = 0.0;
+  Xqt_gf_ = 0.0;
   LQ_bdry_->Update();
   LQ_bdry_->Assemble();
-  LQ_bdry_->ParallelAssemble(tmpR0_);
-  tmpR0_.Neg();
+  // LQ_bdry_->ParallelAssemble(tmpR0_);
+  // tmpR0_.Neg();
+  LQ_bdry_->ParallelAssemble(rhsqt_bd_);
+  rhsqt_bd_.Neg();
+  tmpR0_ += rhsqt_bd_;
+  // printf("%f\n", tmpR0_.Norml2());
 
   Array<int> empty;
   LQ_form_->Update();
   LQ_form_->Assemble();
   LQ_form_->FormSystemMatrix(empty, LQ_);
-  LQ_->AddMult(Tn_next_, tmpR0_);  // tmpR0_ += LQ{Tn_next}
+  // LQ_->AddMult(Tn_next_, tmpR0_);  // tmpR0_ += LQ{Tn_next}
+  LQ_->Mult(Tn_next_, rhsqt_fo_);  // tmpR0_ += LQ{Tn_next}
+  tmpR0_ += rhsqt_fo_;
+  // printf("%f\n", tmpR0_.Norml2());
 
   // Joule heating (and radiation sink)
   jh_form_->Update();
   jh_form_->Assemble();
   jh_form_->ParallelAssemble(jh_);
   tmpR0_ -= jh_;
-
+  rhsqt_jh_.SetFromTrueDofs(jh_);
+  rhsqt_jh_.Neg();
+  // printf("%f\n", tmpR0_.Norml2());
+  
   // heat of formation
-  Ms_->AddMult(hw_, tmpR0_, -1.0);
+  // Ms_->AddMult(hw_, tmpR0_, -1.0);
+  Ms_->Mult(hw_, rhsqt_hf_);
+  rhsqt_hf_.Neg();
+  tmpR0_ += rhsqt_hf_;
+  // printf("%f\n", tmpR0_.Norml2());
 
   // species-temp diffusion term, already in int-weak form
   tmpR0_.Add(-1.0, crossDiff_);
+  rhsqt_sd_.SetFromTrueDofs(crossDiff_);
+  rhsqt_sd_.Neg();
+  // printf("%f\n", tmpR0_.Norml2());
 
   sfes_->GetRestrictionMatrix()->MultTranspose(tmpR0_, resT_gf_);
+  rhsqt_total_.SetFromTrueDofs(resT_gf_);
 
   Qt_ = 0.0;
   Qt_gf_.SetFromTrueDofs(Qt_);
 
   Vector Xqt, Bqt;
   Mq_form_->FormLinearSystem(Qt_ess_tdof_, Qt_gf_, resT_gf_, Mq_, Xqt, Bqt, 1);
-
+  // std::ofstream myfile("mq_mat");
+  // Mq_->PrintMatlab(myfile);
   MqInv_->Mult(Bqt, Xqt);
+  // std::ofstream myfile("mqi_mat");
+  // MqInv_->PrintMatlab(myfile);
   Mq_form_->RecoverFEMSolution(Xqt, resT_gf_, Qt_gf_);
+  Xqt_gf_.SetFromTrueDofs(Xqt);
 
   Qt_gf_ *= Rmix_gf_;
   Qt_gf_ /= CpMix_gf_;
   Qt_gf_ /= thermo_pressure_;
+
+  // NOTE: clipping for diagnosis, goes both directions for now
+  double clip_val;
+  if (clip_qt_) {
+    tpsP_->getInput("loMach/reactingFlow/clip-qt-value", clip_val, 50000.);
+
+    for (int n = 0; n < sfes_->GetNDofs(); n++) {
+      // Qt_gf_[n] = std::clamp(Qt_gf_[n], -clip_val, clip_val)
+      Qt_gf_[n] = std::min(clip_val, std::max(-clip_val, Qt_gf_[n]));
+    }
+
+  }
+
   Qt_gf_.Neg();
 }
 
