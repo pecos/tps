@@ -98,10 +98,12 @@ class ReactingFlow : public ThermoChemModelBase {
   PerfectMixtureInput mixtureInput_;
   ArgonTransportInput argonInput_;
   ChemistryInput chemistryInput_;
+  ChemistryInput chemistryInputBase_;
 
   PerfectMixture *mixture_ = NULL;
   ArgonMixtureTransport *transport_ = NULL;
   Chemistry *chemistry_ = NULL;
+  Chemistry *chemistryBase_ = NULL;
 
   std::vector<std::string> speciesNames_;
   std::map<std::string, int> atomMap_;
@@ -371,6 +373,11 @@ class ReactingFlow : public ThermoChemModelBase {
   double implicit_chemistry_atol_ = 1e-12;
   double implicit_chemistry_smin_ = 1e-12;
 
+  // chemistry ramping
+  bool ramp_chem_ = false;
+  double ramp_start;
+  double ramp_time;
+  
   // Parameters and objects used in filter-based stabilization
   bool filter_temperature_ = false;
   int filter_cutoff_modes_ = 0;

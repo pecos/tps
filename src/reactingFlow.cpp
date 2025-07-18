@@ -447,6 +447,41 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
 
   chemistry_ = new Chemistry(mixture_, chemistryInput_);
 
+  // ramping changes between chemistry models
+  tpsP_->getInput("loMach/reactingFlow/ramp-chem", ramp_chem_, false);
+  if (ramp_chem_) {
+    tpsP_->getInput("loMach/reactingFlow/ramp-chem/ramp_start", ramp_start, -1.);
+    tpsP_->getInput("loMach/reactingFlow/ramp-chem/ramp_time", ramp_time, -1.);
+  }
+
+  // retain access to baseline chemistry models if ramping from one to another
+  if (ramp_chem_) {
+
+    chemistryInputBase_ = chemistryInput_;
+    for (int r = 1; r <= nReactions_; r++) {
+      std::string basepath("reactions_base/reaction" + std::to_string(r));
+
+      std::string equation, model;
+      tpsP_->getRequiredInput((basepath + "/equation").c_str(), equation);
+      tpsP_->getRequiredInput((basepath + "/model").c_str(), model);
+
+      double energy;
+      tpsP_->getRequiredInput((basepath + "/reaction_energy").c_str(), energy);
+
+      // not implemented for non-tabulated
+      if (model == "tabulated") {
+        std::string inputPath(basepath + "/tabulated");
+        readTableWrapper(inputPath, chemistryInputBase_.reactionInputs[r - 1].tableInput);
+
+      } else {
+        grvy_printf(GRVY_ERROR, "\nUnknown reaction_model for chem_ramp settings -> %s", model.c_str());
+        exit(ERROR);
+      }
+
+    }
+    chemistryBase_ = new Chemistry(mixture_, chemistryInputBase_);
+  }
+
   // Initialize radiation (just NEC for now) model
   std::string type;
   std::string basepath("plasma_models/radiation_model");
@@ -626,6 +661,7 @@ ReactingFlow::~ReactingFlow() {
   delete mixture_;
   delete transport_;
   delete chemistry_;
+  delete chemistryBase_;
 
   delete umag_coeff_;
   delete gscale_coeff_;
@@ -2231,6 +2267,22 @@ void ReactingFlow::speciesProduction() {
 
     // Evaluate the chemical source terms
     chemistry_->computeForwardRateCoeffs(n_sp.Read(), Th, Te, i, kfwd.HostWrite());
+
+    // ramp chemistry from previous run
+    if (ramp_chem_ && time_ < ramp_time + ramp_start && time_ > ramp_start) {
+      Vector kfwd_base;
+      kfwd_base.SetSize(chemistryBase_->getNumReactions());
+      chemistryBase_->computeForwardRateCoeffs(n_sp.Read(), Th, Te, i, kfwd_base.HostWrite());
+      for (int r = 0; r < chemistryBase_->getNumReactions(); r++) {
+        kfwd[r] = kfwd_base[r] + (time_ - ramp_start)*(kfwd[r] - kfwd_base[r])/ramp_time;
+      }
+      // if (i == 100) {
+      //   // kfwd new = %.6e, 
+      //   printf("kfwd old = %.6e, kfwd star = %.6e\n", kfwd_base[0], kfwd[0]);
+      // }
+    }
+    
+    
     chemistry_->computeEquilibriumConstants(Th, Te, keq.HostWrite());
     chemistry_->computeProgressRate(n_sp, kfwd, keq, progressRate);
     chemistry_->computeCreationRate(progressRate, creationRate, emissionRate);
@@ -3168,6 +3220,17 @@ void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, 
 
   // Evaluate the chemical source terms
   chemistry_->computeForwardRateCoeffs(n_sp.Read(), Th, Te, dofindex, kfwd.HostWrite());
+
+  // ramp chemistry from previous run
+  if (ramp_chem_ && time_ < ramp_time + ramp_start && time_ > ramp_start) {
+    Vector kfwd_base;
+    kfwd_base.SetSize(chemistryBase_->getNumReactions());
+    chemistryBase_->computeForwardRateCoeffs(n_sp.Read(), Th, Te, dofindex, kfwd_base.HostWrite());
+    for (int r = 0; r < chemistryBase_->getNumReactions(); r++) {
+      kfwd[r] = kfwd_base[r] + (time_ - ramp_start)*(kfwd[r] - kfwd_base[r])/ramp_time;
+    }
+  }
+
   chemistry_->computeEquilibriumConstants(Th, Te, keq.HostWrite());
   chemistry_->computeProgressRate(n_sp, kfwd, keq, progressRate);
   chemistry_->computeCreationRate(progressRate, creationRate, emissionRate);
