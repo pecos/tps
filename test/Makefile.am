@@ -50,8 +50,9 @@ EXTRA_DIST  = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes lte-
 		      tabulated.test lte_mixture.test distance_fcn.test \
               sgsSmag.test sgsSigma.test heatEq.test sponge.test plate.test pipe.mix.test lte2noneq-restart.test \
               coupled-3d.interface.test plasma.axisym.test plasma.axisym.lte1d.test \
-	      lomach-flow.test lomach-lequere.test interpInlet.test sgsLoMach.test autoPeriodic.test aveLoMach.test \
-              reactFlow-binDiff.test reactFlow-singleRx.test reactFlow-table.test radiativeDecay.test
+	      	  lomach-flow.test lomach-lequere.test interpInlet.test sgsLoMach.test autoPeriodic.test aveLoMach.test \
+              reactFlow-binDiff.test reactFlow-singleRx.test reactFlow-table.test radiativeDecay.test \
+			  lomach-chan-stab.test
 
 
 TESTS = vpath.sh
@@ -125,7 +126,8 @@ TESTS += cyl3d.test \
          reactFlow-binDiff.test \
          reactFlow-singleRx.test \
          reactFlow-table.test \
-         radiativeDecay.test
+         radiativeDecay.test \
+		 lomach-chan-stab.test
 
 if PYTHON_ENABLED
 TESTS += cyl3d.python.test \

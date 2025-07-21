@@ -157,7 +157,7 @@ class ReactingFlow : public ThermoChemModelBase {
   bool sw_stab_;
   
   // clip qt for diagnosis
-  bool clip_qt_;
+  // bool clip_qt_;
 
   // FEM related fields and objects
 
@@ -212,13 +212,13 @@ class ReactingFlow : public ThermoChemModelBase {
   ParGridFunction jh_gf_;
 
   // viz for qt rhs
-  ParGridFunction rhsqt_bd_;
-  ParGridFunction rhsqt_fo_;
-  ParGridFunction rhsqt_jh_;
-  ParGridFunction rhsqt_hf_;
-  ParGridFunction rhsqt_sd_;
-  ParGridFunction rhsqt_total_;
-  ParGridFunction Xqt_gf_;
+  // ParGridFunction rhsqt_bd_;
+  // ParGridFunction rhsqt_fo_;
+  // ParGridFunction rhsqt_jh_;
+  // ParGridFunction rhsqt_hf_;
+  // ParGridFunction rhsqt_sd_;
+  // ParGridFunction rhsqt_total_;
+  // ParGridFunction Xqt_gf_;
 
   // ParGridFunction *buffer_tInlet_ = nullptr;
   GridFunctionCoefficient *temperature_bc_field_ = nullptr;

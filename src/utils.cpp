@@ -1427,7 +1427,7 @@ void GradientVectorGridFunctionCoefficient::Eval(DenseMatrix &G, ElementTransfor
 
 
 VectorMagnitudeCoefficient::VectorMagnitudeCoefficient(VectorCoefficient &A)
-   : a(&A), va(A.GetVDim()) { }
+   : a(&A), va(A.GetVDim()) {}
 
 void VectorMagnitudeCoefficient::SetTime(double t)
 {
