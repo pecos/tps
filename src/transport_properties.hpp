@@ -136,6 +136,12 @@ class TransportProperties {
   MFEM_HOST_DEVICE virtual void GetViscosities(const double *conserved, const double *primitive, const double *gradUp,
                                                double radius, double distance, double *visc) = 0;
 
+  // here HERE
+  //virtual void computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield, Vector &diffusivity, bool unused);  
+  //MFEM_HOST_DEVICE virtual void computeMixtureAverageDiffusivity(const double *state, const double *Efield, double *diffusivity, bool unused) = 0;
+  //MFEM_HOST_DEVICE virtual void GetThermalConductivities(const double *conserved, const double *primitive, double *kappa) = 0;
+  //MFEM_HOST_DEVICE virtual void ComputeElectricalConductivity(const double *state, double &sigma) = 0;  
+  
   // For mixture-averaged diffusion, correct for mass conservation.
   void correctMassDiffusionFlux(const Vector &Y_sp, DenseMatrix &diffusionVelocity);
   MFEM_HOST_DEVICE void correctMassDiffusionFlux(const double *Y_sp, double *diffusionVelocity);
@@ -157,7 +163,8 @@ class TransportProperties {
   // Curtiss-Hirschfelder approximation of diffusivity.
   void CurtissHirschfelder(const Vector &X_sp, const Vector &Y_sp, const DenseMatrix &binaryDiff, Vector &avgDiff);
   MFEM_HOST_DEVICE void CurtissHirschfelder(const double *X_sp, const double *Y_sp, const double *binaryDiff,
-                                            double *avgDiff);
+                                            double *avgDiff);  
+  
 };
 
 /** Class for molecular transport (as opposed to turbulent transport) */
@@ -218,6 +225,24 @@ class MolecularTransport : public TransportProperties {
                                        double radius, double distance, double *visc) final {
     GetViscosities(conserved, primitive, visc);
   }
+
+  // here HERE  
+  //void computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield, Vector &diffusivity, bool unused) override {
+  //computeMixtureAverageDiffusivity(&state[0], &Efield[0], &diffusivity[0], unused);
+  //}
+
+  //MFEM_HOST_DEVICE void computeMixtureAverageDiffusivity(const double *state, const double *Efield, double *diffusivity, bool unused) override {
+  //  printf("MolecularTransport::computeMixtureAverageDiffusivity is not implemented!\n");    
+  //}  
+
+  //MFEM_HOST_DEVICE void GetThermalConductivities(const double *conserved, const double *primitive, double *kappa) override {
+  //  printf("MolecularTransport::GetThermalConductivities is not implemented!\n");
+  //}  
+
+  //MFEM_HOST_DEVICE void ComputeElectricalConductivity(const double *state, double &sigma) override {
+  //  printf("MolecularTransport::ComputeElectricalConductivity is not implemented!\n");
+  //}
+  
 };
 
 //////////////////////////////////////////////////////
@@ -258,7 +283,7 @@ class DryAirTransport : public MolecularTransport {
                                                         double *n_sp) final {}
 
   using MolecularTransport::GetViscosities;
-  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) final;
+  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) final;  
 };
 
 MFEM_HOST_DEVICE inline void DryAirTransport::GetViscosities(const double *conserved, const double *primitive,
@@ -266,6 +291,7 @@ MFEM_HOST_DEVICE inline void DryAirTransport::GetViscosities(const double *conse
   const double temp = primitive[1 + nvel_];
   visc[0] = (C1_ * visc_mult * pow(temp, 1.5) / (temp + S0_));
   visc[1] = bulk_visc_mult * visc[0];
+  
 }
 
 //////////////////////////////////////////////////////
@@ -300,6 +326,19 @@ class ConstantTransport : public MolecularTransport {
 
   using MolecularTransport::GetViscosities;
   MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) final;
+
+  // HERE
+  //virtual void computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield, Vector &diffusivity, bool unused); // override;
+
+  //using MolecularTransport::computeMixtureAverageDiffusivity;    
+  //MFEM_HOST_DEVICE void computeMixtureAverageDiffusivity(const double *state, const double *Efield, double *diffusivity, bool unused) override;
+
+  //using MolecularTransport::GetThermalConductivities;
+  //MFEM_HOST_DEVICE void GetThermalConductivities(const double *conserved, const double *primitive, double *kappa) override;
+
+  //using MolecularTransport::ComputeElectricalConductivity;  
+  //MFEM_HOST_DEVICE void ComputeElectricalConductivity(const double *state, double &sigma) override;
+  
 };
 
 MFEM_HOST_DEVICE inline void ConstantTransport::GetViscosities(const double *conserved, const double *primitive,

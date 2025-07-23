@@ -703,6 +703,17 @@ struct GasTransportInput {
   double spcsTrnsMultiplier[SpeciesTrns::NUM_SPECIES_COEFFS];
   double diffMult;
   double mobilMult;
+
+  // for constant type
+  bool constantActive;  
+  constantTransportData constantTransport;
+  //double viscosity;
+  //double bulkViscosity;
+  //double diffusivity[gpudata::MAXSPECIES];
+  //double thermalConductivity;
+  //double electronThermalConductivity;
+  //double mtFreq[gpudata::MAXSPECIES];  // momentum transfer frequency
+  
 };
 
 struct TableInput {

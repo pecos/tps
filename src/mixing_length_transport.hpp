@@ -77,6 +77,24 @@ class MixingLengthTransport : public TransportProperties {
   MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) final;
   MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, const double *gradUp,
                                        double radius, double distance, double *visc) final;
+
+  // here HERE  
+  //MFEM_HOST_DEVICE void computeMixtureAverageDiffusivity(const double *state, const double *Efield, double *diffusivity, bool unused) override {
+  //  printf("MixingLengthTransport::computeMixtureAverageDiffusivity is not implemented!\n");    
+  //}
+
+  //MFEM_HOST_DEVICE void computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield, Vector &diffusivity, bool unused) override {
+  //  printf("MixingLengthTransport::computeMixtureAverageDiffusivity is not implemented!\n");    
+  //}  
+
+  //MFEM_HOST_DEVICE void GetThermalConductivities(const double *conserved, const double *primitive, double *kappa) override {
+  //  printf("MixingLengthTransport::GetThermalConductivities is not implemented!\n");
+  //}  
+
+  //MFEM_HOST_DEVICE void ComputeElectricalConductivity(const double *state, double &sigma) override {
+  //  printf("MixingLengthTransport::ComputeElectricalConductivity is not implemented!\n");
+  //}
+  
 };
 
 MFEM_HOST_DEVICE inline void MixingLengthTransport::GetViscosities(const double *conserved, const double *primitive,

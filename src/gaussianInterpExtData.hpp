@@ -76,6 +76,9 @@ class GaussianInterpExtData : public ExternalDataBase {
   int rank_;    // local MPI rank
   bool rank0_;  // flag to indicate rank 0
 
+  // for reading in species
+  int nSpec_;   // number of species to read-in
+  
   // space sizes
   int Sdof_, SdofInt_;
 
@@ -114,12 +117,20 @@ class GaussianInterpExtData : public ExternalDataBase {
   FiniteElementCollection *vfec_ = nullptr;
   ParFiniteElementSpace *vfes_ = nullptr;
 
+  // for species dirichlet bc
+  FiniteElementCollection *yfec_ = nullptr;
+  ParFiniteElementSpace *yfes_ = nullptr;
+  
   ParGridFunction temperature_gf_;
   ParGridFunction velocity_gf_;
   ParGridFunction vel0_gf_;
+  ParGridFunction Yn_gf_;  
 
   // gradual increase of external bc over multiple steps
   int rampSteps_;
+
+  // messy but required for compilation
+  const int maxSpec_ = 10;
 
  public:
   GaussianInterpExtData(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &coeff,

@@ -395,7 +395,7 @@ MFEM_HOST_DEVICE void GasMinimalTransport::ComputeFluxMolecularTransport(const d
   // std::cout << "max diff. vel: " << charSpeed << std::endl;
 }
 
-// HERE HERE HERE
+
 MFEM_HOST_DEVICE double GasMinimalTransport::computeThirdOrderElectronThermalConductivity(const double *X_sp,
                                                                                             const double debyeLength,
                                                                                             const double Te,
@@ -487,10 +487,11 @@ MFEM_HOST_DEVICE double GasMinimalTransport::computeThirdOrderElectronThermalCon
 
 }
 
+/**/
 void GasMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield,
                                                              Vector &diffusivity, bool unused) {
-  diffusivity.SetSize(3);
-  diffusivity = 0.0;
+  //diffusivity.SetSize(3); // isnt this size wrong?
+  //diffusivity = 0.0;
   computeMixtureAverageDiffusivity(&state[0], &Efield[0], &diffusivity[0], unused);
 }
 
@@ -580,6 +581,7 @@ MFEM_HOST_DEVICE void GasMinimalTransport::computeMixtureAverageDiffusivity(cons
   for (int sp = 0; sp < 3; sp++) diffusivity[sp] = 0.0;
   CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
 }
+/**/
 
 MFEM_HOST_DEVICE void GasMinimalTransport::ComputeSourceMolecularTransport(const double *state, const double *Up,
                                                                              const double *gradUp, const double *Efield,
@@ -840,6 +842,13 @@ collInputs); kappa[1] = computeThirdOrderElectronThermalConductivity(X_sp, collI
 }
 */
 
+//MFEM_HOST_DEVICE void GasMinimalTransport::GetThermalConductivities(const double *conserved, const double *primitive,
+//                                                                      double *kappa) {
+//  std::cout<< "GasMinimalTransport::GetThermalConductivities not implemented!" << endl;  
+//}
+
+
+
 //////////////////////////////////////////////////////
 //////// Gas Mixture Transport
 //////////////////////////////////////////////////////
@@ -853,7 +862,21 @@ MFEM_HOST_DEVICE GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, 
   electronIndex_ = inputs.electronIndex;
   neutralIndex_ = inputs.neutralIndex;
   ionIndex_ = inputs.ionIndex;
-  
+
+  constantTransport_ = inputs.constantActive;
+  if (constantTransport_) {
+    viscosity_ = inputs.constantTransport.viscosity;
+    bulkViscosity_ = inputs.constantTransport.bulkViscosity;
+    thermalConductivity_ = inputs.constantTransport.thermalConductivity;
+    electronThermalConductivity_ = inputs.constantTransport.electronThermalConductivity;
+    for (int mixSp = 0; mixSp < numSpecies; mixSp++) {
+      diffusivity_[mixSp] = inputs.constantTransport.diffusivity[mixSp];
+      mtFreq_[mixSp] = inputs.constantTransport.mtFreq[mixSp];
+    }    
+  }
+
+  multiply_ = inputs.multiply;
+    
   // Argon
   if (inputs.gas=="Ar" || inputs.gas=="argon") {
     gasType_ = Ar;
@@ -892,9 +915,9 @@ MFEM_HOST_DEVICE GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, 
      assert(abs(mw_[neutralIndex_] - mw_[electronIndex_] - mw_[ionIndex_]) < 1.0e-12);
 
   // Nitrogen
-  } else if (inputs.gas=="Ni" || inputs.gas=="nitrogen") {
+  } else if (inputs.gas=="Ni" || inputs.gas=="nitrogen") {    
     gasType_ = Ni;
-    //printf("gas type nitrogen...\n");
+    printf("gas mixture type nitrogen...\n");
     neutralIndex2_ = inputs.neutralIndex2;
     ionIndex2_ = inputs.ionIndex2;
   } else {
@@ -1445,6 +1468,13 @@ MFEM_HOST_DEVICE void GasMixtureTransport::ComputeSourceMolecularTransport(const
 
 MFEM_HOST_DEVICE void GasMixtureTransport::GetViscosities(const double *conserved, const double *primitive,
                                                             double *visc) {
+
+  if (constantTransport_) {
+    visc[0] = viscosity_;
+    visc[1] = bulkViscosity_;
+    return;
+  }
+  
   double n_sp[gpudata::MAXSPECIES], X_sp[gpudata::MAXSPECIES], Y_sp[gpudata::MAXSPECIES];
   mixture->computeSpeciesPrimitives(conserved, X_sp, Y_sp, n_sp);
   // double nTotal = 0.0;
@@ -1476,6 +1506,12 @@ MFEM_HOST_DEVICE void GasMixtureTransport::GetViscosities(const double *conserve
 MFEM_HOST_DEVICE void GasMixtureTransport::GetThermalConductivities(const double *conserved, const double *primitive,
                                                                       double *kappa) {
   double n_sp[gpudata::MAXSPECIES], X_sp[gpudata::MAXSPECIES], Y_sp[gpudata::MAXSPECIES];
+
+  if (constantTransport_) {
+    kappa = &thermalConductivity_;
+    return;
+  }
+  
   mixture->computeSpeciesPrimitives(conserved, X_sp, Y_sp, n_sp);
   // double nTotal = 0.0;
   // for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp[sp];
@@ -1513,13 +1549,22 @@ MFEM_HOST_DEVICE void GasMixtureTransport::GetThermalConductivities(const double
 
 void GasMixtureTransport::computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield,
                                                              Vector &diffusivity, bool unused) {
-  diffusivity.SetSize(3);
+  //diffusivity.SetSize(3);
+  //diffusivity.SetSize(numSpecies);
+  diffusivity.SetSize(gpudata::MAXSPECIES); // should already be set coming in
   diffusivity = 0.0;
   computeMixtureAverageDiffusivity(&state[0], &Efield[0], &diffusivity[0], unused);
 }
 
 MFEM_HOST_DEVICE void GasMixtureTransport::computeMixtureAverageDiffusivity(const double *state, const double *Efield,
                                                                               double *diffusivity, bool unused) {
+  if (constantTransport_) {
+    for (int sp = 0; sp < numSpecies; sp++) {
+      diffusivity[sp] = diffusivity_[sp];
+    }    
+    return;
+  }
+  
   double primitiveState[gpudata::MAXEQUATIONS];
   mixture->GetPrimitivesFromConservatives(state, primitiveState);
 
@@ -1563,6 +1608,12 @@ MFEM_HOST_DEVICE void GasMixtureTransport::computeMixtureAverageDiffusivity(cons
 }
 
 MFEM_HOST_DEVICE void GasMixtureTransport::ComputeElectricalConductivity(const double *state, double &sigma) {
+
+  if (constantTransport_) {
+    sigma = electronThermalConductivity_;
+    return;
+  }
+  
   double X_sp[gpudata::MAXSPECIES], Y_sp[gpudata::MAXSPECIES], n_sp[gpudata::MAXSPECIES];
   for (int sp = 0; sp < numSpecies; sp++) n_sp[sp] = X_sp[sp] = Y_sp[sp] = 0.0;
   mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
