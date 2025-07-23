@@ -294,14 +294,14 @@ class Tomboulides final : public FlowBase {
   mfem::VectorMagnitudeCoefficient *umag_coeff_ = nullptr;
   mfem::GridFunctionCoefficient *gscale_coeff_ = nullptr;
   mfem::PowerCoefficient *visc_inv_coeff_ = nullptr;
-  mfem::ProductCoefficient *reh1_coeff_  = nullptr;
-  mfem::ProductCoefficient *reh2_coeff_  = nullptr;
-  mfem::ProductCoefficient *Reh_coeff_  = nullptr;
+  mfem::ProductCoefficient *reh1_coeff_ = nullptr;
+  mfem::ProductCoefficient *reh2_coeff_ = nullptr;
+  mfem::ProductCoefficient *Reh_coeff_ = nullptr;
   mfem::TransformedCoefficient *csupg_coeff_ = nullptr;
-  mfem::ProductCoefficient *uw1_coeff_  = nullptr;
+  mfem::ProductCoefficient *uw1_coeff_ = nullptr;
   mfem::ProductCoefficient *uw2_coeff_ = nullptr;
-  mfem::ProductCoefficient *upwind_coeff_  = nullptr;
-  mfem::TransformedMatrixVectorCoefficient *swdiff_coeff_  = nullptr;
+  mfem::ProductCoefficient *upwind_coeff_ = nullptr;
+  mfem::TransformedMatrixVectorCoefficient *swdiff_coeff_ = nullptr;
   mfem::ScalarMatrixProductCoefficient *supg_coeff_ = nullptr;
   mfem::GridFunctionCoefficient *visc_coeff_ = nullptr;
 
@@ -328,7 +328,7 @@ class Tomboulides final : public FlowBase {
   mfem::ParLinearForm *rho_ur_ut_form_ = nullptr;
   mfem::ParLinearForm *swirl_var_viscosity_form_ = nullptr;
 
-  // streamwise stability 
+  // streamwise stability
   mfem::ParBilinearForm *Mv_stab_form_ = nullptr;
 
   // mfem operator objects
@@ -343,7 +343,7 @@ class Tomboulides final : public FlowBase {
   mfem::OperatorHandle Hs_op_;
   mfem::OperatorHandle As_op_;
 
-  // streamwise stability 
+  // streamwise stability
   mfem::OperatorHandle Mv_stab_op_;
 
   // solver objects
@@ -421,7 +421,7 @@ class Tomboulides final : public FlowBase {
  public:
   /// Constructor
   Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalSchemeCoefficients &coeff,
-              mfem::ParGridFunction *gridScale, TPS::Tps *tps = nullptr);
+              mfem::ParGridFunction *gridScale = nullptr, TPS::Tps *tps = nullptr);
 
   /// Destructor
   ~Tomboulides() final;

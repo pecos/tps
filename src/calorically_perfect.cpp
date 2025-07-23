@@ -58,7 +58,8 @@ MFEM_HOST_DEVICE double Sutherland(const double T, const double mu_star, const d
 }
 
 CaloricallyPerfectThermoChem::CaloricallyPerfectThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts,
-                                                           temporalSchemeCoefficients &time_coeff, ParGridFunction *gridScale, TPS::Tps *tps)
+                                                           temporalSchemeCoefficients &time_coeff,
+                                                           ParGridFunction *gridScale, TPS::Tps *tps)
     : tpsP_(tps), pmesh_(pmesh), time_coeff_(time_coeff) {
   rank0_ = (pmesh_->GetMyRank() == 0);
   order_ = loMach_opts->order;
@@ -178,7 +179,7 @@ CaloricallyPerfectThermoChem::~CaloricallyPerfectThermoChem() {
   delete csupg_coeff_;
   delete uw1_coeff_;
   delete uw2_coeff_;
-  delete upwind_coeff_; 
+  delete upwind_coeff_;
   delete swdiff_coeff_;
   delete supg_coeff_;
 
@@ -467,7 +468,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   rhou_coeff_ = new ScalarVectorProductCoefficient(*rhon_next_coeff_, *un_next_coeff_);
 
   // artifical diffusion coefficients
-  if(sw_stab_) {
+  if (sw_stab_) {
     umag_coeff_ = new VectorMagnitudeCoefficient(*un_next_coeff_);
     gscale_coeff_ = new GridFunctionCoefficient(gridScale_gf_);
     visc_coeff_ = new GridFunctionCoefficient(&visc_gf_);
@@ -491,7 +492,6 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
 
     supg_coeff_ = new ScalarMatrixProductCoefficient(*upwind_coeff_, *swdiff_coeff_);
   }
-  
 
   At_form_ = new ParBilinearForm(sfes_);
   auto *at_blfi = new ConvectionIntegrator(*rhou_coeff_);
@@ -629,7 +629,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
     lqd_blfi->SetIntRule(&ir_di);
   }
   LQ_form_->AddDomainIntegrator(lqd_blfi);
-  
+
   // DiffusionIntegrator *slqd_blfi;
   if (sw_stab_) {
     // slqd_blfi = new DiffusionIntegrator(*supg_coeff_);
