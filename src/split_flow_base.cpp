@@ -37,7 +37,7 @@
 using namespace mfem;
 
 ZeroFlow::ZeroFlow(mfem::ParMesh *pmesh, int vorder, TPS::Tps *tps)
-    : pmesh_(pmesh), vorder_(vorder), tpsP_(tps), dim_(pmesh->Dimension()) {
+    : pmesh_(pmesh), vorder_(vorder), dim_(pmesh->Dimension()), tpsP_(tps) {
   // nonzero flow option
   tpsP_->getInput("loMach/zeroflow/nonzero-flow", nonzero_flow_, false);
 }
