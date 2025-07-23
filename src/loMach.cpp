@@ -758,6 +758,9 @@ void LoMachSolver::parseSolverOptions() {
   // compute wall distance
   tpsP_->getInput("loMach/computeWallDistance", loMach_opts_.compute_wallDistance, false);
 
+  // check for species 
+  tpsP_->getInput("plasma_models/species_number", loMach_opts_.nSpec, 0);
+
   // add all models here which require wall dist, eg: SA, k-e, etc...
   if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::ALGEBRAIC_RANS) {
     loMach_opts_.compute_wallDistance = true;

@@ -104,6 +104,8 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
    assert(false);    
   }
 
+  /*  
+  // TODO: add user-defined gas
   switch (gasType_) {
     case Ar: 
       transportModel_ = ARGON_MIXTURE;
@@ -116,7 +118,32 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
       assert(false);
       break;
   }
+  */
+    
+  std::string transportModelStr;
+  tpsP_->getRequiredInput("plasma_models/transport_model", transportModelStr);  
+  switch (gasType_) {
+    case Ar:
+      if (transportModelStr == "gas_mixture") {      
+        transportModel_ = ARGON_MIXTURE;
+      } else if (transportModelStr == "constant") {
+        transportModel_ = CONSTANT;
+      }      
+      break;
+    case Ni:
+      if (transportModelStr == "gas_mixture") {            
+        transportModel_ = NITROGEN_MIXTURE;
+      } else if (transportModelStr == "constant") {
+        transportModel_ = CONSTANT;
+      }            
+      break;
+    default:
+      printf("Unknown gasType.");
+      assert(false);
+      break;
+  }
 
+  
   /// Minimal amount of info for mixture input struct
   mixtureInput_.f = workFluid_;
   tpsP_->getInput("plasma_models/species_number", nSpecies_, 3);
@@ -200,10 +227,9 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     InputSpeciesNames[i - 1] = speciesName;
   }
 
+  /*
   tpsP_->getRequiredInput("species/background_index", backgroundIndex);
-  tpsP_->getInput("plasma_models/transport_model/argon_minimal/third_order_thermal_conductivity",
-                  gasInput_.thirdOrderkElectron, true);
-  tpsP_->getInput("plasma_models/transport_model/artificial_multiplier/enabled", gasInput_.multiply, false);
+  tpsP_->getInput("plasma_models/transport_model/argon_minimal/third_order_thermal_conductivity", gasInput_.thirdOrderkElectron, true);
   if (!(gasInput_.thirdOrderkElectron) && rank0_)
     std::cout << "Notice: Using 1st order electron thermal conductivity." << endl;
   if (gasInput_.multiply) {
@@ -220,6 +246,84 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     tpsP_->getInput("plasma_models/transport_model/artificial_multiplier/diffusivity", gasInput_.diffMult, 1.0);
     tpsP_->getInput("plasma_models/transport_model/artificial_multiplier/mobility", gasInput_.mobilMult, 1.0);
   }
+  */
+
+
+  gasInput_.thirdOrderkElectron = true;
+  gasInput_.multiply = false;
+  switch (transportModel_) {
+    case ARGON_MIXTURE || NITROGEN_MIXTURE: {
+      if (rank0_) std::cout << " parsing mixture transport inputs... " << endl;
+      
+      tpsP_->getInput("plasma_models/transport_model/gas_mixture/third_order_thermal_conductivity",gasInput_.thirdOrderkElectron, true);
+    if (!(gasInput_.thirdOrderkElectron) && rank0_)
+      std::cout << "Notice: Using 1st order electron thermal conductivity." << endl;
+    tpsP_->getInput("plasma_models/transport_model/artificial_multiplier/enabled", gasInput_.multiply, false);
+    if (gasInput_.multiply) {
+      tpsP_->getInput("plasma_models/transport_model/artificial_multiplier/viscosity",
+                      gasInput_.fluxTrnsMultiplier[FluxTrns::VISCOSITY], 1.0);
+      tpsP_->getInput("plasma_models/transport_model/artificial_multiplier/bulk_viscosity",
+                      gasInput_.fluxTrnsMultiplier[FluxTrns::BULK_VISCOSITY], 1.0);
+      tpsP_->getInput("plasma_models/transport_model/artificial_multiplier/heavy_thermal_conductivity",
+                      gasInput_.fluxTrnsMultiplier[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY], 1.0);
+      tpsP_->getInput("plasma_models/transport_model/artificial_multiplier/electron_thermal_conductivity",
+                      gasInput_.fluxTrnsMultiplier[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY], 1.0);
+      tpsP_->getInput("plasma_models/transport_model/artificial_multiplier/momentum_transfer_frequency",
+                      gasInput_.spcsTrnsMultiplier[SpeciesTrns::MF_FREQUENCY], 1.0);
+      tpsP_->getInput("plasma_models/transport_model/artificial_multiplier/diffusivity", gasInput_.diffMult, 1.0);
+      tpsP_->getInput("plasma_models/transport_model/artificial_multiplier/mobility", gasInput_.mobilMult, 1.0);
+    }
+
+    } break;
+
+    case CONSTANT: {
+      if (rank0_) {}
+	std::cout << " parsing constant transport inputs... " << endl;      
+      tpsP_->getRequiredInput("plasma_models/transport_model/constant/viscosity", gasInput_.constantTransport.viscosity);
+      tpsP_->getRequiredInput("plasma_models/transport_model/constant/bulk_viscosity", gasInput_.constantTransport.bulkViscosity);
+      tpsP_->getRequiredInput("plasma_models/transport_model/constant/thermal_conductivity", gasInput_.constantTransport.thermalConductivity);
+      tpsP_->getRequiredInput("plasma_models/transport_model/constant/electron_thermal_conductivity",
+                             gasInput_.constantTransport.electronThermalConductivity);
+      std::string diffpath("plasma_models/transport_model/constant/diffusivity");
+      // config.constantTransport.diffusivity.SetSize(config.numSpecies);
+      std::string mtpath("plasma_models/transport_model/constant/momentum_transfer_frequency");
+      // config.constantTransport.mtFreq.SetSize(config.numSpecies);
+      for (int sp = 0; sp < nSpecies_; sp++) {
+        gasInput_.constantTransport.diffusivity[sp] = 0.0;
+        gasInput_.constantTransport.mtFreq[sp] = 0.0;
+      }
+      for (int sp = 0; sp < nSpecies_; sp++) {  // mixture species index.
+        //int inputSp = mixtureToInputMap[sp];
+	int inputSp = sp;
+        tpsP_->getRequiredInput((diffpath + "/species" + std::to_string(inputSp + 1)).c_str(),
+                               gasInput_.constantTransport.diffusivity[sp]);
+        if (mixtureInput_.twoTemperature)
+          tpsP_->getRequiredInput((mtpath + "/species" + std::to_string(inputSp + 1)).c_str(),
+                                 gasInput_.constantTransport.mtFreq[sp]);
+      }
+      //gasInput_.electronIndex = -1;
+      if (speciesMapping.count("E")) {
+        gasInput_.constantTransport.electronIndex = speciesMapping["E"];
+      } else {
+        gasInput_.constantTransport.electronIndex = -1;
+      }
+      
+
+      /*
+      if (config.IsTwoTemperature()) {
+        if (config.speciesMapping.count("E")) {
+          config.constantTransport.electronIndex = config.speciesMapping["E"];
+        } else {
+          grvy_printf(GRVY_ERROR, "\nConstant transport: two-temperature plasma requires the species 'E' !\n");
+          exit(ERROR);
+        }
+      }
+      */      
+    } break;
+  }
+
+
+  
 
   // input file species index.
   for (int sp = 0; sp < nSpecies_; sp++) {
@@ -401,7 +505,27 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
 
   mixture_ = new PerfectMixture(mixtureInput_, dim_, dim_, const_plasma_conductivity_);
   //transport_ = new ArgonMixtureTransport(mixture_, gasInput_);
+  /*
   transport_ = new GasMixtureTransport(mixture_, gasInput_);
+  */
+
+
+  gasInput_.constantActive = false;
+  switch (transportModel_) {
+  case ARGON_MIXTURE:
+  case NITROGEN_MIXTURE: {
+      if(rank0_) std::cout << "Gas mixture tranport model will be used." << endl;
+      gasInput_.constantActive = false;           
+      transport_ = new GasMixtureTransport(mixture_, gasInput_); 
+    } break;
+    case CONSTANT: {
+      if(rank0_) std::cout << "Constant tranport model will be used." << endl;
+      gasInput_.constantActive = true;            
+      //transport_ = new ConstantTransport(mixture_, gasInput_.constantTransport);
+      transport_ = new GasMixtureTransport(mixture_, gasInput_);
+    } break;
+  }  
+  
 
   /// Minimal amount of info for chemistry input struct
   chemistryInput_.model = chemistryModel_;
@@ -1075,6 +1199,14 @@ void ReactingFlow::initializeSelf() {
         // this BC, there will be a discrepancy (which will be
         // eliminated after the first step).
         Tn_gf_.ProjectBdrCoefficient(*temperature_bc_field_, inlet_attr);
+
+        species_bc_field_ = new GridFunctionCoefficient(extData_interface_->Ydata);
+        if (rank0_) {
+          std::cout << "Rx Flow: Setting interpolated Dirichlet species on patch = " << patch << std::endl;
+        }
+        AddSpecDirichletBC(species_bc_field_, inlet_attr);
+        Yn_gf_.ProjectBdrCoefficient(*species_bc_field_, inlet_attr);
+	
       } else {
         if (rank0_) {
           std::cout << "ERROR: Rx Flow inlet type = " << type << " not supported." << std::endl;
@@ -2881,6 +3013,32 @@ void ReactingFlow::AddTempDirichletBC(ScalarFuncT *f, Array<int> &attr) {
   AddTempDirichletBC(new FunctionCoefficient(f), attr);
 }
 
+/// Add a Dirichlet boundary condition to the species field
+void ReactingFlow::AddSpecDirichletBC(const double &spec, Array<int> &attr) {
+  spec_dbcs_.emplace_back(attr, new ConstantCoefficient(spec));
+  for (int i = 0; i < attr.Size(); ++i) {
+    if (attr[i] == 1) {
+      assert(!spec_ess_attr_[i]);
+      spec_ess_attr_[i] = 1;
+    }
+  }
+}
+
+void ReactingFlow::AddSpecDirichletBC(Coefficient *coeff, Array<int> &attr) {
+  spec_dbcs_.emplace_back(attr, coeff);
+  for (int i = 0; i < attr.Size(); ++i) {
+    if (attr[i] == 1) {
+      assert(!spec_ess_attr_[i]);
+      spec_ess_attr_[i] = 1;
+    }
+  }
+}
+
+void ReactingFlow::AddSpecDirichletBC(ScalarFuncT *f, Array<int> &attr) {
+  AddSpecDirichletBC(new FunctionCoefficient(f), attr);
+}
+
+// thermal divergence term
 void ReactingFlow::AddQtDirichletBC(Coefficient *coeff, Array<int> &attr) {
   Qt_dbcs_.emplace_back(attr, coeff);
 

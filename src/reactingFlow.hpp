@@ -209,6 +209,7 @@ class ReactingFlow : public ThermoChemModelBase {
 
   // ParGridFunction *buffer_tInlet_ = nullptr;
   GridFunctionCoefficient *temperature_bc_field_ = nullptr;
+  GridFunctionCoefficient *species_bc_field_ = nullptr;    
 
   VectorGridFunctionCoefficient *un_next_coeff_ = nullptr;
   GridFunctionCoefficient *rhon_next_coeff_ = nullptr;
@@ -448,10 +449,13 @@ class ReactingFlow : public ThermoChemModelBase {
   void AddTempDirichletBC(const double &temp, Array<int> &attr);
   void AddTempDirichletBC(Coefficient *coeff, Array<int> &attr);
   void AddTempDirichletBC(ScalarFuncT *f, Array<int> &attr);
+  
   void AddQtDirichletBC(Coefficient *coeff, Array<int> &attr);
   void AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr);
 
-  void AddSpecDirichletBC(const double &Y, Array<int> &attr);
+  void AddSpecDirichletBC(const double &spec, Array<int> &attr);
+  void AddSpecDirichletBC(Coefficient *coeff, Array<int> &attr);
+  void AddSpecDirichletBC(ScalarFuncT *f, Array<int> &attr);  
 
   void evalSubstepNumber();
   void readTableWrapper(std::string inputPath, TableInput &result);

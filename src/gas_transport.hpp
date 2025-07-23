@@ -129,11 +129,16 @@ class GasMinimalTransport : public MolecularTransport {
   MFEM_HOST_DEVICE double computeThirdOrderElectronThermalConductivity(const double *X_sp, const double debyeLength,
                                                                        const double Te, const double nondimTe);
 
-  virtual void computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield, Vector &diffusivity,
-                                                bool unused);
-  MFEM_HOST_DEVICE virtual void computeMixtureAverageDiffusivity(const double *state, const double *Efield,
-                                                                 double *diffusivity, bool unused);
-  MFEM_HOST_DEVICE void GetThermalConductivities(const double *conserved, const double *primitive, double *kappa);
+  virtual void computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield, Vector &diffusivity, bool unused);
+  MFEM_HOST_DEVICE virtual void computeMixtureAverageDiffusivity(const double *state, const double *Efield, double *diffusivity, bool unused);
+  
+  // here HERE
+  //virtual void computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield, Vector &diffusivity, bool unused); // override;   
+  //using MolecularTransport::computeMixtureAverageDiffusivity;  
+  //MFEM_HOST_DEVICE void computeMixtureAverageDiffusivity(const double *state, const double *Efield, double *diffusivity, bool unused) override;
+
+  //using TransportProperties::GetThermalConductivities;  
+  //MFEM_HOST_DEVICE void GetThermalConductivities(const double *conserved, const double *primitive, double *kappa) override;
 
   // These are used to compute third-order electron thermal conductivity based on standard Chapman--Enskog method.
   MFEM_HOST_DEVICE double L11ee(const double *Q2) { return Q2[0]; }
@@ -170,6 +175,14 @@ class GasMixtureTransport : public GasMinimalTransport {
   // std::vector<std::vector<GasColl>> collisionIndex_;
   GasColl collisionIndex_[gpudata::MAXSPECIES * gpudata::MAXSPECIES];
 
+  bool constantTransport_ = false;
+  double viscosity_;
+  double bulkViscosity_;
+  double thermalConductivity_;
+  double electronThermalConductivity_;
+  double diffusivity_[gpudata::MAXSPECIES];  
+  double mtFreq_[gpudata::MAXSPECIES];
+  
   // void identifySpeciesType();
   // void identifyCollisionType();
 
@@ -197,14 +210,25 @@ class GasMixtureTransport : public GasMinimalTransport {
   MFEM_HOST_DEVICE double computeThirdOrderElectronThermalConductivity(const double *X_sp,
                                                                        const collisionInputs &collInputs);
 
-  virtual void computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield, Vector &diffusivity,
-                                                bool unused);
-  MFEM_HOST_DEVICE virtual void computeMixtureAverageDiffusivity(const double *state, const double *Efield,
-                                                                 double *diffusivity, bool unused);
-
+  // here HERE
+  virtual void computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield, Vector &diffusivity, bool unused);
+  
+  MFEM_HOST_DEVICE virtual void computeMixtureAverageDiffusivity(const double *state, const double *Efield, double *diffusivity, bool unused);
+  
   MFEM_HOST_DEVICE void GetThermalConductivities(const double *conserved, const double *primitive, double *kappa);
+  
+  MFEM_HOST_DEVICE void ComputeElectricalConductivity(const double *state, double &sigma);  
 
-  MFEM_HOST_DEVICE void ComputeElectricalConductivity(const double *state, double &sigma);
+  //virtual void computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield, Vector &diffusivity, bool unused); // final; //override;
+  //using GasMinimalTransport::computeMixtureAverageDiffusivity;  
+  //MFEM_HOST_DEVICE void computeMixtureAverageDiffusivity(const double *state, const double *Efield, double *diffusivity, bool unused) final; //override;
+  
+  //using TransportProperties::GetThermalConductivities;  
+  //MFEM_HOST_DEVICE void GetThermalConductivities(const double *conserved, const double *primitive, double *kappa) override; 
+
+  //using TransportProperties::ComputeElectricalConductivity;  
+  //MFEM_HOST_DEVICE void ComputeElectricalConductivity(const double *state, double &sigma) override;
+  
 };
 
 #endif  // GAS_TRANSPORT_HPP_
