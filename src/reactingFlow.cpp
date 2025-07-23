@@ -700,11 +700,8 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
 
   // artificial diffusion (SUPG)
   tpsP_->getInput("loMach/reactingFlow/streamwise-stabilization", sw_stab_, false);
-  
   // NOTE: clipping Qt for debugging
   // tpsP_->getInput("loMach/reactingFlow/clip-qt", clip_qt_, false);
-  
-
 }  // NOLINT
 
 ReactingFlow::~ReactingFlow() {
@@ -795,7 +792,7 @@ ReactingFlow::~ReactingFlow() {
   delete csupg_coeff_;
   delete uw1_coeff_;
   delete uw2_coeff_;
-  delete upwind_coeff_; 
+  delete upwind_coeff_;
   delete swdiff_coeff_;
   delete supg_coeff_;
   delete supg_cp_coeff_;
@@ -1154,7 +1151,7 @@ void ReactingFlow::initializeSelf() {
         }
         AddTempDirichletBC(temperature_value, inlet_attr);
 
-        AddSpecDirichletBC(0.0, inlet_attr);
+        // AddSpecDirichletBC(0.0, inlet_attr);
 
       } else if (type == "interpolate") {
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
@@ -1238,7 +1235,7 @@ void ReactingFlow::initializeSelf() {
         Qt_bc_coeff->constant = 0.0;
         AddQtDirichletBC(Qt_bc_coeff, attr_wall);
 
-        AddSpecDirichletBC(0.0, attr_wall);
+        // AddSpecDirichletBC(0.0, attr_wall);
       }
     }
     if (rank0_) std::cout << "Temp wall bc completed: " << numWalls << endl;
@@ -1319,7 +1316,7 @@ void ReactingFlow::initializeOperators() {
   }
 
   // artifical diffusion coefficients
-  if(sw_stab_) {
+  if (sw_stab_) {
     // run once to avoid division by zero
     // updateMixture();
     // updateDensity(1.0);
@@ -1328,28 +1325,27 @@ void ReactingFlow::initializeOperators() {
     gscale_coeff_ = new GridFunctionCoefficient(gridScale_gf_);
     visc_coeff_ = new GridFunctionCoefficient(&visc_gf_);
     visc_inv_coeff_ = new PowerCoefficient(*visc_coeff_, -1.);
-    
+
     // compute Reh
     reh1_coeff_ = new ProductCoefficient(*rhon_next_coeff_, *visc_inv_coeff_);
     reh2_coeff_ = new ProductCoefficient(*reh1_coeff_, *gscale_coeff_);
     Reh_coeff_ = new ProductCoefficient(*reh2_coeff_, *umag_coeff_);
-    
+
     // Csupg
     csupg_coeff_ = new TransformedCoefficient(Reh_coeff_, csupgFactor);
-      
+
     if (axisym_) {
       // compute upwind magnitude
       uw1_coeff_ = new ProductCoefficient(*rad_rho_coeff_, *csupg_coeff_);
       uw2_coeff_ = new ProductCoefficient(*uw1_coeff_, *gscale_coeff_);
       upwind_coeff_ = new ProductCoefficient(*uw2_coeff_, *umag_coeff_);
-      
+
       // streamwise diffusion direction
       swdiff_coeff_ = new TransformedMatrixVectorCoefficient(un_next_coeff_, &streamwiseTensor);
 
       supg_coeff_ = new ScalarMatrixProductCoefficient(*upwind_coeff_, *swdiff_coeff_);
       supg_cp_coeff_ = new ScalarMatrixProductCoefficient(*cpMix_coeff_, *supg_coeff_);
-    }
-    else {
+    } else {
       // compute upwind magnitude
       uw1_coeff_ = new ProductCoefficient(*rhon_next_coeff_, *csupg_coeff_);
       uw2_coeff_ = new ProductCoefficient(*uw1_coeff_, *gscale_coeff_);
@@ -1470,7 +1466,7 @@ void ReactingFlow::initializeOperators() {
     hdt_blfi->SetIntRule(&ir_di);
   }
   // SUPG
-  DiffusionIntegrator *sdt_blfi; 
+  DiffusionIntegrator *sdt_blfi;
   if (sw_stab_) {
     // auto *sdt_blfi = new DiffusionIntegrator(*supg_coeff_);
     sdt_blfi = new DiffusionIntegrator(*supg_cp_coeff_);
@@ -1676,13 +1672,12 @@ void ReactingFlow::initializeOperators() {
   LQ_form_->AddDomainIntegrator(lqd_blfi);
 
   DiffusionIntegrator *slqd_blfi;
-  if (sw_stab_)
-    slqd_blfi = new DiffusionIntegrator(*supg_coeff_);
-    // SUPG diffusion
-    // if (numerical_integ_) {
-    //   slqd_blfi->SetIntRule(&ir_di);
-    // }
-    LQ_form_->AddDomainIntegrator(slqd_blfi);
+  if (sw_stab_) slqd_blfi = new DiffusionIntegrator(*supg_coeff_);
+  // SUPG diffusion
+  // if (numerical_integ_) {
+  //   slqd_blfi->SetIntRule(&ir_di);
+  // }
+  LQ_form_->AddDomainIntegrator(slqd_blfi);
 
   if (partial_assembly_) {
     LQ_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
@@ -2640,7 +2635,7 @@ void ReactingFlow::initializeViz(ParaViewDataCollection &pvdc) {
   pvdc.RegisterField("epsilon_rad", &radiation_sink_gf_);
   pvdc.RegisterField("weff", &weff_gf_);
   pvdc.RegisterField("emission", &emission_gf_);
-  
+
   // diagnose Qt issues, rhs contributions
   // pvdc.RegisterField("rhsqt_bd", &rhsqt_bd_); //boundary terms
   // pvdc.RegisterField("rhsqt_fo", &rhsqt_fo_); //bilinear form
@@ -2649,7 +2644,7 @@ void ReactingFlow::initializeViz(ParaViewDataCollection &pvdc) {
   // pvdc.RegisterField("rhsqt_sd", &rhsqt_sd_); ///species-temp diff
   // pvdc.RegisterField("rhsqt_total", &rhsqt_total_);
   // pvdc.RegisterField("Xqt", &Xqt_gf_);
-  
+
   vizSpecFields_.clear();
   vizSpecNames_.clear();
   for (int sp = 0; sp < nSpecies_; sp++) {
@@ -3158,7 +3153,7 @@ void ReactingFlow::computeQtTO() {
   // rhsqt_jh_.SetFromTrueDofs(jh_);
   // rhsqt_jh_.Neg();
   // printf("%f\n", tmpR0_.Norml2());
-  
+
   // heat of formation
   Ms_->AddMult(hw_, tmpR0_, -1.0);
   // Ms_->Mult(hw_, rhsqt_hf_);

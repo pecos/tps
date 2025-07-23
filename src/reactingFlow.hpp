@@ -156,7 +156,7 @@ class ReactingFlow : public ThermoChemModelBase {
 
   // streamwise-stabilization
   bool sw_stab_;
-  
+
   // clip qt for diagnosis
   // bool clip_qt_;
 
@@ -268,14 +268,14 @@ class ReactingFlow : public ThermoChemModelBase {
   GridFunctionCoefficient *gscale_coeff_ = nullptr;
   GridFunctionCoefficient *visc_coeff_ = nullptr;
   PowerCoefficient *visc_inv_coeff_ = nullptr;
-  ProductCoefficient *reh1_coeff_  = nullptr;
-  ProductCoefficient *reh2_coeff_  = nullptr;
-  ProductCoefficient *Reh_coeff_  = nullptr;
+  ProductCoefficient *reh1_coeff_ = nullptr;
+  ProductCoefficient *reh2_coeff_ = nullptr;
+  ProductCoefficient *Reh_coeff_ = nullptr;
   TransformedCoefficient *csupg_coeff_ = nullptr;
-  ProductCoefficient *uw1_coeff_  = nullptr;
+  ProductCoefficient *uw1_coeff_ = nullptr;
   ProductCoefficient *uw2_coeff_ = nullptr;
-  ProductCoefficient *upwind_coeff_  = nullptr;
-  TransformedMatrixVectorCoefficient *swdiff_coeff_  = nullptr;
+  ProductCoefficient *upwind_coeff_ = nullptr;
+  TransformedMatrixVectorCoefficient *swdiff_coeff_ = nullptr;
   ScalarMatrixProductCoefficient *supg_coeff_ = nullptr;
   ScalarMatrixProductCoefficient *supg_cp_coeff_ = nullptr;
 
@@ -391,7 +391,7 @@ class ReactingFlow : public ThermoChemModelBase {
   std::vector<std::string> vizSpecNames_;
 
  public:
-  ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff, 
+  ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff,
                ParGridFunction *gridScale, TPS::Tps *tps);
   virtual ~ReactingFlow();
 

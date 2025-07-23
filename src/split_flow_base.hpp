@@ -148,7 +148,6 @@ class FlowBase {
 
 class ZeroFlow final : public FlowBase {
  protected:
-
   // Options-related structures
   TPS::Tps *tpsP_ = nullptr;
 
