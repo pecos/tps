@@ -2356,7 +2356,7 @@ void ReactingFlow::computeExplicitSpecConvectionOP(int iSpec, bool extrap) {
 }
 
 void ReactingFlow::initializeIO(IODataOrganizer &io) {
-  io.registerIOFamily("Temperature", "/temperature", &Tn_gf_, false);
+  io.registerIOFamily("Temperature", "/temperature", &Tn_gf_, true, true, sfec_);
   io.registerIOVar("/temperature", "temperature", 0);
 
   // TODO(trevilo): This hackery is necessary b/c we don't have access
@@ -2369,7 +2369,7 @@ void ReactingFlow::initializeIO(IODataOrganizer &io) {
   // If restarting from LTE, we don't expect to find species in the restart file
   const bool species_in_restart_file = !restart_from_lte;
 
-  io.registerIOFamily("Species", "/species", &YnFull_gf_, false, species_in_restart_file);
+  io.registerIOFamily("Species", "/species", &YnFull_gf_, true, species_in_restart_file, yfec_);
   for (int sp = 0; sp < nSpecies_; sp++) {
     std::string speciesName = std::to_string(sp);
     io.registerIOVar("/species", "Y_" + speciesName, sp, species_in_restart_file);
