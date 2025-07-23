@@ -43,6 +43,7 @@
  */
 struct extDataToFlow {
   const mfem::ParGridFunction *Udata = nullptr;
+  const mfem::ParGridFunction *Thdata = nullptr;
 };
 
 /**

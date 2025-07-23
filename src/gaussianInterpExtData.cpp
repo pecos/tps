@@ -81,6 +81,9 @@ GaussianInterpExtData::GaussianInterpExtData(mfem::ParMesh *pmesh, LoMachOptions
       tpsP_->getInput((basepath + "/name").c_str(), fname_, std::string("inletPlane.csv"));
     }
   }
+
+  // axisymmetric
+  tpsP_->getInput("boundaryConditions/numInlets", axisym_, false);
 }
 
 GaussianInterpExtData::~GaussianInterpExtData() {
@@ -123,6 +126,15 @@ void GaussianInterpExtData::initializeSelf() {
   // exports
   toThermoChem_interface_.Tdata = &temperature_gf_;
   toFlow_interface_.Udata = &velocity_gf_;
+
+  if (axisym_) {
+    swirl_gf_.SetSpace(sfes_);
+    swirl_gf_ = 0.0;
+    swirl0_gf_.SetSpace(sfes_);
+    swirl0_gf_ = 0.0;
+
+    toFlow_interface_.Thdata = &swirl_gf_;
+  }
 }
 
 void GaussianInterpExtData::initializeViz(ParaViewDataCollection &pvdc) {
@@ -131,6 +143,9 @@ void GaussianInterpExtData::initializeViz(ParaViewDataCollection &pvdc) {
   }
   pvdc.RegisterField("externalTemp", &temperature_gf_);
   pvdc.RegisterField("externalU", &velocity_gf_);
+  if (axisym_) {
+    pvdc.RegisterField("externalTh", &swirl_gf_);
+  }
 }
 
 // TODO(swh): add a translation and rotation for external data plane
@@ -148,6 +163,8 @@ void GaussianInterpExtData::setup() {
   double *Tdata = temperature_gf_.HostReadWrite();
   double *Udata = velocity_gf_.HostReadWrite();
   double *U0 = vel0_gf_.HostReadWrite();
+  double *Thdata = swirl_gf_.HostReadWrite();
+  double *Th0 = swirl0_gf_.HostReadWrite();
   double *hcoords = coordsDof.HostReadWrite();
 
   struct inlet_profile {
@@ -363,10 +380,24 @@ void GaussianInterpExtData::setup() {
         Tdata[n] = 0.0;
       }
 
+      if (axisym_) {
+        // zero out z component, attach to theta instead
+        Udata[n + 2 * Sdof_] = 0.0;
+        if (wt_tot > 0.0) {
+          Thdata[n] = val_w / wt_tot;
+        } else {
+          Thdata[n] = 0.0;
+        }
+      }
+
       // store initial interpolated field to ramp from
       U0[n + 0 * Sdof_] = Udata[n + 0 * Sdof_];
       U0[n + 1 * Sdof_] = Udata[n + 1 * Sdof_];
       U0[n + 2 * Sdof_] = Udata[n + 2 * Sdof_];
+
+      if (axisym_) {
+        Th0[n] = Thdata[n];
+      }
     }
   }
 }
@@ -382,11 +413,18 @@ void GaussianInterpExtData::step() {
 
   double *Udata = velocity_gf_.HostReadWrite();
   double *U0 = vel0_gf_.HostReadWrite();
+  double *Thdata = swirl_gf_.HostReadWrite();
+  double *Th0 = swirl0_gf_.HostReadWrite();
 
   // only addressing velocity for now and assume ic is zero
   for (int eq = 0; eq < dim_; eq++) {
     for (int i = 0; i < Sdof_; i++) {
       Udata[i + eq * Sdof_] = U0[i + eq * Sdof_] * std::min(double(coeff_.nStep) / double(rampSteps_), 1.0);
+    }
+  }
+  if (axisym_) {
+    for (int i = 0; i < Sdof_; i++) {
+      Thdata[i] = Th0[i] * std::min(double(coeff_.nStep) / double(rampSteps_), 1.0);
     }
   }
 }

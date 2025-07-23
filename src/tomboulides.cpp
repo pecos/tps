@@ -487,10 +487,10 @@ void Tomboulides::initializeSelf() {
 
       velocity_field_ = new VectorGridFunctionCoefficient(extData_interface_->Udata);
       addVelDirichletBC(velocity_field_, inlet_attr);
-
-      // axisymmetric not testsed with interpolation BCs yet.  For now, just stop.
-      assert(!axisym_);
-
+      if (axisym_) {
+        swirl_field_ = new GridFunctionCoefficient(extData_interface_->Thdata);
+        addSwirlDirichletBC(swirl_field_, inlet_attr);
+      }
     } else {
       Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
       inlet_attr = 0;
@@ -1882,6 +1882,16 @@ void Tomboulides::addSwirlDirichletBC(double ut, mfem::Array<int> &attr) {
   for (int i = 0; i < attr.Size(); ++i) {
     if (attr[i] == 1) {
       assert(!swirl_ess_attr_[i]);  // if swirl_ess_attr[i] already set, fail b/c duplicate
+      swirl_ess_attr_[i] = 1;
+    }
+  }
+}
+
+void Tomboulides::addSwirlDirichletBC(Coefficient *coeff, Array<int> &attr) {
+  swirl_dbcs_.emplace_back(attr, coeff);
+  for (int i = 0; i < attr.Size(); ++i) {
+    if (attr[i] == 1) {
+      assert(!swirl_ess_attr_[i]);
       swirl_ess_attr_[i] = 1;
     }
   }

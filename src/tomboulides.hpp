@@ -228,6 +228,7 @@ class Tomboulides final : public FlowBase {
   mfem::ParGridFunction *gradW_gf_ = nullptr;
   // mfem::ParGridFunction *buffer_uInlet_ = nullptr;
   mfem::VectorGridFunctionCoefficient *velocity_field_ = nullptr;
+  mfem::GridFunctionCoefficient *swirl_field_ = nullptr;
   mfem::ParGridFunction *epsi_gf_ = nullptr;
 
   /// Pressure FEM objects and fields
@@ -497,8 +498,9 @@ class Tomboulides final : public FlowBase {
   /// Add a Dirichlet boundary condition to the pressure field.
   void addPresDirichletBC(double p, mfem::Array<int> &attr);
 
-  /// Add constant swirl
+  /// Add swirl DBCs
   void addSwirlDirichletBC(double ut, mfem::Array<int> &attr);
+  void addSwirlDirichletBC(mfem::Coefficient *coeff, mfem::Array<int> &attr);
 
   /// Compute maximum velocity magnitude anywhere in the domain
   double maxVelocityMagnitude();
