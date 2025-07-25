@@ -204,39 +204,43 @@ MFEM_HOST_DEVICE double eAr15(const double &T) {
 // All r=2 uses "isotropic scattering assumption", see: Sherman, M. P. (1965). Transport properties of partially ionized nitrogen. NASA: R65SD43.
 namespace nitrogen {
 
-// Reference : Levin et. al. (1990). "Collision Integrals and High Temperature Transport Properties for N-N, O-O, and N-O".  
+// Reference : Levin et. al. (1990). "Collision Integrals and High Temperature Transport Properties for N-N, O-O, and N-O".
+// see also: Capitelli 2000  
 MFEM_HOST_DEVICE double NiNi11(const double &T) {
 
   double logT = log(T);
   double c[5];
-  c[0] = -39.100221303876083;
-  c[1] = -4.216563895965268;
-  c[2] = 0.704162971673771;
-  c[3] = -0.052865207953036;
-  c[4] = 0.001398271066244;
+  c[0] = -34.495061828795336;
+  c[1] = -4.216558629806175;
+  c[2] = 0.704162022307954;
+  c[3] = -0.052865133429065;
+  c[4] = 0.001398268912999;
   double expOmega = c[0] + c[1]*logT + c[2]*pow(logT,2) + c[3]*pow(logT,3) + c[4]*pow(logT,4);
   return exp(expOmega);
   
 }
 
-// Reference : Levin et. al. (1990). "Collision Integrals and High Temperature Transport Properties for N-N, O-O, and N-O".  
+// Reference : Levin et. al. (1990). "Collision Integrals and High Temperature Transport Properties for N-N, O-O, and N-O".
+// see also: Capitelli 2000    
 MFEM_HOST_DEVICE double NiNi22(const double &T) {
   
   double logT = log(T);
   double c[5];
-  c[0] = -39.100221303876083;
-  c[1] = -4.216563895965268;
-  c[2] = 0.704162971673771;
-  c[3] = -0.052865207953036;
-  c[4] = 0.001398271066244;
+  c[0] = -36.815543020557080;
+  c[1] = -2.950557093855711;
+  c[2] = 0.464808279754732;
+  c[3] = -0.033419105245876;
+  c[4] = 0.000830667315518;
   double expOmega = c[0] + c[1]*logT + c[2]*pow(logT,2) + c[3]*pow(logT,3) + c[4]*pow(logT,4);
   return exp(expOmega);
       
 }
 
 // N-N+: NO DATA (using N-N)
+// see: su 2023  
 MFEM_HOST_DEVICE double NiNi1P11(const double &T) {
 
+  /*
   double logT = log(T);
   double c[5];
   c[0] = -39.100221303876083;
@@ -245,11 +249,24 @@ MFEM_HOST_DEVICE double NiNi1P11(const double &T) {
   c[3] = -0.052865207953036;
   c[4] = 0.001398271066244;
   double expOmega = c[0] + c[1]*logT + c[2]*pow(logT,2) + c[3]*pow(logT,3) + c[4]*pow(logT,4);
-  return exp(expOmega);  
-
+  return exp(expOmega);
+  */
+  
+  // su...
+  double logT = log(T);
+  double c[5];
+  c[0] = -42.636655788983042;
+  c[1] = -1.615826079255470;
+  c[2] = 0.232349830798135;
+  c[3] = -0.015601922847053;
+  c[4] = 0.000385808346874;
+  double expOmega = c[0] + c[1]*logT + c[2]*pow(logT,2) + c[3]*pow(logT,3) + c[4]*pow(logT,4);
+  return exp(expOmega);
+  
 }
 
-// Reference : A. V. Phelps. (1991). "Cross Sections and Swarm Coefficients for Nitrogen Ions and Neutrals in N2 and Argon Ions and Neutrals in Ar for Energies from 0.1 eV to 10 keV"  
+// Reference : A. V. Phelps. (1991). "Cross Sections and Swarm Coefficients for Nitrogen Ions and Neutrals in N2 and Argon Ions and Neutrals in Ar for Energies from 0.1 eV to 10 keV"
+// see also: Capitelli 2000    
 MFEM_HOST_DEVICE double N2N211(const double &T) {
   
   double logT = log(T);
@@ -264,7 +281,8 @@ MFEM_HOST_DEVICE double N2N211(const double &T) {
   
 }
 
-// Reference : A. V. Phelps. (1991). "Cross Sections and Swarm Coefficients for Nitrogen Ions and Neutrals in N2 and Argon Ions and Neutrals in Ar for Energies from 0.1 eV to 10 keV"  
+// Reference : A. V. Phelps. (1991). "Cross Sections and Swarm Coefficients for Nitrogen Ions and Neutrals in N2 and Argon Ions and Neutrals in Ar for Energies from 0.1 eV to 10 keV"
+// see also: Capitelli 2000    
 MFEM_HOST_DEVICE double N2N222(const double &T) {
 
   double logT = log(T);
@@ -312,6 +330,7 @@ MFEM_HOST_DEVICE double N2Ni1P11(const double &T) {
 }
 
 // N-N2+ : NO DATA (using N2-N+)
+// NOTE: this one doesnt really matter as N2 is all N by the temp of N2+  
 MFEM_HOST_DEVICE double NiN21P11(const double &T) {
 
   double logT = log(T);
@@ -329,8 +348,10 @@ MFEM_HOST_DEVICE double NiN21P11(const double &T) {
 }
 
 // N2-N : NO DATA (using N2-N+)
+// see: su2023  
 MFEM_HOST_DEVICE double N2Ni11(const double &T) {
 
+  /*
   double logT = log(T);
   double c[5];
   c[0] = -1.017786766181694;
@@ -340,12 +361,26 @@ MFEM_HOST_DEVICE double N2Ni11(const double &T) {
   c[4] = -0.000140132790060;
   double expOmega = 100.0 * (c[0] + c[1]*logT + c[2]*pow(logT,2) + c[3]*pow(logT,3) + c[4]*pow(logT,4));
   return exp(expOmega);
+  */
+  
+  // su
+  double logT = log(T);
+  double c[5];
+  c[0] = 18.895032856552813;
+  c[1] = -27.386697424046677;
+  c[2] = 4.200933633575070;
+  c[3] = -0.289112663583481;
+  c[4] = 0.007460982127127;
+  double expOmega = 100.0 * (c[0] + c[1]*logT + c[2]*pow(logT,2) + c[3]*pow(logT,3) + c[4]*pow(logT,4));
+  return exp(expOmega);  
   
 }
 
 // N2-N : NO DATA  (using N-N 22)
+// see: su2023
 MFEM_HOST_DEVICE double N2Ni22(const double &T) {
 
+  /*
   double logT = log(T);
   double c[5];
   c[0] = -39.100221303876083;
@@ -355,6 +390,18 @@ MFEM_HOST_DEVICE double N2Ni22(const double &T) {
   c[4] = 0.001398271066244;
   double expOmega = c[0] + c[1]*logT + c[2]*pow(logT,2) + c[3]*pow(logT,3) + c[4]*pow(logT,4);
   return exp(expOmega);
+  */
+
+  // su
+  double logT = log(T);
+  double c[5];
+  c[0] = -67.577669011716850;
+  c[1] = 7.317860223552945;
+  c[2] = -1.004212657950381;
+  c[3] = 0.057337472395188;
+  c[4] = -0.001172617187796;    
+  double expOmega = c[0] + c[1]*logT + c[2]*pow(logT,2) + c[3]*pow(logT,3) + c[4]*pow(logT,4);
+  return exp(expOmega);  
   
 }
 
@@ -365,26 +412,6 @@ MFEM_HOST_DEVICE double N2Ni22(const double &T) {
   fitted over IAA LXCat dataset.
 */
 MFEM_HOST_DEVICE double eNi11(const double &T) {
-
-  //double val;
-  //val = collision::argon::eAr11(T);
-  //return(val);
-  
-  /*
-  double logT = log(T);
-  double c[8];
-  c[0] = -2.003882301835628;
-  c[1] = 1.532253343478155;
-  c[2] = -0.505597421163568;
-  c[3] = 0.091480325046587;
-  c[4] = -0.009821686553564;
-  c[5] = 0.000626838643976;
-  c[6] = -0.000022046833696;
-  c[7] = 0.000000329903530;   
-  for(int i=0; i<8; i++) c[i] *= 1000.0;
-  double expOmega = c[0] + c[1]*logT + c[2]*logT*logT + c[2]*pow(logT,3) + c[3]*pow(logT,4) + c[4]*pow(logT,5) + c[5]*pow(logT,6) + c[6]*pow(logT,7) + c[7]*pow(logT,8);
-  return exp(expOmega);
-  */
 
   double logT = log(T);
   double c[7];
@@ -402,26 +429,6 @@ MFEM_HOST_DEVICE double eNi11(const double &T) {
 }
 
 MFEM_HOST_DEVICE double eNi12(const double &T) {
-
-  //double val;
-  //val = collision::argon::eAr12(T);
-  //return(val);
-
-  /*
-  double logT = log(T);
-  double c[8];
-  c[0] = -1.956159066307375;
-  c[1] = 1.557221870910142;
-  c[2] = -0.533922416988002;
-  c[3] = 0.100141637408542;
-  c[4] = -0.011119131479736;
-  c[5] = 0.000732252201714;
-  c[6] = -0.000026518334060;
-  c[7] = 0.000000407775769;
-  for(int i=0; i<8; i++) c[i] *= 1000.0;  
-  double expOmega = c[0] + c[1]*logT + c[2]*logT*logT + c[2]*pow(logT,3) + c[3]*pow(logT,4) + c[4]*pow(logT,5) + c[5]*pow(logT,6) + c[6]*pow(logT,7) + c[7]*pow(logT,8);
-  return exp(expOmega);
-  */
   
   double logT = log(T);
   double c[7];
@@ -439,26 +446,6 @@ MFEM_HOST_DEVICE double eNi12(const double &T) {
 }
 
 MFEM_HOST_DEVICE double eNi13(const double &T) {
-
-  //double val;
-  //val = collision::argon::eAr13(T);
-  //return(val);
-
-  /*
-  double logT = log(T);
-  double c[8];
-  c[0] = -4.514549781113058;
-  c[1] = 3.776124850464214;
-  c[2] = -1.427950653286536;
-  c[3] = 0.289498661175164;
-  c[4] = -0.034291085489797;
-  c[5] = 0.002389263184571;
-  c[6] = -0.000091052188327;
-  c[7] = 0.000001467616631;
-  for(int i=0; i<8; i++) c[i] *= 100.0;    
-  double expOmega = c[0] + c[1]*logT + c[2]*logT*logT + c[2]*pow(logT,3) + c[3]*pow(logT,4) + c[4]*pow(logT,5) + c[5]*pow(logT,6) + c[6]*pow(logT,7) + c[7]*pow(logT,8);
-  return exp(expOmega);
-  */
   
   double logT = log(T);
   double c[7];
@@ -476,25 +463,6 @@ MFEM_HOST_DEVICE double eNi13(const double &T) {
 }
 
 MFEM_HOST_DEVICE double eNi14(const double &T) {
-
-  //double val;
-  //val = collision::argon::eAr14(T);
-  //return(val);
-  
-  /* ...WHY IS THIS ONE BAD???
-  double logT = log(T);
-  double c[8];     
-  c[0] = 7.850307064335757;
-  c[1] = -6.131538141527012;
-  c[2] = 1.925885314608013;
-  c[3] = -0.333041600780530;
-  c[4] = 0.034213058505903;
-  c[5] = -0.002083820862016;
-  c[6] = 0.000069580148773;
-  c[7] = -0.000000982075309;
-  double expOmega = c[0] + c[1]*logT + c[2]*logT*logT + c[2]*pow(logT,3) + c[3]*pow(logT,4) + c[4]*pow(logT,5) + c[5]*pow(logT,6) + c[6]*pow(logT,7) + c[7]*pow(logT,8);
-  return exp(expOmega);  
-  */
   
   double logT = log(T);
   double c[7];
@@ -512,26 +480,6 @@ MFEM_HOST_DEVICE double eNi14(const double &T) {
 }
 
 MFEM_HOST_DEVICE double eNi15(const double &T) {
-
-  //double val;
-  //val = collision::argon::eAr15(T);
-  //return(val);
-  
-  /*
-  double logT = log(T);
-  double c[8];
-  c[0] = 9.350737481569830;  
-  c[1] = -7.411741684073336;
-  c[2] = 2.380778500283301;
-  c[3] = -0.420842759318950;
-  c[4] = 0.044194959058462;
-  c[5] = -0.002753071048199;
-  c[6] = 0.000094064763399;
-  c[7] = -0.000001358467597;
-  for(int i=0; i<8; i++) c[i] *= 100.0;    
-  double expOmega = c[0] + c[1]*logT + c[2]*logT*logT + c[2]*pow(logT,3) + c[3]*pow(logT,4) + c[4]*pow(logT,5) + c[5]*pow(logT,6) + c[6]*pow(logT,7) + c[7]*pow(logT,8);
-  return exp(expOmega);
-  */
   
   double logT = log(T);
   double c[7];
@@ -550,20 +498,6 @@ MFEM_HOST_DEVICE double eNi15(const double &T) {
 
 MFEM_HOST_DEVICE double eN211(const double &T) {
 
-  //double val;
-  //val = collision::argon::eAr11(T);
-  //return(val);
-  
-  /*
-  double logT = log(T);
-  double c[3];
-  c[0] = -57.365347800354527;
-  c[1] = 2.237881478639873;
-  c[2] = -0.064095690853854;
-  double expOmega = c[0] + c[1]*logT + c[2]*logT*logT;
-  return exp(expOmega);
-  */
-
   double logT = log(T);
   double c[6];
   c[0] = -3.847278097767338;
@@ -579,20 +513,6 @@ MFEM_HOST_DEVICE double eN211(const double &T) {
 }
 
 MFEM_HOST_DEVICE double eN212(const double &T) {
-
-  //double val;
-  //val = collision::argon::eAr12(T);
-  //return(val);
-
-  /*
-  double logT = log(T);
-  double c[3];
-  c[0] = -57.103935279579566;
-  c[1] = 2.310012393118432;
-  c[2] = -0.069886269572701;
-  double expOmega = c[0] + c[1]*logT + c[2]*logT*logT;
-  return exp(expOmega);
-  */
   
   double logT = log(T);
   double c[6];
@@ -609,20 +529,6 @@ MFEM_HOST_DEVICE double eN212(const double &T) {
 }
 
 MFEM_HOST_DEVICE double eN213(const double &T) {
-
-  //double val;
-  //val = collision::argon::eAr13(T);
-  //return(val);
-  
-  /*
-  double logT = log(T);
-  double c[3];
-  c[0] = -57.352822536318413;
-  c[1] = 2.444566251016784;
-  c[2] = -0.078578082485722;
-  double expOmega = c[0] + c[1]*logT + c[2]*logT*logT;
-  return exp(expOmega);
-  */
   
   double logT = log(T);
   double c[6];
@@ -639,20 +545,6 @@ MFEM_HOST_DEVICE double eN213(const double &T) {
 }
 
 MFEM_HOST_DEVICE double eN214(const double &T) {
-
-  //double val;
-  //val = collision::argon::eAr14(T);
-  //return(val);  
-
-  /*
-  double logT = log(T);
-  double c[3];
-  c[0] = -57.643870857111693;
-  c[1] = 2.561369597252678;
-  c[2] = -0.086168461442770;
-  double expOmega = c[0] + c[1]*logT + c[2]*logT*logT;
-  return exp(expOmega);
-  */
   
   double logT = log(T);
   double c[6];
@@ -669,20 +561,6 @@ MFEM_HOST_DEVICE double eN214(const double &T) {
 }
 
 MFEM_HOST_DEVICE double eN215(const double &T) {
-
-  //double val;
-  //val = collision::argon::eAr15(T);
-  //return(val);
-  
-  /*
-  double logT = log(T);
-  double c[3];
-  c[0] = -57.774233348256821;
-  c[1] = 2.632018476967198;
-  c[2] = -0.091227910380667;
-  double expOmega = c[0] + c[1]*logT + c[2]*logT*logT;
-  return exp(expOmega);
-  */
   
   double logT = log(T);
   double c[6];
