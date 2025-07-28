@@ -620,32 +620,81 @@ void IOFamily::serializeForWrite() {
       this->serial_sol_->SetSubVector(gvdofs, lsoln);
     }
 
-    // have rank 0 receive data from other tasks and copy its own
+    // have rank 0 receive data from other tasks
+    // each rank sends one vector, so must figure out how much data to expect, receive it, and then unpack
+
+    // First, count how many values each rank will send
+    const int nprocs = pfunc_->ParFESpace()->GetNRanks();
+    std::vector<int> nvar(nprocs);
+    for (int irank = 0; irank < nprocs; irank++) nvar[irank] = 0;
+
     for (int gelem = 0; gelem < global_ne_; gelem++) {
       int from_rank = partitioning[gelem];
       if (from_rank != 0) {
         this->serial_fes_->GetElementVDofs(gelem, gvdofs);
-        lsoln.SetSize(gvdofs.Size());
-
-        MPI_Recv(lsoln.HostReadWrite(), gvdofs.Size(), MPI_DOUBLE, from_rank, gelem, comm, MPI_STATUS_IGNORE);
-
-        this->serial_sol_->SetSubVector(gvdofs, lsoln);
+        nvar[from_rank] += gvdofs.Size();
       }
     }
 
+    // Second, receive the messages
+    Vector *soln = new Vector[nprocs];
+    for (int irank = 1; irank < nprocs; irank++) {
+      soln[irank].SetSize(nvar[irank]);
+      MPI_Recv(soln[irank].HostReadWrite(), nvar[irank], MPI_DOUBLE, irank, 0, comm, MPI_STATUS_IGNORE);
+    }
+
+    // Finally, extract data
+    for (int irank = 0; irank < nprocs; irank++) nvar[irank] = 0;
+
+    for (int gelem = 0; gelem < global_ne_; gelem++) {
+      int from_rank = partitioning[gelem];
+      if (from_rank != 0) {
+        const double *d_soln = soln[from_rank].HostRead();
+
+        this->serial_fes_->GetElementVDofs(gelem, gvdofs);
+        lsoln.SetSize(gvdofs.Size());
+        double *d_lsoln = lsoln.HostWrite();
+
+        for (int i = 0; i < lsoln.Size(); i++) {
+          d_lsoln[i] = d_soln[nvar[from_rank] + i];
+        }
+
+        this->serial_sol_->SetSubVector(gvdofs, lsoln);
+        nvar[from_rank] += gvdofs.Size();
+      }
+    }
   } else {
     // have non-zero ranks send their data to rank 0
+    // each rank concatenates its data into a single send
+
+    // First, count number of variables to send from this rank so that
+    // we can size the send buffer
     Array<int> lvdofs;
     Vector lsoln;
+
+    int nvar = 0;
     for (int elem = 0; elem < local_ne_; elem++) {
-      int gelem = locToGlobElem[elem];
-      //       assert(gelem > 0);
       this->pfunc_->ParFESpace()->GetElementVDofs(elem, lvdofs);
       pfunc->GetSubVector(lvdofs, lsoln);  // work for gpu build?
-
-      // send to task 0
-      MPI_Send(lsoln.HostReadWrite(), lsoln.Size(), MPI_DOUBLE, 0, gelem, comm);
+      nvar += lsoln.Size();
     }
+
+    // Second, fill the send buffer
+    Vector send_buffer(nvar);
+    double *h_send_buffer = send_buffer.HostWrite();
+    int n = 0;
+    for (int elem = 0; elem < local_ne_; elem++) {
+      this->pfunc_->ParFESpace()->GetElementVDofs(elem, lvdofs);
+      pfunc->GetSubVector(lvdofs, lsoln);  // work for gpu build?
+      const double *h_lsoln = lsoln.HostRead();
+      for (int i = 0; i < lsoln.Size(); i++) {
+        h_send_buffer[n + i] = h_lsoln[i];
+      }
+      n += lsoln.Size();
+    }
+
+    // Finally, send
+    MPI_Send(send_buffer.HostReadWrite(), send_buffer.Size(), MPI_DOUBLE, 0, 0, comm);
   }
 }
 

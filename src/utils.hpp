@@ -231,40 +231,37 @@ class GradientVectorGridFunctionCoefficient : public MatrixCoefficient {
 };
 
 /// Scalar coefficient defined as the magnitude of a vector coefficient
-class VectorMagnitudeCoefficient : public Coefficient
-{
-private:
-   VectorCoefficient * a;
+class VectorMagnitudeCoefficient : public Coefficient {
+ private:
+  VectorCoefficient *a;
 
-   mutable Vector va;
-public:
-   /// Construct with the vector coefficient.  Result is \sqrt{(\f$ A \cdot a \f$}.
-   VectorMagnitudeCoefficient(VectorCoefficient &A);
+  mutable Vector va;
 
-   /// Set the time for internally stored coefficients
-   void SetTime(double t);
+ public:
+  /// Construct with the vector coefficient.  Result is \sqrt{(\f$ A \cdot a \f$}.
+  VectorMagnitudeCoefficient(VectorCoefficient &A);
 
-   /// Reset the vector
-   void SetACoef(VectorCoefficient &A) { a = &A; }
-   /// Return the vector coefficient
-   VectorCoefficient * GetACoef() const { return a; }
+  /// Set the time for internally stored coefficients
+  void SetTime(double t);
 
-   /// Evaluate the coefficient at @a ip.
-   virtual double Eval(ElementTransformation &T,
-                       const IntegrationPoint &ip);
+  /// Reset the vector
+  void SetACoef(VectorCoefficient &A) { a = &A; }
+  /// Return the vector coefficient
+  VectorCoefficient *GetACoef() const { return a; }
+
+  /// Evaluate the coefficient at @a ip.
+  virtual double Eval(ElementTransformation &T, const IntegrationPoint &ip);
 };
 
-/// Matrix coefficient computed from a function F(v(x)) of a dim-sized vector coefficient, v(x) 
+/// Matrix coefficient computed from a function F(v(x)) of a dim-sized vector coefficient, v(x)
 class TransformedMatrixVectorCoefficient : public MatrixCoefficient {
  protected:
   VectorCoefficient *Q1;
   std::function<void(const Vector &, DenseMatrix &)> Function;
 
  public:
-  TransformedMatrixVectorCoefficient(VectorCoefficient *vc, 
-    std::function<void(const Vector &, DenseMatrix &)> F) : 
-    MatrixCoefficient(vc->GetVDim() ),
-    Q1(vc), Function(std::move(F)) { }
+  TransformedMatrixVectorCoefficient(VectorCoefficient *vc, std::function<void(const Vector &, DenseMatrix &)> F)
+      : MatrixCoefficient(vc->GetVDim()), Q1(vc), Function(std::move(F)) {}
 
   /// Set the time for internally stored coefficients
   void SetTime(double t);

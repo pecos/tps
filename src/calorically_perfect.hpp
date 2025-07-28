@@ -181,14 +181,14 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   GridFunctionCoefficient *gscale_coeff_ = nullptr;
   GridFunctionCoefficient *visc_coeff_ = nullptr;
   PowerCoefficient *visc_inv_coeff_ = nullptr;
-  ProductCoefficient *reh1_coeff_  = nullptr;
-  ProductCoefficient *reh2_coeff_  = nullptr;
-  ProductCoefficient *Reh_coeff_  = nullptr;
+  ProductCoefficient *reh1_coeff_ = nullptr;
+  ProductCoefficient *reh2_coeff_ = nullptr;
+  ProductCoefficient *Reh_coeff_ = nullptr;
   TransformedCoefficient *csupg_coeff_ = nullptr;
-  ProductCoefficient *uw1_coeff_  = nullptr;
+  ProductCoefficient *uw1_coeff_ = nullptr;
   ProductCoefficient *uw2_coeff_ = nullptr;
-  ProductCoefficient *upwind_coeff_  = nullptr;
-  TransformedMatrixVectorCoefficient *swdiff_coeff_  = nullptr;
+  ProductCoefficient *upwind_coeff_ = nullptr;
+  TransformedMatrixVectorCoefficient *swdiff_coeff_ = nullptr;
   ScalarMatrixProductCoefficient *supg_coeff_ = nullptr;
 
   // operators and solvers

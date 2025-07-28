@@ -237,7 +237,7 @@ void M2ulPhyS::initMixtureAndTransportModels() {
                                               TPSCommWorld, trans_data, trans_tables);
         if (!success) exit(ERROR);
 
-          // Instantiate LteTransport class
+        // Instantiate LteTransport class
 #if defined(_CUDA_) || defined(_HIP_)
         // Tables from above have host pointers.  Must get device
         // pointers here before instantiating device class
@@ -1784,7 +1784,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
         // visualizationNames_.push_back(std::string("rxn_rate: " + config.reactionEquations[r]));
       }
     }  // if (config.workFluid != DRY_AIR)
-  }    // if tpsP->isVisualizationMode()
+  }  // if tpsP->isVisualizationMode()
 
   // If mms, add conserved and exact solution.
 #ifdef HAVE_MASA
@@ -2094,7 +2094,7 @@ void M2ulPhyS::solveStep() {
       exit(ERROR);
 #endif
     }  // plane dump
-  }    // step check
+  }  // step check
 
   average->addSample(iter, d_mixture);
 }
@@ -2465,7 +2465,9 @@ void M2ulPhyS::Check_NAN() {
   int dof = vfes->GetNDofs();
 
 #ifdef _GPU_
-  { local_print = M2ulPhyS::Check_NaN_GPU(U, dof * num_equation, loc_print); }
+  {
+    local_print = M2ulPhyS::Check_NaN_GPU(U, dof * num_equation, loc_print);
+  }
   if (local_print > 0) {
     cout << "Found a NaN!" << endl;
   }
@@ -4234,7 +4236,7 @@ void M2ulPhyS::updateVisualizationVariables() {
         dataVis[visualIdxs.rxn + r][n] = progressRates[r];
       }
     }  // if (!isDryAir)
-  }    // for (int n = 0; n < ndofs; n++)
+  }  // for (int n = 0; n < ndofs; n++)
 }
 
 void M2ulPhyS::evaluatePlasmaConductivityGF() {

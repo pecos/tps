@@ -1133,10 +1133,7 @@ void scalarGrad3DV(FiniteElementSpace *fes, FiniteElementSpace *vfes, Vector u, 
   R1_gf.GetTrueDofs(*gu);
 }
 
-
-
 void streamwiseTensor(const Vector &vel, DenseMatrix &swMgbl) {
-
   int dim = vel.Size();
 
   // streamwise coordinate system
@@ -1154,7 +1151,7 @@ void streamwiseTensor(const Vector &vel, DenseMatrix &swMgbl) {
   mod = std::max(mod, 1.0e-18);
   double Umag = std::sqrt(mod);
   unitNorm /= Umag;
- 
+
   // std::cout << Umag << " " << endl ;
 
   // for zero-flow
@@ -1183,7 +1180,7 @@ void streamwiseTensor(const Vector &vel, DenseMatrix &swMgbl) {
 
   unitT1[minusInd] = -unitNorm[maxInd];
   unitT1[maxInd] = unitNorm[minusInd];
-  if (dim == 3) { // DOUBLE CHECK THIS WHEN TESTING 3D
+  if (dim == 3) {  // DOUBLE CHECK THIS WHEN TESTING 3D
     unitT1[plusInd] = 0.0;
   }
   mod = 0.0;
@@ -1211,7 +1208,6 @@ void streamwiseTensor(const Vector &vel, DenseMatrix &swMgbl) {
   swM = 0.0;
   swM(0, 0) = 1.0;
 
-  
   // std::cout << " " << endl;
   // for (int i = 0; i < dim; i++) {
   //   for (int j = 0; j < dim; j++) {
@@ -1219,7 +1215,6 @@ void streamwiseTensor(const Vector &vel, DenseMatrix &swMgbl) {
   //   }
   //   std::cout << endl;
   // }
-  
 
   // M_{im} swM_{mn} M_{jn} or M*"mu"*M^T (with n,t1,t2 in columns of M)
   // DenseMatrix swMgbl(dim, dim);
@@ -1241,7 +1236,6 @@ void streamwiseTensor(const Vector &vel, DenseMatrix &swMgbl) {
   //   }
   //   std::cout << endl;
   // }
-  
 }
 
 double csupgFactor(double Reh) {
@@ -1250,7 +1244,6 @@ double csupgFactor(double Reh) {
   // printf("%f\n", 0.5 * (tanh(Reh) + 1.0));
   return 0.5 * (tanh(Reh) + 1.0);
 }
-
 
 void EliminateRHS(Operator &A, ConstrainedOperator &constrainedA, const Array<int> &ess_tdof_list, Vector &x, Vector &b,
                   Vector &X, Vector &B, int copy_interior) {
@@ -1425,19 +1418,16 @@ void GradientVectorGridFunctionCoefficient::Eval(DenseMatrix &G, ElementTransfor
   }
 }
 
+VectorMagnitudeCoefficient::VectorMagnitudeCoefficient(VectorCoefficient &A) : a(&A), va(A.GetVDim()) {}
 
-VectorMagnitudeCoefficient::VectorMagnitudeCoefficient(VectorCoefficient &A)
-   : a(&A), va(A.GetVDim()) { }
-
-void VectorMagnitudeCoefficient::SetTime(double t)
-{
-  if (a) { a->SetTime(t); }
+void VectorMagnitudeCoefficient::SetTime(double t) {
+  if (a) {
+    a->SetTime(t);
+  }
   this->Coefficient::SetTime(t);
 }
 
-double VectorMagnitudeCoefficient::Eval(ElementTransformation &T,
-                                     const IntegrationPoint &ip)
-{
+double VectorMagnitudeCoefficient::Eval(ElementTransformation &T, const IntegrationPoint &ip) {
   a->Eval(va, T, ip);
   // double res = 0;
   // for (int i = 0; i < va.size(); i++) { res += va[i] * va[i]}
@@ -1447,14 +1437,12 @@ double VectorMagnitudeCoefficient::Eval(ElementTransformation &T,
   return mod;
 }
 
-void TransformedMatrixVectorCoefficient::SetTime(double t)
-{
+void TransformedMatrixVectorCoefficient::SetTime(double t) {
   Q1->SetTime(t);
   this->MatrixCoefficient::SetTime(t);
 }
 
 void TransformedMatrixVectorCoefficient::Eval(DenseMatrix &G, ElementTransformation &T, const IntegrationPoint &ip) {
-  
   Vector buf;
   buf.SetSize(Q1->GetVDim());
   Q1->Eval(buf, T, ip);

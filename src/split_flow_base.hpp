@@ -148,16 +148,15 @@ class FlowBase {
 
 class ZeroFlow final : public FlowBase {
  protected:
-
-  // Options-related structures
-  TPS::Tps *tpsP_ = nullptr;
-
   // Options
   bool nonzero_flow_;
 
   mfem::ParMesh *pmesh_;
   const int vorder_;
   const int dim_;
+
+  // Options-related structures
+  TPS::Tps *tpsP_ = nullptr;
 
   mfem::FiniteElementCollection *fec_ = nullptr;
   mfem::ParFiniteElementSpace *fes_ = nullptr;
