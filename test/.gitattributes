@@ -53,3 +53,5 @@ ref_solns/spongeBox/restart_output.sol.h5 filter=lfs diff=lfs merge=lfs -text
 meshes/spongeBox.msh filter=lfs diff=lfs merge=lfs -text
 ref_solns/lequere-varmu/restart_output-lequere-varmu.sol.h5 filter=lfs diff=lfs merge=lfs -text
 ref_solns/lequere-varmu/reference-lequere-varmu.sol.h5 filter=lfs diff=lfs merge=lfs -text
+meshes/channel182p4_25x9p4_THIN.msh filter=lfs diff=lfs merge=lfs -text
+ref_solns/stabChan/restart_output.sol.h5 filter=lfs diff=lfs merge=lfs -text

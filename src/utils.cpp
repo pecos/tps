@@ -769,6 +769,7 @@ void ComputeCurl3D(const ParGridFunction &u, ParGridFunction &cu) {
 
   // Communication
 
+  /**/
   // Count the zones globally.
   GroupCommunicator &gcomm = u.ParFESpace()->GroupComm();
   gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
@@ -777,6 +778,7 @@ void ComputeCurl3D(const ParGridFunction &u, ParGridFunction &cu) {
   // Accumulate for all vdofs.
   gcomm.Reduce<double>(cu.GetData(), GroupCommunicator::Sum);
   gcomm.Bcast<double>(cu.GetData());
+  /**/
 
   // Compute means.
   for (int i = 0; i < cu.Size(); i++) {
@@ -866,7 +868,6 @@ void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu) {
       // Eval and GetVectorGradientHat.
       el->CalcDShape(tr->GetIntPoint(), dshape);
       grad_hat.SetSize(vdim, dim);
-      // DenseMatrix loc_data_mat(loc_data.GetData(), elndofs, 1);
       DenseMatrix loc_data_mat(loc_data.GetData(), elndofs, vdim);
       MultAtB(loc_data_mat, dshape, grad_hat);
 
@@ -888,6 +889,7 @@ void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu) {
       int ldof = vdofs[j];
       gu(ldof + 1 * nSize) += vals2[j];
     }
+
     if (dim == 3) {
       for (int j = 0; j < vdofs.Size(); j++) {
         int ldof = vdofs[j];
@@ -995,6 +997,7 @@ void ComputeCurl2D(const ParGridFunction &u, ParGridFunction &cu, bool assume_sc
 
   // Communication.
 
+  /*
   // Count the zones globally.
   GroupCommunicator &gcomm = u.ParFESpace()->GroupComm();
   gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
@@ -1003,6 +1006,7 @@ void ComputeCurl2D(const ParGridFunction &u, ParGridFunction &cu, bool assume_sc
   // Accumulate for all vdofs.
   gcomm.Reduce<double>(cu.GetData(), GroupCommunicator::Sum);
   gcomm.Bcast<double>(cu.GetData());
+  */
 
   // Compute means.
   for (int i = 0; i < cu.Size(); i++) {
@@ -1103,6 +1107,7 @@ void ComputeCurlAxi(const ParGridFunction &u, ParGridFunction &cu, bool assume_s
 
   // Communication.
 
+  /*
   // Count the zones globally.
   GroupCommunicator &gcomm = u.ParFESpace()->GroupComm();
   gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
@@ -1111,6 +1116,7 @@ void ComputeCurlAxi(const ParGridFunction &u, ParGridFunction &cu, bool assume_s
   // Accumulate for all vdofs.
   gcomm.Reduce<double>(cu.GetData(), GroupCommunicator::Sum);
   gcomm.Bcast<double>(cu.GetData());
+  */
 
   // Compute means.
   for (int i = 0; i < cu.Size(); i++) {
@@ -1180,6 +1186,156 @@ bool copyFile(const char *SRC, const char *DEST) {
   std::ofstream dest(DEST, std::ios::binary);
   dest << src.rdbuf();
   return src && dest;
+}
+
+// void streamwiseGrad(int dim, ParGridFunction &phi, ParGridFunction &u, ParGridFunction &swGrad) {
+void streamwiseGrad(int dim, ParGridFunction &u, ParGridFunction &swGrad) {
+  /*
+  std::cout << "maxInd   minusInd   plusInd" << endl;
+  std::cout << 0 << " " << ((0-1) % dim_ + dim_) % dim_ << " " << (0 + 1) % dim_ << endl;
+  std::cout << 1 << " " << ((1-1) % dim_ + dim_) % dim_  << " " << (1 + 1) % dim_ << endl;
+  std::cout << 2 << " " << ((2-1) % dim_ + dim_) % dim_ << " " << (2 + 1) % dim_ << endl;
+  */
+
+  // compute gradient of input field
+  // scalarGrad3D(phi, swGrad);
+
+  const double *vel = u.HostRead();
+  double *gPhi = swGrad.HostReadWrite();
+
+  int Sdof = u.Size() / dim;
+  for (int dof = 0; dof < Sdof; dof++) {
+    // streamwise coordinate system
+    Vector unitNorm;
+    Vector unitT1;
+    Vector unitT2;
+    unitNorm.SetSize(dim);
+    unitT1.SetSize(dim);
+    unitT2.SetSize(dim);
+
+    // streamwise direction
+    for (int i = 0; i < dim; i++) unitNorm[i] = vel[dof + i * Sdof];
+    double mod = 0.0;
+    for (int i = 0; i < dim; i++) mod += unitNorm[i] * unitNorm[i];
+    mod = std::max(mod, 1.0e-18);
+    double Umag = std::sqrt(mod);
+    unitNorm /= Umag;
+
+    // check for zero-flow areas
+    if (Umag < 1.0e-8) {
+      for (int i = 0; i < dim; i++) gPhi[dof + i * Sdof] = 0.0;
+      continue;
+    }
+
+    // tangent direction (not unique)
+    int maxInd, minusInd, plusInd;
+    if (unitNorm[0] * unitNorm[0] > unitNorm[1] * unitNorm[1]) {
+      maxInd = 0;
+    } else {
+      maxInd = 1;
+    }
+    if (dim == 3 && unitNorm[maxInd] * unitNorm[maxInd] < unitNorm[2] * unitNorm[2]) {
+      maxInd = 2;
+    }
+    minusInd = ((maxInd - 1) % dim + dim) % dim;
+    plusInd = (maxInd + 1) % dim;
+
+    unitT1[minusInd] = -unitNorm[maxInd];
+    unitT1[maxInd] = unitNorm[minusInd];
+    unitT1[plusInd] = 0.0;
+    mod = 0.0;
+    for (int i = 0; i < dim; i++) mod += unitT1[i] * unitT1[i];
+    unitT1 /= std::sqrt(mod);
+
+    // t2 is then orthogonal to both normal & t1
+    if (dim == 3) {
+      unitT2[0] = +(unitNorm[1] * unitT1[2] - unitNorm[2] * unitT1[1]);
+      unitT2[1] = -(unitNorm[0] * unitT1[2] - unitNorm[2] * unitT1[0]);
+      unitT2[2] = +(unitNorm[0] * unitT1[1] - unitNorm[1] * unitT1[0]);
+    }
+
+    // transform from streamwise coords to global
+    DenseMatrix M(dim, dim);
+    for (int d = 0; d < dim; d++) {
+      M(d, 0) = unitNorm[d];
+      M(d, 1) = unitT1[d];
+      if (dim == 3) M(d, 2) = unitT2[d];
+    }
+
+    // streamwise coeff
+    DenseMatrix swM(dim, dim);
+    swM = 0.0;
+    swM(0, 0) = 1.0;
+
+    /*
+    std::cout << " " << endl;
+    for (int i = 0; i < dim_; i++) {
+      for (int j = 0; j < dim_; j++) {
+        std::cout << M(i,j) << " " ;
+      }
+      std::cout << endl;
+    }
+    */
+
+    // M_{im} swM_{mn} M_{jn} or M*"mu"*M^T (with n,t1,t2 in columns of M)
+    DenseMatrix swMgbl(dim, dim);
+    swMgbl = 0.0;
+    for (int i = 0; i < dim; i++) {
+      for (int j = 0; j < dim; j++) {
+        for (int m = 0; m < dim; m++) {
+          for (int n = 0; n < dim; n++) {
+            swMgbl(i, j) += M(i, m) * M(j, n) * swM(m, n);
+          }
+        }
+      }
+    }
+
+    // copy grad into local vecotr
+    Vector tmp1;
+    tmp1.SetSize(dim);
+    for (int i = 0; i < dim; i++) tmp1[i] = gPhi[dof + i * Sdof];
+
+    // gradient in streamwise-direction
+    Vector tmp2;
+    tmp2.SetSize(dim);
+    for (int i = 0; i < dim; i++) tmp2[i] = 0.0;
+    for (int i = 0; i < dim; i++) {
+      for (int j = 0; j < dim; j++) {
+        tmp2[i] += swMgbl(i, j) * tmp1[j];
+      }
+    }
+
+    // copy back to input vector gf
+    for (int i = 0; i < dim; i++) gPhi[dof + i * Sdof] = tmp2[i];
+  }
+}
+
+void upwindDiff(int dim, double re_factor, double re_offset, Vector &u_vec, Vector &rho_vec, Vector &del_vec,
+                Vector &Reh_vec, Vector &swDiff) {
+  const double *rho = rho_vec.HostRead();
+  const double *del = del_vec.HostRead();
+  const double *vel = u_vec.HostRead();
+  const double *Reh = Reh_vec.HostRead();
+  double *data = swDiff.HostReadWrite();
+
+  int Sdof = rho_vec.Size();
+  for (int dof = 0; dof < Sdof; dof++) {
+    double Umag = 0.0;
+    for (int i = 0; i < dim; i++) Umag += vel[i] * vel[i];
+    Umag = std::sqrt(Umag);
+
+    // element Re
+    double Re = Reh[dof];
+
+    // SUPG weight
+    double Csupg = 0.5 * (tanh(re_factor * Re - re_offset) + 1.0);
+
+    // streamwise diffusion coeff
+    double CswDiff = Csupg * Umag * del[dof] * rho[dof];
+
+    // scaled streamwise Laplacian
+    data[dof] *= CswDiff;
+  }
 }
 
 void makeContinuous(ParGridFunction &u) {
