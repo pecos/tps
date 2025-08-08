@@ -658,7 +658,9 @@ ReactingFlow::~ReactingFlow() {
   delete mixture_;
   delete transport_;
   delete chemistry_;
-  delete chemistryBase_;
+  if (axisym_) {
+    delete chemistryBase_;
+  }
 
   delete umag_coeff_;
   delete gscale_coeff_;
