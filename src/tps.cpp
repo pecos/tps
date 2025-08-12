@@ -46,6 +46,10 @@
 #ifdef HAVE_PYTHON
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <pybind11/embed.h>
+
+namespace py = pybind11;
+using namespace py::literals;
 
 #ifdef HAVE_MPI4PY
 #include <mpi4py/mpi4py.h>

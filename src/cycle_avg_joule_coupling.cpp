@@ -36,6 +36,25 @@
 #include "loMach.hpp"
 #include "quasimagnetostatic.hpp"
 
+#include <fstream>
+#include <iostream>
+#include <string>
+
+#ifdef HAVE_PYTHON
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/embed.h>
+#include <pybind11/eval.h>
+
+namespace py = pybind11;
+using namespace py::literals;
+
+#ifdef HAVE_MPI4PY
+#include <mpi4py/mpi4py.h>
+#endif
+
+#endif
+
 CycleAvgJouleCoupling::CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tps)
     : em_opt_(),
       qmsa_solver_(nullptr),
@@ -409,6 +428,70 @@ void CycleAvgJouleCoupling::initialize() {
 }
 
 void CycleAvgJouleCoupling::solve() {
+  // WRITE THE LOCAL RANK TO A FILE FOR PYTHON TO READ AND MODIFY
+  {
+    {
+      std::string writeFile =  "/work2/10565/ashwathsv/frontera/pybind-test/output-files/rank" + std::to_string(rank_) + ".txt";
+      std::ofstream outputFile(writeFile, std::ios::out);
+      if(outputFile.is_open()) {
+        outputFile << std::to_string( 2*rank_ + 1);
+        outputFile.close();
+      } else {
+        // Handle the case where the file could not be opened
+        std::cerr << "Unable to open file for writing.\n";
+      }
+    }
+    
+    {
+      // READ WHATEVER WAS WRITTEN FROM C++ AND PRINT IT
+      std::string readFile =  "/work2/10565/ashwathsv/frontera/pybind-test/output-files/rank" + std::to_string(rank_) + ".txt";
+      std::ifstream inputFile(readFile);
+      // Check if the file was opened successfully
+      if (!inputFile.is_open()) {
+        std::cerr << "Error: Unable to open file." << std::endl;
+      }
+
+      std::string line;
+      while (std::getline(inputFile, line)) {
+        std::string outString = "[C++] Rank " + std::to_string(rank_) + " of " + std::to_string(nprocs_) + " wrote " + line + "\n";
+        std::cout << outString;
+      }
+    
+    }
+  }
+  // INITIALIZE THE PYTHON INTERPRETER BEFORE solveBegin() is called
+  py::initialize_interpreter();
+  // TEST IF PYTHON HELLO WORLD CAN BE CALLED FROM HERE
+  try {
+      py::exec(R"(
+                import sys
+                sys.path.insert(0, "/work2/10565/ashwathsv/frontera/pybind-test")
+            )");
+      py::eval_file("/work2/10565/ashwathsv/frontera/pybind-test/modify-file.py");
+  }
+  catch (const py::error_already_set& e) {
+      std::cerr << "Python error: " << e.what() << std::endl;
+  }
+
+  // NUMBERS ARE NOW MODIFIED. READ THEM BACK INTO C++ FROM FILE
+  {
+    // READ WHATEVER WAS WRITTEN FROM C++ AND PRINT IT
+    std::string readFile =  "/work2/10565/ashwathsv/frontera/pybind-test/output-files/rank" + std::to_string(rank_) + ".txt";
+    std::ifstream inputFile(readFile);
+    // Check if the file was opened successfully
+    if (!inputFile.is_open()) {
+      std::cerr << "Error: Unable to open file." << std::endl;
+    }
+
+    std::string line;
+    while (std::getline(inputFile, line)) {
+      std::string outString = "[C++ modified] Rank " + std::to_string(rank_) + " of " + std::to_string(nprocs_) + " read " + line + "\n";
+      std::cout << outString;
+    }
+  
+  }
+
+  // END OF TEST
   this->solveBegin();
   double tlast = grvy_timer_elapsed_global();
 
@@ -429,6 +512,9 @@ void CycleAvgJouleCoupling::solve() {
   }
 
   this->solveEnd();
+
+  // FINALIZE PYTHON INTERPRETER
+  py::finalize_interpreter();
 }
 
 void CycleAvgJouleCoupling::solveBegin() {

@@ -43,6 +43,21 @@
 #include "radiation.hpp"
 #include "tps2Boltzmann.hpp"
 
+#ifdef HAVE_PYTHON
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/embed.h>
+
+namespace py = pybind11;
+using namespace py::literals;
+
+#ifdef HAVE_MPI4PY
+#include <mpi4py/mpi4py.h>
+#endif
+ 
+#endif
+
+
 using namespace mfem;
 using namespace mfem::common;
 
@@ -2305,23 +2320,32 @@ void ReactingFlow::updateMixture() {
     Mmix_gf_ = 0.0;
 
     for (int sp = 0; sp < nSpecies_; sp++) {
+      // Extract scalar component from Yn_ and store in tmpR0_
       setScalarFromVector(Yn_, sp, &tmpR0_);
+      // Yn_gf_ stores mass fractions for species "sp" at each DOFs
       Yn_gf_.SetFromTrueDofs(tmpR0_);
+      // Iteration over Finite Element DOFs
       for (int i = 0; i < sDof_; i++) {
+        // Stores inverse of the average mixture molar mass at each DOF
+        // 1 / avg(M) = \sum_{nSpecies_} Y_{sp} / Mw_{sp}
         dataM[i] += dataY[i] / gasParams_(sp, GasParams::SPECIES_MW);
       }
     }
 
     for (int i = 0; i < sDof_; i++) {
+      // Take inverse to obtain the average molar mass
       dataM[i] = 1.0 / dataM[i];
     }
     for (int i = 0; i < sDof_; i++) {
+      // Specific gas constant, Rsp = RU / avg(M)
       dataR[i] = Rgas_ / dataM[i];
     }
   }
 
   // can use mixture calls directly for this
   for (int sp = 0; sp < nSpecies_; sp++) {
+    // Extract scalar component corresponding to "sp" from Yn_, Xn_ and store 
+    // in tmpR0a_, tmpR0b_ respectively
     setScalarFromVector(Yn_, sp, &tmpR0a_);
     setScalarFromVector(Xn_, sp, &tmpR0b_);
     Mmix_gf_.GetTrueDofs(tmpR0c_);
@@ -2329,6 +2353,8 @@ void ReactingFlow::updateMixture() {
     double *d_X = tmpR0b_.HostReadWrite();
     double *d_M = tmpR0c_.HostReadWrite();
     for (int i = 0; i < sDofInt_; i++) {
+      // Get the mole fractions for each species
+      // X_{sp} = Y_{sp} * avg(M) / Mw_{sp}
       d_X[i] = d_Y[i] * d_M[i] / gasParams_(sp, GasParams::SPECIES_MW);
     }
     setVectorFromScalar(tmpR0b_, sp, &Xn_);
@@ -2353,10 +2379,12 @@ void ReactingFlow::updateMixture() {
       // Set up conserved state (just the mass densities, which is all we need here)
       state[0] = d_Rho[i];
       for (int sp = 0; sp < nActiveSpecies_; sp++) {
+        // dim_ + 1 = mass + momentum + energy equations
+        // species conserved state (rho * Y_{sp}) indices start from dim_ + 1 + 1
         state[dim_ + 1 + sp + 1] = d_Rho[i] * d_Yn[i + sp * sDofInt_];
       }
 
-      // Evaluate the mole densities (from mass densities)
+      // Evaluate the mole densities in mol-m^{-3} (from mass densities) and store in n_sp
       mixture_->computeNumberDensities(state, n_sp);
 
       // GetMixtureCp returns cpMix = sum_s X_s Cp_s, where X_s is
