@@ -15,6 +15,7 @@ setup() {
     RUNFILE_LID_MOD="inputs/lomach.lid.mod.ini"
 
     RUNFILE_PIPE="inputs/lomach.pipe.ini"
+    RUNFILE_PIPE_INTERP="inputs/lomach.pipe.interp.ini"
     REF_SOLN_PIPE="ref_solns/pipe/restart_output-pipe-lam.sol.h5"
     OUT_SOLN_PIPE="output_solns/restart_output-pipe-lam.sol.h5"    
 
@@ -157,6 +158,15 @@ setup() {
 
 @test "[$TEST] check that fully developed pipe (axisymmetric) runs" {
     run $EXE --runFile $RUNFILE_PIPE
+    [[ ${status} -eq 0 ]]
+    test -s restart_output-pipe-lam.sol.h5
+    h5diff -r --delta=1e-10 restart_output-pipe-lam.sol.h5 $REF_SOLN_PIPE /velocity
+    h5diff -r --delta=1e-10 restart_output-pipe-lam.sol.h5 $REF_SOLN_PIPE /swirl
+    # cp restart_output-pipe-lam.sol.h5 $OUT_SOLN_PIPE
+}
+
+@test "[$TEST] check that fully developed pipe (axisymmetric) runs with interpolated inlet" {
+    run $EXE --runFile $RUNFILE_PIPE_INTERP
     [[ ${status} -eq 0 ]]
     test -s restart_output-pipe-lam.sol.h5
     h5diff -r --delta=1e-10 restart_output-pipe-lam.sol.h5 $REF_SOLN_PIPE /velocity
