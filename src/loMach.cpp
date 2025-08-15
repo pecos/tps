@@ -235,7 +235,6 @@ void LoMachSolver::initialize() {
   extData_->setup();
   flow_->initializeFromExtData(&extData_->toFlow_interface_);
   thermo_->initializeFromExtData(&extData_->toThermoChem_interface_);
-
   // Initialize model-owned data
   sponge_->initializeSelf();
   turbModel_->initializeSelf();

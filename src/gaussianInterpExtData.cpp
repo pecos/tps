@@ -277,7 +277,7 @@ void GaussianInterpExtData::setup() {
   double radius = 2.0 * torch_radius / nSamples; // 300 from nxn interp plane
   */
   double radius = 1.0;
-
+  bool search = true;
   // NB: be careful with GetNBE (see comments in mfem/mesh/mesh.hpp)
   for (int be = 0; be < pmesh_->GetNBE(); be++) {
     Array<int> vdofs;
@@ -371,18 +371,24 @@ void GaussianInterpExtData::setup() {
       if (wt_tot > 0.0) {
         Udata[n + 0 * Sdof_] = val_u / wt_tot;
         Udata[n + 1 * Sdof_] = val_v / wt_tot;
-        Udata[n + 2 * Sdof_] = val_w / wt_tot;
+        if (dim_ == 3) {
+          Udata[n + 2 * Sdof_] = val_w / wt_tot;
+        }
         Tdata[n] = val_T / wt_tot;
       } else {
         Udata[n + 0 * Sdof_] = 0.0;
         Udata[n + 1 * Sdof_] = 0.0;
-        Udata[n + 2 * Sdof_] = 0.0;
+        if (dim_ == 3) {
+          Udata[n + 2 * Sdof_] = 0.0;
+        }
         Tdata[n] = 0.0;
       }
 
       if (axisym_) {
         // zero out z component, attach to theta instead
-        Udata[n + 2 * Sdof_] = 0.0;
+        if (dim_ == 3) {
+          Udata[n + 2 * Sdof_] = 0.0;
+        }
         if (wt_tot > 0.0) {
           Thdata[n] = val_w / wt_tot;
         } else {
@@ -393,7 +399,9 @@ void GaussianInterpExtData::setup() {
       // store initial interpolated field to ramp from
       U0[n + 0 * Sdof_] = Udata[n + 0 * Sdof_];
       U0[n + 1 * Sdof_] = Udata[n + 1 * Sdof_];
-      U0[n + 2 * Sdof_] = Udata[n + 2 * Sdof_];
+      if (dim_ == 3) {
+        U0[n + 2 * Sdof_] = Udata[n + 2 * Sdof_];
+      }
 
       if (axisym_) {
         Th0[n] = Thdata[n];
@@ -419,11 +427,19 @@ void GaussianInterpExtData::step() {
   // only addressing velocity for now and assume ic is zero
   for (int eq = 0; eq < dim_; eq++) {
     for (int i = 0; i < Sdof_; i++) {
+      // double diff = Udata[i + eq * Sdof_] - U0[i + eq * Sdof_];
+      // if (abs(diff) > 0.0) {
+      //   printf("Udata changed %i, %i, %f, %f \n", eq, i, Udata[i + eq * Sdof_], U0[i + eq * Sdof_]);
+      // }
       Udata[i + eq * Sdof_] = U0[i + eq * Sdof_] * std::min(double(coeff_.nStep) / double(rampSteps_), 1.0);
     }
   }
   if (axisym_) {
     for (int i = 0; i < Sdof_; i++) {
+      // double diff = Thdata[i] - Th0[i];
+      // if (abs(diff) > 0.0) {
+      //   printf("Thdata changed %i, %f, %f \n", i, Thdata[i] , Th0[i]);
+      // }
       Thdata[i] = Th0[i] * std::min(double(coeff_.nStep) / double(rampSteps_), 1.0);
     }
   }

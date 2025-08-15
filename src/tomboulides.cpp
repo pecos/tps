@@ -487,8 +487,8 @@ void Tomboulides::initializeSelf() {
 
       velocity_field_ = new VectorGridFunctionCoefficient(extData_interface_->Udata);
       addVelDirichletBC(velocity_field_, inlet_attr);
+      swirl_field_ = new GridFunctionCoefficient(extData_interface_->Thdata);
       if (axisym_) {
-        swirl_field_ = new GridFunctionCoefficient(extData_interface_->Thdata);
         addSwirlDirichletBC(swirl_field_, inlet_attr);
       }
     } else {
