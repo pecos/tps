@@ -29,7 +29,6 @@ class TabulatedSolver:
 
     def _read_tables(self):
         filenames = self._findPythonReactions()
-        
         tables = []
         for filename in filenames:
             with h5py.File(filename, 'r') as fid:
@@ -56,9 +55,37 @@ class TabulatedSolver:
         for table in self.tables:
             self.rates.append(table(self.heavy_temperature))
 
+    def solve_weighted(self, wtind, wt):
+        # THIS FUNCTION MULTIPLIES THE CHOSEN REACTION RATE (denoted by index wtind) BY A FACTOR wt
+        # THE INPUT REACTION RATES ARE OBTAINED FROM TABULATED CHEMISTRY USING LTE ASSUMPTION
+        self.rates = []
+        nt = 0
+        for table in self.tables:
+            if nt == int(wtind):
+                self.rates.append(wt*table(self.heavy_temperature))
+            else:
+                self.rates.append(table(self.heavy_temperature))
+            nt = nt + 1
+
+
     def push(self, interface):
         rates =  np.array(interface.HostWrite(libtps.t2bIndex.ReactionRates), copy=False)
         offset = 0
         for rate in self.rates:
             rates[offset:offset+rate.shape[0]] = rate
             offset = offset+rate.shape[0]
+
+    def blend_and_push(self, interface, rate1, rate2, alpha):
+        assert len(self.rates) == len(rate1), "ERROR: len(self.rates) != len(rate1)"
+        assert len(self.rates) == len(rate2), "ERROR: len(self.rates) != len(rate2)"
+        rates =  np.array(interface.HostWrite(libtps.t2bIndex.ReactionRates), copy=False)
+        offset = 0
+        ratenum = 0
+        for r in range(len(self.rates)):
+            # print("ratenum = ", ratenum, "r = ", r)
+            # print("maxmin(rate1) = ", np.amin(rate1[r]), ", ", np.amax(rate1[r]), ", maxmin(rate2) = ", np.amin(rate2[r]), ", ", np.amax(rate2[r]))
+            # print("len(self.rates) = ", len(self.rates), ", len(rate1) = ", len(rate1), ", len(rate2) = ", len(rate2))
+            rates[offset:offset+self.rates[r].shape[0]] = (1.-alpha)*rate1[r] + alpha*rate2[r]
+            offset = offset+self.rates[r].shape[0]
+
+            ratenum = ratenum + 1

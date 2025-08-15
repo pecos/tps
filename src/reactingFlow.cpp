@@ -47,6 +47,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/embed.h>
+#include <pybind11/numpy.h>
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -2040,6 +2041,45 @@ void ReactingFlow::speciesProduction() {
 
   kfwd.SetSize(chemistry_->getNumReactions());
   keq.SetSize(chemistry_->getNumReactions());
+
+  // ---------------------------------------------------------------
+  // Get the BTE rates by calling Python solver
+  // Pass temperature as input to Python function
+  int size = Tn_.Size();
+  // Wrap const pointer into NumPy array (no copy)
+  // Dimensions given as {size}, stride as {sizeof(double)}
+  auto Tarr = py::array_t<double>(
+      {size},                 // shape
+      {sizeof(double)},       // stride
+      dataT                    // const double* pointer
+  );
+  Tarr.attr("flags").attr("writeable") = false; // mark read-only
+
+  // Print the min/max of Tn_ from C++ for each rank
+  double minT = Tn_.Min();
+  double maxT = Tn_.Max();
+
+  int rank = mfem::Mpi::WorldRank(); // Get rank in MPI_COMM_WORLD
+  if (rank0_)
+    std::cout << "[C++] Rank = " << rank << ", min(T) = " << minT << ", max(T) = " << maxT << ", size = "
+   << size << ", sDof = " << sDofInt_ << "\n"; 
+
+    // IMPORT MODULES IN PYTHON AND SET PATHS
+    py::exec(R"(
+                import sys
+                sys.path.insert(0, "/work2/10565/ashwathsv/frontera/tps-venv/frontera/tps-venv/tps/src")
+            )");  
+  // Call the Python function
+  // py::object result_obj = myscript.attr("process_temperature")(temp_arr);
+
+  try {
+    py::object script = py::module_::import("tps-get-bte-rates");
+  } catch (const py::error_already_set& e) {
+    std::cerr << "Python error: " << e.what() << std::endl;
+  }
+  
+  // PYTHON CALLS END HERE
+  // ---------------------------------------------------------------
 
   for (int i = 0; i < sDofInt_; i++) {
     // Get temperature

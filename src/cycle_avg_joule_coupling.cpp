@@ -39,12 +39,14 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <vector>
 
 #ifdef HAVE_PYTHON
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/embed.h>
 #include <pybind11/eval.h>
+#include <pybind11/numpy.h>
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -428,67 +430,48 @@ void CycleAvgJouleCoupling::initialize() {
 }
 
 void CycleAvgJouleCoupling::solve() {
-  // WRITE THE LOCAL RANK TO A FILE FOR PYTHON TO READ AND MODIFY
-  {
-    {
-      std::string writeFile =  "/work2/10565/ashwathsv/frontera/pybind-test/output-files/rank" + std::to_string(rank_) + ".txt";
-      std::ofstream outputFile(writeFile, std::ios::out);
-      if(outputFile.is_open()) {
-        outputFile << std::to_string( 2*rank_ + 1);
-        outputFile.close();
-      } else {
-        // Handle the case where the file could not be opened
-        std::cerr << "Unable to open file for writing.\n";
-      }
-    }
-    
-    {
-      // READ WHATEVER WAS WRITTEN FROM C++ AND PRINT IT
-      std::string readFile =  "/work2/10565/ashwathsv/frontera/pybind-test/output-files/rank" + std::to_string(rank_) + ".txt";
-      std::ifstream inputFile(readFile);
-      // Check if the file was opened successfully
-      if (!inputFile.is_open()) {
-        std::cerr << "Error: Unable to open file." << std::endl;
-      }
-
-      std::string line;
-      while (std::getline(inputFile, line)) {
-        std::string outString = "[C++] Rank " + std::to_string(rank_) + " of " + std::to_string(nprocs_) + " wrote " + line + "\n";
-        std::cout << outString;
-      }
-    
-    }
-  }
   // INITIALIZE THE PYTHON INTERPRETER BEFORE solveBegin() is called
   py::initialize_interpreter();
-  // TEST IF PYTHON HELLO WORLD CAN BE CALLED FROM HERE
-  try {
-      py::exec(R"(
-                import sys
-                sys.path.insert(0, "/work2/10565/ashwathsv/frontera/pybind-test")
-            )");
-      py::eval_file("/work2/10565/ashwathsv/frontera/pybind-test/modify-file.py");
+  // PASS A VECTOR FROM C++ TO PYTHON, MODIFY IT AND RETURN A NEW VECTOR TO C++
+  // try {
+  //   std::vector<double> in_data = {rank_, rank_ + 1.0, rank_ + 2.0};
+
+  //   std::cout << "[C++] Rank = " << rank_ << ", Input = ";
+  //   for (int i = 0; i < in_data.size(); ++i) {
+  //     std::cout << in_data[i] << " ";
+  //   }
+  //   std::cout << "\n";
+    
+  //   // CALL PYTHON FUNCTION TO MODIFY INPUT VECTOR
+  //   py::array_t<double> inp({in_data.size()}, in_data.data()); // numpy wrapper around std:vector
+    
+  //   // IMPORT MODULES IN PYTHON AND SET PATHS
+  //   py::exec(R"(
+  //               import sys
+  //               sys.path.insert(0, "/work2/10565/ashwathsv/frontera/pybind-test")
+  //           )");
+  
+  //   // IMPORT PYTHON SCRIPT
+    py::object script = py::module_::import("pyscript");
+    // EXECUTE FUNCTION IN PYTHON WITH "inp" AS INPUT
+    // PYTHON RETURNS "result" (a NUMPY ARRAY) AS OUTPUT
+    py::array_t<double> result = script.attr("modify_vector")(inp)
+        .cast<py::array_t<double>>();
+
+    // CONVERT "result" INTO C++ std::vector<double>
+    py::buffer_info info = result.request();
+    double* ptr = static_cast<double*>(info.ptr);
+
+    std::vector<double> ret_data(ptr, ptr + info.size); // STORE RETURNED ARRAY IN std::vector
+    // PRINT THE RETURNED VECTOR ELEMENTS
+    std::cout << "[C++] Rank = " << rank_ << ", Python returns = ";
+    for (int i = 0; i < ret_data.size(); ++i) {
+      std::cout << ret_data[i] << " ";
+    }
+    std::cout << "\n"; 
   }
   catch (const py::error_already_set& e) {
       std::cerr << "Python error: " << e.what() << std::endl;
-  }
-
-  // NUMBERS ARE NOW MODIFIED. READ THEM BACK INTO C++ FROM FILE
-  {
-    // READ WHATEVER WAS WRITTEN FROM C++ AND PRINT IT
-    std::string readFile =  "/work2/10565/ashwathsv/frontera/pybind-test/output-files/rank" + std::to_string(rank_) + ".txt";
-    std::ifstream inputFile(readFile);
-    // Check if the file was opened successfully
-    if (!inputFile.is_open()) {
-      std::cerr << "Error: Unable to open file." << std::endl;
-    }
-
-    std::string line;
-    while (std::getline(inputFile, line)) {
-      std::string outString = "[C++ modified] Rank " + std::to_string(rank_) + " of " + std::to_string(nprocs_) + " read " + line + "\n";
-      std::cout << outString;
-    }
-  
   }
 
   // END OF TEST
