@@ -164,7 +164,7 @@ void GaussianInterpExtData::setup() {
   double *Ydata = Yn_gf_.HostReadWrite();
   double *hcoords = coordsDof.HostReadWrite();
 
-  // TODO: need to generalize for more species...
+  // TODO(swh): need to generalize for more species...
   const int maxSpec = 10;
   if (nSpec_ > maxSpec) {
     if (rank0_) {
