@@ -162,7 +162,6 @@ enum NitrogenSpcs {
 */
 
 enum GasColl {
-
   // general
   CLMB_ATT,  // Attractive Coulomb potential
   CLMB_REP,  // Repulsive Coulomb potential
@@ -184,11 +183,9 @@ enum GasColl {
   N2_NI,    // Ni2 - Ni (include excited states)
   N2_N21P,  // Ni2 - Ni2.1+ (include excited states)
   NONE_NITCOLL
-
 };
 
 enum GasSpcs {
-
   // Argon
   AR,    // Monomer Argon neutral, including excited states
   AR1P,  // Ar.1+, including excited states
@@ -202,7 +199,6 @@ enum GasSpcs {
   NONE_NITSPCS,
 
   ELECTRON  // Electron
-
 };
 
 // Type of primitive variable which requires gradient evaulation for diffusion velocity.

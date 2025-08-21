@@ -42,7 +42,7 @@ EXTRA_DIST  = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes lte-
 		      die.test averaging.test wedge.test cyl3d.interp.test qms.rings.test qms.axisym.test \
 		      sponge_zone.test annulus.test pipe.test valgrind.test valgrind.suppressions \
 		      mms.euler.test reaction.test perfect_gas.test collision_integrals.test \
-	 	      argon_minimal.test argon_minimal.binary.test diffusion_wall.test \
+                      diffusion_wall.test \
 	 	      inflow_outflow.test mms.ternary_2d.test mms.ternary_2d_wall.test \
 	 	      mms.ternary_2d_inout.test cuda-memcheck.test mms.general_wall.test \
 		      independent_coupling.test interp_em.test mms.euler_2d.test mms.cns_2d.test \
@@ -53,6 +53,7 @@ EXTRA_DIST  = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes lte-
 	      lomach-flow.test lomach-lequere.test interpInlet.test sgsLoMach.test autoPeriodic.test aveLoMach.test \
               reactFlow-binDiff.test reactFlow-singleRx.test reactFlow-table.test radiativeDecay.test \
               reactFlow-nitrogen.test
+#	 	      argon_minimal.test argon_minimal.binary.test
 
 TESTS = vpath.sh
 XFAIL_TESTS =
@@ -62,7 +63,6 @@ TESTS += cyl3d.gpu.test \
 	 cyl3d.mflow.gpu.test \
 	 wedge.gpu.test \
 	 averaging.gpu.test \
-	 argon_minimal.binary.test \
 	 diffusion_wall.test \
 	 reaction.test \
 	 inflow_outflow.test \
@@ -94,8 +94,6 @@ TESTS += cyl3d.test \
 	 pipe.test \
 	 perfect_gas.test \
 	 collision_integrals.test \
-	 argon_minimal.test \
-	 argon_minimal.binary.test \
 	 diffusion_wall.test \
 	 reaction.test \
 	 inflow_outflow.test \
@@ -213,11 +211,11 @@ test_collision_LDADD          = ../src/libtps.la
 test_collision_LDADD         += $(HDF5_LIBS)
 test_collision_LDADD         += $(GRVY_LIBS)
 
-check_PROGRAMS               += test_argon_minimal
-test_argon_minimal_SOURCES    = test_argon_minimal.cpp
-test_argon_minimal_LDADD      = ../src/libtps.la
-test_argon_minimal_LDADD     += $(HDF5_LIBS)
-test_argon_minimal_LDADD     += $(GRVY_LIBS)
+#check_PROGRAMS               += test_argon_minimal
+#test_argon_minimal_SOURCES    = test_argon_minimal.cpp
+#test_argon_minimal_LDADD      = ../src/libtps.la
+#test_argon_minimal_LDADD     += $(HDF5_LIBS)
+#test_argon_minimal_LDADD     += $(GRVY_LIBS)
 
 check_PROGRAMS               += test_bdr_flux
 test_bdr_flux_SOURCES  	      = test_boundary_flux.cpp

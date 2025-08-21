@@ -55,7 +55,7 @@ MFEM_HOST_DEVICE GasMinimalTransport::GasMinimalTransport(GasMixture *_mixture, 
       assert(false);
     }
 
-    // TODO:
+    // TODO(swh):
     // if this works, replace all "collision::argon::" and "collision::nitrogen" with "gas::"
     // and then create an array of pointers to the collision functions with indexing
     // matching the binary diffusivity indexing, for each namespace in collision.
@@ -349,7 +349,7 @@ MFEM_HOST_DEVICE void GasMinimalTransport::ComputeFluxMolecularTransport(const d
                                                         (collision::charged::att11(nondimTe) * debyeCircle);
   binaryDiff[ionIndex_ + electronIndex_ * numSpecies] = binaryDiff[electronIndex_ + ionIndex_ * numSpecies];
 
-  // TODO: add more for Ni system => compiler my throw a warning...
+  // TODO(swh): add more for Ni system => compiler my throw a warning...
   double diffusivity[numSpecies], mobility[numSpecies];
   CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
 
@@ -626,6 +626,7 @@ MFEM_HOST_DEVICE void GasMinimalTransport::ComputeSourceMolecularTransport(const
   switch (gasType_) {
     case Ar:
       Qea = collision::argon::eAr11(Te);
+      Qea2 = collision::argon::eAr11(Te);  // wont actually be used but gti checks complain if this is not set
       break;
     case Ni:
       Qea = collision::nitrogen::eNi11(Te);
@@ -695,9 +696,12 @@ MFEM_HOST_DEVICE void GasMinimalTransport::ComputeSourceMolecularTransport(const
 
       speciesTransport[ionIndex2_ + SpeciesTrns::MF_FREQUENCY * numSpecies] =
           mfFreqFactor_ * sqrt(Te / mw_[electronIndex_]) * n_sp[ionIndex2_] * Qie;
+
+      speciesTransport[neutralIndex_ + SpeciesTrns::MF_FREQUENCY * numSpecies] =
+          mfFreqFactor_ * sqrt(Te / mw_[electronIndex_]) * n_sp[neutralIndex_] * Qea;
+
       speciesTransport[neutralIndex2_ + SpeciesTrns::MF_FREQUENCY * numSpecies] =
-          mfFreqFactor_ * sqrt(Te / mw_[electronIndex_]) * n_sp[neutralIndex2_] *
-          Qea;  // WARNING "Qea" probably a hard-code
+          mfFreqFactor_ * sqrt(Te / mw_[electronIndex_]) * n_sp[neutralIndex2_] * Qea2;
 
       break;
     default:
@@ -716,8 +720,10 @@ MFEM_HOST_DEVICE void GasMinimalTransport::ComputeSourceMolecularTransport(const
       mfFreqFactor_ * sqrt(Te / mw_[electronIndex_]) * n_sp[ionIndex_] * Qie;
   speciesTransport[neutralIndex_ + SpeciesTrns::MF_FREQUENCY * numSpecies] =
       mfFreqFactor_ * sqrt(Te / mw_[electronIndex_]) * n_sp[neutralIndex_] * Qea;  // WARNING "Qea" probably a hard-code
+  speciesTransport[neutralIndex2_ + SpeciesTrns::MF_FREQUENCY * numSpecies] =
+      mfFreqFactor_ * sqrt(Te / mw_[electronIndex_]) * n_sp[neutralIndex_] * Qea2;
 
-  // TODO: add mroe for Ni => compiler might throw a warning
+  // TODO(swh): add mroe for Ni => compiler might throw a warning
   double diffusivity[numSpecies], mobility[numSpecies];
   CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
 
