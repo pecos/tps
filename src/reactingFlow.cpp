@@ -462,6 +462,10 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
       // transport_ = new ConstantTransport(mixture_, gasInput_.constantTransport);
       transport_ = new GasMixtureTransport(mixture_, gasInput_);
     } break;
+    default: {
+      std::cout << "Unhandled case being accessed in reactingFlow..." << endl;
+      assert(false);
+    } break;      
   }
 
   /// Minimal amount of info for chemistry input struct
