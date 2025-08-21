@@ -1921,8 +1921,8 @@ void ReactingFlow::step() {
         updateMixture();
         updateThermoP();
         updateDensity(0.0, false);
-        speciesProduction();
-        heatOfFormation();
+	speciesProduction();
+	heatOfFormation();
 
         // advance over substep
         for (int iSpecies = 0; iSpecies < nActiveSpecies_; iSpecies++) {
@@ -2086,8 +2086,6 @@ void ReactingFlow::temperatureStep() {
   rhoDt_gf_ = rn_gf_;
   rhoDt_gf_ *= (time_coeff_.bd0 / dt_);
 
-  // HACK HACK HACK ...for testing only commenting out...    
-  /*
   Ht_form_->Update();
   Ht_form_->Assemble();
   Ht_form_->FormSystemMatrix(temp_ess_tdof_, Ht_);
@@ -2121,12 +2119,6 @@ void ReactingFlow::temperatureStep() {
 
   Ht_form_->RecoverFEMSolution(Xt2, resT_gf_, Tn_next_gf_);
   Tn_next_gf_.GetTrueDofs(Tn_next_);
-  */
-
-  Tn_ = T_ic_;
-  Tn_next_ = T_ic_;
-  Tn_gf_.SetFromTrueDofs(Tn_);    
-  Tn_next_gf_.SetFromTrueDofs(Tn_next_);  
   
 }
 
@@ -3104,6 +3096,7 @@ void ReactingFlow::computeQtTO() {
   Qt_gf_ /= CpMix_gf_;
   Qt_gf_ /= thermo_pressure_;
   Qt_gf_.Neg();
+
 }
 
 /// identifySpeciesType and identifyCollisionType copies from M2ulPhyS
@@ -3726,6 +3719,8 @@ double temp_ic(const Vector &coords, double t) {
   return temp;
 }
 
+
+// TODO: there should be NO problem-specific code in physics modules
 double temp_wall(const Vector &coords, double t) {
   double Thi = 400.0;
   double Tlo = 200.0;

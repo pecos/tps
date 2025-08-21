@@ -1354,7 +1354,20 @@ MFEM_HOST_DEVICE void GasMixtureTransport::GetViscosities(const double *conserve
     }
     speciesViscosity[sp] =
         viscosityFactor_ * sqrt(mw_[sp] * collInputs.Th) / collisionIntegral(sp, sp, 2, 2, collInputs);
-  }
+  } // 1.016 * 5/16 * 1/sigma^2 * (kb*m*T/pi)^(1/2)
+  // sigma^2 = Q^(22) / (pi * Q^(22)*)
+  // mu = 1.016 * 5/16 * 1/Q^(22) * (pi * Q^(22)*) * (kb*m*T/pi)^(1/2)
+  // mu = 1.016 * 5/16 * 1/Q^(22) * pi^(1/2) * Q^(22)* * (kb*m*T)^(1/2)
+  // mu = 1.016 * 5/16 * (pi*kb)^(1/2) * (m*T)^(1/2) * Q^(22)*/Q^(22)
+  
+  // 2.84a: Q^(22)* = Q^(22) / (pi * lambda_D^2)  
+  
+  // collisionalIntegral returns pi*lambda_D^2 * Q (from collisionalIntegral code)
+  // so, this is saying Q^(22)* = 1/(pi*lambda_D^2) which contradicts 2.84a
+  
+  // viscosityFactor_ = 5. / 16. * sqrt(PI_ * kB_);
+  // 2.21 in torch doc: 5/16 * (pi *kb)^(1/2) * (m*T)^(1/2) / \bar{Q}_{aa}^(2,2)
+  // but \bar{Q}_{aa}^(2,2) = pi*sigma^2 * Q_{aa}^(2,2)*
   visc[0] = linearAverage(X_sp, speciesViscosity);
   visc[1] = 0.0;
 
