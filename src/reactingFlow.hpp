@@ -462,7 +462,7 @@ class ReactingFlow : public ThermoChemModelBase {
 
   void AddSpecDirichletBC(const double &spec, Array<int> &attr);
   void AddSpecDirichletBC(Coefficient *coeff, Array<int> &attr);
-  void AddSpecDirichletBC(ScalarFuncT *f, Array<int> &attr);  
+  void AddSpecDirichletBC(ScalarFuncT *f, Array<int> &attr);
   // void AddSpecDirichletBC(const double &Y, Array<int> &attr);
 
   void evalSubstepNumber();
