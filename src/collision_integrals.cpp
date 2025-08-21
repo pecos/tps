@@ -225,7 +225,10 @@ MFEM_HOST_DEVICE double NiNi11(const double &T) {
   c[0] = -41.999345922993626;
   c[1] = -0.294552697364472;
   double expOmega = c[0] + c[1]*logT;
-  return exp(expOmega);
+  //return exp(expOmega);
+
+  double returnVal = 3.14159265358979323846 * exp(expOmega);
+  return returnVal;  
   
 }
 
@@ -250,7 +253,11 @@ MFEM_HOST_DEVICE double NiNi22(const double &T) {
   c[0] = -42.134170027961517;
   c[1] = -0.264742466936063;
   double expOmega = c[0] + c[1]*logT;
-  return exp(expOmega);
+  //return exp(expOmega);
+
+  // hack to get approximate correct viscosity
+  double returnVal = 3.14159265358979323846 * exp(expOmega);
+  return returnVal;
   
 }
 
@@ -279,14 +286,17 @@ MFEM_HOST_DEVICE double NiNi1P11(const double &T) {
   c[3] = -0.015601342343555;
   c[4] = 0.000385790678744;
   double expOmega = c[0] + c[1]*logT + c[2]*pow(logT,2) + c[3]*pow(logT,3) + c[4]*pow(logT,4);
-  return exp(expOmega);
+  //return exp(expOmega);
+
+  double returnVal = 3.14159265358979323846 * exp(expOmega);
+  return returnVal;  
   
 }
 
 // Reference : A. V. Phelps. (1991). "Cross Sections and Swarm Coefficients for Nitrogen Ions and Neutrals in N2 and Argon Ions and Neutrals in Ar for Energies from 0.1 eV to 10 keV"
 // see also: Capitelli 2000    
 MFEM_HOST_DEVICE double N2N211(const double &T) {
-  
+
   /*
   double logT = log(T);
   double c[5];
@@ -300,12 +310,16 @@ MFEM_HOST_DEVICE double N2N211(const double &T) {
   */
 
   // su2023
+  /**/
   double logT = log(T);
   double c[2];
   c[0] = -42.225712551892755;
   c[1] = -0.229958945507976;
   double expOmega = c[0] + c[1]*logT;
-  return exp(expOmega);
+  //return exp(expOmega);
+  double returnVal = 3.14159265358979323846 * exp(expOmega);
+  return returnVal;    
+  /**/
   
 }
 
@@ -326,12 +340,16 @@ MFEM_HOST_DEVICE double N2N222(const double &T) {
   */
   
   // su2023
+  /**/
   double logT = log(T);
   double c[2];
   c[0] = -42.077467697607034;
   c[1] = -0.229160550336776;
   double expOmega = c[0] + c[1]*logT;
-  return exp(expOmega);
+  //return exp(expOmega);
+  double returnVal = 3.14159265358979323846 * exp(expOmega);
+  return returnVal;    
+  /**/
   
 }
 
@@ -409,9 +427,12 @@ MFEM_HOST_DEVICE double N2Ni11(const double &T) {
   c[2] = 4.261190501951376;
   c[3] = -0.293139208272160;
   c[4] = 0.007561754781801;
-  double expOmega = 100.0 * (c[0] + c[1]*logT + c[2]*pow(logT,2) + c[3]*pow(logT,3) + c[4]*pow(logT,4));
-  return exp(expOmega);  
-  
+  double expOmega = c[0] + c[1]*logT + c[2]*pow(logT,2) + c[3]*pow(logT,3) + c[4]*pow(logT,4);
+  //return exp(expOmega);
+
+  double returnVal = 3.14159265358979323846 * exp(expOmega);
+  return returnVal;  
+    
 }
 
 // N2-N : NO DATA  (using N-N 22)
@@ -439,7 +460,10 @@ MFEM_HOST_DEVICE double N2Ni22(const double &T) {
   c[3] = 0.056255946061936;
   c[4] = -0.001145315858929;
   double expOmega = c[0] + c[1]*logT + c[2]*pow(logT,2) + c[3]*pow(logT,3) + c[4]*pow(logT,4);
-  return exp(expOmega);  
+  //return exp(expOmega);  
+
+  double returnVal = 3.14159265358979323846 * exp(expOmega);
+  return returnVal;  
   
 }
 
