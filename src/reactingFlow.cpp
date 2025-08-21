@@ -3190,7 +3190,6 @@ void ReactingFlow::identifyCollisionType(const Array<GasSpcs> &speciesType, GasC
       } else if (pairType < 0.0) {  // Attractive screened Coulomb potential
         collisionIndex[spI + spJ * nSpecies_] = CLMB_ATT;
       } else {  // determines collision type by species pairs.
-
         switch (gasType_) {
           case Ar:
             if ((speciesType[spI] == AR) && (speciesType[spJ] == AR)) {

@@ -626,6 +626,7 @@ MFEM_HOST_DEVICE void GasMinimalTransport::ComputeSourceMolecularTransport(const
   switch (gasType_) {
     case Ar:
       Qea = collision::argon::eAr11(Te);
+      Qea2 = collision::argon::eAr11(Te);  // wont actually be used but gti checks complain if this is not set
       break;
     case Ni:
       Qea = collision::nitrogen::eNi11(Te);
