@@ -54,7 +54,6 @@ EXTRA_DIST  = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes lte-
 	      lomach-flow.test lomach-lequere.test interpInlet.test sgsLoMach.test autoPeriodic.test aveLoMach.test \
               reactFlow-binDiff.test reactFlow-singleRx.test reactFlow-table.test radiativeDecay.test lomach-chan-stab.test \
               reactFlow-nitrogen.test
-
 #	 	      argon_minimal.test argon_minimal.binary.test
 
 TESTS = vpath.sh
@@ -78,7 +77,6 @@ TESTS += cyl3d.gpu.test \
          sgsLoMach.test \
 	 lomach-flow.test \
 	 lomach-lequere.test
-
 #	 argon_minimal.binary.test \
 
 if PYTHON_ENABLED
@@ -130,7 +128,6 @@ TESTS += cyl3d.test \
          radiativeDecay.test \
          lomach-chan-stab.test \
          reactFlow-nitrogen.test
-
 #	 argon_minimal.test \
 #	 argon_minimal.binary.test \
 
