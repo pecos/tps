@@ -1931,14 +1931,6 @@ void ReactingFlow::evalSubstepNumber() {
   {
     const double *dataProd = prodY_.HostRead();
     const double *dataYn = Yn_.HostRead();
-    //<<<<<<< HEAD
-    //    const double *dataRho = rn_.HostRead();
-    //    for (int i = 0; i < sDofInt_; i++) {
-    //      for (int sp = 0; sp < nSpecies_; sp++) {
-    //	double check = dataProd[i + sp * sDofInt_] / dataRho[i];
-    //        check /= dataYn[i + sp * sDofInt_];
-    //        myMaxProd = std::max(std::abs(check), myMaxProd);
-    //=======
     for (int i = 0; i < sDofInt_; i++) {
       for (int sp = 0; sp < nSpecies_; sp++) {
         // basic based on max production
@@ -1956,7 +1948,6 @@ void ReactingFlow::evalSubstepNumber() {
         tmp /= time_coeff_.dt;
         tmp *= 10.0;
         myMaxProd = std::max(std::abs(dataProd[i + sp * sDofInt_]) + tmp, myMaxProd);
-        //>>>>>>> implicit-nonlinear-chem
       }
     }
   }
@@ -3644,7 +3635,7 @@ double temp_ic(const Vector &coords, double t) {
 }
 
 
-// TODO: there should be NO problem-specific code in physics modules
+// TODO(swh): there should be NO problem-specific code in physics modules
 double temp_wall(const Vector &coords, double t) {
   double Thi = 400.0;
   double Tlo = 200.0;
