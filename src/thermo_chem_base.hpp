@@ -84,6 +84,13 @@ class ThermoChemModelBase {
   mfem::ParGridFunction *plasma_conductivity_gf_ = nullptr;
   mfem::ParGridFunction *joule_heating_gf_ = nullptr;
 
+#ifdef HAVE_PYTHON
+  // ParGridFunctions for real and imaginary parts of electric field
+  // These will be passed to BTE solver from ReactingFlow::solveStep()
+  mfem::ParGridFunction *efield_real_gf_ = nullptr;
+  mfem::ParGridFunction *efield_imag_gf_ = nullptr;
+#endif
+
  public:
   /// Destructor
   virtual ~ThermoChemModelBase() {}
@@ -194,6 +201,10 @@ class ThermoChemModelBase {
 
   mfem::ParGridFunction *getPlasmaConductivityGF() { return plasma_conductivity_gf_; }
   mfem::ParGridFunction *getJouleHeatingGF() { return joule_heating_gf_; }
+#ifdef HAVE_PYTHON
+  mfem::ParGridFunction *getEfieldRealGF() { return efield_real_gf_; }
+  mfem::ParGridFunction *getEfieldImagGF() { return efield_imag_gf_; }
+#endif
   virtual void evaluatePlasmaConductivityGF() {
     std::cout << "ERROR: " << __func__ << " remains unimplemented" << std::endl;
     exit(1);

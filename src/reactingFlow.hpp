@@ -220,6 +220,13 @@ class ReactingFlow : public ThermoChemModelBase {
   ParGridFunction sigma_gf_;
   ParGridFunction jh_gf_;
 
+#ifdef HAVE_PYTHON
+  // ParGridFunctions for the real and imaginary parts of the electric field
+  // We only store the magnitude (works only for axisymmetric case)
+  ParGridFunction er_gf_;
+  ParGridFunction ei_gf_;
+#endif
+
   // ParGridFunction *buffer_tInlet_ = nullptr;
   GridFunctionCoefficient *temperature_bc_field_ = nullptr;
 

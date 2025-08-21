@@ -344,6 +344,7 @@ void CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow() {
     joule_heating_flow->SetTrueVector();
     joule_heating_flow->SetFromTrueVector();
   }
+
 #else
   mfem_error("Cannot interpolate without GSLIB support.");
 #endif
@@ -430,51 +431,14 @@ void CycleAvgJouleCoupling::initialize() {
 }
 
 void CycleAvgJouleCoupling::solve() {
+#ifdef HAVE_PYTHON
   // INITIALIZE THE PYTHON INTERPRETER BEFORE solveBegin() is called
   py::initialize_interpreter();
-  // PASS A VECTOR FROM C++ TO PYTHON, MODIFY IT AND RETURN A NEW VECTOR TO C++
-  // try {
-  //   std::vector<double> in_data = {rank_, rank_ + 1.0, rank_ + 2.0};
-
-  //   std::cout << "[C++] Rank = " << rank_ << ", Input = ";
-  //   for (int i = 0; i < in_data.size(); ++i) {
-  //     std::cout << in_data[i] << " ";
-  //   }
-  //   std::cout << "\n";
-    
-  //   // CALL PYTHON FUNCTION TO MODIFY INPUT VECTOR
-  //   py::array_t<double> inp({in_data.size()}, in_data.data()); // numpy wrapper around std:vector
-    
-  //   // IMPORT MODULES IN PYTHON AND SET PATHS
-  //   py::exec(R"(
-  //               import sys
-  //               sys.path.insert(0, "/work2/10565/ashwathsv/frontera/pybind-test")
-  //           )");
-  
-  //   // IMPORT PYTHON SCRIPT
-    py::object script = py::module_::import("pyscript");
-    // EXECUTE FUNCTION IN PYTHON WITH "inp" AS INPUT
-    // PYTHON RETURNS "result" (a NUMPY ARRAY) AS OUTPUT
-    py::array_t<double> result = script.attr("modify_vector")(inp)
-        .cast<py::array_t<double>>();
-
-    // CONVERT "result" INTO C++ std::vector<double>
-    py::buffer_info info = result.request();
-    double* ptr = static_cast<double*>(info.ptr);
-
-    std::vector<double> ret_data(ptr, ptr + info.size); // STORE RETURNED ARRAY IN std::vector
-    // PRINT THE RETURNED VECTOR ELEMENTS
-    std::cout << "[C++] Rank = " << rank_ << ", Python returns = ";
-    for (int i = 0; i < ret_data.size(); ++i) {
-      std::cout << ret_data[i] << " ";
-    }
-    std::cout << "\n"; 
-  }
-  catch (const py::error_already_set& e) {
-      std::cerr << "Python error: " << e.what() << std::endl;
-  }
-
-  // END OF TEST
+  ParMesh *flow_mesh = flow_solver_->getMesh();
+  int dimension = flow_mesh->Dimension();
+  if (rank0_)
+    std::cout << "dimension = " << dimension << "\n";
+#endif
   this->solveBegin();
   double tlast = grvy_timer_elapsed_global();
 
@@ -495,9 +459,10 @@ void CycleAvgJouleCoupling::solve() {
   }
 
   this->solveEnd();
-
+#ifdef HAVE_PYTHON
   // FINALIZE PYTHON INTERPRETER
   py::finalize_interpreter();
+#endif
 }
 
 void CycleAvgJouleCoupling::solveBegin() {
@@ -563,6 +528,7 @@ void CycleAvgJouleCoupling::solveStep() {
     // interpolate the Joule heating to the flow mesh
     interpJouleHeatingFromEMToFlow();
     if (efieldFES_) interpElectricFieldFromEMToFlow();
+    if (rank0_) std::cout << "efield_ncomp_ = " << efield_ncomp_ << "\n";
   }
   // Run a step of the flow solver
   flow_solver_->solveStep();

@@ -879,6 +879,11 @@ void ReactingFlow::initializeSelf() {
   plasma_conductivity_gf_ = &sigma_gf_;
   joule_heating_gf_ = &jh_gf_;
 
+#ifdef HAVE_PYTHON
+  efield_real_gf_ = &er_gf_;
+  efield_imag_gf_ = &ei_gf_;
+#endif
+
   //-----------------------------------------------------
   // 2) Set the initial condition
   //-----------------------------------------------------
@@ -1681,6 +1686,97 @@ void ReactingFlow::step() {
       auto h_Yn = Yn_next_.HostReadWrite();
       auto h_Tn = Tn_next_.HostReadWrite();
       double *YT = new double[nActiveSpecies_ + 1];
+
+// -----------------------OBTAIN BTE RATE COEFFICIENTS HERE BEFORE CALLING IMPLICIT TIME STEPPING ----------------------------------------
+      // Get the BTE rates by calling Python solver
+     // Pass temperature as input to Python function
+      const double *dataT = Tn_.HostRead();
+      const double *dataRho = rn_.HostRead();
+      const double *dataY = Yn_.HostRead();
+    
+#ifdef HAVE_PYTHON
+      // // Wrap const pointer into NumPy array (no copy)
+      // // Dimensions given as {size}, stride as {sizeof(double)}
+      int size = Tn_.Size();
+      auto Tarr = py::array_t<double>(
+          {size},                 // shape
+          {sizeof(double)},       // stride
+          dataT                    // const double* pointer
+      );
+      Tarr.attr("flags").attr("writeable") = false; // mark read-only
+
+      // BELOW, WE GET VECTOR OF NUMBER DENSITIES FOR EACH SPECIES
+      // THIS WILL BE PASSED TO BTE
+      mfem::Vector speciesInt_(sDofInt_*nSpecies_);
+      double *species_data = speciesInt_.HostWrite();
+      int specsize = speciesInt_.Size();
+
+      double state_local[gpudata::MAXEQUATIONS];
+      double species_local[gpudata::MAXSPECIES];
+
+      for (int i = 0; i < gpudata::MAXEQUATIONS; ++i)
+        state_local[i] = 0.;
+
+      for (int i = 0; i < gpudata::MAXSPECIES; ++i)
+        species_local[i] = 0.;
+
+      for (int i = 0; i < sDofInt_; i++) {
+        state_local[0] = dataRho[i];
+        for (int asp = 0; asp < nActiveSpecies_; asp++)
+          state_local[dim_ + 2 + asp] = dataRho[i]*dataY[i+asp*sDofInt_];
+        mixture_->computeNumberDensities(state_local, species_local);
+
+        for (int sp = 0; sp < nSpecies_; sp++)
+          species_data[i + sp * sDofInt_] = AVOGADRONUMBER * species_local[sp];
+      }
+
+      const double *species_read = speciesInt_.HostRead();
+      auto specarr = py::array_t<double>(
+        {specsize},                 // shape
+        {sizeof(double)},       // stride
+        species_read                    // const double* pointer
+      );
+      // specarr.attr("flags").attr("writeable") = false; // mark read-only
+
+      if(rank0_) {
+        std::cout << "len(species_data) = " << specsize << ", sdofint_ = " << sDofInt_
+        << ", nSpecies = " << nSpecies_ << ", prod = " << sDofInt_*nSpecies_ << "\n";
+      }
+
+      // IMPORT MODULES IN PYTHON AND SET PATHS
+      py::exec(R"(
+                    import sys
+                    sys.path.insert(0, "/work2/10565/ashwathsv/frontera/tps-venv/frontera/tps-venv/tps/src")
+                )");  
+
+      py::object result;
+      try {
+        // IMPORT THE PYTHON SCRIPT
+        py::object script = py::module_::import("tps-get-bte-rates");
+        // CALL THE PYTHON FUNCTION
+        result = script.attr("bte_from_tps")(Tarr, specarr, nSpecies_);
+      } catch (const py::error_already_set &e) {
+        std::cerr << "Python error: " << e.what() << std::endl;
+      }
+  
+      // Convert "result" to an MFEM Vector
+      py::array res_array = result.cast<py::array>();
+      py::buffer_info buf = res_array.request();
+
+      if(buf.ndim != 1) {
+        throw std::runtime_error("Expected 1D array from Python");
+      }
+
+      // MFEM::Vector to store the returned Python array
+      mfem::Vector Tnew_(buf.shape[0]);
+      double *dst = Tnew_.HostWrite();
+      double *src = static_cast<double *>(buf.ptr);
+
+      for (int i = 0; i < buf.shape[0]; i++) {
+        dst[i] = src[i];
+      }
+#endif
+
       for (int i = 0; i < sDofInt_; i++) {
         // Extract point state
         for (int sp = 0; sp < nActiveSpecies_; sp++) {
@@ -2131,45 +2227,6 @@ void ReactingFlow::speciesProduction() {
 
   kfwd.SetSize(chemistry_->getNumReactions());
   keq.SetSize(chemistry_->getNumReactions());
-
-  // ---------------------------------------------------------------
-  // Get the BTE rates by calling Python solver
-  // Pass temperature as input to Python function
-  int size = Tn_.Size();
-  // Wrap const pointer into NumPy array (no copy)
-  // Dimensions given as {size}, stride as {sizeof(double)}
-  auto Tarr = py::array_t<double>(
-      {size},                 // shape
-      {sizeof(double)},       // stride
-      dataT                    // const double* pointer
-  );
-  Tarr.attr("flags").attr("writeable") = false; // mark read-only
-
-  // Print the min/max of Tn_ from C++ for each rank
-  double minT = Tn_.Min();
-  double maxT = Tn_.Max();
-
-  int rank = mfem::Mpi::WorldRank(); // Get rank in MPI_COMM_WORLD
-  if (rank0_)
-    std::cout << "[C++] Rank = " << rank << ", min(T) = " << minT << ", max(T) = " << maxT << ", size = "
-   << size << ", sDof = " << sDofInt_ << "\n"; 
-
-    // IMPORT MODULES IN PYTHON AND SET PATHS
-    py::exec(R"(
-                import sys
-                sys.path.insert(0, "/work2/10565/ashwathsv/frontera/tps-venv/frontera/tps-venv/tps/src")
-            )");  
-  // Call the Python function
-  // py::object result_obj = myscript.attr("process_temperature")(temp_arr);
-
-  try {
-    py::object script = py::module_::import("tps-get-bte-rates");
-  } catch (const py::error_already_set& e) {
-    std::cerr << "Python error: " << e.what() << std::endl;
-  }
-  
-  // PYTHON CALLS END HERE
-  // ---------------------------------------------------------------
 
   for (int i = 0; i < sDofInt_; i++) {
     // Get temperature
