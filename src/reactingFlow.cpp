@@ -208,7 +208,8 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   gasInput_.thirdOrderkElectron = true;
   gasInput_.multiply = false;
   switch (transportModel_) {
-    case ARGON_MIXTURE || NITROGEN_MIXTURE: {
+    case ARGON_MIXTURE:
+    case NITROGEN_MIXTURE: {
       if (rank0_) std::cout << " parsing mixture transport inputs... " << endl;
 
       tpsP_->getInput("plasma_models/transport_model/gas_mixture/third_order_thermal_conductivity",
@@ -263,6 +264,11 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
       } else {
         gasInput_.constantTransport.electronIndex = -1;
       }
+    } break;
+
+    default: {
+      std::cout << "Unhandled case being accessed in reactingFlow..." << endl;
+      assert(false);
     } break;
   }
 
@@ -2256,7 +2262,7 @@ void ReactingFlow::speciesSubstep(int iSpec, int iSub) {
 
   const double *dYstar = YnStar_.HostRead();
   const double *dYn = Yn_.HostRead();
-  const double *dRho = rn_.HostRead();
+  // const double *dRho = rn_.HostRead();
   double *data = tmpR0_.HostReadWrite();
   for (int i = 0; i < sDofInt_; i++) {
     // increasing Y(sp)
