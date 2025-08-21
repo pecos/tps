@@ -119,8 +119,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
         transportModel_ = CONSTANT;
       }
       break;
-    default:
-      printf("Unknown gasType.");
+    default:  // will already have exited but this is needed to make the style check happy
       assert(false);
       break;
   }
@@ -189,9 +188,9 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
       tpsP_->getRequiredInput((basepath + "/name").c_str(), atomName);
       tpsP_->getRequiredInput((basepath + "/mass").c_str(), atomMW_(a - 1));
       atomMap_[atomName] = a - 1;
-      if (rank0_) {
-        std::cout << " Atom: " << a << " is named " << atomName << " and has mass " << atomMW_(a - 1) << endl;
-      }
+      // if (rank0_) {
+      //   std::cout << " Atom: " << a << " is named " << atomName << " and has mass " << atomMW_(a - 1) << endl;
+      // }
     }
   }
   speciesNames_.resize(nSpecies_);
@@ -210,8 +209,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   switch (transportModel_) {
     case ARGON_MIXTURE:
     case NITROGEN_MIXTURE: {
-      if (rank0_) std::cout << " parsing mixture transport inputs... " << endl;
-
+      // if (rank0_) std::cout << " parsing mixture transport inputs... " << endl;
       tpsP_->getInput("plasma_models/transport_model/gas_mixture/third_order_thermal_conductivity",
                       gasInput_.thirdOrderkElectron, true);
       if (!(gasInput_.thirdOrderkElectron) && rank0_)
@@ -234,9 +232,9 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     } break;
 
     case CONSTANT: {
-      if (rank0_) {
-        std::cout << " parsing constant transport inputs... " << endl;
-      }
+      // if (rank0_) {
+      //   std::cout << " parsing constant transport inputs... " << endl;
+      // }
       tpsP_->getRequiredInput("plasma_models/transport_model/constant/viscosity",
                               gasInput_.constantTransport.viscosity);
       tpsP_->getRequiredInput("plasma_models/transport_model/constant/bulk_viscosity",
@@ -465,7 +463,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     default: {
       std::cout << "Unhandled case being accessed in reactingFlow..." << endl;
       assert(false);
-    } break;      
+    } break;
   }
 
   /// Minimal amount of info for chemistry input struct
@@ -702,7 +700,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     operator_split_ = true;
     assert(nSub_ == 1);
   }
-}
+}  // NOLINT
 
 ReactingFlow::~ReactingFlow() {
   for (unsigned int i = 0; i < vizSpecFields_.size(); i++) {
