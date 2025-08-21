@@ -1176,6 +1176,8 @@ void ReactingFlow::initializeSelf() {
         }
         AddTempDirichletBC(temperature_value, inlet_attr);
 
+        // AddSpecDirichletBC(0.0, inlet_attr);
+
       } else if (type == "interpolate") {
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
         inlet_attr = 0;
@@ -1257,12 +1259,15 @@ void ReactingFlow::initializeSelf() {
         ConstantCoefficient *Qt_bc_coeff = new ConstantCoefficient();
         Qt_bc_coeff->constant = 0.0;
         AddQtDirichletBC(Qt_bc_coeff, attr_wall);
+
+        // AddSpecDirichletBC(0.0, attr_wall);
       }
     }
     if (rank0_) std::cout << "Temp wall bc completed: " << numWalls << endl;
   }
 
   sfes_->GetEssentialTrueDofs(temp_ess_attr_, temp_ess_tdof_);
+  sfes_->GetEssentialTrueDofs(spec_ess_attr_, spec_ess_tdof_);
   sfes_->GetEssentialTrueDofs(Qt_ess_attr_, Qt_ess_tdof_);
 
   // with ic set, update Rmix
@@ -1877,6 +1882,29 @@ void ReactingFlow::step() {
         h_Tn[i] = YT[nActiveSpecies_];
       }
       delete[] YT;
+
+      if (mixtureInput_.ambipolar) {
+        // Evaluate electron mass fraction based on quasi-neutrality
+
+        // temporary storage for electron mass fraction
+        tmpR0_ = 0.0;
+
+        // Y_electron = sum_{i \in active species} (m_electron / m_i) * q_i * Y_i
+        for (int iSpecies = 0; iSpecies < nActiveSpecies_; iSpecies++) {
+          setScalarFromVector(Yn_next_, iSpecies, &tmpR0a_);
+          const double q_sp = mixture_->GetGasParams(iSpecies, GasParams::SPECIES_CHARGES);
+          const double m_sp = mixture_->GetGasParams(iSpecies, GasParams::SPECIES_MW);
+          const double fac = q_sp / m_sp;
+          tmpR0a_ *= fac;
+          tmpR0_ += tmpR0a_;
+        }
+        const int iElectron = nSpecies_ - 2;  // TODO(trevilo): check me!
+        const double m_electron = mixture_->GetGasParams(iElectron, GasParams::SPECIES_MW);
+        tmpR0_ *= m_electron;
+        setVectorFromScalar(tmpR0_, iElectron, &Yn_next_);
+      }
+      speciesLastStep();
+
     } else {
       // Evaluate (Yn_next_ - Yn_)/nSub and store in YnStar_, and analog
       // for TnStar_.
@@ -1939,6 +1967,14 @@ void ReactingFlow::step() {
 
   /// PART III: prepare for external use
   updateDensity(1.0);
+
+  if (operator_split_ && implicit_chemistry_) {
+    updateMixture();
+    updateThermoP();
+    speciesProduction();
+    heatOfFormation();
+  }
+
   computeQtTO();
 
   UpdateTimestepHistory(dt_);
@@ -2513,7 +2549,7 @@ void ReactingFlow::computeExplicitSpecConvectionOP(int iSpec, bool extrap) {
 }
 
 void ReactingFlow::initializeIO(IODataOrganizer &io) {
-  io.registerIOFamily("Temperature", "/temperature", &Tn_gf_, false);
+  io.registerIOFamily("Temperature", "/temperature", &Tn_gf_, true, true, sfec_);
   io.registerIOVar("/temperature", "temperature", 0);
 
   // TODO(trevilo): This hackery is necessary b/c we don't have access
@@ -2526,7 +2562,7 @@ void ReactingFlow::initializeIO(IODataOrganizer &io) {
   // If restarting from LTE, we don't expect to find species in the restart file
   const bool species_in_restart_file = !restart_from_lte;
 
-  io.registerIOFamily("Species", "/species", &YnFull_gf_, false, species_in_restart_file);
+  io.registerIOFamily("Species", "/species", &YnFull_gf_, true, species_in_restart_file, yfec_);
   for (int sp = 0; sp < nSpecies_; sp++) {
     std::string speciesName = std::to_string(sp);
     io.registerIOVar("/species", "Y_" + speciesName, sp, species_in_restart_file);
@@ -2939,6 +2975,16 @@ void ReactingFlow::AddTempDirichletBC(const double &temp, Array<int> &attr) {
     if (attr[i] == 1) {
       assert(!temp_ess_attr_[i]);
       temp_ess_attr_[i] = 1;
+    }
+  }
+}
+
+void ReactingFlow::AddSpecDirichletBC(const double &Y, Array<int> &attr) {
+  spec_dbcs_.emplace_back(attr, new ConstantCoefficient(Y));
+  for (int i = 0; i < attr.Size(); ++i) {
+    if (attr[i] == 1) {
+      assert(!spec_ess_attr_[i]);
+      spec_ess_attr_[i] = 1;
     }
   }
 }

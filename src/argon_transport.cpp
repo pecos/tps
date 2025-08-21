@@ -218,6 +218,7 @@ MFEM_HOST_DEVICE void ArgonMinimalTransport::ComputeFluxMolecularTransport(const
                                                                sqrt(Te / mw_[electronIndex_]) * X_sp[electronIndex_] /
                                                                (collision::charged::rep22(nondimTe) * debyeCircle);
   }
+  assert(transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] >= 0.);
 
   double binaryDiff[3 * 3];
   for (int i = 0; i < 3 * 3; i++) binaryDiff[i] = 0.0;
@@ -854,6 +855,7 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::ComputeFluxMolecularTransport(const
         viscosityFactor_ * kOverEtaFactor_ * sqrt(collInputs.Te / mw_[electronIndex_]) * X_sp[electronIndex_] /
         collisionIntegral(electronIndex_, electronIndex_, 2, 2, collInputs);
   }
+  assert(transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] >= 0.);
 
   double binaryDiff[gpudata::MAXSPECIES * gpudata::MAXSPECIES];
   // binaryDiff = 0.0;
@@ -1083,6 +1085,7 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::GetThermalConductivities(const doub
   // transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = linearAverage(X_sp, speciesHvyThrmCnd);
   // transportBuffer[FluxTrns::BULK_VISCOSITY] = 0.0;
   kappa[0] = linearAverage(X_sp, speciesHvyThrmCnd);
+  assert(kappa[0] > 0.0);
 
   if (thirdOrderkElectron_) {
     // transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY] =
@@ -1096,6 +1099,7 @@ MFEM_HOST_DEVICE void ArgonMixtureTransport::GetThermalConductivities(const doub
     kappa[1] = viscosityFactor_ * kOverEtaFactor_ * sqrt(collInputs.Te / mw_[electronIndex_]) * X_sp[electronIndex_] /
                collisionIntegral(electronIndex_, electronIndex_, 2, 2, collInputs);
   }
+  assert(kappa[1] >= 0.0);
 }
 
 void ArgonMixtureTransport::computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield,
