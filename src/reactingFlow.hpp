@@ -344,13 +344,6 @@ class ReactingFlow : public ThermoChemModelBase {
   double implicit_chemistry_atol_ = 1e-12;
   double implicit_chemistry_smin_ = 1e-12;
 
-  bool implicit_chemistry_verbose_ = false;
-  int implicit_chemistry_maxiter_ = 200;
-  double implicit_chemistry_fd_eps_ = 1e-7;
-  double implicit_chemistry_rtol_ = 1e-8;
-  double implicit_chemistry_atol_ = 1e-12;
-  double implicit_chemistry_smin_ = 1e-12;
-
   // Parameters and objects used in filter-based stabilization
   bool filter_temperature_ = false;
   int filter_cutoff_modes_ = 0;

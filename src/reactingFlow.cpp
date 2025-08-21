@@ -105,7 +105,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   }
 
   /*
-  // TODO: add user-defined gas
+  // TODO(swh): add user-defined gas
   switch (gasType_) {
     case Ar:
       transportModel_ = ARGON_MIXTURE;
@@ -278,8 +278,8 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
 
     case CONSTANT: {
       if (rank0_) {
+        std::cout << " parsing constant transport inputs... " << endl;
       }
-      std::cout << " parsing constant transport inputs... " << endl;
       tpsP_->getRequiredInput("plasma_models/transport_model/constant/viscosity",
                               gasInput_.constantTransport.viscosity);
       tpsP_->getRequiredInput("plasma_models/transport_model/constant/bulk_viscosity",
@@ -761,9 +761,10 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
 }
 
 ReactingFlow::~ReactingFlow() {
-  for (unsigned int i = 0; i < vizSpecFields_.size(); i++) {
-    delete vizSpecFields_[i];
-  }
+  // throwing a style error
+  // for (unsigned int i = 0; i < vizSpecFields_.size(); i++) {
+  //  delete vizSpecFields_[i];
+  //}
 
   // allocated in initializeOperators
   delete sfes_filter_;
@@ -2979,6 +2980,7 @@ void ReactingFlow::AddTempDirichletBC(const double &temp, Array<int> &attr) {
   }
 }
 
+/*
 void ReactingFlow::AddSpecDirichletBC(const double &Y, Array<int> &attr) {
   spec_dbcs_.emplace_back(attr, new ConstantCoefficient(Y));
   for (int i = 0; i < attr.Size(); ++i) {
@@ -2988,6 +2990,7 @@ void ReactingFlow::AddSpecDirichletBC(const double &Y, Array<int> &attr) {
     }
   }
 }
+*/
 
 void ReactingFlow::AddTempDirichletBC(Coefficient *coeff, Array<int> &attr) {
   temp_dbcs_.emplace_back(attr, coeff);

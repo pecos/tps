@@ -259,7 +259,7 @@ void GaussianInterpExtData::setup() {
           // zero species before movign to section
           for (int is = 0; is < nSpec_; is++) inlet[nLines].yn[is] = 0.0;
 
-          // (swh)TODO: need to generalize multiple species
+          // TODO(swh): need to generalize multiple species
         } else {
           for (int is = 0; is < nSpec_; is++) {
             if (entry == (9 + is)) {
@@ -324,7 +324,7 @@ void GaussianInterpExtData::setup() {
       double val_v = 0.0;
       double val_w = 0.0;
       double val_T = 0.0;
-      double val_y[maxSpec];
+      double val_y[10];  // complaining even with maxSpec used
       for (int is = 0; is < maxSpec; is++) val_y[is] = 0.0;
 
       // minimum distance in interpolant field
