@@ -265,7 +265,6 @@ MFEM_HOST_DEVICE void DryAirTransport::ComputeFluxMolecularTransport(const doubl
   }
 }
 
-
 //////////////////////////////////////////////////////
 //////// Constant transport
 //////////////////////////////////////////////////////
@@ -464,12 +463,12 @@ MFEM_HOST_DEVICE void ConstantTransport::computeMixtureAverageDiffusivity(const 
   for (int sp = 0; sp < numSpecies; sp++) {
     diffusivity[sp] = diffusivity_[sp];
   }
-  
+
 }
 
 MFEM_HOST_DEVICE void ConstantTransport::GetThermalConductivities(const double *conserved, const double *primitive,
                                                                       double *kappa) {
-  kappa = &thermalConductivity_;  
+  kappa = &thermalConductivity_;
 }
 
 MFEM_HOST_DEVICE void ConstantTransport::ComputeElectricalConductivity(const double *state, double &sigma) {

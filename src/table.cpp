@@ -86,22 +86,21 @@ MFEM_HOST_DEVICE LinearTable::LinearTable(const TableInput &input)
   xLogScale_ = input.xLogScale;
   for (int k = 0; k < Ndata_ - 1; k++) fdata_[k] = *(input.fdata + k);
   for (int k = 0; k < Ndata_ - 1; k++) xdata_[k] = *(input.xdata + k);
-  
-  //std::cout << "LinearTable... (flog?: " << fLogScale_ << " )" << Ndata_ << " " << input.Ndata << endl;
-  
+
+  // std::cout << "LinearTable... (flog?: " << fLogScale_ << " )" << Ndata_ << " " << input.Ndata << endl;
+
   for (int k = 0; k < Ndata_ - 1; k++) {
     a_[k] = (fLogScale_) ? log(fdata_[k]) : fdata_[k];
-    //std::cout << k << " fdata: " << a_[k] << " xdata: " << xdata_[k] << endl;
-    
+    // std::cout << k << " fdata: " << a_[k] << " xdata: " << xdata_[k] << endl;
+
     double df = (fLogScale_) ? (log(fdata_[k + 1]) - log(fdata_[k])) : (fdata_[k + 1] - fdata_[k]);
-    //std::cout << k << " df: " << df << endl;
-    
+    // std::cout << k << " df: " << df << endl;
+
     b_[k] = (xLogScale_) ? df / (log(xdata_[k + 1]) - log(xdata_[k])) : df / (xdata_[k + 1] - xdata_[k]);
-    //std::cout << k << " df/dx: " << b_[k] << endl;
-    
+    // std::cout << k << " df/dx: " << b_[k] << endl;
+
     a_[k] -= (xLogScale_) ? b_[k] * log(xdata_[k]) : b_[k] * xdata_[k];
-    //std::cout << k << " fdata - df/dx * xdata: " << a_[k] << endl;
-    
+    // std::cout << k << " fdata - df/dx * xdata: " << a_[k] << endl;
   }
 }
 

@@ -58,7 +58,7 @@ MFEM_HOST_DEVICE Chemistry::Chemistry(GasMixture *mixture, const ChemistryInput 
 
   for (int r = 0; r < numReactions_; r++)
     for (int p = 0; p < 3; p++) equilibriumConstantParams_[p + r * gpudata::MAXCHEMPARAMS] = 0.0;
-  
+
   for (int r = 0; r < numReactions_; r++) {
     for (int mixSp = 0; mixSp < numSpecies_; mixSp++) {
       // int inputSp = (*mixtureToInputMap_)[mixSp];

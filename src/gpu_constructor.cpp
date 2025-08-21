@@ -66,27 +66,24 @@ __global__ void instantiateDeviceConstantTransport(GasMixture *mixture, const co
                                                    void *trans) {
   trans = new (trans) ConstantTransport(mixture, inputs);
 }
-  /*  
+/*
 __global__ void instantiateDeviceArgonMinimalTransport(GasMixture *mixture, const ArgonTransportInput inputs,
-                                                       void *trans) {
-  trans = new (trans) ArgonMinimalTransport(mixture, inputs);
+                                                     void *trans) {
+trans = new (trans) ArgonMinimalTransport(mixture, inputs);
 }
 __global__ void instantiateDeviceArgonMixtureTransport(GasMixture *mixture, const ArgonTransportInput inputs,
-                                                       void *trans) {
-  trans = new (trans) ArgonMixtureTransport(mixture, inputs);
+                                                     void *trans) {
+trans = new (trans) ArgonMixtureTransport(mixture, inputs);
 }
-  */
+*/
 
-__global__ void instantiateDeviceGasMinimalTransport(GasMixture *mixture, const GasTransportInput inputs,
-                                                       void *trans) {
+__global__ void instantiateDeviceGasMinimalTransport(GasMixture *mixture, const GasTransportInput inputs, void *trans) {
   trans = new (trans) GasMinimalTransport(mixture, inputs);
 }
-__global__ void instantiateDeviceGasMixtureTransport(GasMixture *mixture, const GasTransportInput inputs,
-                                                       void *trans) {
+__global__ void instantiateDeviceGasMixtureTransport(GasMixture *mixture, const GasTransportInput inputs, void *trans) {
   trans = new (trans) GasMixtureTransport(mixture, inputs);
-}  
+}
 
-  
 __global__ void instantiateDeviceLteTransport(GasMixture *mixture, TableInput mu_table_input,
                                               TableInput kappa_table_input, TableInput sigma_table_input, void *trans) {
   trans = new (trans) LteTransport(mixture, mu_table_input, kappa_table_input, sigma_table_input);

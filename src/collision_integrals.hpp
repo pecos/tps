@@ -109,21 +109,21 @@ MFEM_HOST_DEVICE double eAr15(const double &T);
 namespace nitrogen {
 
 // atmoic nitrogen neutral (Ar) - atomic nitrogen positive ion (Ni1P)
-MFEM_HOST_DEVICE double NiNi1P11(const double &T);  
+MFEM_HOST_DEVICE double NiNi1P11(const double &T);
 MFEM_HOST_DEVICE double NiNi11(const double &T);
 MFEM_HOST_DEVICE double NiNi22(const double &T);
 
 // molecular nitrogen neutral (N2) - molecular nitrogen positive ion (N21P)
-MFEM_HOST_DEVICE double N2N21P11(const double &T);  
+MFEM_HOST_DEVICE double N2N21P11(const double &T);
 MFEM_HOST_DEVICE double N2N211(const double &T);
 MFEM_HOST_DEVICE double N2N222(const double &T);
 
 // mixed
 MFEM_HOST_DEVICE double N2Ni11(const double &T);
-MFEM_HOST_DEVICE double N2Ni22(const double &T);    
+MFEM_HOST_DEVICE double N2Ni22(const double &T);
 MFEM_HOST_DEVICE double N2Ni1P11(const double &T);
-MFEM_HOST_DEVICE double NiN21P11(const double &T);    
-  
+MFEM_HOST_DEVICE double NiN21P11(const double &T);
+
 /*
   e-Ar (l,r) are fitted over numerical quadrature of definitions.
   Q_{e,Ar}^(1), elastic momentum transfer cross section, is determined by a 7-parameter shifted MERT model,
@@ -140,8 +140,8 @@ MFEM_HOST_DEVICE double eN212(const double &T);
 MFEM_HOST_DEVICE double eN213(const double &T);
 MFEM_HOST_DEVICE double eN214(const double &T);
 MFEM_HOST_DEVICE double eN215(const double &T);
-  
+
 }  // namespace nitrogen
-  
+
 }  // namespace collision
 #endif  // COLLISION_INTEGRALS_HPP_

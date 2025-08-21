@@ -65,7 +65,7 @@ class GasMinimalTransport : public MolecularTransport {
   int neutralIndex_ = -1;
   int ionIndex2_ = -1;
   int neutralIndex2_ = -1;
-  
+
   const double kB_ = BOLTZMANNCONSTANT;
   const double eps0_ = VACUUMPERMITTIVITY;
   const double qe_ = ELECTRONCHARGE;
@@ -77,7 +77,7 @@ class GasMinimalTransport : public MolecularTransport {
   const double qeOverkB_ = qe_ / kB_;
 
   GasType gasType_;
-  
+
   // standard Chapman-Enskog coefficients
   // evaluated in ctor to avoid confusing hip about sqrt
   double viscosityFactor_;
@@ -129,16 +129,20 @@ class GasMinimalTransport : public MolecularTransport {
   MFEM_HOST_DEVICE double computeThirdOrderElectronThermalConductivity(const double *X_sp, const double debyeLength,
                                                                        const double Te, const double nondimTe);
 
-  virtual void computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield, Vector &diffusivity, bool unused);
-  MFEM_HOST_DEVICE virtual void computeMixtureAverageDiffusivity(const double *state, const double *Efield, double *diffusivity, bool unused);
-  
-  // here HERE
-  //virtual void computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield, Vector &diffusivity, bool unused); // override;   
-  //using MolecularTransport::computeMixtureAverageDiffusivity;  
-  //MFEM_HOST_DEVICE void computeMixtureAverageDiffusivity(const double *state, const double *Efield, double *diffusivity, bool unused) override;
+  virtual void computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield, Vector &diffusivity,
+                                                bool unused);
+  MFEM_HOST_DEVICE virtual void computeMixtureAverageDiffusivity(const double *state, const double *Efield,
+                                                                 double *diffusivity, bool unused);
 
-  //using TransportProperties::GetThermalConductivities;  
-  //MFEM_HOST_DEVICE void GetThermalConductivities(const double *conserved, const double *primitive, double *kappa) override;
+  // here HERE
+  // virtual void computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield, Vector &diffusivity, bool
+  // unused); // override; using MolecularTransport::computeMixtureAverageDiffusivity; MFEM_HOST_DEVICE void
+  // computeMixtureAverageDiffusivity(const double *state, const double *Efield, double *diffusivity, bool unused)
+  // override;
+
+  // using TransportProperties::GetThermalConductivities;
+  // MFEM_HOST_DEVICE void GetThermalConductivities(const double *conserved, const double *primitive, double *kappa)
+  // override;
 
   // These are used to compute third-order electron thermal conductivity based on standard Chapman--Enskog method.
   MFEM_HOST_DEVICE double L11ee(const double *Q2) { return Q2[0]; }
@@ -180,9 +184,9 @@ class GasMixtureTransport : public GasMinimalTransport {
   double bulkViscosity_;
   double thermalConductivity_;
   double electronThermalConductivity_;
-  double diffusivity_[gpudata::MAXSPECIES];  
+  double diffusivity_[gpudata::MAXSPECIES];
   double mtFreq_[gpudata::MAXSPECIES];
-  
+
   // void identifySpeciesType();
   // void identifyCollisionType();
 
@@ -211,24 +215,27 @@ class GasMixtureTransport : public GasMinimalTransport {
                                                                        const collisionInputs &collInputs);
 
   // here HERE
-  virtual void computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield, Vector &diffusivity, bool unused);
-  
-  MFEM_HOST_DEVICE virtual void computeMixtureAverageDiffusivity(const double *state, const double *Efield, double *diffusivity, bool unused);
-  
+  virtual void computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield, Vector &diffusivity,
+                                                bool unused);
+
+  MFEM_HOST_DEVICE virtual void computeMixtureAverageDiffusivity(const double *state, const double *Efield,
+                                                                 double *diffusivity, bool unused);
+
   MFEM_HOST_DEVICE void GetThermalConductivities(const double *conserved, const double *primitive, double *kappa);
-  
-  MFEM_HOST_DEVICE void ComputeElectricalConductivity(const double *state, double &sigma);  
 
-  //virtual void computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield, Vector &diffusivity, bool unused); // final; //override;
-  //using GasMinimalTransport::computeMixtureAverageDiffusivity;  
-  //MFEM_HOST_DEVICE void computeMixtureAverageDiffusivity(const double *state, const double *Efield, double *diffusivity, bool unused) final; //override;
-  
-  //using TransportProperties::GetThermalConductivities;  
-  //MFEM_HOST_DEVICE void GetThermalConductivities(const double *conserved, const double *primitive, double *kappa) override; 
+  MFEM_HOST_DEVICE void ComputeElectricalConductivity(const double *state, double &sigma);
 
-  //using TransportProperties::ComputeElectricalConductivity;  
-  //MFEM_HOST_DEVICE void ComputeElectricalConductivity(const double *state, double &sigma) override;
-  
+  // virtual void computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield, Vector &diffusivity, bool
+  // unused); // final; //override; using GasMinimalTransport::computeMixtureAverageDiffusivity; MFEM_HOST_DEVICE void
+  // computeMixtureAverageDiffusivity(const double *state, const double *Efield, double *diffusivity, bool unused)
+  // final; //override;
+
+  // using TransportProperties::GetThermalConductivities;
+  // MFEM_HOST_DEVICE void GetThermalConductivities(const double *conserved, const double *primitive, double *kappa)
+  // override;
+
+  // using TransportProperties::ComputeElectricalConductivity;
+  // MFEM_HOST_DEVICE void ComputeElectricalConductivity(const double *state, double &sigma) override;
 };
 
 #endif  // GAS_TRANSPORT_HPP_

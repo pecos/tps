@@ -44,7 +44,7 @@ const int MAXINTPOINTS = 64;  // corresponding to HEX face with p=5
 const int MAXDOFS = 216;      // corresponding to HEX with p=5
 
 const int MAXDIM = 3;
-  //const int MAXSPECIES = 6;
+// const int MAXSPECIES = 6;
 const int MAXSPECIES = 8;
 const int MAXEQUATIONS = MAXDIM + 2 + MAXSPECIES;  // momentum + two energies + species
 // NOTE: (presumably from marc) lets make sure we don't have more than 20 eq.
@@ -53,8 +53,8 @@ const int MAXEQUATIONS = MAXDIM + 2 + MAXSPECIES;  // momentum + two energies + 
 const int MAXREACTIONS = 34;
 const int MAXCHEMPARAMS = 3;
 
-//const int MAXTABLE = 512;
-const int MAXTABLE = 1000;  
+// const int MAXTABLE = 512;
+const int MAXTABLE = 1000;
 const int MAXTABLEDIM = 2;
 
 const int MAXVISUAL = 128;
@@ -74,7 +74,15 @@ enum GasType { Ar, Ni };
 // These are the type of EquationOfState.
 enum GasModel { /* PERFECT_SINGLE, */ PERFECT_MIXTURE, /* CANTERA, */ NUM_GASMODEL };
 
-enum TransportModel { ARGON_MINIMAL, ARGON_MIXTURE, CONSTANT, LTE_TRANSPORT, MIXING_LENGTH, NUM_TRANSPORTMODEL, NITROGEN_MIXTURE };
+enum TransportModel {
+  ARGON_MINIMAL,
+  ARGON_MIXTURE,
+  CONSTANT,
+  LTE_TRANSPORT,
+  MIXING_LENGTH,
+  NUM_TRANSPORTMODEL,
+  NITROGEN_MIXTURE
+};
 
 enum ChemistryModel { /* CANTERA, */ NUM_CHEMISTRYMODEL };
 
@@ -139,7 +147,7 @@ enum NitrogenColl {
   NI2_NI1P,      // Ni2 - Ni.1+ (include excited states)
   NI2_E,         // Ni2 - E (include excited states)
   NI2_NI2,       // Ni2 - Ni2 (include excited states)
-  NI2_NI,        // Ni2 - Ni (include excited states)  
+  NI2_NI,        // Ni2 - Ni (include excited states)
   NONE_NITCOLL
 };
 */
@@ -157,45 +165,45 @@ enum NitrogenSpcs {
 enum GasColl {
 
   // general
-  CLMB_ATT,      // Attractive Coulomb potential
-  CLMB_REP,      // Repulsive Coulomb potential
+  CLMB_ATT,  // Attractive Coulomb potential
+  CLMB_REP,  // Repulsive Coulomb potential
 
   // argon
-  AR_AR1P,       // Ar - Ar.1+ (include excited states)
-  AR_E,          // Ar - E (include excited states)
-  AR_AR,         // Ar - Ar (include excited states)
+  AR_AR1P,  // Ar - Ar.1+ (include excited states)
+  AR_E,     // Ar - E (include excited states)
+  AR_AR,    // Ar - Ar (include excited states)
   NONE_ARGCOLL,
-  
+
   // nitrogen ("Ni", not nickel)
-  NI_NI1P,       // Ni - Ni.1+ (include excited states)
-  NI_E,          // Ni - E (include excited states)
-  NI_NI,         // Ni - Ni (include excited states)
-  NI_N21P,       // Ni - Ni2.1+ (include excited states)  
-  N2_NI1P,       // Ni2 - Ni.1+ (include excited states)
-  N2_E,          // Ni2 - E (include excited states)
-  N2_N2,         // Ni2 - Ni2 (include excited states)
-  N2_NI,         // Ni2 - Ni (include excited states)
-  N2_N21P,       // Ni2 - Ni2.1+ (include excited states)  
+  NI_NI1P,  // Ni - Ni.1+ (include excited states)
+  NI_E,     // Ni - E (include excited states)
+  NI_NI,    // Ni - Ni (include excited states)
+  NI_N21P,  // Ni - Ni2.1+ (include excited states)
+  N2_NI1P,  // Ni2 - Ni.1+ (include excited states)
+  N2_E,     // Ni2 - E (include excited states)
+  N2_N2,    // Ni2 - Ni2 (include excited states)
+  N2_NI,    // Ni2 - Ni (include excited states)
+  N2_N21P,  // Ni2 - Ni2.1+ (include excited states)
   NONE_NITCOLL
-  
+
 };
 
 enum GasSpcs {
-  
+
   // Argon
-  AR,        // Monomer Argon neutral, including excited states
-  AR1P,      // Ar.1+, including excited states
+  AR,    // Monomer Argon neutral, including excited states
+  AR1P,  // Ar.1+, including excited states
   NONE_ARGSPCS,
 
   // Nitrogen
-  N2,        // Ni2, including excited states
-  NI,        // Monomer Nitrogen neutral, including excited states
-  NI1P,      // Ni.1+, including excited states
-  N21P,      // Ni2.1+, including excited states  
+  N2,    // Ni2, including excited states
+  NI,    // Monomer Nitrogen neutral, including excited states
+  NI1P,  // Ni.1+, including excited states
+  N21P,  // Ni2.1+, including excited states
   NONE_NITSPCS,
 
-  ELECTRON  // Electron  
-  
+  ELECTRON  // Electron
+
 };
 
 // Type of primitive variable which requires gradient evaulation for diffusion velocity.
@@ -681,18 +689,18 @@ struct LteMixtureInput {
 };
 
 // make this general, needs collisionIndex to be general
-//struct ArgonTransportInput {
+// struct ArgonTransportInput {
 struct GasTransportInput {
   int neutralIndex;
   int ionIndex;
   int neutralIndex2;
-  int ionIndex2;  
+  int ionIndex2;
   int electronIndex;
-  
+
   bool thirdOrderkElectron;
 
   // ArgonMixtureTransport
-  //ArgonColl collisionIndex[gpudata::MAXSPECIES * gpudata::MAXSPECIES];
+  // ArgonColl collisionIndex[gpudata::MAXSPECIES * gpudata::MAXSPECIES];
 
   GasColl collisionIndex[gpudata::MAXSPECIES * gpudata::MAXSPECIES];
   std::string gas;
@@ -705,15 +713,14 @@ struct GasTransportInput {
   double mobilMult;
 
   // for constant type
-  bool constantActive;  
+  bool constantActive;
   constantTransportData constantTransport;
-  //double viscosity;
-  //double bulkViscosity;
-  //double diffusivity[gpudata::MAXSPECIES];
-  //double thermalConductivity;
-  //double electronThermalConductivity;
-  //double mtFreq[gpudata::MAXSPECIES];  // momentum transfer frequency
-  
+  // double viscosity;
+  // double bulkViscosity;
+  // double diffusivity[gpudata::MAXSPECIES];
+  // double thermalConductivity;
+  // double electronThermalConductivity;
+  // double mtFreq[gpudata::MAXSPECIES];  // momentum transfer frequency
 };
 
 struct TableInput {

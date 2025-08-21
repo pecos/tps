@@ -44,12 +44,12 @@ class Tps;
 #include <fstream>
 #include <iostream>
 
-//#include "argon_transport.hpp"
-#include "gas_transport.hpp"
+// #include "argon_transport.hpp"
 #include "chemistry.hpp"
 #include "dataStructures.hpp"
 #include "dirichlet_bc_helper.hpp"
 #include "equation_of_state.hpp"
+#include "gas_transport.hpp"
 #include "gpu_constructor.hpp"
 #include "io.hpp"
 #include "mpi_groups.hpp"
@@ -90,7 +90,7 @@ class ReactingFlow : public ThermoChemModelBase {
   int yDof_, yDofInt_;
 
   WorkingFluid workFluid_;
-  GasType gasType_;  
+  GasType gasType_;
   GasModel gasModel_;
   TransportModel transportModel_;
   ChemistryModel chemistryModel_;
@@ -98,12 +98,12 @@ class ReactingFlow : public ThermoChemModelBase {
 
   // packaged inputs
   PerfectMixtureInput mixtureInput_;
-  //ArgonTransportInput argonInput_;
+  // ArgonTransportInput argonInput_;
   GasTransportInput gasInput_;
   ChemistryInput chemistryInput_;
 
   PerfectMixture *mixture_ = NULL;
-  //ArgonMixtureTransport *transport_ = NULL;
+  // ArgonMixtureTransport *transport_ = NULL;
   GasMixtureTransport *transport_ = NULL;
   Chemistry *chemistry_ = NULL;
 
@@ -209,7 +209,7 @@ class ReactingFlow : public ThermoChemModelBase {
 
   // ParGridFunction *buffer_tInlet_ = nullptr;
   GridFunctionCoefficient *temperature_bc_field_ = nullptr;
-  GridFunctionCoefficient *species_bc_field_ = nullptr;    
+  GridFunctionCoefficient *species_bc_field_ = nullptr;
 
   VectorGridFunctionCoefficient *un_next_coeff_ = nullptr;
   GridFunctionCoefficient *rhon_next_coeff_ = nullptr;
@@ -449,14 +449,14 @@ class ReactingFlow : public ThermoChemModelBase {
   void AddTempDirichletBC(const double &temp, Array<int> &attr);
   void AddTempDirichletBC(Coefficient *coeff, Array<int> &attr);
   void AddTempDirichletBC(ScalarFuncT *f, Array<int> &attr);
-  
+
   void AddQtDirichletBC(Coefficient *coeff, Array<int> &attr);
   void AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr);
 
   void AddSpecDirichletBC(const double &spec, Array<int> &attr);
   void AddSpecDirichletBC(Coefficient *coeff, Array<int> &attr);
-  void AddSpecDirichletBC(ScalarFuncT *f, Array<int> &attr);  
-  
+  void AddSpecDirichletBC(ScalarFuncT *f, Array<int> &attr);
+
   void evalSubstepNumber();
   void readTableWrapper(std::string inputPath, TableInput &result);
 };
