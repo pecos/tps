@@ -90,7 +90,8 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   chemistryModel_ = NUM_CHEMISTRYMODEL;
 
   std::string gas;
-  tpsP_->getRequiredInput("plasma_models/gas", gas);
+  // tpsP_->getRequiredInput("plasma_models/gas", gas);
+  tpsP_->getInput("plasma_models/gas", gas,std::string("argon"));
   gasInput_.gas = gas;
 
   if (gas == "Ar" || gas == "argon") {
