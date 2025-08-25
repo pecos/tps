@@ -345,10 +345,122 @@ void CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow() {
     joule_heating_flow->SetFromTrueVector();
   }
 
+  int jh_size = joule_heating_flow->Size();
+  double jh_min = joule_heating_flow->Min();
+  double jh_max = joule_heating_flow->Max();
+
+  if (rank0_) {
+    std::cout << "jhsize = " << jh_size << ", min = " << jh_min << ", max = " << jh_max << "\n";
+  }
+
 #else
   mfem_error("Cannot interpolate without GSLIB support.");
 #endif
 }
+
+#ifdef HAVE_PYTHON
+void CycleAvgJouleCoupling::interpElectricFieldFromEMToFlowforBTE() {
+  const bool verbose = rank0_;
+  if (verbose) grvy_printf(ginfo, "Interpolating Electric field to flow mesh for calling BTE from TPS.\n");
+
+  // FIRST, GET THE NUMBER OF ELECTRIC FIELD COMPONENTS
+  ParMesh *pmesh(flow_solver_->getMesh());
+  int nEfieldComps_ = 0;
+  switch (pmesh->Dimension()) {
+    case 2:
+      nEfieldComps_ = 2;
+      break;
+    case 3:
+      nEfieldComps_ = 6;
+      break;
+    default:
+      std::abort();
+  }
+  efield_ncomp_ = nEfieldComps_ / 2;
+
+#ifdef HAVE_GSLIB
+  const ParFiniteElementSpace *flow_fespace = flow_solver_->getFESpace();
+
+  // // Generate list of points where the grid function will be evaluated.
+  Vector vxyz;
+  interpolationPoints(vxyz, n_flow_interp_nodes_, flow_fespace);
+
+  // // Evaluate source grid function.
+  Vector interp_vals(n_flow_interp_nodes_ * efield_ncomp_);
+
+  const ParGridFunction *efield_real_gf = qmsa_solver_->getElectricFieldreal();
+  assert(efield_real_gf != NULL);
+
+  interp_em_to_flow_->Interpolate(vxyz, *efield_real_gf, interp_vals);
+
+  ParGridFunction *efield_real_flow = flow_solver_->getEfieldRealGF();
+  assert(efield_real_flow != nullptr);
+  if (flow_fespace->IsDGSpace()) {
+    efield_real_flow->SetFromTrueDofs(interp_vals);
+  } else {
+    Array<int> vdofs;
+    Vector elem_dof_vals;
+    int n0 = 0;
+    const int NE = flow_solver_->getMesh()->GetNE();
+    for (int i = 0; i < NE; i++) {
+      flow_fespace->GetElementDofs(i, vdofs);
+      const int nsp = flow_fespace->GetFE(i)->GetNodes().GetNPoints();
+      assert(nsp == vdofs.Size());
+      elem_dof_vals.SetSize(nsp);
+      for (int j = 0; j < nsp; j++) {
+        elem_dof_vals(j) = interp_vals(n0 + j);
+      }
+      efield_real_flow->SetSubVector(vdofs, elem_dof_vals);
+      n0 += nsp;
+    }
+    efield_real_flow->SetTrueVector();
+    efield_real_flow->SetFromTrueVector();
+  }
+  efield_real_flow->HostRead();
+
+  int ersize = efield_real_flow->Size();
+  double ermin =  efield_real_flow->Min();
+  double ermax = efield_real_flow->Max();
+
+  if (rank0_) {
+    std::cout << "ersize = " << ersize << ", min = " << ermin << ", max = " << ermax << "\n";
+  }
+
+  const ParGridFunction *efield_imag_gf = qmsa_solver_->getElectricFieldimag();
+  assert(efield_imag_gf != NULL);
+
+  interp_em_to_flow_->Interpolate(vxyz, *efield_imag_gf, interp_vals);
+
+  ParGridFunction *efield_imag_flow = flow_solver_->getEfieldImagGF();
+  assert(efield_imag_flow != nullptr);
+  if (flow_fespace->IsDGSpace()) {
+    efield_imag_flow->SetFromTrueDofs(interp_vals);
+  } else {
+    Array<int> vdofs;
+    Vector elem_dof_vals;
+    int n0 = 0;
+    const int NE = flow_solver_->getMesh()->GetNE();
+    for (int i = 0; i < NE; i++) {
+      flow_fespace->GetElementDofs(i, vdofs);
+      const int nsp = flow_fespace->GetFE(i)->GetNodes().GetNPoints();
+      assert(nsp == vdofs.Size());
+      elem_dof_vals.SetSize(nsp);
+      for (int j = 0; j < nsp; j++) {
+        elem_dof_vals(j) = interp_vals(n0 + j);
+      }
+      efield_imag_flow->SetSubVector(vdofs, elem_dof_vals);
+      n0 += nsp;
+    }
+    efield_imag_flow->SetTrueVector();
+    efield_imag_flow->SetFromTrueVector();
+  }
+  efield_imag_flow->HostRead();
+
+#else
+  mfem_error("Cannot interpolate without GSLIB support.");
+#endif
+}
+#endif
 
 void CycleAvgJouleCoupling::interpElectricFieldFromEMToFlow() {
   assert(efieldFES_);
@@ -433,11 +545,11 @@ void CycleAvgJouleCoupling::initialize() {
 void CycleAvgJouleCoupling::solve() {
 #ifdef HAVE_PYTHON
   // INITIALIZE THE PYTHON INTERPRETER BEFORE solveBegin() is called
-  py::initialize_interpreter();
-  ParMesh *flow_mesh = flow_solver_->getMesh();
-  int dimension = flow_mesh->Dimension();
-  if (rank0_)
-    std::cout << "dimension = " << dimension << "\n";
+  // py::initialize_interpreter();
+  // ParMesh *flow_mesh = flow_solver_->getMesh();
+  // int dimension = flow_mesh->Dimension();
+  // if (rank0_)
+  //   std::cout << "dimension = " << dimension << "\n";
 #endif
   this->solveBegin();
   double tlast = grvy_timer_elapsed_global();
@@ -461,11 +573,21 @@ void CycleAvgJouleCoupling::solve() {
   this->solveEnd();
 #ifdef HAVE_PYTHON
   // FINALIZE PYTHON INTERPRETER
-  py::finalize_interpreter();
+  // py::finalize_interpreter();
 #endif
 }
 
 void CycleAvgJouleCoupling::solveBegin() {
+#ifdef HAVE_PYTHON
+// Tell the EM solver to store the electric fields.
+// Electric fields are stored now irrespective of the initialization of
+// TPS-BTE interface
+  bool storeE = qmsa_solver_->getStoreE();
+  if (rank0_) std::cout << "Initially, storeE_ = " << storeE << "\n";
+  qmsa_solver_->setStoreE(true);
+  storeE = qmsa_solver_->getStoreE();
+  if (rank0_) std::cout << "Now, storeE_ = " << storeE << "\n";
+#endif
   flow_solver_->solveBegin();
   qmsa_solver_->solveBegin();
 }
@@ -527,8 +649,15 @@ void CycleAvgJouleCoupling::solveStep() {
 
     // interpolate the Joule heating to the flow mesh
     interpJouleHeatingFromEMToFlow();
+#ifdef HAVE_PYTHON
+    // Electrid field is interpolated from EM to Flow for calling BTE from TPS
+    // Interface is not used for this
+    interpElectricFieldFromEMToFlowforBTE();
+    if (rank0_) std::cout << "Now, efield_ncomp_ = " << efield_ncomp_ << "\n";
+#endif
+    // Electric field is interpolated from EM to Flow for the Interface
     if (efieldFES_) interpElectricFieldFromEMToFlow();
-    if (rank0_) std::cout << "efield_ncomp_ = " << efield_ncomp_ << "\n";
+    
   }
   // Run a step of the flow solver
   flow_solver_->solveStep();

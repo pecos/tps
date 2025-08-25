@@ -96,6 +96,9 @@ class QuasiMagnetostaticSolverBase : public TPS::Solver {
   }
 
   virtual void setStoreE(bool storeE) = 0;
+  bool getStoreE() {
+    return storeE_;
+  }
 
   virtual double elementJouleHeating(const FiniteElement &el, ElementTransformation &Tr, const Vector &elfun) = 0;
   virtual double totalJouleHeating() = 0;

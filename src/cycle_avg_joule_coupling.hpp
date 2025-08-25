@@ -109,6 +109,10 @@ class CycleAvgJouleCoupling : public TPS::Solver {
   void interpJouleHeatingFromEMToFlow();
   void interpElectricFieldFromEMToFlow();
 
+#ifdef HAVE_PYTHON
+  void interpElectricFieldFromEMToFlowforBTE();
+#endif
+
   void parseSolverOptions() override;
   void initialize() override;
   void solve() override;

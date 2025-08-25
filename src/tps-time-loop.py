@@ -31,8 +31,6 @@ config.read(ini_name)
 
 boltzmann = pytps.TabulatedSolver(comm, config)
 
-boltzmann2 = pytps.TabulatedSolver(comm, config)
-
 interface = pytps.libtps.Tps2Boltzmann(tps)
 tps.initInterface(interface)
 
@@ -50,20 +48,8 @@ while it < max_iters:
     tps.fetch(interface)
     tps.solveStep() 
 
-# BELOW IS JUST PSEUDOCODE
-    if(tps.solver_type == "cycle-avg-joule-coupled"):
-        tps.solver.EMsolver() # call EM solver through binding
-        if tps.solver.plasma_solver == "lomach":
-            # Choosing the Reacting flow option in the lomach solver
-            if tps.solver.plasma_solver.thermo_solver == "reacting-flow":
-                tps.solver.plasma_solver.reactingFlow.step() # Need further bindings for speciesProduction within this
-                # The binding for speciesProduction() calls the Boltzmann solver for the reaction rates
-            if tps.solver.plasma_solver.flow_solver == "tomboulides":
-                tps.solver.plasma_solver.tomboulides.step() # binding for flow part of lomach solver
-
-# END OF PSEUDOCODE
     it = it+1
-    pytps.master_print(comm, "it, ", it, ", alpha = ", alpha)
+    pytps.master_print(comm, "it, ", it)
 
 tps.solveEnd()
 

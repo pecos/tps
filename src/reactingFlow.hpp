@@ -322,6 +322,11 @@ class ReactingFlow : public ThermoChemModelBase {
   Vector jh_;
   Vector radiation_sink_;
 
+#ifdef HAVE_PYTHON
+  // Vectors for real and imaginary parts of electric field magnitude
+  Vector er_, ei_;
+#endif
+
   // additions for species
   Vector Yn_, Yn_next_, Ynm1_, Ynm2_;
   Vector NYn_, NYnm1_, NYnm2_;

@@ -141,6 +141,23 @@ class PlasmaSolver : public Solver {
     exit(1);
     return nullptr;
   }
+
+#ifdef HAVE_PYTHON
+  /// Fetch the Electric field (real component) grid function
+  virtual mfem::ParGridFunction *getEfieldRealGF() {
+    cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
+    exit(1);
+    return nullptr;
+  }
+  
+  /// Fetch the Electric field (real component) grid function 
+  virtual mfem::ParGridFunction *getEfieldImagGF() {
+    cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
+    exit(1);
+    return nullptr;
+  }
+#endif
+
 };
 
 }  // end namespace TPS
