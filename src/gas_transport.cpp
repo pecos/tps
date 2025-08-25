@@ -47,7 +47,7 @@ MFEM_HOST_DEVICE GasMinimalTransport::GasMinimalTransport(GasMixture *_mixture, 
   mfFreqFactor_ = 4. / 3. * AVOGADRONUMBER * sqrt(8. * kB_ / PI_);
 
   // This class is only still called from MultiPhys which only supports argon...
-  inputs.gas == std::string("argon");
+  inputs.gas = std::string("argon");
 
   // Argon
   if (inputs.gas == "Ar" || inputs.gas == "argon") {
