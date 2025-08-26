@@ -143,10 +143,8 @@ MFEM_HOST_DEVICE GasMinimalTransport::GasMinimalTransport(GasMixture *_mixture, 
   }
 
   if (!ambipolar) {
-    grvy_printf(
-        GRVY_ERROR,
-        "\nGas ternary transport currently supports ambipolar condition only. Set plasma_models/ambipolar = true.\n");
-    exit(ERROR);
+    grvy_printf(GRVY_WARN,
+         "\nGas ternary transport currently supports ambipolar condition only. Set plasma_models/ambipolar = true.\n");
   }
 
   computeEffectiveMass(mw_, muw_);
@@ -496,8 +494,8 @@ MFEM_HOST_DEVICE double GasMinimalTransport::computeThirdOrderElectronThermalCon
 /**/
 void GasMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield,
                                                            Vector &diffusivity, bool unused) {
-  // diffusivity.SetSize(3); // isnt this size wrong?
-  // diffusivity = 0.0;
+  diffusivity.SetSize(3);
+  diffusivity = 0.0;
   computeMixtureAverageDiffusivity(&state[0], &Efield[0], &diffusivity[0], unused);
 }
 
