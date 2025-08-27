@@ -143,8 +143,9 @@ MFEM_HOST_DEVICE GasMinimalTransport::GasMinimalTransport(GasMixture *_mixture, 
   }
 
   if (!ambipolar) {
-    grvy_printf(GRVY_WARN,
-         "\nGas ternary transport currently supports ambipolar condition only. Set plasma_models/ambipolar = true.\n");
+    grvy_printf(
+        GRVY_WARN,
+        "\nGas ternary transport currently supports ambipolar condition only. Set plasma_models/ambipolar = true.\n");
   }
 
   computeEffectiveMass(mw_, muw_);
@@ -928,11 +929,19 @@ MFEM_HOST_DEVICE GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, 
     // TODO(kevin): need to factor out avogadro numbers throughout all transport property.
     // multiplying/dividing big numbers are risky of losing precision.
     // mw_.SetSize(3);
-    // mw_[electronIndex_] = mixture->GetGasParams(electronIndex_, GasParams::SPECIES_MW);
-    // mw_[neutralIndex_] = mixture->GetGasParams(neutralIndex_, GasParams::SPECIES_MW);
-    // mw_[ionIndex_] = mixture->GetGasParams(ionIndex_, GasParams::SPECIES_MW);
+    mw_[electronIndex_] = mixture->GetGasParams(electronIndex_, GasParams::SPECIES_MW);
+    mw_[neutralIndex_] = mixture->GetGasParams(neutralIndex_, GasParams::SPECIES_MW);
+    mw_[ionIndex_] = mixture->GetGasParams(ionIndex_, GasParams::SPECIES_MW);
 
     // assumes input mass is consistent with this.
+    assert(abs(mw_[neutralIndex_] - mw_[electronIndex_] - mw_[ionIndex_]) < 1.0e-12);
+    for (int sp = 0; sp < numSpecies; sp++) mw_[sp] /= AVOGADRONUMBER;
+
+    // assumes input mass is consistent with this.
+    if (abs(mw_[neutralIndex_] - mw_[electronIndex_] - mw_[ionIndex_]) > 1.0e-12) {
+      std::cout << "bad input mass:" << mw_[neutralIndex_] << " " << mw_[electronIndex_] << " " << mw_[ionIndex_]
+                << " ni: " << neutralIndex_ << endl;
+    }
     assert(abs(mw_[neutralIndex_] - mw_[electronIndex_] - mw_[ionIndex_]) < 1.0e-12);
 
     // Nitrogen
