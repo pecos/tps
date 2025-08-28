@@ -45,6 +45,7 @@ MFEM_HOST_DEVICE GasMinimalTransport::GasMinimalTransport(GasMixture *_mixture, 
   kOverEtaFactor_ = 15. / 4. * kB_;
   diffusivityFactor_ = 3. / 16. * sqrt(2.0 * PI_ * kB_) / AVOGADRONUMBER;
   mfFreqFactor_ = 4. / 3. * AVOGADRONUMBER * sqrt(8. * kB_ / PI_);
+  numSpecies = _mixture->GetNumSpecies();
 
   // Argon
   if (inputs.gas == "Ar" || inputs.gas == "argon") {
@@ -885,6 +886,7 @@ MFEM_HOST_DEVICE GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, 
   neutralIndex_ = inputs.neutralIndex;
   ionIndex_ = inputs.ionIndex;
 
+  numSpecies = _mixture->GetNumSpecies();
   constantTransport_ = inputs.constantActive;
   if (constantTransport_) {
     viscosity_ = inputs.constantTransport.viscosity;
