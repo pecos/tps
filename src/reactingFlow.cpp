@@ -102,6 +102,10 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   tpsP_->getInput("loMach/reacting/eddy-Pr", Pr_, 0.72);
   tpsP_->getInput("loMach/reacting/eddy-Sc", Sc_, 1.0);
 
+#ifdef HAVE_PYTHON
+  tpsP_->getInput("cycle-avg-joule-coupled/bte-from-tps", bte_from_tps_, false);
+#endif
+
   // plasma conditions. ???
   workFluid_ = USER_DEFINED;
   gasModel_ = PERFECT_MIXTURE;
@@ -1712,119 +1716,99 @@ void ReactingFlow::step() {
       const double *dataY = Yn_.HostRead();
     
 #ifdef HAVE_PYTHON
+    if(bte_from_tps_) {
+      // // Wrap const pointer into NumPy array (no copy)
+      // // Dimensions given as {size}, stride as {sizeof(double)}
+      int size = Tn_.Size();
+      auto Tarr = py::array_t<double>(
+          {size},                 // shape
+          {sizeof(double)},       // stride
+          dataT                    // const double* pointer
+      );
+      Tarr.attr("flags").attr("writeable") = false; // mark read-only
+
+      // BELOW, WE GET VECTOR OF NUMBER DENSITIES FOR EACH SPECIES
+      // THIS WILL BE PASSED TO BTE
+      mfem::Vector speciesInt_(sDofInt_*nSpecies_);
+      double *species_data = speciesInt_.HostWrite();
+      int specsize = speciesInt_.Size();
+
+      double state_local[gpudata::MAXEQUATIONS];
+      double species_local[gpudata::MAXSPECIES];
+
+      for (int i = 0; i < gpudata::MAXEQUATIONS; ++i)
+        state_local[i] = 0.;
+
+      for (int i = 0; i < gpudata::MAXSPECIES; ++i)
+        species_local[i] = 0.;
+
+      for (int i = 0; i < sDofInt_; i++) {
+        state_local[0] = dataRho[i];
+        for (int asp = 0; asp < nActiveSpecies_; asp++)
+          state_local[dim_ + 2 + asp] = dataRho[i]*dataY[i+asp*sDofInt_];
+        mixture_->computeNumberDensities(state_local, species_local);
+
+        for (int sp = 0; sp < nSpecies_; sp++)
+          species_data[i + sp * sDofInt_] = AVOGADRONUMBER * species_local[sp];
+      }
+
+      const double *species_read = speciesInt_.HostRead();
+      auto specarr = py::array_t<double>(
+        {specsize},                 // shape
+        {sizeof(double)},       // stride
+        species_read                    // const double* pointer
+      );
+      specarr.attr("flags").attr("writeable") = false; // mark read-only
+
+      ei_gf_.GetTrueDofs(ei_);
+      er_gf_.GetTrueDofs(er_);
+
       const double *dataEr = er_.HostRead();
       const double *dataEi = ei_.HostRead();
 
       int ersize = er_.Size();
+      auto Erarr = py::array_t<double>(
+          {ersize},                 // shape
+          {sizeof(double)},       // stride
+          dataEr                    // const double* pointer
+      );
+      Erarr.attr("flags").attr("writeable") = false; // mark read-only
+
       int eisize = ei_.Size();
+      auto Eiarr = py::array_t<double>(
+          {eisize},                 // shape
+          {sizeof(double)},       // stride
+          dataEi                    // const double* pointer
+      );
+      Eiarr.attr("flags").attr("writeable") = false; // mark read-only
 
-      double erloc_min = er_.Min();
-      double erloc_max = er_.Max();
+      py::object result;
+      try {
+        // IMPORT THE PYTHON SCRIPT
+        py::object script = py::module_::import("tps-get-bte-rates");
+        // CALL THE PYTHON FUNCTION
+        result = script.attr("bte_from_tps")(Tarr, specarr, Erarr, Eiarr, nSpecies_);
+      } catch (const py::error_already_set &e) {
+        std::cerr << "ReactingFlow::step(), Python error: " << e.what() << std::endl;
+      }
+  
+      // Convert "result" to an MFEM Vector
+      py::array res_array = result.cast<py::array>();
+      py::buffer_info buf = res_array.request();
 
-      double eiloc_max = ei_.Max();
-      double eiloc_min = ei_.Min();
-
-      double jhloc_min = jh_.Min();
-      double jhloc_max = jh_.Max();
-
-      double erglo_max, erglo_min, eiglo_max, eiglo_min, jhglo_min, jhglo_max;
-
-      MPI_Allreduce(&erloc_min, &erglo_min, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
-      MPI_Allreduce(&erloc_max, &erglo_max, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
-      
-      MPI_Allreduce(&eiloc_min, &eiglo_min, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
-      MPI_Allreduce(&eiloc_max, &eiglo_max, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
-
-      MPI_Allreduce(&jhloc_min, &jhglo_min, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
-      MPI_Allreduce(&jhloc_max, &jhglo_max, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
-
-      if (rank0_) {
-        std::cout << "ersize = " << ersize << ", eisize = " << eisize << ", sdofInt_ = " << sDofInt_ << "\n";
-        std::cout << "ermin = " << erglo_min << ", ermax = " << erglo_max << ", eimin = " << eiglo_min 
-                  << ", eimax = " << eiglo_max << "\n";
-        std::cout << "jhmin = " << jhglo_min << ", jhmax = " << jhglo_max << "\n";
+      if(buf.ndim != 1) {
+        throw std::runtime_error("Expected 1D array from Python");
       }
 
-      // // Wrap const pointer into NumPy array (no copy)
-      // // Dimensions given as {size}, stride as {sizeof(double)}
-      // int size = Tn_.Size();
-      // auto Tarr = py::array_t<double>(
-      //     {size},                 // shape
-      //     {sizeof(double)},       // stride
-      //     dataT                    // const double* pointer
-      // );
-      // Tarr.attr("flags").attr("writeable") = false; // mark read-only
+      // MFEM::Vector to store the returned Python array
+      mfem::Vector Tnew_(buf.shape[0]);
+      double *dst = Tnew_.HostWrite();
+      double *src = static_cast<double *>(buf.ptr);
 
-      // // BELOW, WE GET VECTOR OF NUMBER DENSITIES FOR EACH SPECIES
-      // // THIS WILL BE PASSED TO BTE
-      // mfem::Vector speciesInt_(sDofInt_*nSpecies_);
-      // double *species_data = speciesInt_.HostWrite();
-      // int specsize = speciesInt_.Size();
-
-      // double state_local[gpudata::MAXEQUATIONS];
-      // double species_local[gpudata::MAXSPECIES];
-
-      // for (int i = 0; i < gpudata::MAXEQUATIONS; ++i)
-      //   state_local[i] = 0.;
-
-      // for (int i = 0; i < gpudata::MAXSPECIES; ++i)
-      //   species_local[i] = 0.;
-
-      // for (int i = 0; i < sDofInt_; i++) {
-      //   state_local[0] = dataRho[i];
-      //   for (int asp = 0; asp < nActiveSpecies_; asp++)
-      //     state_local[dim_ + 2 + asp] = dataRho[i]*dataY[i+asp*sDofInt_];
-      //   mixture_->computeNumberDensities(state_local, species_local);
-
-      //   for (int sp = 0; sp < nSpecies_; sp++)
-      //     species_data[i + sp * sDofInt_] = AVOGADRONUMBER * species_local[sp];
-      // }
-
-      // const double *species_read = speciesInt_.HostRead();
-      // auto specarr = py::array_t<double>(
-      //   {specsize},                 // shape
-      //   {sizeof(double)},       // stride
-      //   species_read                    // const double* pointer
-      // );
-      // // specarr.attr("flags").attr("writeable") = false; // mark read-only
-
-      // if(rank0_) {
-      //   std::cout << "len(species_data) = " << specsize << ", sdofint_ = " << sDofInt_
-      //   << ", nSpecies = " << nSpecies_ << ", prod = " << sDofInt_*nSpecies_ << "\n";
-      // }
-
-      // // IMPORT MODULES IN PYTHON AND SET PATHS
-      // py::exec(R"(
-      //               import sys
-      //               sys.path.insert(0, "/work2/10565/ashwathsv/frontera/tps-venv/frontera/tps-venv/tps/src")
-      //           )");  
-
-      // py::object result;
-      // try {
-      //   // IMPORT THE PYTHON SCRIPT
-      //   py::object script = py::module_::import("tps-get-bte-rates");
-      //   // CALL THE PYTHON FUNCTION
-      //   result = script.attr("bte_from_tps")(Tarr, specarr, nSpecies_);
-      // } catch (const py::error_already_set &e) {
-      //   std::cerr << "Python error: " << e.what() << std::endl;
-      // }
-  
-      // // Convert "result" to an MFEM Vector
-      // py::array res_array = result.cast<py::array>();
-      // py::buffer_info buf = res_array.request();
-
-      // if(buf.ndim != 1) {
-      //   throw std::runtime_error("Expected 1D array from Python");
-      // }
-
-      // // MFEM::Vector to store the returned Python array
-      // mfem::Vector Tnew_(buf.shape[0]);
-      // double *dst = Tnew_.HostWrite();
-      // double *src = static_cast<double *>(buf.ptr);
-
-      // for (int i = 0; i < buf.shape[0]; i++) {
-      //   dst[i] = src[i];
-      // }
+      for (int i = 0; i < buf.shape[0]; i++) {
+        dst[i] = src[i];
+      }
+    } 
 #endif
 
       for (int i = 0; i < sDofInt_; i++) {

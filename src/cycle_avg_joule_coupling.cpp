@@ -96,6 +96,12 @@ CycleAvgJouleCoupling::CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tp
     flow_solver_ = new M2ulPhyS(inputFileName, tps);
   } else if (plasma_solver == "lomach") {
     flow_solver_ = new LoMachSolver(tps);
+#ifdef HAVE_PYTHON
+    tps->getInput("cycle-avg-joule-coupled/bte-from-tps", bte_from_tps_, false);
+    tps->getRequiredInput("boltzmannSolver/bte-path", bte_path);
+    tps->getRequiredInput("boltzmannSolver/tps-src-path", tps_src_path);
+#endif
+
   } else {
     assert(false);
     exit(-1);
@@ -345,14 +351,6 @@ void CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow() {
     joule_heating_flow->SetFromTrueVector();
   }
 
-  int jh_size = joule_heating_flow->Size();
-  double jh_min = joule_heating_flow->Min();
-  double jh_max = joule_heating_flow->Max();
-
-  if (rank0_) {
-    std::cout << "jhsize = " << jh_size << ", min = " << jh_min << ", max = " << jh_max << "\n";
-  }
-
 #else
   mfem_error("Cannot interpolate without GSLIB support.");
 #endif
@@ -417,14 +415,6 @@ void CycleAvgJouleCoupling::interpElectricFieldFromEMToFlowforBTE() {
     efield_real_flow->SetFromTrueVector();
   }
   efield_real_flow->HostRead();
-
-  int ersize = efield_real_flow->Size();
-  double ermin =  efield_real_flow->Min();
-  double ermax = efield_real_flow->Max();
-
-  if (rank0_) {
-    std::cout << "ersize = " << ersize << ", min = " << ermin << ", max = " << ermax << "\n";
-  }
 
   const ParGridFunction *efield_imag_gf = qmsa_solver_->getElectricFieldimag();
   assert(efield_imag_gf != NULL);
@@ -543,14 +533,41 @@ void CycleAvgJouleCoupling::initialize() {
 }
 
 void CycleAvgJouleCoupling::solve() {
+
 #ifdef HAVE_PYTHON
   // INITIALIZE THE PYTHON INTERPRETER BEFORE solveBegin() is called
-  // py::initialize_interpreter();
-  // ParMesh *flow_mesh = flow_solver_->getMesh();
-  // int dimension = flow_mesh->Dimension();
-  // if (rank0_)
-  //   std::cout << "dimension = " << dimension << "\n";
+  if(bte_from_tps_) {
+    py::initialize_interpreter();
+
+    // Import the paths to TPS and BTE
+    try {
+      py::module sys  = py::module::import("sys");
+
+      // Access sys.path (a Python list)
+      py::list sys_path = sys.attr("path");
+
+      // Add the TPS src path to sys.path
+      sys_path.insert(0, tps_src_path); // Insert at the beginning of sys.path
+      sys_path.insert(0, bte_path); // Path to BTE scripts
+
+      // Verify that the paths were added
+      if(rank0_) {
+        std::cout << "Updated sys.path:" << std::endl;
+        for (auto item : sys_path) {
+          std::cout << "  " << std::string(py::str(item)) << std::endl;
+        }
+      } 
+    } catch (const py::error_already_set& e) {
+        // Catch and print Python errors
+        std::cerr << "CycleAvgJouleCoupling::solve(), Python error: " << e.what() << std::endl;
+    } catch (const std::exception& e) {
+        // Catch other C++ exceptions
+        std::cerr << "CycleAvgJouleCoupling::solve(), C++ error: " << e.what() << std::endl;
+    }
+
+  }
 #endif
+
   this->solveBegin();
   double tlast = grvy_timer_elapsed_global();
 
@@ -573,20 +590,22 @@ void CycleAvgJouleCoupling::solve() {
   this->solveEnd();
 #ifdef HAVE_PYTHON
   // FINALIZE PYTHON INTERPRETER
-  // py::finalize_interpreter();
+  if (bte_from_tps_) {
+    py::finalize_interpreter();
+  }
 #endif
 }
 
 void CycleAvgJouleCoupling::solveBegin() {
 #ifdef HAVE_PYTHON
-// Tell the EM solver to store the electric fields.
-// Electric fields are stored now irrespective of the initialization of
-// TPS-BTE interface
-  bool storeE = qmsa_solver_->getStoreE();
-  if (rank0_) std::cout << "Initially, storeE_ = " << storeE << "\n";
-  qmsa_solver_->setStoreE(true);
-  storeE = qmsa_solver_->getStoreE();
-  if (rank0_) std::cout << "Now, storeE_ = " << storeE << "\n";
+  if (bte_from_tps_) {
+  // Tell the EM solver to store the electric fields.
+  // Electric fields are stored now irrespective of the initialization of
+  // TPS-BTE interface
+    bool storeE = qmsa_solver_->getStoreE();
+    qmsa_solver_->setStoreE(true);
+    storeE = qmsa_solver_->getStoreE();
+  }
 #endif
   flow_solver_->solveBegin();
   qmsa_solver_->solveBegin();
@@ -652,8 +671,9 @@ void CycleAvgJouleCoupling::solveStep() {
 #ifdef HAVE_PYTHON
     // Electrid field is interpolated from EM to Flow for calling BTE from TPS
     // Interface is not used for this
-    interpElectricFieldFromEMToFlowforBTE();
-    if (rank0_) std::cout << "Now, efield_ncomp_ = " << efield_ncomp_ << "\n";
+    if (bte_from_tps_) {
+      interpElectricFieldFromEMToFlowforBTE();
+    }
 #endif
     // Electric field is interpolated from EM to Flow for the Interface
     if (efieldFES_) interpElectricFieldFromEMToFlow();

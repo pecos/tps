@@ -126,6 +126,10 @@ class ReactingFlow : public ThermoChemModelBase {
   bool domain_is_open_ = false;     /**< true if domain is open */
   bool axisym_ = false;             /**< true if simulation is axisymmetric */
 
+  #ifdef HAVE_PYTHON
+  bool bte_from_tps_ = false;       /**< true if the BTE solver is called from within TPS (C++ call Python) */
+  #endif
+
   // Linear-solver-related options
   int pl_solve_ = 0;    /**< Verbosity level passed to mfem solvers */
   int max_iter_;        /**< Maximum number of linear solver iterations */
