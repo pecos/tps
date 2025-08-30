@@ -674,6 +674,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     tpsP_->getInput("loMach/reactingFlow/implicit-chemistry/species-min", implicit_chemistry_smin_, 1e-12);
   }
 
+  tpsP_->getInput("loMach/reactingFlow/explicit-destruction", explicit_destruction_, false);
   tpsP_->getInput("loMach/reactingFlow/sub-steps", nSub_, 1);
   tpsP_->getInput("loMach/reactingFlow/dynamic-substep", dynamic_substepping_, false);
   if (dynamic_substepping_) nSub_ = 2;
@@ -2089,26 +2090,29 @@ void ReactingFlow::temperatureSubstep(int iSub) {
   double *data = tmpR0_.HostReadWrite();
   double *dTstar = TnStar_.HostReadWrite();
   double *dTn = Tn_.HostReadWrite();
-  for (int i = 0; i < sDofInt_; i++) {
-    // increasing T
-    if (data[i] > 0.0) {
-      // tmpR0_.Add(1.0, TnStar_);
-      // tmpR0_.Add(1.0, Tn_);
+
+  if (explicit_destruction_) {
+    for (int i = 0; i < sDofInt_; i++) {
       data[i] += dTstar[i];
       data[i] += dTn[i];
+    }
 
-      // reducing T
-    } else {
-      // tmpR0_ /= Tn_; // dtsub*Pt/rho/Cp/Tn{n+(substep)}
-      // tmpR0a_ = 1.0;
-      // tmpR0a_.Add(-1.0,tmpR0_); // 1 - dtsub*Pt/rho/Cp/Tn{n+(substep)}
-      // tmpR0b_ = Tn_;
-      // tmpR0b_ /= tmpR0a_; // Tn{n+(substep)}/(1 - dtsub*Pt/rho/Cp/Tn{n+(substep)})
-      // tmpR0b_.Add(1.0, TnStar_);  // + deltaTn*
-      // tmpR0_.Set(1.0,tmpR0b_);
+  } else {
+    for (int i = 0; i < sDofInt_; i++) {
+      // increasing T
+      if (data[i] > 0.0) {
+        data[i] += dTstar[i];
+        data[i] += dTn[i];
 
-      double tmp = 1.0 - data[i] / dTn[i];
-      data[i] = dTn[i] / tmp + dTstar[i];
+        // reducing T
+      } else {
+        double tmp = 1.0 - data[i] / dTn[i];
+        double tmp2 = data[i];
+        data[i] = 0.5 * (dTn[i] / tmp + dTstar[i]);
+        data[i] += 0.5 * tmp2;
+        data[i] += 0.5 * dTstar[i];
+        data[i] += 0.5 * dTn[i];
+      }
     }
   }
 
@@ -2267,29 +2271,29 @@ void ReactingFlow::speciesSubstep(int iSpec, int iSub) {
   const double *dYn = Yn_.HostRead();
   // const double *dRho = rn_.HostRead();
   double *data = tmpR0_.HostReadWrite();
-  for (int i = 0; i < sDofInt_; i++) {
-    // increasing Y(sp)
-    if (data[i] > 0.0) {
-      // setScalarFromVector(YnStar_, iSpec, &tmpR0a_);
-      // tmpR0_.Add(1.0, tmpR0a_);
-      // setScalarFromVector(Yn_, iSpec, &tmpR0a_);
-      // tmpR0_.Add(1.0, tmpR0a_);
+
+  if (explicit_destruction_) {
+    for (int i = 0; i < sDofInt_; i++) {
       data[i] += dYstar[i + iSpec * sDofInt_];
       data[i] += dYn[i + iSpec * sDofInt_];
+    }
 
-      // reducing Y(sp)
-    } else {
-      // setScalarFromVector(Yn_, iSpec, &tmpR0b_); // Y{n+(substep)}
-      // tmpR0_ /= tmpR0b_; // dtsub*Py/rho/Yn{n+(substep)}
-      // tmpR0a_ = 1.0;
-      // tmpR0a_.Add(-1.0,tmpR0_); // 1 - dtsub*Py/rho/Yn{n+(substep)}
-      // tmpR0b_ /= tmpR0a_; // Y{n+(substep)}/(1 - dtsub*Py/rho/Yn{n+(substep)})
-      // setScalarFromVector(YnStar_, iSpec, &tmpR0a_); // deltaY*
-      // tmpR0a_.Add(1.0, tmpR0b_);  // Y{n+(substep+1)}
-      // tmpR0_.Set(1.0,tmpR0a_);
+  } else {
+    for (int i = 0; i < sDofInt_; i++) {
+      // increasing Y(sp)
+      if (data[i] > 0.0) {
+        data[i] += dYstar[i + iSpec * sDofInt_];
+        data[i] += dYn[i + iSpec * sDofInt_];
 
-      double tmp = 1.0 - data[i] / dYn[i + iSpec * sDofInt_];
-      data[i] = dYn[i + iSpec * sDofInt_] / tmp + dYstar[i + iSpec * sDofInt_];
+        // reducing Y(sp)
+      } else {
+        double tmp = 1.0 - data[i] / dYn[i + iSpec * sDofInt_];
+        double tmp2 = data[i];
+        data[i] = 0.5 * (dYn[i + iSpec * sDofInt_] / tmp + dYstar[i + iSpec * sDofInt_]);
+        data[i] += 0.5 * tmp2;
+        data[i] += 0.5 * dYstar[i + iSpec * sDofInt_];
+        data[i] += 0.5 * dYn[i + iSpec * sDofInt_];
+      }
     }
   }
 

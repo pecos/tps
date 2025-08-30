@@ -333,6 +333,7 @@ class ReactingFlow : public ThermoChemModelBase {
   Vector TnStar_, temp_buffer_;
   bool operator_split_ = false;
   bool implicit_chemistry_ = false;
+  bool explicit_destruction_ = false;
   int nSub_;
   bool dynamic_substepping_ = true;
   double stabFrac_;
