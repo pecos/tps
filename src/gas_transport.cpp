@@ -905,8 +905,9 @@ MFEM_HOST_DEVICE GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, 
   if (inputs.gas == "Ar" || inputs.gas == "argon") {
     gasType_ = Ar;
 
-    if (numSpecies != 3) {
-      printf("\nGas:Ar ternary transport only supports ternary mixture of Ar, Ar.+1, and E !\n");
+    if (numSpecies > 6) {
+      printf("\nGas:Ar ternary transport only supports ternary mixture of Ar, Ar.+1, Ar_m, Ar_r, Ar_p, and E (%d)!\n",
+             numSpecies);
       assert(false);
     }
 
