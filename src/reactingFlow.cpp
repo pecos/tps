@@ -107,14 +107,14 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   tpsP_->getRequiredInput("plasma_models/transport_model", transportModelStr);
   switch (gasType_) {
     case Ar:
-      if (transportModelStr == "gas_mixture") {
+      if (transportModelStr == "gas_mixture" || transportModelStr == "argon_mixture") {
         transportModel_ = ARGON_MIXTURE;
       } else if (transportModelStr == "constant") {
         transportModel_ = CONSTANT;
       }
       break;
     case Ni:
-      if (transportModelStr == "gas_mixture") {
+      if (transportModelStr == "gas_mixture" || transportModelStr == "nitrogen_mixture") {
         transportModel_ = NITROGEN_MIXTURE;
       } else if (transportModelStr == "constant") {
         transportModel_ = CONSTANT;
