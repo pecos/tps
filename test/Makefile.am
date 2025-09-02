@@ -36,6 +36,7 @@ EXTRA_DIST  = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes lte-
               ref_solns/reactSingleRx/*.h5 \
               ref_solns/reactTable/*.h5 \
               ref_solns/radDecay/*.h5 \
+              ref_solns/reactNitrogen/*.h5 \
 		      vpath.sh die.sh count_gpus.sh sniff_mpirun.sh \
 		      cyl3d.gpu.test cyl3d.mflow.gpu.test wedge.gpu.test \
 	          averaging.gpu.test cyl3d.test cyl3d.gpu.python.test cyl3d.mflow.test cyl3d.dtconst.test \
