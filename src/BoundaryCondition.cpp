@@ -31,7 +31,7 @@
 // -----------------------------------------------------------------------------------el-
 #include "BoundaryCondition.hpp"
 
-BoundaryCondition::BoundaryCondition(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSystem,
+BoundaryCondition::BoundaryCondition(RiemannSolverTPS *_rsolver, GasMixture *_mixture, Equations _eqSystem,
                                      ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt,
                                      const int _dim, const int _num_equation, const int _patchNumber,
                                      const double _refLength, bool axisym)

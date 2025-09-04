@@ -105,7 +105,7 @@ __global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSyste
 
 __global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture, Equations _eqSystem,
                                          Fluxes *_fluxClass, bool _useRoe, bool axisym, void *r) {
-  r = new (r) RiemannSolver(_num_equation, _mixture, _eqSystem, _fluxClass, _useRoe, axisym);
+  r = new (r) RiemannSolverTPS(_num_equation, _mixture, _eqSystem, _fluxClass, _useRoe, axisym);
 }
 
 __global__ void instantiateDeviceChemistry(GasMixture *mixture, const ChemistryInput inputs, void *chem) {
@@ -120,7 +120,7 @@ __global__ void instantiateDeviceNetEmission(const RadiationInput inputs, void *
 // And then destructors
 //---------------------------------------------------
 __global__ void freeDeviceFluxes(Fluxes *f) { f->~Fluxes(); }
-__global__ void freeDeviceRiemann(RiemannSolver *r) { r->~RiemannSolver(); }
+__global__ void freeDeviceRiemann(RiemannSolverTPS *r) { r->~RiemannSolverTPS(); }
 __global__ void freeDeviceMixture(GasMixture *mix) { mix->~GasMixture(); }
 __global__ void freeDeviceTransport(TransportProperties *transport) { transport->~TransportProperties(); }
 __global__ void freeDeviceChemistry(Chemistry *chem) {

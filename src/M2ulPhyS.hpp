@@ -215,7 +215,7 @@ class M2ulPhyS : public TPS::PlasmaSolver {
   // DataCollection *visitColl = NULL;
 
   // Riemann Solver
-  RiemannSolver *rsolver;
+  RiemannSolverTPS *rsolver;
 
   // RHS operators
   // ParNonlinearForm *A;

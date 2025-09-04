@@ -39,7 +39,9 @@
 GasMinimalTransport::GasMinimalTransport(GasMixture *_mixture, RunConfiguration &_runfile)
     : GasMinimalTransport(_mixture, _runfile.gasTransportInput) {}
 
-MFEM_HOST_DEVICE GasMinimalTransport::GasMinimalTransport(GasMixture *_mixture, const GasTransportInput &inputs)
+// MFEM_HOST_DEVICE GasMinimalTransport::GasMinimalTransport(GasMixture *_mixture, const GasTransportInput &inputs)
+//     : MolecularTransport(_mixture) {
+GasMinimalTransport::GasMinimalTransport(GasMixture *_mixture, const GasTransportInput &inputs)
     : MolecularTransport(_mixture) {
   viscosityFactor_ = 5. / 16. * sqrt(PI_ * kB_);
   kOverEtaFactor_ = 15. / 4. * kB_;
@@ -880,7 +882,9 @@ collInputs); kappa[1] = computeThirdOrderElectronThermalConductivity(X_sp, collI
 GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, RunConfiguration &_runfile)
     : GasMixtureTransport(_mixture, _runfile.gasTransportInput) {}
 
-MFEM_HOST_DEVICE GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, const GasTransportInput &inputs)
+// MFEM_HOST_DEVICE GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, const GasTransportInput &inputs)
+//     : GasMinimalTransport(_mixture) {
+GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, const GasTransportInput &inputs)
     : GasMinimalTransport(_mixture) {
   electronIndex_ = inputs.electronIndex;
   neutralIndex_ = inputs.neutralIndex;
