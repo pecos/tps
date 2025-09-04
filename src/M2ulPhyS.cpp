@@ -3212,6 +3212,18 @@ void M2ulPhyS::parseTransportInputs() {
 
       // pack up argon transport input.
       {
+        if (config.speciesMapping.count("Ar")) {
+          config.gasTransportInput.neutralIndex = config.speciesMapping["Ar"];
+        } else {
+          grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar' !\n");
+          exit(ERROR);
+        }
+        if (config.speciesMapping.count("Ar.+1")) {
+          config.gasTransportInput.ionIndex = config.speciesMapping["Ar.+1"];
+        } else {
+          grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar.+1' !\n");
+          exit(ERROR);
+        }
         if (config.speciesMapping.count("E")) {
           config.gasTransportInput.electronIndex = config.speciesMapping["E"];
         } else {
