@@ -53,8 +53,7 @@ EXTRA_DIST  = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes lte-
               coupled-3d.interface.test plasma.axisym.test plasma.axisym.lte1d.test \
 	      lomach-flow.test lomach-lequere.test interpInlet.test sgsLoMach.test autoPeriodic.test aveLoMach.test \
               reactFlow-binDiff.test reactFlow-singleRx.test reactFlow-table.test radiativeDecay.test \
-              reactFlow-nitrogen.test
-#	 	      argon_minimal.test argon_minimal.binary.test
+              reactFlow-nitrogen.test argon_minimal.test argon_minimal.binary.test
 
 TESTS = vpath.sh
 XFAIL_TESTS =
@@ -64,6 +63,7 @@ TESTS += cyl3d.gpu.test \
 	 cyl3d.mflow.gpu.test \
 	 wedge.gpu.test \
 	 averaging.gpu.test \
+	 argon_minimal.binary.test \
 	 diffusion_wall.test \
 	 reaction.test \
 	 inflow_outflow.test \
@@ -95,6 +95,8 @@ TESTS += cyl3d.test \
 	 pipe.test \
 	 perfect_gas.test \
 	 collision_integrals.test \
+	 argon_minimal.test \
+	 argon_minimal.binary.test \
 	 diffusion_wall.test \
 	 reaction.test \
 	 inflow_outflow.test \
@@ -212,11 +214,11 @@ test_collision_LDADD          = ../src/libtps.la
 test_collision_LDADD         += $(HDF5_LIBS)
 test_collision_LDADD         += $(GRVY_LIBS)
 
-#check_PROGRAMS               += test_argon_minimal
-#test_argon_minimal_SOURCES    = test_argon_minimal.cpp
-#test_argon_minimal_LDADD      = ../src/libtps.la
-#test_argon_minimal_LDADD     += $(HDF5_LIBS)
-#test_argon_minimal_LDADD     += $(GRVY_LIBS)
+check_PROGRAMS               += test_argon_minimal
+test_argon_minimal_SOURCES    = test_argon_minimal.cpp
+test_argon_minimal_LDADD      = ../src/libtps.la
+test_argon_minimal_LDADD     += $(HDF5_LIBS)
+test_argon_minimal_LDADD     += $(GRVY_LIBS)
 
 check_PROGRAMS               += test_bdr_flux
 test_bdr_flux_SOURCES  	      = test_boundary_flux.cpp
