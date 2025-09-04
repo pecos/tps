@@ -72,10 +72,10 @@ int main (int argc, char *argv[])
   TransportProperties *transport;
   switch (srcConfig.GetTranportModel()) {
     case ARGON_MINIMAL:
-      transport = new ArgonMinimalTransport(mixture, srcConfig);
+      transport = new GasMinimalTransport(mixture, srcConfig);
       break;
     case ARGON_MIXTURE:
-      transport = new ArgonMixtureTransport(mixture, srcConfig);
+      transport = new GasMixtureTransport(mixture, srcConfig);
       break;
     default:
       printf("test_argon_minimal only supports argon transport models.\n"); fflush(stdout);
@@ -189,9 +189,9 @@ int main (int argc, char *argv[])
     }
 
     // Check if the artificial multipliers are applied correctly.
-    if (srcConfig.argonTransportInput.multiply) {
+    if (srcConfig.gasTransportInput.multiply) {
       for (int t = 0; t < FluxTrns::NUM_FLUX_TRANS; t++)
-        transportBuffer[t] /= srcConfig.argonTransportInput.fluxTrnsMultiplier[t];
+        transportBuffer[t] /= srcConfig.gasTransportInput.fluxTrnsMultiplier[t];
     }
 
     // error = max(error, abs(refValues(i,1) - transportBuffer[FluxTrns::VISCOSITY]) / refValues(i,1));
