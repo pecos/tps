@@ -1312,7 +1312,15 @@ void GradientVectorGridFunctionCoefficient::Eval(DenseMatrix &G, ElementTransfor
     // NB: In mfem/fem/coefficients.cpp, the function RefinedToCoarse is defined.  Here we reproduce it explicitly.
     //
     // ElementTransformation *coarse_T = RefinedToCoarse(*gf_mesh, T, ip, coarse_ip);
+
+#if MFEM_VERSION >= 40700
+    // mfem 4.7 and later
+    const Mesh &fine_mesh = *T.mesh;
+#else
+    // older versions
     Mesh &fine_mesh = *T.mesh;
+#endif
+
     // Get the element transformation of the coarse element containing the
     // fine element.
     int fine_element = T.ElementNo;
