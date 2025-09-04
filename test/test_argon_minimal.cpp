@@ -69,6 +69,9 @@ int main (int argc, char *argv[])
   double pressure = 101325.0;
 
   PerfectMixture *mixture = new PerfectMixture(srcConfig, dim, dim);
+
+  srcConfig.gasTransportInput.constantActive = false;
+
   TransportProperties *transport;
   switch (srcConfig.GetTranportModel()) {
     case ARGON_MINIMAL:
