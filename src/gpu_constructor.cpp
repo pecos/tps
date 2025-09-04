@@ -77,10 +77,12 @@ trans = new (trans) ArgonMixtureTransport(mixture, inputs);
 }
 */
 
-// __global__ void instantiateDeviceGasMinimalTransport(GasMixture *mixture, const GasTransportInput inputs, void *trans) {
+// __global__ void instantiateDeviceGasMinimalTransport(GasMixture *mixture, const GasTransportInput inputs,
+//   void *trans) {
 //   trans = new (trans) GasMinimalTransport(mixture, inputs);
 // }
-// __global__ void instantiateDeviceGasMixtureTransport(GasMixture *mixture, const GasTransportInput inputs, void *trans) {
+// __global__ void instantiateDeviceGasMixtureTransport(GasMixture *mixture, const GasTransportInput inputs,
+//   void *trans) {
 //   trans = new (trans) GasMixtureTransport(mixture, inputs);
 // }
 

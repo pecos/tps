@@ -123,26 +123,30 @@ void M2ulPhyS::initMixtureAndTransportModels() {
 
       switch (config.GetTranportModel()) {
         case ARGON_MINIMAL:
+          /*
 #if defined(_CUDA_) || defined(_HIP_)
           // tpsGpuMalloc((void **)&transportPtr, sizeof(ArgonMinimalTransport));
           // gpu::instantiateDeviceArgonMinimalTransport<<<1, 1>>>(d_mixture, config.gasTransportInput, transportPtr);
           tpsGpuMalloc((void **)&transportPtr, sizeof(GasMinimalTransport));
           gpu::instantiateDeviceGasMinimalTransport<<<1, 1>>>(d_mixture, config.gasTransportInput, transportPtr);
 #else
+          */
           // transportPtr = new ArgonMinimalTransport(mixture, config);
           transportPtr = new GasMinimalTransport(mixture, config);
-#endif
+          // #endif
           break;
         case ARGON_MIXTURE:
+          /*
 #if defined(_CUDA_) || defined(_HIP_)
           // tpsGpuMalloc((void **)&transportPtr, sizeof(ArgonMixtureTransport));
           // gpu::instantiateDeviceArgonMixtureTransport<<<1, 1>>>(d_mixture, config.gasTransportInput, transportPtr);
           tpsGpuMalloc((void **)&transportPtr, sizeof(GasMixtureTransport));
           gpu::instantiateDeviceGasMixtureTransport<<<1, 1>>>(d_mixture, config.gasTransportInput, transportPtr);
 #else
+          */
           // transportPtr = new ArgonMixtureTransport(mixture, config);
           transportPtr = new GasMixtureTransport(mixture, config);
-#endif
+          // #endif
           break;
         case CONSTANT:
 #if defined(_CUDA_) || defined(_HIP_)
