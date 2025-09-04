@@ -187,13 +187,6 @@ split_interface_test_LDADD    = ../src/libtps.la
 split_interface_test_LDADD   += $(HDF5_LIBS)
 split_interface_test_LDADD   += $(GRVY_LIBS)
 
-#check_PROGRAMS += tomboulides_test
-#tomboulides_test_SOURCES  = test_tomboulides.cpp
-#tomboulides_test_LDADD    = ../src/libtps.la
-#tomboulides_test_LDADD   += $(HDF5_LIBS)
-#tomboulides_test_LDADD   += $(GRVY_LIBS)
-
-
 if !GPU_ENABLED
 
 check_PROGRAMS               += perfect_mixture_test
