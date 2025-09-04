@@ -46,7 +46,7 @@ using namespace mfem;
 
 class BoundaryCondition {
  protected:
-  RiemannSolver *rsolver;
+  RiemannSolverTPS *rsolver;
   GasMixture *mixture;
   Equations eqSystem;
   ParFiniteElementSpace *vfes;
@@ -68,7 +68,7 @@ class BoundaryCondition {
   Vector face_flux_;
 
  public:
-  BoundaryCondition(RiemannSolver *_rsolver, GasMixture *_mixture, Equations _eqSystem, ParFiniteElementSpace *_vfes,
+  BoundaryCondition(RiemannSolverTPS *_rsolver, GasMixture *_mixture, Equations _eqSystem, ParFiniteElementSpace *_vfes,
                     IntegrationRules *_intRules, double &dt, const int _dim, const int _num_equation,
                     const int _patchNumber, const double _refLength, bool axisym);
   virtual ~BoundaryCondition();

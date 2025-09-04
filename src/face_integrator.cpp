@@ -33,7 +33,7 @@
 #include "face_integrator.hpp"
 
 // Implementation of class FaceIntegrator
-FaceIntegrator::FaceIntegrator(IntegrationRules *_intRules, RiemannSolver *rsolver_, Fluxes *_fluxClass,
+FaceIntegrator::FaceIntegrator(IntegrationRules *_intRules, RiemannSolverTPS *rsolver_, Fluxes *_fluxClass,
                                ParFiniteElementSpace *_vfes, bool _useLinear, const int _dim, const int _num_equation,
                                ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes, double &_max_char_speed,
                                bool axisym, ParGridFunction *distance)

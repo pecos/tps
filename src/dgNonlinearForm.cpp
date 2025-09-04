@@ -35,7 +35,7 @@
 
 #include "riemann_solver.hpp"
 
-DGNonLinearForm::DGNonLinearForm(RiemannSolver *rsolver, Fluxes *_flux, ParFiniteElementSpace *_vfes,
+DGNonLinearForm::DGNonLinearForm(RiemannSolverTPS *rsolver, Fluxes *_flux, ParFiniteElementSpace *_vfes,
                                  ParFiniteElementSpace *_gradFes, ParGridFunction *_gradUp, BCintegrator *_bcIntegrator,
                                  IntegrationRules *_intRules, const int _dim, const int _num_equation,
                                  GasMixture *_mixture, const precomputedIntegrationData &gpu_precomputed_data,
@@ -254,7 +254,7 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
   const int num_equation = num_equation_;
   const int maxIntPoints = maxIntPoints_;
 
-  const RiemannSolver *d_rsolver = rsolver_;
+  const RiemannSolverTPS *d_rsolver = rsolver_;
   Fluxes *d_flux = fluxes;
 
   // clang-format off
@@ -607,7 +607,7 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
 
   double *d_shared_flux = shared_flux.Write();
 
-  const RiemannSolver *d_rsolver = rsolver_;
+  const RiemannSolverTPS *d_rsolver = rsolver_;
   Fluxes *d_flux = fluxes;
 
   MFEM_FORALL_2D(el, maxNumElems, maxIntPoints, 1, 1, {
