@@ -100,13 +100,13 @@ class GasMinimalTransport : public MolecularTransport {
 
  public:
   GasMinimalTransport(GasMixture *_mixture, RunConfiguration &_runfile);
-  // MFEM_HOST_DEVICE GasMinimalTransport(GasMixture *_mixture, const GasTransportInput &inputs);
-  // MFEM_HOST_DEVICE GasMinimalTransport(GasMixture *_mixture);
-  // MFEM_HOST_DEVICE virtual ~GasMinimalTransport() {}
+  MFEM_HOST_DEVICE GasMinimalTransport(GasMixture *_mixture, const GasTransportInput &inputs);
+  MFEM_HOST_DEVICE GasMinimalTransport(GasMixture *_mixture);
+  MFEM_HOST_DEVICE virtual ~GasMinimalTransport() {}
 
-  GasMinimalTransport(GasMixture *_mixture, const GasTransportInput &inputs);
-  GasMinimalTransport(GasMixture *_mixture);
-  virtual ~GasMinimalTransport() {}
+  // GasMinimalTransport(GasMixture *_mixture, const GasTransportInput &inputs);
+  // GasMinimalTransport(GasMixture *_mixture);
+  // virtual ~GasMinimalTransport() {}
 
   MFEM_HOST_DEVICE double getMuw(const int &spI, const int &spJ) { return muw_[spI + spJ * numSpecies]; }
 
@@ -195,11 +195,11 @@ class GasMixtureTransport : public GasMinimalTransport {
 
  public:
   GasMixtureTransport(GasMixture *_mixture, RunConfiguration &_runfile);
-  // MFEM_HOST_DEVICE GasMixtureTransport(GasMixture *_mixture, const GasTransportInput &inputs);
-  // MFEM_HOST_DEVICE virtual ~GasMixtureTransport() {}
+  MFEM_HOST_DEVICE GasMixtureTransport(GasMixture *_mixture, const GasTransportInput &inputs);
+  MFEM_HOST_DEVICE virtual ~GasMixtureTransport() {}
 
-  GasMixtureTransport(GasMixture *_mixture, const GasTransportInput &inputs);
-  virtual ~GasMixtureTransport() {}
+  // GasMixtureTransport(GasMixture *_mixture, const GasTransportInput &inputs);
+  // virtual ~GasMixtureTransport() {}
 
   MFEM_HOST_DEVICE double collisionIntegral(const int _spI, const int _spJ, const int l, const int r,
                                             const collisionInputs collInputs);
