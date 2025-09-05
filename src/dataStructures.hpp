@@ -698,7 +698,7 @@ struct GasTransportInput {
   // ArgonColl collisionIndex[gpudata::MAXSPECIES * gpudata::MAXSPECIES];
 
   GasColl collisionIndex[gpudata::MAXSPECIES * gpudata::MAXSPECIES];
-  std::string gas;
+  GasType gas;
 
   // artificial multipliers
   bool multiply;

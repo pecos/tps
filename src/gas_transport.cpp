@@ -48,7 +48,7 @@ MFEM_HOST_DEVICE GasMinimalTransport::GasMinimalTransport(GasMixture *_mixture, 
   numSpecies = _mixture->GetNumSpecies();
 
   // Argon
-  if (inputs.gas == "Ar" || inputs.gas == "argon") {
+  if (inputs.gas == GasType::Ar) {
     gasType_ = Ar;
 
     if (numSpecies != 3) {
@@ -91,7 +91,7 @@ MFEM_HOST_DEVICE GasMinimalTransport::GasMinimalTransport(GasMixture *_mixture, 
     for (int sp = 0; sp < numSpecies; sp++) mw_[sp] /= AVOGADRONUMBER;
 
     // Nitrogen
-  } else if (inputs.gas == "Ni" || inputs.gas == "nitrogen") {
+  } else if (inputs.gas == GasType::Ni) {
     gasType_ = Ni;
 
     if (numSpecies != 8) {
@@ -141,12 +141,6 @@ MFEM_HOST_DEVICE GasMinimalTransport::GasMinimalTransport(GasMixture *_mixture, 
   } else {
     printf("Unknown gasType.");
     assert(false);
-  }
-
-  if (!ambipolar) {
-    grvy_printf(
-        GRVY_WARN,
-        "\nGas ternary transport currently supports ambipolar condition only. Set plasma_models/ambipolar = true.\n");
   }
 
   computeEffectiveMass(mw_, muw_);
@@ -350,7 +344,7 @@ MFEM_HOST_DEVICE void GasMinimalTransport::ComputeFluxMolecularTransport(const d
   binaryDiff[ionIndex_ + electronIndex_ * numSpecies] = binaryDiff[electronIndex_ + ionIndex_ * numSpecies];
 
   // TODO(swh): add more for Ni system => compiler my throw a warning...
-  double diffusivity[numSpecies], mobility[numSpecies];
+  double diffusivity[gpudata::MAXSPECIES], mobility[gpudata::MAXSPECIES];
   CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
 
   for (int sp = 0; sp < numSpecies; sp++) {
@@ -724,7 +718,7 @@ MFEM_HOST_DEVICE void GasMinimalTransport::ComputeSourceMolecularTransport(const
       mfFreqFactor_ * sqrt(Te / mw_[electronIndex_]) * n_sp[neutralIndex_] * Qea2;
 
   // TODO(swh): add mroe for Ni => compiler might throw a warning
-  double diffusivity[numSpecies], mobility[numSpecies];
+  double diffusivity[gpudata::MAXSPECIES], mobility[gpudata::MAXSPECIES];
   CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
 
   for (int sp = 0; sp < numSpecies; sp++) {
@@ -902,7 +896,7 @@ MFEM_HOST_DEVICE GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, 
   multiply_ = inputs.multiply;
 
   // Argon
-  if (inputs.gas == "Ar" || inputs.gas == "argon") {
+  if (inputs.gas == GasType::Ar) {
     gasType_ = Ar;
 
     if (numSpecies > 6) {
@@ -941,14 +935,14 @@ MFEM_HOST_DEVICE GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, 
     for (int sp = 0; sp < numSpecies; sp++) mw_[sp] /= AVOGADRONUMBER;
 
     // assumes input mass is consistent with this.
-    if (abs(mw_[neutralIndex_] - mw_[electronIndex_] - mw_[ionIndex_]) > 1.0e-12) {
-      std::cout << "bad input mass:" << mw_[neutralIndex_] << " " << mw_[electronIndex_] << " " << mw_[ionIndex_]
-                << " ni: " << neutralIndex_ << endl;
-    }
+    // if (abs(mw_[neutralIndex_] - mw_[electronIndex_] - mw_[ionIndex_]) > 1.0e-12) {
+    //   std::cout << "bad input mass:" << mw_[neutralIndex_] << " " << mw_[electronIndex_] << " " << mw_[ionIndex_]
+    //             << " ni: " << neutralIndex_ << endl;
+    // }
     assert(abs(mw_[neutralIndex_] - mw_[electronIndex_] - mw_[ionIndex_]) < 1.0e-12);
 
     // Nitrogen
-  } else if (inputs.gas == "Ni" || inputs.gas == "nitrogen") {
+  } else if (inputs.gas == GasType::Ni) {
     gasType_ = Ni;
     printf("gas mixture type nitrogen...\n");
     neutralIndex2_ = inputs.neutralIndex2;

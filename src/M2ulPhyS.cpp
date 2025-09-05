@@ -2935,9 +2935,10 @@ void M2ulPhyS::parsePlasmaModels() {
     config.initialElectronTemperature = -1;
   }
 
-  tpsP->getInput("plasma_models/gas", config.gasTransportInput.gas, std::string("argon"));
-  if (config.gasTransportInput.gas == "Ar" || config.gasTransportInput.gas == "argon") {
-    // do nothign for now, argon is assumed in minimal transport...
+  std::string gasString;
+  tpsP->getInput("plasma_models/gas", gasString, std::string("argon"));
+  if (gasString == "Ar" || gasString == "argon") {
+    config.gasTransportInput.gas = GasType::Ar;
   } else {
     printf("Unknown gasType for M2ultPhyS");
     assert(false);
