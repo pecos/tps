@@ -115,14 +115,12 @@ __global__ void instantiateDeviceConstantTransport(GasMixture *mixture, const co
 //! Instantiate ArgonMinimalTransport object on the device with placement new
 //  __global__ void instantiateDeviceArgonMinimalTransport(GasMixture *mixture, const GasTransportInput inputs,
 //                                                       void *trans);
-// __global__ void instantiateDeviceGasMinimalTransport(GasMixture *mixture, const GasTransportInput inputs, void
-// *trans);
+__global__ void instantiateDeviceGasMinimalTransport(GasMixture *mixture, const GasTransportInput inputs, void *trans);
 
 //! Instantiate ArgonMixtureTransport object on the device with placement new
 //  __global__ void instantiateDeviceArgonMixtureTransport(GasMixture *mixture, const GasTransportInput inputs,
 //                                                       void *trans);
-// __global__ void instantiateDeviceGasMixtureTransport(GasMixture *mixture, const GasTransportInput inputs, void
-// *trans);
+__global__ void instantiateDeviceGasMixtureTransport(GasMixture *mixture, const GasTransportInput inputs, void *trans);
 
 //! Instantiate ConstantTransport object on the device with placement new
 __global__ void instantiateDeviceLteTransport(GasMixture *mixture, TableInput mu_table_input,
