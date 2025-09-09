@@ -165,7 +165,7 @@ enum GasColl {
   AR_AR,         // Ar - Ar (include excited states)
   NONE_ARGCOLL,
   
-  // nitrogen
+  // nitrogen ("Ni", not nickel)
   NI_NI1P,       // Ni - Ni.1+ (include excited states)
   NI_E,          // Ni - E (include excited states)
   NI_NI,         // Ni - Ni (include excited states)

@@ -3295,24 +3295,38 @@ void ReactingFlow::identifyCollisionType(const Array<GasSpcs> &speciesType, GasC
 	  
         case Ni:
   	    if ((speciesType[spI] == N2) && (speciesType[spJ] == N2)) {
+	      
               collisionIndex[spI + spJ * nSpecies_] = N2_N2;
+	      
             } else if (((speciesType[spI] == N2) && (speciesType[spJ] == NI)) ||
                        ((speciesType[spI] == NI) && (speciesType[spJ] == N2))) {
+	      
               collisionIndex[spI + spJ * nSpecies_] = N2_NI;
+	      
             } else if (((speciesType[spI] == N2) && (speciesType[spJ] == NI1P)) ||
                        ((speciesType[spI] == NI1P) && (speciesType[spJ] == N2))) {
+	      
               collisionIndex[spI + spJ * nSpecies_] = N2_NI1P;
+	      
             } else if (((speciesType[spI] == N2) && (speciesType[spJ] == ELECTRON)) ||
                        ((speciesType[spI] == ELECTRON) && (speciesType[spJ] == N2))) {
-              collisionIndex[spI + spJ * nSpecies_] = N2_E;    	    
+	      
+              collisionIndex[spI + spJ * nSpecies_] = N2_E;
+	      
     	    } else if ((speciesType[spI] == NI) && (speciesType[spJ] == NI)) {
+	      
               collisionIndex[spI + spJ * nSpecies_] = NI_NI;
+	      
             } else if (((speciesType[spI] == NI) && (speciesType[spJ] == NI1P)) ||
                        ((speciesType[spI] == NI1P) && (speciesType[spJ] == NI))) {
+	      
               collisionIndex[spI + spJ * nSpecies_] = NI_NI1P;
+	      
             } else if (((speciesType[spI] == NI) && (speciesType[spJ] == ELECTRON)) ||
                        ((speciesType[spI] == ELECTRON) && (speciesType[spJ] == NI))) {
+	      
               collisionIndex[spI + spJ * nSpecies_] = NI_E;
+	      
             } else {
               std::string name1 = speciesNames_[spI];
               std::string name2 = speciesNames_[spJ];
