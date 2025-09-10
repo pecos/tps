@@ -56,7 +56,7 @@ GaussianInterpExtData::GaussianInterpExtData(mfem::ParMesh *pmesh, LoMachOptions
   rank_ = pmesh_->GetMyRank();
   rank0_ = (pmesh_->GetMyRank() == 0);
   order_ = loMach_opts->order;
-  nSpec_ = loMach_opts->nSpec;  
+  nSpec_ = loMach_opts->nSpec;
 
   // only allows one inlet now
   isInterpInlet_ = false;
@@ -125,17 +125,16 @@ void GaussianInterpExtData::initializeSelf() {
     yfec_ = new H1_FECollection(order_);
     yfes_ = new ParFiniteElementSpace(pmesh_, yfec_, nSpec_);
     Yn_gf_.SetSpace(yfes_);
-    Yn_gf_ = 0.0;    
-  } 
+    Yn_gf_ = 0.0;
+  }
 
   // exports
   toThermoChem_interface_.Tdata = &temperature_gf_;
   toFlow_interface_.Udata = &velocity_gf_;
 
-  if (nSpec_ > 0) {  
+  if (nSpec_ > 0) {
     toThermoChem_interface_.Ydata = &Yn_gf_;
   }
-  
 }
 
 void GaussianInterpExtData::initializeViz(ParaViewDataCollection &pvdc) {
@@ -144,7 +143,7 @@ void GaussianInterpExtData::initializeViz(ParaViewDataCollection &pvdc) {
   }
   pvdc.RegisterField("externalTemp", &temperature_gf_);
   pvdc.RegisterField("externalU", &velocity_gf_);
-  if(nSpec_ > 0) pvdc.RegisterField("externalSpecies", &Yn_gf_);  
+  if (nSpec_ > 0) pvdc.RegisterField("externalSpecies", &Yn_gf_);
 }
 
 // TODO(swh): add a translation and rotation for external data plane
@@ -162,18 +161,20 @@ void GaussianInterpExtData::setup() {
   double *Tdata = temperature_gf_.HostReadWrite();
   double *Udata = velocity_gf_.HostReadWrite();
   double *U0 = vel0_gf_.HostReadWrite();
-  double *Ydata = Yn_gf_.HostReadWrite();  
+  double *Ydata = Yn_gf_.HostReadWrite();
   double *hcoords = coordsDof.HostReadWrite();
 
   // TODO: need to generalize for more species...
   const int maxSpec = 10;
   if (nSpec_ > maxSpec) {
     if (rank0_) {
-      std::cout << "Requesting more species than set in c-standard-required compile-time limit.  Increase maxSpec in gaussianInterpExtData.cpp" << endl;
+      std::cout << "Requesting more species than set in c-standard-required compile-time limit.  Increase maxSpec in "
+                   "gaussianInterpExtData.cpp"
+                << endl;
     }
   }
   struct inlet_profile {
-    //double x, y, z, rho, temp, u, v, w;    
+    // double x, y, z, rho, temp, u, v, w;
     double x, y, z, rho, temp, u, v, w, yn[maxSpec];
   };
 
@@ -204,7 +205,7 @@ void GaussianInterpExtData::setup() {
     }
     fclose(inlet_file);
     std::cout << " final external data line count: " << nCount << endl;
-    std::cout << " expecting species number: " << nSpec_ << endl;    
+    std::cout << " expecting species number: " << nSpec_ << endl;
     fflush(stdout);
   }
 
@@ -255,16 +256,16 @@ void GaussianInterpExtData::setup() {
         } else if (entry == 8) {
           inlet[nLines].w = buffer;
 
-	  // zero species before movign to section
-	  for (int is = 0; is < nSpec_; is++) inlet[nLines].yn[is] = 0.0;
-	  
-	// (swh)TODO: need to generalize multiple species
-	} else {
-	  for (int is = 0; is < nSpec_; is++) {
-	    if (entry == (9+is)) {
-	      inlet[nLines].yn[is] = buffer;
-	    }
-	  }
+          // zero species before movign to section
+          for (int is = 0; is < nSpec_; is++) inlet[nLines].yn[is] = 0.0;
+
+          // (swh)TODO: need to generalize multiple species
+        } else {
+          for (int is = 0; is < nSpec_; is++) {
+            if (entry == (9 + is)) {
+              inlet[nLines].yn[is] = buffer;
+            }
+          }
         }
       }
       nLines++;
@@ -273,8 +274,8 @@ void GaussianInterpExtData::setup() {
   }
 
   // broadcast data
-  //MPI_Bcast(&inlet, nCount * 8, MPI_DOUBLE, 0, tpsP_->getTPSCommWorld());
-  MPI_Bcast(&inlet, nCount * (8+maxSpec), MPI_DOUBLE, 0, tpsP_->getTPSCommWorld());  
+  // MPI_Bcast(&inlet, nCount * 8, MPI_DOUBLE, 0, tpsP_->getTPSCommWorld());
+  MPI_Bcast(&inlet, nCount * (8 + maxSpec), MPI_DOUBLE, 0, tpsP_->getTPSCommWorld());
   if (rank0_) {
     std::cout << " communicated inlet data" << endl;
     fflush(stdout);
@@ -374,22 +375,21 @@ void GaussianInterpExtData::setup() {
           val_v = val_v + wt * inlet[j].v;
           val_w = val_w + wt * inlet[j].w;
           val_T = val_T + wt * inlet[j].temp;
-	  for (int is = 0; is < nSpec_; is++) {
+          for (int is = 0; is < nSpec_; is++) {
             val_y[is] = val_y[is] + wt * inlet[j].yn[is];
-	  }
+          }
         }
 
-	/*
+        /*
           // nearest
-	  if (dist <= distMin) {
+          if (dist <= distMin) {
             wt_tot = 1.0;
             val_u = inlet[j].u;
             val_v = inlet[j].v;
             val_w = inlet[j].w;
             val_T = inlet[j].temp;
-	  }
-	*/
-	
+          }
+        */
       }
 
       if (wt_tot > 0.0) {
@@ -397,19 +397,18 @@ void GaussianInterpExtData::setup() {
         Udata[n + 1 * Sdof_] = val_v / wt_tot;
         Udata[n + 2 * Sdof_] = val_w / wt_tot;
         Tdata[n] = val_T / wt_tot;
-	for (int is = 0.0; is < nSpec_; is++) {
+        for (int is = 0.0; is < nSpec_; is++) {
           Ydata[n + is * Sdof_] = val_y[is] / wt_tot;
-	}
-	
+        }
+
       } else {
         Udata[n + 0 * Sdof_] = 0.0;
         Udata[n + 1 * Sdof_] = 0.0;
         Udata[n + 2 * Sdof_] = 0.0;
         Tdata[n] = 0.0;
-	for (int is = 0.0; is < nSpec_; is++) {
+        for (int is = 0.0; is < nSpec_; is++) {
           Ydata[n + is * Sdof_] = 0.0;
-	}	
-	
+        }
       }
 
       // store initial interpolated field to ramp from

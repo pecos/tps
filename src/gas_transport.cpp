@@ -47,7 +47,7 @@ MFEM_HOST_DEVICE GasMinimalTransport::GasMinimalTransport(GasMixture *_mixture, 
   mfFreqFactor_ = 4. / 3. * AVOGADRONUMBER * sqrt(8. * kB_ / PI_);
 
   // Argon
-  if (inputs.gas=="Ar" || inputs.gas=="argon") {
+  if (inputs.gas == "Ar" || inputs.gas == "argon") {
     gasType_ = Ar;
 
     if (numSpecies != 3) {
@@ -60,7 +60,7 @@ MFEM_HOST_DEVICE GasMinimalTransport::GasMinimalTransport(GasMixture *_mixture, 
     // and then create an array of pointers to the collision functions with indexing
     // matching the binary diffusivity indexing, for each namespace in collision.
     // Would allow for generic index-based computation of all binary-diffs
-    //namespace gas = collision::argon;
+    // namespace gas = collision::argon;
 
     neutralIndex_ = inputs.neutralIndex;
     if (neutralIndex_ < 0) {
@@ -77,20 +77,20 @@ MFEM_HOST_DEVICE GasMinimalTransport::GasMinimalTransport(GasMixture *_mixture, 
       printf("\nArgon ternary transport requires the species 'E' !\n");
       assert(false);
     }
-    
-     // TODO(kevin): need to factor out avogadro numbers throughout all transport property.
-     // multiplying/dividing big numbers are risky of losing precision.
-     // mw_.SetSize(3);
-     mw_[electronIndex_] = mixture->GetGasParams(electronIndex_, GasParams::SPECIES_MW);
-     mw_[neutralIndex_] = mixture->GetGasParams(neutralIndex_, GasParams::SPECIES_MW);
-     mw_[ionIndex_] = mixture->GetGasParams(ionIndex_, GasParams::SPECIES_MW);
 
-     // assumes input mass is consistent with this.
-     assert(abs(mw_[neutralIndex_] - mw_[electronIndex_] - mw_[ionIndex_]) < 1.0e-12);
-     for (int sp = 0; sp < numSpecies; sp++) mw_[sp] /= AVOGADRONUMBER;    
+    // TODO(kevin): need to factor out avogadro numbers throughout all transport property.
+    // multiplying/dividing big numbers are risky of losing precision.
+    // mw_.SetSize(3);
+    mw_[electronIndex_] = mixture->GetGasParams(electronIndex_, GasParams::SPECIES_MW);
+    mw_[neutralIndex_] = mixture->GetGasParams(neutralIndex_, GasParams::SPECIES_MW);
+    mw_[ionIndex_] = mixture->GetGasParams(ionIndex_, GasParams::SPECIES_MW);
 
-  // Nitrogen     
-  } else if (inputs.gas=="Ni" || inputs.gas=="nitrogen") {
+    // assumes input mass is consistent with this.
+    assert(abs(mw_[neutralIndex_] - mw_[electronIndex_] - mw_[ionIndex_]) < 1.0e-12);
+    for (int sp = 0; sp < numSpecies; sp++) mw_[sp] /= AVOGADRONUMBER;
+
+    // Nitrogen
+  } else if (inputs.gas == "Ni" || inputs.gas == "nitrogen") {
     gasType_ = Ni;
 
     if (numSpecies != 8) {
@@ -98,9 +98,9 @@ MFEM_HOST_DEVICE GasMinimalTransport::GasMinimalTransport(GasMixture *_mixture, 
       assert(false);
     }
 
-    //namespace gas = collision::nitrogen;    
+    // namespace gas = collision::nitrogen;
 
-    neutralIndex_ = inputs.neutralIndex;    
+    neutralIndex_ = inputs.neutralIndex;
     if (neutralIndex_ < 0) {
       printf("\nNitrogen transport requires the species 'N2' !\n");
       assert(false);
@@ -115,7 +115,7 @@ MFEM_HOST_DEVICE GasMinimalTransport::GasMinimalTransport(GasMixture *_mixture, 
       printf("\nNitrogen transport requires the species 'E' !\n");
       assert(false);
     }
-    neutralIndex2_ = inputs.neutralIndex2;    
+    neutralIndex2_ = inputs.neutralIndex2;
     if (neutralIndex2_ < 0) {
       printf("\nNitrogen transport requires the species 'Ni' !\n");
       assert(false);
@@ -124,27 +124,30 @@ MFEM_HOST_DEVICE GasMinimalTransport::GasMinimalTransport(GasMixture *_mixture, 
     if (ionIndex2_ < 0) {
       printf("\nNitrogen transport requires the species 'Ni.+1' !\n");
       assert(false);
-    }    
-    
+    }
+
     mw_[electronIndex_] = mixture->GetGasParams(electronIndex_, GasParams::SPECIES_MW);
     mw_[neutralIndex_] = mixture->GetGasParams(neutralIndex_, GasParams::SPECIES_MW);
     mw_[ionIndex_] = mixture->GetGasParams(ionIndex_, GasParams::SPECIES_MW);
     mw_[neutralIndex2_] = mixture->GetGasParams(neutralIndex2_, GasParams::SPECIES_MW);
-    mw_[ionIndex2_] = mixture->GetGasParams(ionIndex2_, GasParams::SPECIES_MW);     
+    mw_[ionIndex2_] = mixture->GetGasParams(ionIndex2_, GasParams::SPECIES_MW);
 
     // assumes input mass is consistent with this.
     assert(abs(mw_[neutralIndex_] - mw_[electronIndex_] - mw_[ionIndex_]) < 1.0e-12);
-    assert(abs(mw_[neutralIndex2_] - mw_[electronIndex_] - mw_[ionIndex2_]) < 1.0e-12);     
-    for (int sp = 0; sp < numSpecies; sp++) mw_[sp] /= AVOGADRONUMBER;    
-    
+    assert(abs(mw_[neutralIndex2_] - mw_[electronIndex_] - mw_[ionIndex2_]) < 1.0e-12);
+    for (int sp = 0; sp < numSpecies; sp++) mw_[sp] /= AVOGADRONUMBER;
+
   } else {
-   printf("Unknown gasType.");
-   assert(false);
-  }  
-  
+    printf("Unknown gasType.");
+    assert(false);
+  }
+
   if (!ambipolar) {
-     grvy_printf(GRVY_ERROR, "\nGas ternary transport currently supports ambipolar condition only. Set plasma_models/ambipolar = true.\n"); exit(ERROR);
-   }
+    grvy_printf(
+        GRVY_ERROR,
+        "\nGas ternary transport currently supports ambipolar condition only. Set plasma_models/ambipolar = true.\n");
+    exit(ERROR);
+  }
 
   computeEffectiveMass(mw_, muw_);
   thirdOrderkElectron_ = inputs.thirdOrderkElectron;
@@ -186,7 +189,7 @@ collisionInputs GasMinimalTransport::computeCollisionInputs(const Vector &primit
 }
 
 MFEM_HOST_DEVICE collisionInputs GasMinimalTransport::computeCollisionInputs(const double *primitive,
-                                                                               const double *n_sp) {
+                                                                             const double *n_sp) {
   collisionInputs collInputs;
   collInputs.Te = (twoTemperature_) ? primitive[num_equation - 1] : primitive[nvel_ + 1];
   collInputs.Th = primitive[nvel_ + 1];
@@ -207,9 +210,8 @@ MFEM_HOST_DEVICE collisionInputs GasMinimalTransport::computeCollisionInputs(con
 }
 
 MFEM_HOST_DEVICE void GasMinimalTransport::ComputeFluxMolecularTransport(const double *state, const double *gradUp,
-                                                                           const double *Efield,
-                                                                           double *transportBuffer,
-                                                                           double *diffusionVelocity) {
+                                                                         const double *Efield, double *transportBuffer,
+                                                                         double *diffusionVelocity) {
   // transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
   for (int p = 0; p < FluxTrns::NUM_FLUX_TRANS; p++) transportBuffer[p] = 0.0;
 
@@ -238,19 +240,21 @@ MFEM_HOST_DEVICE void GasMinimalTransport::ComputeFluxMolecularTransport(const d
       viscosityFactor_ * sqrt(mw_[ionIndex_] * Th) / (collision::charged::rep22(nondimTh) * debyeCircle);
 
   switch (gasType_) {
-    case Ar: 
+    case Ar:
       speciesViscosity[neutralIndex_] = viscosityFactor_ * sqrt(mw_[neutralIndex_] * Th) / collision::argon::ArAr22(Th);
       break;
     case Ni:
-      speciesViscosity[neutralIndex_] = viscosityFactor_ * sqrt(mw_[neutralIndex_] * Th) / collision::nitrogen::NiNi22(Th);   
-      speciesViscosity[neutralIndex2_] = viscosityFactor_ * sqrt(mw_[neutralIndex2_] * Th) / collision::nitrogen::N2N222(Th);    
+      speciesViscosity[neutralIndex_] =
+          viscosityFactor_ * sqrt(mw_[neutralIndex_] * Th) / collision::nitrogen::NiNi22(Th);
+      speciesViscosity[neutralIndex2_] =
+          viscosityFactor_ * sqrt(mw_[neutralIndex2_] * Th) / collision::nitrogen::N2N222(Th);
       break;
     default:
       printf("Unknown gasType.");
       assert(false);
       break;
   }
-  
+
   speciesViscosity[electronIndex_] = 0.0;
   // speciesViscosity(0) = 5. / 16. * sqrt(PI_ * mI_ * kB_ * Th) / (collision::charged::rep22(nondimTe) * PI_ *
   // debyeLength * debyeLength);
@@ -273,7 +277,6 @@ MFEM_HOST_DEVICE void GasMinimalTransport::ComputeFluxMolecularTransport(const d
   double binaryDiff[3 * 3];
   for (int i = 0; i < 3 * 3; i++) binaryDiff[i] = 0.0;
 
-
   // from: transport_properties.cpp
   //  for (int spI = 0; spI < numSpecies; spI++) {
   //    for (int spJ = 0; spJ < numSpecies; spJ++) {
@@ -283,19 +286,21 @@ MFEM_HOST_DEVICE void GasMinimalTransport::ComputeFluxMolecularTransport(const d
   //    avgDiff[spI] = (1.0 - Y_sp[spI]) / avgDiff[spI];
   //  }
   // diffusion of i into j (or j into i): D_{ij} = binaryDiff[i + j * numSpecies]
-  
 
   switch (gasType_) {
-    case Ar: 
+    case Ar:
       binaryDiff[electronIndex_ + neutralIndex_ * numSpecies] =
-        diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / collision::argon::eAr11(Te);
+          diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / collision::argon::eAr11(Te);
       break;
     case Ni:
-      binaryDiff[electronIndex_ + neutralIndex_ * numSpecies] =
-        diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / collision::nitrogen::eNi11(Te);     
-      binaryDiff[electronIndex_ + neutralIndex2_ * numSpecies] =
-        diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex2_)) / nTotal / collision::nitrogen::eN211(Te);
-      binaryDiff[neutralIndex2_ + electronIndex_ * numSpecies] = binaryDiff[electronIndex_ + neutralIndex2_ * numSpecies];      
+      binaryDiff[electronIndex_ + neutralIndex_ * numSpecies] = diffusivityFactor_ *
+                                                                sqrt(Te / getMuw(electronIndex_, neutralIndex_)) /
+                                                                nTotal / collision::nitrogen::eNi11(Te);
+      binaryDiff[electronIndex_ + neutralIndex2_ * numSpecies] = diffusivityFactor_ *
+                                                                 sqrt(Te / getMuw(electronIndex_, neutralIndex2_)) /
+                                                                 nTotal / collision::nitrogen::eN211(Te);
+      binaryDiff[neutralIndex2_ + electronIndex_ * numSpecies] =
+          binaryDiff[electronIndex_ + neutralIndex2_ * numSpecies];
       break;
     default:
       printf("Unknown gasType.");
@@ -306,35 +311,38 @@ MFEM_HOST_DEVICE void GasMinimalTransport::ComputeFluxMolecularTransport(const d
   binaryDiff[neutralIndex_ + electronIndex_ * numSpecies] = binaryDiff[electronIndex_ + neutralIndex_ * numSpecies];
 
   switch (gasType_) {
-    case Ar: 
+    case Ar:
       binaryDiff[neutralIndex_ + ionIndex_ * numSpecies] =
-        diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
+          diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
       break;
     case Ni:
       binaryDiff[neutralIndex_ + ionIndex_ * numSpecies] =
-        diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::nitrogen::NiNi1P11(Th);
-      binaryDiff[neutralIndex2_ + ionIndex2_ * numSpecies] =
-        diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex2_, ionIndex2_)) / nTotal / collision::nitrogen::N2N21P11(Th);
-      binaryDiff[neutralIndex2_ + ionIndex_ * numSpecies] =
-        diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex2_, ionIndex_)) / nTotal / collision::nitrogen::N2Ni1P11(Th);
-      binaryDiff[neutralIndex_ + ionIndex2_ * numSpecies] =
-        diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex2_)) / nTotal / collision::nitrogen::NiN21P11(Th);      
-      
+          diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::nitrogen::NiNi1P11(Th);
+      binaryDiff[neutralIndex2_ + ionIndex2_ * numSpecies] = diffusivityFactor_ *
+                                                             sqrt(Th / getMuw(neutralIndex2_, ionIndex2_)) / nTotal /
+                                                             collision::nitrogen::N2N21P11(Th);
+      binaryDiff[neutralIndex2_ + ionIndex_ * numSpecies] = diffusivityFactor_ *
+                                                            sqrt(Th / getMuw(neutralIndex2_, ionIndex_)) / nTotal /
+                                                            collision::nitrogen::N2Ni1P11(Th);
+      binaryDiff[neutralIndex_ + ionIndex2_ * numSpecies] = diffusivityFactor_ *
+                                                            sqrt(Th / getMuw(neutralIndex_, ionIndex2_)) / nTotal /
+                                                            collision::nitrogen::NiN21P11(Th);
+
       binaryDiff[ionIndex2_ + neutralIndex_ * numSpecies] = binaryDiff[neutralIndex_ + ionIndex2_ * numSpecies];
       binaryDiff[ionIndex_ + neutralIndex2_ * numSpecies] = binaryDiff[neutralIndex2_ + ionIndex_ * numSpecies];
       binaryDiff[ionIndex2_ + neutralIndex2_ * numSpecies] = binaryDiff[neutralIndex2_ + ionIndex2_ * numSpecies];
       binaryDiff[electronIndex_ + ionIndex2_ * numSpecies] = diffusivityFactor_ *
-                                                        sqrt(Te / getMuw(ionIndex2_, electronIndex_)) / nTotal /
-                                                        (collision::charged::att11(nondimTe) * debyeCircle);
+                                                             sqrt(Te / getMuw(ionIndex2_, electronIndex_)) / nTotal /
+                                                             (collision::charged::att11(nondimTe) * debyeCircle);
       binaryDiff[ionIndex2_ + electronIndex_ * numSpecies] = binaryDiff[electronIndex_ + ionIndex2_ * numSpecies];
-      
+
       break;
     default:
       printf("Unknown gasType.");
       assert(false);
       break;
-  }  
-  
+  }
+
   binaryDiff[ionIndex_ + neutralIndex_ * numSpecies] = binaryDiff[neutralIndex_ + ionIndex_ * numSpecies];
   binaryDiff[electronIndex_ + ionIndex_ * numSpecies] = diffusivityFactor_ *
                                                         sqrt(Te / getMuw(ionIndex_, electronIndex_)) / nTotal /
@@ -395,14 +403,13 @@ MFEM_HOST_DEVICE void GasMinimalTransport::ComputeFluxMolecularTransport(const d
   // std::cout << "max diff. vel: " << charSpeed << std::endl;
 }
 
-
 MFEM_HOST_DEVICE double GasMinimalTransport::computeThirdOrderElectronThermalConductivity(const double *X_sp,
-                                                                                            const double debyeLength,
-                                                                                            const double Te,
-                                                                                            const double nondimTe) {
+                                                                                          const double debyeLength,
+                                                                                          const double Te,
+                                                                                          const double nondimTe) {
   // Q1: momentum-transfer cross-section
   // Q2: thermal-conductivity / viscosity cross-section
-  
+
   double debyeCircle = PI_ * debyeLength * debyeLength;
 
   double Q2[3];
@@ -419,11 +426,11 @@ MFEM_HOST_DEVICE double GasMinimalTransport::computeThirdOrderElectronThermalCon
   Q1Ion[4] = debyeCircle * collision::charged::att15(nondimTe);
 
   double Q1Neutral[5];
-  double Q2Neutral[5];  
+  double Q2Neutral[5];
   double L11, L12, L22;
-  
+
   switch (gasType_) {
-    case Ar: 
+    case Ar:
 
       Q1Neutral[0] = collision::argon::eAr11(Te);
       Q1Neutral[1] = collision::argon::eAr12(Te);
@@ -434,15 +441,15 @@ MFEM_HOST_DEVICE double GasMinimalTransport::computeThirdOrderElectronThermalCon
       L11 = sqrt(2.0) * X_sp[electronIndex_] * L11ee(Q2);
       L11 += X_sp[ionIndex_] * L11ea(Q1Ion);
       L11 += X_sp[neutralIndex_] * L11ea(Q1Neutral);
-  
+
       L12 = sqrt(2.0) * X_sp[electronIndex_] * L12ee(Q2);
       L12 += X_sp[ionIndex_] * L12ea(Q1Ion);
       L12 += X_sp[neutralIndex_] * L12ea(Q1Neutral);
-  
+
       L22 = sqrt(2.0) * X_sp[electronIndex_] * L22ee(Q2);
       L22 += X_sp[ionIndex_] * L22ea(Q1Ion);
       L22 += X_sp[neutralIndex_] * L22ea(Q1Neutral);
-      
+
       break;
     case Ni:
 
@@ -456,22 +463,22 @@ MFEM_HOST_DEVICE double GasMinimalTransport::computeThirdOrderElectronThermalCon
       Q2Neutral[1] = collision::nitrogen::eN212(Te);
       Q2Neutral[2] = collision::nitrogen::eN213(Te);
       Q2Neutral[3] = collision::nitrogen::eN214(Te);
-      Q2Neutral[4] = collision::nitrogen::eN215(Te);      
+      Q2Neutral[4] = collision::nitrogen::eN215(Te);
 
       L11 = sqrt(2.0) * X_sp[electronIndex_] * L11ee(Q2);
       L11 += X_sp[ionIndex_] * L11ea(Q1Ion);
       L11 += X_sp[neutralIndex_] * L11ea(Q1Neutral);
-      L11 += X_sp[neutralIndex2_] * L11ea(Q2Neutral);      
-  
+      L11 += X_sp[neutralIndex2_] * L11ea(Q2Neutral);
+
       L12 = sqrt(2.0) * X_sp[electronIndex_] * L12ee(Q2);
       L12 += X_sp[ionIndex_] * L12ea(Q1Ion);
       L12 += X_sp[neutralIndex_] * L12ea(Q1Neutral);
-      L12 += X_sp[neutralIndex2_] * L12ea(Q2Neutral);      
-  
+      L12 += X_sp[neutralIndex2_] * L12ea(Q2Neutral);
+
       L22 = sqrt(2.0) * X_sp[electronIndex_] * L22ee(Q2);
       L22 += X_sp[ionIndex_] * L22ea(Q1Ion);
       L22 += X_sp[neutralIndex_] * L22ea(Q1Neutral);
-      L22 += X_sp[neutralIndex2_] * L22ea(Q2Neutral);      
+      L22 += X_sp[neutralIndex2_] * L22ea(Q2Neutral);
 
       break;
     default:
@@ -481,22 +488,21 @@ MFEM_HOST_DEVICE double GasMinimalTransport::computeThirdOrderElectronThermalCon
   }
 
   double TOETC = viscosityFactor_ * kOverEtaFactor_ * sqrt(2.0 * Te / mw_[electronIndex_]) * X_sp[electronIndex_] /
-         (L11 - L12 * L12 / L22);
-  
-  return TOETC;
+                 (L11 - L12 * L12 / L22);
 
+  return TOETC;
 }
 
 /**/
 void GasMinimalTransport::computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield,
-                                                             Vector &diffusivity, bool unused) {
-  //diffusivity.SetSize(3); // isnt this size wrong?
-  //diffusivity = 0.0;
+                                                           Vector &diffusivity, bool unused) {
+  // diffusivity.SetSize(3); // isnt this size wrong?
+  // diffusivity = 0.0;
   computeMixtureAverageDiffusivity(&state[0], &Efield[0], &diffusivity[0], unused);
 }
 
 MFEM_HOST_DEVICE void GasMinimalTransport::computeMixtureAverageDiffusivity(const double *state, const double *Efield,
-                                                                              double *diffusivity, bool unused) {
+                                                                            double *diffusivity, bool unused) {
   double primitiveState[gpudata::MAXEQUATIONS];
   mixture->GetPrimitivesFromConservatives(state, primitiveState);
 
@@ -520,57 +526,63 @@ MFEM_HOST_DEVICE void GasMinimalTransport::computeMixtureAverageDiffusivity(cons
   for (int i = 0; i < 3 * 3; i++) binaryDiff[i] = 0.0;
 
   switch (gasType_) {
-    case Ar: 
+    case Ar:
       binaryDiff[electronIndex_ + neutralIndex_ * numSpecies] =
-        diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / collision::argon::eAr11(Te);
+          diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / collision::argon::eAr11(Te);
       break;
     case Ni:
-      binaryDiff[electronIndex_ + neutralIndex_ * numSpecies] =
-        diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / collision::nitrogen::eNi11(Te);
-      binaryDiff[electronIndex_ + neutralIndex2_ * numSpecies] =
-        diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex2_)) / nTotal / collision::nitrogen::eN211(Te);
+      binaryDiff[electronIndex_ + neutralIndex_ * numSpecies] = diffusivityFactor_ *
+                                                                sqrt(Te / getMuw(electronIndex_, neutralIndex_)) /
+                                                                nTotal / collision::nitrogen::eNi11(Te);
+      binaryDiff[electronIndex_ + neutralIndex2_ * numSpecies] = diffusivityFactor_ *
+                                                                 sqrt(Te / getMuw(electronIndex_, neutralIndex2_)) /
+                                                                 nTotal / collision::nitrogen::eN211(Te);
 
-      binaryDiff[neutralIndex2_ + electronIndex_ * numSpecies] = binaryDiff[electronIndex_ + neutralIndex2_ * numSpecies];
-      
+      binaryDiff[neutralIndex2_ + electronIndex_ * numSpecies] =
+          binaryDiff[electronIndex_ + neutralIndex2_ * numSpecies];
+
       break;
     default:
       printf("Unknown gasType.");
       assert(false);
       break;
-  }  
-  
+  }
+
   binaryDiff[neutralIndex_ + electronIndex_ * numSpecies] = binaryDiff[electronIndex_ + neutralIndex_ * numSpecies];
 
   switch (gasType_) {
-    case Ar: 
+    case Ar:
       binaryDiff[neutralIndex_ + ionIndex_ * numSpecies] =
-        diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
+          diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
       break;
     case Ni:
       binaryDiff[neutralIndex_ + ionIndex_ * numSpecies] =
-        diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::nitrogen::NiNi1P11(Th);
-      binaryDiff[neutralIndex2_ + ionIndex2_ * numSpecies] =
-        diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex2_, ionIndex2_)) / nTotal / collision::nitrogen::N2N21P11(Th);
-      binaryDiff[neutralIndex_ + ionIndex2_ * numSpecies] =
-        diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex2_)) / nTotal / collision::nitrogen::NiN21P11(Th);
-      binaryDiff[neutralIndex2_ + ionIndex_ * numSpecies] =
-        diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex2_)) / nTotal / collision::nitrogen::N2Ni1P11(Th);
+          diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::nitrogen::NiNi1P11(Th);
+      binaryDiff[neutralIndex2_ + ionIndex2_ * numSpecies] = diffusivityFactor_ *
+                                                             sqrt(Th / getMuw(neutralIndex2_, ionIndex2_)) / nTotal /
+                                                             collision::nitrogen::N2N21P11(Th);
+      binaryDiff[neutralIndex_ + ionIndex2_ * numSpecies] = diffusivityFactor_ *
+                                                            sqrt(Th / getMuw(neutralIndex_, ionIndex2_)) / nTotal /
+                                                            collision::nitrogen::NiN21P11(Th);
+      binaryDiff[neutralIndex2_ + ionIndex_ * numSpecies] = diffusivityFactor_ *
+                                                            sqrt(Th / getMuw(neutralIndex_, ionIndex2_)) / nTotal /
+                                                            collision::nitrogen::N2Ni1P11(Th);
 
       binaryDiff[ionIndex2_ + neutralIndex2_ * numSpecies] = binaryDiff[neutralIndex2_ + ionIndex2_ * numSpecies];
       binaryDiff[ionIndex_ + neutralIndex2_ * numSpecies] = binaryDiff[neutralIndex2_ + ionIndex_ * numSpecies];
-      binaryDiff[ionIndex2_ + neutralIndex_ * numSpecies] = binaryDiff[neutralIndex_ + ionIndex2_ * numSpecies];  
+      binaryDiff[ionIndex2_ + neutralIndex_ * numSpecies] = binaryDiff[neutralIndex_ + ionIndex2_ * numSpecies];
       binaryDiff[electronIndex_ + ionIndex2_ * numSpecies] = diffusivityFactor_ *
-                                                        sqrt(Te / getMuw(ionIndex2_, electronIndex_)) / nTotal /
-                                                        (collision::charged::att11(nondimTe) * debyeCircle);
+                                                             sqrt(Te / getMuw(ionIndex2_, electronIndex_)) / nTotal /
+                                                             (collision::charged::att11(nondimTe) * debyeCircle);
       binaryDiff[ionIndex2_ + electronIndex_ * numSpecies] = binaryDiff[electronIndex_ + ionIndex2_ * numSpecies];
-      
+
       break;
     default:
       printf("Unknown gasType.");
       assert(false);
       break;
-  }  
-  
+  }
+
   binaryDiff[ionIndex_ + neutralIndex_ * numSpecies] = binaryDiff[neutralIndex_ + ionIndex_ * numSpecies];
   binaryDiff[electronIndex_ + ionIndex_ * numSpecies] = diffusivityFactor_ *
                                                         sqrt(Te / getMuw(ionIndex_, electronIndex_)) / nTotal /
@@ -584,10 +596,10 @@ MFEM_HOST_DEVICE void GasMinimalTransport::computeMixtureAverageDiffusivity(cons
 /**/
 
 MFEM_HOST_DEVICE void GasMinimalTransport::ComputeSourceMolecularTransport(const double *state, const double *Up,
-                                                                             const double *gradUp, const double *Efield,
-                                                                             double *globalTransport,
-                                                                             double *speciesTransport,
-                                                                             double *diffusionVelocity, double *n_sp) {
+                                                                           const double *gradUp, const double *Efield,
+                                                                           double *globalTransport,
+                                                                           double *speciesTransport,
+                                                                           double *diffusionVelocity, double *n_sp) {
   for (int p = 0; p < SrcTrns::NUM_SRC_TRANS; p++) globalTransport[p] = 0.0;
   for (int p = 0; p < SpeciesTrns::NUM_SPECIES_COEFFS; p++)
     for (int sp = 0; sp < numSpecies; sp++) speciesTransport[sp + p * numSpecies] = 0.0;
@@ -612,18 +624,18 @@ MFEM_HOST_DEVICE void GasMinimalTransport::ComputeSourceMolecularTransport(const
   double Qea, Qea2;
 
   switch (gasType_) {
-    case Ar: 
+    case Ar:
       Qea = collision::argon::eAr11(Te);
       break;
     case Ni:
-      Qea = collision::nitrogen::eNi11(Te);    
+      Qea = collision::nitrogen::eNi11(Te);
       Qea2 = collision::nitrogen::eN211(Te);
       break;
     default:
       printf("Unknown gasType.");
       assert(false);
       break;
-  }  
+  }
 
   // double Qai = collision::gas::ArAr1P11(Th);
   double Qie = collision::charged::att11(nondimTe) * debyeCircle;
@@ -632,62 +644,68 @@ MFEM_HOST_DEVICE void GasMinimalTransport::ComputeSourceMolecularTransport(const
   for (int i = 0; i < 3 * 3; i++) binaryDiff[i] = 0.0;
 
   switch (gasType_) {
-    case Ar: 
+    case Ar:
       binaryDiff[electronIndex_ + neutralIndex_ * numSpecies] =
-        diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / collision::argon::eAr11(Te);
+          diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / collision::argon::eAr11(Te);
       break;
     case Ni:
-      binaryDiff[electronIndex_ + neutralIndex_ * numSpecies] =
-        diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex_)) / nTotal / collision::nitrogen::eNi11(Te);
-      binaryDiff[electronIndex_ + neutralIndex2_ * numSpecies] =
-        diffusivityFactor_ * sqrt(Te / getMuw(electronIndex_, neutralIndex2_)) / nTotal / collision::nitrogen::eN211(Te);
-      
-      binaryDiff[neutralIndex2_ + electronIndex_ * numSpecies] = binaryDiff[electronIndex_ + neutralIndex2_ * numSpecies];      
+      binaryDiff[electronIndex_ + neutralIndex_ * numSpecies] = diffusivityFactor_ *
+                                                                sqrt(Te / getMuw(electronIndex_, neutralIndex_)) /
+                                                                nTotal / collision::nitrogen::eNi11(Te);
+      binaryDiff[electronIndex_ + neutralIndex2_ * numSpecies] = diffusivityFactor_ *
+                                                                 sqrt(Te / getMuw(electronIndex_, neutralIndex2_)) /
+                                                                 nTotal / collision::nitrogen::eN211(Te);
+
+      binaryDiff[neutralIndex2_ + electronIndex_ * numSpecies] =
+          binaryDiff[electronIndex_ + neutralIndex2_ * numSpecies];
       break;
     default:
       printf("Unknown gasType.");
       assert(false);
       break;
-  }  
-  
+  }
+
   binaryDiff[neutralIndex_ + electronIndex_ * numSpecies] = binaryDiff[electronIndex_ + neutralIndex_ * numSpecies];
 
-
   switch (gasType_) {
-    case Ar: 
+    case Ar:
       binaryDiff[neutralIndex_ + ionIndex_ * numSpecies] =
-        diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
+          diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::argon::ArAr1P11(Th);
       break;
     case Ni:
       binaryDiff[neutralIndex_ + ionIndex_ * numSpecies] =
-        diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::nitrogen::NiNi1P11(Th);
-      binaryDiff[neutralIndex2_ + ionIndex_ * numSpecies] =
-        diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex2_, ionIndex_)) / nTotal / collision::nitrogen::N2Ni1P11(Th);
-      binaryDiff[neutralIndex_ + ionIndex2_ * numSpecies] =
-        diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex2_)) / nTotal / collision::nitrogen::NiN21P11(Th);
-      binaryDiff[neutralIndex2_ + ionIndex2_ * numSpecies] =
-        diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex2_, ionIndex2_)) / nTotal / collision::nitrogen::N2N21P11(Th);      
-      
+          diffusivityFactor_ * sqrt(Th / getMuw(neutralIndex_, ionIndex_)) / nTotal / collision::nitrogen::NiNi1P11(Th);
+      binaryDiff[neutralIndex2_ + ionIndex_ * numSpecies] = diffusivityFactor_ *
+                                                            sqrt(Th / getMuw(neutralIndex2_, ionIndex_)) / nTotal /
+                                                            collision::nitrogen::N2Ni1P11(Th);
+      binaryDiff[neutralIndex_ + ionIndex2_ * numSpecies] = diffusivityFactor_ *
+                                                            sqrt(Th / getMuw(neutralIndex_, ionIndex2_)) / nTotal /
+                                                            collision::nitrogen::NiN21P11(Th);
+      binaryDiff[neutralIndex2_ + ionIndex2_ * numSpecies] = diffusivityFactor_ *
+                                                             sqrt(Th / getMuw(neutralIndex2_, ionIndex2_)) / nTotal /
+                                                             collision::nitrogen::N2N21P11(Th);
+
       binaryDiff[ionIndex2_ + neutralIndex2_ * numSpecies] = binaryDiff[neutralIndex2_ + ionIndex2_ * numSpecies];
       binaryDiff[ionIndex_ + neutralIndex2_ * numSpecies] = binaryDiff[neutralIndex2_ + ionIndex_ * numSpecies];
-      binaryDiff[ionIndex2_ + neutralIndex_ * numSpecies] = binaryDiff[neutralIndex_ + ionIndex2_ * numSpecies];    
+      binaryDiff[ionIndex2_ + neutralIndex_ * numSpecies] = binaryDiff[neutralIndex_ + ionIndex2_ * numSpecies];
       binaryDiff[electronIndex_ + ionIndex2_ * numSpecies] = diffusivityFactor_ *
-                                                        sqrt(Te / getMuw(ionIndex2_, electronIndex_)) / nTotal /
-                                                        (collision::charged::att11(nondimTe) * debyeCircle);
+                                                             sqrt(Te / getMuw(ionIndex2_, electronIndex_)) / nTotal /
+                                                             (collision::charged::att11(nondimTe) * debyeCircle);
       binaryDiff[ionIndex2_ + electronIndex_ * numSpecies] = binaryDiff[electronIndex_ + ionIndex2_ * numSpecies];
 
       speciesTransport[ionIndex2_ + SpeciesTrns::MF_FREQUENCY * numSpecies] =
-         mfFreqFactor_ * sqrt(Te / mw_[electronIndex_]) * n_sp[ionIndex2_] * Qie;
+          mfFreqFactor_ * sqrt(Te / mw_[electronIndex_]) * n_sp[ionIndex2_] * Qie;
       speciesTransport[neutralIndex2_ + SpeciesTrns::MF_FREQUENCY * numSpecies] =
-         mfFreqFactor_ * sqrt(Te / mw_[electronIndex_]) * n_sp[neutralIndex2_] * Qea; // WARNING "Qea" probably a hard-code
-      
+          mfFreqFactor_ * sqrt(Te / mw_[electronIndex_]) * n_sp[neutralIndex2_] *
+          Qea;  // WARNING "Qea" probably a hard-code
+
       break;
     default:
       printf("Unknown gasType.");
       assert(false);
       break;
-  }  
-  
+  }
+
   binaryDiff[ionIndex_ + neutralIndex_ * numSpecies] = binaryDiff[neutralIndex_ + ionIndex_ * numSpecies];
   binaryDiff[electronIndex_ + ionIndex_ * numSpecies] = diffusivityFactor_ *
                                                         sqrt(Te / getMuw(ionIndex_, electronIndex_)) / nTotal /
@@ -697,9 +715,9 @@ MFEM_HOST_DEVICE void GasMinimalTransport::ComputeSourceMolecularTransport(const
   speciesTransport[ionIndex_ + SpeciesTrns::MF_FREQUENCY * numSpecies] =
       mfFreqFactor_ * sqrt(Te / mw_[electronIndex_]) * n_sp[ionIndex_] * Qie;
   speciesTransport[neutralIndex_ + SpeciesTrns::MF_FREQUENCY * numSpecies] =
-    mfFreqFactor_ * sqrt(Te / mw_[electronIndex_]) * n_sp[neutralIndex_] * Qea; // WARNING "Qea" probably a hard-code  
+      mfFreqFactor_ * sqrt(Te / mw_[electronIndex_]) * n_sp[neutralIndex_] * Qea;  // WARNING "Qea" probably a hard-code
 
-  //TODO: add mroe for Ni => compiler might throw a warning
+  // TODO: add mroe for Ni => compiler might throw a warning
   double diffusivity[numSpecies], mobility[numSpecies];
   CurtissHirschfelder(X_sp, Y_sp, binaryDiff, diffusivity);
 
@@ -755,7 +773,7 @@ MFEM_HOST_DEVICE void GasMinimalTransport::ComputeSourceMolecularTransport(const
 }
 
 MFEM_HOST_DEVICE void GasMinimalTransport::GetViscosities(const double *conserved, const double *primitive,
-                                                            double *visc) {
+                                                          double *visc) {
   double n_sp[3], X_sp[3], Y_sp[3];
   mixture->computeSpeciesPrimitives(conserved, X_sp, Y_sp, n_sp);
   // double nTotal = 0.0;
@@ -777,19 +795,21 @@ MFEM_HOST_DEVICE void GasMinimalTransport::GetViscosities(const double *conserve
       viscosityFactor_ * sqrt(mw_[ionIndex_] * Th) / (collision::charged::rep22(nondimTh) * debyeCircle);
 
   switch (gasType_) {
-    case Ar: 
+    case Ar:
       speciesViscosity[neutralIndex_] = viscosityFactor_ * sqrt(mw_[neutralIndex_] * Th) / collision::argon::ArAr22(Th);
       break;
     case Ni:
-      speciesViscosity[neutralIndex_] = viscosityFactor_ * sqrt(mw_[neutralIndex_] * Th) / collision::nitrogen::NiNi22(Th);
-      speciesViscosity[neutralIndex2_] = viscosityFactor_ * sqrt(mw_[neutralIndex2_] * Th) / collision::nitrogen::N2N222(Th);  
+      speciesViscosity[neutralIndex_] =
+          viscosityFactor_ * sqrt(mw_[neutralIndex_] * Th) / collision::nitrogen::NiNi22(Th);
+      speciesViscosity[neutralIndex2_] =
+          viscosityFactor_ * sqrt(mw_[neutralIndex2_] * Th) / collision::nitrogen::N2N222(Th);
       break;
     default:
       printf("Unknown gasType.");
       assert(false);
       break;
-  }  
-  
+  }
+
   speciesViscosity[electronIndex_] = 0.0;
 
   visc[0] = linearAverage(X_sp, speciesViscosity);
@@ -842,12 +862,10 @@ collInputs); kappa[1] = computeThirdOrderElectronThermalConductivity(X_sp, collI
 }
 */
 
-//MFEM_HOST_DEVICE void GasMinimalTransport::GetThermalConductivities(const double *conserved, const double *primitive,
-//                                                                      double *kappa) {
-//  std::cout<< "GasMinimalTransport::GetThermalConductivities not implemented!" << endl;  
-//}
-
-
+// MFEM_HOST_DEVICE void GasMinimalTransport::GetThermalConductivities(const double *conserved, const double *primitive,
+//                                                                       double *kappa) {
+//   std::cout<< "GasMinimalTransport::GetThermalConductivities not implemented!" << endl;
+// }
 
 //////////////////////////////////////////////////////
 //////// Gas Mixture Transport
@@ -858,7 +876,6 @@ GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, RunConfiguration 
 
 MFEM_HOST_DEVICE GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, const GasTransportInput &inputs)
     : GasMinimalTransport(_mixture) {
-  
   electronIndex_ = inputs.electronIndex;
   neutralIndex_ = inputs.neutralIndex;
   ionIndex_ = inputs.ionIndex;
@@ -872,13 +889,13 @@ MFEM_HOST_DEVICE GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, 
     for (int mixSp = 0; mixSp < numSpecies; mixSp++) {
       diffusivity_[mixSp] = inputs.constantTransport.diffusivity[mixSp];
       mtFreq_[mixSp] = inputs.constantTransport.mtFreq[mixSp];
-    }    
+    }
   }
 
   multiply_ = inputs.multiply;
-    
+
   // Argon
-  if (inputs.gas=="Ar" || inputs.gas=="argon") {
+  if (inputs.gas == "Ar" || inputs.gas == "argon") {
     gasType_ = Ar;
 
     if (numSpecies != 3) {
@@ -886,7 +903,7 @@ MFEM_HOST_DEVICE GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, 
       assert(false);
     }
 
-    //namespace gas = collision::argon;
+    // namespace gas = collision::argon;
 
     neutralIndex_ = inputs.neutralIndex;
     if (neutralIndex_ < 0) {
@@ -904,25 +921,25 @@ MFEM_HOST_DEVICE GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, 
       assert(false);
     }
 
-     // TODO(kevin): need to factor out avogadro numbers throughout all transport property.
-     // multiplying/dividing big numbers are risky of losing precision.
-     // mw_.SetSize(3);
-     //mw_[electronIndex_] = mixture->GetGasParams(electronIndex_, GasParams::SPECIES_MW);
-     //mw_[neutralIndex_] = mixture->GetGasParams(neutralIndex_, GasParams::SPECIES_MW);
-     //mw_[ionIndex_] = mixture->GetGasParams(ionIndex_, GasParams::SPECIES_MW);
+    // TODO(kevin): need to factor out avogadro numbers throughout all transport property.
+    // multiplying/dividing big numbers are risky of losing precision.
+    // mw_.SetSize(3);
+    // mw_[electronIndex_] = mixture->GetGasParams(electronIndex_, GasParams::SPECIES_MW);
+    // mw_[neutralIndex_] = mixture->GetGasParams(neutralIndex_, GasParams::SPECIES_MW);
+    // mw_[ionIndex_] = mixture->GetGasParams(ionIndex_, GasParams::SPECIES_MW);
 
-     // assumes input mass is consistent with this.
-     assert(abs(mw_[neutralIndex_] - mw_[electronIndex_] - mw_[ionIndex_]) < 1.0e-12);
+    // assumes input mass is consistent with this.
+    assert(abs(mw_[neutralIndex_] - mw_[electronIndex_] - mw_[ionIndex_]) < 1.0e-12);
 
-  // Nitrogen
-  } else if (inputs.gas=="Ni" || inputs.gas=="nitrogen") {    
+    // Nitrogen
+  } else if (inputs.gas == "Ni" || inputs.gas == "nitrogen") {
     gasType_ = Ni;
     printf("gas mixture type nitrogen...\n");
     neutralIndex2_ = inputs.neutralIndex2;
     ionIndex2_ = inputs.ionIndex2;
   } else {
-   printf("Unknown gasType.");
-   assert(false);
+    printf("Unknown gasType.");
+    assert(false);
   }
 
   // TODO(kevin): need to factor out avogadro numbers throughout all transport property.
@@ -948,12 +965,20 @@ MFEM_HOST_DEVICE GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, 
   for (int spI = 0; spI < numSpecies; spI++)
     for (int spJ = spI; spJ < numSpecies; spJ++)
       collisionIndex_[spI + spJ * numSpecies] = inputs.collisionIndex[spI + spJ * numSpecies];
-  
+
   setArtificialMultipliers(inputs);
 }
 
-MFEM_HOST_DEVICE double GasMixtureTransport::collisionIntegral(const int _spI, const int _spJ, const int l,
-                                                                 const int r, const collisionInputs collInputs) {
+// Current valid collision index tags (see reacting_flow.cpp):
+// ALL:  CLMB_REP, CLMB_ATT
+// Argon: AR_AR, AR_AR1P, AR_E
+// Nitrogen: N2_N2, N2_NI, N2_NI1P, N2_E, NI_NI, NI_NI1P, NI_E
+//
+//  Note: this is very messy and should be targetted for streamlining if
+//        we want to add support for more reacting gases
+//
+MFEM_HOST_DEVICE double GasMixtureTransport::collisionIntegral(const int _spI, const int _spJ, const int l, const int r,
+                                                               const collisionInputs collInputs) {
   const int spI = (_spI > _spJ) ? _spJ : _spI;
   const int spJ = (_spI > _spJ) ? _spI : _spJ;
 
@@ -966,6 +991,7 @@ MFEM_HOST_DEVICE double GasMixtureTransport::collisionIntegral(const int _spI, c
   }
 
   switch (collIdx) {
+    // Generic charged-particle section
     case CLMB_ATT: {
       if (l == 1) {
         switch (r) {
@@ -1013,6 +1039,7 @@ MFEM_HOST_DEVICE double GasMixtureTransport::collisionIntegral(const int _spI, c
         }
       }
     } break;
+
     case CLMB_REP: {
       if (l == 1) {
         switch (r) {
@@ -1060,6 +1087,10 @@ MFEM_HOST_DEVICE double GasMixtureTransport::collisionIntegral(const int _spI, c
         }
       }
     } break;
+
+      // Argon specific section
+      // AR_AR, AR_AR1P, AR_E
+
     case AR_AR1P: {
       if ((l == 1) && (r == 1)) {
         return collision::argon::ArAr1P11(temp);
@@ -1068,6 +1099,7 @@ MFEM_HOST_DEVICE double GasMixtureTransport::collisionIntegral(const int _spI, c
         assert(false);
       }
     } break;
+
     case AR_E: {
       if (l == 1) {
         switch (r) {
@@ -1099,6 +1131,7 @@ MFEM_HOST_DEVICE double GasMixtureTransport::collisionIntegral(const int _spI, c
         assert(false);
       }
     } break;
+
     case AR_AR: {
       if ((l == 1) && (r == 1)) {
         return collision::argon::ArAr11(temp);
@@ -1109,6 +1142,125 @@ MFEM_HOST_DEVICE double GasMixtureTransport::collisionIntegral(const int _spI, c
         assert(false);
       }
     } break;
+
+      // Nitrogen-specific section
+      // N2_N2, N2_NI, N2_NI1P, N2_E, NI_NI, NI_NI1P, NI_E
+
+    case NI_NI1P: {
+      if ((l == 1) && (r == 1)) {
+        return collision::nitrogen::NiNi1P11(temp);
+      } else {
+        printf("(%d, %d)-collision integral for N-N.1+ pair is not supported in GasMixtureTransport! \n", l, r);
+        assert(false);
+      }
+    } break;
+
+    case N2_NI1P: {
+      if ((l == 1) && (r == 1)) {
+        return collision::nitrogen::N2Ni1P11(temp);
+      } else {
+        printf("(%d, %d)-collision integral for N2-N.1+ pair is not supported in GasMixtureTransport! \n", l, r);
+        assert(false);
+      }
+    } break;
+
+    case N2_E: {
+      if (l == 1) {
+        switch (r) {
+          case 1:
+            return collision::nitrogen::eN211(temp);
+            break;
+          case 2:
+            return collision::nitrogen::eN212(temp);
+            break;
+          case 3:
+            return collision::nitrogen::eN213(temp);
+            break;
+          case 4:
+            return collision::nitrogen::eN214(temp);
+            break;
+          case 5:
+            return collision::nitrogen::eN215(temp);
+            break;
+          default:
+            printf(
+                "(%d, %d)-collision integral for repulsive Coulomb potential is not supported in "
+                "GasMixtureTransport! \n",
+                l, r);
+            assert(false);
+            break;
+        }
+      } else {
+        printf("(%d, %d)-collision integral for N2-E pair is not supported in GasMixtureTransport! \n", l, r);
+        assert(false);
+      }
+    } break;
+
+    case NI_E: {
+      if (l == 1) {
+        switch (r) {
+          case 1:
+            return collision::nitrogen::eNi11(temp);
+            break;
+          case 2:
+            return collision::nitrogen::eNi12(temp);
+            break;
+          case 3:
+            return collision::nitrogen::eNi13(temp);
+            break;
+          case 4:
+            return collision::nitrogen::eNi14(temp);
+            break;
+          case 5:
+            return collision::nitrogen::eNi15(temp);
+            break;
+          default:
+            printf(
+                "(%d, %d)-collision integral for repulsive Coulomb potential is not supported in "
+                "GasMixtureTransport! \n",
+                l, r);
+            assert(false);
+            break;
+        }
+      } else {
+        printf("(%d, %d)-collision integral for N-E pair is not supported in GasMixtureTransport! \n", l, r);
+        assert(false);
+      }
+    } break;
+
+    case NI_NI: {
+      if ((l == 1) && (r == 1)) {
+        return collision::nitrogen::NiNi11(temp);
+      } else if ((l == 2) && (r == 2)) {
+        return collision::nitrogen::NiNi22(temp);
+      } else {
+        printf("(%d, %d)-collision integral for Ni-Ni pair is not supported in GasMixtureTransport! \n", l, r);
+        assert(false);
+      }
+    } break;
+
+    case N2_N2: {
+      if ((l == 1) && (r == 1)) {
+        return collision::nitrogen::N2N211(temp);
+      } else if ((l == 2) && (r == 2)) {
+        return collision::nitrogen::N2N222(temp);
+      } else {
+        printf("(%d, %d)-collision integral for N2-N2 pair is not supported in GasMixtureTransport! \n", l, r);
+        assert(false);
+      }
+    } break;
+
+    case N2_NI: {
+      if ((l == 1) && (r == 1)) {
+        return collision::nitrogen::N2Ni11(temp);
+      } else if ((l == 2) && (r == 2)) {
+        return collision::nitrogen::N2Ni22(temp);
+      } else {
+        printf("(%d, %d)-collision integral for N2-N pair is not supported in GasMixtureTransport! \n", l, r);
+        assert(false);
+      }
+    } break;
+
     default:
       break;
   }
@@ -1116,9 +1268,8 @@ MFEM_HOST_DEVICE double GasMixtureTransport::collisionIntegral(const int _spI, c
 }
 
 MFEM_HOST_DEVICE void GasMixtureTransport::ComputeFluxMolecularTransport(const double *state, const double *gradUp,
-                                                                           const double *Efield,
-                                                                           double *transportBuffer,
-                                                                           double *diffusionVelocity) {
+                                                                         const double *Efield, double *transportBuffer,
+                                                                         double *diffusionVelocity) {
   for (int p = 0; p < FluxTrns::NUM_FLUX_TRANS; p++) transportBuffer[p] = 0.0;
 
   double primitiveState[gpudata::MAXEQUATIONS];
@@ -1241,10 +1392,10 @@ MFEM_HOST_DEVICE double GasMixtureTransport::computeThirdOrderElectronThermalCon
 }
 
 MFEM_HOST_DEVICE void GasMixtureTransport::ComputeSourceMolecularTransport(const double *state, const double *Up,
-                                                                             const double *gradUp, const double *Efield,
-                                                                             double *globalTransport,
-                                                                             double *speciesTransport,
-                                                                             double *diffusionVelocity, double *n_sp) {
+                                                                           const double *gradUp, const double *Efield,
+                                                                           double *globalTransport,
+                                                                           double *speciesTransport,
+                                                                           double *diffusionVelocity, double *n_sp) {
   for (int p = 0; p < SrcTrns::NUM_SRC_TRANS; p++) globalTransport[p] = 0.0;
   for (int p = 0; p < SpeciesTrns::NUM_SPECIES_COEFFS; p++)
     for (int sp = 0; sp < numSpecies; sp++) speciesTransport[sp + p * numSpecies] = 0.0;
@@ -1331,14 +1482,13 @@ MFEM_HOST_DEVICE void GasMixtureTransport::ComputeSourceMolecularTransport(const
 }
 
 MFEM_HOST_DEVICE void GasMixtureTransport::GetViscosities(const double *conserved, const double *primitive,
-                                                            double *visc) {
-
+                                                          double *visc) {
   if (constantTransport_) {
     visc[0] = viscosity_;
     visc[1] = bulkViscosity_;
     return;
   }
-  
+
   double n_sp[gpudata::MAXSPECIES], X_sp[gpudata::MAXSPECIES], Y_sp[gpudata::MAXSPECIES];
   mixture->computeSpeciesPrimitives(conserved, X_sp, Y_sp, n_sp);
   // double nTotal = 0.0;
@@ -1354,17 +1504,17 @@ MFEM_HOST_DEVICE void GasMixtureTransport::GetViscosities(const double *conserve
     }
     speciesViscosity[sp] =
         viscosityFactor_ * sqrt(mw_[sp] * collInputs.Th) / collisionIntegral(sp, sp, 2, 2, collInputs);
-  } // 1.016 * 5/16 * 1/sigma^2 * (kb*m*T/pi)^(1/2)
+  }  // 1.016 * 5/16 * 1/sigma^2 * (kb*m*T/pi)^(1/2)
   // sigma^2 = Q^(22) / (pi * Q^(22)*)
   // mu = 1.016 * 5/16 * 1/Q^(22) * (pi * Q^(22)*) * (kb*m*T/pi)^(1/2)
   // mu = 1.016 * 5/16 * 1/Q^(22) * pi^(1/2) * Q^(22)* * (kb*m*T)^(1/2)
   // mu = 1.016 * 5/16 * (pi*kb)^(1/2) * (m*T)^(1/2) * Q^(22)*/Q^(22)
-  
-  // 2.84a: Q^(22)* = Q^(22) / (pi * lambda_D^2)  
-  
+
+  // 2.84a: Q^(22)* = Q^(22) / (pi * lambda_D^2)
+
   // collisionalIntegral returns pi*lambda_D^2 * Q (from collisionalIntegral code)
   // so, this is saying Q^(22)* = 1/(pi*lambda_D^2) which contradicts 2.84a
-  
+
   // viscosityFactor_ = 5. / 16. * sqrt(PI_ * kB_);
   // 2.21 in torch doc: 5/16 * (pi *kb)^(1/2) * (m*T)^(1/2) / \bar{Q}_{aa}^(2,2)
   // but \bar{Q}_{aa}^(2,2) = pi*sigma^2 * Q_{aa}^(2,2)*
@@ -1381,14 +1531,14 @@ MFEM_HOST_DEVICE void GasMixtureTransport::GetViscosities(const double *conserve
 }
 
 MFEM_HOST_DEVICE void GasMixtureTransport::GetThermalConductivities(const double *conserved, const double *primitive,
-                                                                      double *kappa) {
+                                                                    double *kappa) {
   double n_sp[gpudata::MAXSPECIES], X_sp[gpudata::MAXSPECIES], Y_sp[gpudata::MAXSPECIES];
 
   if (constantTransport_) {
     kappa = &thermalConductivity_;
     return;
   }
-  
+
   mixture->computeSpeciesPrimitives(conserved, X_sp, Y_sp, n_sp);
   // double nTotal = 0.0;
   // for (int sp = 0; sp < numSpecies; sp++) nTotal += n_sp[sp];
@@ -1425,23 +1575,23 @@ MFEM_HOST_DEVICE void GasMixtureTransport::GetThermalConductivities(const double
 }
 
 void GasMixtureTransport::computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield,
-                                                             Vector &diffusivity, bool unused) {
-  //diffusivity.SetSize(3);
-  //diffusivity.SetSize(numSpecies);
-  diffusivity.SetSize(gpudata::MAXSPECIES); // should already be set coming in
+                                                           Vector &diffusivity, bool unused) {
+  // diffusivity.SetSize(3);
+  // diffusivity.SetSize(numSpecies);
+  diffusivity.SetSize(gpudata::MAXSPECIES);  // should already be set coming in
   diffusivity = 0.0;
   computeMixtureAverageDiffusivity(&state[0], &Efield[0], &diffusivity[0], unused);
 }
 
 MFEM_HOST_DEVICE void GasMixtureTransport::computeMixtureAverageDiffusivity(const double *state, const double *Efield,
-                                                                              double *diffusivity, bool unused) {
+                                                                            double *diffusivity, bool unused) {
   if (constantTransport_) {
     for (int sp = 0; sp < numSpecies; sp++) {
       diffusivity[sp] = diffusivity_[sp];
-    }    
+    }
     return;
   }
-  
+
   double primitiveState[gpudata::MAXEQUATIONS];
   mixture->GetPrimitivesFromConservatives(state, primitiveState);
 
@@ -1485,12 +1635,11 @@ MFEM_HOST_DEVICE void GasMixtureTransport::computeMixtureAverageDiffusivity(cons
 }
 
 MFEM_HOST_DEVICE void GasMixtureTransport::ComputeElectricalConductivity(const double *state, double &sigma) {
-
   if (constantTransport_) {
     sigma = electronThermalConductivity_;
     return;
   }
-  
+
   double X_sp[gpudata::MAXSPECIES], Y_sp[gpudata::MAXSPECIES], n_sp[gpudata::MAXSPECIES];
   for (int sp = 0; sp < numSpecies; sp++) n_sp[sp] = X_sp[sp] = Y_sp[sp] = 0.0;
   mixture->computeSpeciesPrimitives(state, X_sp, Y_sp, n_sp);
