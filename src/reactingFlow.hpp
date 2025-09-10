@@ -44,7 +44,6 @@ class Tps;
 #include <fstream>
 #include <iostream>
 
-// #include "argon_transport.hpp"
 #include "chemistry.hpp"
 #include "dataStructures.hpp"
 #include "dirichlet_bc_helper.hpp"
@@ -98,12 +97,10 @@ class ReactingFlow : public ThermoChemModelBase {
 
   // packaged inputs
   PerfectMixtureInput mixtureInput_;
-  // ArgonTransportInput argonInput_;
   GasTransportInput gasInput_;
   ChemistryInput chemistryInput_;
 
   PerfectMixture *mixture_ = NULL;
-  // ArgonMixtureTransport *transport_ = NULL;
   GasMixtureTransport *transport_ = NULL;
   Chemistry *chemistry_ = NULL;
 

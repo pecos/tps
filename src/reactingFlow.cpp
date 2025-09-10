@@ -436,16 +436,11 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
       break;
   }
 
-  // Array<ArgonSpcs> speciesType(nSpecies_);
   Array<GasSpcs> speciesType(nSpecies_);
   identifySpeciesType(speciesType);
   identifyCollisionType(speciesType, gasInput_.collisionIndex);
 
   mixture_ = new PerfectMixture(mixtureInput_, dim_, dim_, const_plasma_conductivity_);
-  // transport_ = new ArgonMixtureTransport(mixture_, gasInput_);
-  /*
-  transport_ = new GasMixtureTransport(mixture_, gasInput_);
-  */
 
   gasInput_.constantActive = false;
   switch (transportModel_) {
@@ -458,7 +453,6 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     case CONSTANT: {
       if (rank0_) std::cout << "Constant tranport model will be used." << endl;
       gasInput_.constantActive = true;
-      // transport_ = new ConstantTransport(mixture_, gasInput_.constantTransport);
       transport_ = new GasMixtureTransport(mixture_, gasInput_);
     } break;
     default: {
@@ -3037,7 +3031,6 @@ void ReactingFlow::computeQtTO() {
 }
 
 /// identifySpeciesType and identifyCollisionType copies from M2ulPhyS
-// void ReactingFlow::identifySpeciesType(Array<ArgonSpcs> &speciesType) {
 //  note: this is rather convoluted and messy, is it even used?
 void ReactingFlow::identifySpeciesType(Array<GasSpcs> &speciesType) {
   speciesType.SetSize(nSpecies_);
@@ -3190,7 +3183,6 @@ void ReactingFlow::readTableWrapper(std::string inputPath, TableInput &result) {
   readTable(tpsP_->getTPSCommWorld(), filename, result.xLogScale, result.fLogScale, result.order, tableHost_, result);
 }
 
-// void ReactingFlow::identifyCollisionType(const Array<ArgonSpcs> &speciesType, ArgonColl *collisionIndex) {
 void ReactingFlow::identifyCollisionType(const Array<GasSpcs> &speciesType, GasColl *collisionIndex) {
   for (int spI = 0; spI < nSpecies_; spI++) {
     for (int spJ = spI; spJ < nSpecies_; spJ++) {

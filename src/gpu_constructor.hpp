@@ -52,7 +52,6 @@
 
 #include <tps_config.h>
 
-// #include "argon_transport.hpp"
 #include "chemistry.hpp"
 #include "dataStructures.hpp"
 #include "equation_of_state.hpp"
@@ -112,14 +111,10 @@ __global__ void instantiateDeviceDryAirTransport(GasMixture *mixture, const doub
 __global__ void instantiateDeviceConstantTransport(GasMixture *mixture, const constantTransportData inputs,
                                                    void *trans);
 
-//! Instantiate ArgonMinimalTransport object on the device with placement new
-//  __global__ void instantiateDeviceArgonMinimalTransport(GasMixture *mixture, const GasTransportInput inputs,
-//                                                       void *trans);
+//! Instantiate GasMinimalTransport object on the device with placement new
 __global__ void instantiateDeviceGasMinimalTransport(GasMixture *mixture, const GasTransportInput inputs, void *trans);
 
-//! Instantiate ArgonMixtureTransport object on the device with placement new
-//  __global__ void instantiateDeviceArgonMixtureTransport(GasMixture *mixture, const GasTransportInput inputs,
-//                                                       void *trans);
+//! Instantiate GasMixtureTransport object on the device with placement new
 __global__ void instantiateDeviceGasMixtureTransport(GasMixture *mixture, const GasTransportInput inputs, void *trans);
 
 //! Instantiate ConstantTransport object on the device with placement new

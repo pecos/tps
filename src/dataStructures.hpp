@@ -115,52 +115,6 @@ enum TransportOutputPrimitives {
   NUM_OUTPUT_PRIMITIVES
 };
 
-/*
-enum ArgonColl {
-  CLMB_ATT,      // Attractive Coulomb potential
-  CLMB_REP,      // Repulsive Coulomb potential
-  AR_AR1P,       // Ar - Ar.1+ (include excited states)
-  AR_E,          // Ar - E (include excited states)
-  AR_AR,         // Ar - Ar (include excited states)
-  // DMR_ION,  // Ar2 - Ar.1+ (include excited states)
-  NONE_ARGCOLL
-};
-*/
-
-/*
-enum ArgonSpcs {
-  AR,        // Monomer Argon neutral, including excited states
-  AR1P,      // Ar.1+, including excited states
-  ELECTRON,  // Electron
-  NONE_ARGSPCS
-};
-*/
-
-/*
-enum NitrogenColl {
-  CLMB_ATT,      // Attractive Coulomb potential
-  CLMB_REP,      // Repulsive Coulomb potential
-  NI_NI1P,       // Ni - Ni.1+ (include excited states)
-  NI_E,          // Ni - E (include excited states)
-  NI_NI,         // Ni - Ni (include excited states)
-  NI2_NI1P,      // Ni2 - Ni.1+ (include excited states)
-  NI2_E,         // Ni2 - E (include excited states)
-  NI2_NI2,       // Ni2 - Ni2 (include excited states)
-  NI2_NI,        // Ni2 - Ni (include excited states)
-  NONE_NITCOLL
-};
-*/
-
-/*
-enum NitrogenSpcs {
-  N2,        // Ni2, including excited states
-  NI,        // Monomer Nitrogen neutral, including excited states
-  NI1P,      // Ni.1+, including excited states
-  ELECTRON,  // Electron
-  NONE_NITSPCS
-};
-*/
-
 enum GasColl {
   // general
   CLMB_ATT,  // Attractive Coulomb potential
@@ -683,8 +637,6 @@ struct LteMixtureInput {
   std::string e_rev_file_name;
 };
 
-// make this general, needs collisionIndex to be general
-// struct ArgonTransportInput {
 struct GasTransportInput {
   int neutralIndex;
   int ionIndex;
@@ -693,9 +645,6 @@ struct GasTransportInput {
   int electronIndex;
 
   bool thirdOrderkElectron;
-
-  // ArgonMixtureTransport
-  // ArgonColl collisionIndex[gpudata::MAXSPECIES * gpudata::MAXSPECIES];
 
   GasColl collisionIndex[gpudata::MAXSPECIES * gpudata::MAXSPECIES];
   GasType gas;
@@ -710,12 +659,6 @@ struct GasTransportInput {
   // for constant type
   bool constantActive;
   constantTransportData constantTransport;
-  // double viscosity;
-  // double bulkViscosity;
-  // double diffusivity[gpudata::MAXSPECIES];
-  // double thermalConductivity;
-  // double electronThermalConductivity;
-  // double mtFreq[gpudata::MAXSPECIES];  // momentum transfer frequency
 };
 
 struct TableInput {
