@@ -104,6 +104,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
 
 #ifdef HAVE_PYTHON
   tpsP_->getInput("cycle-avg-joule-coupled/bte-from-tps", bte_from_tps_, false);
+  tpsP_->getRequiredInput("boltzmannSolver/collisionsFile", collisionsFile);
 #endif
 
   // plasma conditions. ???
@@ -1752,13 +1753,34 @@ void ReactingFlow::step() {
           species_data[i + sp * sDofInt_] = AVOGADRONUMBER * species_local[sp];
       }
 
+      // GET THE MIN AND MAX VALUES OF SPECIES NUMBER DENSITIES FRACTIONS FOR EACH SPECIES
+      if (rank0_) std::cout << "sDofInt = " << sDofInt_ << "\n";
+      // for (int sp = 0; sp < nSpecies_; sp++) {
+      //   mfem::Vector species_view(speciesInt_.GetData() + sp*sDofInt_, sDofInt_);
+
+      //   double local_min = species_view.Min();
+      //   double local_max = species_view.Max();
+
+      //   double global_min, global_max;
+
+      //   MPI_Allreduce(&local_min, &global_min, 1, MPI_DOUBLE, MPI_MIN, tpsP_->getTPSCommWorld());
+      //   MPI_Allreduce(&local_max, &global_max, 1, MPI_DOUBLE, MPI_MAX, tpsP_->getTPSCommWorld());
+
+      //   if (rank0_) {
+      //     std::cout << "sp = " << sp << ", for number density, Local extrema = " 
+      //               << local_min << " to" << local_max 
+      //               << ", Global Extrema = " 
+      //               << global_min << " to " << global_max << "\n";
+      //   }
+      // }
+
       const double *species_read = speciesInt_.HostRead();
       auto specarr = py::array_t<double>(
         {specsize},                 // shape
         {sizeof(double)},       // stride
         species_read                    // const double* pointer
       );
-      specarr.attr("flags").attr("writeable") = false; // mark read-only
+      // specarr.attr("flags").attr("writeable") = false; // mark read-only
 
       ei_gf_.GetTrueDofs(ei_);
       er_gf_.GetTrueDofs(er_);
@@ -1787,7 +1809,7 @@ void ReactingFlow::step() {
         // IMPORT THE PYTHON SCRIPT
         py::object script = py::module_::import("tps-get-bte-rates");
         // CALL THE PYTHON FUNCTION
-        result = script.attr("bte_from_tps")(Tarr, specarr, Erarr, Eiarr, nSpecies_);
+        result = script.attr("bte_from_tps")(Tarr, specarr, Erarr, Eiarr, collisionsFile);
       } catch (const py::error_already_set &e) {
         std::cerr << "ReactingFlow::step(), Python error: " << e.what() << std::endl;
       }
