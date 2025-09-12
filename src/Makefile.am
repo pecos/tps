@@ -5,7 +5,7 @@ AM_CPPFLAGS += -dc $(CUDA_CXXFLAGS)
 endif
 
 if HIP_ENABLED
-AM_CPPFLAGS += -fgpu-rdc $(HIP_CXXFLAGS)
+AM_CPPFLAGS += $(HIP_CXXFLAGS)
 endif
 
 if MASA_ENABLED
@@ -25,7 +25,7 @@ tps_LDADD            = libtps.la
 tps_LDFLAGS         += $(MPI4PY_LIBS) $(PYTHON_LIBS) $(MFEM_LIBS)
 
 if HIP_ENABLED
-tps_LDFLAGS += -fgpu-rdc
+tps_LDFLAGS += $(HIP_LDFLAGS)
 endif
 
 # C++ solver library sources
