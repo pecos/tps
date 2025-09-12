@@ -545,7 +545,7 @@ void WallBC::computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix
 void WallBC::integrateWalls_gpu(Vector &y, const Vector &x, const elementIndexingData &elem_index_data,
                                 const boundaryFaceIntegrationData &boundary_face_data, const int &maxDofs) {
 #ifdef _GPU_
-  double *d_y = y.Write();
+  double *d_y = y.ReadWrite();
   //   const double *d_U = x.Read();
   const int *d_elem_dofs_list = elem_index_data.dofs_list.Read();
   const int *d_elem_dof_off = elem_index_data.dof_offset.Read();
