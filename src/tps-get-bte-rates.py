@@ -31,6 +31,7 @@ import cross_section
 ev_to_K               = collisions.TEMP_K_1EV
 Td_fac                = 1e-21
 c_gamma               = np.sqrt(2 * (scipy.constants.elementary_charge/ scipy.constants.electron_mass))
+eps                   = 1e-15
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-threads", "--threads"                       , help="number of cpu threads", type=int, default=4)
@@ -54,9 +55,9 @@ parser.add_argument("-n_pts", "--n_pts"                           , help="number
 parser.add_argument("-store_eedf", "--store_eedf"                 , help="store EEDF"          , type=int, default=0)
 parser.add_argument("-store_csv", "--store_csv"                   , help="store csv format of QoI comparisons", type=int, default=0)
 parser.add_argument("-plot_data", "--plot_data"                   , help="plot data", type=int, default=0)
-parser.add_argument("-ee_collisions", "--ee_collisions"           , help="enable electron-electron collisions", type=int, default=1)
-parser.add_argument("-verbose", "--verbose"                       , help="verbose with debug information", type=int, default=1)
-parser.add_argument("-use_gpu", "--use_gpu"                       , help="use gpus for batched solver", type=int, default=0)
+parser.add_argument("-ee_collisions", "--ee_collisions"           , help="enable electron-electron collisions", type=int, default=0)
+parser.add_argument("-verbose", "--verbose"                       , help="verbose with debug information", type=int, default=0)
+parser.add_argument("-use_gpu", "--use_gpu"                       , help="use gpus for batched solver", type=int, default=1)
 parser.add_argument("-cycles", "--cycles"                         , help="number of max cycles to evolve to compute cycle average rates", type=float, default=5)
 parser.add_argument("-dt"    , "--dt"                             , help="1/dt number of denotes the number of steps for cycle", type=float, default=5e-3)
 parser.add_argument("-Efreq" , "--Efreq"                          , help="electric field frequency Hz", type=float, default=6e6)
@@ -99,29 +100,31 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file):
     # SETUP THE INPUT ARRAYS CONTAINING Temperature, number densities, electric field
     Te = Tarr 
     Tg = Tarr 
-    npts = len(Te)
-    args.n_pts = npts
+    n_pts = len(Te)
+    args.n_pts = n_pts
 
     args.collisions = collisions_file # collision cross-section file
-    n0 = np.zeros(npts) # n0 = \sum_{sp} (n_{sp}) - n_e
+    n0 = np.zeros(n_pts) # n0 = \sum_{sp} (n_{sp}) - n_e
     for i in range(nActSpecies):
-        n0 = n0 + narr[i*npts:i*npts+npts]
+        n0 = n0 + narr[i*n_pts:i*n_pts+n_pts]
     
     # ADD THE NEUTRAL NUMBER DENSITY TO n0
-    n0 = n0 + narr[NEUIDX*npts:NEUIDX*npts+npts]
+    n0 = n0 + narr[NEUIDX*n_pts:NEUIDX*n_pts+n_pts] + eps
 
-    ne = narr[ELEIDX*npts:ELEIDX*npts+npts] # electron number density
-    ni = narr[IONIDX*npts:IONIDX*npts+npts] # ion number density
+    ne = narr[ELEIDX*n_pts:ELEIDX*n_pts+n_pts] + eps # electron number density
+    ni = narr[IONIDX*n_pts:IONIDX*n_pts+n_pts] + eps # ion number density
 
-    ion_deg = ne / n0
+    print()
 
-    ns_by_n0 = np.zeros((len(all_species), npts)) # ns_by_n0 defined for all background species with which electrons collide (ie Ar, Ar*)
+    ion_deg = (ne / n0) + eps
+
+    ns_by_n0 = np.zeros((len(all_species), n_pts)) # ns_by_n0 defined for all background species with which electrons collide (ie Ar, Ar*)
     # In the collisions file, Ar is index 0, Ar* is index 1
-    ns_by_n0[0,0:npts] = narr[NEUIDX*npts:NEUIDX*npts+npts] / n0
-    ns_by_n0[1,0:npts] = narr[EXCIDX*npts:EXCIDX*npts+npts] / n0
+    ns_by_n0[0,0:n_pts] = narr[NEUIDX*n_pts:NEUIDX*n_pts+n_pts] / n0
+    ns_by_n0[1,0:n_pts] = narr[EXCIDX*n_pts:EXCIDX*n_pts+n_pts] / n0
 
     # Getting the electric field magnitude from real and imaginary components
-    Emag = np.sqrt(Er**2 + Ei**2)
+    Emag = np.sqrt((Er+eps)**2 + (Ei+eps)**2)
     EbyN = Emag/n0/Td_fac
 
     # Definiting mean parameters for temperature and thermal velocity
@@ -142,14 +145,40 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file):
     nr          = np.ones(n_grids, dtype=np.int32) * args.Nr
 
     bte_solver  = bte_0d3v_batched(args,ev_max, Te, nr, lm_modes, n_grids, [args.collisions])
-    # comm.Barrier()
     if rank_ == 0:
         print("Batched BTE solver class initialized")
 
     bte_solver.assemble_operators(grid_idx)
-    # comm.Barrier()
     if rank_ == 0:
         print("Batched BTE solver operator assembly complete")
+
+    comm.Barrier()
+
+    f0         = bte_solver.initialize(grid_idx, n_pts,"maxwellian")
+    bte_solver.set_boltzmann_parameter(grid_idx, "n0"       , n0)
+    bte_solver.set_boltzmann_parameter(grid_idx, "ne"       , ne)
+    bte_solver.set_boltzmann_parameter(grid_idx, "ns_by_n0" , ns_by_n0)
+    bte_solver.set_boltzmann_parameter(grid_idx, "Tg"       , Tg)   
+    bte_solver.set_boltzmann_parameter(grid_idx, "eRe"      , Er + eps)
+    bte_solver.set_boltzmann_parameter(grid_idx, "eIm"      , Ei + eps)
+    bte_solver.set_boltzmann_parameter(grid_idx, "f0"       , f0)
+    bte_solver.set_boltzmann_parameter(grid_idx,  "E"       , Emag)
+
+    if args.use_gpu==1:
+        dev_id   = 0
+        bte_solver.host_to_device_setup(dev_id, grid_idx)
+
+    f0       = bte_solver.get_boltzmann_parameter(grid_idx,"f0")
+    ff , qoi = bte_solver.solve(grid_idx, f0, args.atol, args.rtol, args.max_iter, args.solver_type)
+    # ev       = np.linspace(1e-3, bte_solver._par_ev_range[grid_idx][1], 500)
+    # ff_r     = bte_solver.compute_radial_components(grid_idx, ev, ff)
+
+    if args.use_gpu==1:
+        bte_solver.device_to_host_setup(dev_id, grid_idx)
+    
+    # ff_r     = cp.asnumpy(ff_r)
+    # for k, v in qoi.items():
+    #     qoi[k] = cp.asnumpy(v)
 
     # Tegmax = comm.allreduce(args.Te, op = MPI.MAX)
     # evgmax = comm.allreduce(args.ev_max, op = MPI.MAX)
@@ -163,6 +192,6 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file):
 
     Tarr2 = Tarr
 
-    # print("Rank = ", rank_, ", Called bte_solver before exit...")
+    print("Rank = ", rank_, ", BTE solve complete...")
 
     return Tarr2
