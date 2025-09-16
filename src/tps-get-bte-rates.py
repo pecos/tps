@@ -165,7 +165,9 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file):
     bte_solver.set_boltzmann_parameter(grid_idx,  "E"       , Emag)
 
     if args.use_gpu==1:
-        dev_id   = 0
+        num_gpus = cp.cuda.runtime.getDeviceCount()
+        dev_id   = rank_ % num_gpus
+        # print("Rank = ", rank_, ", dev_id = ", dev_id, ", number of GPUs = ", num_gpus)
         bte_solver.host_to_device_setup(dev_id, grid_idx)
 
     f0       = bte_solver.get_boltzmann_parameter(grid_idx,"f0")
