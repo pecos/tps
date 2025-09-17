@@ -79,7 +79,7 @@ void idenity_fun(const Vector &x, Vector &out) {
 }
 
 Tps2Boltzmann::Tps2Boltzmann(Tps *tps)
-    : NIndexes(7), tps_(tps), all_fes_(nullptr), save_to_paraview_dc(false), paraview_dc(nullptr) {
+    : NIndexes(7), tps_(tps), all_fes_(nullptr), use_h1fec_(false), save_to_paraview_dc(false), paraview_dc(nullptr) {
   // Assert we have a couple solver;
   assert(tps->isFlowEMCoupled());
 
@@ -92,6 +92,7 @@ Tps2Boltzmann::Tps2Boltzmann(Tps *tps)
   tps->getRequiredInput("em/current_frequency", EfieldAngularFreq_);
   EfieldAngularFreq_ *= 2. * M_PI;
 
+  use_h1fec_ = tps->getInput("boltzmannInterface/h1fec", false);
   save_to_paraview_dc = tps->getInput("boltzmannInterface/save_to_paraview", false);
 
   offsets.SetSize(NIndexes + 1);
@@ -117,9 +118,12 @@ int Tps2Boltzmann::_countBTEReactions() {
 }
 
 void Tps2Boltzmann::init(TPS::PlasmaSolver *flowSolver) {
-  std::cout << "Tps2Boltzmann::init is called" << std::endl;
   mfem::ParMesh *pmesh(flowSolver->getMesh());
-  fec_ = new mfem::L2_FECollection(order_, pmesh->Dimension(), basis_type_);
+  if (use_h1fec_)
+    fec_ = new mfem::H1_FECollection(order_, pmesh->Dimension(), basis_type_);
+  else
+    fec_ = new mfem::L2_FECollection(order_, pmesh->Dimension(), basis_type_);
+
   switch (pmesh->Dimension()) {
     case 2:
       nEfieldComps_ = 2;

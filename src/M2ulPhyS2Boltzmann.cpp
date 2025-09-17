@@ -36,7 +36,6 @@
 #include "M2ulPhyS.hpp"
 #include "tps2Boltzmann.hpp"
 
-// CPU version (just for starting up)
 void M2ulPhyS::push(TPS::Tps2Boltzmann &interface) {
   assert(interface.IsInitialized());
 

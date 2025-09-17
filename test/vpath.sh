@@ -29,6 +29,11 @@ if [ ! -d ref_solns ];then
     ln -s $testDir/ref_solns .
 fi
 
+# pytps
+if [ ! -d ../src/pytps ];then
+    ln -s $testDir/../src/pytps ../src/pytps
+fi
+
 # necessary binaries
 binaries="bats die.sh soln_differ count_gpus.sh sniff_mpirun.sh "
 binaries+="../src/tps.py ../src/tps-time-loop.py ../src/tps-bte_0d3v.py ../test/test_tps_splitcomm.py"

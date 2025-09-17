@@ -170,6 +170,7 @@ class Tps2Boltzmann {
   double timestep_;
   double currentTime_;
 
+  bool use_h1fec_;
   bool save_to_paraview_dc;
   mfem::ParaViewDataCollection *paraview_dc;
   std::vector<std::string> reaction_eqs_;

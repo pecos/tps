@@ -15,6 +15,7 @@ import scipy.interpolate
 import scipy.cluster
 import threading
 import datetime
+import h5py
 # Use asynchronous stream ordered memory
 #cp.cuda.set_allocator(cp.cuda.MemoryAsyncPool().malloc)
 
@@ -57,11 +58,20 @@ def min_mean_max(a, comm: MPI.Comm):
 
 # set path to C++ TPS library
 path = os.path.abspath(os.path.dirname(sys.argv[0]))
-sys.path.append(path + "/.libs")
+sys.path.append(path)
+sys.path.append(path + "/../../torch-chemistry")
+import argon.scripts.synthetic_cs as synthetic_cs
 sys.path.append(path + "/../../boltzmann/BESolver/python")
-import libtps
+
+crs_folder = path + "/../../torch-chemistry/argon/scripts/crs_lxcat"
+if not os.path.exists(crs_folder):
+    os.makedirs(crs_folder)
+
+import pytps    
+from pytps import libtps, TabulatedSolver
 from   bte_0d3v_batched import bte_0d3v_batched as BoltzmannSolver
 import utils as bte_utils
+print(bte_utils)
 
 WITH_PARLA = 0
 if WITH_PARLA:
@@ -69,7 +79,8 @@ if WITH_PARLA:
         from parla import Parla
         from parla.tasks import spawn, TaskSpace
         from parla.devices import cpu, gpu
-    except:
+    except Exception as e:
+        print(e)
         print("Error occured during Parla import. Please make sure Parla is installed properly.")
         sys.exit(0)
 
@@ -122,7 +133,7 @@ class BoltzmannSolverParams():
     n0            = 3.22e22 #[m^{-3}]
     
     rand_seed       = 0
-    use_clstr_inp   = False
+    use_clstr_inp   = True
     clstr_maxiter   = 10
     clstr_threshold = 1e-3
     
@@ -142,17 +153,14 @@ class TPSINDEX():
     # in future we need to setup this methodically
     # here key denotes the idx running from 0, nreactions-1
     # value denotes the reaction index in the qoi array
-    RR_IDX   = {0 : 4 , 1 : 5 , 2 : 6, 3 : 7, 4 : 1 , 5 : 2, 6 : 3 }
+    RR_IDX    = {0 : 2 , 1 : 4 , 2 : 1, 3 : 3}
     
-    
-    ION_IDX  = 3
-    ELE_IDX  = 4
-    NEU_IDX  = 5
+    ION_IDX  = 1
+    ELE_IDX  = 2
+    NEU_IDX  = 3
     EX1_IDX  = 0
-    EX2_IDX  = 1
-    EX3_IDX  = 2
     
-    MOLE_FRAC_IDX = {0: NEU_IDX, 1: EX1_IDX , 2: EX2_IDX , 3: EX3_IDX} 
+    MOLE_FRAC_IDX = {0: NEU_IDX, 1: EX1_IDX} 
 
 def k_means(x, num_clusters, xi=None, max_iter=1000, thresh=1e-12, rand_seed=0, xp=np):
     assert x.ndim == 2, "observations must me 2d array"
@@ -319,7 +327,15 @@ class Boltzmann0D2VBactchedSolver:
         Te                               = xp.array([Te_b[b_idx]  for b_idx in range(self.param.n_grids)]) # xp.ones(self.param.n_grids) * self.param.Te 
         vth                              = np.sqrt(2* self.param.kB * Te * self.param.ev_to_K  /self.param.me)
         ev_max                           = (6 * vth / self.param.c_gamma)**2 
-        self.bte_solver                  = BoltzmannSolver(self.param, ev_max , Te , nr, lm_modes, self.param.n_grids, self.param.collisions)
+
+        # generate crs Tg depended crs data 
+        col_cs = list()
+        for idx in range(self.param.n_grids):
+            cs_fname = "%s/crs_rank_%06d_npes_%06d_%06d.txt"%(crs_folder,self.rankG, self.npesG, idx) 
+            synthetic_cs.gen_lxcat_file(cs_fname, Te_b[idx] * self.param.ev_to_K)
+            col_cs.append(cs_fname)
+
+        self.bte_solver                  = BoltzmannSolver(self.param, ev_max , Te , nr, lm_modes, self.param.n_grids, col_cs)
 
         # compute BTE operators
         for grid_idx in range(self.param.n_grids):
@@ -344,7 +360,7 @@ class Boltzmann0D2VBactchedSolver:
         #         active_grid_idx.append(grid_idx)
         
         # self.active_grid_idx  = active_grid_idx #[i for i in range(self.param.n_grids)]
-        self.active_grid_idx  = [2,3]#[i for i in range(self.param.n_grids)]
+        self.active_grid_idx  = [i for i in range(self.param.n_grids)]
         self.sub_clusters_run = False
         return
 
@@ -359,13 +375,15 @@ class Boltzmann0D2VBactchedSolver:
         n_grids                 = self.param.n_grids
         gidx_to_device_map      = self.gidx_to_device_map
         
-        self.qoi         = [None for grid_idx in range(self.param.n_grids)]
-        self.ff          = [None for grid_idx in range(self.param.n_grids)]
-        coll_list        = self.bte_solver.get_collision_list()
-        coll_names       = self.bte_solver.get_collision_names()
+        self.qoi                = [None for grid_idx in range(self.param.n_grids)]
+        self.ff                 = [None for grid_idx in range(self.param.n_grids)]
+        
         
         if csv_write: 
-            data_csv = np.empty((self.tps_npts, 8 + len(coll_list)))
+            for grid_idx in range(n_grids):
+                assert len(self.bte_solver.get_collision_list()[i]) == len(self.bte_solver.get_collision_list()[0])
+            
+            data_csv = np.empty((self.tps_npts, 8 + len(self.bte_solver.get_collision_list()[0])))
         
         t1 = time()
         for grid_idx in range(n_grids):
@@ -376,9 +394,10 @@ class Boltzmann0D2VBactchedSolver:
                     ff , qoi = self.bte_solver.solve(grid_idx, f0, self.param.atol, self.param.rtol, self.param.max_iter, self.param.solver_type)
                     self.qoi[grid_idx] = qoi
                     self.ff [grid_idx] = ff
-                except:
+                except Exception as e:
+                    print(e)
                     print("solver failed for v-space gird no %d"%(grid_idx), flush=True)
-                    sys.exit(-1)
+                    self.comm.Abort(0)
             else:
                 with xp.cuda.Device(dev_id):
                     try:
@@ -386,15 +405,20 @@ class Boltzmann0D2VBactchedSolver:
                         ff , qoi = self.bte_solver.solve(grid_idx, f0, self.param.atol, self.param.rtol, self.param.max_iter, self.param.solver_type)
                         self.qoi[grid_idx] = qoi
                         self.ff [grid_idx] = ff
-                    except:
+                    except Exception as e:
+                        print(e)
                         print("solver failed for v-space gird no %d"%(grid_idx), flush=True)
-                        sys.exit(-1)
+                        self.comm.Abort(0)
                     
         t2 = time()
         print("time for boltzmann v-space solve = %.4E"%(t2- t1), flush=True)
         
         if (self.param.export_csv ==1 or self.param.plot_data==1):
             for grid_idx in range(n_grids):
+
+                coll_list      = self.bte_solver.get_collision_list()[grid_idx]
+                coll_names     = self.bte_solver.get_collision_names()[grid_idx]
+
                 dev_id   = gidx_to_device_map(grid_idx, n_grids)
                 ff       = self.ff[grid_idx]
                 qoi      = self.qoi[grid_idx]
@@ -483,7 +507,9 @@ class Boltzmann0D2VBactchedSolver:
         efield                  = np.array(interface.HostRead(libtps.t2bIndex.ElectricField), copy=False).reshape((2, tps_npts))
         species_densities       = np.array(interface.HostRead(libtps.t2bIndex.SpeciesDensities), copy=False).reshape(nspecies, tps_npts)
         
-        cs_avail_species        = self.bte_solver._avail_species
+        cs_avail_species        = self.bte_solver._avail_species[0]
+        for i in range(len(self.bte_solver._avail_species)):
+            assert cs_avail_species == self.bte_solver._avail_species[i]
         
         n0                      = np.sum(species_densities, axis=0) - species_densities[TPSINDEX.ELE_IDX]
         ns_by_n0                = np.concatenate([species_densities[TPSINDEX.MOLE_FRAC_IDX[i]]/n0 for i in range(len(cs_avail_species))]).reshape((len(cs_avail_species), tps_npts))
@@ -497,21 +523,23 @@ class Boltzmann0D2VBactchedSolver:
         Ey                      = efield[1]
         
         ne                      = species_densities[TPSINDEX.ELE_IDX]
-        coll_list               = self.bte_solver.get_collision_list()
-        coll_names              = self.bte_solver.get_collision_names()
-        cs_data                 = self.bte_solver.get_cross_section_data()
         
-        cs_species              = list()
-        for col_idx, (k,v) in enumerate(cs_data.items()):
-            cs_species.append(v["species"])
-        
-        cs_species = list(sorted(set(cs_species), key=cs_species.index))
         data_csv   = np.concatenate([(Ex).reshape((-1, 1)),
                                      (Ey).reshape((-1, 1)),
                                      (Tg).reshape((-1, 1)),
                                      (ne/n0).reshape((-1, 1))] + [ns_by_n0[i].reshape((-1, 1)) for i in range(ns_by_n0.shape[0])] + [n0.reshape(-1, 1)], axis=1)
         
         for grid_idx in self.active_grid_idx:
+            coll_list               = self.bte_solver.get_collision_list()[grid_idx]
+            coll_names              = self.bte_solver.get_collision_names()[grid_idx]
+            cs_data                 = self.bte_solver.get_cross_section_data()[grid_idx]
+            
+            cs_species              = list()
+            for col_idx, (k,v) in enumerate(cs_data.items()):
+                cs_species.append(v["species"])
+            cs_species = list(sorted(set(cs_species), key=cs_species.index))
+            
+
             with open("%s/%s.csv"%(self.param.output_dir, "tps_fetch_grid_%02d_rank_%02d_npes_%02d"%(grid_idx, self.rankG, self.npesG)), 'w', encoding='UTF8') as f:
                 writer = csv.writer(f,delimiter=',')
                 # write the header
@@ -820,12 +848,8 @@ class Boltzmann0D2VBactchedSolver:
         
         self.qoi                = [None for grid_idx in range(self.param.n_grids)]
         self.ff                 = [None for grid_idx in range(self.param.n_grids)]
-        coll_list               = self.bte_solver.get_collision_list()
-        coll_names              = self.bte_solver.get_collision_names()
-        
-        if csv_write: 
-            data_csv = np.empty((self.tps_npts, 8 + len(coll_list)))
-            
+
+
         for grid_idx in self.active_grid_idx:
             dev_id = gidx_to_device_map(grid_idx,n_grids)
             
@@ -836,9 +860,11 @@ class Boltzmann0D2VBactchedSolver:
                     ff , qoi = self.bte_solver.solve(grid_idx, f0, self.param.atol, self.param.rtol, self.param.max_iter, self.param.solver_type)
                     self.ff[grid_idx]  = ff
                     self.qoi[grid_idx] = qoi
-                except:
+                except Exception as e:
+                    print(e)
                     print("rank [%d/%d] solver failed for v-space gird no %d"%(self.rankG, self.npesG, grid_idx), flush=True)
-                    sys.exit(-1)
+                    self.comm.Abort(0)
+                    #sys.exit(-1)
             
             with cp.cuda.Device(dev_id):
                 t1()
@@ -870,7 +896,6 @@ class Boltzmann0D2VBactchedSolver:
                         qoi       = self.bte_solver.compute_QoIs(grid_idx, h_curr, effective_mobility=False)
                         rr_cpu    = xp.asnumpy(qoi["rates"])
                         inp_mask  = xp.asnumpy(self.sub_cluster_c_lbl[grid_idx]) == np.arange(self.param.n_sub_clusters)[:, None]
-                        
                         rr_interp = np.zeros((n_reactions, len(gidx_to_pidx_map[grid_idx])))
                         
                         for c_idx in range(self.param.n_sub_clusters):
@@ -883,7 +908,7 @@ class Boltzmann0D2VBactchedSolver:
                     
                     with cp.cuda.Device(dev_id):
                         t1()
-                        
+
                 rates = rates.reshape((-1))
                 rates[rates<0] = 0.0
         else:
@@ -922,7 +947,9 @@ class Boltzmann0D2VBactchedSolver:
         efield                  = np.array(interface.HostRead(libtps.t2bIndex.ElectricField), copy=False).reshape((2, tps_npts))
         species_densities       = np.array(interface.HostRead(libtps.t2bIndex.SpeciesDensities), copy=False).reshape(nspecies, tps_npts)
         
-        cs_avail_species        = self.bte_solver._avail_species
+        cs_avail_species        = self.bte_solver._avail_species[0]
+        for i in range(len(self.bte_solver._avail_species)):
+            assert cs_avail_species == self.bte_solver._avail_species[i]
         
         n0                      = np.sum(species_densities, axis=0) - species_densities[TPSINDEX.ELE_IDX]
         ns_by_n0                = np.concatenate([species_densities[TPSINDEX.MOLE_FRAC_IDX[i]]/n0 for i in range(len(cs_avail_species))]).reshape((len(cs_avail_species), tps_npts))
@@ -1240,16 +1267,13 @@ class Boltzmann0D2VBactchedSolver:
         self.ff                 = [None for grid_idx in range(self.param.n_grids)]
         num_gpus                = len(gpu)
         assert num_gpus         == self.num_gpus_per_node, "CuPy and Parla number of GPUs per node does not match %d vs. %d"%(num_gpus, self.num_gpus_per_node)
-        coll_list               = self.bte_solver.get_collision_list()
-        coll_names              = self.bte_solver.get_collision_names()
         
         if (use_gpu==1):
             parla_placement = [gpu(gidx_to_device_map(grid_idx,n_grids)) for grid_idx in range(n_grids)]
         else:
             parla_placement = [cpu for grid_idx in range(n_grids)]
 
-        if csv_write: 
-            data_csv = np.empty((self.tps_npts, 8 + len(coll_list)))
+        
             
         ts = TaskSpace("T")
         for grid_idx in self.active_grid_idx:
@@ -1340,9 +1364,10 @@ class Boltzmann0D2VBactchedSolver:
         h_curr                  = self.bte_solver.normalized_distribution(grid_idx, h_curr)
         ff                      = h_curr
         qoi                     = self.bte_solver.compute_QoIs(grid_idx, h_curr, effective_mobility=False)
-        coll_list               = self.bte_solver.get_collision_list()
-        coll_names              = self.bte_solver.get_collision_names()
-        cs_data                 = self.bte_solver.get_cross_section_data()
+        
+        coll_list               = self.bte_solver.get_collision_list()[grid_idx]
+        coll_names              = self.bte_solver.get_collision_names()[grid_idx]
+        cs_data                 = self.bte_solver.get_cross_section_data()[grid_idx]
         
         cs_species              = list()
         for col_idx, (k,v) in enumerate(cs_data.items()):
@@ -1780,6 +1805,19 @@ def driver_wo_parla(comm):
             interface = libtps.Tps2Boltzmann(tps)
             tps.initInterface(interface)
             tps.solveBegin()
+
+            ## Hack to set-up the correct initial condition
+            tps.push(interface)
+            ini_name = pytps.resolve_runFile(sys.argv)
+
+            print(ini_name)
+            config = configparser.ConfigParser()
+            config.read(ini_name)
+            tabulatedSolver = TabulatedSolver(comm, config)
+            tabulatedSolver.fetch(interface)
+            tabulatedSolver.solve()
+            tabulatedSolver.push(interface)
+            tps.fetch(interface)
             # --- first TPS step is needed to initialize the EM fields
             tps.solveStep()
             tps.push(interface)
@@ -1946,6 +1984,9 @@ def driver_wo_parla(comm):
                 profile_tt[pp.TPS_FETCH].start()
                 tps.fetch(interface)
                 profile_tt[pp.TPS_FETCH].stop()
+
+                if (iter%cycle_freq==0):
+                    interface.saveDataCollection(cycle=(iter//cycle_freq), time=iter)
                 
                 tps_u  = 0
                 tps_v  = 0
