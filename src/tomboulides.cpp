@@ -649,6 +649,8 @@ void Tomboulides::initializeOperators() {
   S_poisson_coeff_ = new VectorSumCoefficient(*twoS_gradmu_coeff_, *gradmu_Qt_coeff_, 1.0, -2. / 3);
   S_mom_coeff_ = new VectorSumCoefficient(*graduT_gradmu_coeff_, *gradmu_Qt_coeff_, 1.0, -1.0);
 
+  u_next_coeff_ = new VectorGridFunctionCoefficient(u_next_gf_);
+  
   // Coefficients for axisymmetric
   if (axisym_) {
     rad_rho_coeff_ = new ProductCoefficient(radius_coeff, *rho_coeff_);
@@ -669,7 +671,6 @@ void Tomboulides::initializeOperators() {
     ur_conv_forcing_coeff_ = new VectorArrayCoefficient(2);
     ur_conv_forcing_coeff_->Set(0, utheta2_coeff_);
 
-    u_next_coeff_ = new VectorGridFunctionCoefficient(u_next_gf_);
     rad_rhou_coeff_ = new ScalarVectorProductCoefficient(*rad_rho_coeff_, *u_next_coeff_);
 
     u_next_rad_coeff_ = new GridFunctionCoefficient(u_next_rad_comp_gf_);
@@ -689,6 +690,7 @@ void Tomboulides::initializeOperators() {
     visc_coeff_ = new GridFunctionCoefficient(thermo_interface_->viscosity);
     umag_coeff_ = new VectorMagnitudeCoefficient(*u_next_coeff_);
     gscale_coeff_ = new GridFunctionCoefficient(gridScale_gf_);
+
     visc_inv_coeff_ = new PowerCoefficient(*visc_coeff_, -1.0);
     // visc_inv_coeff_ = new PowerCoefficient(*mu_coeff_, -1.0);
     
