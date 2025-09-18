@@ -67,8 +67,8 @@ void Orthogonalize(Vector &v, const ParFiniteElementSpace *pfes) {
   v -= global_sum / static_cast<double>(global_size);
 }
 
-Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalSchemeCoefficients &coeff, 
-                        mfem::ParGridFunction *gridScale, TPS::Tps *tps)
+Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalSchemeCoefficients &coeff,
+                         mfem::ParGridFunction *gridScale, TPS::Tps *tps)
     : gll_rules(0, Quadrature1D::GaussLobatto),
       tpsP_(tps),
       pmesh_(pmesh),
@@ -130,7 +130,7 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
     tps->getInput("loMach/tomboulides/psolve-maxIters", pressure_solve_max_iter_, default_max_iter_);
     tps->getInput("loMach/tomboulides/hsolve-maxIters", hsolve_max_iter_, default_max_iter_);
     tps->getInput("loMach/tomboulides/msolve-maxIters", mass_inverse_max_iter_, default_max_iter_);
-  
+
     // artificial diffusion (SUPG)
     tpsP_->getInput("loMach/tomboulides/streamwise-stabilization", sw_stab_, false);
   }
@@ -210,7 +210,7 @@ Tomboulides::~Tomboulides() {
   delete rho_over_dt_coeff_;
   delete iorho_coeff_;
   delete rho_coeff_;
-  
+
   delete umag_coeff_;
   delete gscale_coeff_;
   delete visc_inv_coeff_;
@@ -220,7 +220,7 @@ Tomboulides::~Tomboulides() {
   delete csupg_coeff_;
   delete uw1_coeff_;
   delete uw2_coeff_;
-  delete upwind_coeff_; 
+  delete upwind_coeff_;
   delete swdiff_coeff_;
   delete supg_coeff_;
   delete visc_coeff_;
@@ -650,7 +650,7 @@ void Tomboulides::initializeOperators() {
   S_mom_coeff_ = new VectorSumCoefficient(*graduT_gradmu_coeff_, *gradmu_Qt_coeff_, 1.0, -1.0);
 
   u_next_coeff_ = new VectorGridFunctionCoefficient(u_next_gf_);
-  
+
   // Coefficients for axisymmetric
   if (axisym_) {
     rad_rho_coeff_ = new ProductCoefficient(radius_coeff, *rho_coeff_);
@@ -686,34 +686,33 @@ void Tomboulides::initializeOperators() {
   }
 
   // artifical diffusion coefficients
-  if(sw_stab_) {
+  if (sw_stab_) {
     visc_coeff_ = new GridFunctionCoefficient(thermo_interface_->viscosity);
     umag_coeff_ = new VectorMagnitudeCoefficient(*u_next_coeff_);
     gscale_coeff_ = new GridFunctionCoefficient(gridScale_gf_);
 
     visc_inv_coeff_ = new PowerCoefficient(*visc_coeff_, -1.0);
     // visc_inv_coeff_ = new PowerCoefficient(*mu_coeff_, -1.0);
-    
+
     // compute Reh
     reh1_coeff_ = new ProductCoefficient(*rho_coeff_, *visc_inv_coeff_);
     reh2_coeff_ = new ProductCoefficient(*reh1_coeff_, *gscale_coeff_);
     Reh_coeff_ = new ProductCoefficient(*reh2_coeff_, *umag_coeff_);
-    
+
     // Csupg
     csupg_coeff_ = new TransformedCoefficient(Reh_coeff_, csupgFactor);
-      
+
     if (axisym_) {
       // compute upwind magnitude
       uw1_coeff_ = new ProductCoefficient(*rad_rho_coeff_, *csupg_coeff_);
       uw2_coeff_ = new ProductCoefficient(*uw1_coeff_, *gscale_coeff_);
       upwind_coeff_ = new ProductCoefficient(*uw2_coeff_, *umag_coeff_);
-      
+
       // streamwise diffusion direction
       swdiff_coeff_ = new TransformedMatrixVectorCoefficient(u_next_coeff_, &streamwiseTensor);
-      
+
       supg_coeff_ = new ScalarMatrixProductCoefficient(*upwind_coeff_, *swdiff_coeff_);
-    }
-    else {
+    } else {
       // compute upwind magnitude
       // dividing by rho anyway
       // uw1_coeff_ = new ProductCoefficient(*rho_coeff_, *csupg_coeff_);
@@ -977,7 +976,7 @@ void Tomboulides::initializeOperators() {
   Hv_form_ = new ParBilinearForm(vfes_);
   VectorMassIntegrator *hmv_blfi;
   VectorDiffusionIntegrator *hdv_blfi;
-  
+
   if (axisym_) {
     hmv_blfi = new VectorMassIntegrator(*rad_rho_over_dt_coeff_);
     hdv_blfi = new VectorDiffusionIntegrator(*rad_mu_coeff_);
@@ -1098,7 +1097,7 @@ void Tomboulides::initializeOperators() {
     auto *hms_blfi = new MassIntegrator(*rad_rho_over_dt_coeff_);
     auto *hds_blfi = new DiffusionIntegrator(*rad_mu_coeff_);
     auto *hfs_blfi = new MassIntegrator(*mu_over_rad_coeff_);
-    
+
     DiffusionIntegrator *shds_blfi;
     if (sw_stab_) {
       // auto *shds_blfi = new DiffusionIntegrator(*supg_coeff_);
@@ -1545,7 +1544,6 @@ void Tomboulides::step() {
   }
 
   if (sw_stab_) {
-
     // Update matrix
     Array<int> empty;
     Mv_stab_form_->Update();
