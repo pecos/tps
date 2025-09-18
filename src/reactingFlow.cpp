@@ -55,10 +55,11 @@ static double radius(const Vector &pos) { return pos[0]; }
 static FunctionCoefficient radius_coeff(radius);
 
 ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &time_coeff,
-                           TPS::Tps *tps)
+                           ParGridFunction *gridScale, TPS::Tps *tps)
     : tpsP_(tps), pmesh_(pmesh), dim_(pmesh->Dimension()), time_coeff_(time_coeff) {
   rank0_ = (pmesh_->GetMyRank() == 0);
   order_ = loMach_opts->order;
+  gridScale_gf_ = gridScale;
 
   /// Basic input information
   tpsP_->getInput("loMach/ambientPressure", ambient_pressure_, 101325.0);
@@ -696,6 +697,9 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     operator_split_ = true;
     assert(nSub_ == 1);
   }
+
+  // artificial diffusion (SUPG)
+  tpsP_->getInput("loMach/reactingFlow/streamwise-stabilization", sw_stab_, false);
 }  // NOLINT
 
 ReactingFlow::~ReactingFlow() {
@@ -775,6 +779,20 @@ ReactingFlow::~ReactingFlow() {
   delete mixture_;
   delete transport_;
   delete chemistry_;
+
+  delete umag_coeff_;
+  delete gscale_coeff_;
+  delete visc_coeff_;
+  delete visc_inv_coeff_;
+  delete reh1_coeff_;
+  delete reh2_coeff_;
+  delete Reh_coeff_;
+  delete csupg_coeff_;
+  delete uw1_coeff_;
+  delete uw2_coeff_;
+  delete upwind_coeff_; 
+  delete swdiff_coeff_;
+  delete supg_coeff_;
 
   // allocated in initializeSelf
   delete vfes_;
@@ -1278,6 +1296,49 @@ void ReactingFlow::initializeOperators() {
     rad_kap_gradT_coeff_ = new ScalarVectorProductCoefficient(radius_coeff, *kap_gradT_coeff_);
   }
 
+  // artifical diffusion coefficients
+  if(sw_stab_) {
+    // run once to avoid division by zero
+    // updateMixture();
+    // updateDensity(1.0);
+    updateDiffusivity();
+    umag_coeff_ = new VectorMagnitudeCoefficient(*un_next_coeff_);
+    gscale_coeff_ = new GridFunctionCoefficient(gridScale_gf_);
+    visc_coeff_ = new GridFunctionCoefficient(&visc_gf_);
+    visc_inv_coeff_ = new PowerCoefficient(*visc_coeff_, -1.);
+    
+    // compute Reh
+    reh1_coeff_ = new ProductCoefficient(*rhon_next_coeff_, *visc_inv_coeff_);
+    reh2_coeff_ = new ProductCoefficient(*reh1_coeff_, *gscale_coeff_);
+    Reh_coeff_ = new ProductCoefficient(*reh2_coeff_, *umag_coeff_);
+    
+    // Csupg
+    csupg_coeff_ = new TransformedCoefficient(Reh_coeff_, csupgFactor);
+      
+    if (axisym_) {
+      // compute upwind magnitude
+      uw1_coeff_ = new ProductCoefficient(*rad_rho_coeff_, *csupg_coeff_);
+      uw2_coeff_ = new ProductCoefficient(*uw1_coeff_, *gscale_coeff_);
+      upwind_coeff_ = new ProductCoefficient(*uw2_coeff_, *umag_coeff_);
+      
+      // streamwise diffusion direction
+      swdiff_coeff_ = new TransformedMatrixVectorCoefficient(un_next_coeff_, &streamwiseTensor);
+
+      supg_coeff_ = new ScalarMatrixProductCoefficient(*upwind_coeff_, *swdiff_coeff_);
+    }
+    else {
+      // compute upwind magnitude
+      uw1_coeff_ = new ProductCoefficient(*rhon_next_coeff_, *csupg_coeff_);
+      uw2_coeff_ = new ProductCoefficient(*uw1_coeff_, *gscale_coeff_);
+      upwind_coeff_ = new ProductCoefficient(*uw2_coeff_, *umag_coeff_);
+
+      // streamwise diffusion direction
+      swdiff_coeff_ = new TransformedMatrixVectorCoefficient(un_next_coeff_, &streamwiseTensor);
+
+      supg_coeff_ = new ScalarMatrixProductCoefficient(*upwind_coeff_, *swdiff_coeff_);
+    }
+  }
+
   At_form_ = new ParBilinearForm(sfes_);
   ConvectionIntegrator *at_blfi;
   if (axisym_) {
@@ -1384,6 +1445,17 @@ void ReactingFlow::initializeOperators() {
     hmt_blfi->SetIntRule(&ir_di);
     hdt_blfi->SetIntRule(&ir_di);
   }
+  // SUPG
+  DiffusionIntegrator *sdt_blfi; 
+  if (sw_stab_) {
+    // auto *sdt_blfi = new DiffusionIntegrator(*supg_coeff_);
+    sdt_blfi = new DiffusionIntegrator(*supg_coeff_);
+    // SUPG diffusion
+    // if (numerical_integ_) {
+    //   sdt_blfi->SetIntRule(&ir_di);
+    // }
+    Ht_form_->AddDomainIntegrator(sdt_blfi);
+  }
   Ht_form_->AddDomainIntegrator(hmt_blfi);
   Ht_form_->AddDomainIntegrator(hdt_blfi);
   if (partial_assembly_) {
@@ -1409,6 +1481,17 @@ void ReactingFlow::initializeOperators() {
   if (numerical_integ_) {
     hmy_blfi->SetIntRule(&ir_di);
     hdy_blfi->SetIntRule(&ir_di);
+  }
+  // SUPG
+  DiffusionIntegrator *syt_blfi;
+  if (sw_stab_) {
+    // auto *syt_blfi = new DiffusionIntegrator(*supg_coeff_);
+    syt_blfi = new DiffusionIntegrator(*supg_coeff_);
+    // SUPG diffusion
+    // if (numerical_integ_) {
+    //   sdt_blfi->SetIntRule(&ir_di);
+    // }
+    Hy_form_->AddDomainIntegrator(syt_blfi);
   }
   Hy_form_->AddDomainIntegrator(hmy_blfi);
   Hy_form_->AddDomainIntegrator(hdy_blfi);
@@ -1567,6 +1650,15 @@ void ReactingFlow::initializeOperators() {
     lqd_blfi->SetIntRule(&ir_di);
   }
   LQ_form_->AddDomainIntegrator(lqd_blfi);
+
+  // auto *slqd_blfi = new DiffusionIntegrator(*supg_coeff_);
+  // if (sw_stab_)
+  //   // SUPG diffusion
+  //   // if (numerical_integ_) {
+  //   //   slqd_blfi->SetIntRule(&ir_di);
+  //   // }
+  //   LQ_form_->AddDomainIntegrator(slqd_blfi);
+
   if (partial_assembly_) {
     LQ_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   }
@@ -1593,6 +1685,15 @@ void ReactingFlow::initializeOperators() {
     lyd_blfi->SetIntRule(&ir_di);
   }
   LY_form_->AddDomainIntegrator(lyd_blfi);
+
+  // auto *slyd_blfi = new DiffusionIntegrator(*supg_coeff_);
+  // if (sw_stab_)
+  //   // SUPG diffusion
+  //   // if (numerical_integ_) {
+  //   //   slyd_blfi->SetIntRule(&ir_di);
+  //   // }
+  //   LY_form_->AddDomainIntegrator(slqd_blfi);
+
   if (partial_assembly_) {
     LY_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   }

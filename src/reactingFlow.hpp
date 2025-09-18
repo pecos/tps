@@ -154,6 +154,9 @@ class ReactingFlow : public ThermoChemModelBase {
   // Initial temperature value (if constant IC)
   double T_ic_;
 
+  // streamwise-stabilization
+  bool sw_stab_;
+
   // FEM related fields and objects
 
   // Scalar \f$H^1\f$ finite element collection.
@@ -173,6 +176,8 @@ class ReactingFlow : public ThermoChemModelBase {
 
   // Vector \f$H^1\f$ finite element space.
   ParFiniteElementSpace *vfes_ = nullptr;
+
+  ParGridFunction *gridScale_gf_ = nullptr;
 
   // Fields
   ParGridFunction Tnm1_gf_, Tnm2_gf_;
@@ -246,6 +251,20 @@ class ReactingFlow : public ThermoChemModelBase {
   ProductCoefficient *rad_jh_coeff_ = nullptr;
   ProductCoefficient *rad_radiation_sink_coeff_ = nullptr;
   ScalarVectorProductCoefficient *rad_kap_gradT_coeff_ = nullptr;
+
+  VectorMagnitudeCoefficient *umag_coeff_ = nullptr;
+  GridFunctionCoefficient *gscale_coeff_ = nullptr;
+  GridFunctionCoefficient *visc_coeff_ = nullptr;
+  PowerCoefficient *visc_inv_coeff_ = nullptr;
+  ProductCoefficient *reh1_coeff_  = nullptr;
+  ProductCoefficient *reh2_coeff_  = nullptr;
+  ProductCoefficient *Reh_coeff_  = nullptr;
+  TransformedCoefficient *csupg_coeff_ = nullptr;
+  ProductCoefficient *uw1_coeff_  = nullptr;
+  ProductCoefficient *uw2_coeff_ = nullptr;
+  ProductCoefficient *upwind_coeff_  = nullptr;
+  TransformedMatrixVectorCoefficient *swdiff_coeff_  = nullptr;
+  ScalarMatrixProductCoefficient *supg_coeff_ = nullptr;
 
   // operators and solvers
   ParBilinearForm *At_form_ = nullptr;
@@ -359,7 +378,8 @@ class ReactingFlow : public ThermoChemModelBase {
   std::vector<std::string> vizSpecNames_;
 
  public:
-  ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff, TPS::Tps *tps);
+  ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff, 
+               ParGridFunction *gridScale, TPS::Tps *tps);
   virtual ~ReactingFlow();
 
   // Functions overriden from base class

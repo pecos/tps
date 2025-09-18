@@ -170,7 +170,7 @@ void LoMachSolver::initialize() {
   } else if (loMach_opts_.thermo_solver == "lte-thermo-chem") {
     thermo_ = new LteThermoChem(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_);
   } else if (loMach_opts_.thermo_solver == "reacting-flow") {
-    thermo_ = new ReactingFlow(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_);
+    thermo_ = new ReactingFlow(pmesh_, &loMach_opts_, temporal_coeff_, (meshData_->getGridScale()), tpsP_);
   } else {
     // Unknown choice... die
     if (rank0_) {
