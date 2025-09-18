@@ -1316,29 +1316,20 @@ void ReactingFlow::initializeOperators() {
     // Csupg
     csupg_coeff_ = new TransformedCoefficient(Reh_coeff_, csupgFactor);
 
+    // compute upwind magnitude
     if (axisym_) {
-      // compute upwind magnitude
       uw1_coeff_ = new ProductCoefficient(*rad_rho_coeff_, *csupg_coeff_);
-      uw2_coeff_ = new ProductCoefficient(*uw1_coeff_, *gscale_coeff_);
-      upwind_coeff_ = new ProductCoefficient(*uw2_coeff_, *umag_coeff_);
-
-      // streamwise diffusion direction
-      swdiff_coeff_ = new TransformedMatrixVectorCoefficient(un_next_coeff_, &streamwiseTensor);
-
-      supg_coeff_ = new ScalarMatrixProductCoefficient(*upwind_coeff_, *swdiff_coeff_);
-      supg_cp_coeff_ = new ScalarMatrixProductCoefficient(*cpMix_coeff_, *supg_coeff_);
     } else {
-      // compute upwind magnitude
       uw1_coeff_ = new ProductCoefficient(*rhon_next_coeff_, *csupg_coeff_);
-      uw2_coeff_ = new ProductCoefficient(*uw1_coeff_, *gscale_coeff_);
-      upwind_coeff_ = new ProductCoefficient(*uw2_coeff_, *umag_coeff_);
-
-      // streamwise diffusion direction
-      swdiff_coeff_ = new TransformedMatrixVectorCoefficient(un_next_coeff_, &streamwiseTensor);
-
-      supg_coeff_ = new ScalarMatrixProductCoefficient(*upwind_coeff_, *swdiff_coeff_);
-      supg_cp_coeff_ = new ScalarMatrixProductCoefficient(*cpMix_coeff_, *supg_coeff_);
     }
+    uw2_coeff_ = new ProductCoefficient(*uw1_coeff_, *gscale_coeff_);
+    upwind_coeff_ = new ProductCoefficient(*uw2_coeff_, *umag_coeff_);
+
+    // streamwise diffusion direction
+    swdiff_coeff_ = new TransformedMatrixVectorCoefficient(un_next_coeff_, &streamwiseTensor);
+
+    supg_coeff_ = new ScalarMatrixProductCoefficient(*upwind_coeff_, *swdiff_coeff_);
+    supg_cp_coeff_ = new ScalarMatrixProductCoefficient(*cpMix_coeff_, *supg_coeff_);
   }
 
   At_form_ = new ParBilinearForm(sfes_);
@@ -1448,9 +1439,8 @@ void ReactingFlow::initializeOperators() {
     hdt_blfi->SetIntRule(&ir_di);
   }
   // SUPG
-  DiffusionIntegrator *sdt_blfi;
   if (sw_stab_) {
-    sdt_blfi = new DiffusionIntegrator(*supg_cp_coeff_);
+    auto sdt_blfi = new DiffusionIntegrator(*supg_cp_coeff_);
     if (numerical_integ_) {
       sdt_blfi->SetIntRule(&ir_di);
     }
@@ -1483,11 +1473,10 @@ void ReactingFlow::initializeOperators() {
     hdy_blfi->SetIntRule(&ir_di);
   }
   // SUPG
-  DiffusionIntegrator *syt_blfi;
   if (sw_stab_) {
-    syt_blfi = new DiffusionIntegrator(*supg_coeff_);
+    auto syt_blfi = new DiffusionIntegrator(*supg_coeff_);
     if (numerical_integ_) {
-      sdt_blfi->SetIntRule(&ir_di);
+      syt_blfi->SetIntRule(&ir_di);
     }
     Hy_form_->AddDomainIntegrator(syt_blfi);
   }
