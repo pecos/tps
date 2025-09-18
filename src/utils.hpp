@@ -188,9 +188,10 @@ void makeContinuous(ParGridFunction &u);
 
 bool copyFile(const char *SRC, const char *DEST);
 
-/// upwind diffusion
-// double upwindDiffMag(Vector *state, double gridspace);
+/// upwind diffusion support: evaluate u * u^T / ||u||^2
 void streamwiseTensor(const Vector &vel, DenseMatrix &swMgbl);
+
+/// upwind diffusion support: evaluate supg constant
 double csupgFactor(double Reh);
 
 /// Eliminate essential BCs in an Operator and apply to RHS.

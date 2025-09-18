@@ -1156,9 +1156,7 @@ void streamwiseTensor(const Vector &vel, DenseMatrix &swMgbl) {
 }
 
 double csupgFactor(double Reh) {
-  // return  0.5 * (tanh(re_factor * Re - re_offset) + 1.0);
-  // printf("%f\n", Reh);
-  // printf("%f\n", 0.5 * (tanh(Reh) + 1.0));
+  // TODO(trevilo): This implementation has lost the re_factor and re_offset options.  Bring them back.
   return 0.5 * (tanh(Reh) + 1.0);
 }
 
@@ -1346,12 +1344,7 @@ void VectorMagnitudeCoefficient::SetTime(double t) {
 
 double VectorMagnitudeCoefficient::Eval(ElementTransformation &T, const IntegrationPoint &ip) {
   a->Eval(va, T, ip);
-  // double res = 0;
-  // for (int i = 0; i < va.size(); i++) { res += va[i] * va[i]}
-  // res = std::sqrt(res)
-  // return res;
-  double mod = std::max(std::sqrt(va * va), 1.0e-18);
-  return mod;
+  return std::max(std::sqrt(va * va), 1.0e-18);
 }
 
 void TransformedMatrixVectorCoefficient::SetTime(double t) {
@@ -1364,15 +1357,6 @@ void TransformedMatrixVectorCoefficient::Eval(DenseMatrix &G, ElementTransformat
   buf.SetSize(Q1->GetVDim());
   Q1->Eval(buf, T, ip);
   Function(buf, G);
-
-  // int dim = Q1->GetVDim();
-  // std::cout << " " << endl;
-  // for (int i = 0; i < dim; i++) {
-  //   for (int j = 0; j < dim; j++) {
-  //     std::cout << G(i,j) << " " ;
-  //   }
-  //   std::cout << endl;
-  // }
 }
 
 }  // namespace mfem
