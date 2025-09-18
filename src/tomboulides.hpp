@@ -303,6 +303,7 @@ class Tomboulides final : public FlowBase {
   mfem::ProductCoefficient *upwind_coeff_  = nullptr;
   mfem::TransformedMatrixVectorCoefficient *swdiff_coeff_  = nullptr;
   mfem::ScalarMatrixProductCoefficient *supg_coeff_ = nullptr;
+  mfem::GridFunctionCoefficient *visc_coeff_ = nullptr;
 
   // mfem "form" objects used to create operators
   mfem::ParBilinearForm *L_iorho_form_ = nullptr;  // \int (1/\rho) \nabla \phi_i \cdot \nabla \phi_j
