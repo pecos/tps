@@ -1136,106 +1136,23 @@ void scalarGrad3DV(FiniteElementSpace *fes, FiniteElementSpace *vfes, Vector u, 
 void streamwiseTensor(const Vector &vel, DenseMatrix &swMgbl) {
   int dim = vel.Size();
 
-  // streamwise coordinate system
-  Vector unitNorm;
-  Vector unitT1;
-  Vector unitT2;
-  unitNorm.SetSize(dim);
-  unitT1.SetSize(dim);
-  unitT2.SetSize(dim);
-
-  // streamwise direction
-  for (int i = 0; i < dim; i++) unitNorm[i] = vel[i];
-  double mod = 0.0;
-  for (int i = 0; i < dim; i++) mod += unitNorm[i] * unitNorm[i];
-  mod = std::max(mod, 1.0e-18);
-  double Umag = std::sqrt(mod);
-  unitNorm /= Umag;
-
-  // std::cout << Umag << " " << endl ;
-
-  // for zero-flow
-  if (Umag < 1.0e-8) {
-    // for (int i = 0; i < dim; i++) {
-    //   for (int j = 0; j < dim; j++) {
-    //     swMgbl(i, j) = 0.0;
-    //   }
-    // }
-    swMgbl = 0.0;
-    return;
-  }
-
-  // tangent direction (not unique)
-  int maxInd, minusInd, plusInd;
-  if (unitNorm[0] * unitNorm[0] > unitNorm[1] * unitNorm[1]) {
-    maxInd = 0;
-  } else {
-    maxInd = 1;
-  }
-  if (dim == 3 && unitNorm[maxInd] * unitNorm[maxInd] < unitNorm[2] * unitNorm[2]) {
-    maxInd = 2;
-  }
-  minusInd = ((maxInd - 1) % dim + dim) % dim;
-  plusInd = (maxInd + 1) % dim;
-
-  unitT1[minusInd] = -unitNorm[maxInd];
-  unitT1[maxInd] = unitNorm[minusInd];
-  if (dim == 3) {  // DOUBLE CHECK THIS WHEN TESTING 3D
-    unitT1[plusInd] = 0.0;
-  }
-  mod = 0.0;
-  for (int i = 0; i < dim; i++) mod += unitT1[i] * unitT1[i];
-  mod = std::max(mod, 1.0e-18);
-  unitT1 /= std::sqrt(mod);
-
-  // t2 is then orthogonal to both normal & t1
-  if (dim == 3) {
-    unitT2[0] = +(unitNorm[1] * unitT1[2] - unitNorm[2] * unitT1[1]);
-    unitT2[1] = -(unitNorm[0] * unitT1[2] - unitNorm[2] * unitT1[0]);
-    unitT2[2] = +(unitNorm[0] * unitT1[1] - unitNorm[1] * unitT1[0]);
-  }
-
-  // transform from streamwise coords to global
-  DenseMatrix M(dim, dim);
-  for (int d = 0; d < dim; d++) {
-    M(d, 0) = unitNorm[d];
-    M(d, 1) = unitT1[d];
-    if (dim == 3) M(d, 2) = unitT2[d];
-  }
-
-  // streamwise coeff
-  DenseMatrix swM(dim, dim);
-  swM = 0.0;
-  swM(0, 0) = 1.0;
-
-  // std::cout << " " << endl;
-  // for (int i = 0; i < dim; i++) {
-  //   for (int j = 0; j < dim; j++) {
-  //     std::cout << M(i,j) << " " ;
-  //   }
-  //   std::cout << endl;
-  // }
-
-  // M_{im} swM_{mn} M_{jn} or M*"mu"*M^T (with n,t1,t2 in columns of M)
-  // DenseMatrix swMgbl(dim, dim);
+  swMgbl.SetSize(dim, dim);
   swMgbl = 0.0;
+
+  // compute velocity magnitude
+  double Umag2 = 0.0;
+  for (int i = 0; i < dim; i++) Umag2 += vel[i] * vel[i];
+  const double Umag = std::sqrt(Umag2);
+
+  // for zero-flow, quick return with swMgbl = 0 (necessary?)
+  if (Umag < 1.0e-8) return;
+
+  // swMgbl = (u u^T) / ||u||^2
   for (int i = 0; i < dim; i++) {
     for (int j = 0; j < dim; j++) {
-      for (int m = 0; m < dim; m++) {
-        for (int n = 0; n < dim; n++) {
-          swMgbl(i, j) += M(i, m) * M(j, n) * swM(m, n);
-        }
-      }
+      swMgbl(i, j) = vel[i] * vel[j] / Umag2;
     }
   }
-
-  // std::cout << " " << endl;
-  // for (int i = 0; i < dim; i++) {
-  //   for (int j = 0; j < dim; j++) {
-  //     std::cout << swMgbl(i,j) << " " ;
-  //   }
-  //   std::cout << endl;
-  // }
 }
 
 double csupgFactor(double Reh) {
