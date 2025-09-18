@@ -1041,7 +1041,7 @@ void ReactingFlow::initializeSelf() {
         if (rank0_) {
           std::cout << "Rx Flow: Setting interpolated Dirichlet temperature on patch = " << patch << std::endl;
         }
-        AddTempDirichletBC(temperature_bc_field_, inlet_attr);
+        // AddTempDirichletBC(temperature_bc_field_, inlet_attr);
 
         // Force the IC to agree with the interpolated inlet BC
         //
@@ -1804,8 +1804,11 @@ void ReactingFlow::step() {
         YT[nActiveSpecies_] = h_Tn[i];
 
         // Solve backward Euler update
+        // printf("Chem %d/%d\n", i, sDofInt_);
+        // Vector loc(3);
+        // pmesh_->GetNode(i, loc);
+        // printf("Coord %f, %f, %f\n", loc[0], loc[1], loc[2]);
         solveChemistryStep(YT, i, dt_);
-
         // Overwrite point state data
         for (int sp = 0; sp < nActiveSpecies_; sp++) {
           h_Yn[sp * sDofInt_ + i] = YT[sp];

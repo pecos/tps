@@ -54,9 +54,14 @@
 using namespace mfem;
 
 /// generic user-specified vel ic
+// void velIC_user(const Vector &x, double t, Vector &u) {
+//   u(0) = 0.0;
+//   u(1) = 0.0;
+//   u(2) = 0.0;
+// }
 void velIC_user(const Vector &x, double t, Vector &u) {
   u(0) = 0.0;
-  u(1) = 0.0;
+  u(1) = 2.0;
   u(2) = 0.0;
 }
 
