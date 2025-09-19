@@ -38,6 +38,7 @@ EXTRA_DIST  = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes lte-
               ref_solns/reactTable/*.h5 \
               ref_solns/radDecay/*.h5 \
               ref_solns/reactNitrogen/*.h5 \
+              ref_solns/supg/*.h5 \
 		      vpath.sh die.sh count_gpus.sh sniff_mpirun.sh \
 		      cyl3d.gpu.test cyl3d.mflow.gpu.test wedge.gpu.test \
 	          averaging.gpu.test cyl3d.test cyl3d.gpu.python.test cyl3d.mflow.test cyl3d.dtconst.test \
@@ -54,7 +55,7 @@ EXTRA_DIST  = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes lte-
               coupled-3d.interface.test plasma.axisym.test plasma.axisym.lte1d.test \
 	      lomach-flow.test lomach-lequere.test interpInlet.test sgsLoMach.test autoPeriodic.test aveLoMach.test \
               reactFlow-binDiff.test reactFlow-singleRx.test reactFlow-table.test radiativeDecay.test \
-              reactFlow-nitrogen.test argon_minimal.test argon_minimal.binary.test
+              reactFlow-nitrogen.test argon_minimal.test argon_minimal.binary.test supg-scalars.test
 
 TESTS = vpath.sh
 XFAIL_TESTS =
@@ -128,7 +129,8 @@ TESTS += cyl3d.test \
          reactFlow-singleRx.test \
          reactFlow-table.test \
          radiativeDecay.test \
-         reactFlow-nitrogen.test
+         reactFlow-nitrogen.test \
+	 supg-scalars.test
 
 if PYTHON_ENABLED
 TESTS += cyl3d.python.test \
