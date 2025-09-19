@@ -42,8 +42,8 @@ parser.add_argument("-c", "--collisions"                          , help="collis
 parser.add_argument("-sp_order", "--sp_order"                     , help="b-spline order", type=int, default=3)
 parser.add_argument("-spline_qpts", "--spline_qpts"               , help="q points per knots", type=int, default=5)
 parser.add_argument("-atol", "--atol"                             , help="absolute tolerance", type=float, default=1e-10)
-parser.add_argument("-rtol", "--rtol"                             , help="relative tolerance", type=float, default=1e-6)
-parser.add_argument("-max_iter", "--max_iter"                     , help="max number of iterations for newton solve", type=int, default=600)
+parser.add_argument("-rtol", "--rtol"                             , help="relative tolerance", type=float, default=1e-4)
+parser.add_argument("-max_iter", "--max_iter"                     , help="max number of iterations for newton solve", type=int, default=1000)
 parser.add_argument("-Te", "--Te"                                 , help="approximate electron temperature (eV)" , type=float, default=0.5)
 parser.add_argument("-n0"    , "--n0"                             , help="heavy density (1/m^3)" , type=float, default=3.22e22)
 parser.add_argument("-ev_max", "--ev_max"                         , help="max energy in the v-space grid" , type=float, default=30)
@@ -65,7 +65,7 @@ parser.add_argument("-input", "--input"                           , help="tps da
 #python3 bte_0d3v_batched_driver.py --threads 1 -out_fname bte_ss -solver_type steady-state -c lxcat_data/eAr_crs.synthetic.3sp2r -sp_order 3 -spline_qpts 5 -atol 1e-10 -rtol 1e-10 -max_iter 300 -Te 3 -n0 3.22e22 -ev_max 30 -Nr 127 -n_pts 1 -ee_collisions 1 -cycles 2 -dt 1e-3
 args                  = parser.parse_args()
 
-def bte_from_tps(Tarr, narr, Er, Ei, collisions_file):
+def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, solver_type, ee_collisions):
     # INPUTS:
     # Tarr : Array of heavies temperature (1D array of length sDofInt)
     # narr : Array of species number densities (1D array of length sDofInt * nspecies)
@@ -88,6 +88,12 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file):
 
     nActSpecies = nSpecies - 2
     all_species           = cross_section.read_available_species(collisions_file)
+
+    args.solver_type = solver_type
+    args.ee_collisions = ee_collisions
+
+    if rank_ == 0:
+        print("BTE solver_type = ", args.solver_type, ", ee_collisions = ", args.ee_collisions, ", atol = ", args.atol, ", rtol = ", args.rtol)
 
     # The species indices are based on the TPS ordering
     NEUIDX = nSpecies - 1
@@ -170,8 +176,8 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file):
     Emmin = np.amin(Emag); Emmax = np.amax(Emag)
 
     # Print out the local extrema for each rank
-    print("Rank = ", rank_, ", n0 = ", n0min, " to ", n0max, ", ne = ", nemin, " to ", nemax, ", ns0 = ", ns0min, " to ", ns0max, ", ns1 = ", ns1min, " to ", ns1max)
-    print("Rank = ", rank_, ", Tg = ", Tgmin, " to ", Tgmax, ", Er = ", Ermin, " to ", Ermax, ", Ei = ", Eimin, " to ", Eimax, ", Em = ", Emmin, " to ", Emmax)
+    # print("Rank = ", rank_, ", n0 = ", n0min, " to ", n0max, ", ne = ", nemin, " to ", nemax, ", ns0 = ", ns0min, " to ", ns0max, ", ns1 = ", ns1min, " to ", ns1max)
+    # print("Rank = ", rank_, ", Tg = ", Tgmin, " to ", Tgmax, ", Er = ", Ermin, " to ", Ermax, ", Ei = ", Eimin, " to ", Eimax, ", Em = ", Emmin, " to ", Emmax)
 
     n0gmin = comm.allreduce(n0min, op = MPI.MIN)
     n0gmax = comm.allreduce(n0max, op = MPI.MAX)

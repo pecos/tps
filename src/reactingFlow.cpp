@@ -105,6 +105,8 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
 #ifdef HAVE_PYTHON
   tpsP_->getInput("cycle-avg-joule-coupled/bte-from-tps", bte_from_tps_, false);
   tpsP_->getRequiredInput("boltzmannSolver/collisionsFile", collisionsFile);
+  tpsP_->getRequiredInput("boltzmannSolver/solver_type", solver_type);
+  tpsP_->getInput("boltzmannSolver/ee_collisions", ee_collisions, 0);
 #endif
 
   // plasma conditions. ???
@@ -1809,7 +1811,7 @@ void ReactingFlow::step() {
         // IMPORT THE PYTHON SCRIPT
         py::object script = py::module_::import("tps-get-bte-rates");
         // CALL THE PYTHON FUNCTION
-        result = script.attr("bte_from_tps")(Tarr, specarr, Erarr, Eiarr, collisionsFile);
+        result = script.attr("bte_from_tps")(Tarr, specarr, Erarr, Eiarr, collisionsFile, solver_type, ee_collisions);
       } catch (const py::error_already_set &e) {
         std::cerr << "ReactingFlow::step(), Python error: " << e.what() << std::endl;
       }

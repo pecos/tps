@@ -128,7 +128,8 @@ class ReactingFlow : public ThermoChemModelBase {
 
   #ifdef HAVE_PYTHON
   bool bte_from_tps_ = false;       /**< true if the BTE solver is called from within TPS (C++ call Python) */
-  std::string collisionsFile;       /**< string to store the path of the collisions cross-sections file (will be passed to BTE) */
+  std::string collisionsFile, solver_type;       /**< string to store the path of the collisions cross-sections file, BTE solver type (will be passed to BTE) */
+  int ee_collisions = 0;            /**< flag to enable electron-electron collisions in BTE solver */
   #endif
 
   // Linear-solver-related options
