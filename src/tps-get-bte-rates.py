@@ -42,12 +42,12 @@ parser.add_argument("-c", "--collisions"                          , help="collis
 parser.add_argument("-sp_order", "--sp_order"                     , help="b-spline order", type=int, default=3)
 parser.add_argument("-spline_qpts", "--spline_qpts"               , help="q points per knots", type=int, default=5)
 parser.add_argument("-atol", "--atol"                             , help="absolute tolerance", type=float, default=1e-10)
-parser.add_argument("-rtol", "--rtol"                             , help="relative tolerance", type=float, default=1e-4)
-parser.add_argument("-max_iter", "--max_iter"                     , help="max number of iterations for newton solve", type=int, default=100)
+parser.add_argument("-rtol", "--rtol"                             , help="relative tolerance", type=float, default=1e-6)
+parser.add_argument("-max_iter", "--max_iter"                     , help="max number of iterations for newton solve", type=int, default=600)
 parser.add_argument("-Te", "--Te"                                 , help="approximate electron temperature (eV)" , type=float, default=0.5)
 parser.add_argument("-n0"    , "--n0"                             , help="heavy density (1/m^3)" , type=float, default=3.22e22)
 parser.add_argument("-ev_max", "--ev_max"                         , help="max energy in the v-space grid" , type=float, default=30)
-parser.add_argument("-Nr", "--Nr"                                 , help="radial refinement", type=int, default=64)
+parser.add_argument("-Nr", "--Nr"                                 , help="radial refinement", type=int, default=63)
 parser.add_argument("-profile", "--profile"                       , help="profile", type=int, default=0)
 parser.add_argument("-warm_up", "--warm_up"                       , help="warm up", type=int, default=5)
 parser.add_argument("-runs", "--runs"                             , help="runs "  , type=int, default=10)
@@ -55,7 +55,7 @@ parser.add_argument("-n_pts", "--n_pts"                           , help="number
 parser.add_argument("-store_eedf", "--store_eedf"                 , help="store EEDF"          , type=int, default=0)
 parser.add_argument("-store_csv", "--store_csv"                   , help="store csv format of QoI comparisons", type=int, default=0)
 parser.add_argument("-plot_data", "--plot_data"                   , help="plot data", type=int, default=0)
-parser.add_argument("-ee_collisions", "--ee_collisions"           , help="enable electron-electron collisions", type=int, default=0)
+parser.add_argument("-ee_collisions", "--ee_collisions"           , help="enable electron-electron collisions", type=int, default=1)
 parser.add_argument("-verbose", "--verbose"                       , help="verbose with debug information", type=int, default=0)
 parser.add_argument("-use_gpu", "--use_gpu"                       , help="use gpus for batched solver", type=int, default=1)
 parser.add_argument("-cycles", "--cycles"                         , help="number of max cycles to evolve to compute cycle average rates", type=float, default=5)
@@ -88,8 +88,6 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file):
 
     nActSpecies = nSpecies - 2
     all_species           = cross_section.read_available_species(collisions_file)
-    # if (rank_ == 0):
-    #     print("nspecies = ", nSpecies, ", nActSpecies = ", nActSpecies, "all_species = ", all_species)
 
     # The species indices are based on the TPS ordering
     NEUIDX = nSpecies - 1
@@ -152,8 +150,6 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file):
     if rank_ == 0:
         print("Batched BTE solver operator assembly complete")
 
-    comm.Barrier()
-
     f0         = bte_solver.initialize(grid_idx, n_pts,"maxwellian")
     bte_solver.set_boltzmann_parameter(grid_idx, "n0"       , n0)
     bte_solver.set_boltzmann_parameter(grid_idx, "ne"       , ne)
@@ -164,19 +160,74 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file):
     bte_solver.set_boltzmann_parameter(grid_idx, "f0"       , f0)
     bte_solver.set_boltzmann_parameter(grid_idx,  "E"       , Emag)
 
+    n0min = np.amin(n0); n0max = np.amax(n0)
+    nemin = np.amin(ne); nemax = np.amax(ne)
+    ns0min = np.amin(ns_by_n0[0]); ns0max = np.amax(ns_by_n0[0])
+    ns1min = np.amin(ns_by_n0[1]); ns1max = np.amax(ns_by_n0[1])
+    Tgmin = np.amin(Tg); Tgmax = np.amax(Tg)
+    Ermin = np.amin(Er+eps); Ermax = np.amax(Er+eps)
+    Eimin = np.amin(Ei+eps); Eimax = np.amax(Ei+eps)
+    Emmin = np.amin(Emag); Emmax = np.amax(Emag)
+
+    # Print out the local extrema for each rank
+    print("Rank = ", rank_, ", n0 = ", n0min, " to ", n0max, ", ne = ", nemin, " to ", nemax, ", ns0 = ", ns0min, " to ", ns0max, ", ns1 = ", ns1min, " to ", ns1max)
+    print("Rank = ", rank_, ", Tg = ", Tgmin, " to ", Tgmax, ", Er = ", Ermin, " to ", Ermax, ", Ei = ", Eimin, " to ", Eimax, ", Em = ", Emmin, " to ", Emmax)
+
+    n0gmin = comm.allreduce(n0min, op = MPI.MIN)
+    n0gmax = comm.allreduce(n0max, op = MPI.MAX)
+
+    negmin = comm.allreduce(nemin, op = MPI.MIN)
+    negmax = comm.allreduce(nemax, op = MPI.MAX)
+
+    ns0gmin = comm.allreduce(ns0min, op = MPI.MIN)
+    ns0gmax = comm.allreduce(ns0max, op = MPI.MAX)
+
+    ns1gmin = comm.allreduce(ns1min, op = MPI.MIN)
+    ns1gmax = comm.allreduce(ns1max, op = MPI.MAX)
+
+    Tggmin = comm.allreduce(Tgmin, op = MPI.MIN)
+    Tggmax = comm.allreduce(Tgmax, op = MPI.MAX)
+
+    Ergmin = comm.allreduce(Ermin, op = MPI.MIN)
+    Ergmax = comm.allreduce(Ermax, op = MPI.MAX)
+
+    Eigmin = comm.allreduce(Eimin, op = MPI.MIN)
+    Eigmax = comm.allreduce(Eimax, op = MPI.MAX)
+
+    Emgmin = comm.allreduce(Emmin, op = MPI.MIN)
+    Emgmax = comm.allreduce(Emmax, op = MPI.MAX)
+
+    # GET THE GLOBAL MAX AND MIN OF EACH PLASMA PARAMETER
+    if rank_ == 0:
+        print("Global n0 = ", n0gmin, " to ", n0gmax, ", ne = ", negmin, " to ", negmax, ", ns0 = ", ns0gmin, " to ", ns0gmax, ", ns1 = ", ns1gmin, " to ", ns1gmax)
+        print("Global Tg = ", Tgmin, " to ", Tgmax, ", Er = ", Ermin, " to ", Ermax, ", Ei = ", Eimin, " to ", Eimax, ", Em = ", Emmin, " to ", Emmax)
+        
+    collision_names = bte_solver.get_collision_names()
+
     if args.use_gpu==1:
         num_gpus = cp.cuda.runtime.getDeviceCount()
         dev_id   = rank_ % num_gpus
-        # print("Rank = ", rank_, ", dev_id = ", dev_id, ", number of GPUs = ", num_gpus)
         bte_solver.host_to_device_setup(dev_id, grid_idx)
+        gpu_device = cp.cuda.Device(dev_id)
+        gpu_device.use()
 
     f0       = bte_solver.get_boltzmann_parameter(grid_idx,"f0")
     ff , qoi = bte_solver.solve(grid_idx, f0, args.atol, args.rtol, args.max_iter, args.solver_type)
-    # ev       = np.linspace(1e-3, bte_solver._par_ev_range[grid_idx][1], 500)
-    # ff_r     = bte_solver.compute_radial_components(grid_idx, ev, ff)
 
     if args.use_gpu==1:
         bte_solver.device_to_host_setup(dev_id, grid_idx)
+    
+    collision_names = bte_solver.get_collision_names()
+
+    # if rank_ == 0:
+    #     print(qoi["rates"].shape)
+    # for col_idx, g in enumerate(collision_names):
+    #     if rank_ == 0:
+    #         print("col_idx = ", col_idx, ", g = ", g, ", shape(dat) = ", qoi["rates"][col_idx].shape, ", ", qoi["rates"][col_idx].reshape(-1,1).shape)
+    #     data = qoi["rates"][col_idx].reshape(-1,1)
+
+    # if rank_ == 0:
+    #     print("Collision_names = ", collision_names, "shape(data) = ", data.shape, " len(data) = ", len(data))
     
     # ff_r     = cp.asnumpy(ff_r)
     # for k, v in qoi.items():
@@ -194,6 +245,7 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file):
 
     Tarr2 = Tarr
 
-    print("Rank = ", rank_, ", BTE solve complete...")
+    if rank_ == 0:
+        print("Rank = ", rank_, ", BTE solve complete...")
 
     return Tarr2
