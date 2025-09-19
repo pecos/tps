@@ -715,7 +715,7 @@ void Tomboulides::initializeOperators() {
     } else {
       // compute upwind magnitude
       // dividing by rho anyway
-      // uw1_coeff_ = new ProductCoefficient(*rho_coeff_, *csupg_coeff_);
+      uw1_coeff_ = new ProductCoefficient(*rho_coeff_, *csupg_coeff_);
       uw2_coeff_ = new ProductCoefficient(*uw1_coeff_, *gscale_coeff_);
       upwind_coeff_ = new ProductCoefficient(*uw2_coeff_, *umag_coeff_);
 
