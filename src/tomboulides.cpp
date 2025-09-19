@@ -1549,19 +1549,16 @@ void Tomboulides::step() {
     Mv_stab_form_->Update();
     Mv_stab_form_->Assemble();
     Mv_stab_form_->FormSystemMatrix(empty, Mv_stab_op_);
-    /*
-    for (int i = 0; i < dim_; i++) {
-      setScalarFromVector(u_vec_, i, &tmpR0a_);
-      streamwiseDiffusion(tmpR0a_, tmpR0b_);
-      setVectorFromScalar(tmpR0b_, i, &swDiff_vec_);
-    }
-    */
-    Mv_stab_op_->Mult(gradU_, tmpR0b_);
+
+    Mv_stab_op_->Mult(gradU_, tmpR1_);
+    D_op_->Mult(tmpR1_, tmpR0b_);
     setVectorFromScalar(tmpR0b_, 0, &swDiff_vec_);
-    Mv_stab_op_->Mult(gradV_, tmpR0b_);
+    Mv_stab_op_->Mult(gradV_, tmpR1_);
+    D_op_->Mult(tmpR1_, tmpR0b_);
     setVectorFromScalar(tmpR0b_, 1, &swDiff_vec_);
     if (dim_ == 3) {
-      Mv_stab_op_->Mult(gradW_, tmpR0b_);
+      Mv_stab_op_->Mult(gradW_, tmpR1_);
+      D_op_->Mult(tmpR1_, tmpR0b_);
       setVectorFromScalar(tmpR0b_, 2, &swDiff_vec_);
     }
     Mv_rho_inv_->Mult(swDiff_vec_, tmpR1_);
