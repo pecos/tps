@@ -181,6 +181,9 @@ class Tomboulides final : public FlowBase {
   // reference here.
   const temporalSchemeCoefficients &coeff_;
 
+  // streamwise-stabilization
+  bool sw_stab_;
+
   StopWatch sw_press_, sw_helm_;
 
   std::string ic_string_;
@@ -234,6 +237,8 @@ class Tomboulides final : public FlowBase {
   mfem::ParGridFunction *resp_gf_ = nullptr;
   mfem::ParGridFunction *pp_div_rad_comp_gf_ = nullptr;
 
+  mfem::ParGridFunction *gridScale_gf_ = nullptr;
+
   /// Swirl
   mfem::ParGridFunction *utheta_gf_ = nullptr;
   mfem::ParGridFunction *utheta_next_gf_ = nullptr;
@@ -286,6 +291,20 @@ class Tomboulides final : public FlowBase {
   mfem::VectorArrayCoefficient *utheta_vec_coeff_ = nullptr;
   mfem::InnerProductCoefficient *swirl_var_viscosity_coeff_ = nullptr;
 
+  mfem::VectorMagnitudeCoefficient *umag_coeff_ = nullptr;
+  mfem::GridFunctionCoefficient *gscale_coeff_ = nullptr;
+  mfem::PowerCoefficient *visc_inv_coeff_ = nullptr;
+  mfem::ProductCoefficient *reh1_coeff_ = nullptr;
+  mfem::ProductCoefficient *reh2_coeff_ = nullptr;
+  mfem::ProductCoefficient *Reh_coeff_ = nullptr;
+  mfem::TransformedCoefficient *csupg_coeff_ = nullptr;
+  mfem::ProductCoefficient *uw1_coeff_ = nullptr;
+  mfem::ProductCoefficient *uw2_coeff_ = nullptr;
+  mfem::ProductCoefficient *upwind_coeff_ = nullptr;
+  mfem::TransformedMatrixVectorCoefficient *swdiff_coeff_ = nullptr;
+  mfem::ScalarMatrixProductCoefficient *supg_coeff_ = nullptr;
+  mfem::GridFunctionCoefficient *visc_coeff_ = nullptr;
+
   // mfem "form" objects used to create operators
   mfem::ParBilinearForm *L_iorho_form_ = nullptr;  // \int (1/\rho) \nabla \phi_i \cdot \nabla \phi_j
   mfem::ParLinearForm *forcing_form_ = nullptr;    // \int \phi_i f
@@ -309,6 +328,9 @@ class Tomboulides final : public FlowBase {
   mfem::ParLinearForm *rho_ur_ut_form_ = nullptr;
   mfem::ParLinearForm *swirl_var_viscosity_form_ = nullptr;
 
+  // streamwise stability
+  mfem::ParBilinearForm *Mv_stab_form_ = nullptr;
+
   // mfem operator objects
   mfem::OperatorHandle L_iorho_op_;
   mfem::OperatorHandle Ms_op_;
@@ -320,6 +342,9 @@ class Tomboulides final : public FlowBase {
   mfem::OperatorHandle Ms_rho_op_;
   mfem::OperatorHandle Hs_op_;
   mfem::OperatorHandle As_op_;
+
+  // streamwise stability
+  mfem::OperatorHandle Mv_stab_op_;
 
   // solver objects
   mfem::ParLORDiscretization *L_iorho_lor_ = nullptr;
@@ -374,6 +399,9 @@ class Tomboulides final : public FlowBase {
   mfem::Vector utheta_m2_vec_;
   mfem::Vector utheta_next_vec_;
 
+  mfem::Vector tmpR0b_;
+  mfem::Vector swDiff_vec_;
+
   // miscellaneous
   double volume_;
   mfem::ParLinearForm *mass_lform_ = nullptr;
@@ -392,7 +420,8 @@ class Tomboulides final : public FlowBase {
 
  public:
   /// Constructor
-  Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalSchemeCoefficients &coeff, TPS::Tps *tps = nullptr);
+  Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalSchemeCoefficients &coeff,
+              mfem::ParGridFunction *gridScale = nullptr, TPS::Tps *tps = nullptr);
 
   /// Destructor
   ~Tomboulides() final;

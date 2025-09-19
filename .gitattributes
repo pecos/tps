@@ -30,3 +30,4 @@ test/ref_solns/aveLoMach/restart_output.sol.h5 filter=lfs diff=lfs merge=lfs -te
 test/ref_solns/reactNitrogen/restart_output.sol.h5 filter=lfs diff=lfs merge=lfs -text
 test/ref_solns/supg/restart_output_wstab1T.sol.h5 filter=lfs diff=lfs merge=lfs -text
 test/ref_solns/supg/restart_output_lte_supg.sol.h5 filter=lfs diff=lfs merge=lfs -text
+test/ref_solns/stabChan/restart_output.sol.h5 filter=lfs diff=lfs merge=lfs -text
