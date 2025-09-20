@@ -47,7 +47,7 @@ parser.add_argument("-max_iter", "--max_iter"                     , help="max nu
 parser.add_argument("-Te", "--Te"                                 , help="approximate electron temperature (eV)" , type=float, default=0.5)
 parser.add_argument("-n0"    , "--n0"                             , help="heavy density (1/m^3)" , type=float, default=3.22e22)
 parser.add_argument("-ev_max", "--ev_max"                         , help="max energy in the v-space grid" , type=float, default=30)
-parser.add_argument("-Nr", "--Nr"                                 , help="radial refinement", type=int, default=63)
+parser.add_argument("-Nr", "--Nr"                                 , help="radial refinement", type=int, default=101)
 parser.add_argument("-profile", "--profile"                       , help="profile", type=int, default=0)
 parser.add_argument("-warm_up", "--warm_up"                       , help="warm up", type=int, default=5)
 parser.add_argument("-runs", "--runs"                             , help="runs "  , type=int, default=10)
@@ -93,7 +93,7 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, solver_type, ee_collisions
     args.ee_collisions = ee_collisions
 
     if rank_ == 0:
-        print("BTE solver_type = ", args.solver_type, ", ee_collisions = ", args.ee_collisions, ", atol = ", args.atol, ", rtol = ", args.rtol)
+        print("BTE solver_type = ", args.solver_type, ", ee_collisions = ", args.ee_collisions, ", atol = ", args.atol, ", rtol = ", args.rtol, ", max-iter = ", args.max_iter)
 
     # The species indices are based on the TPS ordering
     NEUIDX = nSpecies - 1
@@ -174,6 +174,7 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, solver_type, ee_collisions
     Ermin = np.amin(Er+eps); Ermax = np.amax(Er+eps)
     Eimin = np.amin(Ei+eps); Eimax = np.amax(Ei+eps)
     Emmin = np.amin(Emag); Emmax = np.amax(Emag)
+    idmin = np.amin(ion_deg); idmax = np.amax(ion_deg)
 
     # Print out the local extrema for each rank
     # print("Rank = ", rank_, ", n0 = ", n0min, " to ", n0max, ", ne = ", nemin, " to ", nemax, ", ns0 = ", ns0min, " to ", ns0max, ", ns1 = ", ns1min, " to ", ns1max)
@@ -203,10 +204,14 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, solver_type, ee_collisions
     Emgmin = comm.allreduce(Emmin, op = MPI.MIN)
     Emgmax = comm.allreduce(Emmax, op = MPI.MAX)
 
+    idgmin = comm.allreduce(idmin, op = MPI.MIN)
+    idgmax = comm.allreduce(idmax, op = MPI.MAX)
+
+
     # GET THE GLOBAL MAX AND MIN OF EACH PLASMA PARAMETER
     if rank_ == 0:
         print("Global n0 = ", n0gmin, " to ", n0gmax, ", ne = ", negmin, " to ", negmax, ", ns0 = ", ns0gmin, " to ", ns0gmax, ", ns1 = ", ns1gmin, " to ", ns1gmax)
-        print("Global Tg = ", Tgmin, " to ", Tgmax, ", Er = ", Ermin, " to ", Ermax, ", Ei = ", Eimin, " to ", Eimax, ", Em = ", Emmin, " to ", Emmax)
+        print("Global Tg = ", Tgmin, " to ", Tgmax, ", Er = ", Ermin, " to ", Ermax, ", Ei = ", Eimin, " to ", Eimax, ", Em = ", Emmin, " to ", Emmax, " ion_deg = ", idgmin, ", to ", idgmax)
         
     collision_names = bte_solver.get_collision_names()
 
