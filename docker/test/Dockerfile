@@ -89,7 +89,7 @@ RUN . /etc/profile.d/lmod.sh \
 RUN rm /tmp/v$gslib_ver.tar.gz
 
 # MFEM (w/ gslib support)
-ENV mfem_ver="4.8"
+ENV mfem_ver="4.6"
 ENV mfem_prefix="/usr/local"
 RUN wget https://github.com/mfem/mfem/archive/refs/tags/v$mfem_ver.tar.gz -P /tmp
 RUN cd /tmp; tar xvf /tmp/v$mfem_ver.tar.gz
@@ -154,7 +154,7 @@ RUN yum -y install gsl-gnu9-ohpc
 RUN pip3 install "pybind11[global]"
 
 RUN . /etc/profile.d/lmod.sh \
-    && pip3 install mpi4py
+    && pip3 install mpi4py==3.1.5
 
 # Register new libs installed into /usr/local/lib with linker
 RUN echo "/usr/local/lib" > /etc/ld.so.conf.d/class.conf
