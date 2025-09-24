@@ -89,7 +89,7 @@ RUN . /etc/profile.d/lmod.sh \
 RUN rm /tmp/v$gslib_ver.tar.gz
 
 # MFEM (w/ gslib support)
-ENV mfem_ver="4.6"
+ENV mfem_ver="4.8"
 ENV mfem_prefix="/usr/local"
 RUN wget https://github.com/mfem/mfem/archive/refs/tags/v$mfem_ver.tar.gz -P /tmp
 RUN cd /tmp; tar xvf /tmp/v$mfem_ver.tar.gz
