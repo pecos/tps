@@ -23,6 +23,20 @@ setup() {
 
     # if neither mpirun or flux found, then MPIRUN is empty and tests
     # below will be skipped
+
+    # figure out if mfem is pre or post 4.6 (4.6 and before has
+    # different behavior for gslib interpolation of points on
+    # inter-element boundaries)
+    MFEM_POST_46=0
+    if [ $(./snarf_mfem.py --version) -gt 40600 ]; then
+        echo "Detected post v4.6 mfem"
+        MFEM_POST_46=1
+    fi
+
+    # If post v4.6, use difference reference soln
+    if [ $MFEM_POST_46 == 1 ]; then
+        REF_FILE_2D=ref_solns/plasma.lte2d.v48.h5
+    fi
 }
 
 @test "[$TEST] verify axisymmetric LTE (2D) plasma case with input from -> $RUNFILE_2D" {
@@ -41,9 +55,6 @@ setup() {
     test -s $SOLN_FILE_2D
     test -s $REF_FILE_2D
 
-    # Relax tolerances here slightly to pass on some cuda platforms;
-    # cause of increased delta is unclear
-    #./soln_differ -r -u 4e-11 -e 6e-14 $SOLN_FILE_MIX $REF_FILE_MIX
     ./soln_differ -r $SOLN_FILE_2D $REF_FILE_2D
 }
 
