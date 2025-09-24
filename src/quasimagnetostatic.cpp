@@ -155,14 +155,22 @@ void QuasiMagnetostaticSolver3D::initialize() {
   if (verbose && (em_opts_.ref_levels > 0)) {
     grvy_printf(ginfo, "Refining mesh: ref_levels %d\n", em_opts_.ref_levels);
   }
-  for (int l = 0; l < em_opts_.ref_levels; l++) {
-    mesh->UniformRefinement();
-  }
+  // for (int l = 0; l < em_opts_.ref_levels; l++) {
+  //   mesh->UniformRefinement();
+  // }
 
   // 1c) Partition the mesh
   pmesh_ = new ParMesh(tpsP_->getTPSCommWorld(), *mesh);
   delete mesh;  // no longer need the serial mesh
   // pmesh_->ReorientTetMesh();
+
+  for (int l = 0; l < em_opts_.ref_levels; l++) {
+    pmesh_->UniformRefinement();
+  }
+
+  if (verbose) {
+    grvy_printf(ginfo, "Done reading mesh.");
+  }
 
   //-----------------------------------------------------
   // 2) Prepare the required finite elements
@@ -178,6 +186,13 @@ void QuasiMagnetostaticSolver3D::initialize() {
   jh_space_ = new ParFiniteElementSpace(pmesh_, L2_);
 
   true_size_ = Aspace_->TrueVSize();
+  HYPRE_BigInt total_size = Aspace_->GlobalTrueVSize();
+
+  if (verbose) {
+    grvy_printf(ginfo, "Done initializing spaces.");
+    grvy_printf(ginfo, "Aspace has %d total dofs.", total_size);
+  }
+
   offsets_[0] = 0;
   offsets_[1] = true_size_;
   offsets_[2] = true_size_;
