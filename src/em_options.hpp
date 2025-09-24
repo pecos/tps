@@ -52,8 +52,8 @@ class ElectromagneticOptions {
   double atol;                            /**< Linear solver absolute tolerance */
   double preconditioner_background_sigma; /**< Uniform conductivity to use to preconditioner (ignored if <= 0) */
 
-  bool top_only; /**< Flag to specify current in top rings only */
-  bool bot_only; /**< Flag to specify current in bottom rings only */
+  bool top_only;         /**< Flag to specify current in top rings only */
+  bool bot_only;         /**< Flag to specify current in bottom rings only */
   bool variable_current; /**< Flag to specify variable current in each ring */
 
   bool evaluate_magnetic_field;

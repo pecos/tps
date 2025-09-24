@@ -814,8 +814,8 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
           d_flux[eq + q * num_equation + n * maxIntPoints * num_equation] = Rflux[eq];
         }
       }  // end quadrature point loop
-    }    // end face loop
-  });    // end element loop
+    }  // end face loop
+  });  // end element loop
 #endif
 }
 

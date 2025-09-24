@@ -68,8 +68,8 @@ static double sigmaTorchStartUp(const Vector &pos) {
 static FunctionCoefficient sigma_start_up(sigmaTorchStartUp);
 
 LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &time_coeff,
-                ParGridFunction *gridScale, TPS::Tps *tps)
-    : tpsP_(tps), pmesh_(pmesh), time_coeff_(time_coeff), gridScale_gf_(gridScale)  {
+                             ParGridFunction *gridScale, TPS::Tps *tps)
+    : tpsP_(tps), pmesh_(pmesh), time_coeff_(time_coeff), gridScale_gf_(gridScale) {
   rank0_ = (pmesh_->GetMyRank() == 0);
   order_ = loMach_opts->order;
 
@@ -469,7 +469,7 @@ void LteThermoChem::initializeSelf() {
 
   // outlet bc
   {
-      // Assumed homogeneous Nuemann on T, so nothing to do
+    // Assumed homogeneous Nuemann on T, so nothing to do
   }
 
   // Wall BCs
@@ -600,7 +600,6 @@ void LteThermoChem::initializeOperators() {
 
     supg_coeff_ = new ScalarMatrixProductCoefficient(*upwind_coeff_, *swdiff_coeff_);
   }
-
 
   // Convection: Atemperature(i,j) = \int_{\Omega} \phi_i \rho Cp u \cdot \nabla \phi_j
   At_form_ = new ParBilinearForm(sfes_);
