@@ -11,18 +11,7 @@ setup() {
     RSTRT_FILE_2D=ref_solns/plasma.lte2d.restart.h5
     REF_FILE_2D=ref_solns/plasma.lte2d.final.h5
 
-    found=1
-
-    # defaut to mpirun if available
-    MPIRUN=$(type -P mpirun) || found=0
-
-    # if not, try flux
-    if [ $found -eq 0 ]; then
-        type -P flux && MPIRUN="$(type -P flux) run" || found=0
-    fi
-
-    # if neither mpirun or flux found, then MPIRUN is empty and tests
-    # below will be skipped
+    MPIRUN=`./sniff_mpirun.sh`
 
     # figure out if mfem is pre or post 4.6 (4.6 and before has
     # different behavior for gslib interpolation of points on
