@@ -327,7 +327,8 @@ void Tps::parseInput() {
   getInput("gpu/numGpusPerRank", numGpusPerRank_, 1);
 #ifdef _HIP_
   // Sometimes hip call stack is too small.  Allow user to resize it.
-  // See https://rocm.docs.amd.com/projects/HIP/en/docs-6.4.2/how-to/hip_runtime_api/call_stack.html#call-stack-management-with-hip
+  // See
+  // https://rocm.docs.amd.com/projects/HIP/en/docs-6.4.2/how-to/hip_runtime_api/call_stack.html#call-stack-management-with-hip
   int stackSizeMult;
   getInput("gpu/hipStackSizeMult", stackSizeMult, 2);
 

@@ -272,9 +272,7 @@ void QuasiMagnetostaticSolver3D::InitializeCurrent() {
   }
 
   if (rank0_) {
-    std::cout << "J0 = " << J0(0) << ", " << J0(1)
-              << ", " << J0(2) << ", " << J0(3)
-              << ", " << J0(4) << endl;
+    std::cout << "J0 = " << J0(0) << ", " << J0(1) << ", " << J0(2) << ", " << J0(3) << ", " << J0(4) << endl;
   }
 
   PWConstCoefficient J0coef(J0);
@@ -924,9 +922,7 @@ void QuasiMagnetostaticSolverAxiSym::InitializeCurrent() {
   }
 
   if (rank0_) {
-    std::cout << "J0 = " << J0(0) << ", " << J0(1)
-              << ", " << J0(2) << ", " << J0(3)
-              << ", " << J0(4) << endl;
+    std::cout << "J0 = " << J0(0) << ", " << J0(1) << ", " << J0(2) << ", " << J0(3) << ", " << J0(4) << endl;
   }
 
   FunctionCoefficient radius_coeff(radius);

@@ -90,7 +90,7 @@ class LteThermoChem final : public ThermoChemModelBase {
   bool numerical_integ_ = false;  /**< Enable/disable numerical integration rules of forms. */
   bool domain_is_open_ = false;   /**< true if domain is open */
   bool axisym_ = false;
-  bool sw_stab_ = false;          /**< Enable/disable supg stabilization. */
+  bool sw_stab_ = false; /**< Enable/disable supg stabilization. */
 
   // Linear-solver-related options
   int pl_solve_ = 0;    /**< Verbosity level passed to mfem solvers */
