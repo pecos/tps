@@ -69,7 +69,7 @@ static FunctionCoefficient sigma_start_up(sigmaTorchStartUp);
 
 LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &time_coeff,
                              ParGridFunction *gridScale, TPS::Tps *tps)
-    : tpsP_(tps), pmesh_(pmesh), time_coeff_(time_coeff), gridScale_gf_(gridScale) {
+    : gll_rules_(0, Quadrature1D::GaussLobatto), tpsP_(tps), pmesh_(pmesh), time_coeff_(time_coeff), gridScale_gf_(gridScale)  {
   rank0_ = (pmesh_->GetMyRank() == 0);
   order_ = loMach_opts->order;
 
@@ -170,6 +170,9 @@ LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, t
   tps->getInput("loMach/ltethermo/linear-solver-verbosity", pl_solve_, 0);
 
   tpsP_->getInput("loMach/ltethermo/streamwise-stabilization", sw_stab_, false);
+  if (sw_stab_) {
+    if (rank0_) std::cout << "Using SUPG in LTE thermo chem!" << std::endl;
+  }
 }
 
 LteThermoChem::~LteThermoChem() {
@@ -489,7 +492,7 @@ void LteThermoChem::initializeSelf() {
       tpsP_->getRequiredInput((basepath + "/type").c_str(), type);
 
       if (type == "viscous_isothermal") {
-        std::cout << "Adding patch = " << patch << " to isothermal wall list!" << std::endl;
+        if(rank0_) std::cout << "Adding patch = " << patch << " to isothermal wall list!" << std::endl;
 
         attr_wall = 0;
         attr_wall[patch - 1] = 1;
@@ -527,9 +530,12 @@ void LteThermoChem::initializeOperators() {
   // unsteady: p+p [+p] = 2p [3p]
   // convection: p+p+(p-1) [+p] = 3p-1 [4p-1]
   // diffusion: (p-1)+(p-1) [+p] = 2p-2 [3p-2]
-  const IntegrationRule &ir_i = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 2 * order_ + 1);
-  const IntegrationRule &ir_nli = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 4 * order_);
-  const IntegrationRule &ir_di = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 3 * order_ - 1);
+  // const IntegrationRule &ir_i = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 2 * order_ + 1);
+  // const IntegrationRule &ir_nli = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 4 * order_);
+  // const IntegrationRule &ir_di = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 3 * order_ - 1);
+  const IntegrationRule &ir_i = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 2 * order_ - 1);
+  const IntegrationRule &ir_nli = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 2 * order_ - 1);
+  const IntegrationRule &ir_di = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 2 * order_ - 1);
   if (rank0_) std::cout << "Integration rules set" << endl;
 
   // coefficients for operators
