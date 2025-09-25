@@ -89,6 +89,10 @@ class ReactingFlow : public ThermoChemModelBase {
   int sDof_, sDofInt_;
   int yDof_, yDofInt_;
 
+  #ifdef HAVE_PYTHON
+  int nBTEReactions_;
+  #endif
+
   // Number of reactions and dofs
   int rDof_, rDofInt_;
 
@@ -331,6 +335,7 @@ class ReactingFlow : public ThermoChemModelBase {
 #ifdef HAVE_PYTHON
   // Vectors for real and imaginary parts of electric field magnitude
   Vector er_, ei_;
+  Vector bterates_;
 #endif
 
   // additions for species
@@ -443,7 +448,11 @@ class ReactingFlow : public ThermoChemModelBase {
    * The incoming YT must contain the nActiveSpecies_ mass fractions
    * for the active species and temperature.
    */
-  void evaluateReactingSource(const double *YT, const int dofindex, double *omega);
+  void evaluateReactingSource(const double *YT, const int dofindex, double *omega
+  #ifdef HAVE_PYTHON
+    , double *BTErr
+  #endif
+  );
 
   /**
    * @brief Solve the thermochemistry update
@@ -455,7 +464,11 @@ class ReactingFlow : public ThermoChemModelBase {
    * for the active species and temperature.  This state is
    * overwritten with the new local state at the end of the time step.
    */
-  void solveChemistryStep(double *YT, const int dofindex, const double dt);
+  void solveChemistryStep(double *YT, const int dofindex, const double dt
+  #ifdef HAVE_PYTHON
+    , double *BTErr
+  #endif
+  );
 
   // time-splitting
   void substepState();

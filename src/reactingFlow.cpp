@@ -334,6 +334,10 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   tpsP_->getInput("reactions/number_of_reactions", nReactions_, 0);
   tpsP_->getInput("reactions/minimum_chemistry_temperature", chemistryInput_.minimumTemperature, 0.0);
 
+#ifdef HAVE_PYTHON
+  tpsP_->getInput("reactions/number_of_BTE_reactions", nBTEReactions_, 0);
+#endif
+
   Vector reactionEnergies(nReactions_);
   Vector detailedBalance(nReactions_);
   Array<ReactionModel> reactionModels;
@@ -857,6 +861,9 @@ void ReactingFlow::initializeSelf() {
 
   ei_.SetSize(sDofInt_);
   ei_ = 0.0;
+
+  bterates_.SetSize(sDofInt_*nBTEReactions_);
+  bterates_ = 0.0;
 #endif
 
   radiation_sink_gf_.SetSpace(sfes_);
@@ -1757,24 +1764,6 @@ void ReactingFlow::step() {
 
       // GET THE MIN AND MAX VALUES OF SPECIES NUMBER DENSITIES FRACTIONS FOR EACH SPECIES
       if (rank0_) std::cout << "sDofInt = " << sDofInt_ << "\n";
-      // for (int sp = 0; sp < nSpecies_; sp++) {
-      //   mfem::Vector species_view(speciesInt_.GetData() + sp*sDofInt_, sDofInt_);
-
-      //   double local_min = species_view.Min();
-      //   double local_max = species_view.Max();
-
-      //   double global_min, global_max;
-
-      //   MPI_Allreduce(&local_min, &global_min, 1, MPI_DOUBLE, MPI_MIN, tpsP_->getTPSCommWorld());
-      //   MPI_Allreduce(&local_max, &global_max, 1, MPI_DOUBLE, MPI_MAX, tpsP_->getTPSCommWorld());
-
-      //   if (rank0_) {
-      //     std::cout << "sp = " << sp << ", for number density, Local extrema = " 
-      //               << local_min << " to" << local_max 
-      //               << ", Global Extrema = " 
-      //               << global_min << " to " << global_max << "\n";
-      //   }
-      // }
 
       const double *species_read = speciesInt_.HostRead();
       auto specarr = py::array_t<double>(
@@ -1824,15 +1813,46 @@ void ReactingFlow::step() {
         throw std::runtime_error("Expected 1D array from Python");
       }
 
-      // MFEM::Vector to store the returned Python array
-      mfem::Vector Tnew_(buf.shape[0]);
-      double *dst = Tnew_.HostWrite();
+      // MFEM::Vector bterates_ stores the returned Python array
+      double *dst = bterates_.HostWrite();
       double *src = static_cast<double *>(buf.ptr);
+
+      int bterr_size = bterates_.Size();
+
+      if (buf.shape[0] != bterr_size) {
+        std::cerr << "ReactingFlow::step(), size of returned reaction rate vector = "
+                  << buf.shape[0] << ", size of BTE reaction rate vector = " << bterr_size << 
+                  ". Both not equal, so aborting... \n"; 
+      }
 
       for (int i = 0; i < buf.shape[0]; i++) {
         dst[i] = src[i];
       }
+
+      // for (int rr = 0; rr < nBTEReactions_; rr++) {
+      //   mfem::Vector rr_view(bterates_.GetData() + rr*sDofInt_, sDofInt_);
+
+      //   double local_min = rr_view.Min();
+      //   double local_max = rr_view.Max();
+
+      //   double global_min, global_max;
+
+      //   MPI_Allreduce(&local_min, &global_min, 1, MPI_DOUBLE, MPI_MIN, tpsP_->getTPSCommWorld());
+      //   MPI_Allreduce(&local_max, &global_max, 1, MPI_DOUBLE, MPI_MAX, tpsP_->getTPSCommWorld());
+
+      //   if (rank0_) {
+      //     std::cout << "[C++], BTE Reaction = " << rr << ", Local extrema = " 
+      //               << local_min << " to" << local_max 
+      //               << ", Global Extrema = " 
+      //               << global_min << " to " << global_max << "\n";
+      //   }
+      // }
     } 
+#endif
+
+#ifdef HAVE_PYTHON
+        int bterr_size = bterates_.Size();
+        assert( sDofInt_ == int(bterr_size / nBTEReactions_));
 #endif
 
       for (int i = 0; i < sDofInt_; i++) {
@@ -1842,8 +1862,20 @@ void ReactingFlow::step() {
         }
         YT[nActiveSpecies_] = h_Tn[i];
 
+#ifdef HAVE_PYTHON
+        // Extract point state for the BTE rates
+        double *bterates = new double[nBTEReactions_];
+        auto btearr = bterates_.HostReadWrite();
+        for (int rr = 0; rr < nBTEReactions_; rr++) {
+          bterates[rr] = btearr[i + rr*sDofInt_];
+        }
+#endif
         // Solve backward Euler update
-        solveChemistryStep(YT, i, dt_);
+        solveChemistryStep(YT, i, dt_,
+#ifdef HAVE_PYTHON
+        bterates
+#endif
+        );
 
         // Overwrite point state data
         for (int sp = 0; sp < nActiveSpecies_; sp++) {
@@ -3129,7 +3161,11 @@ void ReactingFlow::identifyCollisionType(const Array<ArgonSpcs> &speciesType, Ar
   return;
 }
 
-void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, double *omega) {
+void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, double *omega
+#ifdef HAVE_PYTHON
+  , double *BTErr
+#endif
+) {
   // This function evaluates the reacting flow source terms at a given
   // state (i.e., at a point in the grid) which is necessary for a
   // nonlinear solve for an implicit time step at each point.  The
@@ -3275,7 +3311,11 @@ void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, 
   omega[nActiveSpecies_] = hw / rho / Cpmix;
 }
 
-void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const double dt) {
+void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const double dt
+#ifdef HAVE_PYTHON
+  , double *BTErr
+#endif
+) {
   const int nState = nActiveSpecies_ + 1;         // Number of variables in YT
   const double eps = implicit_chemistry_fd_eps_;  // Perturbation for finite difference Jacobian
 
@@ -3295,7 +3335,11 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
   // Jacobian for a backward Euler step
 
   // Evaluate RHS...
-  this->evaluateReactingSource(YT, dofindex, rhs);
+  this->evaluateReactingSource(YT, dofindex, rhs
+#ifdef HAVE_PYTHON
+    , BTErr
+#endif
+  );
 
   // ... and Jacobian (via finite difference)
   for (int i = 0; i < nState; i++) {
@@ -3308,7 +3352,11 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
       YT1[i] *= (1 + eps);
     }
 
-    this->evaluateReactingSource(YT1, dofindex, rhs1);
+    this->evaluateReactingSource(YT1, dofindex, rhs1
+#ifdef HAVE_PYTHON
+      , BTErr
+#endif  
+    );
 
     for (int j = 0; j < nState; j++) {
       Jac(j, i) = (rhs1[j] - rhs[j]) / (YT1[i] - YT[i]);
@@ -3344,7 +3392,11 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
     }
 
     // Compute rhs and Jacobian, in preparation for next step
-    this->evaluateReactingSource(YT, dofindex, rhs);
+    this->evaluateReactingSource(YT, dofindex, rhs
+#ifdef HAVE_PYTHON
+      , BTErr
+#endif
+    );
 
     for (int i = 0; i < nState; i++) {
       for (int j = 0; j < nState; j++) {
@@ -3356,7 +3408,11 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
         YT1[i] *= (1 + eps);
       }
 
-      this->evaluateReactingSource(YT1, dofindex, rhs1);
+      this->evaluateReactingSource(YT1, dofindex, rhs1
+#ifdef HAVE_PYTHON
+        , BTErr
+#endif
+      );
       for (int j = 0; j < nState; j++) {
         Jac(j, i) = (rhs1[j] - rhs[j]) / (YT1[i] - YT[i]);
       }
