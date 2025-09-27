@@ -168,6 +168,7 @@ LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, t
   tps->getInput("loMach/ltethermo/linear-solver-verbosity", pl_solve_, 0);
 
   tpsP_->getInput("loMach/ltethermo/streamwise-stabilization", sw_stab_, false);
+  tpsP_->getInput("loMach/ltethermo/filter-Q", qt_filter_, false);
 }
 
 LteThermoChem::~LteThermoChem() {
@@ -572,9 +573,13 @@ void LteThermoChem::initializeOperators() {
   }
 
   // artifical diffusion coefficients
+  if (sw_stab_ || qt_filter_) {
+    gscale_coeff_ = new GridFunctionCoefficient(gridScale_gf_);
+  }
+
   if (sw_stab_) {
     umag_coeff_ = new VectorMagnitudeCoefficient(*un_next_coeff_);
-    gscale_coeff_ = new GridFunctionCoefficient(gridScale_gf_);
+
     visc_coeff_ = new GridFunctionCoefficient(&mu_gf_);
     visc_inv_coeff_ = new PowerCoefficient(*visc_coeff_, -1.0);
 
@@ -599,6 +604,10 @@ void LteThermoChem::initializeOperators() {
     swdiff_coeff_ = new TransformedMatrixVectorCoefficient(un_next_coeff_, &streamwiseTensor);
 
     supg_coeff_ = new ScalarMatrixProductCoefficient(*upwind_coeff_, *swdiff_coeff_);
+  }
+
+  if (qt_filter_) {
+    gscale2_coeff_ = new ProductCoefficient(*gscale_coeff_, *gscale_coeff_);
   }
 
   // Convection: Atemperature(i,j) = \int_{\Omega} \phi_i \rho Cp u \cdot \nabla \phi_j
@@ -805,6 +814,16 @@ void LteThermoChem::initializeOperators() {
     mq_blfi->SetIntRule(&ir_i);
   }
   Mq_form_->AddDomainIntegrator(mq_blfi);
+
+  if (qt_filter_) {
+    DiffusionIntegrator *qtf_blfi;
+    qtf_blfi = new DiffusionIntegrator(*gscale2_coeff_);
+    if (numerical_integ_) {
+      qtf_blfi->SetIntRule(&ir_i);
+    }
+    Mq_form_->AddDomainIntegrator(qtf_blfi);
+  }
+
   if (partial_assembly_) {
     Mq_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   }

@@ -90,7 +90,8 @@ class LteThermoChem final : public ThermoChemModelBase {
   bool numerical_integ_ = false;  /**< Enable/disable numerical integration rules of forms. */
   bool domain_is_open_ = false;   /**< true if domain is open */
   bool axisym_ = false;
-  bool sw_stab_ = false; /**< Enable/disable supg stabilization. */
+  bool sw_stab_ = false;   /**< Enable/disable supg stabilization. */
+  bool qt_filter_ = false; /**< Enable/disable filter in thermal div calc. */
 
   // Linear-solver-related options
   int pl_solve_ = 0;    /**< Verbosity level passed to mfem solvers */
@@ -186,6 +187,7 @@ class LteThermoChem final : public ThermoChemModelBase {
 
   VectorMagnitudeCoefficient *umag_coeff_ = nullptr;
   GridFunctionCoefficient *gscale_coeff_ = nullptr;
+  ProductCoefficient *gscale2_coeff_ = nullptr;
   GridFunctionCoefficient *visc_coeff_ = nullptr;
   PowerCoefficient *visc_inv_coeff_ = nullptr;
   ProductCoefficient *reh1_coeff_ = nullptr;
