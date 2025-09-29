@@ -479,7 +479,7 @@ void LteThermoChem::initializeSelf() {
 
   // Wall BCs
   {
-    std::cout << "There are " << pmesh_->bdr_attributes.Max() << " boundary attributes!" << std::endl;
+    // std::cout << "There are " << pmesh_->bdr_attributes.Max() << " boundary attributes!" << std::endl;
     Array<int> attr_wall(pmesh_->bdr_attributes.Max());
     attr_wall = 0;
 
@@ -1183,7 +1183,8 @@ void LteThermoChem::updateThermoP() {
 void LteThermoChem::updateProperties() {
   // TODO(trevilo): Refactor for gpu support
   {
-    const double *d_T = Tn_.Read();
+    // const double *d_T = Tn_.Read();
+    const double *d_T = Tn_next_.Read();
 
     double *d_visc = visc_.Write();
     MFEM_FORALL(i, Tn_.Size(), { d_visc[i] = mu_table_->eval(d_T[i]); });
@@ -1362,7 +1363,8 @@ void LteThermoChem::computeQt() {
   sfes_->GetRestrictionMatrix()->MultTranspose(tmpR0_, resT_gf_);
 
   Qt_ = 0.0;
-  Qt_gf_.SetFromTrueDofs(tmpR0_);
+  // Qt_gf_.SetFromTrueDofs(tmpR0_);
+  Qt_gf_.SetFromTrueDofs(Qt_);
 
   Vector Xqt, Bqt;
   Mq_form_->FormLinearSystem(Qt_ess_tdof_, Qt_gf_, resT_gf_, Mq_, Xqt, Bqt, 1);
