@@ -52,7 +52,8 @@ static double radius(const Vector &pos) { return pos[0]; }
 static FunctionCoefficient radius_coeff(radius);
 
 static double sigmaTorchStartUp(const Vector &pos) {
-  const double x = pos[0];  // radial location
+  //const double x = pos[0];  // radial location
+  const double x = std::sqrt(pos[0] * pos[0] + pos[2] * pos[2]);  // radial location
   const double y = pos[1];  // axial location
 
   const double r0 = 0.005;
@@ -177,6 +178,12 @@ LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, t
   if (sw_stab_) {
     if (rank0_) std::cout << "Using SUPG in LTE thermo chem!" << std::endl;
   }
+
+  tpsP_->getInput("loMach/ltethermo/filter-Q", qt_filter_, false);
+  if (qt_filter_) {
+    if (rank0_) std::cout << "Using Qt filter in LTE thermo chem!" << std::endl;
+  }
+
 }
 
 LteThermoChem::~LteThermoChem() {
@@ -483,7 +490,7 @@ void LteThermoChem::initializeSelf() {
 
   // Wall BCs
   {
-    std::cout << "There are " << pmesh_->bdr_attributes.Max() << " boundary attributes!" << std::endl;
+    // std::cout << "There are " << pmesh_->bdr_attributes.Max() << " boundary attributes!" << std::endl;
     Array<int> attr_wall(pmesh_->bdr_attributes.Max());
     attr_wall = 0;
 
@@ -584,9 +591,13 @@ void LteThermoChem::initializeOperators() {
   }
 
   // artifical diffusion coefficients
+  if (sw_stab_ || qt_filter_) {
+    gscale_coeff_ = new GridFunctionCoefficient(gridScale_gf_);
+  }
+
   if (sw_stab_) {
     umag_coeff_ = new VectorMagnitudeCoefficient(*un_next_coeff_);
-    gscale_coeff_ = new GridFunctionCoefficient(gridScale_gf_);
+
     visc_coeff_ = new GridFunctionCoefficient(&mu_gf_);
     visc_inv_coeff_ = new PowerCoefficient(*visc_coeff_, -1.0);
 
@@ -611,6 +622,10 @@ void LteThermoChem::initializeOperators() {
     swdiff_coeff_ = new TransformedMatrixVectorCoefficient(un_next_coeff_, &streamwiseTensor);
 
     supg_coeff_ = new ScalarMatrixProductCoefficient(*upwind_coeff_, *swdiff_coeff_);
+  }
+
+  if (qt_filter_) {
+    gscale2_coeff_ = new ProductCoefficient(*gscale_coeff_, *gscale_coeff_);
   }
 
   // Convection: Atemperature(i,j) = \int_{\Omega} \phi_i \rho Cp u \cdot \nabla \phi_j
@@ -817,6 +832,16 @@ void LteThermoChem::initializeOperators() {
     mq_blfi->SetIntRule(&ir_i);
   }
   Mq_form_->AddDomainIntegrator(mq_blfi);
+
+  if (qt_filter_) {
+    DiffusionIntegrator *qtf_blfi;
+    qtf_blfi = new DiffusionIntegrator(*gscale2_coeff_);
+    if (numerical_integ_) {
+      qtf_blfi->SetIntRule(&ir_i);
+    }
+    Mq_form_->AddDomainIntegrator(qtf_blfi);
+  }
+
   if (partial_assembly_) {
     Mq_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   }
@@ -886,9 +911,33 @@ void LteThermoChem::initializeOperators() {
 
 
   // Smooth the restart temperature field (if requested)
-  if (filter_restart_) {
-    if (rank0_) std::cout << "************ Filtering temperature restart ******************" << std::endl;
+  if (filter_restart_ && qt_filter_) {
+    if (rank0_) std::cout << "************ Filtering temperature restart (Qt) ******************" << std::endl;
+    resT_ = 0.0;
+    Ms_->AddMult(Tn_, resT_);
 
+    // Prepare for the solve
+    for (auto &temp_dbc : temp_dbcs_) {
+      Tn_next_gf_.ProjectBdrCoefficient(*temp_dbc.coeff, temp_dbc.attr);
+    }
+    sfes_->GetRestrictionMatrix()->MultTranspose(resT_, resT_gf_);
+
+    Vector Xt2, Bt2;
+    Mq_form_->FormLinearSystem(Qt_ess_tdof_, Tn_next_gf_, resT_gf_, Mq_, Xt2, Bt2, 1);
+
+    MqInv_->Mult(Bt2, Xt2);
+    assert(MqInv_->GetConverged());
+    Mq_form_->RecoverFEMSolution(Xt2, resT_gf_, Tn_next_gf_);
+
+    Tn_next_gf_.GetTrueDofs(Tn_next_);
+
+    Tn_gf_.SetFromTrueDofs(Tn_next_);
+
+    Tn_gf_.GetTrueDofs(Tn_);
+    Tn_next_gf_.SetFromTrueDofs(Tn_);
+    Tn_next_gf_.GetTrueDofs(Tn_next_);
+  } else if (filter_restart_) {
+    if (rank0_) std::cout << "************ Filtering temperature restart ******************" << std::endl;
     // Build the right-hand-side
     resT_ = 0.0;
     M_rho_Cp_->AddMult(Tn_, resT_);
@@ -1191,7 +1240,8 @@ void LteThermoChem::updateThermoP() {
 void LteThermoChem::updateProperties() {
   // TODO(trevilo): Refactor for gpu support
   {
-    const double *d_T = Tn_.Read();
+    // const double *d_T = Tn_.Read();
+    const double *d_T = Tn_next_.Read();
 
     double *d_visc = visc_.Write();
     MFEM_FORALL(i, Tn_.Size(), { d_visc[i] = mu_table_->eval(d_T[i]); });
@@ -1370,7 +1420,8 @@ void LteThermoChem::computeQt() {
   sfes_->GetRestrictionMatrix()->MultTranspose(tmpR0_, resT_gf_);
 
   Qt_ = 0.0;
-  Qt_gf_.SetFromTrueDofs(tmpR0_);
+  // Qt_gf_.SetFromTrueDofs(tmpR0_);
+  Qt_gf_.SetFromTrueDofs(Qt_);
 
   Vector Xqt, Bqt;
   Mq_form_->FormLinearSystem(Qt_ess_tdof_, Qt_gf_, resT_gf_, Mq_, Xqt, Bqt, 1);
