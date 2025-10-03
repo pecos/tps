@@ -3271,6 +3271,16 @@ void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, 
   const double Th = T;
   const double Te = Th;
 
+#ifdef HAVE_PYTHON
+  if (bte_from_tps_ && rank0_ && dofindex == 1557) {
+    std::cout << "[C++] Index = " << dofindex << ",  Sample rates = ";
+    for (int rr = 0; rr < nBTEReactions_; rr++) {
+      std::cout << BTErr[rr] << ", ";
+    }
+    std::cout << "\n";
+  }
+#endif
+
   // Evaluate the chemical source terms
   chemistry_->computeForwardRateCoeffs(n_sp.Read(), Th, Te, dofindex, kfwd.HostWrite());
   chemistry_->computeEquilibriumConstants(Th, Te, keq.HostWrite());

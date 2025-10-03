@@ -48,7 +48,7 @@ parser.add_argument("-max_iter", "--max_iter"                     , help="max nu
 parser.add_argument("-Te", "--Te"                                 , help="approximate electron temperature (eV)" , type=float, default=0.5)
 parser.add_argument("-n0"    , "--n0"                             , help="heavy density (1/m^3)" , type=float, default=3.22e22)
 parser.add_argument("-ev_max", "--ev_max"                         , help="max energy in the v-space grid" , type=float, default=30)
-parser.add_argument("-Nr", "--Nr"                                 , help="radial refinement", type=int, default=128)
+parser.add_argument("-Nr", "--Nr"                                 , help="radial refinement", type=int, default=64)
 parser.add_argument("-profile", "--profile"                       , help="profile", type=int, default=0)
 parser.add_argument("-warm_up", "--warm_up"                       , help="warm up", type=int, default=5)
 parser.add_argument("-runs", "--runs"                             , help="runs "  , type=int, default=10)
@@ -209,8 +209,8 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, solver_type, ee_collisions
             #     file.write(filestr)
         if rank_ == 0 and i == qoi["rates"].shape[0]-1:
             print("Global reaction ", i, ", min = ", glomin, ", max = ", glomax, ", num_negatives = ", glonumneg)
-            # sampind = np.argmax(rateloc)
-            # print("[Py] Index = ", sampind, "Sample rates = ", rates[:,sampind])
+            sampind = 1557
+            print("[Py] Index = ", sampind, "Sample rates = ", rates[:,sampind])
     
     rates[rates < 0.0] = 0.0
     data = rates[1:rates.shape[0]].flatten()

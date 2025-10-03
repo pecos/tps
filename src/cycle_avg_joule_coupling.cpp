@@ -681,6 +681,10 @@ void CycleAvgJouleCoupling::solveStep() {
   }
   // Run a step of the flow solver
   flow_solver_->solveStep();
+
+  if (rank0_) {
+    std::cout << "current_iter_ = " << current_iter_ << "\n";
+  }
   // Increment the current iterate
   ++current_iter_;
 }
