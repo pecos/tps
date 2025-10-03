@@ -104,7 +104,11 @@ int main(int argc, char *argv[]) {
     }
     std::cout << std::endl;
 
-    thermo->solveChemistryStep(YT, 0, dt);
+    thermo->solveChemistryStep(YT, 0, dt
+#ifdef HAVE_PYTHON
+      , YT
+#endif
+    );
     time += dt;
   }
 

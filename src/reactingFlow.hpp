@@ -235,6 +235,9 @@ class ReactingFlow : public ThermoChemModelBase {
   // We only store the magnitude (works only for axisymmetric case)
   ParGridFunction er_gf_;
   ParGridFunction ei_gf_;
+
+  // additions for rate coefficients
+  ParGridFunction kReac_gf_;
 #endif
 
   // ParGridFunction *buffer_tInlet_ = nullptr;
@@ -336,6 +339,9 @@ class ReactingFlow : public ThermoChemModelBase {
   // Vectors for real and imaginary parts of electric field magnitude
   Vector er_, ei_;
   Vector bterates_;
+  Vector bte_rr_mapping_;
+  // additions for reaction rate coefficients
+  Vector kReac_;
 #endif
 
   // additions for species
@@ -404,6 +410,20 @@ class ReactingFlow : public ThermoChemModelBase {
   // PARGRID FUNCTION AND STRING FOR REACTION PROGRESS RATES
   std::vector<ParGridFunction *> vizReacFields_;
   std::vector<std::string> vizReacNames_;
+
+#ifdef HAVE_PYTHON
+  // PARGRID FUNCTION AND STRING FOR REACTION PROGRESS RATES
+  std::vector<ParGridFunction *> vizkReacFields_;
+  std::vector<std::string> vizkReacNames_;
+
+  // k_blend = bl_frac * k_BTE + (1 - bl_frac)*k_LTE
+  // bl_frac is the blending coefficient which is initialized as bl_frac_init
+  // and incremented by bl_frac_increment after every bl_frac_change_freq steps of the main TPS solver
+  // bl_frac_init -> specify in inputs file to say what is the blending fraction at start of simulation
+  // This needs to be updated if you are starting a BTE blended run from a check point
+  double bl_frac_init_, bl_frac_increment_, bl_frac_;
+  int bl_frac_change_freq_ = 1;
+#endif
 
  public:
   ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff, TPS::Tps *tps);

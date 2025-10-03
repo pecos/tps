@@ -48,7 +48,7 @@ parser.add_argument("-max_iter", "--max_iter"                     , help="max nu
 parser.add_argument("-Te", "--Te"                                 , help="approximate electron temperature (eV)" , type=float, default=0.5)
 parser.add_argument("-n0"    , "--n0"                             , help="heavy density (1/m^3)" , type=float, default=3.22e22)
 parser.add_argument("-ev_max", "--ev_max"                         , help="max energy in the v-space grid" , type=float, default=30)
-parser.add_argument("-Nr", "--Nr"                                 , help="radial refinement", type=int, default=128)
+parser.add_argument("-Nr", "--Nr"                                 , help="radial refinement", type=int, default=64)
 parser.add_argument("-profile", "--profile"                       , help="profile", type=int, default=0)
 parser.add_argument("-warm_up", "--warm_up"                       , help="warm up", type=int, default=5)
 parser.add_argument("-runs", "--runs"                             , help="runs "  , type=int, default=10)

@@ -81,6 +81,10 @@ class ThermoChemModelBase {
 
   double thermo_pressure_;
 
+#ifdef HAVE_PYTHON
+  int current_iter_;
+#endif
+
   mfem::ParGridFunction *plasma_conductivity_gf_ = nullptr;
   mfem::ParGridFunction *joule_heating_gf_ = nullptr;
 
@@ -204,6 +208,10 @@ class ThermoChemModelBase {
 #ifdef HAVE_PYTHON
   mfem::ParGridFunction *getEfieldRealGF() { return efield_real_gf_; }
   mfem::ParGridFunction *getEfieldImagGF() { return efield_imag_gf_; }
+
+  /// Return the current step number for BTE blending
+  int GetCurrentIter() { return current_iter_; }
+  void SetCurrentIter(int &iter) { current_iter_ = iter; }
 #endif
   virtual void evaluatePlasmaConductivityGF() {
     std::cout << "ERROR: " << __func__ << " remains unimplemented" << std::endl;

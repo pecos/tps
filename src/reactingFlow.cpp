@@ -104,9 +104,15 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
 
 #ifdef HAVE_PYTHON
   tpsP_->getInput("cycle-avg-joule-coupled/bte-from-tps", bte_from_tps_, false);
-  tpsP_->getRequiredInput("boltzmannSolver/collisionsFile", collisionsFile);
-  tpsP_->getRequiredInput("boltzmannSolver/solver_type", solver_type);
-  tpsP_->getInput("boltzmannSolver/ee_collisions", ee_collisions, 0);
+  if (bte_from_tps_) {
+    tpsP_->getRequiredInput("boltzmannSolver/collisionsFile", collisionsFile);
+    tpsP_->getRequiredInput("boltzmannSolver/solver_type", solver_type);
+    tpsP_->getInput("boltzmannSolver/ee_collisions", ee_collisions, 0);
+  }
+  tpsP_->getInput("boltzmannSolver/blend-frac-init", bl_frac_init_, 0.01);
+  tpsP_->getInput("boltzmannSolver/blend-frac-increment", bl_frac_increment_, 0.01);
+  tpsP_->getInput("boltzmannSolver/blend-frac-change-freq", bl_frac_change_freq_, 1);
+  bl_frac_ = bl_frac_init_;
 #endif
 
   // plasma conditions. ???
@@ -336,6 +342,20 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
 
 #ifdef HAVE_PYTHON
   tpsP_->getInput("reactions/number_of_BTE_reactions", nBTEReactions_, 0);
+  if (bte_from_tps_) {
+    // Define the mapping of the reaction indices from TPS to BTE
+    // TPS reaction index (starting from 0) is obtained from the input file
+    // For BTE, the reaction index is obtained from the collisionsFile
+    bte_rr_mapping_.SetSize(nBTEReactions_);
+    bte_rr_mapping_ = -1;
+    Array<double> btemap(nBTEReactions_);
+    tpsP_->getRequiredVec("reactions/bte_rr_mapping", btemap, nBTEReactions_);
+    double* mapping = bte_rr_mapping_.HostWrite();
+    for (int rr = 0; rr < nBTEReactions_; rr++) {
+      mapping[rr] = btemap[rr];
+    }
+  }
+  
 #endif
 
   Vector reactionEnergies(nReactions_);
@@ -787,6 +807,12 @@ void ReactingFlow::initializeSelf() {
   reacR_gf_.SetSpace(rfes_);
   reacR_gf_ = 0.0;
 
+#ifdef HAVE_PYTHON
+  // reaction rate coefficients for plotting
+  kReac_gf_.SetSpace(rfes_);
+  kReac_gf_ = 0.0;
+#endif
+
   // rest can just be sfes
   Yn_gf_.SetSpace(sfes_);
   Yext_gf_.SetSpace(sfes_);
@@ -864,6 +890,10 @@ void ReactingFlow::initializeSelf() {
 
   bterates_.SetSize(sDofInt_*nBTEReactions_);
   bterates_ = 0.0;
+
+  // reaction rate coefficients to be passed to kReac_gf_
+  kReac_.SetSize(rDofInt_);
+  kReac_ = 1.0e-12;
 #endif
 
   radiation_sink_gf_.SetSpace(sfes_);
@@ -1828,25 +1858,6 @@ void ReactingFlow::step() {
       for (int i = 0; i < buf.shape[0]; i++) {
         dst[i] = src[i];
       }
-
-      // for (int rr = 0; rr < nBTEReactions_; rr++) {
-      //   mfem::Vector rr_view(bterates_.GetData() + rr*sDofInt_, sDofInt_);
-
-      //   double local_min = rr_view.Min();
-      //   double local_max = rr_view.Max();
-
-      //   double global_min, global_max;
-
-      //   MPI_Allreduce(&local_min, &global_min, 1, MPI_DOUBLE, MPI_MIN, tpsP_->getTPSCommWorld());
-      //   MPI_Allreduce(&local_max, &global_max, 1, MPI_DOUBLE, MPI_MAX, tpsP_->getTPSCommWorld());
-
-      //   if (rank0_) {
-      //     std::cout << "[C++], BTE Reaction = " << rr << ", Local extrema = " 
-      //               << local_min << " to" << local_max 
-      //               << ", Global Extrema = " 
-      //               << global_min << " to " << global_max << "\n";
-      //   }
-      // }
     } 
 #endif
 
@@ -1884,6 +1895,33 @@ void ReactingFlow::step() {
         h_Tn[i] = YT[nActiveSpecies_];
       }
       delete[] YT;
+#ifdef HAVE_PYTHON
+      kReac_gf_.SetFromTrueDofs(kReac_);
+      // UPDATE THE BLENDING FRACTION
+      int iter_number_ = this->GetCurrentIter();
+      if (iter_number_ % bl_frac_change_freq_ == 0) {
+        bl_frac_ = bl_frac_ + bl_frac_increment_;
+      }
+      bl_frac_ = std::min(bl_frac_, 1.0);
+      for (int rr = 0; rr < nReactions_; rr++) {
+        mfem::Vector rr_view(kReac_.GetData() + rr*sDofInt_, sDofInt_);
+
+        double local_min = rr_view.Min();
+        double local_max = rr_view.Max();
+
+        double global_min, global_max;
+
+        MPI_Allreduce(&local_min, &global_min, 1, MPI_DOUBLE, MPI_MIN, tpsP_->getTPSCommWorld());
+        MPI_Allreduce(&local_max, &global_max, 1, MPI_DOUBLE, MPI_MAX, tpsP_->getTPSCommWorld());
+
+        if (rank0_) {
+          std::cout << "[C++], Reaction " << rr << ", Rate coefficient Local = " 
+                    << local_min << " to " << local_max 
+                    << ", Global = " 
+                    << global_min << " to " << global_max << "\n";
+        }
+      }
+#endif
 
       if (mixtureInput_.ambipolar) {
         // Evaluate electron mass fraction based on quasi-neutrality
@@ -2542,6 +2580,18 @@ void ReactingFlow::initializeViz(ParaViewDataCollection &pvdc) {
     vizReacNames_.push_back(std::string("reacR_" + sr));
     pvdc.RegisterField(vizReacNames_[nr], vizReacFields_[nr]);
   }
+
+#ifdef HAVE_PYTHON
+  // WRITING THE REACTION RATE COEFFICIENTS TO THE PARAVIEW FILE
+  vizkReacFields_.clear();
+  vizkReacNames_.clear();
+  for (int nr = 0; nr < nReactions_; nr++) {
+    auto sr = std::to_string(nr);
+    vizkReacFields_.push_back(new ParGridFunction(sfes_, kReac_gf_, (nr * sDof_)));
+    vizkReacNames_.push_back(std::string("kReac_" + sr));
+    pvdc.RegisterField(vizkReacNames_[nr], vizkReacFields_[nr]);
+  }
+#endif
 }
 
 /**
@@ -3273,6 +3323,28 @@ void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, 
 
   // Evaluate the chemical source terms
   chemistry_->computeForwardRateCoeffs(n_sp.Read(), Th, Te, dofindex, kfwd.HostWrite());
+#ifdef HAVE_PYTHON
+  int iter_number_ = this->GetCurrentIter();
+  if (rank0_ && dofindex == 400) {
+    std::cout << "ReactingFlow::evaluateReactingSource(), iter_number_ = " << iter_number_ << ", bl_frac = " << bl_frac_ << "\n";
+  }
+  if (bte_from_tps_) {
+    const double* mapping = bte_rr_mapping_.HostRead();
+    if (rank0_ && dofindex == 400) {
+      std::cout << "ReactingFlow::evaluateReactingSource(), Tabulated vs BTE rate coefficients -> ";
+      for (int rr = 0; rr < nBTEReactions_; rr++) {
+        int tpi = int(mapping[rr]); // tpi stores TPS index of reaction given by BTE index rr
+        double kblend = bl_frac_ * BTErr[rr] + (1.0 - bl_frac_) * kfwd[tpi];
+        std::cout << "rr = " << rr << " Tab ind = " << tpi << ", rate = " << kfwd[tpi] << ", BTE = " << BTErr[rr] 
+        << " Blended = " << kblend << "\n";
+      }
+    }
+  }
+  double *datakfwd = kReac_.HostWrite();
+  for (int nr = 0; nr < nReactions_; nr++) {
+    datakfwd[dofindex + nr*sDofInt_] = kfwd[nr];
+  }
+#endif
   chemistry_->computeEquilibriumConstants(Th, Te, keq.HostWrite());
   chemistry_->computeProgressRate(n_sp, kfwd, keq, progressRate);
   chemistry_->computeCreationRate(progressRate, creationRate, emissionRate);
