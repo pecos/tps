@@ -105,6 +105,7 @@ class GaussianInterpExtData : public ExternalDataBase {
   bool axisym_;
 
   std::string fname_;
+  std::string fname_turb_;
 
   // Scalar \f$H^1\f$ finite element collection.
   FiniteElementCollection *sfec_ = nullptr;
@@ -121,6 +122,7 @@ class GaussianInterpExtData : public ExternalDataBase {
   ParGridFunction vel0_gf_;
   ParGridFunction swirl_gf_;
   ParGridFunction swirl0_gf_;
+  ParGridFunction nut_gf_;
 
   // gradual increase of external bc over multiple steps
   int rampSteps_;

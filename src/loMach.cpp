@@ -45,6 +45,7 @@
 
 #include "algebraicSubgridModels.hpp"
 #include "algebraic_rans.hpp"
+#include "static_rans.hpp"
 #include "calorically_perfect.hpp"
 #include "gaussianInterpExtData.hpp"
 #include "geometricSponge.hpp"
@@ -151,6 +152,9 @@ void LoMachSolver::initialize() {
   } else if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::ALGEBRAIC_RANS) {
     //    turbModel_ = new AlgebraicRans(serial_mesh_, pmesh_, partitioning_, loMach_opts_.order, tpsP_);
     turbModel_ = new AlgebraicRans(pmesh_, partitioning_, loMach_opts_.order, tpsP_, (meshData_->getWallDistance()));
+  } else if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::STATIC_RANS) {
+    //    turbModel_ = new AlgebraicRans(serial_mesh_, pmesh_, partitioning_, loMach_opts_.order, tpsP_);
+    turbModel_ = new StaticRans(pmesh_, partitioning_, loMach_opts_.order, tpsP_);
   } else if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::NONE) {
     // default
     turbModel_ = new ZeroTurbModel(pmesh_, loMach_opts_.order);
@@ -235,6 +239,7 @@ void LoMachSolver::initialize() {
   extData_->setup();
   flow_->initializeFromExtData(&extData_->toFlow_interface_);
   thermo_->initializeFromExtData(&extData_->toThermoChem_interface_);
+  turbModel_->initializeFromExtData(&extData_->toTurbModel_interface_);
   // Initialize model-owned data
   sponge_->initializeSelf();
   turbModel_->initializeSelf();

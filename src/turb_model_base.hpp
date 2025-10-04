@@ -57,6 +57,14 @@ struct turbModelToThermoChem {
   const mfem::ParGridFunction *eddy_viscosity = nullptr;
 };
 
+struct extDataToTurbModel;
+
+/**
+ * Provides wrapper for fields that need to be provided by the
+ * turbulence model to the thermo chem model.
+ */
+struct turbModelToExtData { };
+
 /**
  * Provides interface for turbulence model implementation
  * to be used for time split schemes, such as those available through
@@ -126,7 +134,7 @@ class TurbModelBase {
    * @brief Initialize data from the thermoChem class
    *
    * Initialize fields that the turbulence model needs from the
-   * turbulence model.
+   * thermochem model.
    */
   void initializeFromThermoChem(thermoChemToTurbModel *thermoChem) { thermoChem_interface_ = thermoChem; }
 
@@ -135,6 +143,20 @@ class TurbModelBase {
 
   /// Interface object, provides fields necessary for the turbModel
   turbModelToThermoChem toThermoChem_interface_;
+  
+  /**
+   * @brief Initialize data from the external data class
+   *
+   * Initialize fields that the turbulence model needs from the
+   * external data.
+   */
+  void initializeFromExtData(extDataToTurbModel *extData) { extData_interface_ = extData; }
+
+  /// Get interface provided by external data
+  const extDataToTurbModel *getExtDataInterface() const { return extData_interface_; }
+
+  /// Interface object, provides fields necessary for the turbModel
+  turbModelToExtData toExtData_interface_;
 
   virtual mfem::ParGridFunction *getCurrentEddyViscosity() { return nullptr; }
   virtual mfem::ParGridFunction *getGridScale() { return nullptr; }

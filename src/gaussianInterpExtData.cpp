@@ -82,8 +82,19 @@ GaussianInterpExtData::GaussianInterpExtData(mfem::ParMesh *pmesh, LoMachOptions
     }
   }
 
+  // static turbulence model
+  if (rank0_)
+    std::cout << "Checking for requested interpolated eddy viscosity data..." << endl;
+  std::string type;
+  std::string basepath("loMach/turb-model");
+  tpsP_->getRequiredInput((basepath).c_str(), type);
+  if (type == "static-rans") {
+    if (rank0_) std::cout << "...static-rans specified" << endl;
+    tpsP_->getInput(("loMach/static-rans/visc-file").c_str(), fname_turb_, std::string("nuT.csv"));
+  }
+
   // axisymmetric
-  tpsP_->getInput("boundaryConditions/numInlets", axisym_, false);
+  tpsP_->getInput("loMach/axisymmetric", axisym_, false);
 }
 
 GaussianInterpExtData::~GaussianInterpExtData() {
@@ -122,10 +133,13 @@ void GaussianInterpExtData::initializeSelf() {
   velocity_gf_ = 0.0;
   vel0_gf_.SetSpace(vfes_);
   vel0_gf_ = 0.0;
+  nut_gf_.SetSpace(sfes_);
+  nut_gf_ = 0.0;
 
   // exports
   toThermoChem_interface_.Tdata = &temperature_gf_;
   toFlow_interface_.Udata = &velocity_gf_;
+  toTurbModel_interface_.NuTData = &nut_gf_;
 
   if (axisym_) {
     swirl_gf_.SetSpace(sfes_);
@@ -143,6 +157,7 @@ void GaussianInterpExtData::initializeViz(ParaViewDataCollection &pvdc) {
   }
   pvdc.RegisterField("externalTemp", &temperature_gf_);
   pvdc.RegisterField("externalU", &velocity_gf_);
+  pvdc.RegisterField("externalNuT", &nut_gf_);
   if (axisym_) {
     pvdc.RegisterField("externalTh", &swirl_gf_);
   }
@@ -165,6 +180,7 @@ void GaussianInterpExtData::setup() {
   double *U0 = vel0_gf_.HostReadWrite();
   double *Thdata = swirl_gf_.HostReadWrite();
   double *Th0 = swirl0_gf_.HostReadWrite();
+  double *NuThdata = nut_gf_.HostReadWrite();
   double *hcoords = coordsDof.HostReadWrite();
 
   struct inlet_profile {
@@ -260,6 +276,91 @@ void GaussianInterpExtData::setup() {
     std::cout << " communicated inlet data" << endl;
     fflush(stdout);
   }
+
+  // now repeat for the turb field data 
+  // TODO: no support for 3D
+  struct turb_profile {
+    double x, y, z, nut;
+  };
+
+  string fnameBase;
+  std::string basepath("./inputs/");
+  fnameBase = (basepath + fname_turb_);
+  const char *fnameRead = fnameBase.c_str();
+  int nCount = 0;
+
+  // find size
+  if (rank0_) {
+    std::cout << " Attempting to open turb file for counting... " << fnameRead << " ";
+
+    FILE *inlet_file;
+    if ((inlet_file = fopen(fnameRead, "r"))) {
+      std::cout << " ...and open" << endl;
+      fflush(stdout);
+    } else {
+      std::cout << " ...CANNOT OPEN FILE" << endl;
+      fflush(stdout);
+    }
+
+    int ch = 0;
+    for (ch = getc(inlet_file); ch != EOF; ch = getc(inlet_file)) {
+      if (ch == '\n') {
+        nCount++;
+      }
+    }
+    fclose(inlet_file);
+    std::cout << " final external data line count: " << nCount << endl;
+    fflush(stdout);
+  }
+
+  // broadcast size
+  MPI_Bcast(&nCount, 1, MPI_INT, 0, tpsP_->getTPSCommWorld());
+  struct turb_profile turb[nCount];
+
+  // mean output from plane interpolation
+  // 0) x, 1) y, 3) nut
+  // TODO: z not provided
+
+  // open, read data
+  if (rank0_) {
+    ifstream file;
+    file.open(fnameRead);
+
+    string line;
+    getline(file, line);
+    int nLines = 0;
+    while (getline(file, line)) {
+      stringstream sline(line);
+      int entry = 0;
+      while (sline.good()) {
+        string substr;
+        getline(sline, substr, ',');  // csv delimited
+        double buffer = std::stod(substr);
+        entry++;
+
+        // using the current format, SHOULD CHANGE
+        if (entry == 1) {
+          turb[nLines].x = buffer;
+        } else if (entry == 2) {
+          turb[nLines].y = buffer;
+        } else if (entry == 3) {
+          turb[nLines].nut = buffer;
+        }
+      }
+      turb[nLines].z = 0.0;
+
+      nLines++;
+    }
+    file.close();
+  }
+
+  // broadcast data
+  MPI_Bcast(&turb, nCount * 8, MPI_DOUBLE, 0, tpsP_->getTPSCommWorld());
+  if (rank0_) {
+    std::cout << " communicated turb data" << endl;
+    fflush(stdout);
+  }
+
 
   /*
   // width of interpolation stencil
