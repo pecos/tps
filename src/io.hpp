@@ -217,6 +217,9 @@ class IOFamily {
    * @param read_order Polynomial order of function in HDF5 file
    */
   void readChangeOrder(hid_t file, int read_order);
+
+  /** @brief Returns pointer to ParGridFunction for this IOFamily */
+  mfem::ParGridFunction *getParGridFunction() { return pfunc_; }
 };
 
 /**
@@ -312,6 +315,13 @@ class IODataOrganizer {
    * @param read_order Polynomial order for data in file (optional, only required for variable order read)
    */
   void read(hid_t file, bool serial, int read_order = -1);
+
+  /**
+   * @brief Get reference to vector of IOFamily objects
+   *
+   * This supports operations on all IO fields (e.g., interpolation between grids)
+   */
+  std::vector<IOFamily> &getIOFamilies() { return families_; }
 };
 
 /**

@@ -440,6 +440,8 @@ class M2ulPhyS : public TPS::PlasmaSolver {
   GasMixture *getMixture() { return mixture; }
   Chemistry *getChemistry() { return chemistry_; }
 
+  IODataOrganizer &getIODataOrganizer() { return ioData; }
+
   const ParGridFunction *getDistanceFcn() { return distance_; }
 
   void updatePrimitives();

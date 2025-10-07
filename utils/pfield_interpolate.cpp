@@ -131,7 +131,6 @@ int main(int argc, char *argv[]) {
   ParGridFunction *func_source = NULL;
 
   src_fec = srcField.getFEC();
-  func_source = srcField.GetSolutionGF();
 
   // 3) Some checks
   const Geometry::Type gt = mesh_2->GetNodalFESpace()->GetFE(0)->GetGeomType();
@@ -142,116 +141,134 @@ int main(int argc, char *argv[]) {
 
   std::cout << "Source FE collection: " << src_fec->Name() << std::endl;
 
-  // Setup the FiniteElementSpace and GridFunction on the target mesh.
-  const FiniteElementCollection *tar_fec = nullptr;
-  ParFiniteElementSpace *tar_fes = nullptr;
-  ParGridFunction *func_target = nullptr;
+  // For every IOFamily that has been registered with the 'source',
+  // interpolate it to the 'target' mesh
+  std::vector<IOFamily>& src_io_families = srcField.getIODataOrganizer().getIOFamilies();
 
-  if (!tarFileName.empty()) {
-    tar_fec = tarField->getFEC();
-    tar_fes = tarField->getFESpace();
-    func_target = tarField->GetSolutionGF();
-  } else {
-    const int num_variables = func_source->VectorDim();
-    tar_fec = new H1_FECollection(order, dim);
-    tar_fes = new ParFiniteElementSpace(mesh_2, tar_fec, num_variables);
-    func_target = new ParGridFunction(tar_fes);
-  }
+  for (size_t ifield = 0; ifield < src_io_families.size(); ifield++) {
+    //func_source = srcField.GetSolutionGF();
+    func_source = src_io_families[ifield].getParGridFunction();
 
-  std::cout << "Target FE collection: " << tar_fec->Name() << std::endl;
 
-  const int NE = mesh_2->GetNE();
-  const int nsp = tar_fes->GetFE(0)->GetNodes().GetNPoints();
-  const int tar_ncomp = func_target->VectorDim();
-  cout << "tar_ncomp = " << tar_ncomp << std::endl;
+    // Setup the FiniteElementSpace and GridFunction on the target mesh.
+    const FiniteElementCollection *tar_fec = nullptr;
+    ParFiniteElementSpace *tar_fes = nullptr;
+    ParGridFunction *func_target = nullptr;
 
-  // Generate list of points where the grid function will be evaluated.
-  Vector vxyz;
-
-  // The method for getting the necessary points here works for both
-  // H1 and L2 fields.  However, for H1, it will contain duplicate
-  // points, which means we must take care when setting the
-  // corresponding ParGridFunction below.
-  vxyz.SetSize(nsp * NE * dim);
-  for (int i = 0; i < NE; i++) {
-    const FiniteElement *fe = tar_fes->GetFE(i);
-    const IntegrationRule ir = fe->GetNodes();
-    ElementTransformation *et = tar_fes->GetElementTransformation(i);
-
-    DenseMatrix pos;
-    et->Transform(ir, pos);
-    Vector rowx(vxyz.GetData() + i * nsp, nsp);
-    Vector rowy(vxyz.GetData() + i * nsp + NE * nsp, nsp);
-    Vector rowz;
-    if (dim == 3) {
-      rowz.SetDataAndSize(vxyz.GetData() + i * nsp + 2 * NE * nsp, nsp);
+    if (!tarFileName.empty()) {
+      tar_fec = tarField->getFEC();
+      tar_fes = tarField->getFESpace();
+      std::vector<IOFamily>& tar_io_families = tarField->getIODataOrganizer().getIOFamilies();
+      func_target = tar_io_families[ifield].getParGridFunction();
+      //func_target = tarField->GetSolutionGF();
+    } else {
+      const int num_variables = func_source->VectorDim();
+      tar_fec = new H1_FECollection(order, dim);
+      tar_fes = new ParFiniteElementSpace(mesh_2, tar_fec, num_variables);
+      func_target = new ParGridFunction(tar_fes);
     }
-    pos.GetRow(0, rowx);
-    pos.GetRow(1, rowy);
-    if (dim == 3) {
-      pos.GetRow(2, rowz);
-    }
-  }
 
-  const int nodes_cnt = vxyz.Size() / dim;
+    std::cout << "Target FE collection: " << tar_fec->Name() << std::endl;
 
-  // Evaluate source grid function.
-  Vector interp_vals(nodes_cnt * tar_ncomp);
-  FindPointsGSLIB finder(MPI_COMM_WORLD);
-  finder.Setup(*mesh_1);
-  finder.Interpolate(vxyz, *func_source, interp_vals);
+    const int NE = mesh_2->GetNE();
+    const int nsp = tar_fes->GetFE(0)->GetNodes().GetNPoints();
+    const int tar_ncomp = func_target->VectorDim();
+    cout << "tar_ncomp = " << tar_ncomp << std::endl;
 
-  if (!tarFileName.empty()) {
-    // Set the target function (NB: works b/c target is DG) and write restart
-    func_target->SetFromTrueDofs(interp_vals);
-    tarField->writeHDF5();
-  } else {
-    // Fill solution element-by-element
-    Array<int> vdofs;
-    Vector elem_dof_vals(nsp * tar_ncomp);
+    // Generate list of points where the grid function will be evaluated.
+    Vector vxyz;
 
-    for (int i = 0; i < mesh_2->GetNE(); i++) {
-      tar_fes->GetElementVDofs(i, vdofs);
-      for (int j = 0; j < nsp; j++) {
-        for (int d = 0; d < tar_ncomp; d++) {
-          // Arrange values byNodes
-          int idx = d * nsp * NE + i * nsp + j;
-          elem_dof_vals(j + d * nsp) = interp_vals(idx);
-        }
+    // The method for getting the necessary points here works for both
+    // H1 and L2 fields.  However, for H1, it will contain duplicate
+    // points, which means we must take care when setting the
+    // corresponding ParGridFunction below.
+    vxyz.SetSize(nsp * NE * dim);
+    for (int i = 0; i < NE; i++) {
+      const FiniteElement *fe = tar_fes->GetFE(i);
+      const IntegrationRule ir = fe->GetNodes();
+      ElementTransformation *et = tar_fes->GetElementTransformation(i);
+
+      DenseMatrix pos;
+      et->Transform(ir, pos);
+      Vector rowx(vxyz.GetData() + i * nsp, nsp);
+      Vector rowy(vxyz.GetData() + i * nsp + NE * nsp, nsp);
+      Vector rowz;
+      if (dim == 3) {
+        rowz.SetDataAndSize(vxyz.GetData() + i * nsp + 2 * NE * nsp, nsp);
       }
-      func_target->SetSubVector(vdofs, elem_dof_vals);
+      pos.GetRow(0, rowx);
+      pos.GetRow(1, rowy);
+      if (dim == 3) {
+        pos.GetRow(2, rowz);
+      }
     }
-    func_target->SetFromTrueVector();
 
-    // Dump paraview for visualization
-    ParaViewDataCollection pvc(pv_output_dir, mesh_2);
-    pvc.SetLevelsOfDetail(order);
-    pvc.SetHighOrderOutput(true);
-    pvc.SetPrecision(8);
+    const int nodes_cnt = vxyz.Size() / dim;
 
-    pvc.SetCycle(srcField.getCurrentIterations());
-    pvc.SetTime(srcField.getCurrentTime());
+    // Evaluate source grid function.
+    Vector interp_vals(nodes_cnt * tar_ncomp);
+    FindPointsGSLIB finder(MPI_COMM_WORLD);
+    finder.Setup(*mesh_1);
+    finder.Interpolate(vxyz, *func_source, interp_vals);
 
-    ParFiniteElementSpace fes(mesh_2, tar_fec, 1);
-    int ndofs = fes.GetNDofs();
-    for (int ivar = 0; ivar < tar_ncomp; ivar++) {
-      string U("U_");
-      pvc.RegisterField(U + to_string(ivar),
-                        new ParGridFunction(&fes, func_target->HostReadWrite() +
-                                                      ivar * ndofs));
+    if (!tarFileName.empty()) {
+      // Set the target function (NB: works b/c target is DG) and write restart
+      func_target->SetFromTrueDofs(interp_vals);
+      // tarField->writeHDF5();
+    } else {
+      // Fill solution element-by-element
+      Array<int> vdofs;
+      Vector elem_dof_vals(nsp * tar_ncomp);
+
+      for (int i = 0; i < mesh_2->GetNE(); i++) {
+        tar_fes->GetElementVDofs(i, vdofs);
+        for (int j = 0; j < nsp; j++) {
+          for (int d = 0; d < tar_ncomp; d++) {
+            // Arrange values byNodes
+            int idx = d * nsp * NE + i * nsp + j;
+            elem_dof_vals(j + d * nsp) = interp_vals(idx);
+          }
+        }
+        func_target->SetSubVector(vdofs, elem_dof_vals);
+      }
+      func_target->SetFromTrueVector();
+
+      // Dump paraview for visualization
+      ParaViewDataCollection pvc(pv_output_dir, mesh_2);
+      pvc.SetLevelsOfDetail(order);
+      pvc.SetHighOrderOutput(true);
+      pvc.SetPrecision(8);
+
+      pvc.SetCycle(srcField.getCurrentIterations());
+      pvc.SetTime(srcField.getCurrentTime());
+
+      ParFiniteElementSpace fes(mesh_2, tar_fec, 1);
+      int ndofs = fes.GetNDofs();
+      for (int ivar = 0; ivar < tar_ncomp; ivar++) {
+        string U("U_");
+        pvc.RegisterField(U + to_string(ivar),
+                          new ParGridFunction(&fes, func_target->HostReadWrite() +
+                                              ivar * ndofs));
+      }
+      pvc.Save();
     }
-    pvc.Save();
+
+    // Free the internal gslib data.
+    finder.FreeData();
+
+    // If we own them, delete fe collection, etc
+    if (tarFileName.empty()) {
+      delete tar_fes;
+      delete tar_fec;
+      delete func_target;
+    }
   }
 
-  // Free the internal gslib data.
-  finder.FreeData();
-
-  // If we own them, delete fe collection, etc
-  if (tarFileName.empty()) {
-    delete tar_fes;
-    delete tar_fec;
-    delete func_target;
+  if (!tarFileName.empty()) {
+    tarField->writeHDF5();
   }
+
+
 
   // delete the target M2ulPhyS class
   delete tarField;
