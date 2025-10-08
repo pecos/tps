@@ -1,5 +1,6 @@
 /* A utility to transfer tps solutions from one mesh to another */
 
+#include "loMach.hpp"
 #include "M2ulPhyS.hpp"
 #include "mfem.hpp"
 #include "tps.hpp"
@@ -11,6 +12,7 @@ using namespace std;
 int main(int argc, char *argv[]) {
   mfem::Mpi::Init(argc, argv);
   TPS::Tps tps(MPI_COMM_WORLD);
+  TPS::Tps tar_tps(MPI_COMM_WORLD);
 
   // Set the method's default parameters.
   const char *src_input_file = "coarse.ini";
@@ -68,13 +70,19 @@ int main(int argc, char *argv[]) {
   tps.parseInputFile(srcFileName);
   tps.chooseDevices();
 
-  M2ulPhyS srcField(srcFileName, &tps);
-  RunConfiguration &srcConfig = srcField.GetConfig();
-  assert(srcConfig.GetRestartCycle() > 0);
+  const std::string &src_solver_type = tps.getSolverType();
 
+  TPS::PlasmaSolver *srcField = nullptr;
+  if (src_solver_type == "flow") {
+    srcField = new M2ulPhyS(srcFileName, &tps);
+    //RunConfiguration &srcConfig = srcField->GetConfig();
+    //assert(srcConfig.GetRestartCycle() > 0);
+  } else if (src_solver_type == "loMach") {
+    srcField = new LoMachSolver(&tps);
+  }
   tps.closeInputFile();
 
-  ParMesh *mesh_1 = srcField.getMesh();
+  ParMesh *mesh_1 = srcField->getMesh();
   const int dim = mesh_1->Dimension();
 
   // Instantiate the "fine" (i.e., target) mesh.
@@ -92,11 +100,18 @@ int main(int argc, char *argv[]) {
     // for the target mesh, you should not set this option. If
     // it is set, M2ulPhyS will try to read a file that doesn't exist
     // and give an error.
-    tps.parseInputFile(tarFileName);
-    tarField = new M2ulPhyS(tarFileName, &tps);
-    RunConfiguration &tarConfig = tarField->GetConfig();
-    assert(tarConfig.GetRestartCycle() == 0);
-    tps.closeInputFile();
+    tar_tps.parseInputFile(tarFileName);
+
+    const std::string &tar_solver_type = tar_tps.getSolverType();
+    assert(src_solver_type == tar_solver_type);
+
+    TPS::PlasmaSolver *tarField = nullptr;
+    if (src_solver_type == "flow") {
+      tarField = new M2ulPhyS(tarFileName, &tar_tps);
+    } else if (src_solver_type == "loMach") {
+      tarField = new LoMachSolver(&tar_tps);
+    }
+    tar_tps.closeInputFile();
 
     mesh_2 = tarField->getMesh();
   } else {
@@ -130,7 +145,7 @@ int main(int argc, char *argv[]) {
   const FiniteElementCollection *src_fec = NULL;
   ParGridFunction *func_source = NULL;
 
-  src_fec = srcField.getFEC();
+  src_fec = srcField->getFEC();
 
   // 3) Some checks
   const Geometry::Type gt = mesh_2->GetNodalFESpace()->GetFE(0)->GetGeomType();
@@ -143,10 +158,10 @@ int main(int argc, char *argv[]) {
 
   // For every IOFamily that has been registered with the 'source',
   // interpolate it to the 'target' mesh
-  std::vector<IOFamily>& src_io_families = srcField.getIODataOrganizer().getIOFamilies();
+  std::vector<IOFamily>& src_io_families = srcField->getIODataOrganizer().getIOFamilies();
 
   for (size_t ifield = 0; ifield < src_io_families.size(); ifield++) {
-    //func_source = srcField.GetSolutionGF();
+    //func_source = srcField->GetSolutionGF();
     func_source = src_io_families[ifield].getParGridFunction();
 
 
@@ -211,6 +226,7 @@ int main(int argc, char *argv[]) {
     finder.Setup(*mesh_1);
     finder.Interpolate(vxyz, *func_source, interp_vals);
 
+    // FIXME: Ensure this functions correctly for H1
     if (!tarFileName.empty()) {
       // Set the target function (NB: works b/c target is DG) and write restart
       func_target->SetFromTrueDofs(interp_vals);
@@ -239,8 +255,8 @@ int main(int argc, char *argv[]) {
       pvc.SetHighOrderOutput(true);
       pvc.SetPrecision(8);
 
-      pvc.SetCycle(srcField.getCurrentIterations());
-      pvc.SetTime(srcField.getCurrentTime());
+      pvc.SetCycle(0);
+      pvc.SetTime(0.0);
 
       ParFiniteElementSpace fes(mesh_2, tar_fec, 1);
       int ndofs = fes.GetNDofs();

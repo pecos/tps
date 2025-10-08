@@ -32,6 +32,7 @@
 #ifndef SOLVER_HPP_
 #define SOLVER_HPP_
 
+#include "io.hpp"
 #include "tps_mfem_wrap.hpp"
 #include "utils.hpp"
 
@@ -119,6 +120,9 @@ class Solver {
 
 // Base class for flow solver implementations
 class PlasmaSolver : public Solver {
+ protected:
+  IODataOrganizer ioData;
+
  public:
   virtual ~PlasmaSolver() {}
 
@@ -141,6 +145,9 @@ class PlasmaSolver : public Solver {
     exit(1);
     return nullptr;
   }
+
+  /// Fetch reference to IODataOrganizer object
+  IODataOrganizer &getIODataOrganizer() { return ioData; }
 };
 
 }  // end namespace TPS

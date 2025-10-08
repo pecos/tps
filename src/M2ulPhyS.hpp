@@ -295,9 +295,6 @@ class M2ulPhyS : public TPS::PlasmaSolver {
   // for use if we want to write a serial file
   Mesh *serial_mesh;
 
-  // I/O organizer
-  IODataOrganizer ioData;
-
   std::list<mfem::DenseMatrix> tableHost_;
 
 #ifdef HAVE_MASA
@@ -439,8 +436,6 @@ class M2ulPhyS : public TPS::PlasmaSolver {
   RunConfiguration &GetConfig() { return config; }
   GasMixture *getMixture() { return mixture; }
   Chemistry *getChemistry() { return chemistry_; }
-
-  IODataOrganizer &getIODataOrganizer() { return ioData; }
 
   const ParGridFunction *getDistanceFcn() { return distance_; }
 
