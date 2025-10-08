@@ -79,6 +79,8 @@ int main(int argc, char *argv[]) {
     //assert(srcConfig.GetRestartCycle() > 0);
   } else if (src_solver_type == "loMach") {
     srcField = new LoMachSolver(&tps);
+    srcField->parseSolverOptions();
+    srcField->initialize();
   }
   tps.closeInputFile();
 
@@ -90,7 +92,7 @@ int main(int argc, char *argv[]) {
   // generate a tps restart on a new mesh.  Alternatively, if just a
   // mesh is specified, using the option --mesh-h1, that mesh is read
   // and decomposed here.
-  M2ulPhyS *tarField = nullptr;
+  TPS::PlasmaSolver *tarField = nullptr;
   ParMesh *mesh_2 = nullptr;
   if (!tarFileName.empty()) {
     // Instantiate M2ulPhyS class for the "fine" (i.e., target) case
@@ -105,11 +107,12 @@ int main(int argc, char *argv[]) {
     const std::string &tar_solver_type = tar_tps.getSolverType();
     assert(src_solver_type == tar_solver_type);
 
-    TPS::PlasmaSolver *tarField = nullptr;
     if (src_solver_type == "flow") {
       tarField = new M2ulPhyS(tarFileName, &tar_tps);
     } else if (src_solver_type == "loMach") {
       tarField = new LoMachSolver(&tar_tps);
+      tarField->parseSolverOptions();
+      tarField->initialize();
     }
     tar_tps.closeInputFile();
 
@@ -175,6 +178,7 @@ int main(int argc, char *argv[]) {
       tar_fes = tarField->getFESpace();
       std::vector<IOFamily>& tar_io_families = tarField->getIODataOrganizer().getIOFamilies();
       func_target = tar_io_families[ifield].getParGridFunction();
+      tar_fes = func_target->ParFESpace();// = tar_io_families[ifield].getParGridFunction();
       //func_target = tarField->GetSolutionGF();
     } else {
       const int num_variables = func_source->VectorDim();
@@ -227,11 +231,9 @@ int main(int argc, char *argv[]) {
     finder.Interpolate(vxyz, *func_source, interp_vals);
 
     // FIXME: Ensure this functions correctly for H1
-    if (!tarFileName.empty()) {
-      // Set the target function (NB: works b/c target is DG) and write restart
+    if (tar_fec->GetContType() == FiniteElementCollection::DISCONTINUOUS) {
       func_target->SetFromTrueDofs(interp_vals);
-      // tarField->writeHDF5();
-    } else {
+    } else if (tar_fec->GetContType() == FiniteElementCollection::CONTINUOUS) {
       // Fill solution element-by-element
       Array<int> vdofs;
       Vector elem_dof_vals(nsp * tar_ncomp);
@@ -248,7 +250,12 @@ int main(int argc, char *argv[]) {
         func_target->SetSubVector(vdofs, elem_dof_vals);
       }
       func_target->SetFromTrueVector();
+    } else {
+      std::cout << "FEC not understood" << std::endl;
+      exit(1);
+    }
 
+    if (tarFileName.empty()) {
       // Dump paraview for visualization
       ParaViewDataCollection pvc(pv_output_dir, mesh_2);
       pvc.SetLevelsOfDetail(order);
@@ -281,7 +288,7 @@ int main(int argc, char *argv[]) {
   }
 
   if (!tarFileName.empty()) {
-    tarField->writeHDF5();
+    tarField->restart_files_hdf5("write");
   }
 
 

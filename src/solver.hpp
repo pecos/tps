@@ -146,6 +146,11 @@ class PlasmaSolver : public Solver {
     return nullptr;
   }
 
+  virtual void restart_files_hdf5(string mode, string inputFileName = std::string()) {
+    cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
+    exit(1);
+  }
+
   /// Fetch reference to IODataOrganizer object
   IODataOrganizer &getIODataOrganizer() { return ioData; }
 };
