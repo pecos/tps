@@ -106,6 +106,7 @@ class GaussianInterpExtData : public ExternalDataBase {
 
   std::string fname_;
   std::string fname_turb_;
+  double v_fac_;
 
   // Scalar \f$H^1\f$ finite element collection.
   FiniteElementCollection *sfec_ = nullptr;

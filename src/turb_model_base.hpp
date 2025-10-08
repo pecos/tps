@@ -74,6 +74,7 @@ class TurbModelBase {
  protected:
   const flowToTurbModel *flow_interface_;
   const thermoChemToTurbModel *thermoChem_interface_;
+  const extDataToTurbModel *extData_interface_;
 
  public:
   /// Destructor

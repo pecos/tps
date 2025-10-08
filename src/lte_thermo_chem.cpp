@@ -428,7 +428,7 @@ void LteThermoChem::initializeSelf() {
           std::cout << "Calorically Perfect: Setting interpolated Dirichlet temperature on patch = " << patch
                     << std::endl;
         }
-        // AddTempDirichletBC(temperature_bc_field_, inlet_attr);
+        AddTempDirichletBC(temperature_bc_field_, inlet_attr);
 
         // Force the IC to agree with the interpolated inlet BC
         //

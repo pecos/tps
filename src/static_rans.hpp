@@ -45,7 +45,7 @@
  * to be used for time split schemes, such as those available through
  * LoMachSolver
  */
-class AlgebraicRans : public TurbModelBase {
+class StaticRans : public TurbModelBase {
  protected:
   mfem::ParMesh *pmesh_ = nullptr;
   int order_;
@@ -56,7 +56,7 @@ class AlgebraicRans : public TurbModelBase {
   mfem::ParFiniteElementSpace *sfes_ = nullptr;
 
   mfem::ParGridFunction *mut_ = nullptr;
-  mfem::ParGridFunction *nut_field_ = nullptr;
+  mfem::GridFunctionCoefficient *nut_field_ = nullptr;
 
   ExternalDataBase *extData_ = nullptr;
 

@@ -40,6 +40,7 @@ TurbulenceModelOptions::TurbulenceModelOptions()
   turb_model_map_["smagorinsky"] = SMAGORINSKY;
   turb_model_map_["sigma"] = SIGMA;
   turb_model_map_["algebraic-rans"] = ALGEBRAIC_RANS;
+  turb_model_map_["static-rans"] = STATIC_RANS;
 
   turb_model_type_ = turb_model_map_[turb_model_string_];
 }

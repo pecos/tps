@@ -37,7 +37,7 @@
 
 using namespace mfem;
 
-StaticRans::StaticRans(ParMesh *pmesh, const Array<int> &partitioning, int order, TPS::Tps *tps) : pmesh_(pmesh), sorder_(sorder) {}
+StaticRans::StaticRans(ParMesh *pmesh, const Array<int> &partitioning, int order, TPS::Tps *tps)
 : pmesh_(pmesh), order_(order) {
 
 
@@ -50,7 +50,6 @@ StaticRans::StaticRans(ParMesh *pmesh, const Array<int> &partitioning, int order
 }
 
 StaticRans::~StaticRans() {
-  delete eddy_viscosity_;
   delete sfes_;
   delete sfec_;
   delete mut_;
@@ -60,7 +59,7 @@ StaticRans::~StaticRans() {
 void StaticRans::initializeSelf() {
   // Eddy viscosity
   mut_ = new ParGridFunction(sfes_);
-  *mut_ = 1.0;
+  *mut_ = 0.0;
 
   toFlow_interface_.eddy_viscosity = mut_;
   toThermoChem_interface_.eddy_viscosity = mut_;
@@ -75,6 +74,6 @@ void StaticRans::initializeViz(mfem::ParaViewDataCollection &pvdc) {
 
 void StaticRans::step() {
 
-  *mut_ *= nut_field_;
+  mut_->ProjectCoefficient(*nut_field_);
   *mut_ *= *thermoChem_interface_->density;
 }

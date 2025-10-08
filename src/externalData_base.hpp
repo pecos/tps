@@ -55,6 +55,14 @@ struct extDataToThermoChem {
 };
 
 /**
+ * Provides wrapper for fields that need to be provided by the
+ * ext data to the turb model
+ */
+struct extDataToTurbModel {
+  const mfem::ParGridFunction *NuTdata = nullptr;
+};
+
+/**
  * Provides interface for ext data implementation
  */
 class ExternalDataBase {
@@ -85,8 +93,11 @@ class ExternalDataBase {
   /// Interface object, provides fields necessary for the flow
   extDataToFlow toFlow_interface_;
 
-  /// Interface object, provides fields necessary for the turbModel
+  /// Interface object, provides fields necessary for the thermo chem model
   extDataToThermoChem toThermoChem_interface_;
+
+  /// Interface object, provides fields necessary for the turb model
+  extDataToTurbModel toTurbModel_interface_;
 };
 
 #endif  // EXTERNALDATA_BASE_HPP_
