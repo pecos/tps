@@ -195,9 +195,8 @@ class LoMachSolver : public TPS::PlasmaSolver {
   StopWatch sw_setup_, sw_step_, sw_turb_, sw_thermChem_, sw_flow_, sw_press_;
   double tlast_;
 
-  // I/O helpers
+  // Viz helper
   ParaViewDataCollection *pvdc_ = nullptr;  // visualization
-  IODataOrganizer ioData;                   // restart
 
   /// Update the EXTk/BDF time integration coefficient.
   void SetTimeIntegrationCoefficients(int step);
