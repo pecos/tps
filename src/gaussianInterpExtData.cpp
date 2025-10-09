@@ -514,71 +514,71 @@ void GaussianInterpExtData::setup() {
   }
 
 
-  // now all interior points for nu_t
-  for (int ie = 0; ie < pmesh_->GetNE(); ie++) {
-    Array<int> vdofs;
-    sfes_->GetElementVDofs(ie, vdofs);
-    for (int i = 0; i < vdofs.Size(); i++) {
-      // index in gf of element
-      int n = vdofs[i];
-      if (n >= Sdof_) {
-        std::cout << " ERROR: problem with GetNE in external data interpolation " << n << " of " << Sdof_ << " dofs"
-                  << endl;
-        exit(1);
-      }
+  // // now all interior points for nu_t
+  // for (int ie = 0; ie < pmesh_->GetNE(); ie++) {
+  //   Array<int> vdofs;
+  //   sfes_->GetElementVDofs(ie, vdofs);
+  //   for (int i = 0; i < vdofs.Size(); i++) {
+  //     // index in gf of element
+  //     int n = vdofs[i];
+  //     if (n >= Sdof_) {
+  //       std::cout << " ERROR: problem with GetNE in external data interpolation " << n << " of " << Sdof_ << " dofs"
+  //                 << endl;
+  //       exit(1);
+  //     }
 
-      double xp[3];
-      for (int d = 0; d < dim_; d++) {
-        xp[d] = hcoords[n + d * Sdof_];
-      }
+  //     double xp[3];
+  //     for (int d = 0; d < dim_; d++) {
+  //       xp[d] = hcoords[n + d * Sdof_];
+  //     }
 
-      // int iCount = 0;
-      double dist = 0.0;
-      double wt = 0.0;
-      double wt_tot = 0.0;
-      double val_nu_T = 0.0;
+  //     // int iCount = 0;
+  //     double dist = 0.0;
+  //     double wt = 0.0;
+  //     double wt_tot = 0.0;
+  //     double val_nu_T = 0.0;
 
-      // minimum distance in interpolant field
-      double distMin = 1.0e12;
-      for (int j = 0; j < nCountTurb; j++) {
-        dist = sqrt((xp[0] - turb[j].x) * (xp[0] - turb[j].x) + (xp[1] - turb[j].y) * (xp[1] - turb[j].y) +
-                    (xp[2] - turb[j].z) * (xp[2] - turb[j].z));
-        distMin = std::min(distMin, dist);
-      }
+  //     // minimum distance in interpolant field
+  //     double distMin = 1.0e12;
+  //     for (int j = 0; j < nCountTurb; j++) {
+  //       dist = sqrt((xp[0] - turb[j].x) * (xp[0] - turb[j].x) + (xp[1] - turb[j].y) * (xp[1] - turb[j].y) +
+  //                   (xp[2] - turb[j].z) * (xp[2] - turb[j].z));
+  //       distMin = std::min(distMin, dist);
+  //     }
 
-      // find second closest data pt
-      double distMinSecond = 1.0e12;
-      for (int j = 0; j < nCountTurb; j++) {
-        dist = sqrt((xp[0] - turb[j].x) * (xp[0] - turb[j].x) + (xp[1] - turb[j].y) * (xp[1] - turb[j].y) +
-                    (xp[2] - turb[j].z) * (xp[2] - turb[j].z));
-        if (dist > distMin) {
-          distMinSecond = std::min(distMinSecond, dist);
-        }
-      }
+  //     // find second closest data pt
+  //     double distMinSecond = 1.0e12;
+  //     for (int j = 0; j < nCountTurb; j++) {
+  //       dist = sqrt((xp[0] - turb[j].x) * (xp[0] - turb[j].x) + (xp[1] - turb[j].y) * (xp[1] - turb[j].y) +
+  //                   (xp[2] - turb[j].z) * (xp[2] - turb[j].z));
+  //       if (dist > distMin) {
+  //         distMinSecond = std::min(distMinSecond, dist);
+  //       }
+  //     }
 
-      // radius for Gaussian interpolation
-      radius = distMinSecond;
+  //     // radius for Gaussian interpolation
+  //     radius = distMinSecond;
 
-      for (int j = 0; j < nCountTurb; j++) {
-        dist = sqrt((xp[0] - turb[j].x) * (xp[0] - turb[j].x) + (xp[1] - turb[j].y) * (xp[1] - turb[j].y) +
-                    (xp[2] - turb[j].z) * (xp[2] - turb[j].z));
+  //     for (int j = 0; j < nCountTurb; j++) {
+  //       dist = sqrt((xp[0] - turb[j].x) * (xp[0] - turb[j].x) + (xp[1] - turb[j].y) * (xp[1] - turb[j].y) +
+  //                   (xp[2] - turb[j].z) * (xp[2] - turb[j].z));
 
-        // gaussian interpolation
-        if (dist <= 1.5 * radius) {
-          wt = exp(-(dist * dist) / (radius * radius));
-          wt_tot += wt;
-          val_nu_T = val_nu_T + wt * turb[j].nut;
-        }
+  //       // gaussian interpolation
+  //       if (dist <= 1.5 * radius) {
+  //         wt = exp(-(dist * dist) / (radius * radius));
+  //         wt_tot += wt;
+  //         val_nu_T = val_nu_T + wt * turb[j].nut;
+  //       }
 
-      }
+  //     }
 
-      if (wt_tot > 0.0) {
-        NuTdata[n] = val_nu_T / wt_tot;
-      } else {
-        NuTdata[n] = 0.0;
-      }
-    }
-  }
+  //     if (wt_tot > 0.0) {
+  //       NuTdata[n] = val_nu_T / wt_tot;
+  //     } else {
+  //       NuTdata[n] = 0.0;
+  //     }
+  //   }
+  // }
 }
 
 void GaussianInterpExtData::step() {
