@@ -295,6 +295,7 @@ int main(int argc, char *argv[]) {
 
   // delete the target M2ulPhyS class
   delete tarField;
+  delete srcField;
 
   return 0;
 }
