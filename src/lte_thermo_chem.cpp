@@ -172,6 +172,7 @@ LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, t
 
 LteThermoChem::~LteThermoChem() {
   // allocated in initializeOperators
+  delete rad_kap_gradT_coeff_;
   delete rad_radiation_sink_coeff_;
   delete rad_jh_coeff_;
   delete rad_un_next_coeff_;
@@ -183,29 +184,40 @@ LteThermoChem::~LteThermoChem() {
 
   delete sfes_filter_;
   delete sfec_filter_;
+  delete MqInv_;
+  delete MqInvPC_;
   delete HtInv_;
   delete HtInvPC_;
   delete MsInv_;
   delete MsInvPC_;
   delete MrhoInv_;
   delete MrhoInvPC_;
+  delete jh_form_;
+  delete Mq_form_;
   delete Ht_form_;
   delete M_rho_form_;
   delete M_rho_Cp_form_;
   delete Ms_form_;
+  delete A_rho_form_;
   delete At_form_;
+  delete LQ_form_;
+  delete LQ_bdry_;
   delete rho_Cp_u_coeff_;
   delete un_next_coeff_;
   delete kap_gradT_coeff_;
   delete gradT_coeff_;
   delete mut_coeff_;
+  delete kapt_coeff_;
   delete mult_coeff_;
   delete thermal_diff_coeff_;
   delete thermal_diff_sum_coeff_;
   delete thermal_diff_total_coeff_;
   delete rho_Cp_over_dt_coeff_;
   delete rho_Cp_coeff_;
+  delete Cp_coeff_;
   delete rho_coeff_;
+  delete jh_coeff_;
+  delete radiation_sink_coeff_;
 
   delete umag_coeff_;
   delete gscale_coeff_;
@@ -224,6 +236,14 @@ LteThermoChem::~LteThermoChem() {
   // allocated in initializeSelf
   delete sfes_;
   delete sfec_;
+
+  delete radiation_;
+
+  delete mu_table_;
+  delete kappa_table_;
+  delete sigma_table_;
+  delete Rgas_table_;
+  delete Cp_table_;
 }
 
 void LteThermoChem::initializeSelf() {
@@ -550,7 +570,7 @@ void LteThermoChem::initializeOperators() {
   kap_gradT_coeff_ = new ScalarVectorProductCoefficient(*thermal_diff_total_coeff_, *gradT_coeff_);
 
   un_next_coeff_ = new VectorGridFunctionCoefficient(flow_interface_->velocity);
-  rhon_next_coeff_ = new GridFunctionCoefficient(&rn_gf_);
+  // rhon_next_coeff_ = new GridFunctionCoefficient(&rn_gf_);
 
   rho_Cp_u_coeff_ = new ScalarVectorProductCoefficient(*rho_Cp_coeff_, *un_next_coeff_);
 
