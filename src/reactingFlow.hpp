@@ -423,6 +423,7 @@ class ReactingFlow : public ThermoChemModelBase {
   // This needs to be updated if you are starting a BTE blended run from a check point
   double bl_frac_init_, bl_frac_increment_, bl_frac_;
   int bl_frac_change_freq_ = 1;
+  int solve_bte_every_n = 1;
 #endif
 
  public:

@@ -108,11 +108,12 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     tpsP_->getRequiredInput("boltzmannSolver/collisionsFile", collisionsFile);
     tpsP_->getRequiredInput("boltzmannSolver/solver_type", solver_type);
     tpsP_->getInput("boltzmannSolver/ee_collisions", ee_collisions, 0);
+    tpsP_->getInput("boltzmannSolver/blend-frac-init", bl_frac_init_, 0.01);
+    tpsP_->getInput("boltzmannSolver/blend-frac-increment", bl_frac_increment_, 0.01);
+    tpsP_->getInput("boltzmannSolver/blend-frac-change-freq", bl_frac_change_freq_, 1);
+    bl_frac_ = bl_frac_init_;
+    tpsP_->getInput("boltzmannSolver/solve-bte-every-n", solve_bte_every_n, 1);
   }
-  tpsP_->getInput("boltzmannSolver/blend-frac-init", bl_frac_init_, 0.01);
-  tpsP_->getInput("boltzmannSolver/blend-frac-increment", bl_frac_increment_, 0.01);
-  tpsP_->getInput("boltzmannSolver/blend-frac-change-freq", bl_frac_change_freq_, 1);
-  bl_frac_ = bl_frac_init_;
 #endif
 
   // plasma conditions. ???
@@ -1756,7 +1757,15 @@ void ReactingFlow::step() {
       const double *dataY = Yn_.HostRead();
     
 #ifdef HAVE_PYTHON
-    if(bte_from_tps_) {
+    int iter = this->GetCurrentIter();
+    int update_bte_rates = (iter - 1) % solve_bte_every_n;
+    
+    if (rank0_) {
+      int iter_number_ = this->GetCurrentIter();
+      std::cout << "[C++] Iter = " << iter_number_ << ", bl_frac = " << bl_frac_
+      << "sDofInt = " << sDofInt_ << "\n";
+    }
+    if(bte_from_tps_ && update_bte_rates == 0) {
       // // Wrap const pointer into NumPy array (no copy)
       // // Dimensions given as {size}, stride as {sizeof(double)}
       int size = Tn_.Size();
@@ -1792,8 +1801,9 @@ void ReactingFlow::step() {
           species_data[i + sp * sDofInt_] = AVOGADRONUMBER * species_local[sp];
       }
 
-      // GET THE MIN AND MAX VALUES OF SPECIES NUMBER DENSITIES FRACTIONS FOR EACH SPECIES
-      if (rank0_) std::cout << "sDofInt = " << sDofInt_ << "\n";
+      if (rank0_) {
+        std::cout << "iter = " << iter << ", Updating BTE rates...... \n";
+      }
 
       const double *species_read = speciesInt_.HostRead();
       auto specarr = py::array_t<double>(
@@ -1897,12 +1907,15 @@ void ReactingFlow::step() {
       delete[] YT;
 #ifdef HAVE_PYTHON
       kReac_gf_.SetFromTrueDofs(kReac_);
-      // UPDATE THE BLENDING FRACTION
-      int iter_number_ = this->GetCurrentIter();
-      if (iter_number_ % bl_frac_change_freq_ == 0) {
-        bl_frac_ = bl_frac_ + bl_frac_increment_;
+      if (bte_from_tps_) {
+        // UPDATE THE BLENDING FRACTION
+        int iter_number_ = this->GetCurrentIter();
+        if (iter_number_ % bl_frac_change_freq_ == 0) {
+          bl_frac_ = bl_frac_ + bl_frac_increment_;
+        }
+        bl_frac_ = std::min(bl_frac_, 1.0);
       }
-      bl_frac_ = std::min(bl_frac_, 1.0);
+      
       for (int rr = 0; rr < nReactions_; rr++) {
         mfem::Vector rr_view(kReac_.GetData() + rr*sDofInt_, sDofInt_);
 
@@ -3334,20 +3347,13 @@ void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, 
   // Evaluate the chemical source terms
   chemistry_->computeForwardRateCoeffs(n_sp.Read(), Th, Te, dofindex, kfwd.HostWrite());
 #ifdef HAVE_PYTHON
-  int iter_number_ = this->GetCurrentIter();
-  if (rank0_ && dofindex == 400) {
-    std::cout << "ReactingFlow::evaluateReactingSource(), iter_number_ = " << iter_number_ << ", bl_frac = " << bl_frac_ << "\n";
-  }
   if (bte_from_tps_) {
+    int iter_number_ = this->GetCurrentIter();
     const double* mapping = bte_rr_mapping_.HostRead();
-    if (rank0_ && dofindex == 400) {
-      std::cout << "ReactingFlow::evaluateReactingSource(), Tabulated vs BTE rate coefficients -> ";
-      for (int rr = 0; rr < nBTEReactions_; rr++) {
-        int tpi = int(mapping[rr]); // tpi stores TPS index of reaction given by BTE index rr
-        double kblend = bl_frac_ * BTErr[rr] + (1.0 - bl_frac_) * kfwd[tpi];
-        std::cout << "rr = " << rr << " Tab ind = " << tpi << ", rate = " << kfwd[tpi] << ", BTE = " << BTErr[rr] 
-        << " Blended = " << kblend << "\n";
-      }
+    for (int rr = 0; rr < nBTEReactions_; rr++) {
+      int tpi = int(mapping[rr]); // tpi stores TPS index of reaction given by BTE index rr
+      double kblend = bl_frac_ * BTErr[rr] + (1.0 - bl_frac_) * kfwd[tpi];
+      kfwd[tpi] = std::max(kblend, 0.0);
     }
   }
   double *datakfwd = kReac_.HostWrite();

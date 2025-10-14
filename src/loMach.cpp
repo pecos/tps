@@ -400,7 +400,7 @@ void LoMachSolver::solveStep() {
   int iter_number_ = iter - iter_start_ + 1;
   if (rank0_) {
     std::cout << "LoMach::solveStep(), iter = " << iter << ", iter_start = " << iter_start_ 
-              << ", iter_number_ = " << iter_number_ << "\n";
+              << ", iter_number_ = " << iter_number_ << ", doFlowStep = " << loMach_opts_.doFlowStep << "\n";
   }
 
   
@@ -413,7 +413,13 @@ void LoMachSolver::solveStep() {
     thermo_->step();
     sw_thermChem_.Stop();
     sw_flow_.Start();
+  #ifdef HAVE_PYTHON
+    if (loMach_opts_.doFlowStep) {
+  #endif
     flow_->step();
+  #ifdef HAVE_PYTHON
+    }
+  #endif
     sw_flow_.Stop();
     sw_turb_.Start();
     turbModel_->step();
@@ -735,6 +741,9 @@ void LoMachSolver::parseSolverOptions() {
   tpsP_->getInput("loMach/thermalDiv", loMach_opts_.thermalDiv, true);
   tpsP_->getInput("loMach/realDiv", loMach_opts_.realDiv, false);
   tpsP_->getInput("loMach/solveTemp", loMach_opts_.solveTemp, true);
+#ifdef HAVE_PYTHON
+  tpsP_->getInput("loMach/do-flow-step", loMach_opts_.doFlowStep, true);
+#endif
 
   // dump options to screen for user inspection
   if (rank0_) {
