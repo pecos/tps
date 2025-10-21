@@ -209,8 +209,8 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, solver_type, ee_collisions
             #     file.write(filestr)
         if rank_ == 0 and i == qoi["rates"].shape[0]-1:
             print("Global reaction ", i, ", min = ", glomin, ", max = ", glomax, ", num_negatives = ", glonumneg)
-            sampind = 1557
-            print("[Py] Index = ", sampind, "Sample rates = ", rates[:,sampind])
+            # sampind = 1557
+            # print("[Py] Index = ", sampind, "Sample rates = ", rates[:,sampind])
     
     rates[rates < 0.0] = 0.0
     data = rates[1:rates.shape[0]].flatten()
