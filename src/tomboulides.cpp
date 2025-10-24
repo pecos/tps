@@ -1127,7 +1127,7 @@ void Tomboulides::initializeOperators() {
 
   
 
-  // Helmholtz for ustar <jump>
+  // solver for ustar <jump> (not really a Helmholtz anymore)
   Hvs_form_ = new ParBilinearForm(vfes_);
   VectorMassIntegrator *hmvs_blfi;
   ConvectionIntegrator *hcvs_blfi;
@@ -1142,7 +1142,7 @@ void Tomboulides::initializeOperators() {
   Hvs_form_->Assemble();
   Hvs_form_->FormSystemMatrix(vel_ess_tdof_, Hvs_op_);
 
-  // Helmholtz solver
+  // solver
   Hvs_inv_pc_ = new HypreSmoother(*Hvs_op_.As<HypreParMatrix>());  
   dynamic_cast<HypreSmoother *>(Hvs_inv_pc_)->SetType(smoother_type_, smoother_passes_);
   dynamic_cast<HypreSmoother *>(Hvs_inv_pc_)->SetSOROptions(hsmoother_relax_weight_, hsmoother_relax_omega_);
@@ -1655,7 +1655,7 @@ void Tomboulides::step() {
 
   
   //------------------------------------------------------------------------
-  // Step 2(4): Helmholtz solve for the velocity star
+  // Step 2(4): solve for the velocity star
   //------------------------------------------------------------------------
   resu_vec_ = 0.0;
   
@@ -1672,7 +1672,7 @@ void Tomboulides::step() {
   Hvs_form_->FormLinearSystem(vel_ess_tdof_, *u_next_gf_, *resu_gf_, Hvs_op_, X2s, B2s, 1);
   Hvs_inv_->Mult(B2s, X2s);
   if (!Hvs_inv_->GetConverged()) {
-    if (rank0_) std::cout << "ERROR: Helmholtz solve did not converge." << std::endl;
+    if (rank0_) std::cout << "ERROR: Solve for u* solve did not converge." << std::endl;
     exit(1);
   }
   // iter_hsolve = HInv->GetNumIterations();
