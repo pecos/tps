@@ -309,6 +309,7 @@ void Tomboulides::initializeSelf() {
   const int pfes_truevsize = pfes_->GetTrueVSize();
 
   forcing_vec_.SetSize(vfes_truevsize);
+  conv_vec_.SetSize(vfes_truevsize);  
   u_vec_.SetSize(vfes_truevsize);
   um1_vec_.SetSize(vfes_truevsize);
   um2_vec_.SetSize(vfes_truevsize);
@@ -316,6 +317,7 @@ void Tomboulides::initializeSelf() {
   Nm1_vec_.SetSize(vfes_truevsize);
   Nm2_vec_.SetSize(vfes_truevsize);
   ustar_vec_.SetSize(vfes_truevsize);
+  uconv_vec_.SetSize(vfes_truevsize);  
   uext_vec_.SetSize(vfes_truevsize);
   pp_div_vec_.SetSize(vfes_truevsize);
   resu_vec_.SetSize(vfes_truevsize);
@@ -350,6 +352,7 @@ void Tomboulides::initializeSelf() {
 
   // zero vectors for now
   forcing_vec_ = 0.0;
+  conv_vec_ = 0.0;  
   u_vec_ = 0.0;
   um1_vec_ = 0.0;
   um2_vec_ = 0.0;
@@ -357,6 +360,7 @@ void Tomboulides::initializeSelf() {
   Nm1_vec_ = 0.0;
   Nm2_vec_ = 0.0;
   ustar_vec_ = 0.0;
+  uconv_vec_ = 0.0;  
   uext_vec_ = 0.0;
   pp_div_vec_ = 0.0;
   resu_vec_ = 0.0;
@@ -454,6 +458,193 @@ void Tomboulides::initializeSelf() {
         addSwirlDirichletBC(swirl, inlet_attr);
       }
 
+
+    // Prescribe inlet velocity bc of face in face-coordinate system
+    // NOTE: Original intent is to allow multiple inlet faces of different
+    // orientation to be included in a single patch number.  There appears
+    // to be an issue with the dof list output from GetFaceDofs(iFace, dofs).
+    // These sections of code are commented (but retained for future reference)
+    // in favor of a simpler approach which requires a different patch tag for
+    // every inlet face. This simple method does not account for curvature
+    // over the contiguous patch.
+    } else if (type == "normal") {
+      if (pmesh_->GetMyRank() == 0) {
+        std::cout << "Tomboulides: Setting face-normal Dirichlet velocity on patch = " << patch << std::endl;
+      }
+
+      // only support 3d mesh for now
+      assert(dim_==3);
+      
+      Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
+      inlet_attr = 0;
+      inlet_attr[patch - 1] = 1;
+      
+      Vector velocity_value(dim_);
+      Vector zero(dim_);
+      zero = 0.0;      
+      tpsP_->getVec((basepath + "/velocity").c_str(), velocity_value, dim_, zero);
+
+      // face coord system
+      Vector normal;
+      Vector nTmp;
+      Vector tangent1;
+      Vector tangent2;      
+      normal.SetSize(dim_);
+      nTmp.SetSize(dim_);      
+      tangent1.SetSize(dim_);
+      tangent2.SetSize(dim_);
+      normal = 0.0;
+      nTmp = 0.0;
+      tangent1 = 0.0;
+      tangent2 = 0.0;      
+      
+      Vector one(dim_);
+      one = 0.0;
+      one[0] = 1.0;
+      
+      tpsP_->getVec((basepath + "/tangent").c_str(), tangent2, dim_, one);
+      double nMag = 0.0;      
+      for (int ii = 0; ii < dim_; ii++) nMag += tangent2[ii]*tangent2[ii];
+      tangent2 /= sqrt(nMag);
+
+      // stores actual boundary conditions
+      //uface_gf_ = new ParGridFunction(vfes_);
+      //*uface_gf_ = 0.0;
+
+      // gets passed to dirichlet bc 
+      //uface_coeff_ = new VectorGridFunctionCoefficient(uface_gf_); 
+      
+      // loop over all boundary elements
+      //tmpR1_ = 0.0;
+      //double *data = tmpR1_.HostWrite();
+      //int sDofInt = sfes_->GetTrueVSize();
+      int nCount = 0;
+      Vector uSingleInlet;
+      uSingleInlet.SetSize(dim_);
+      uSingleInlet = 0.0;
+      
+      for (int bel = 0; bel < vfes_->GetNBE(); bel++) {
+
+	// bel face tag
+	int attr = vfes_->GetBdrAttribute(bel);
+
+	// bndry eles with patch tag
+	if (attr == patch) {
+
+  	  //std::cout << patch << ") attr: " << attr << endl;	  
+	  nCount++;
+
+	  int iFace = vfes_->GetMesh()->GetBdrFace(bel);
+	  //FaceElementTransformations *Tr = vfes_->GetMesh()->GetBdrFaceTransformations(bel);
+	  //ElementTransformation *Tr = vfes_->GetMesh()->GetBdrElementTransformation(bel);
+	  ElementTransformation *Tr = vfes_->GetMesh()->GetFaceTransformation(iFace);
+
+	  // changing order from 1
+	  const IntegrationRule ir = gll_rules.Get(Tr->GetGeometryType(), 2 * vorder_ - 1);
+
+  	  // face normal	  
+          for (int i = 0; i < ir.GetNPoints(); i++) {	    
+            IntegrationPoint ip = ir.IntPoint(i);
+            //Tr->SetAllIntPoints(&ip);
+	    Tr->SetIntPoint(&ip);	 
+            CalcOrtho(Tr->Jacobian(), nTmp);
+            //std::cout << patch << "/" << bel << ") normal: (" << nTmp[0] << ", " << nTmp[1] << ", " << nTmp[2] << ")" << endl;	  	  	    
+	    for (int ii = 0; ii < dim_; ii++) normal[ii] -= nTmp[ii]; // minus to be inward facing normal
+            //std::cout << patch << "/" << i << ") normal: (" << normal[0] << ", " << normal[1] << ", " << normal[2] << ")" << endl;	  	  	    	    
+	  }
+
+	} // attr patch check
+      } // bel loop
+
+      Vector uGlobal;
+      uGlobal.SetSize(dim_);
+      uGlobal = 0.0;	        
+      if (nCount>0) {
+	
+  	  nMag = 0.0;
+          for (int ii = 0; ii < dim_; ii++) nMag += normal[ii]*normal[ii];
+	  normal /= sqrt(nMag);	  
+
+          // ensure normal is orthogonal to specified tangent
+	  //std::cout << patch << ") inlet orig normal: (" << normal[0] << ", " << normal[1] << ", " << normal[2] << ")" << endl;	  	  
+          {
+            Vector projt2(dim_);
+            double tmag, tn;
+            tmag = 0.0;
+            tn = 0.0;
+            for (int d = 0; d < dim_; d++) tmag += tangent2[d] * tangent2[d];
+            for (int d = 0; d < dim_; d++) tn += tangent2[d] * normal[d];
+            for (int d = 0; d < dim_; d++) projt2[d] = (tn / tmag) * tangent2[d];
+            for (int d = 0; d < dim_; d++) normal[d] -= projt2[d];
+          }
+	  //std::cout << patch << ") inlet fixed normal: (" << normal[0] << ", " << normal[1] << ", " << normal[2] << ")" << endl;	  
+	  
+          // unspecified tangent
+          tangent1[0] = normal[1] * tangent2[2] - normal[2] * tangent2[1];
+          tangent1[1] = normal[2] * tangent2[0] - normal[0] * tangent2[2];
+          tangent1[2] = normal[0] * tangent2[1] - normal[1] * tangent2[0];
+          nMag = 0.0;
+          for (int ii = 0; ii < dim_; ii++) nMag += tangent1[ii]*tangent1[ii];
+          tangent1 /= sqrt(nMag);
+	  //std::cout << patch << ") inlet patch tangent: (" << tangent1[0] << ", " << tangent1[1] << ", " << tangent1[2] << ")" << endl;	  
+	  
+          // transform to global	  
+          DenseMatrix M(dim_, dim_);
+          for (int d = 0; d < dim_; d++) {
+            M(0, d) = normal[d];
+            M(1, d) = tangent1[d];
+            M(2, d) = tangent2[d];
+          } 
+          for (int ii = 0; ii < dim_; ii++) {
+            for (int jj = 0; jj < dim_; jj++) {
+              uGlobal[ii] = uGlobal[ii] + M(jj,ii) * velocity_value[jj];
+              //uGlobal[ii] = uGlobal[ii] + M(ii,jj) * velocity_value[jj];	      
+            }
+          }
+	  //std::cout << patch << ") Ugbl: " << uGlobal[0] << ", " << uGlobal[1] << ", " << uGlobal[2] << endl;
+
+	  // with simple form of bc, just take mean of all ip
+          //for (int ii = 0; ii < dim_; ii++) uSingleInlet[ii] += uGlobal[ii];
+	  //std::cout << patch << ") Usingle: " << uSingleInlet[0] << ", " << uSingleInlet[1] << ", " << uSingleInlet[2] << endl;	  
+	    
+          // dofs of element
+          //Array<int> dofs;
+          //sfes_->GetElementDofs(Tr->Elem1No, dofs);
+          //sfes_->GetBdrElementDofs(bel, dofs);
+	  //sfes_->GetFaceDofs(iFace, dofs);
+	  //int nDofs = dofs.Size();
+	  
+	  //std::cout << bel << ") dofs: ";
+          //for (int ii = 0; ii < nDofs ; ii++) {
+  	  //  std::cout << dofs[ii] << " ";  
+	  //}
+	  //std::cout << endl;	  
+	  
+          //for (int eq = 0; eq < dim_; eq++) {
+          //  for (int ii = 0; ii < nDofs ; ii++) {
+          //    int idof = dofs[ii]; 
+          //    data[idof + eq*sDofInt] = uGlobal[eq];
+	  //  }
+	  //}
+	  
+	  //} // attr patch check
+	//} // bel loop
+      
+      //uface_gf_->SetFromTrueDofs(tmpR1_);      
+      //addVelDirichletBC(uface_coeff_, inlet_attr);
+
+      //if (nCount > 0) {
+	  //	for (int ii = 0; ii < dim_; ii++) uSingleInlet[ii] /= (double)nCount;
+	  //        std::cout <<  patch << ") Inlet BC: " << uSingleInlet[0] << ", " << uSingleInlet[1] << ", " << uSingleInlet[2] << " cnt: " << nCount << endl; 
+	  //      }
+	  //      addVelDirichletBC(uSingleInlet, inlet_attr);
+        std::cout <<  patch << ") Inlet BC: " << uGlobal[0] << ", " << uGlobal[1] << ", " << uGlobal[2] << " cnt: " << nCount << endl; 	  
+
+      }
+	  
+      addVelDirichletBC(uGlobal, inlet_attr);	  
+            
+      
     } else if (type == "interpolate") {
       if (pmesh_->GetMyRank() == 0) {
         std::cout << "Tomboulides: Setting interpolated Dirichlet velocity on patch = " << patch << std::endl;
@@ -626,6 +817,9 @@ void Tomboulides::initializeOperators() {
   S_poisson_coeff_ = new VectorSumCoefficient(*twoS_gradmu_coeff_, *gradmu_Qt_coeff_, 1.0, -2. / 3);
   S_mom_coeff_ = new VectorSumCoefficient(*graduT_gradmu_coeff_, *gradmu_Qt_coeff_, 1.0, -1.0);
 
+  u_next_coeff_ = new VectorGridFunctionCoefficient(u_next_gf_);
+  rhou_coeff_ = new ScalarVectorProductCoefficient(*rho_coeff_, *u_next_coeff_);  
+  
   // Coefficients for axisymmetric
   if (axisym_) {
     rad_rho_coeff_ = new ProductCoefficient(radius_coeff, *rho_coeff_);
@@ -646,7 +840,6 @@ void Tomboulides::initializeOperators() {
     ur_conv_forcing_coeff_ = new VectorArrayCoefficient(2);
     ur_conv_forcing_coeff_->Set(0, utheta2_coeff_);
 
-    u_next_coeff_ = new VectorGridFunctionCoefficient(u_next_gf_);
     rad_rhou_coeff_ = new ScalarVectorProductCoefficient(*rad_rho_coeff_, *u_next_coeff_);
 
     u_next_rad_coeff_ = new GridFunctionCoefficient(u_next_rad_comp_gf_);
@@ -667,6 +860,7 @@ void Tomboulides::initializeOperators() {
   // For most terms this will result in an under-integration, but it
   // has the nice consequence that the mass matrix is diagonal.
   const IntegrationRule &ir_ni_v = gll_rules.Get(vfes_->GetFE(0)->GetGeomType(), 2 * vorder_ - 1);
+  const IntegrationRule &ir_ni_c = gll_rules.Get(vfes_->GetFE(0)->GetGeomType(), 3 * vorder_ - 1);  
   const IntegrationRule &ir_ni_p = gll_rules.Get(pfes_->GetFE(0)->GetGeomType(), 2 * porder_ - 1);
 
   // Empty array, use where we want operators without BCs
@@ -732,7 +926,7 @@ void Tomboulides::initializeOperators() {
     nlc_nlfi = new VectorConvectionNLFIntegrator(nlcoeff_);
   }
   if (numerical_integ_) {
-    nlc_nlfi->SetIntRule(&ir_ni_v);
+    nlc_nlfi->SetIntRule(&ir_ni_c);
   }
   Nconv_form_->AddDomainIntegrator(nlc_nlfi);
   if (partial_assembly_) {
@@ -886,6 +1080,9 @@ void Tomboulides::initializeOperators() {
   Hv_form_ = new ParBilinearForm(vfes_);
   VectorMassIntegrator *hmv_blfi;
   VectorDiffusionIntegrator *hdv_blfi;
+  //ConvectionIntegrator *hcv_blfi;
+  //ConservativeConvectionIntegrator *hcv_blfi;
+  //GroupConvectionIntegrator *hcv_blfi;
   if (axisym_) {
     hmv_blfi = new VectorMassIntegrator(*rad_rho_over_dt_coeff_);
     hdv_blfi = new VectorDiffusionIntegrator(*rad_mu_coeff_);
@@ -893,12 +1090,17 @@ void Tomboulides::initializeOperators() {
     hmv_blfi = new VectorMassIntegrator(*rho_over_dt_coeff_);
     hdv_blfi = new VectorDiffusionIntegrator(*mu_coeff_);
   }
+  //hcv_blfi = new ConvectionIntegrator(*rhou_coeff_,1.0); // no ibp with this integrator
+  //hcv_blfi = new ConservativeConvectionIntegrator(*rhou_coeff_,1.0); // ibp, but integrator applies a negative
+  //hcv_blfi = new GroupConvectionIntegrator(*rhou_coeff_,1.0);
   if (numerical_integ_) {
     hmv_blfi->SetIntRule(&ir_ni_v);
     hdv_blfi->SetIntRule(&ir_ni_v);
+    //hcv_blfi->SetIntRule(&ir_ni_c);
   }
   Hv_form_->AddDomainIntegrator(hmv_blfi);
   Hv_form_->AddDomainIntegrator(hdv_blfi);
+  //Hv_form_->AddDomainIntegrator(hcv_blfi);
   if (axisym_) {
     auto *hfv_blfi = new VectorMassIntegrator(*visc_forcing_coeff_);
     Hv_form_->AddDomainIntegrator(hfv_blfi);
@@ -907,13 +1109,14 @@ void Tomboulides::initializeOperators() {
   Hv_form_->FormSystemMatrix(vel_ess_tdof_, Hv_op_);
 
   // Helmholtz solver
-  Hv_inv_pc_ = new HypreSmoother(*Hv_op_.As<HypreParMatrix>());
+  Hv_inv_pc_ = new HypreSmoother(*Hv_op_.As<HypreParMatrix>());  
   dynamic_cast<HypreSmoother *>(Hv_inv_pc_)->SetType(smoother_type_, smoother_passes_);
   dynamic_cast<HypreSmoother *>(Hv_inv_pc_)->SetSOROptions(hsmoother_relax_weight_, hsmoother_relax_omega_);
   dynamic_cast<HypreSmoother *>(Hv_inv_pc_)
       ->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_, smoother_eig_est_);
 
   Hv_inv_ = new CGSolver(vfes_->GetComm());
+  //Hv_inv_ = new GMRESSolver(vfes_->GetComm());  
   Hv_inv_->iterative_mode = true;
   Hv_inv_->SetOperator(*Hv_op_);
   Hv_inv_->SetPreconditioner(*Hv_inv_pc_);
@@ -922,7 +1125,40 @@ void Tomboulides::initializeOperators() {
   Hv_inv_->SetRelTol(hsolve_rtol_);
   Hv_inv_->SetMaxIter(hsolve_max_iter_);
 
-  //
+  
+
+  // Helmholtz for ustar <jump>
+  Hvs_form_ = new ParBilinearForm(vfes_);
+  VectorMassIntegrator *hmvs_blfi;
+  ConvectionIntegrator *hcvs_blfi;
+  //ConservativeConvectionIntegrator *hcvs_blfi;
+  //GroupConvectionIntegrator *hcvs_blfi;
+  hmvs_blfi = new VectorMassIntegrator(*rho_over_dt_coeff_);
+  hcvs_blfi = new ConvectionIntegrator(*rhou_coeff_,1.0); // no ibp with this integrator
+  //hcvs_blfi = new ConservativeConvectionIntegrator(*rhou_coeff_,1.0); // ibp, but integrator applies a negative
+  //hcvs_blfi = new GroupConvectionIntegrator(*rhou_coeff_,1.0);
+  Hvs_form_->AddDomainIntegrator(hmvs_blfi);
+  Hvs_form_->AddDomainIntegrator(hcvs_blfi);
+  Hvs_form_->Assemble();
+  Hvs_form_->FormSystemMatrix(vel_ess_tdof_, Hvs_op_);
+
+  // Helmholtz solver
+  Hvs_inv_pc_ = new HypreSmoother(*Hvs_op_.As<HypreParMatrix>());  
+  dynamic_cast<HypreSmoother *>(Hvs_inv_pc_)->SetType(smoother_type_, smoother_passes_);
+  dynamic_cast<HypreSmoother *>(Hvs_inv_pc_)->SetSOROptions(hsmoother_relax_weight_, hsmoother_relax_omega_);
+  dynamic_cast<HypreSmoother *>(Hvs_inv_pc_)
+      ->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_, smoother_eig_est_);
+  Hvs_inv_ = new GMRESSolver(vfes_->GetComm());  
+  Hvs_inv_->iterative_mode = true;
+  Hvs_inv_->SetOperator(*Hvs_op_);
+  Hvs_inv_->SetPreconditioner(*Hvs_inv_pc_);
+  Hvs_inv_->SetPrintLevel(hsolve_pl_);
+  Hvs_inv_->SetAbsTol(hsolve_atol_);
+  Hvs_inv_->SetRelTol(hsolve_rtol_);
+  Hvs_inv_->SetMaxIter(hsolve_max_iter_);
+  
+
+  
   pp_div_bdr_form_ = new ParLinearForm(pfes_);
   BoundaryNormalLFIntegrator *ppd_bnlfi;
   if (axisym_) {
@@ -1270,96 +1506,25 @@ void Tomboulides::step() {
   Mv_rho_form_->Update();
   Mv_rho_form_->Assemble();
   Mv_rho_form_->FormSystemMatrix(empty, Mv_rho_op_);
-
   Mv_rho_inv_->SetOperator(*Mv_rho_op_);
 
   // Update the Helmholtz operator and inverse
   sw_helm_.Start();
+  
   Hv_bdfcoeff_.constant = coeff_.bd0 / dt;
   Hv_form_->Update();
   Hv_form_->Assemble();
   Hv_form_->FormSystemMatrix(vel_ess_tdof_, Hv_op_);
-
   Hv_inv_->SetOperator(*Hv_op_);
 
+  Hvs_bdfcoeff_.constant = coeff_.bd0 / dt;
+  Hvs_form_->Update();
+  Hvs_form_->Assemble();
+  Hvs_form_->FormSystemMatrix(vel_ess_tdof_, Hvs_op_);
+  Hvs_inv_->SetOperator(*Hvs_op_);
+  
   sw_helm_.Stop();
 
-  //------------------------------------------------------------------------
-  // Step 2: Compute vstar / dt (as in eqn 2.3 from Tomboulides)
-  // ------------------------------------------------------------------------
-
-  // Evaluate the forcing at the end of the time step
-  for (auto &force : forcing_terms_) {
-    force.coeff->SetTime(time + dt);
-  }
-  forcing_form_->Assemble();
-  forcing_form_->ParallelAssemble(forcing_vec_);
-
-  // Evaluate the nonlinear---i.e. convection---term in the velocity eqn
-  Nconv_form_->Mult(u_vec_, N_vec_);
-  Nconv_form_->Mult(um1_vec_, Nm1_vec_);
-  Nconv_form_->Mult(um2_vec_, Nm2_vec_);
-
-  {
-    const auto d_N = N_vec_.Read();
-    const auto d_Nm1 = Nm1_vec_.Read();
-    const auto d_Nm2 = Nm2_vec_.Read();
-    auto d_force = forcing_vec_.ReadWrite();
-    const auto ab1 = coeff_.ab1;
-    const auto ab2 = coeff_.ab2;
-    const auto ab3 = coeff_.ab3;
-    MFEM_FORALL(i, forcing_vec_.Size(), { d_force[i] += (ab1 * d_N[i] + ab2 * d_Nm1[i] + ab3 * d_Nm2[i]); });
-  }
-
-  if (axisym_) {
-    // Extrapolate the swirl velocity
-    {
-      const auto d_u = utheta_vec_.Read();
-      const auto d_um1 = utheta_m1_vec_.Read();
-      const auto d_um2 = utheta_m2_vec_.Read();
-      auto d_uext = utheta_next_vec_.Write();
-      const auto ab1 = coeff_.ab1;
-      const auto ab2 = coeff_.ab2;
-      const auto ab3 = coeff_.ab3;
-      MFEM_FORALL(i, utheta_next_vec_.Size(), { d_uext[i] = ab1 * d_u[i] + ab2 * d_um1[i] + ab3 * d_um2[i]; });
-    }
-    utheta_next_gf_->SetFromTrueDofs(utheta_next_vec_);
-
-    // evaluate the rho u_{\theta}^2 term (from convection)
-    ur_conv_axi_form_->Assemble();
-    ur_conv_axi_form_->ParallelAssemble(ur_conv_forcing_vec_);
-    forcing_vec_ += ur_conv_forcing_vec_;
-  }
-
-  // vstar / dt = M^{-1} (extrapolated nonlinear + forcing) --- eqn.
-  Mv_inv_->Mult(forcing_vec_, ustar_vec_);
-  if (!Mv_inv_->GetConverged()) {
-    if (rank0_) std::cout << "ERROR: Mv inverse did not converge." << std::endl;
-    exit(1);
-  }
-  // TODO(trevilo): track linear solve
-  // iter_mvsolve = MvInv->GetNumIterations();
-  // res_mvsolve = MvInv->GetFinalNorm();
-
-  // vstar / dt += BDF contribution
-  {
-    const double bd1idt = -coeff_.bd1 / dt;
-    const double bd2idt = -coeff_.bd2 / dt;
-    const double bd3idt = -coeff_.bd3 / dt;
-    const auto d_u = u_vec_.Read();
-    const auto d_um1 = um1_vec_.Read();
-    const auto d_um2 = um2_vec_.Read();
-    auto d_ustar = ustar_vec_.ReadWrite();
-    MFEM_FORALL(i, ustar_vec_.Size(), { d_ustar[i] += bd1idt * d_u[i] + bd2idt * d_um1[i] + bd3idt * d_um2[i]; });
-  }
-
-  // At this point ustar_vec_ holds vstar/dt!
-
-  // NB: axisymmetric (no swirl!) implemented to here
-
-  //------------------------------------------------------------------------
-  // Step 3: Poisson
-  // ------------------------------------------------------------------------
 
   // Extrapolate the velocity field (and store in u_next_gf_)
   {
@@ -1373,6 +1538,55 @@ void Tomboulides::step() {
     MFEM_FORALL(i, uext_vec_.Size(), { d_uext[i] = ab1 * d_u[i] + ab2 * d_um1[i] + ab3 * d_um2[i]; });
   }
   u_next_gf_->SetFromTrueDofs(uext_vec_);
+
+  
+  //------------------------------------------------------------------------
+  // Step 2: Compute vstar / dt (as in eqn 2.3 from Tomboulides)
+  // ------------------------------------------------------------------------
+
+  // Evaluate the forcing at the end of the time step
+  for (auto &force : forcing_terms_) {
+    force.coeff->SetTime(time + dt);
+  }
+  forcing_form_->Assemble();
+  forcing_form_->ParallelAssemble(forcing_vec_);
+
+  // Evaluate the nonlinear---i.e. convection---term in the velocity eqn
+  /*
+  Nconv_form_->Mult(u_vec_, N_vec_);
+  Nconv_form_->Mult(um1_vec_, Nm1_vec_);
+  Nconv_form_->Mult(um2_vec_, Nm2_vec_);
+
+  {
+    const auto d_N = N_vec_.Read();
+    const auto d_Nm1 = Nm1_vec_.Read();
+    const auto d_Nm2 = Nm2_vec_.Read();
+    auto d_force = forcing_vec_.ReadWrite();
+    auto d_conv = conv_vec_.ReadWrite();    
+    const auto ab1 = coeff_.ab1;
+    const auto ab2 = coeff_.ab2;
+    const auto ab3 = coeff_.ab3;
+    MFEM_FORALL(i, conv_vec_.Size(), { d_conv[i] = (ab1 * d_N[i] + ab2 * d_Nm1[i] + ab3 * d_Nm2[i]); });    
+    MFEM_FORALL(i, forcing_vec_.Size(), { d_force[i] += d_conv[i]; });
+  }
+  */
+
+  // vstar / dt = M^{-1} (forcing)
+  Mv_inv_->Mult(forcing_vec_, ustar_vec_);
+
+  // vstar / dt += BDF contribution
+  {
+    const double bd1idt = -coeff_.bd1 / dt;
+    const double bd2idt = -coeff_.bd2 / dt;
+    const double bd3idt = -coeff_.bd3 / dt;
+    const auto d_u = u_vec_.Read();
+    const auto d_um1 = um1_vec_.Read();
+    const auto d_um2 = um2_vec_.Read();
+    auto d_ustar = ustar_vec_.ReadWrite();
+    MFEM_FORALL(i, ustar_vec_.Size(), { d_ustar[i] += bd1idt * d_u[i] + bd2idt * d_um1[i] + bd3idt * d_um2[i]; });
+  }
+
+  // "ustar_vec" now has unsteady and forcing terms
 
   // Evaluate the double curl of the extrapolated velocity field
   if (axisym_) {
@@ -1392,20 +1606,11 @@ void Tomboulides::step() {
   // Negate b/c term that appears in residual is -curl curl u
   pp_div_vec_.Neg();
 
-  // TODO(trevilo): This calculation of the pressure Poisson RHS
-  // assumes that mu is constant (i.e., there are terms that are
-  // proportional to grad(mu) that are not included below).  Relax
-  // this assumption by adding the necessary terms!
-
   // Compute and add grad(Qt) contribution
   assert(thermo_interface_->thermal_divergence != nullptr);
   thermo_interface_->thermal_divergence->GetTrueDofs(Qt_vec_);
   G_op_->Mult(Qt_vec_, resu_vec_);
   Mv_inv_->Mult(resu_vec_, grad_Qt_vec_);
-  if (!Mv_inv_->GetConverged()) {
-    if (rank0_) std::cout << "ERROR: Mv inverse did not converge (grad Qt calc)." << std::endl;
-    exit(1);
-  }
   grad_Qt_vec_ *= (4. / 3);
   pp_div_vec_ += grad_Qt_vec_;
 
@@ -1444,6 +1649,96 @@ void Tomboulides::step() {
   pp_div_vec_ += S_poisson_vec_;
 
   pp_div_gf_->SetFromTrueDofs(pp_div_vec_);
+
+  // now pp_div_gf_ (PRE_DIVERGENCE AND QT FROM div(u){n+1}) is the rhs of the ustar equation
+  // plug this into Helmholtz solve mechanism
+
+  
+  //------------------------------------------------------------------------
+  // Step 2(4): Helmholtz solve for the velocity star
+  //------------------------------------------------------------------------
+  resu_vec_ = 0.0;
+  
+  // rho * vstar / dt term (less implicit part of nl-term)
+  Mv_rho_op_->AddMult(pp_div_vec_, resu_vec_);
+
+  for (auto &vel_dbc : vel_dbcs_) {
+    u_next_gf_->ProjectBdrCoefficient(*vel_dbc.coeff, vel_dbc.attr);
+  }
+
+  vfes_->GetRestrictionMatrix()->MultTranspose(resu_vec_, *resu_gf_);
+
+  Vector X2s, B2s;
+  Hvs_form_->FormLinearSystem(vel_ess_tdof_, *u_next_gf_, *resu_gf_, Hvs_op_, X2s, B2s, 1);
+  Hvs_inv_->Mult(B2s, X2s);
+  if (!Hvs_inv_->GetConverged()) {
+    if (rank0_) std::cout << "ERROR: Helmholtz solve did not converge." << std::endl;
+    exit(1);
+  }
+  // iter_hsolve = HInv->GetNumIterations();
+  // res_hsolve = HInv->GetFinalNorm();
+  Hvs_form_->RecoverFEMSolution(X2s, *resu_gf_, *u_next_gf_);
+  u_next_gf_->GetTrueDofs(u_next_vec_);
+
+  // u_next now has u* from star eq (mom less P) which comes from convection with u_next convecting u*
+  // package this back into form for pp-eq and full momentum
+
+  // c-n for NL term
+  u_next_vec_ *= 0.5;
+  u_next_vec_.Add(0.5,u_vec_);
+
+  // (re)Evaluate the forcing at the end of the time step
+  for (auto &force : forcing_terms_) {
+    force.coeff->SetTime(time + dt);
+  }
+  forcing_form_->Assemble();
+  forcing_form_->ParallelAssemble(forcing_vec_);
+
+  // Evaluate the nonlinear---i.e. convection---term in the velocity eqn
+  // POTENTIAL PROBLEM: as-is, this gives u*u* which is not the same as u^{ext}u*
+  // that was used to predict u*, might be okay?
+  Nconv_form_->Mult(u_next_vec_, N_vec_);
+  {
+    const auto d_N = N_vec_.Read();
+    auto d_force = forcing_vec_.ReadWrite();
+    auto d_conv = conv_vec_.ReadWrite();    
+    MFEM_FORALL(i, conv_vec_.Size(), { d_conv[i] = d_N[i]; });    
+    MFEM_FORALL(i, forcing_vec_.Size(), { d_force[i] += d_conv[i]; });
+  }
+
+  // vstar / dt = M^{-1} (forcing)
+  Mv_inv_->Mult(forcing_vec_, ustar_vec_);
+
+  // vstar / dt += BDF contribution
+  {
+    const double bd1idt = -coeff_.bd1 / dt;
+    const double bd2idt = -coeff_.bd2 / dt;
+    const double bd3idt = -coeff_.bd3 / dt;
+    const auto d_u = u_vec_.Read();
+    const auto d_um1 = um1_vec_.Read();
+    const auto d_um2 = um2_vec_.Read();
+    auto d_ustar = ustar_vec_.ReadWrite();
+    MFEM_FORALL(i, ustar_vec_.Size(), { d_ustar[i] += bd1idt * d_u[i] + bd2idt * d_um1[i] + bd3idt * d_um2[i]; });
+  }   
+  // At this point ustar_vec_ holds vstar/dt!
+
+  
+  //------------------------------------------------------------------------
+  // Step 3: Poisson
+  // ------------------------------------------------------------------------
+
+  // Extrapolate the velocity field (and store in u_next_gf_)
+  {
+    const auto d_u = u_vec_.Read();
+    const auto d_um1 = um1_vec_.Read();
+    const auto d_um2 = um2_vec_.Read();
+    auto d_uext = uext_vec_.Write();
+    const auto ab1 = coeff_.ab1;
+    const auto ab2 = coeff_.ab2;
+    const auto ab3 = coeff_.ab3;
+    MFEM_FORALL(i, uext_vec_.Size(), { d_uext[i] = ab1 * d_u[i] + ab2 * d_um1[i] + ab3 * d_um2[i]; });
+  }
+  u_next_gf_->SetFromTrueDofs(uext_vec_);  
 
   // rhs = div(pp_div_vec_)
   D_op_->Mult(pp_div_vec_, resp_vec_);
@@ -1533,8 +1828,11 @@ void Tomboulides::step() {
   // Add grad(mu * Qt) term
   Qt_vec_ *= mu_vec_;  // NB: pointwise multiply
   G_op_->AddMult(Qt_vec_, resu_vec_, 1.0 / 3.0);
-
-  // rho * vstar / dt term
+  
+  // rho * vstar / dt term (less implicit part of nl-term)
+  //Mv_inv_->Mult(conv_vec_, uconv_vec_);
+  //uconv_vec_ *= -0.5;
+  //ustar_vec_ += uconv_vec_;
   Mv_rho_op_->AddMult(ustar_vec_, resu_vec_);
 
   for (auto &vel_dbc : vel_dbcs_) {
