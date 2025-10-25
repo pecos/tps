@@ -97,9 +97,9 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   int max_iter_; /**< Maximum number of linear solver iterations */
   double rtol_;  /**< Linear solver relative tolerance */
 
-  int default_max_iter_ = 1000;
-  double default_rtol_ = 1.0e-10;
-  double default_atol_ = 1.0e-12;
+  int default_max_iter_ = 10000;
+  double default_rtol_ = 1.0e-8;
+  double default_atol_ = 1.0e-10;
 
   int mass_inverse_pl_ = 0;
   int mass_inverse_max_iter_;
@@ -212,7 +212,8 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   mfem::Solver *MqInvPC_ = nullptr;
   mfem::CGSolver *MqInv_ = nullptr;
   mfem::Solver *HtInvPC_ = nullptr;
-  mfem::CGSolver *HtInv_ = nullptr;
+  //mfem::CGSolver *HtInv_ = nullptr;
+  mfem::GMRESSolver *HtInv_ = nullptr;
 
   // Vectors
   Vector Tn_, Tn_next_, Tnm1_, Tnm2_;

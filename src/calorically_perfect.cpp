@@ -494,7 +494,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   }
 
   At_form_ = new ParBilinearForm(sfes_);
-  auto *at_blfi = new ConvectionIntegrator(*rhou_coeff_);
+  auto *at_blfi = new ConvectionIntegrator(*rhou_coeff_,0.5);
   if (numerical_integ_) {
     at_blfi->SetIntRule(&ir_nli);
   }
@@ -532,10 +532,11 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   Ht_form_ = new ParBilinearForm(sfes_);
   auto *hmt_blfi = new MassIntegrator(*rho_over_dt_coeff_);
   auto *hdt_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
-
+  auto *hct_blfi = new ConvectionIntegrator(*rhou_coeff_,0.5);
   if (numerical_integ_) {
     hmt_blfi->SetIntRule(&ir_di);
     hdt_blfi->SetIntRule(&ir_di);
+    hct_blfi->SetIntRule(&ir_di); // make this higher order   
   }
   // SUPG diffusion
   if (sw_stab_) {
@@ -547,6 +548,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   }
   Ht_form_->AddDomainIntegrator(hmt_blfi);
   Ht_form_->AddDomainIntegrator(hdt_blfi);
+  Ht_form_->AddDomainIntegrator(hct_blfi);  
   Ht_form_->Assemble();
   Ht_form_->FormSystemMatrix(temp_ess_tdof_, Ht_);
   if (rank0_) std::cout << "CaloricallyPerfectThermoChem Ht operator set" << endl;
@@ -577,7 +579,8 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   dynamic_cast<HypreSmoother *>(HtInvPC_)->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_,
                                                           smoother_eig_est_);
 
-  HtInv_ = new CGSolver(sfes_->GetComm());
+  //HtInv_ = new CGSolver(sfes_->GetComm());
+  HtInv_ = new GMRESSolver(sfes_->GetComm());  
   HtInv_->iterative_mode = true;
   HtInv_->SetOperator(*Ht_);
   HtInv_->SetPreconditioner(*HtInvPC_);
@@ -716,6 +719,8 @@ void CaloricallyPerfectThermoChem::step() {
   resT_ = 0.0;
 
   // convection
+  // HERE: commenting out for full implicit convection treatmeant...
+  // currently setting both imp&exp with 1/2 coeff for C-N
   computeExplicitTempConvectionOP(true);  // ->tmpR0_
   resT_.Set(-1.0, tmpR0_);
 

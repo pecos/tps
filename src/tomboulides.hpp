@@ -144,7 +144,7 @@ class Tomboulides final : public FlowBase {
   int amg_interpolation_ = 14;
 
   // solver tolerance options
-  int default_max_iter_ = 4000;
+  int default_max_iter_ = 10000;
   double default_rtol_ = 1e-10;
   double default_atol_ = 1e-12;
 
