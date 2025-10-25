@@ -225,6 +225,7 @@ Tomboulides::~Tomboulides() {
   delete gradV_gf_;
   delete gradW_gf_;
   delete epsi_gf_;
+  delete NL_error_gf_;  
   delete vfes_;
   delete vfec_;
   delete sfes_;
@@ -244,6 +245,8 @@ void Tomboulides::initializeSelf() {
   gradU_gf_ = new ParGridFunction(vfes_);
   gradV_gf_ = new ParGridFunction(vfes_);
   gradW_gf_ = new ParGridFunction(vfes_);
+  NL_error_gf_ = new ParGridFunction(vfes_);
+  
   sfec_ = new H1_FECollection(vorder_);
   sfes_ = new ParFiniteElementSpace(pmesh_, sfec_);
 
@@ -277,6 +280,8 @@ void Tomboulides::initializeSelf() {
   *gradV_gf_ = 0.0;
   *gradW_gf_ = 0.0;
 
+  *NL_error_gf_ = 0.0;  
+
   *p_gf_ = 0.0;
   *resp_gf_ = 0.0;
   *mu_total_gf_ = 0.0;
@@ -309,13 +314,15 @@ void Tomboulides::initializeSelf() {
   const int pfes_truevsize = pfes_->GetTrueVSize();
 
   forcing_vec_.SetSize(vfes_truevsize);
-  conv_vec_.SetSize(vfes_truevsize);  
+  conv_vec_.SetSize(vfes_truevsize);
+  diff_vec_.SetSize(vfes_truevsize);    
   u_vec_.SetSize(vfes_truevsize);
   um1_vec_.SetSize(vfes_truevsize);
   um2_vec_.SetSize(vfes_truevsize);
   N_vec_.SetSize(vfes_truevsize);
   Nm1_vec_.SetSize(vfes_truevsize);
   Nm2_vec_.SetSize(vfes_truevsize);
+  NL_error_vec_.SetSize(vfes_truevsize);  
   ustar_vec_.SetSize(vfes_truevsize);
   uconv_vec_.SetSize(vfes_truevsize);  
   uext_vec_.SetSize(vfes_truevsize);
@@ -352,13 +359,15 @@ void Tomboulides::initializeSelf() {
 
   // zero vectors for now
   forcing_vec_ = 0.0;
-  conv_vec_ = 0.0;  
+  conv_vec_ = 0.0;
+  diff_vec_ = 0.0;    
   u_vec_ = 0.0;
   um1_vec_ = 0.0;
   um2_vec_ = 0.0;
   N_vec_ = 0.0;
   Nm1_vec_ = 0.0;
   Nm2_vec_ = 0.0;
+  NL_error_vec_ = 0.0;  
   ustar_vec_ = 0.0;
   uconv_vec_ = 0.0;  
   uext_vec_ = 0.0;
@@ -799,6 +808,8 @@ void Tomboulides::initializeOperators() {
   updateTotalViscosity();
 
   mu_coeff_ = new GridFunctionCoefficient(mu_total_gf_);
+  half_.constant = 0.5;
+  half_mu_coeff_ = new ProductCoefficient(half_, *mu_coeff_);  
   pp_div_coeff_ = new VectorGridFunctionCoefficient(pp_div_gf_);
   pp_div_rad_comp_coeff_ = new GridFunctionCoefficient(pp_div_rad_comp_gf_);
 
@@ -1086,9 +1097,11 @@ void Tomboulides::initializeOperators() {
   if (axisym_) {
     hmv_blfi = new VectorMassIntegrator(*rad_rho_over_dt_coeff_);
     hdv_blfi = new VectorDiffusionIntegrator(*rad_mu_coeff_);
+    // TODO: update 1/2mu for axisym...
   } else {
     hmv_blfi = new VectorMassIntegrator(*rho_over_dt_coeff_);
-    hdv_blfi = new VectorDiffusionIntegrator(*mu_coeff_);
+    //hdv_blfi = new VectorDiffusionIntegrator(*mu_coeff_);
+    hdv_blfi = new VectorDiffusionIntegrator(*half_mu_coeff_);
   }
   //hcv_blfi = new ConvectionIntegrator(*rhou_coeff_,1.0); // no ibp with this integrator
   //hcv_blfi = new ConservativeConvectionIntegrator(*rhou_coeff_,1.0); // ibp, but integrator applies a negative
@@ -1303,6 +1316,7 @@ void Tomboulides::initializeViz(mfem::ParaViewDataCollection &pvdc) const {
   if (axisym_) {
     pvdc.RegisterField("swirl", utheta_gf_);
   }
+  pvdc.RegisterField("nonlinear error", NL_error_gf_);  
 }
 
 void Tomboulides::initializeStats(Averaging &average, IODataOrganizer &io, bool continuation) const {
@@ -1639,15 +1653,19 @@ void Tomboulides::step() {
     });
   }
 
-  // Add ustar/dt contribution
-  pp_div_vec_ += ustar_vec_;
-
   // Evaluate and add variable viscosity terms
   S_poisson_form_->Assemble();
   S_poisson_form_->ParallelAssemble(ress_vec_);
   Mv_rho_inv_->Mult(ress_vec_, S_poisson_vec_);
   pp_div_vec_ += S_poisson_vec_;
 
+  // intercept full explicit viscous term held in pp_div_vec
+  diff_vec_ = pp_div_vec_;
+  
+  // Add ustar/dt contribution
+  pp_div_vec_ += ustar_vec_;
+
+  // fill grid function
   pp_div_gf_->SetFromTrueDofs(pp_div_vec_);
 
   // now pp_div_gf_ (PRE_DIVERGENCE AND QT FROM div(u){n+1}) is the rhs of the ustar equation
@@ -1706,6 +1724,9 @@ void Tomboulides::step() {
     MFEM_FORALL(i, forcing_vec_.Size(), { d_force[i] += d_conv[i]; });
   }
 
+  // storing NL term with u* in Nm1 for later use
+  Nm1_vec_ = N_vec_;
+  
   // vstar / dt = M^{-1} (forcing)
   Mv_inv_->Mult(forcing_vec_, ustar_vec_);
 
@@ -1743,6 +1764,9 @@ void Tomboulides::step() {
   // rhs = div(pp_div_vec_)
   D_op_->Mult(pp_div_vec_, resp_vec_);
 
+  // add pressure-splitting error from previous step
+  resp_vec_ += NL_error_vec_;
+  
   // Add Qt term (rhs += -bd0 * Qt / dt)
   Ms_op_->AddMult(Qt_vec_, resp_vec_, -coeff_.bd0 / dt);
 
@@ -1821,18 +1845,23 @@ void Tomboulides::step() {
   // Variable viscosity term
   S_mom_form_->Assemble();
   S_mom_form_->ParallelAssemble(resu_vec_);
+  resu_vec_ *= 0.5; // half for C-N
+  diff_vec_ *= 0.5;
+  //resu_vec_ += diff_vec_;
+  Mv_rho_op_->AddMult(diff_vec_, resu_vec_);  
 
   // -grad(p)
   G_op_->AddMult(p_vec_, resu_vec_, -1.0);
 
   // Add grad(mu * Qt) term
   Qt_vec_ *= mu_vec_;  // NB: pointwise multiply
-  G_op_->AddMult(Qt_vec_, resu_vec_, 1.0 / 3.0);
+  G_op_->AddMult(Qt_vec_, resu_vec_, 1.0/6.0); //1.0 / 3.0); half for C-N
   
   // rho * vstar / dt term (less implicit part of nl-term)
   //Mv_inv_->Mult(conv_vec_, uconv_vec_);
   //uconv_vec_ *= -0.5;
   //ustar_vec_ += uconv_vec_;
+  // u* has unsteady, NL, and forcing contributions
   Mv_rho_op_->AddMult(ustar_vec_, resu_vec_);
 
   for (auto &vel_dbc : vel_dbcs_) {
@@ -1865,6 +1894,17 @@ void Tomboulides::step() {
   // update gradients for turbulence model
   evaluateVelocityGradient();
 
+  // compute NL term with actual u{n+1} and store in in Nm2 for later use  
+  Nconv_form_->Mult(u_next_vec_, N_vec_);
+
+  // Now, (N_vec_ - Nm1) is the error in the non-linear term which propagates to
+  // the error in the pressure correction via the pressure source.
+  // We store this error and add it to the source of the next pressure
+  // solve at {n+2} to prevent the accumulation of splitting errors.
+  NL_error_vec_ = N_vec_;
+  NL_error_vec_ -= Nm1_vec_;
+  NL_error_gf_->SetFromTrueDofs(NL_error_vec_);
+  
   if (axisym_) {
     u_next_gf_->HostRead();
     {

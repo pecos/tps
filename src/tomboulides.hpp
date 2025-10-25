@@ -226,6 +226,7 @@ class Tomboulides final : public FlowBase {
   // mfem::ParGridFunction *buffer_uInlet_ = nullptr;
   mfem::VectorGridFunctionCoefficient *velocity_field_ = nullptr;
   mfem::ParGridFunction *epsi_gf_ = nullptr;
+  mfem::ParGridFunction *NL_error_gf_ = nullptr;  
 
   /// Pressure FEM objects and fields
   mfem::FiniteElementCollection *pfec_ = nullptr;
@@ -252,6 +253,9 @@ class Tomboulides final : public FlowBase {
   mfem::ProductCoefficient *rho_over_dt_coeff_ = nullptr;
   mfem::GridFunctionCoefficient *mu_coeff_ = nullptr;
   mfem::VectorGridFunctionCoefficient *pp_div_coeff_ = nullptr;
+
+  mfem::ConstantCoefficient half_;  
+  mfem::ProductCoefficient *half_mu_coeff_ = nullptr;
 
   mfem::GradientGridFunctionCoefficient *grad_mu_coeff_ = nullptr;
   mfem::GradientVectorGridFunctionCoefficient *grad_u_next_coeff_ = nullptr;
@@ -349,7 +353,8 @@ class Tomboulides final : public FlowBase {
 
   // Vectors
   mfem::Vector forcing_vec_;
-  mfem::Vector conv_vec_;  
+  mfem::Vector conv_vec_;
+  mfem::Vector diff_vec_;    
   mfem::Vector u_vec_;
   mfem::Vector um1_vec_;
   mfem::Vector um2_vec_;
@@ -357,6 +362,7 @@ class Tomboulides final : public FlowBase {
   mfem::Vector N_vec_;
   mfem::Vector Nm1_vec_;
   mfem::Vector Nm2_vec_;
+  mfem::Vector NL_error_vec_;  
   mfem::Vector ustar_vec_;
   mfem::Vector uconv_vec_;  
   mfem::Vector uext_vec_;
