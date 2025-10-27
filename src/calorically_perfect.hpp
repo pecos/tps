@@ -140,6 +140,9 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   // streamwise-stabilization
   bool sw_stab_;
 
+  // streamwise-stabilization
+  bool smooth_qt_;
+  
   // FEM related fields and objects
 
   // Scalar \f$H^1\f$ finite element collection.
@@ -191,6 +194,11 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   TransformedMatrixVectorCoefficient *swdiff_coeff_ = nullptr;
   ScalarMatrixProductCoefficient *supg_coeff_ = nullptr;
 
+  ConstantCoefficient filter_factor_coeff_;  
+  ProductCoefficient *gsq_coeff_ = nullptr;
+  ProductCoefficient *filter_coeff_ = nullptr;    
+  ScalarVectorProductCoefficient *ds_gradT_coeff_ = nullptr;
+  
   // operators and solvers
   ParBilinearForm *At_form_ = nullptr;
   ParBilinearForm *Ms_form_ = nullptr;
@@ -199,13 +207,16 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   ParBilinearForm *Mq_form_ = nullptr;
   ParBilinearForm *LQ_form_ = nullptr;
   ParLinearForm *LQ_bdry_ = nullptr;
-
+  ParBilinearForm *LF_form_ = nullptr;
+  ParLinearForm *LF_bdry_ = nullptr;
+  
   OperatorHandle LQ_;
   OperatorHandle At_;
   OperatorHandle Ht_;
   OperatorHandle Ms_;
   OperatorHandle MsRho_;
   OperatorHandle Mq_;
+  OperatorHandle LF_;  
 
   mfem::Solver *MsInvPC_ = nullptr;
   mfem::CGSolver *MsInv_ = nullptr;

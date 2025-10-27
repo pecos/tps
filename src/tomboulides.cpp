@@ -548,8 +548,8 @@ void Tomboulides::initializeSelf() {
 	  //ElementTransformation *Tr = vfes_->GetMesh()->GetBdrElementTransformation(bel);
 	  ElementTransformation *Tr = vfes_->GetMesh()->GetFaceTransformation(iFace);
 
-	  // changing order from 1
-	  const IntegrationRule ir = gll_rules.Get(Tr->GetGeometryType(), 2 * vorder_ - 1);
+	  // necessary just to get the integration points of nodes for normal calc
+	  const IntegrationRule ir = gll_rules.Get(Tr->GetGeometryType(), 1);
 
   	  // face normal	  
           for (int i = 0; i < ir.GetNPoints(); i++) {	    
