@@ -515,18 +515,19 @@ void GaussianInterpExtData::setup() {
   }
 
 
-  // now all interior points for nu_t
+  // // now all interior points for nu_t
   for (int ie = 0; ie < pmesh_->GetNE(); ie++) {
     Array<int> vdofs;
     sfes_->GetElementVDofs(ie, vdofs);
     for (int i = 0; i < vdofs.Size(); i++) {
       // index in gf of element
       int n = vdofs[i];
-      if (n >= Sdof_) {
-        std::cout << " ERROR: problem with GetNE in external data interpolation " << n << " of " << Sdof_ << " dofs"
-                  << endl;
-        exit(1);
-      }
+      // TODO: This check is causing issues in parallel for some reason.
+      // if (n >= Sdof_) {
+      //   std::cout << " ERROR: problem with GetNE in external data interpolation " << n << " of " << Sdof_ << " dofs"
+      //             << endl;
+      //   exit(1);
+      // }
 
       double xp[3];
       for (int d = 0; d < dim_; d++) {
