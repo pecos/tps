@@ -1136,112 +1136,27 @@ void scalarGrad3DV(FiniteElementSpace *fes, FiniteElementSpace *vfes, Vector u, 
 void streamwiseTensor(const Vector &vel, DenseMatrix &swMgbl) {
   int dim = vel.Size();
 
-  // streamwise coordinate system
-  Vector unitNorm;
-  Vector unitT1;
-  Vector unitT2;
-  unitNorm.SetSize(dim);
-  unitT1.SetSize(dim);
-  unitT2.SetSize(dim);
-
-  // streamwise direction
-  for (int i = 0; i < dim; i++) unitNorm[i] = vel[i];
-  double mod = 0.0;
-  for (int i = 0; i < dim; i++) mod += unitNorm[i] * unitNorm[i];
-  mod = std::max(mod, 1.0e-18);
-  double Umag = std::sqrt(mod);
-  unitNorm /= Umag;
-
-  // std::cout << Umag << " " << endl ;
-
-  // for zero-flow
-  if (Umag < 1.0e-8) {
-    // for (int i = 0; i < dim; i++) {
-    //   for (int j = 0; j < dim; j++) {
-    //     swMgbl(i, j) = 0.0;
-    //   }
-    // }
-    swMgbl = 0.0;
-    return;
-  }
-
-  // tangent direction (not unique)
-  int maxInd, minusInd, plusInd;
-  if (unitNorm[0] * unitNorm[0] > unitNorm[1] * unitNorm[1]) {
-    maxInd = 0;
-  } else {
-    maxInd = 1;
-  }
-  if (dim == 3 && unitNorm[maxInd] * unitNorm[maxInd] < unitNorm[2] * unitNorm[2]) {
-    maxInd = 2;
-  }
-  minusInd = ((maxInd - 1) % dim + dim) % dim;
-  plusInd = (maxInd + 1) % dim;
-
-  unitT1[minusInd] = -unitNorm[maxInd];
-  unitT1[maxInd] = unitNorm[minusInd];
-  if (dim == 3) {  // DOUBLE CHECK THIS WHEN TESTING 3D
-    unitT1[plusInd] = 0.0;
-  }
-  mod = 0.0;
-  for (int i = 0; i < dim; i++) mod += unitT1[i] * unitT1[i];
-  mod = std::max(mod, 1.0e-18);
-  unitT1 /= std::sqrt(mod);
-
-  // t2 is then orthogonal to both normal & t1
-  if (dim == 3) {
-    unitT2[0] = +(unitNorm[1] * unitT1[2] - unitNorm[2] * unitT1[1]);
-    unitT2[1] = -(unitNorm[0] * unitT1[2] - unitNorm[2] * unitT1[0]);
-    unitT2[2] = +(unitNorm[0] * unitT1[1] - unitNorm[1] * unitT1[0]);
-  }
-
-  // transform from streamwise coords to global
-  DenseMatrix M(dim, dim);
-  for (int d = 0; d < dim; d++) {
-    M(d, 0) = unitNorm[d];
-    M(d, 1) = unitT1[d];
-    if (dim == 3) M(d, 2) = unitT2[d];
-  }
-
-  // streamwise coeff
-  DenseMatrix swM(dim, dim);
-  swM = 0.0;
-  swM(0, 0) = 1.0;
-
-  // std::cout << " " << endl;
-  // for (int i = 0; i < dim; i++) {
-  //   for (int j = 0; j < dim; j++) {
-  //     std::cout << M(i,j) << " " ;
-  //   }
-  //   std::cout << endl;
-  // }
-
-  // M_{im} swM_{mn} M_{jn} or M*"mu"*M^T (with n,t1,t2 in columns of M)
-  // DenseMatrix swMgbl(dim, dim);
+  swMgbl.SetSize(dim, dim);
   swMgbl = 0.0;
+
+  // compute velocity magnitude
+  double Umag2 = 0.0;
+  for (int i = 0; i < dim; i++) Umag2 += vel[i] * vel[i];
+  const double Umag = std::sqrt(Umag2);
+
+  // for zero-flow, quick return with swMgbl = 0 (necessary?)
+  if (Umag < 1.0e-8) return;
+
+  // swMgbl = (u u^T) / ||u||^2
   for (int i = 0; i < dim; i++) {
     for (int j = 0; j < dim; j++) {
-      for (int m = 0; m < dim; m++) {
-        for (int n = 0; n < dim; n++) {
-          swMgbl(i, j) += M(i, m) * M(j, n) * swM(m, n);
-        }
-      }
+      swMgbl(i, j) = vel[i] * vel[j] / Umag2;
     }
   }
-
-  // std::cout << " " << endl;
-  // for (int i = 0; i < dim; i++) {
-  //   for (int j = 0; j < dim; j++) {
-  //     std::cout << swMgbl(i,j) << " " ;
-  //   }
-  //   std::cout << endl;
-  // }
 }
 
 double csupgFactor(double Reh) {
-  // return  0.5 * (tanh(re_factor * Re - re_offset) + 1.0);
-  // printf("%f\n", Reh);
-  // printf("%f\n", 0.5 * (tanh(Reh) + 1.0));
+  // TODO(trevilo): This implementation has lost the re_factor and re_offset options.  Bring them back.
   return 0.5 * (tanh(Reh) + 1.0);
 }
 
@@ -1397,7 +1312,15 @@ void GradientVectorGridFunctionCoefficient::Eval(DenseMatrix &G, ElementTransfor
     // NB: In mfem/fem/coefficients.cpp, the function RefinedToCoarse is defined.  Here we reproduce it explicitly.
     //
     // ElementTransformation *coarse_T = RefinedToCoarse(*gf_mesh, T, ip, coarse_ip);
+
+#if MFEM_VERSION >= 40700
+    // mfem 4.7 and later
+    const Mesh &fine_mesh = *T.mesh;
+#else
+    // older versions
     Mesh &fine_mesh = *T.mesh;
+#endif
+
     // Get the element transformation of the coarse element containing the
     // fine element.
     int fine_element = T.ElementNo;
@@ -1429,12 +1352,7 @@ void VectorMagnitudeCoefficient::SetTime(double t) {
 
 double VectorMagnitudeCoefficient::Eval(ElementTransformation &T, const IntegrationPoint &ip) {
   a->Eval(va, T, ip);
-  // double res = 0;
-  // for (int i = 0; i < va.size(); i++) { res += va[i] * va[i]}
-  // res = std::sqrt(res)
-  // return res;
-  double mod = std::max(std::sqrt(va * va), 1.0e-18);
-  return mod;
+  return std::max(std::sqrt(va * va), 1.0e-18);
 }
 
 void TransformedMatrixVectorCoefficient::SetTime(double t) {
@@ -1447,15 +1365,6 @@ void TransformedMatrixVectorCoefficient::Eval(DenseMatrix &G, ElementTransformat
   buf.SetSize(Q1->GetVDim());
   Q1->Eval(buf, T, ip);
   Function(buf, G);
-
-  // int dim = Q1->GetVDim();
-  // std::cout << " " << endl;
-  // for (int i = 0; i < dim; i++) {
-  //   for (int j = 0; j < dim; j++) {
-  //     std::cout << G(i,j) << " " ;
-  //   }
-  //   std::cout << endl;
-  // }
 }
 
 }  // namespace mfem

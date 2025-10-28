@@ -1,0 +1,47 @@
+#!./bats
+# -*- mode: sh -*-
+
+TEST="supg-scalars"
+
+EXE="../src/tps"
+
+@test "[$TEST] Regression test for SUPG implementation in CaloricallyPerfectThermoChem" {
+    # Solution to be generated
+    SOLN_FILE=restart_output_wstab1T.sol.h5
+    rm -f $SOLN_FILE
+
+    # Case to run
+    RUNFILE=inputs/input.supgBox.ini
+    test -s $RUNFILE
+
+    # run
+    $EXE --runFile $RUNFILE
+    test -s $SOLN_FILE
+
+    # check
+    REF_SOLN=ref_solns/supg/restart_output_wstab1T.sol.h5
+    test -s $REF_FILE
+
+    h5diff -r --relative=1e-10 $SOLN_FILE $REF_SOLN /temperature/temperature
+}
+
+@test "[$TEST] Regression test for SUPG implementation in LteThermoChem" {
+    # Solution to be generated
+    SOLN_FILE=restart_output_lte_supg.sol.h5
+    rm -f $SOLN_FILE
+
+    # Case to run
+    RUNFILE=inputs/input.supgLte.ini
+    test -s $RUNFILE
+
+    # run
+    $EXE --runFile $RUNFILE
+    test -s $SOLN_FILE
+
+    # check
+    REF_SOLN=ref_solns/supg/restart_output_lte_supg.sol.h5
+    test -s $REF_FILE
+
+    h5diff -r --relative=1e-10 $SOLN_FILE $REF_SOLN /temperature/temperature
+}
+

@@ -300,7 +300,7 @@ class RunConfiguration {
   DryAirInput dryAirInput;
   PerfectMixtureInput perfectMixtureInput;
   LteMixtureInput lteMixtureInput;
-  ArgonTransportInput argonTransportInput;
+  GasTransportInput gasTransportInput;
   ChemistryInput chemistryInput;
   RadiationInput radiationInput;
 
@@ -344,7 +344,7 @@ class RunConfiguration {
   double GetFixedDT() const { return dt_fixed; }
   int GetNumIters() { return numIters; }
   int GetNumItersOutput() { return itersOut; }
-  bool RoeRiemannSolver() const { return useRoe; }
+  bool RoeRiemannSolverTPS() const { return useRoe; }
 
   int GetMeanStartIter() { return avg_opts_.step_start_mean_; }
   int GetMeanSampleInterval() { return avg_opts_.sample_interval_; }

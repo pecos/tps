@@ -477,7 +477,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
     // compute Reh
     reh1_coeff_ = new ProductCoefficient(*rho_coeff_, *visc_inv_coeff_);
     reh2_coeff_ = new ProductCoefficient(*reh1_coeff_, *gscale_coeff_);
-    Reh_coeff_ = new ProductCoefficient(*reh1_coeff_, *umag_coeff_);
+    Reh_coeff_ = new ProductCoefficient(*reh2_coeff_, *umag_coeff_);
 
     // Csupg
     csupg_coeff_ = new TransformedCoefficient(Reh_coeff_, csupgFactor);
@@ -537,13 +537,12 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
     hmt_blfi->SetIntRule(&ir_di);
     hdt_blfi->SetIntRule(&ir_di);
   }
-  // SUPG
+  // SUPG diffusion
   if (sw_stab_) {
     auto *sdt_blfi = new DiffusionIntegrator(*supg_coeff_);
-    // SUPG diffusion
-    // if (numerical_integ_) {
-    //   sdt_blfi->SetIntRule(&ir_di);
-    // }
+    if (numerical_integ_) {
+      sdt_blfi->SetIntRule(&ir_di);
+    }
     Ht_form_->AddDomainIntegrator(sdt_blfi);
   }
   Ht_form_->AddDomainIntegrator(hmt_blfi);
@@ -630,14 +629,12 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   }
   LQ_form_->AddDomainIntegrator(lqd_blfi);
 
-  // DiffusionIntegrator *slqd_blfi;
+  // SUPG diffusion
   if (sw_stab_) {
-    // slqd_blfi = new DiffusionIntegrator(*supg_coeff_);
     auto *slqd_blfi = new DiffusionIntegrator(*supg_coeff_);
-    // SUPG diffusion
-    // if (numerical_integ_) {
-    //   slqd_blfi->SetIntRule(&ir_di);
-    // }
+    if (numerical_integ_) {
+      slqd_blfi->SetIntRule(&ir_di);
+    }
     LQ_form_->AddDomainIntegrator(slqd_blfi);
   }
 

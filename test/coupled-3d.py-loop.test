@@ -8,11 +8,12 @@ EXE="../src/tps-time-loop.py"
 setup() {
     SOLN_FILE=restart_output-coupled-3d.sol.h5
     REF_FILE=ref_solns/coupled-3d.sol.h5
+    MPIRUN=`./sniff_mpirun.sh`
 }
 
 @test "[$TEST] verify tps runs in cylce-avg-joule-coupling mode (3D)" {
     test -s $RUNFILE
-    mpirun -np 2 $EXE --runFile $RUNFILE
+    $MPIRUN -n 2 $EXE --runFile $RUNFILE
 
     test -s $SOLN_FILE
     test -s $REF_FILE

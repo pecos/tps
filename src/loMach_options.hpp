@@ -138,6 +138,7 @@ class LoMachOptions {
   double filterWeight;
   bool filterTemp, filterVel;
   bool solveTemp;
+  int nSpec;
 
   LoMachOptions() {
     order = 1;
@@ -147,6 +148,7 @@ class LoMachOptions {
     rtol = 1.0e-8;
     atol = 1.0e-12;
     compute_wallDistance = false;
+    nSpec = 0;
   }
 
   void print(std::ostream &out) {

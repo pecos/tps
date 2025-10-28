@@ -34,7 +34,7 @@
 
 #include "riemann_solver.hpp"
 
-WallBC::WallBC(RiemannSolver *_rsolver, GasMixture *_mixture, GasMixture *d_mixture, Equations _eqSystem,
+WallBC::WallBC(RiemannSolverTPS *_rsolver, GasMixture *_mixture, GasMixture *d_mixture, Equations _eqSystem,
                Fluxes *_fluxClass, ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt,
                const int _dim, const int _num_equation, int _patchNumber, WallType _bcType, const WallData _inputData,
                const boundaryFaceIntegrationData &boundary_face_data, const int &_maxIntPoints, bool axisym,
@@ -545,7 +545,7 @@ void WallBC::computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix
 void WallBC::integrateWalls_gpu(Vector &y, const Vector &x, const elementIndexingData &elem_index_data,
                                 const boundaryFaceIntegrationData &boundary_face_data, const int &maxDofs) {
 #ifdef _GPU_
-  double *d_y = y.Write();
+  double *d_y = y.ReadWrite();
   //   const double *d_U = x.Read();
   const int *d_elem_dofs_list = elem_index_data.dofs_list.Read();
   const int *d_elem_dof_off = elem_index_data.dof_offset.Read();
@@ -667,7 +667,7 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
 
   const bool computeSheath = (wallData_.elecThermalCond == SHTH);
 
-  const RiemannSolver *d_rsolver = rsolver;
+  const RiemannSolverTPS *d_rsolver = rsolver;
   GasMixture *d_mix = d_mixture_;
   Fluxes *d_fluxclass = fluxClass;
 

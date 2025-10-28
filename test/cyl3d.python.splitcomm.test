@@ -9,6 +9,7 @@ EXE="./test_tps_splitcomm.py"
 setup() {
     SOLN_FILE=restart_output.sol.h5
     REF_FILE=ref_solns/cyl3d_coarse.4iters.h5
+    MPIRUN=`./sniff_mpirun.sh`
 }
 
 @test "[$TEST] check for input file $RUNFILE" {
@@ -19,7 +20,7 @@ setup() {
     rm -f $SOLN_FILE
     touch DIE
     ls
-    mpirun -n 2 $EXE --runFile $RUNFILE
+    $MPIRUN -n 2 $EXE --runFile $RUNFILE
 
     test -s $SOLN_FILE
     test ! -e DIE
@@ -54,7 +55,7 @@ setup() {
     rm -f $SOLN_FILE
 
     # following should exit with error
-    run mpirun -n 2 $EXE --runFile $RUNFILE
+    run $MPIRUN -n 2 $EXE --runFile $RUNFILE
     [[ "${status}" -eq 1 ]]
     [[ "${output}" =~ "Unable to access desired restart file" ]]
 }
@@ -64,14 +65,14 @@ setup() {
 
     rm -f $SOLN_FILE
     test -s $RUNFILE
-    mpirun -n 2 $EXE --runFile $RUNFILE
+    $MPIRUN -n 2 $EXE --runFile $RUNFILE
     test -s $SOLN_FILE
 
     run h5dump  -a iteration  restart_output.sol.h5
     [ "${lines[5]}" = "   (0): 2" ]
 
     RUNFILE=inputs/input.4iters.restart.cyl.ini
-    mpirun -n 2 $EXE --runFile $RUNFILE
+    $MPIRUN -n 2 $EXE --runFile $RUNFILE
     ./soln_differ $SOLN_FILE $REF_FILE
 }
 
@@ -80,7 +81,7 @@ setup() {
 
     rm -f $SOLN_FILE
     test -s $RUNFILE
-    mpirun -n 2 $EXE --runFile $RUNFILE
+    $MPIRUN -n 2 $EXE --runFile $RUNFILE
     test -s $SOLN_FILE
 
     run h5dump  -a iteration  restart_output.sol.h5
@@ -92,7 +93,7 @@ setup() {
     VARPLOG=varp.log
     rm -f $VARPLOG
     RUNFILE=inputs/input.8iters.restart.newp.cyl.ini
-    mpirun -n 2 $EXE --runFile $RUNFILE >& $VARPLOG
+    $MPIRUN -n 2 $EXE --runFile $RUNFILE >& $VARPLOG
 
     #intErr=$(cat $VARPLOG | grep "interpolation error" | awk '{print $6}')
     # Line grabs the printed interpolation error norm, which I'd like
@@ -127,7 +128,7 @@ setup() {
     echo "restartMode = singleFileWrite" >> $RUNFILE_PART
 
     # run 2 tasks
-    mpirun -np 4 $EXE --runFile $RUNFILE_PART
+    $MPIRUN -n 4 $EXE --runFile $RUNFILE_PART
     test -s $SOLN_FILE_SERIAL
 
     ./soln_differ $SOLN_FILE $REF_FILE
@@ -154,7 +155,7 @@ setup() {
     echo "restartMode = singleFileWrite" >> $RUNFILE_PART
 
     # run 4 tasks
-    mpirun -np 8 $EXE --runFile $RUNFILE_PART
+    $MPIRUN -n 8 $EXE --runFile $RUNFILE_PART
     test -s $SOLN_FILE_SERIAL
 
     ./soln_differ $SOLN_FILE $REF_FILE
@@ -183,7 +184,7 @@ setup() {
     echo "[io]" >> $RUNFILE_MOD
     echo "restartMode = singleFileWrite" >> $RUNFILE_MOD
     
-    mpirun -np 4 $EXE --runFile $RUNFILE_MOD
+    $MPIRUN -n 4 $EXE --runFile $RUNFILE_MOD
     test -s ${SOLFILE_BASE}.h5
     test -s partition.2p.h5
 
@@ -197,7 +198,7 @@ setup() {
     echo "restartMode   = singleFileRead" >> $RUNFILE_MOD
     echo "enableRestart = true" >> $RUNFILE_MOD
 
-    mpirun -np 8 $EXE --runFile $RUNFILE_MOD
+    $MPIRUN -n 8 $EXE --runFile $RUNFILE_MOD
     test -s partition.4p.h5
 
     mkdir $TMPDIR
@@ -211,7 +212,7 @@ setup() {
 
     # finally, run a normal 4 proc case for 4 iterations and compare against above solution
     rm -f  restart_output.sol*.h5
-    mpirun -np 8 $EXE --runFile $RUNFILE
+    $MPIRUN -n 8 $EXE --runFile $RUNFILE
 
     for i in `seq 0 3`; do
 	test -s ${SOLFILE_BASE}.$i.h5
@@ -236,7 +237,7 @@ setup() {
 
     # run 2 iterations using 2 tasks and save partitioned restart files
     test -s $RUNFILE
-    mpirun -np 4 $EXE --runFile $RUNFILE
+    $MPIRUN -n 4 $EXE --runFile $RUNFILE
     test -s ${SOLFILE_BASE}.0.h5
     test -s ${SOLFILE_BASE}.1.h5
     test -s partition.2p.h5
@@ -259,7 +260,7 @@ setup() {
     echo "restartMode   = singleFileWrite" >> $RUNFILE_MOD
     echo "enableRestart = true" >> $RUNFILE_MOD
 
-    mpirun -np 4 $EXE --runFile $RUNFILE_MOD
+    $MPIRUN -n 4 $EXE --runFile $RUNFILE_MOD
     test -s partition.2p.h5
     test -s ${SOLFILE_BASE}.h5
     run h5dump  -a iteration  ${SOLFILE_BASE}.h5
@@ -284,7 +285,7 @@ setup() {
     sed  's/maxIters = 4/maxIters = 2/' $RUNFILE > $RUNFILE_MOD
 
     test -s $RUNFILE
-    mpirun -np 4 $EXE --runFile $RUNFILE_MOD
+    $MPIRUN -n 4 $EXE --runFile $RUNFILE_MOD
     test -s ${SOLFILE_BASE}.0.h5
     test -s ${SOLFILE_BASE}.1.h5
     test -s partition.2p.h5
@@ -296,7 +297,7 @@ setup() {
 
     # now, restart and run 1 additional iteration
     sed  's/maxIters = 4/maxIters = 3/' $RUNFILE > $RUNFILE_MOD
-    run mpirun -np 4 $EXE --runFile $RUNFILE_MOD
+    run $MPIRUN -n 4 $EXE --runFile $RUNFILE_MOD
 
     run h5dump  -a iteration  ${SOLFILE_BASE}.0.h5
     [ "${lines[5]}" = "   (0): 3" ]
@@ -305,7 +306,7 @@ setup() {
     [ "${lines[5]}" = "   (0): 3" ]
 
     # now, repeat and run 1 additional iteration
-    run mpirun -np 4 $EXE --runFile $RUNFILE
+    run $MPIRUN -n 4 $EXE --runFile $RUNFILE
 
     mkdir $TMPDIR
 
@@ -318,7 +319,7 @@ setup() {
 
     # finally, run a normal 2 proc case for 4 iterations and compare against above solution
    rm -f  restart_output.sol*.h5
-   mpirun -np 4 $EXE --runFile $RUNFILE
+   $MPIRUN -n 4 $EXE --runFile $RUNFILE
 
    for i in `seq 0 1`; do
 	test -s ${SOLFILE_BASE}.$i.h5

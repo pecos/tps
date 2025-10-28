@@ -8,6 +8,7 @@ endif
 
 if HIP_ENABLED
 AM_CPPFLAGS += $(HIP_CXXFLAGS)
+AM_LDFLAGS += $(HIP_LDFLAGS)
 endif
 
 if MASA_ENABLED
@@ -37,13 +38,15 @@ EXTRA_DIST  = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes lte-
               ref_solns/reactTable/*.h5 \
               ref_solns/radDecay/*.h5 \
               ref_solns/stabChan/*.h5 \
+              ref_solns/reactNitrogen/*.h5 \
+              ref_solns/supg/*.h5 \
 		      vpath.sh die.sh count_gpus.sh sniff_mpirun.sh \
 		      cyl3d.gpu.test cyl3d.mflow.gpu.test wedge.gpu.test \
 	          averaging.gpu.test cyl3d.test cyl3d.gpu.python.test cyl3d.mflow.test cyl3d.dtconst.test \
 		      die.test averaging.test wedge.test cyl3d.interp.test qms.rings.test qms.axisym.test \
 		      sponge_zone.test annulus.test pipe.test valgrind.test valgrind.suppressions \
 		      mms.euler.test reaction.test perfect_gas.test collision_integrals.test \
-	 	      argon_minimal.test argon_minimal.binary.test diffusion_wall.test \
+                      diffusion_wall.test \
 	 	      inflow_outflow.test mms.ternary_2d.test mms.ternary_2d_wall.test \
 	 	      mms.ternary_2d_inout.test cuda-memcheck.test mms.general_wall.test \
 		      independent_coupling.test interp_em.test mms.euler_2d.test mms.cns_2d.test \
@@ -53,7 +56,8 @@ EXTRA_DIST  = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes lte-
               coupled-3d.interface.test plasma.axisym.test plasma.axisym.lte1d.test \
 	      	  lomach-flow.test lomach-lequere.test interpInlet.test sgsLoMach.test autoPeriodic.test aveLoMach.test \
               reactFlow-binDiff.test reactFlow-singleRx.test reactFlow-table.test radiativeDecay.test \
-			  lomach-chan-stab.test
+			  lomach-chan-stab.test reactFlow-nitrogen.test argon_minimal.test argon_minimal.binary.test \
+			supg-scalars.test
 
 
 TESTS = vpath.sh
@@ -129,6 +133,8 @@ TESTS += cyl3d.test \
          reactFlow-table.test \
          radiativeDecay.test \
 		 lomach-chan-stab.test
+         reactFlow-nitrogen.test \
+	 supg-scalars.test
 
 if PYTHON_ENABLED
 TESTS += cyl3d.python.test \
@@ -187,13 +193,6 @@ split_interface_test_SOURCES  = test_split_interface.cpp
 split_interface_test_LDADD    = ../src/libtps.la
 split_interface_test_LDADD   += $(HDF5_LIBS)
 split_interface_test_LDADD   += $(GRVY_LIBS)
-
-check_PROGRAMS += tomboulides_test
-tomboulides_test_SOURCES  = test_tomboulides.cpp
-tomboulides_test_LDADD    = ../src/libtps.la
-tomboulides_test_LDADD   += $(HDF5_LIBS)
-tomboulides_test_LDADD   += $(GRVY_LIBS)
-
 
 if !GPU_ENABLED
 

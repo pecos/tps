@@ -52,6 +52,7 @@ struct extDataToFlow {
  */
 struct extDataToThermoChem {
   const mfem::ParGridFunction *Tdata = nullptr;
+  const mfem::ParGridFunction *Ydata = nullptr;
 };
 
 /**
