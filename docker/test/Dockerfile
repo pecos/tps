@@ -89,24 +89,23 @@ RUN . /etc/profile.d/lmod.sh \
 RUN rm /tmp/v$gslib_ver.tar.gz
 
 # MFEM (w/ gslib support)
-ENV mfem_ver="4.5.2"
+ENV mfem_ver="4.8"
 ENV mfem_prefix="/usr/local"
 RUN wget https://github.com/mfem/mfem/archive/refs/tags/v$mfem_ver.tar.gz -P /tmp
 RUN cd /tmp; tar xvf /tmp/v$mfem_ver.tar.gz
 
 RUN . /etc/profile.d/lmod.sh \
-    && module load hypre metis netcdf petsc superlu_dist \
+    && module load openblas hypre metis \
     && cd /tmp/mfem-$mfem_ver \
     && make config \
     PREFIX=$mfem_prefix \
     CXXFLAGS="-O3 -fPIC -std=c++11" \
     MFEM_USE_MPI=YES \
     MFEM_USE_LAPACK=NO \
-    HYPRE_OPT=-I$HYPRE_INC HYPRE_LIB="-L$HYPRE_LIB -lHYPRE" \
+    MFEM_USE_METIS_5=YES MFEM_DEBUG=NO \
+    HYPRE_OPT=-I$HYPRE_INC HYPRE_LIB="-L$HYPRE_LIB -lHYPRE -L$OPENBLAS_LIB -lopenblas" \
     METIS_OPT=-I$METIS_INC METIS_LIB="-L$METIS_LIB -lmetis" \
-    MFEM_USE_NETCDF=YES NETCDF_OPT=-I$NETCDF_INC NETCDF_LIB="-L$NETCDF_LIB -lnetcdf" \
-    MFEM_USE_PETSC=YES PETSC_OPT=-I$PETSC_INC PETSC_LIB="-L$PETSC_LIB -lpetsc" \
-    MFEM_USE_SUPERLU=YES SUPERLU_OPT=-I$SUPERLU_DIST_INC SUPERLU_LIB="-L$SUPERLU_DIST_LIB -lsuperlu_dist" \
+    MFEM_USE_PETSC=NO \
     MFEM_USE_GSLIB=YES GSLIB_OPT=-I/usr/local/include GSLIB_LIB="-L/usr/local/lib -lgs" \
     STATIC=NO SHARED=YES MFEM_DEBUG=NO \
     && make && make install
@@ -125,7 +124,12 @@ RUN yum -y install git-lfs
 RUN yum -y install aspell
 RUN yum -y install cmake-ohpc
 RUN yum -y install bc
-RUN yum -y install clang-tools-extra
+
+# explicitly set version of clang-tools to avoid clash with python
+# versions (where later versions of clang-tools-extra installs newer
+# python and messes up pip3)
+RUN yum -y install clang-tools-extra-18.1.8
+
 RUN yum -y install zlib-devel
 RUN yum -y install libcurl-devel
 RUN yum -y install python38-devel
@@ -150,7 +154,7 @@ RUN yum -y install gsl-gnu9-ohpc
 RUN pip3 install "pybind11[global]"
 
 RUN . /etc/profile.d/lmod.sh \
-    && pip3 install mpi4py
+    && pip3 install mpi4py==3.1.5
 
 # Register new libs installed into /usr/local/lib with linker
 RUN echo "/usr/local/lib" > /etc/ld.so.conf.d/class.conf
@@ -171,7 +175,7 @@ RUN echo "module try-add valgrind" >> /etc/profile.d/lmod.sh
 RUN echo "module try-add gsl" >> /etc/profile.d/lmod.sh
 
 # include git sha in motd
-COPY motd.sh /etc/profile.d/motd.sh
+#COPY motd.sh /etc/profile.d/motd.sh
 
 ## Define a user
 RUN useradd -u 1000 -m test

@@ -1397,7 +1397,15 @@ void GradientVectorGridFunctionCoefficient::Eval(DenseMatrix &G, ElementTransfor
     // NB: In mfem/fem/coefficients.cpp, the function RefinedToCoarse is defined.  Here we reproduce it explicitly.
     //
     // ElementTransformation *coarse_T = RefinedToCoarse(*gf_mesh, T, ip, coarse_ip);
+
+#if MFEM_VERSION >= 40700
+    // mfem 4.7 and later
+    const Mesh &fine_mesh = *T.mesh;
+#else
+    // older versions
     Mesh &fine_mesh = *T.mesh;
+#endif
+
     // Get the element transformation of the coarse element containing the
     // fine element.
     int fine_element = T.ElementNo;
@@ -1429,12 +1437,7 @@ void VectorMagnitudeCoefficient::SetTime(double t) {
 
 double VectorMagnitudeCoefficient::Eval(ElementTransformation &T, const IntegrationPoint &ip) {
   a->Eval(va, T, ip);
-  // double res = 0;
-  // for (int i = 0; i < va.size(); i++) { res += va[i] * va[i]}
-  // res = std::sqrt(res)
-  // return res;
-  double mod = std::max(std::sqrt(va * va), 1.0e-18);
-  return mod;
+  return std::max(std::sqrt(va * va), 1.0e-18);
 }
 
 void TransformedMatrixVectorCoefficient::SetTime(double t) {
@@ -1447,15 +1450,6 @@ void TransformedMatrixVectorCoefficient::Eval(DenseMatrix &G, ElementTransformat
   buf.SetSize(Q1->GetVDim());
   Q1->Eval(buf, T, ip);
   Function(buf, G);
-
-  // int dim = Q1->GetVDim();
-  // std::cout << " " << endl;
-  // for (int i = 0; i < dim; i++) {
-  //   for (int j = 0; j < dim; j++) {
-  //     std::cout << G(i,j) << " " ;
-  //   }
-  //   std::cout << endl;
-  // }
 }
 
 }  // namespace mfem

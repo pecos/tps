@@ -174,7 +174,7 @@ void LoMachSolver::initialize() {
     thermo_ =
         new CaloricallyPerfectThermoChem(pmesh_, &loMach_opts_, temporal_coeff_, (meshData_->getGridScale()), tpsP_);
   } else if (loMach_opts_.thermo_solver == "lte-thermo-chem") {
-    thermo_ = new LteThermoChem(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_);
+    thermo_ = new LteThermoChem(pmesh_, &loMach_opts_, temporal_coeff_, meshData_->getGridScale(), tpsP_);
   } else if (loMach_opts_.thermo_solver == "reacting-flow") {
     thermo_ = new ReactingFlow(pmesh_, &loMach_opts_, temporal_coeff_, (meshData_->getGridScale()), tpsP_);
   } else if (loMach_opts_.thermo_solver == "static-thermo") {
@@ -768,6 +768,9 @@ void LoMachSolver::parseSolverOptions() {
 
   // compute wall distance
   tpsP_->getInput("loMach/computeWallDistance", loMach_opts_.compute_wallDistance, false);
+
+  // check for species
+  tpsP_->getInput("plasma_models/species_number", loMach_opts_.nSpec, 0);
 
   // add all models here which require wall dist, eg: SA, k-e, etc...
   if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::ALGEBRAIC_RANS) {

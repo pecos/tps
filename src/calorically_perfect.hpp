@@ -97,9 +97,9 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   int max_iter_; /**< Maximum number of linear solver iterations */
   double rtol_;  /**< Linear solver relative tolerance */
 
-  int default_max_iter_ = 1000;
-  double default_rtol_ = 1.0e-10;
-  double default_atol_ = 1.0e-12;
+  int default_max_iter_ = 10000;
+  double default_rtol_ = 1.0e-8;
+  double default_atol_ = 1.0e-10;
 
   int mass_inverse_pl_ = 0;
   int mass_inverse_max_iter_;
@@ -140,6 +140,9 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   // streamwise-stabilization
   bool sw_stab_;
 
+  // streamwise-stabilization
+  bool smooth_qt_;
+  
   // FEM related fields and objects
 
   // Scalar \f$H^1\f$ finite element collection.
@@ -191,6 +194,11 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   TransformedMatrixVectorCoefficient *swdiff_coeff_ = nullptr;
   ScalarMatrixProductCoefficient *supg_coeff_ = nullptr;
 
+  ConstantCoefficient filter_factor_coeff_;  
+  ProductCoefficient *gsq_coeff_ = nullptr;
+  ProductCoefficient *filter_coeff_ = nullptr;    
+  ScalarVectorProductCoefficient *ds_gradT_coeff_ = nullptr;
+  
   // operators and solvers
   ParBilinearForm *At_form_ = nullptr;
   ParBilinearForm *Ms_form_ = nullptr;
@@ -199,20 +207,24 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   ParBilinearForm *Mq_form_ = nullptr;
   ParBilinearForm *LQ_form_ = nullptr;
   ParLinearForm *LQ_bdry_ = nullptr;
-
+  ParBilinearForm *LF_form_ = nullptr;
+  ParLinearForm *LF_bdry_ = nullptr;
+  
   OperatorHandle LQ_;
   OperatorHandle At_;
   OperatorHandle Ht_;
   OperatorHandle Ms_;
   OperatorHandle MsRho_;
   OperatorHandle Mq_;
+  OperatorHandle LF_;  
 
   mfem::Solver *MsInvPC_ = nullptr;
   mfem::CGSolver *MsInv_ = nullptr;
   mfem::Solver *MqInvPC_ = nullptr;
   mfem::CGSolver *MqInv_ = nullptr;
   mfem::Solver *HtInvPC_ = nullptr;
-  mfem::CGSolver *HtInv_ = nullptr;
+  //mfem::CGSolver *HtInv_ = nullptr;
+  mfem::GMRESSolver *HtInv_ = nullptr;
 
   // Vectors
   Vector Tn_, Tn_next_, Tnm1_, Tnm2_;

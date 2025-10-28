@@ -51,7 +51,6 @@ class Tps;
 #include <mfem/general/forall.hpp>
 
 #include "BCintegrator.hpp"
-#include "argon_transport.hpp"
 #include "averaging.hpp"
 #include "chemistry.hpp"
 #include "dataStructures.hpp"
@@ -61,6 +60,7 @@ class Tps;
 #include "faceGradientIntegration.hpp"
 #include "face_integrator.hpp"
 #include "fluxes.hpp"
+#include "gas_transport.hpp"
 #include "gpu_constructor.hpp"
 #include "gradNonLinearForm.hpp"
 #include "io.hpp"
@@ -214,7 +214,7 @@ class M2ulPhyS : public TPS::PlasmaSolver {
   // DataCollection *visitColl = NULL;
 
   // Riemann Solver
-  RiemannSolver *rsolver;
+  RiemannSolverTPS *rsolver;
 
   // RHS operators
   // ParNonlinearForm *A;
@@ -398,8 +398,8 @@ class M2ulPhyS : public TPS::PlasmaSolver {
   void readTableWrapper(std::string inputPath, TableInput &result);
 
   void packUpGasMixtureInput();
-  void identifySpeciesType(Array<ArgonSpcs> &speciesType);
-  void identifyCollisionType(const Array<ArgonSpcs> &speciesType, ArgonColl *collisionIndex);
+  void identifySpeciesType(Array<GasSpcs> &speciesType);
+  void identifyCollisionType(const Array<GasSpcs> &speciesType, GasColl *collisionIndex);
 
   void checkSolverOptions() const;
   void projectInitialSolution();

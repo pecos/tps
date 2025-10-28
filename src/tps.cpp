@@ -57,6 +57,10 @@
 #include "independent_coupling.hpp"
 #include "loMach.hpp"
 
+#ifdef _HIP_
+#include <hip/hip_runtime.h>
+#endif
+
 namespace TPS {
 
 /** \brief Constructs default Tps object.
@@ -321,6 +325,19 @@ void Tps::parseInput() {
   getInput("solver/type", input_solver_type_, std::string("flow"));
 #ifdef _GPU_
   getInput("gpu/numGpusPerRank", numGpusPerRank_, 1);
+#ifdef _HIP_
+  // Sometimes hip call stack is too small.  Allow user to resize it.
+  // See
+  // https://rocm.docs.amd.com/projects/HIP/en/docs-6.4.2/how-to/hip_runtime_api/call_stack.html#call-stack-management-with-hip
+  int stackSizeMult;
+  getInput("gpu/hipStackSizeMult", stackSizeMult, 2);
+
+  size_t stackSize;
+  hipDeviceGetLimit(&stackSize, hipLimitStackSize);
+
+  size_t newStackSize = stackSize * stackSizeMult;
+  hipDeviceSetLimit(hipLimitStackSize, newStackSize);
+#endif
 #endif
 
   return;

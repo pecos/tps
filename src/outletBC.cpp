@@ -35,7 +35,7 @@
 #include "riemann_solver.hpp"
 
 // TODO(kevin): non-reflecting BC for plasma.
-OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolver *_rsolver, GasMixture *_mixture,
+OutletBC::OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolverTPS *_rsolver, GasMixture *_mixture,
                    GasMixture *d_mixture, ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt,
                    const int _dim, const int _num_equation, int _patchNumber, double _refLength, OutletType _bcType,
                    const Array<double> &_inputData, const int &_maxIntPoints, const int &_maxDofs, bool axisym)
@@ -1030,7 +1030,7 @@ void OutletBC::integrateOutlets_gpu(Vector &y, const Vector &x, const elementInd
                                     const boundaryFaceIntegrationData &boundary_face_data, Array<int> &listElems,
                                     Array<int> &offsetsBoundaryU) {
 #ifdef _GPU_
-  double *d_y = y.Write();
+  double *d_y = y.ReadWrite();
   const int *d_elem_dofs_list = elem_index_data.dofs_list.Read();
   const int *d_elem_dof_off = elem_index_data.dof_offset.Read();
   const int *d_elem_dof_num = elem_index_data.dof_number.Read();
@@ -1148,7 +1148,7 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const elementIndexingData
   const int maxDofs = maxDofs_;
   const int nvel = nvel_;
 
-  const RiemannSolver *d_rsolver = rsolver;
+  const RiemannSolverTPS *d_rsolver = rsolver;
   GasMixture *d_mix = d_mixture_;
 
   // MFEM_FORALL(n, numBdrElem, {
