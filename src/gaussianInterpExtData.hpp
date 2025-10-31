@@ -128,13 +128,10 @@ class GaussianInterpExtData : public ExternalDataBase {
   ParGridFunction temperature_gf_;
   ParGridFunction velocity_gf_;
   ParGridFunction vel0_gf_;
-<<<<<<< HEAD
   ParGridFunction swirl_gf_;
   ParGridFunction swirl0_gf_;
   ParGridFunction nut_gf_;
-=======
   ParGridFunction Yn_gf_;
->>>>>>> dev-semiImpConv
 
   // gradual increase of external bc over multiple steps
   int rampSteps_;
