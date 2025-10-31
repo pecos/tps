@@ -483,7 +483,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   rhou_coeff_ = new ScalarVectorProductCoefficient(*rhon_next_coeff_, *un_next_coeff_);
   
   // numerical filter (gscale_coeff_ also used in supg)
-  filter_factor_coeff_.constant = 0.06;
+  filter_factor_coeff_.constant = 0.06; // make readable?
   gscale_coeff_ = new GridFunctionCoefficient(gridScale_gf_);
   gsq_coeff_ = new ProductCoefficient(*gscale_coeff_,*gscale_coeff_);
   filter_coeff_ = new ProductCoefficient(filter_factor_coeff_,*gsq_coeff_);
