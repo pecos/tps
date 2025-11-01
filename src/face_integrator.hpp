@@ -43,7 +43,7 @@
 using namespace mfem;
 
 // TODO(kevin): In order to avoid repeated primitive variable evaluation,
-// Fluxes and RiemannSolver should take Vector Up (on the evaulation point) as input argument,
+// Fluxes and RiemannSolverTPS should take Vector Up (on the evaulation point) as input argument,
 // and FaceIntegrator should have a pointer to ParGridFunction *Up.
 // Also should be able to have Up more than number of equations,
 // while gradUp is evaluated only for the first num_equation variables.
@@ -52,7 +52,7 @@ using namespace mfem;
 // Interior face term: <F.n(u),[w]>
 class FaceIntegrator : public NonlinearFormIntegrator {
  private:
-  RiemannSolver *rsolver;
+  RiemannSolverTPS *rsolver;
   Fluxes *fluxClass;
   ParFiniteElementSpace *vfes;
 
@@ -106,7 +106,7 @@ class FaceIntegrator : public NonlinearFormIntegrator {
                        Vector &dist1, Vector &dist2);
 
  public:
-  FaceIntegrator(IntegrationRules *_intRules, RiemannSolver *rsolver_, Fluxes *_fluxClass, ParFiniteElementSpace *_vfes,
+  FaceIntegrator(IntegrationRules *_intRules, RiemannSolverTPS *rsolver_, Fluxes *_fluxClass, ParFiniteElementSpace *_vfes,
                  bool _useLinear, const int _dim, const int _num_equation, ParGridFunction *_gradUp,
                  ParFiniteElementSpace *_gradUpfes, double &_max_char_speed, bool axisym, ParGridFunction *distance);
   ~FaceIntegrator();
