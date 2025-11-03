@@ -418,7 +418,7 @@ void Tomboulides::initializeSelf() {
   } else {
     forcing_terms_.emplace_back(domain_attr, gravity_vec_);
   }
-
+  
   // Initial condition function.  For options, see cases.cpp
   tpsP_->getInput("loMach/tomboulides/ic", ic_string_, std::string(""));
 
@@ -1920,6 +1920,10 @@ double Tomboulides::maxVelocityMagnitude() {
   MPI_Reduce(&local_max_vel_magnitude, &global_max_vel_magnitude, 1, MPI_DOUBLE, MPI_MAX, 0, pfes_->GetComm());
 
   return global_max_vel_magnitude;
+}
+
+void Tomboulides::setup() {
+  evaluateVelocityGradient();
 }
 
 void Tomboulides::evaluateVelocityGradient() {

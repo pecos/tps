@@ -54,6 +54,14 @@ struct spongeToThermoChem {
 };
 
 /**
+ * Provides wrapper for fields that need to be provided by the
+ * visc sponge to the turbulence model.
+ */
+struct spongeToTurbModel {
+  const mfem::ParGridFunction *diff_multiplier = nullptr;
+};
+
+/**
  * Provides interface for viscous sponge implementation
  */
 class SpongeBase {
@@ -90,6 +98,9 @@ class SpongeBase {
 
   /// Interface object, provides fields necessary for the turbModel
   spongeToThermoChem toThermoChem_interface_;
+
+  /// Interface object, provides fields necessary for the turbModel
+  spongeToTurbModel toTurbModel_interface_;
 };
 
 /**

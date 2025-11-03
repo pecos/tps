@@ -46,6 +46,7 @@
 #include "algebraicSubgridModels.hpp"
 #include "algebraic_rans.hpp"
 #include "static_rans.hpp"
+#include "zetaModel.hpp"
 #include "calorically_perfect.hpp"
 #include "gaussianInterpExtData.hpp"
 #include "geometricSponge.hpp"
@@ -156,6 +157,8 @@ void LoMachSolver::initialize() {
   } else if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::STATIC_RANS) {
     //    turbModel_ = new AlgebraicRans(serial_mesh_, pmesh_, partitioning_, loMach_opts_.order, tpsP_);
     turbModel_ = new StaticRans(pmesh_, partitioning_, loMach_opts_.order, tpsP_);
+  } else if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::ZETA_F) {
+    turbModel_ = new ZetaModel(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_, (meshData_->getGridScale()));
   } else if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::NONE) {
     // default
     turbModel_ = new ZeroTurbModel(pmesh_, loMach_opts_.order);
@@ -186,7 +189,7 @@ void LoMachSolver::initialize() {
       grvy_printf(GRVY_ERROR, "Unknown loMach/thermo-solver option > %s\n", loMach_opts_.thermo_solver.c_str());
     }
     exit(ERROR);
-  }
+  }  
 
   // Instantiate flow solver
   if (loMach_opts_.flow_solver == "zero-flow") {
@@ -251,6 +254,7 @@ void LoMachSolver::initialize() {
   thermo_->initializeSelf();
 
   // Exchange interface information
+  turbModel_->initializeFromSponge(&sponge_->toTurbModel_interface_);  
   turbModel_->initializeFromThermoChem(&thermo_->toTurbModel_interface_);
   turbModel_->initializeFromFlow(&flow_->toTurbModel_interface_);
   flow_->initializeFromTurbModel(&turbModel_->toFlow_interface_);
@@ -261,6 +265,7 @@ void LoMachSolver::initialize() {
   thermo_->initializeFromSponge(&sponge_->toThermoChem_interface_);
 
   // Initialize restart read/write capability
+  turbModel_->initializeIO(ioData);    
   flow_->initializeIO(ioData);
   thermo_->initializeIO(ioData);
 
@@ -286,7 +291,8 @@ void LoMachSolver::initialize() {
 
   // Finish initializing operators
   flow_->initializeOperators();
-  turbModel_->setup();
+  flow_->setup();      
+  turbModel_->setup();    
   turbModel_->initializeOperators();
   thermo_->initializeOperators();
 
@@ -382,7 +388,7 @@ void LoMachSolver::solveBegin() {
     }
 
     std::cout << std::endl;
-    std::cout << "#==================================================================" << std::endl;
+    std::cout << "#==========================================================================" << std::endl;
 
     std::cout << std::setw(10) << iter << " ";
     std::cout << std::setw(10) << std::scientific << temporal_coeff_.time << " ";

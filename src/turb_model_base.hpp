@@ -37,7 +37,10 @@
 
 #include "tps_mfem_wrap.hpp"
 
+class IODataOrganizer;
 struct flowToTurbModel;
+struct thermoChemToTurbModel;
+struct spongeToTurbModel;
 
 /**
  * Provides wrapper for fields that need to be provided by the
@@ -46,8 +49,6 @@ struct flowToTurbModel;
 struct turbModelToFlow {
   const mfem::ParGridFunction *eddy_viscosity = nullptr;
 };
-
-struct thermoChemToTurbModel;
 
 /**
  * Provides wrapper for fields that need to be provided by the
@@ -75,6 +76,7 @@ class TurbModelBase {
   const flowToTurbModel *flow_interface_;
   const thermoChemToTurbModel *thermoChem_interface_;
   const extDataToTurbModel *extData_interface_;
+  const spongeToTurbModel *sponge_interface_;
 
  public:
   /// Destructor
@@ -97,6 +99,8 @@ class TurbModelBase {
    */
   virtual void initializeViz(mfem::ParaViewDataCollection &pvdc) {}
 
+  virtual void initializeIO(IODataOrganizer &io) {}  
+
   /**
    * @brief Initialize model operators
    *
@@ -117,6 +121,17 @@ class TurbModelBase {
    */
   virtual void setup() = 0;
 
+  /**
+   * @brief Initialize data from visc mult class
+   *
+   * Initialize fields that the turbulence model needs from the
+   * visc mult.
+   */
+  void initializeFromSponge(spongeToTurbModel *sponge) { sponge_interface_ = sponge; }
+
+  /// Get interface provided by flow model
+  const spongeToTurbModel *getSpongeInterface() const { return sponge_interface_; }
+  
   /**
    * @brief Initialize data from the flow class
    *

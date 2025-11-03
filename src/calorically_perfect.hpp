@@ -152,7 +152,7 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   ParGridFunction Tnm1_gf_, Tnm2_gf_;
   ParGridFunction Tn_gf_, Tn_next_gf_, Text_gf_, resT_gf_;
   ParGridFunction rn_gf_;
-  ParGridFunction rhoDt;
+  ParGridFunction rhoDt_gf_;
 
   ParGridFunction visc_gf_;
   ParGridFunction kappa_gf_;

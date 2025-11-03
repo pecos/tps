@@ -48,7 +48,7 @@ class TurbulenceModelOptions {
   TurbulenceModelOptions();
   void read(TPS::Tps *tps, std::string prefix = std::string(""));
 
-  enum TurbulenceModelType { NONE, SMAGORINSKY, SIGMA, ALGEBRAIC_RANS, STATIC_RANS };
+  enum TurbulenceModelType { NONE, SMAGORINSKY, SIGMA, ALGEBRAIC_RANS, STATIC_RANS, ZETA_F};
 
   std::string turb_model_string_;
   std::map<std::string, TurbulenceModelType> turb_model_map_;
