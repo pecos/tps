@@ -601,8 +601,8 @@ void M2ulPhyS::initVariables() {
                                          config.GetSgsModelType(), config.GetSgsFloor(), config.GetSgsConstant(), vsd,
                                          d_fluxClass);
 
-  tpsGpuMalloc((void **)&rsolver, sizeof(RiemannSolver));
-  gpu::instantiateDeviceRiemann<<<1, 1>>>(num_equation, d_mixture, eqSystem, d_fluxClass, config.RoeRiemannSolver(),
+  tpsGpuMalloc((void **)&rsolver, sizeof(RiemannSolverTPS));
+  gpu::instantiateDeviceRiemann<<<1, 1>>>(num_equation, d_mixture, eqSystem, d_fluxClass, config.RoeRiemannSolverTPS(),
                                           config.isAxisymmetric(), rsolver);
 
   // Note: This flux class is only used to compute the viscosity
@@ -616,7 +616,7 @@ void M2ulPhyS::initVariables() {
   fluxClass = new Fluxes(mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(), &config);
   d_fluxClass = fluxClass;
 
-  rsolver = new RiemannSolver(num_equation, mixture, eqSystem, d_fluxClass, config.RoeRiemannSolver(),
+  rsolver = new RiemannSolverTPS(num_equation, mixture, eqSystem, d_fluxClass, config.RoeRiemannSolverTPS(),
                               config.isAxisymmetric());
 #endif
 
@@ -3973,7 +3973,7 @@ void M2ulPhyS::checkSolverOptions() const {
       }
     }
     // Don't support Roe flux yet
-    if (config.RoeRiemannSolver()) {
+    if (config.RoeRiemannSolverTPS()) {
       if (rank0_) {
         std::cerr << "[ERROR]: Roe flux not supported for axisymmetric simulations. Please use flow/useRoe = 0."
                   << std::endl;

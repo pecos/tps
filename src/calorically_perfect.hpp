@@ -113,12 +113,16 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   // Boundary condition info
   Array<int> temp_ess_attr_; /**< List of patches with Dirichlet BC on temperature */
   Array<int> Qt_ess_attr_;   /**< List of patches with Dirichlet BC on Q (thermal divergence) */
+  Array<int> rho_ess_attr_;
+  Array<int> rho_nat_attr_;   
 
   Array<int> temp_ess_tdof_; /**< List of true dofs with Dirichlet BC on temperature */
   Array<int> Qt_ess_tdof_;   /**< List of true dofs with Dirichlet BC on Q */
+  Array<int> rho_ess_tdof_;
 
   std::vector<DirichletBC_T<Coefficient>> temp_dbcs_; /**< vector of Dirichlet BC coefficients for T*/
   std::vector<DirichletBC_T<Coefficient>> Qt_dbcs_;   /**< vector of Dirichlet BC coefficients for Q*/
+  std::vector<DirichletBC_T<Coefficient>> rho_dbcs_;  
 
   // Scalar modeling parameters
   double mu0_;           /**< Dynamic viscosity, either multiplier for Sutherland or constant */
@@ -134,7 +138,7 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   double dtP_;
 
   // Initial temperature value (if constant IC)
-  double T_ic_;
+  double T_ic_, r_ic_;
 
   // FEM related fields and objects
 
@@ -147,7 +151,9 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   // Fields
   ParGridFunction Tnm1_gf_, Tnm2_gf_;
   ParGridFunction Tn_gf_, Tn_next_gf_, Text_gf_, resT_gf_;
-  ParGridFunction rn_gf_;
+  ParGridFunction rnm1_gf_, rnm2_gf_;  
+  ParGridFunction rn_gf_, rn_next_gf_, rext_gf_, resr_gf_;
+  ParGridFunction Pn_gf_;
   ParGridFunction rhoDt;
 
   ParGridFunction visc_gf_;
@@ -170,25 +176,38 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   ScalarVectorProductCoefficient *kap_gradT_coeff_ = nullptr;
   GridFunctionCoefficient *rho_over_dt_coeff_ = nullptr;
   GridFunctionCoefficient *rho_coeff_ = nullptr;
-
+  
+  GridFunctionCoefficient *pressure_coeff_ = nullptr;
+  GridFunctionCoefficient *temperature_coeff_ = nullptr;
+  ProductCoefficient *tsq_coeff_ = nullptr;
+  ConstantCoefficient *Rgas_coeff_ = nullptr;
+  ProductCoefficient *Rtsq_coeff_ = nullptr;
+  RatioCoefficient *pOrTsq_coeff_ = nullptr;
+  ScalarVectorProductCoefficient *grad_rho_coeff_ = nullptr;
+  
   // operators and solvers
   ParBilinearForm *At_form_ = nullptr;
   ParBilinearForm *Ms_form_ = nullptr;
+  ParBilinearForm *Mr_form_ = nullptr;  
   ParBilinearForm *MsRho_form_ = nullptr;
   ParBilinearForm *Ht_form_ = nullptr;
   ParBilinearForm *Mq_form_ = nullptr;
   ParBilinearForm *LQ_form_ = nullptr;
   ParLinearForm *LQ_bdry_ = nullptr;
+  ParLinearForm *Mr_bdry_ = nullptr;  
 
   OperatorHandle LQ_;
   OperatorHandle At_;
   OperatorHandle Ht_;
   OperatorHandle Ms_;
+  OperatorHandle Mr_;  
   OperatorHandle MsRho_;
   OperatorHandle Mq_;
 
   mfem::Solver *MsInvPC_ = nullptr;
   mfem::CGSolver *MsInv_ = nullptr;
+  mfem::Solver *MrInvPC_ = nullptr;
+  mfem::CGSolver *MrInv_ = nullptr;  
   mfem::Solver *MqInvPC_ = nullptr;
   mfem::CGSolver *MqInv_ = nullptr;
   mfem::Solver *HtInvPC_ = nullptr;
@@ -201,8 +220,13 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   Vector resT_;
   Vector tmpR0_, tmpR0b_;
 
+  Vector rn_, rn_next_, rnm1_, rnm2_;
+  Vector Nrn_, Nrnm1_, Nrnm2_;
+  Vector rext_;
+  Vector resr_;
+  Vector Pn_, DtP_;
+
   Vector Qt_;
-  Vector rn_;
   Vector kappa_;
   Vector visc_;
 
@@ -253,10 +277,14 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   void updateDensity(double tStep);
   void updateBC(int current_step);
   void updateDiffusivity();
+  void updateDensity();
+  void updatePressure();
   void computeSystemMass();
   void computeExplicitTempConvectionOP(bool extrap);
+  void computeExplicitRhoConvectionOP(bool extrap);  
   void computeQt();
   void computeQtTO();
+  void computeExplicitPressureSubstantial();
 
   /// Return a pointer to the current temperature ParGridFunction.
   ParGridFunction *GetCurrentTemperature() { return &Tn_gf_; }
@@ -284,6 +312,9 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   void AddTempDirichletBC(const double &temp, Array<int> &attr);
   void AddTempDirichletBC(Coefficient *coeff, Array<int> &attr);
   void AddTempDirichletBC(ScalarFuncT *f, Array<int> &attr);
+  void AddRhoDirichletBC(const double &rho, Array<int> &attr);
+  void AddRhoDirichletBC(Coefficient *coeff, Array<int> &attr);
+  void AddRhoDirichletBC(ScalarFuncT *f, Array<int> &attr);  
   void AddQtDirichletBC(Coefficient *coeff, Array<int> &attr);
   void AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr);
 };

@@ -41,14 +41,14 @@
 using namespace mfem;
 
 // TODO(kevin): In order to avoid repeated primitive variable evaluation,
-// Fluxes and RiemannSolver should take Vector Up (on the evaulation point) as input argument,
+// Fluxes and RiemannSolverTPS should take Vector Up (on the evaulation point) as input argument,
 // and FaceIntegrator should have a pointer to ParGridFunction *Up.
 // Also should be able to have Up more than number of equations,
 // while gradUp is evaluated only for the first num_equation variables.
 // Need to discuss further.
 
 // Implements a simple Rusanov flux
-class RiemannSolver {
+class RiemannSolverTPS {
  private:
   const int num_equation;
 
@@ -62,7 +62,7 @@ class RiemannSolver {
   void Eval_Roe(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux);
 
  public:
-  MFEM_HOST_DEVICE RiemannSolver(int _num_equation, GasMixture *mixture, Equations _eqSystem, Fluxes *_fluxClass,
+  MFEM_HOST_DEVICE RiemannSolverTPS(int _num_equation, GasMixture *mixture, Equations _eqSystem, Fluxes *_fluxClass,
                                  bool _useRoe, bool axisym);
 
   void Eval(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux, bool LF = false);

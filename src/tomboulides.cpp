@@ -1284,6 +1284,7 @@ void Tomboulides::step() {
 
   sw_helm_.Stop();
 
+  
   //------------------------------------------------------------------------
   // Step 2: Compute vstar / dt (as in eqn 2.3 from Tomboulides)
   // ------------------------------------------------------------------------
@@ -1360,7 +1361,7 @@ void Tomboulides::step() {
   //------------------------------------------------------------------------
   // Step 3: Poisson
   // ------------------------------------------------------------------------
-
+  /*
   // Extrapolate the velocity field (and store in u_next_gf_)
   {
     const auto d_u = u_vec_.Read();
@@ -1517,6 +1518,7 @@ void Tomboulides::step() {
     meanZero(*p_gf_);
   }
   p_gf_->GetTrueDofs(p_vec_);
+  */
 
   //------------------------------------------------------------------------
   // Step 4: Helmholtz solve for the velocity
@@ -1528,6 +1530,7 @@ void Tomboulides::step() {
   S_mom_form_->ParallelAssemble(resu_vec_);
 
   // -grad(p)
+  (thermo_interface_->thermal_divergence)->GetTrueDofs(p_vec_);
   G_op_->AddMult(p_vec_, resu_vec_, -1.0);
 
   // Add grad(mu * Qt) term
