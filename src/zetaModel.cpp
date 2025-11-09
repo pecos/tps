@@ -441,6 +441,18 @@ void ZetaModel::initializeSelf() {
         tpsP_->getRequiredInput((basepath + "/tke").c_str(), tke_value);
         AddTKEDirichletBC(tke_value, inlet_attr);
         AddV2DirichletBC(2.0/3.0*tke_value, inlet_attr);	
+      // TODO: Currently just applies a uniform BC as well
+      } else if (type == "interpolate") {
+        if (rank0_) {
+          std::cout << "Zeta Model: Setting interpolated Dirichlet TKE on patch = " << patch << std::endl;
+        }
+        Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
+        inlet_attr = 0;
+        inlet_attr[patch - 1] = 1;
+        double tke_value;
+        tpsP_->getRequiredInput((basepath + "/tke").c_str(), tke_value);
+        AddTKEDirichletBC(tke_value, inlet_attr);
+        AddV2DirichletBC(2.0/3.0*tke_value, inlet_attr);	
       } else {
         if (rank0_) {
           std::cout << "ERROR: zeta-f inlet type = " << type << " not supported." << std::endl;
@@ -588,7 +600,7 @@ void ZetaModel::initializeOperators() {
   //v2_diag_coeff_ = new SumCoefficient(*rhoDt_coeff_, *ek_rho_coeff_, 1.0, 6.0*des_wgt_);  
   f_diag_coeff_ = new RatioCoefficient(1.0, *tls2_coeff_);
   f_diag_total_coeff_ = new SumCoefficient(*f_diag_coeff_, *zero_coeff_);
-  
+
   // operators
   As_form_ = new ParBilinearForm(sfes_);
   auto *as_blfi = new ConvectionIntegrator(*rhou_coeff_);
@@ -640,7 +652,7 @@ void ZetaModel::initializeOperators() {
   }
   Mf_form_->Assemble();
   Mf_form_->FormSystemMatrix(empty, Mf_);
-  
+
   // diffusion of tke for tdr bc
   Lk_form_ = new ParBilinearForm(sfes_);
   // auto *lkd_blfi = new DiffusionIntegrator(*tke_diff_total_coeff_);
@@ -704,7 +716,7 @@ void ZetaModel::initializeOperators() {
   Hv_form_->AddDomainIntegrator(hdv_blfi);
   Hv_form_->Assemble();
   Hv_form_->FormSystemMatrix(v2_ess_tdof_, Hv_);
-  
+
   Hf_form_ = new ParBilinearForm(ffes_);
   // dividing all by L^2
   auto *hmf_blfi = new MassIntegrator(*f_diag_coeff_);
@@ -732,7 +744,7 @@ void ZetaModel::initializeOperators() {
   Hz_form_->AddDomainIntegrator(hdz_blfi);
   Hz_form_->Assemble();
   Hz_form_->FormSystemMatrix(fRate_ess_tdof_, Hz_);
-  
+
   // boundary terms for tdr
   /*
   He_bdry_ = new ParLinearForm(sfes_);

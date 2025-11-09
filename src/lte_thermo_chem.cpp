@@ -345,6 +345,7 @@ void LteThermoChem::initializeSelf() {
   toFlow_interface_.viscosity = &mu_gf_;
   toFlow_interface_.thermal_divergence = &Qt_gf_;
   toTurbModel_interface_.density = &rn_gf_;
+  toTurbModel_interface_.viscosity = &mu_gf_;
 
   plasma_conductivity_gf_ = &sigma_gf_;
   joule_heating_gf_ = &jh_gf_;
