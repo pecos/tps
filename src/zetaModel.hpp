@@ -97,8 +97,8 @@ class ZetaModel : public TurbModelBase {
 
   // Flags
   bool partial_assembly_ = false;
-  //bool numerical_integ_ = false;
-  bool numerical_integ_ = true;
+  bool numerical_integ_ = false;
+  //bool numerical_integ_ = true;
 
   // Linear-solver-related options
   int pl_solve_ = 0;
