@@ -77,7 +77,7 @@ class WallBC : public BoundaryCondition {
                               Vector &bdrFlux);
 
  public:
-  WallBC(RiemannSolver *rsolver_, GasMixture *_mixture, GasMixture *d_mixture, Equations _eqSystem, Fluxes *_fluxClass,
+  WallBC(RiemannSolverTPS *rsolver_, GasMixture *_mixture, GasMixture *d_mixture, Equations _eqSystem, Fluxes *_fluxClass,
          ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
          const int _num_equation, int _patchNumber, WallType _bcType, const WallData _inputData,
          const boundaryFaceIntegrationData &boundary_face_data, const int &maxIntPoints, bool axisym,
