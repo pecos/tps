@@ -1660,9 +1660,12 @@ void ZetaModel::fStep() {
   */
 
   // code-friendly form
+  // rhs: 1/T * [(C1-6)*v2/k - 2/3*(C1-1)] - C2*Pk/(rho*k)
   double Ctmp1, Ctmp2;
   Ctmp1 = 2.0/3.0 * (C1_ - 1.0);
   Ctmp2 = (C1_ - 6.0);
+
+  // C2*Pk/(rho*k)  
   tmpR0b_.Set(C2_, prod_);
   tmpR0b_ /= rho_;
   {
@@ -1672,6 +1675,8 @@ void ZetaModel::fStep() {
       data[i] /= std::max(dk[i], tke_min_);
     }
   }
+  
+  // v2/k
   {
     double twoThirds = 2.0/3.0;
     const double *dv2 = v2_next_.HostRead();    
@@ -1684,6 +1689,7 @@ void ZetaModel::fStep() {
       data[i] /= std::max(dk[i], tke_min_);
     }
   }
+  tmpR0a_ *= Ctmp2;
   tmpR0a_ -= Ctmp1;
   tmpR0a_ /= tts_;
   tmpR0a_ -= tmpR0b_;
@@ -1735,13 +1741,13 @@ void ZetaModel::fStep() {
   // minus is to (-) on operator
   //Ms_->AddMult(tmpR0a_, res_, -1.0);
 
+  // if not including L2 in laplacian term
+  tmpR0a_ /= tls2_; 
+  
   // project to f-space
   res_gf_.SetFromTrueDofs(tmpR0a_);
   resf_gf_.ProjectGridFunction(res_gf_);
   resf_gf_.GetTrueDofs(ftmpR0_);
-
-  // if not including L2 in laplacian term
-  ftmpR0_ /= tls2_; 
   
   Mf_->AddMult(ftmpR0_, resf_, -1.0);
   resf_gf_.SetFromTrueDofs(resf_);  
