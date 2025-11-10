@@ -101,12 +101,14 @@ ZetaModel::~ZetaModel() {
   delete Hf_form_;
   delete Hz_form_;
   delete Lk_form_;
+  //std::cout << "okay 1" << endl;
   delete Lf_form_;  
   delete MsRho_form_;
   delete Ms_form_;
   delete Mf_form_;  
   delete As_form_;
   //delete He_bdry_;
+  //std::cout << "okay 2" << endl;  
   
   delete zero_coeff_;
   delete unity_coeff_;
@@ -115,49 +117,57 @@ ZetaModel::~ZetaModel() {
   delete delta_coeff_;
   delete rho_coeff_;
   delete mu_coeff_;
+  //std::cout << "okay 3" << endl;  
   delete tts_coeff_;
   delete tls2_coeff_;
   delete prod_coeff_;
   delete tke_coeff_;
   delete nu_coeff_;
-  delete nu_delta_coeff_;
+  //std::cout << "okay 4" << endl;  
+  //delete nu_delta_coeff_;
   delete gradTKE_coeff_;
-  delete two_nu_delta_coeff_;
+  //delete two_nu_delta_coeff_;
   delete tdr_wall_coeff_;
-  delete gradZeta_coeff_;
-  delete two_nuNeg_delta_coeff_;
-  delete fRate_wall_coeff_;
+  //delete gradZeta_coeff_;
+  //delete two_nuNeg_delta_coeff_;
+  //delete fRate_wall_coeff_;
   delete vel_coeff_;
   delete rhou_coeff_;
   delete scalar_diff_coeff_;
+  //std::cout << "okay 5" << endl;  
   delete mut_coeff_;
   delete mult_coeff_;
   delete tke_diff_sum_coeff_;
   delete tdr_diff_sum_coeff_;
   delete zeta_diff_sum_coeff_;
+  //std::cout << "okay 6" << endl;  
   delete tke_diff_total_coeff_;
   delete tdr_diff_total_coeff_;
   delete zeta_diff_total_coeff_;
   delete unity_diff_total_coeff_;
   delete rhoDt_coeff_;
   delete rhoTTS_coeff_;
+  //std::cout << "okay 7" << endl;  
   delete Ce2_coeff_;
   delete Ce2rhoTTS_coeff_;
   delete Pk_coeff_;
   delete ek_coeff_;  
   delete tke_diag_coeff_;
   delete tdr_diag_coeff_;
+  //std::cout << "okay 8" << endl;  
   delete zeta_diag_coeff_;
   delete v2_diag_coeff_;  
   delete f_diag_coeff_;
   delete f_diag_total_coeff_;
-
+  //std::cout << "okay 9" << endl;
+  
   delete ffec_;
   delete ffes_;  
   delete sfec_;
   delete sfes_;
   delete vfec_;
   delete vfes_;
+  //std::cout << "okay 10" << endl;  
 }
 
 void ZetaModel::initializeSelf() {
@@ -239,6 +249,11 @@ void ZetaModel::initializeSelf() {
   tke_next_gf_ = tke_gf_;
   tke_next_gf_.GetTrueDofs(tke_next_);  
 
+  tke_lapl_gf_.SetSpace(sfes_);
+  tke_lapl_.SetSize(sfes_truevsize);
+  tke_lapl_ = 0.0;
+  tke_lapl_gf_.SetFromTrueDofs(tke_lapl_);
+  
   tdr_next_gf_.SetSpace(sfes_);
   tdr_next_.SetSize(sfes_truevsize);
   tdr_next_gf_ = tdr_gf_;
@@ -470,6 +485,15 @@ void ZetaModel::initializeSelf() {
   }
 
   // Wall BCs
+  //Array<int> wall_tags(pmesh_->bdr_attributes.Max());
+  //wall_tags= 0;
+  //rho_coeff_ = new GridFunctionCoefficient(thermoChem_interface_->density);
+  //mu_coeff_ = new GridFunctionCoefficient(thermoChem_interface_->viscosity);  
+  //nu_coeff_ = new RatioCoefficient(*mu_coeff_, *rho_coeff_);
+  //gradTKE_coeff_ = new GradientGridFunctionCoefficient(&tke_next_gf_);  
+  //nu_gradTKE_coeff_ = new ScalarVectorProductCoefficient(*nu_coeff_, *gradTKE_coeff_);  
+  //tdr_wall_coeff_ = new DivergenceGridFunctionCoefficient(*nu_gradTKE_coeff_);
+  tdr_wall_coeff_ = new GridFunctionCoefficient(&tke_lapl_gf_);    
   {
     Array<int> attr_wall(pmesh_->bdr_attributes.Max());
     attr_wall = 0;
@@ -487,6 +511,8 @@ void ZetaModel::initializeSelf() {
         attr_wall = 0;
         attr_wall[patch - 1] = 1;
 
+        //wall_tags[patch - 1] = 1;	
+
         //ConstantCoefficient *tke_wall_coeff = new ConstantCoefficient();
         //tke_wall_coeff->constant = 0.0;
         //AddTKEDirichletBC(tke_wall_coeff, attr_wall);
@@ -496,8 +522,10 @@ void ZetaModel::initializeSelf() {
         // tdr handled through Hs_bdry
         // ConstantCoefficient *tdr_wall_coeff = new ConstantCoefficient();
         // tdr_wall_coeff->constant = 0.0;
-	//>>>
-        AddTDRDirichletBC(0.0, attr_wall);
+	// AddTDRDirichletBC(0.0, attr_wall);
+	AddTDRDirichletBC(tdr_wall_coeff_, attr_wall);	
+	//DivergenceGridFunctionCoefficient *tdr_wall_coeff = new DivergenceGridFunctionCoefficient(*nu_gradTKE_coeff_);
+        //AddTDRDirichletBC(tdr_wall_coeff, attr_wall);
 	
         //tdr_bc_ = new GridFunctionCoefficient(&tdr_wall_gf_);
         //AddTDRDirichletBC(tdr_bc_, attr_wall);	
@@ -557,15 +585,19 @@ void ZetaModel::initializeOperators() {
 
   // boundary-condition related
   nu_coeff_ = new RatioCoefficient(*mu_coeff_, *rho_coeff_);
-  nu_delta_coeff_ = new RatioCoefficient(*nu_coeff_, *delta_coeff_);
-  gradTKE_coeff_ = new GradientGridFunctionCoefficient(&tke_next_gf_);
-  two_nu_delta_coeff_ = new ProductCoefficient(*nu_delta_coeff_, *posTwo_coeff_);
-  tdr_wall_coeff_ = new ScalarVectorProductCoefficient(*two_nu_delta_coeff_, *gradTKE_coeff_);
-  gradZeta_coeff_ = new GradientGridFunctionCoefficient(&zeta_next_gf_);
-  two_nuNeg_delta_coeff_ = new ProductCoefficient(*nu_delta_coeff_, *negTwo_coeff_);
-  fRate_wall_coeff_ = new ScalarVectorProductCoefficient(*two_nuNeg_delta_coeff_, *gradZeta_coeff_);
-  tdr_wall_eval_coeff_ = new GridFunctionCoefficient(&tdr_wall_gf_);
+  gradTKE_coeff_ = new GradientGridFunctionCoefficient(&tke_next_gf_);  
+  //nu_delta_coeff_ = new RatioCoefficient(*nu_coeff_, *delta_coeff_);
+  //two_nu_delta_coeff_ = new ProductCoefficient(*nu_delta_coeff_, *posTwo_coeff_);
+  //tdr_wall_coeff_ = new ScalarVectorProductCoefficient(*two_nu_delta_coeff_, *gradTKE_coeff_);
+  //gradZeta_coeff_ = new GradientGridFunctionCoefficient(&zeta_next_gf_);
+  //two_nuNeg_delta_coeff_ = new ProductCoefficient(*nu_delta_coeff_, *negTwo_coeff_);
+  //fRate_wall_coeff_ = new ScalarVectorProductCoefficient(*two_nuNeg_delta_coeff_, *gradZeta_coeff_);
+  //tdr_wall_eval_coeff_ = new GridFunctionCoefficient(&tdr_wall_gf_);
 
+  // epsi_wall = d_i [nu * d_i{k_wall}]
+  nu_gradTKE_coeff_ = new ScalarVectorProductCoefficient(*nu_coeff_, *gradTKE_coeff_);  
+  //tdr_wall_coeff_ = new DivergenceGridFunctionCoefficient(*nu_gradTKE_coeff_);
+  
   // convection-related
   vel_coeff_ = new VectorGridFunctionCoefficient(flow_interface_->velocity);
   rhou_coeff_ = new ScalarVectorProductCoefficient(*rho_coeff_, *vel_coeff_);
@@ -654,6 +686,7 @@ void ZetaModel::initializeOperators() {
   Mf_form_->FormSystemMatrix(empty, Mf_);
 
   // diffusion of tke for tdr bc
+  /*
   Lk_form_ = new ParBilinearForm(sfes_);
   // auto *lkd_blfi = new DiffusionIntegrator(*tke_diff_total_coeff_);
   auto *lkd_blfi = new DiffusionIntegrator(*scalar_diff_coeff_);
@@ -662,7 +695,8 @@ void ZetaModel::initializeOperators() {
   }
   Lk_form_->AddDomainIntegrator(lkd_blfi);
   Lk_form_->Assemble();
-  Lk_form_->FormSystemMatrix(empty, Lk_);  
+  Lk_form_->FormSystemMatrix(empty, Lk_);
+  */
 
   // testing...
   /*
@@ -755,6 +789,26 @@ void ZetaModel::initializeOperators() {
   He_bdry_->AddBoundaryIntegrator(he_bdry_lfi, tdr_ess_attr_);
   if (rank0_) std::cout << "... check 8 ..." << endl;
   */
+  Lk_form_ = new ParBilinearForm(sfes_);
+  auto *lkd_blfi = new DiffusionIntegrator(*scalar_diff_coeff_);
+  if (numerical_integ_) {
+    lkd_blfi->SetIntRule(&ir_di);
+  }
+  Lk_form_->AddDomainIntegrator(lkd_blfi);
+  if (partial_assembly_) {
+    Lk_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+  }
+  Lk_form_->Assemble();
+  Lk_form_->FormSystemMatrix(empty, Lk_);
+
+  Lk_bdry_ = new ParLinearForm(sfes_);
+  auto *lk_bdry_lfi = new BoundaryNormalLFIntegrator(*nu_gradTKE_coeff_, 2, -1);
+  if (numerical_integ_) {
+    lk_bdry_lfi->SetIntRule(&ir_di);
+  }
+  Lk_bdry_->AddBoundaryIntegrator(lk_bdry_lfi, tdr_ess_attr_);
+
+
   
   // inverse operators:: linear solves
   if (partial_assembly_) {
@@ -1399,6 +1453,10 @@ void ZetaModel::tkeStep() {
     }
   }
   tke_next_gf_.SetFromTrueDofs(tke_next_);
+
+  // wall-bc for tdr
+  computeTDRwall();
+  
 }
 
 void ZetaModel::tdrStep() {
@@ -1828,6 +1886,26 @@ void ZetaModel::updateBC(int step) {
   fWall_gf_.SetFromTrueDofs(tmpR0_);
   */
 }
+
+void ZetaModel::computeTDRwall() {
+  
+  tmpR0_ = 0.0;
+  Lk_bdry_->Update();
+  Lk_bdry_->Assemble();
+  Lk_bdry_->ParallelAssemble(tmpR0_);
+  tmpR0_.Neg();
+
+  Array<int> empty;
+  Lk_form_->Update();
+  Lk_form_->Assemble();
+  Lk_form_->FormSystemMatrix(empty, Lk_);
+  Lk_->AddMult(tke_next_, tmpR0_);
+
+  MsInv_->Mult(tmpR0_,tke_lapl_);
+  tke_lapl_gf_.SetFromTrueDofs(tmpR0_);
+
+}
+
 
 /// Add a Dirichlet boundary condition to scalar fields
 void ZetaModel::AddTKEDirichletBC(const double &tke, Array<int> &attr) {

@@ -171,6 +171,8 @@ class ZetaModel : public TurbModelBase {
   Vector tke_next_;
   Vector tke_nm1_, tke_nm2_;
   Vector Ntke_, Ntke_nm1_, Ntke_nm2_;
+  ParGridFunction tke_lapl_gf_;
+  Vector tke_lapl_;  
 
   /// turbulent dissipation rate
   ParGridFunction tdr_gf_;
@@ -251,13 +253,16 @@ class ZetaModel : public TurbModelBase {
   /// coefficient fields for operators
   GridFunctionCoefficient *delta_coeff_ = nullptr;
   GradientGridFunctionCoefficient *gradTKE_coeff_ = nullptr;
+  ScalarVectorProductCoefficient *nu_gradTKE_coeff_ = nullptr;
   GridFunctionCoefficient *mu_coeff_ = nullptr;
   RatioCoefficient *nu_coeff_ = nullptr;
   RatioCoefficient *nu_delta_coeff_ = nullptr;
   ProductCoefficient *two_nu_delta_coeff_ = nullptr;
   ProductCoefficient *two_nuNeg_delta_coeff_ = nullptr;
   GradientGridFunctionCoefficient *gradZeta_coeff_ = nullptr;
-  ScalarVectorProductCoefficient *tdr_wall_coeff_ = nullptr;
+  //ScalarVectorProductCoefficient *tdr_wall_coeff_ = nullptr;
+  //DivergenceGridFunctionCoefficient *tdr_wall_coeff_ = nullptr;
+  GridFunctionCoefficient *tdr_wall_coeff_ = nullptr;
   ScalarVectorProductCoefficient *fRate_wall_coeff_ = nullptr;
   ScalarVectorProductCoefficient *wall_coeff_ = nullptr;
   GridFunctionCoefficient *tdr_wall_eval_coeff_ = nullptr;
@@ -314,7 +319,8 @@ class ZetaModel : public TurbModelBase {
   ParBilinearForm *Hf_form_ = nullptr;
   ParBilinearForm *Hz_form_ = nullptr;
   ParBilinearForm *Lk_form_ = nullptr;
-  ParBilinearForm *Lf_form_ = nullptr;    
+  ParBilinearForm *Lf_form_ = nullptr;
+  ParLinearForm *Lk_bdry_ = nullptr;  
   ParLinearForm *He_bdry_ = nullptr;
 
   OperatorHandle As_;
@@ -394,6 +400,7 @@ class ZetaModel : public TurbModelBase {
   void updateTTS();
   void computeStrain();
   void updateMuT();
+  void computeTDRwall();
 
   /// Return a pointer to the current temperature ParGridFunction.
   ParGridFunction *getCurrentEddyViscosity() { return &eddyVisc_gf_; }
