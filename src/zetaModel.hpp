@@ -92,6 +92,9 @@ class ZetaModel : public TurbModelBase {
   // space sizes
   int Sdof_, SdofInt_;
 
+  // axisymmetry
+  bool axisym_;
+
   /// Enable/disable verbose output.
   bool verbose = true;
 
@@ -136,6 +139,10 @@ class ZetaModel : public TurbModelBase {
   /// velocity
   ParGridFunction *vel_gf_ = nullptr;
   Vector vel_;
+
+  /// swirl
+  ParGridFunction *swirl_gf_ = nullptr;
+  Vector swirl_;
 
   /// velocity gradients
   ParGridFunction *gradU_gf_ = nullptr;
@@ -267,6 +274,20 @@ class ZetaModel : public TurbModelBase {
   ScalarVectorProductCoefficient *wall_coeff_ = nullptr;
   GridFunctionCoefficient *tdr_wall_eval_coeff_ = nullptr;
 
+  ProductCoefficient *rad_rho_coeff_ = nullptr;
+  ScalarVectorProductCoefficient *rad_rhou_coeff_ = nullptr;
+  ProductCoefficient *rad_tke_diag_coeff_ = nullptr;
+  ProductCoefficient *rad_tke_diff_total_coeff_ = nullptr;
+  ProductCoefficient *rad_tdr_diag_coeff_ = nullptr;
+  ProductCoefficient *rad_tdr_diff_total_coeff_ = nullptr;
+  ProductCoefficient *rad_v2_diag_coeff_ = nullptr;
+  ProductCoefficient *rad_f_diag_coeff_ = nullptr;
+  ProductCoefficient *rad_unity_coeff_ = nullptr;
+  ProductCoefficient *rad_zeta_diag_coeff_ = nullptr;
+  ProductCoefficient *rad_zeta_diff_total_coeff_ = nullptr;
+  ProductCoefficient *rad_scalar_diff_coeff_ = nullptr;
+  ScalarVectorProductCoefficient *rad_nu_gradTKE_coeff_ = nullptr;
+
   GridFunctionCoefficient *tts_coeff_ = nullptr;
   GridFunctionCoefficient *tls2_coeff_ = nullptr;
   GridFunctionCoefficient *prod_coeff_ = nullptr;
@@ -274,6 +295,7 @@ class ZetaModel : public TurbModelBase {
   GridFunctionCoefficient *tdr_coeff_ = nullptr;  
   GridFunctionCoefficient *rho_coeff_ = nullptr;
   VectorGridFunctionCoefficient *vel_coeff_ = nullptr;
+  GridFunctionCoefficient *swirl_coeff_ = nullptr;
   ScalarVectorProductCoefficient *rhou_coeff_ = nullptr;
   GridFunctionCoefficient *scalar_diff_coeff_ = nullptr;
   GridFunctionCoefficient *mut_coeff_ = nullptr;
