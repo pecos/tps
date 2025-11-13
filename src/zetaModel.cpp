@@ -194,6 +194,7 @@ ZetaModel::~ZetaModel() {
   delete sfes_;
   delete vfec_;
   delete vfes_;
+
   //std::cout << "okay 10" << endl;  
 }
 
@@ -403,6 +404,8 @@ void ZetaModel::initializeSelf() {
   gradV_.SetSize(vfes_truevsize);
   gradW_.SetSize(vfes_truevsize);
   if (axisym_) {
+    radius_gf_.SetSpace(sfes_);
+    radius_v_.SetSize(sfes_truevsize);
     swirl_.SetSize(sfes_truevsize);
   }
 
@@ -457,6 +460,11 @@ void ZetaModel::initializeSelf() {
   tdr_next_gf_.GetTrueDofs(tdr_next_);
   zeta_next_gf_.GetTrueDofs(zeta_next_);
   v2_next_gf_.GetTrueDofs(v2_next_);  
+
+  if (axisym_) {
+    radius_gf_.ProjectCoefficient(radius_coeff);
+    radius_gf_.GetTrueDofs(radius_v_);
+  }
 
   //-----------------------------------------------------
   // 3) Set the boundary conditions
@@ -1173,6 +1181,7 @@ void ZetaModel::computeStrain() {
   const double *dGradW = gradW_.HostRead();
   double *Sij = strain_.HostReadWrite();
   double *dSmag = sMag_.HostReadWrite();
+  double *dRad = radius_v_.HostReadWrite();
   double Smin = 1.0e-14;
 
   for (int i = 0; i < SdofInt_; i++) {
@@ -1212,6 +1221,12 @@ void ZetaModel::computeStrain() {
       for (int j = 0; j < dim_; j++) dSmag[i] += Sij[i + j * SdofInt_] * Sij[i + j * SdofInt_];
       for (int j = dim_; j < 3; j++) dSmag[i] += 2.0 * Sij[i + j * SdofInt_] * Sij[i + j * SdofInt_];      
     }
+
+    // term not included in Sij, but counted in magnitude
+    if (axisym_) {
+      dSmag[i] += vel_[i]/dRad[i];
+    }
+
     dSmag[i] = sqrt(std::max(dSmag[i],0.0));
     dSmag[i] = std::max(dSmag[i], Smin);
   }
@@ -1308,6 +1323,7 @@ void ZetaModel::updateProd() {
   const double *dTKE = tke_.HostRead();
   const double *dmuT = eddyVisc_.HostRead();
   const double *dRho = rho_.HostRead();
+  const double *dRad = radius_v_.HostRead();
   double *Pk = prod_.HostReadWrite();
 
   double twoThirds = 2.0 / 3.0;
@@ -1363,6 +1379,14 @@ void ZetaModel::updateProd() {
       for (int k = 0; k < dim_; k++) {
         Pk[i] += tau(j, k) * gradUp(j, k);
       }
+    }
+
+    // (2 mu_t u_r/r - (2/3)rho k)u_r/r
+    double axiP = 0.0;
+    if (axisym_) {
+      axiP += 2.0 * dmuT[i] * vel_[i]/dRad[i] - twoThirds * dRho[i] * dTKE[i];
+      axiP *= vel_[i]/dRad[i];
+      Pk[i] += axiP;
     }
 
     Pk[i] = std::max(Pk[i], 0.0);

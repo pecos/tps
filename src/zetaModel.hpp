@@ -256,6 +256,9 @@ class ZetaModel : public TurbModelBase {
   Vector tmpR0_, tmpR0a_, tmpR0b_, tmpR0c_;
   Vector strain_, sMag_;
   Vector ftmpR0_;
+  
+  ParGridFunction radius_gf_;
+  Vector radius_v_;
 
   /// coefficient fields for operators
   GridFunctionCoefficient *delta_coeff_ = nullptr;
