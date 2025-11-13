@@ -128,6 +128,9 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
     tps->getInput("loMach/tomboulides/psolve-maxIters", pressure_solve_max_iter_, default_max_iter_);
     tps->getInput("loMach/tomboulides/hsolve-maxIters", hsolve_max_iter_, default_max_iter_);
     tps->getInput("loMach/tomboulides/msolve-maxIters", mass_inverse_max_iter_, default_max_iter_);
+
+    tps->getInput("loMach/tomboulides/explicit-convection", nl_explicit_, true);
+    
   }
 }
 
@@ -1093,7 +1096,7 @@ void Tomboulides::initializeOperators() {
   VectorDiffusionIntegrator *hdv_blfi;
   //ConvectionIntegrator *hcv_blfi;
   //ConservativeConvectionIntegrator *hcv_blfi;
-  //GroupConvectionIntegrator *hcv_blfi;
+  //GroupConvectionIntegrator *hcv_blfi;  
   if (axisym_) {
     hmv_blfi = new VectorMassIntegrator(*rad_rho_over_dt_coeff_);
     hdv_blfi = new VectorDiffusionIntegrator(*rad_mu_coeff_);
@@ -1103,7 +1106,7 @@ void Tomboulides::initializeOperators() {
     //hdv_blfi = new VectorDiffusionIntegrator(*mu_coeff_);
     hdv_blfi = new VectorDiffusionIntegrator(*half_mu_coeff_);
   }
-  //hcv_blfi = new ConvectionIntegrator(*rhou_coeff_,1.0); // no ibp with this integrator
+  //hcv_blfi = new ConvectionIntegrator(*rhou_coeff_,0.5); // no ibp with this integrator
   //hcv_blfi = new ConservativeConvectionIntegrator(*rhou_coeff_,1.0); // ibp, but integrator applies a negative
   //hcv_blfi = new GroupConvectionIntegrator(*rhou_coeff_,1.0);
   if (numerical_integ_) {
@@ -1139,7 +1142,6 @@ void Tomboulides::initializeOperators() {
   Hv_inv_->SetMaxIter(hsolve_max_iter_);
 
   
-
   // solver for ustar <jump> (not really a Helmholtz anymore)
   Hvs_form_ = new ParBilinearForm(vfes_);
   VectorMassIntegrator *hmvs_blfi;
@@ -1524,7 +1526,7 @@ void Tomboulides::step() {
 
   // Update the Helmholtz operator and inverse
   sw_helm_.Start();
-  
+
   Hv_bdfcoeff_.constant = coeff_.bd0 / dt;
   Hv_form_->Update();
   Hv_form_->Assemble();
@@ -1539,7 +1541,6 @@ void Tomboulides::step() {
   
   sw_helm_.Stop();
 
-
   // Extrapolate the velocity field (and store in u_next_gf_)
   {
     const auto d_u = u_vec_.Read();
@@ -1552,7 +1553,7 @@ void Tomboulides::step() {
     MFEM_FORALL(i, uext_vec_.Size(), { d_uext[i] = ab1 * d_u[i] + ab2 * d_um1[i] + ab3 * d_um2[i]; });
   }
   u_next_gf_->SetFromTrueDofs(uext_vec_);
-
+  
   
   //------------------------------------------------------------------------
   // Step 2: Compute vstar / dt (as in eqn 2.3 from Tomboulides)
@@ -1669,53 +1670,90 @@ void Tomboulides::step() {
   pp_div_gf_->SetFromTrueDofs(pp_div_vec_);
 
   // now pp_div_gf_ (PRE_DIVERGENCE AND QT FROM div(u){n+1}) is the rhs of the ustar equation
-  // plug this into Helmholtz solve mechanism
+  // solve for u* or finish with explicit nl term
 
   
   //------------------------------------------------------------------------
-  // Step 2(4): solve for the velocity star
+  // Step 2(*): solve for non-linear term to be used in p-p
   //------------------------------------------------------------------------
-  resu_vec_ = 0.0;
+  if (nl_explicit_) {
+
+    Nconv_form_->Mult(u_vec_, N_vec_);
+    Nconv_form_->Mult(um1_vec_, Nm1_vec_);
+    Nconv_form_->Mult(um2_vec_, Nm2_vec_);
+    {
+      const auto d_N = N_vec_.Read();
+      const auto d_Nm1 = Nm1_vec_.Read();
+      const auto d_Nm2 = Nm2_vec_.Read();
+      //auto d_force = forcing_vec_.ReadWrite();
+      //auto d_conv = conv_vec_.ReadWrite();
+      auto d_conv = N_vec_.ReadWrite();    
+      const auto ab1 = coeff_.ab1;
+      const auto ab2 = coeff_.ab2;
+      const auto ab3 = coeff_.ab3;
+      MFEM_FORALL(i, conv_vec_.Size(), { d_conv[i] = (ab1 * d_N[i] + ab2 * d_Nm1[i] + ab3 * d_Nm2[i]); });    
+      //MFEM_FORALL(i, forcing_vec_.Size(), { d_force[i] += d_conv[i]; });
+    }
+    
+  } else {
+    
+    resu_vec_ = 0.0;
   
-  // rho * vstar / dt term (less implicit part of nl-term)
-  Mv_rho_op_->AddMult(pp_div_vec_, resu_vec_);
+    // rho * vstar / dt term (less implicit part of nl-term)
+    Mv_rho_op_->AddMult(pp_div_vec_, resu_vec_);
 
-  for (auto &vel_dbc : vel_dbcs_) {
-    u_next_gf_->ProjectBdrCoefficient(*vel_dbc.coeff, vel_dbc.attr);
+    // -grad(p{n})
+    G_op_->AddMult(p_vec_, resu_vec_, -1.0);
+  
+    for (auto &vel_dbc : vel_dbcs_) {
+      u_next_gf_->ProjectBdrCoefficient(*vel_dbc.coeff, vel_dbc.attr);
+    }
+
+    vfes_->GetRestrictionMatrix()->MultTranspose(resu_vec_, *resu_gf_);
+
+    Vector X2s, B2s;
+    Hvs_form_->FormLinearSystem(vel_ess_tdof_, *u_next_gf_, *resu_gf_, Hvs_op_, X2s, B2s, 1);
+    Hvs_inv_->Mult(B2s, X2s);
+    if (!Hvs_inv_->GetConverged()) {
+      if (rank0_) std::cout << "ERROR: Solve for u* solve did not converge." << std::endl;
+      exit(1);
+    }
+    // iter_hsolve = HInv->GetNumIterations();
+    // res_hsolve = HInv->GetFinalNorm();
+    Hvs_form_->RecoverFEMSolution(X2s, *resu_gf_, *u_next_gf_);
+    u_next_gf_->GetTrueDofs(u_next_vec_);
+
+    // u_next now has u* from star eq (mom less P) which comes from convection with u_next convecting u*
+    // package this back into form for pp-eq and full momentum
+
+    // c-n for NL term
+    //u_next_vec_ *= 0.5;
+    //u_next_vec_.Add(0.5,u_vec_);
+
+    // (re)Evaluate the forcing
+    /*
+    for (auto &force : forcing_terms_) {
+      force.coeff->SetTime(time + dt);
+    }
+    forcing_form_->Assemble();
+    forcing_form_->ParallelAssemble(forcing_vec_);
+    */
+
+    // Evaluate the nonlinear---i.e. convection---term in the velocity eqn
+    // note this guys already has a negative
+    Nconv_form_->Mult(u_next_vec_, N_vec_);
+    Nconv_form_->AddMult(u_vec_, N_vec_,1.0);
+    N_vec_ *= 0.5; 
+
   }
+  
+  // this part must be added to pp_div 
+  Mv_inv_->AddMult(N_vec_, pp_div_vec_,+1.0);  
 
-  vfes_->GetRestrictionMatrix()->MultTranspose(resu_vec_, *resu_gf_);
-
-  Vector X2s, B2s;
-  Hvs_form_->FormLinearSystem(vel_ess_tdof_, *u_next_gf_, *resu_gf_, Hvs_op_, X2s, B2s, 1);
-  Hvs_inv_->Mult(B2s, X2s);
-  if (!Hvs_inv_->GetConverged()) {
-    if (rank0_) std::cout << "ERROR: Solve for u* solve did not converge." << std::endl;
-    exit(1);
-  }
-  // iter_hsolve = HInv->GetNumIterations();
-  // res_hsolve = HInv->GetFinalNorm();
-  Hvs_form_->RecoverFEMSolution(X2s, *resu_gf_, *u_next_gf_);
-  u_next_gf_->GetTrueDofs(u_next_vec_);
-
-  // u_next now has u* from star eq (mom less P) which comes from convection with u_next convecting u*
-  // package this back into form for pp-eq and full momentum
-
-  // c-n for NL term
-  u_next_vec_ *= 0.5;
-  u_next_vec_.Add(0.5,u_vec_);
-
-  // (re)Evaluate the forcing at the end of the time step
-  for (auto &force : forcing_terms_) {
-    force.coeff->SetTime(time + dt);
-  }
-  forcing_form_->Assemble();
-  forcing_form_->ParallelAssemble(forcing_vec_);
-
-  // Evaluate the nonlinear---i.e. convection---term in the velocity eqn
-  // POTENTIAL PROBLEM: as-is, this gives u*u* which is not the same as u^{ext}u*
-  // that was used to predict u*, might be okay?
-  Nconv_form_->Mult(u_next_vec_, N_vec_);
+  // fill grid function => used in pp-bndry
+  pp_div_gf_->SetFromTrueDofs(pp_div_vec_);
+  
+  /*
   {
     const auto d_N = N_vec_.Read();
     auto d_force = forcing_vec_.ReadWrite();
@@ -1723,14 +1761,18 @@ void Tomboulides::step() {
     MFEM_FORALL(i, conv_vec_.Size(), { d_conv[i] = d_N[i]; });    
     MFEM_FORALL(i, forcing_vec_.Size(), { d_force[i] += d_conv[i]; });
   }
-
-  // storing NL term with u* in Nm1 for later use
-  Nm1_vec_ = N_vec_;
+  // forcing_vec_ now has forcing and NL term
+  */
   
-  // vstar / dt = M^{-1} (forcing)
+  // storing NL term with u* in Nm1 for later use
+  conv_vec_ = N_vec_;
+  //Nm1_vec_ = N_vec_;
+
+  /*
+  // go to strong form
   Mv_inv_->Mult(forcing_vec_, ustar_vec_);
 
-  // vstar / dt += BDF contribution
+  // unsteady contribution
   {
     const double bd1idt = -coeff_.bd1 / dt;
     const double bd2idt = -coeff_.bd2 / dt;
@@ -1741,13 +1783,17 @@ void Tomboulides::step() {
     auto d_ustar = ustar_vec_.ReadWrite();
     MFEM_FORALL(i, ustar_vec_.Size(), { d_ustar[i] += bd1idt * d_u[i] + bd2idt * d_um1[i] + bd3idt * d_um2[i]; });
   }   
-  // At this point ustar_vec_ holds vstar/dt!
+  // At this point ustar_vec_ holds vstar/dt
+  */
+
+  // now pp_div_vec_ includes standard bit with NL computed semi-implicitly
 
   
   //------------------------------------------------------------------------
   // Step 3: Poisson
   // ------------------------------------------------------------------------
 
+  /*
   // Extrapolate the velocity field (and store in u_next_gf_)
   {
     const auto d_u = u_vec_.Read();
@@ -1759,15 +1805,16 @@ void Tomboulides::step() {
     const auto ab3 = coeff_.ab3;
     MFEM_FORALL(i, uext_vec_.Size(), { d_uext[i] = ab1 * d_u[i] + ab2 * d_um1[i] + ab3 * d_um2[i]; });
   }
-  u_next_gf_->SetFromTrueDofs(uext_vec_);  
+  u_next_gf_->SetFromTrueDofs(uext_vec_);
+  */
 
   // rhs = div(pp_div_vec_)
   D_op_->Mult(pp_div_vec_, resp_vec_);
 
   // add pressure-splitting error from previous step
-  resp_vec_ += NL_error_vec_;
+  if (!nl_explicit_) resp_vec_ += NL_error_vec_;
   
-  // Add Qt term (rhs += -bd0 * Qt / dt)
+  // Add Qt term, i.e. divergence from u{n+1} (rhs += -bd0 * Qt / dt)
   Ms_op_->AddMult(Qt_vec_, resp_vec_, -coeff_.bd0 / dt);
 
   // Add axisymmetric "forcing" term to rhs
@@ -1816,6 +1863,7 @@ void Tomboulides::step() {
   pfes_->GetRestrictionMatrix()->MultTranspose(resp_vec_, *resp_gf_);
 
   Vector X1, B1;
+  // p_gf_ is the initial guess here
   L_iorho_form_->FormLinearSystem(pres_ess_tdof_, *p_gf_, *resp_gf_, L_iorho_op_, X1, B1, 1);
   L_iorho_inv_->Mult(B1, X1);
   if (!L_iorho_inv_->GetConverged()) {
@@ -1837,14 +1885,15 @@ void Tomboulides::step() {
   }
   p_gf_->GetTrueDofs(p_vec_);
 
+  
   //------------------------------------------------------------------------
   // Step 4: Helmholtz solve for the velocity
-  //------------------------------------------------------------------------
+  //------------------------------------------------------------------------  
   resu_vec_ = 0.0;
 
   // Variable viscosity term
   S_mom_form_->Assemble();
-  S_mom_form_->ParallelAssemble(resu_vec_);
+  S_mom_form_->ParallelAssemble(resu_vec_);  
   resu_vec_ *= 0.5; // half for C-N
   diff_vec_ *= 0.5;
   //resu_vec_ += diff_vec_;
@@ -1855,23 +1904,27 @@ void Tomboulides::step() {
 
   // Add grad(mu * Qt) term
   Qt_vec_ *= mu_vec_;  // NB: pointwise multiply
-  G_op_->AddMult(Qt_vec_, resu_vec_, 1.0/6.0); //1.0 / 3.0); half for C-N
+  G_op_->AddMult(Qt_vec_, resu_vec_, 1.0/6.0); // 1.0/3.0); half for C-N
   
-  // rho * vstar / dt term (less implicit part of nl-term)
-  //Mv_inv_->Mult(conv_vec_, uconv_vec_);
-  //uconv_vec_ *= -0.5;
-  //ustar_vec_ += uconv_vec_;
-  // u* has unsteady, NL, and forcing contributions
-  Mv_rho_op_->AddMult(ustar_vec_, resu_vec_);
+  // add convection,conv_vec_ already has a negative
+  Mv_inv_->AddMult(conv_vec_, ustar_vec_, +1.0);
 
+  // u* now has unsteady, nl, and forcing contributions
+  Mv_rho_op_->AddMult(ustar_vec_, resu_vec_);
+  
+
+  // boundary conditions
   for (auto &vel_dbc : vel_dbcs_) {
     u_next_gf_->ProjectBdrCoefficient(*vel_dbc.coeff, vel_dbc.attr);
   }
 
   vfes_->GetRestrictionMatrix()->MultTranspose(resu_vec_, *resu_gf_);
 
+  // set up system with bcs
   Vector X2, B2;
   Hv_form_->FormLinearSystem(vel_ess_tdof_, *u_next_gf_, *resu_gf_, Hv_op_, X2, B2, 1);
+
+  // solve
   Hv_inv_->Mult(B2, X2);
   if (!Hv_inv_->GetConverged()) {
     if (rank0_) std::cout << "ERROR: Helmholtz solve did not converge." << std::endl;
@@ -1885,7 +1938,7 @@ void Tomboulides::step() {
   // Rotate values in solution history
   um2_vec_ = um1_vec_;
   um1_vec_ = u_vec_;
-
+  
   // Update the current solution and corresponding GridFunction
   u_next_gf_->GetTrueDofs(u_next_vec_);
   u_vec_ = u_next_vec_;
@@ -1897,13 +1950,102 @@ void Tomboulides::step() {
   // compute NL term with actual u{n+1} and store in in Nm2 for later use  
   Nconv_form_->Mult(u_next_vec_, N_vec_);
 
-  // Now, (N_vec_ - Nm1) is the error in the non-linear term which propagates to
+  // Now, (N_vec_ - conv_vec_) is the error in the non-linear term which propagates to
   // the error in the pressure correction via the pressure source.
   // We store this error and add it to the source of the next pressure
   // solve at {n+2} to prevent the accumulation of splitting errors.
   NL_error_vec_ = N_vec_;
-  NL_error_vec_ -= Nm1_vec_;
+  NL_error_vec_ -= conv_vec_;
   NL_error_gf_->SetFromTrueDofs(NL_error_vec_);
+
+
+  /*
+  //...
+  //if (!nl_explicit_)
+  // rhs = div(pp_div_vec_)
+  Mv_inv_->Mult(NL_error_vec_, pp_div_vec_);
+  pp_div_gf_->SetFromTrueDofs(pp_div_vec_);  
+  D_op_->Mult(pp_div_vec_, resp_vec_);
+
+  // Negate residual s.t. sign is consistent with -\nabla ( (1/\rho) \cdot \nabla p ) on LHS
+  resp_vec_.Neg();
+
+  // Add boundary terms to residual
+  pp_div_bdr_form_->Assemble();
+  pp_div_bdr_form_->ParallelAssemble(pp_div_bdr_vec_);
+  resp_vec_.Add(1.0, pp_div_bdr_vec_);
+
+  //u_bdr_form_->Assemble();
+  //u_bdr_form_->ParallelAssemble(u_bdr_vec_);
+  //resp_vec_.Add(-coeff_.bd0 / dt, u_bdr_vec_);
+
+  // Orthogonalize rhs if no Dirichlet BCs on pressure
+  sw_press_.Start();
+  if (pres_dbcs_.empty()) {
+    Orthogonalize(resp_vec_, pfes_);
+  }
+
+  for (auto &pres_dbc : pres_dbcs_) {
+    p_gf_->ProjectBdrCoefficient(*pres_dbc.coeff, pres_dbc.attr);
+  }
+
+  // Isn't this the same as SetFromTrueDofs????
+  pfes_->GetRestrictionMatrix()->MultTranspose(resp_vec_, *resp_gf_);
+  
+  Vector X1b, B1b;  
+  // NL_error_gf_ is the initial guess here
+  NL_error_vec_ = 0.0;
+  NL_error_gf_->SetFromTrueDofs(NL_error_vec_);
+  L_iorho_form_->FormLinearSystem(pres_ess_tdof_, *NL_error_gf_, *resp_gf_, L_iorho_op_, X1b, B1b, 1);
+  L_iorho_inv_->Mult(B1b, X1b);
+  if (!L_iorho_inv_->GetConverged()) {
+    if (rank0_) std::cout << "ERROR: Poisson solve did not converge." << std::endl;
+    exit(1);
+  }
+  sw_press_.Stop();
+
+  // iter_spsolve = SpInv->GetNumIterations();
+  // res_spsolve = SpInv->GetFinalNorm();
+  L_iorho_form_->RecoverFEMSolution(X1b, *resp_gf_, *p_gf_);
+
+  // If the boundary conditions on the pressure are pure Neumann remove the
+  // nullspace by removing the mean of the pressure solution. This is also
+  // ensured by the OrthoSolver wrapper for the preconditioner which removes
+  // the nullspace after every application.
+  if (pres_dbcs_.empty()) {
+    meanZero(*p_gf_);
+  }
+  //p_gf_->GetTrueDofs(p_vec_);
+
+  // grad(p)
+  p_gf_->GetTrueDofs(tmpR0_);  
+  G_op_->Mult(tmpR0_, resu_vec_);
+  Mv_inv_->Mult(resu_vec_,tmpR1_);
+
+  // 1/rho
+  {
+    auto d_gP = tmpR1_.ReadWrite();
+    auto d_rho = rho_vec_.Read();    
+    MFEM_FORALL(i, tmpR1_.Size(), { d_gP[i] = d_gP[i]/d_rho[i]; });
+  }  
+
+  // update u
+  tmpR1_ *= dt;
+  u_next_vec_ = u_vec_ - tmpR1_;
+  u_vec_ = u_next_vec_;  
+
+  // Update the current solution and corresponding GridFunction
+  u_curr_gf_->SetFromTrueDofs(u_vec_);
+
+  // update gradients for turbulence model
+  evaluateVelocityGradient();
+
+  // fill p_gf_ again with first pressure solve
+  p_gf_->SetFromTrueDofs(p_vec_);  
+  
+  //...
+  */  
+  
   
   if (axisym_) {
     u_next_gf_->HostRead();

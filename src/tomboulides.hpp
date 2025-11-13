@@ -176,6 +176,9 @@ class Tomboulides final : public FlowBase {
   const int dim_;
   int nvel_;
 
+  // treatment of nonlinear term
+  bool nl_explicit_;
+
   // Coefficients necessary to take a time step (including dt).
   // Assumed to be externally managed and determined, so just get a
   // reference here.
