@@ -325,7 +325,9 @@ void Tomboulides::initializeSelf() {
   N_vec_.SetSize(vfes_truevsize);
   Nm1_vec_.SetSize(vfes_truevsize);
   Nm2_vec_.SetSize(vfes_truevsize);
-  NL_error_vec_.SetSize(vfes_truevsize);  
+  NL_error_vec_.SetSize(vfes_truevsize);
+  NLm1_error_vec_.SetSize(vfes_truevsize);
+  NLm2_error_vec_.SetSize(vfes_truevsize);    
   ustar_vec_.SetSize(vfes_truevsize);
   uconv_vec_.SetSize(vfes_truevsize);  
   uext_vec_.SetSize(vfes_truevsize);
@@ -370,7 +372,9 @@ void Tomboulides::initializeSelf() {
   N_vec_ = 0.0;
   Nm1_vec_ = 0.0;
   Nm2_vec_ = 0.0;
-  NL_error_vec_ = 0.0;  
+  NL_error_vec_ = 0.0;
+  NLm1_error_vec_ = 0.0;
+  NLm2_error_vec_ = 0.0;    
   ustar_vec_ = 0.0;
   uconv_vec_ = 0.0;  
   uext_vec_ = 0.0;
@@ -1585,7 +1589,7 @@ void Tomboulides::step() {
     MFEM_FORALL(i, forcing_vec_.Size(), { d_force[i] += d_conv[i]; });
   }
   */
-
+  
   // vstar / dt = M^{-1} (forcing)
   Mv_inv_->Mult(forcing_vec_, ustar_vec_);
 
@@ -1598,9 +1602,23 @@ void Tomboulides::step() {
     const auto d_um1 = um1_vec_.Read();
     const auto d_um2 = um2_vec_.Read();
     auto d_ustar = ustar_vec_.ReadWrite();
-    MFEM_FORALL(i, ustar_vec_.Size(), { d_ustar[i] += bd1idt * d_u[i] + bd2idt * d_um1[i] + bd3idt * d_um2[i]; });
+    MFEM_FORALL(i, ustar_vec_.Size(), { d_ustar[i] += bd1idt*d_u[i] + bd2idt*d_um1[i] + bd3idt*d_um2[i]; });
   }
 
+  // includings non-linear splitting error terms
+  /*
+  if (!nl_explicit_) {
+    const double bd1idt = -coeff_.bd1 * coeff_.dt1 / dt;
+    const double bd2idt = -coeff_.bd2 * coeff_.dt2 / dt;
+    const double bd3idt = -coeff_.bd3 * coeff_.dt3 / dt;
+    const auto d_u = NL_error_vec_.Read();
+    const auto d_um1 = NLm1_error_vec_.Read();
+    const auto d_um2 = NLm2_error_vec_.Read();
+    auto d_ustar = ustar_vec_.ReadWrite();
+    MFEM_FORALL(i, ustar_vec_.Size(), { d_ustar[i] -= bd1idt*d_u[i] + bd2idt*d_um1[i] + bd3idt*d_um2[i]; });
+  }
+  */
+  
   // "ustar_vec" now has unsteady and forcing terms
 
   // Evaluate the double curl of the extrapolated velocity field
@@ -1808,11 +1826,24 @@ void Tomboulides::step() {
   u_next_gf_->SetFromTrueDofs(uext_vec_);
   */
 
+  // add pressure-splitting error from previous step
+  //... if (!nl_explicit_) pp_div_vec_ -= NL_error_vec_;
+
+  /*
+  if (!nl_explicit_) {
+    const double bd1idt = -coeff_.bd1 * coeff_.dt1 / dt;
+    const double bd2idt = -coeff_.bd2 * coeff_.dt2 / dt;
+    const double bd3idt = -coeff_.bd3 * coeff_.dt3 / dt;
+    const auto d_u = NL_error_vec_.Read();
+    const auto d_um1 = NLm1_error_vec_.Read();
+    const auto d_um2 = NLm2_error_vec_.Read();
+    auto d_ustar = pp_div_vec_.ReadWrite();
+    MFEM_FORALL(i, pp_div_vec_.Size(), { d_ustar[i] -= bd1idt*d_u[i] + bd2idt*d_um1[i] + bd3idt*d_um2[i]; });
+  }
+  */
+  
   // rhs = div(pp_div_vec_)
   D_op_->Mult(pp_div_vec_, resp_vec_);
-
-  // add pressure-splitting error from previous step
-  if (!nl_explicit_) resp_vec_ += NL_error_vec_;
   
   // Add Qt term, i.e. divergence from u{n+1} (rhs += -bd0 * Qt / dt)
   Ms_op_->AddMult(Qt_vec_, resp_vec_, -coeff_.bd0 / dt);
@@ -1954,8 +1985,11 @@ void Tomboulides::step() {
   // the error in the pressure correction via the pressure source.
   // We store this error and add it to the source of the next pressure
   // solve at {n+2} to prevent the accumulation of splitting errors.
-  NL_error_vec_ = N_vec_;
-  NL_error_vec_ -= conv_vec_;
+  NLm2_error_vec_ = NLm1_error_vec_;
+  NLm1_error_vec_ = NL_error_vec_;
+  tmpR1_ = N_vec_;
+  tmpR1_ -= conv_vec_;
+  Mv_inv_->Mult(tmpR1_,NL_error_vec_);  
   NL_error_gf_->SetFromTrueDofs(NL_error_vec_);
 
 

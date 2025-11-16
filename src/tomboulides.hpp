@@ -365,7 +365,9 @@ class Tomboulides final : public FlowBase {
   mfem::Vector N_vec_;
   mfem::Vector Nm1_vec_;
   mfem::Vector Nm2_vec_;
-  mfem::Vector NL_error_vec_;  
+  mfem::Vector NL_error_vec_;
+  mfem::Vector NLm1_error_vec_;
+  mfem::Vector NLm2_error_vec_;    
   mfem::Vector ustar_vec_;
   mfem::Vector uconv_vec_;  
   mfem::Vector uext_vec_;
