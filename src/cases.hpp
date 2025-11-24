@@ -59,6 +59,8 @@ void vel_tgv2d_uniform(const mfem::Vector &x, double t, mfem::Vector &u);
 void vel_channel(const mfem::Vector &x, double t, mfem::Vector &u);
 void vel_exact_pipe(const mfem::Vector &x, double t, mfem::Vector &u);
 
+double tke_pipe(const mfem::Vector &x, double t);
+
 double tempIC_user(const mfem::Vector &x, double t);
 double temp_rt3d(const mfem::Vector &x, double t);
 double temp_channel(const mfem::Vector &x, double t);

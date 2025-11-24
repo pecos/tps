@@ -44,6 +44,7 @@
 #include "mfem/general/forall.hpp"
 #include "mfem/linalg/solvers.hpp"
 #include "utils.hpp"
+#include "cases.hpp"
 
 using namespace mfem;
 using namespace mfem::common;
@@ -80,9 +81,11 @@ ZetaModel::ZetaModel(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalS
   tpsP_->getInput("ransModel/tls-max", tls_max_, 100.0);
   tpsP_->getInput("ransModel/mut-min", mut_min_, 1.0e-12);
   tpsP_->getInput("ransModel/destruction", des_wgt_, 1.0);
+  // tpsP_->getInput("ransModel/production", prod_wgt_, 1.0);
   tpsP_->getInput("ransModel/tls-coeff", Cl_, 0.23);
   tpsP_->getInput("ransModel/f-order", forder_, order_);
-
+  tpsP_->getInput("ransModel/zfp-max", zfp_max_, 1.0e12);
+  
   if (axisym_) {
     assert(dim_ == 2);
     assert(!numerical_integ_);
@@ -158,21 +161,20 @@ ZetaModel::~ZetaModel() {
   delete unity_diff_total_coeff_;
   delete rhoDt_coeff_;
   delete rhoTTS_coeff_;
-  //std::cout << "okay 7" << endl;  
+  // std::cout << "okay 7" << endl;  
   delete Ce2_coeff_;
   delete Ce2rhoTTS_coeff_;
   delete Pk_coeff_;
   delete ek_coeff_;  
   delete tke_diag_coeff_;
   delete tdr_diag_coeff_;
-  //std::cout << "okay 8" << endl;  
+  // std::cout << "okay 8" << endl;  
   delete zeta_diag_coeff_;
   delete v2_diag_coeff_;  
   delete f_diag_coeff_;
   delete f_diag_total_coeff_;
-  //std::cout << "okay 9" << endl;
+  // std::cout << "okay 9" << endl;
   
-  delete rad_rhou_coeff_;
   delete swirl_coeff_;
   delete rad_rho_coeff_;
   delete rad_rhou_coeff_;
@@ -188,6 +190,8 @@ ZetaModel::~ZetaModel() {
   delete rad_scalar_diff_coeff_;
   delete rad_nu_gradTKE_coeff_;
 
+  // std::cout << "okay 10" << endl; 
+
   delete ffec_;
   delete ffes_;  
   delete sfec_;
@@ -195,7 +199,7 @@ ZetaModel::~ZetaModel() {
   delete vfec_;
   delete vfes_;
 
-  //std::cout << "okay 10" << endl;  
+  std::cout << "okay 11" << endl;  
 }
 
 void ZetaModel::initializeSelf() {
@@ -393,6 +397,8 @@ void ZetaModel::initializeSelf() {
   res_gf_.SetSpace(sfes_);
   res_.SetSize(sfes_truevsize);
 
+  vfres_gf_.SetSpace(sfes_);
+
   resf_gf_.SetSpace(ffes_);
   resf_.SetSize(ffes_truevsize);
   
@@ -494,18 +500,33 @@ void ZetaModel::initializeSelf() {
         tpsP_->getRequiredInput((basepath + "/tke").c_str(), tke_value);
         AddTKEDirichletBC(tke_value, inlet_attr);
         AddV2DirichletBC(2.0/3.0*tke_value, inlet_attr);	
-      // TODO: Currently just applies a uniform BC as well
       } else if (type == "interpolate") {
-        if (rank0_) {
-          std::cout << "Zeta Model: Setting interpolated Dirichlet TKE on patch = " << patch << std::endl;
-        }
+        // if (rank0_) {
+        //   std::cout << "Zeta Model: Setting interpolated Dirichlet TKE on patch = " << patch << std::endl;
+        // }
+        // Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
+        // inlet_attr = 0;
+        // inlet_attr[patch - 1] = 1;
+        // double tke_value;
+        // tpsP_->getRequiredInput((basepath + "/tke").c_str(), tke_value);
+        // AddTKEDirichletBC(tke_value, inlet_attr);
+        // AddV2DirichletBC(2.0/3.0*tke_value, inlet_attr);
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
         inlet_attr = 0;
         inlet_attr[patch - 1] = 1;
-        double tke_value;
-        tpsP_->getRequiredInput((basepath + "/tke").c_str(), tke_value);
-        AddTKEDirichletBC(tke_value, inlet_attr);
-        AddV2DirichletBC(2.0/3.0*tke_value, inlet_attr);	
+
+        tke_field_ = new GridFunctionCoefficient(extData_interface_->TKEdata);
+        AddTKEDirichletBC(tke_field_, inlet_attr);
+      // TODO: Same purpose
+      } else if (type == "fully-developed-pipe") {
+        // if (rank0_) {
+        //   std::cout << "Zeta Model: Setting interpolated Dirichlet TKE on patch = " << patch << std::endl;
+        // }
+        // Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
+        // inlet_attr = 0;
+        // inlet_attr[patch - 1] = 1;
+
+        // AddTKEDirichletBC(tke_pipe, inlet_attr);
       } else {
         if (rank0_) {
           std::cout << "ERROR: zeta-f inlet type = " << type << " not supported." << std::endl;
@@ -1058,6 +1079,7 @@ void ZetaModel::initializeViz(ParaViewDataCollection &pvdc) {
   pvdc.RegisterField("v2", &v2_gf_);  
   pvdc.RegisterField("zeta", &zeta_gf_);
   pvdc.RegisterField("f", &fRate_gf_);
+  pvdc.RegisterField("resf", &vfres_gf_);
 }
 
 void ZetaModel::setup() {
@@ -1223,8 +1245,11 @@ void ZetaModel::computeStrain() {
     }
 
     // term not included in Sij, but counted in magnitude
+    double velRR = 0.0;
     if (axisym_) {
-      dSmag[i] += vel_[i]/dRad[i];
+      if (dRad[i] < 1e-10) { velRR = dGradU[i]; } 
+      else { velRR = vel_[i]/dRad[i]; }
+      dSmag[i] += velRR;
     }
 
     dSmag[i] = sqrt(std::max(dSmag[i],0.0));
@@ -1383,9 +1408,13 @@ void ZetaModel::updateProd() {
 
     // (2 mu_t u_r/r - (2/3)rho k)u_r/r
     double axiP = 0.0;
+    double velRR = 0.0;
     if (axisym_) {
-      axiP += 2.0 * dmuT[i] * vel_[i]/dRad[i] - twoThirds * dRho[i] * dTKE[i];
-      axiP *= vel_[i]/dRad[i];
+      // approximate u_r/r as du_r/dr as r -> 0
+      if (dRad[i] < 1e-10) { velRR = dGradU[i]; } 
+      else { velRR = vel_[i]/dRad[i]; }
+      axiP += 2.0 * dmuT[i] * velRR - twoThirds * dRho[i] * dTKE[i];
+      axiP *= velRR;
       Pk[i] += axiP;
     }
 
@@ -1911,7 +1940,14 @@ void ZetaModel::fStep() {
     for (int i = 0; i < SdofInt_; i++) {  
       data[i] /= std::max(dk[i], tke_min_);
     }
+    // clip again?
+    for (int i = 0; i < SdofInt_; i++) {  
+      data[i] = std::min(data[i], zfp_max_);
+    }
   }
+  // intercept f res for viz
+  vfres_gf_.SetFromTrueDofs(tmpR0a_);
+
   tmpR0a_ *= Ctmp2;
   tmpR0a_ -= Ctmp1;
   tmpR0a_ /= tts_;
@@ -2079,6 +2115,10 @@ void ZetaModel::AddTKEDirichletBC(Coefficient *coeff, Array<int> &attr) {
       tke_ess_attr_[i] = 1;
     }
   }
+}
+
+void ZetaModel::AddTKEDirichletBC(ScalarFuncT *f, Array<int> &attr) {
+  AddTKEDirichletBC(new FunctionCoefficient(f), attr);
 }
 
 void ZetaModel::AddV2DirichletBC(const double &v2, Array<int> &attr) {

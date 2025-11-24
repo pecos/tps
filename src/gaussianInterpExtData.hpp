@@ -109,6 +109,7 @@ class GaussianInterpExtData : public ExternalDataBase {
 
   std::string fname_;
   std::string fname_turb_;
+  std::string fname_tke_;
   double v_fac_;
 
   // Scalar \f$H^1\f$ finite element collection.
@@ -131,6 +132,7 @@ class GaussianInterpExtData : public ExternalDataBase {
   ParGridFunction swirl_gf_;
   ParGridFunction swirl0_gf_;
   ParGridFunction nut_gf_;
+  ParGridFunction tke_gf_;
   ParGridFunction Yn_gf_;
 
   // gradual increase of external bc over multiple steps
@@ -154,5 +156,11 @@ class GaussianInterpExtData : public ExternalDataBase {
 
   /// Return a pointer to the current velocity ParGridFunction.
   ParGridFunction *GetExternalInterpolatedVelocity() { return &velocity_gf_; }
+
+  /// Return a pointer to the current TKE ParGridFunction.
+  ParGridFunction *GetExternalInterpolatedTurbKineticEnergy() { return &tke_gf_; }
+
+  /// Return a pointer to the current eddy viscosity ParGridFunction.
+  ParGridFunction *GetExternalInterpolatedEddyViscosity() { return &nut_gf_; }
 };
 #endif  // GAUSSIANINTERPEXTDATA_HPP_

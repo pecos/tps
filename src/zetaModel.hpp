@@ -117,6 +117,7 @@ class ZetaModel : public TurbModelBase {
   double fRate_max_, tts_max_, tls_max_;
   double mut_min_;
   double des_wgt_;
+  double zfp_max_;
 
   // just keep these saved for ease
   int numWalls_, numInlets_, numOutlets_;
@@ -249,6 +250,8 @@ class ZetaModel : public TurbModelBase {
 
   ParGridFunction resf_gf_;
   Vector resf_;  
+
+  ParGridFunction vfres_gf_;
   
   // ParGridFunction diag_gf_;
 
@@ -277,6 +280,7 @@ class ZetaModel : public TurbModelBase {
   ScalarVectorProductCoefficient *wall_coeff_ = nullptr;
   GridFunctionCoefficient *tdr_wall_eval_coeff_ = nullptr;
 
+  GridFunctionCoefficient *swirl_coeff_ = nullptr;
   ProductCoefficient *rad_rho_coeff_ = nullptr;
   ScalarVectorProductCoefficient *rad_rhou_coeff_ = nullptr;
   ProductCoefficient *rad_tke_diag_coeff_ = nullptr;
@@ -298,7 +302,6 @@ class ZetaModel : public TurbModelBase {
   GridFunctionCoefficient *tdr_coeff_ = nullptr;  
   GridFunctionCoefficient *rho_coeff_ = nullptr;
   VectorGridFunctionCoefficient *vel_coeff_ = nullptr;
-  GridFunctionCoefficient *swirl_coeff_ = nullptr;
   ScalarVectorProductCoefficient *rhou_coeff_ = nullptr;
   GridFunctionCoefficient *scalar_diff_coeff_ = nullptr;
   GridFunctionCoefficient *mut_coeff_ = nullptr;
@@ -332,6 +335,8 @@ class ZetaModel : public TurbModelBase {
 
   ProductCoefficient *diff_total_coeff_ = nullptr;
   SumCoefficient *diag_coeff_ = nullptr;
+
+  GridFunctionCoefficient *tke_field_ = nullptr;
 
   /// operators and solvers
   ParBilinearForm *As_form_ = nullptr;
