@@ -226,6 +226,7 @@ class Tomboulides final : public FlowBase {
   mfem::ParGridFunction *gradU_gf_ = nullptr;
   mfem::ParGridFunction *gradV_gf_ = nullptr;
   mfem::ParGridFunction *gradW_gf_ = nullptr;
+  mfem::ParGridFunction *gradS_gf_ = nullptr;
   // mfem::ParGridFunction *buffer_uInlet_ = nullptr;
   mfem::VectorGridFunctionCoefficient *velocity_field_ = nullptr;
   mfem::GridFunctionCoefficient *swirl_field_ = nullptr;
@@ -387,6 +388,7 @@ class Tomboulides final : public FlowBase {
   mfem::Vector gradU_;
   mfem::Vector gradV_;
   mfem::Vector gradW_;
+  mfem::Vector gradS_;
   mfem::Vector Qt_vec_;
   mfem::Vector grad_Qt_vec_;
   mfem::Vector rho_vec_;

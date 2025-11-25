@@ -61,6 +61,7 @@ struct flowToTurbModel {
 
   bool swirl_supported = false;
   const mfem::ParGridFunction *swirl = nullptr;
+  const mfem::ParGridFunction *gradS = nullptr;
 
   const mfem::ParGridFunction *gradU = nullptr;
   const mfem::ParGridFunction *gradV = nullptr;

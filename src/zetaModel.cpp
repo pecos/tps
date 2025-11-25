@@ -81,7 +81,7 @@ ZetaModel::ZetaModel(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalS
   tpsP_->getInput("ransModel/tls-max", tls_max_, 100.0);
   tpsP_->getInput("ransModel/mut-min", mut_min_, 1.0e-12);
   tpsP_->getInput("ransModel/destruction", des_wgt_, 1.0);
-  // tpsP_->getInput("ransModel/production", prod_wgt_, 1.0);
+  tpsP_->getInput("ransModel/production", prod_wgt_, 1.0);
   tpsP_->getInput("ransModel/tls-coeff", Cl_, 0.23);
   tpsP_->getInput("ransModel/f-order", forder_, order_);
   tpsP_->getInput("ransModel/zfp-max", zfp_max_, 1.0e12);
@@ -1120,9 +1120,10 @@ void ZetaModel::step() {
 
   // gather necessary information from other classes
   (flow_interface_->velocity)->GetTrueDofs(vel_);
-  // if (axisym_) {
-  //   (flow_interface_->swirl)->GetTrueDofs(swirl_);
-  // }
+  if (axisym_) {
+    (flow_interface_->swirl)->GetTrueDofs(swirl_);
+    (flow_interface_->swirl)->GetTrueDofs(GradS_);
+  }
   (flow_interface_->gradU)->GetTrueDofs(gradU_);
   (flow_interface_->gradV)->GetTrueDofs(gradV_);
   (flow_interface_->gradW)->GetTrueDofs(gradW_);
@@ -1201,6 +1202,7 @@ void ZetaModel::computeStrain() {
   const double *dGradU = gradU_.HostRead();
   const double *dGradV = gradV_.HostRead();
   const double *dGradW = gradW_.HostRead();
+  const double *dGradS = gradS_.HostRead();
   double *Sij = strain_.HostReadWrite();
   double *dSmag = sMag_.HostReadWrite();
   double *dRad = radius_v_.HostReadWrite();
@@ -1244,12 +1246,23 @@ void ZetaModel::computeStrain() {
       for (int j = dim_; j < 3; j++) dSmag[i] += 2.0 * Sij[i + j * SdofInt_] * Sij[i + j * SdofInt_];      
     }
 
-    // term not included in Sij, but counted in magnitude
+    // swirl terms not included in Sij, but counted in magnitude
     double velRR = 0.0;
+    double velRTh = 0.0;
     if (axisym_) {
+      // S_th,th = -u_r/r
       if (dRad[i] < 1e-10) { velRR = dGradU[i]; } 
       else { velRR = vel_[i]/dRad[i]; }
-      dSmag[i] += velRR;
+      dSmag[i] += velRR*velRR;
+
+      // S_r,th + S_th,r = du_th/dr - u_th/r, 0 at center
+      if !(dRad[i] < 1e-10) { 
+        velRTh = swirl_[i]/dRad[i]
+        dSmag[i] += (dGradS[i] - velRTh)*(dGradS[i] - velRTh)
+      } 
+      
+      // S_th,z + S_z,th = du_th/dz
+      dSmag[i] += dGradS[i + SdofInt_]*dGradS[i + SdofInt_]
     }
 
     dSmag[i] = sqrt(std::max(dSmag[i],0.0));
@@ -1344,6 +1357,7 @@ void ZetaModel::updateProd() {
   const double *dGradU = gradU_.HostRead();
   const double *dGradV = gradV_.HostRead();
   const double *dGradW = gradW_.HostRead();
+  const double *dGradS = gradS_.HostRead();
   const double *Sij = strain_.HostReadWrite();
   const double *dTKE = tke_.HostRead();
   const double *dmuT = eddyVisc_.HostRead();
@@ -1409,13 +1423,24 @@ void ZetaModel::updateProd() {
     // (2 mu_t u_r/r - (2/3)rho k)u_r/r
     double axiP = 0.0;
     double velRR = 0.0;
+    double velRTh = 0.0;
     if (axisym_) {
+      // S_th,th = -u_r/r
       // approximate u_r/r as du_r/dr as r -> 0
       if (dRad[i] < 1e-10) { velRR = dGradU[i]; } 
       else { velRR = vel_[i]/dRad[i]; }
       axiP += 2.0 * dmuT[i] * velRR - twoThirds * dRho[i] * dTKE[i];
       axiP *= velRR;
       Pk[i] += axiP;
+
+      // S_r,th = S_th,r = du_th/dr - u_th/r, S_ij 0 at center
+      if !(dRad[i] < 1e-10) { 
+        velRTh = swirl_[i]/dRad[i]
+        Pk[i] += dmuT[i] * (dGradS[i] - velRTh) * (dGradS[i] - velRTh)
+      } 
+      
+      // S_th = 1/2  du_th/dz
+      Pk[i] += dmuT[i] * dGradS[i + SdofInt_] * dGradS[i + SdofInt_]
     }
 
     Pk[i] = std::max(Pk[i], 0.0);

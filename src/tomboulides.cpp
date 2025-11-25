@@ -245,6 +245,7 @@ Tomboulides::~Tomboulides() {
   delete gradU_gf_;
   delete gradV_gf_;
   delete gradW_gf_;
+  delete gradS_gf_;
   delete epsi_gf_;
   delete vfes_;
   delete vfec_;
@@ -265,6 +266,7 @@ void Tomboulides::initializeSelf() {
   gradU_gf_ = new ParGridFunction(vfes_);
   gradV_gf_ = new ParGridFunction(vfes_);
   gradW_gf_ = new ParGridFunction(vfes_);
+  gradS_gf_ = new ParGridFunction(vfes_);
   sfec_ = new H1_FECollection(vorder_);
   sfes_ = new ParFiniteElementSpace(pmesh_, sfec_);
 
@@ -297,6 +299,7 @@ void Tomboulides::initializeSelf() {
   *gradU_gf_ = 0.0;
   *gradV_gf_ = 0.0;
   *gradW_gf_ = 0.0;
+  *gradS_gf_ = 0.0;
 
   *p_gf_ = 0.0;
   *resp_gf_ = 0.0;
@@ -319,6 +322,7 @@ void Tomboulides::initializeSelf() {
   if (axisym_) {
     toTurbModel_interface_.swirl_supported = true;
     toTurbModel_interface_.swirl = utheta_next_gf_;
+    toTurbModel_interface_.gradS = gradS_gf_;
   }
   toTurbModel_interface_.gradU = gradU_gf_;
   toTurbModel_interface_.gradV = gradV_gf_;
@@ -370,6 +374,7 @@ void Tomboulides::initializeSelf() {
   gradU_.SetSize(vfes_truevsize);
   gradV_.SetSize(vfes_truevsize);
   gradW_.SetSize(vfes_truevsize);
+  gradS_.SetSize(vfes_truevsize);
 
   // zero vectors for now
   forcing_vec_ = 0.0;
@@ -1941,4 +1946,9 @@ void Tomboulides::evaluateVelocityGradient() {
   gradU_gf_->SetFromTrueDofs(gradU_);
   gradV_gf_->SetFromTrueDofs(gradV_);
   gradW_gf_->SetFromTrueDofs(gradW_);
+
+  if (axisym_) {
+    G_op_->Mult(utheta_next_vec_, tmpR1_);
+    Mv_inv_->Mult(tmpR1_, gradS_);
+  }
 }

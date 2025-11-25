@@ -117,6 +117,7 @@ class ZetaModel : public TurbModelBase {
   double fRate_max_, tts_max_, tls_max_;
   double mut_min_;
   double des_wgt_;
+  double prod_wgt_;
   double zfp_max_;
 
   // just keep these saved for ease
