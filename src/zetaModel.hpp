@@ -153,6 +153,7 @@ class ZetaModel : public TurbModelBase {
   Vector gradU_;
   Vector gradV_;
   Vector gradW_;
+  Vector gradS_;
 
   // Fields
   ParGridFunction rhoDt_gf_;

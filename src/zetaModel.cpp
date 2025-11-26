@@ -413,6 +413,7 @@ void ZetaModel::initializeSelf() {
     radius_gf_.SetSpace(sfes_);
     radius_v_.SetSize(sfes_truevsize);
     swirl_.SetSize(sfes_truevsize);
+    gradS_.SetSize(vfes_truevsize);
   }
 
   tmpR0_.SetSize(sfes_truevsize);
@@ -1122,7 +1123,7 @@ void ZetaModel::step() {
   (flow_interface_->velocity)->GetTrueDofs(vel_);
   if (axisym_) {
     (flow_interface_->swirl)->GetTrueDofs(swirl_);
-    (flow_interface_->swirl)->GetTrueDofs(GradS_);
+    (flow_interface_->gradS)->GetTrueDofs(gradS_);
   }
   (flow_interface_->gradU)->GetTrueDofs(gradU_);
   (flow_interface_->gradV)->GetTrueDofs(gradV_);
@@ -1256,13 +1257,13 @@ void ZetaModel::computeStrain() {
       dSmag[i] += velRR*velRR;
 
       // S_r,th + S_th,r = du_th/dr - u_th/r, 0 at center
-      if !(dRad[i] < 1e-10) { 
-        velRTh = swirl_[i]/dRad[i]
-        dSmag[i] += (dGradS[i] - velRTh)*(dGradS[i] - velRTh)
+      if (!(dRad[i] < 1e-10)) { 
+        velRTh = swirl_[i]/dRad[i];
+        dSmag[i] += (dGradS[i] - velRTh)*(dGradS[i] - velRTh);
       } 
       
       // S_th,z + S_z,th = du_th/dz
-      dSmag[i] += dGradS[i + SdofInt_]*dGradS[i + SdofInt_]
+      dSmag[i] += dGradS[i + SdofInt_]*dGradS[i + SdofInt_];
     }
 
     dSmag[i] = sqrt(std::max(dSmag[i],0.0));
@@ -1434,13 +1435,13 @@ void ZetaModel::updateProd() {
       Pk[i] += axiP;
 
       // S_r,th = S_th,r = du_th/dr - u_th/r, S_ij 0 at center
-      if !(dRad[i] < 1e-10) { 
-        velRTh = swirl_[i]/dRad[i]
-        Pk[i] += dmuT[i] * (dGradS[i] - velRTh) * (dGradS[i] - velRTh)
+      if (!(dRad[i] < 1e-10)) { 
+        velRTh = swirl_[i]/dRad[i];
+        Pk[i] += dmuT[i] * (dGradS[i] - velRTh) * (dGradS[i] - velRTh);
       } 
       
       // S_th = 1/2  du_th/dz
-      Pk[i] += dmuT[i] * dGradS[i + SdofInt_] * dGradS[i + SdofInt_]
+      Pk[i] += dmuT[i] * dGradS[i + SdofInt_] * dGradS[i + SdofInt_];
     }
 
     Pk[i] = std::max(Pk[i], 0.0);
