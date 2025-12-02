@@ -503,6 +503,7 @@ class Tomboulides final : public FlowBase {
   /// Add swirl DBCs
   void addSwirlDirichletBC(double ut, mfem::Array<int> &attr);
   void addSwirlDirichletBC(mfem::Coefficient *coeff, mfem::Array<int> &attr);
+  void addSwirlDirichletBC(double (*f)(const Vector &, double), Array<int> &attr);
 
   /// Compute maximum velocity magnitude anywhere in the domain
   double maxVelocityMagnitude();

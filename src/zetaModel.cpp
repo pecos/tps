@@ -518,16 +518,10 @@ void ZetaModel::initializeSelf() {
 
         tke_field_ = new GridFunctionCoefficient(extData_interface_->TKEdata);
         AddTKEDirichletBC(tke_field_, inlet_attr);
-      // TODO: Same purpose
+      // TODO: Same purpose, need to fix. 
+      // On the other hand, we are just implying Neumann TKE conditions
       } else if (type == "fully-developed-pipe") {
-        // if (rank0_) {
-        //   std::cout << "Zeta Model: Setting interpolated Dirichlet TKE on patch = " << patch << std::endl;
-        // }
-        // Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
-        // inlet_attr = 0;
-        // inlet_attr[patch - 1] = 1;
-
-        // AddTKEDirichletBC(tke_pipe, inlet_attr);
+      } else if (type == "fully-developed-pipe-swirl") {
       } else {
         if (rank0_) {
           std::cout << "ERROR: zeta-f inlet type = " << type << " not supported." << std::endl;

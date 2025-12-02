@@ -175,10 +175,23 @@ vfptr vel_ic(std::string ic_string_) {
   }
 }
 
-/// Used to for pipe flow test case
+/// Used for pipe flow test case
 void vel_exact_pipe(const Vector &x, double t, Vector &u) {
   u(0) = 0.0;
   u(1) = 2.0 * (1 - x[0] * x[0]);
+}
+
+/// Used for pipe with swirl
+double swirl_pipe(const Vector &x, double t) {
+  double rt = 0.9;
+  double R = 1.0;
+  double u_th_max = 1.0;
+
+  if (x[0] < rt) {
+    return u_th_max * x[0] / rt;
+  } else {
+    return u_th_max * rt * (R - x[0]) / (x[0] * (R - rt));
+  }
 }
 
 /// rough tke bc for pipe flow test case

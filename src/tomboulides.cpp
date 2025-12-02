@@ -496,6 +496,18 @@ void Tomboulides::initializeSelf() {
       if (axisym_) {
         addSwirlDirichletBC(swirl_field_, inlet_attr);
       }
+    } else if (type == "fully-developed-pipe-swirl") {
+      if (pmesh_->GetMyRank() == 0) {
+        std::cout << "Tomboulides: Setting uniform inlet velocity on patch = " << patch << std::endl;
+      }
+      Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
+      inlet_attr = 0;
+      inlet_attr[patch - 1] = 1;
+
+      addVelDirichletBC(vel_exact_pipe, inlet_attr);
+      if (axisym_) {
+        addSwirlDirichletBC(swirl_pipe, inlet_attr);
+      }
     } else {
       Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
       inlet_attr = 0;
@@ -1897,6 +1909,10 @@ void Tomboulides::addSwirlDirichletBC(Coefficient *coeff, Array<int> &attr) {
       swirl_ess_attr_[i] = 1;
     }
   }
+}
+
+void Tomboulides::addSwirlDirichletBC(double (*f)(const Vector &, double), Array<int> &attr) {
+  addSwirlDirichletBC(new FunctionCoefficient(f), attr);
 }
 
 double Tomboulides::maxVelocityMagnitude() {
