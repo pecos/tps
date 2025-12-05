@@ -111,11 +111,13 @@ class ZetaModel : public TurbModelBase {
   int f_max_iter_ = 4000;
   double f_rtol_ = 1e-8;  
 
+  double tanh_half_ = 0.54930615;
+  
   double tke_ic_, tdr_ic_;
   double tke_min_, tdr_min_, zeta_min_, v2_min_;
   double fRate_min_, tts_min_, tls_min_;
   double fRate_max_, tts_max_, tls_max_;
-  double mut_min_;
+  double pk_min_, mut_min_;
   double des_wgt_;
   double prod_wgt_;
   double zfp_max_;
