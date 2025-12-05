@@ -119,6 +119,7 @@ class ZetaModel : public TurbModelBase {
   double des_wgt_;
   double prod_wgt_;
   double zfp_max_;
+  double v2Prod_fLimiter_coeff_;
 
   // just keep these saved for ease
   int numWalls_, numInlets_, numOutlets_;

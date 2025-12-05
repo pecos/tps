@@ -85,7 +85,8 @@ ZetaModel::ZetaModel(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalS
   tpsP_->getInput("ransModel/tls-coeff", Cl_, 0.23);
   tpsP_->getInput("ransModel/f-order", forder_, order_);
   tpsP_->getInput("ransModel/zfp-max", zfp_max_, 1.0e12);
-  
+  tpsP_->getInput("ransModel/v2-production-rate-coeff-limit", v2Prod_fLimiter_coeff_, 4.0);
+    
   if (axisym_) {
     assert(dim_ == 2);
     assert(!numerical_integ_);
@@ -1493,10 +1494,13 @@ void ZetaModel::extrapolateRHS() {
 void ZetaModel::updateZeta() {
   zeta_next_.Set(1.0, v2_next_);
   {
+    const double twoThirds = 2.0/3.0;
     const double *dk = tke_next_.HostRead();
     double *dz = zeta_next_.HostReadWrite();    
     for (int i = 0; i < SdofInt_; i++) {  
       dz[i] /= std::max(dk[i], tke_min_);
+      // leave larger so D_v2 can grow
+      // dz[i] = std::min(twoThirds, dz[i]);
     }
   }
   zeta_next_gf_.SetFromTrueDofs(zeta_next_);
@@ -1852,10 +1856,15 @@ void ZetaModel::v2Step() {
   {
     const double *df = tmpR0a_.HostRead();
     const double *dtkol = tts_kol_.HostRead();
+    const double *dTTS = tts_.HostReadWrite();    
     double *data = tmpR0_.HostReadWrite();
     for (int i = 0; i < SdofInt_; i++) {
       // data[i] *= std::min(df[i], 12.0/dtkol[i]);
-      data[i] *= df[i];
+      // data[i] *= df[i];
+
+      // limiter on v2-production to make resistent to f craziness where both TLS and TTS are very small
+      data[i] *= std::min(df[i], v2Prod_fLimiter_coeff_/dTTS[i]);
+      
     }
   }
   MsRho_->AddMult(tmpR0_, res_, +1.0);
