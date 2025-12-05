@@ -24,7 +24,8 @@ int main (int argc, char *argv[])
   int numSpecies = mixture->GetNumSpecies();
   int num_equation = mixture->GetNumEquations();
 
-  ArgonMinimalTransport transport = ArgonMinimalTransport(mixture, srcConfig);
+  //ArgonMinimalTransport transport = ArgonMinimalTransport(mixture, srcConfig);
+  GasMinimalTransport transport = GasMinimalTransport(mixture, srcConfig);  
 
   // Get meshes
   ParMesh* mesh_1 = srcField->getMesh();

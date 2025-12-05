@@ -9,19 +9,7 @@ RESTART="ref_solns/noSGM1K/restart_output.sol.h5"
 setup() {
     SOLN_FILE=restart_output.sol.h5
     REF_FILE=ref_solns/smag1K_1/restart_output.sol.h5
-
-    found=1
-
-    # defaut to mpirun if available
-    MPIRUN=$(type -P mpirun) || found=0
-
-    # if not, try flux
-    if [ $found -eq 0 ]; then
-        type -P flux && MPIRUN="$(type -P flux) run" || found=0
-    fi
-
-    # if neither mpirun or flux found, then MPIRUN is empty and tests
-    # below will be skipped
+    MPIRUN=`./sniff_mpirun.sh`
 }
 
 @test "[$TEST] check for input file $RUNFILE" {

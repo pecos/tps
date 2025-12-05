@@ -68,8 +68,8 @@ static double sigmaTorchStartUp(const Vector &pos) {
 static FunctionCoefficient sigma_start_up(sigmaTorchStartUp);
 
 LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &time_coeff,
-                             TPS::Tps *tps)
-    : tpsP_(tps), pmesh_(pmesh), time_coeff_(time_coeff) {
+                             ParGridFunction *gridScale, TPS::Tps *tps)
+    : tpsP_(tps), pmesh_(pmesh), time_coeff_(time_coeff), gridScale_gf_(gridScale) {
   rank0_ = (pmesh_->GetMyRank() == 0);
   order_ = loMach_opts->order;
 
@@ -166,6 +166,8 @@ LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, t
   tps->getInput("loMach/ltethermo/linear-solver-rtol", rtol_, 1e-12);
   tps->getInput("loMach/ltethermo/linear-solver-max-iter", max_iter_, 1000);
   tps->getInput("loMach/ltethermo/linear-solver-verbosity", pl_solve_, 0);
+
+  tpsP_->getInput("loMach/ltethermo/streamwise-stabilization", sw_stab_, false);
 }
 
 LteThermoChem::~LteThermoChem() {
@@ -204,6 +206,20 @@ LteThermoChem::~LteThermoChem() {
   delete rho_Cp_over_dt_coeff_;
   delete rho_Cp_coeff_;
   delete rho_coeff_;
+
+  delete umag_coeff_;
+  delete gscale_coeff_;
+  delete visc_coeff_;
+  delete visc_inv_coeff_;
+  delete reh1_coeff_;
+  delete reh2_coeff_;
+  delete Reh_coeff_;
+  delete csupg_coeff_;
+  delete uw1_coeff_;
+  delete uw2_coeff_;
+  delete upwind_coeff_;
+  delete swdiff_coeff_;
+  delete supg_coeff_;
 
   // allocated in initializeSelf
   delete sfes_;
@@ -453,7 +469,7 @@ void LteThermoChem::initializeSelf() {
 
   // outlet bc
   {
-      // Assumed homogeneous Nuemann on T, so nothing to do
+    // Assumed homogeneous Nuemann on T, so nothing to do
   }
 
   // Wall BCs
@@ -555,6 +571,36 @@ void LteThermoChem::initializeOperators() {
     rad_kap_gradT_coeff_ = new ScalarVectorProductCoefficient(radius_coeff, *kap_gradT_coeff_);
   }
 
+  // artifical diffusion coefficients
+  if (sw_stab_) {
+    umag_coeff_ = new VectorMagnitudeCoefficient(*un_next_coeff_);
+    gscale_coeff_ = new GridFunctionCoefficient(gridScale_gf_);
+    visc_coeff_ = new GridFunctionCoefficient(&mu_gf_);
+    visc_inv_coeff_ = new PowerCoefficient(*visc_coeff_, -1.0);
+
+    // compute Reh
+    reh1_coeff_ = new ProductCoefficient(*rho_coeff_, *visc_inv_coeff_);
+    reh2_coeff_ = new ProductCoefficient(*reh1_coeff_, *gscale_coeff_);
+    Reh_coeff_ = new ProductCoefficient(*reh2_coeff_, *umag_coeff_);
+
+    // Csupg
+    csupg_coeff_ = new TransformedCoefficient(Reh_coeff_, csupgFactor);
+
+    // compute upwind magnitude
+    if (axisym_) {
+      uw1_coeff_ = new ProductCoefficient(*rad_rho_Cp_coeff_, *csupg_coeff_);
+    } else {
+      uw1_coeff_ = new ProductCoefficient(*rho_Cp_coeff_, *csupg_coeff_);
+    }
+    uw2_coeff_ = new ProductCoefficient(*uw1_coeff_, *gscale_coeff_);
+    upwind_coeff_ = new ProductCoefficient(*uw2_coeff_, *umag_coeff_);
+
+    // streamwise diffusion direction
+    swdiff_coeff_ = new TransformedMatrixVectorCoefficient(un_next_coeff_, &streamwiseTensor);
+
+    supg_coeff_ = new ScalarMatrixProductCoefficient(*upwind_coeff_, *swdiff_coeff_);
+  }
+
   // Convection: Atemperature(i,j) = \int_{\Omega} \phi_i \rho Cp u \cdot \nabla \phi_j
   At_form_ = new ParBilinearForm(sfes_);
   ConvectionIntegrator *at_blfi;
@@ -645,6 +691,14 @@ void LteThermoChem::initializeOperators() {
   }
   Ht_form_->AddDomainIntegrator(hmt_blfi);
   Ht_form_->AddDomainIntegrator(hdt_blfi);
+
+  if (sw_stab_) {
+    auto *sdt_blfi = new DiffusionIntegrator(*supg_coeff_);
+    if (numerical_integ_) {
+      sdt_blfi->SetIntRule(&ir_di);
+    }
+    Ht_form_->AddDomainIntegrator(sdt_blfi);
+  }
   if (partial_assembly_) {
     Ht_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   }
@@ -784,6 +838,14 @@ void LteThermoChem::initializeOperators() {
     lqd_blfi->SetIntRule(&ir_di);
   }
   LQ_form_->AddDomainIntegrator(lqd_blfi);
+
+  if (sw_stab_) {
+    auto *slqd_blfi = new DiffusionIntegrator(*supg_coeff_);
+    if (numerical_integ_) {
+      slqd_blfi->SetIntRule(&ir_di);
+    }
+    LQ_form_->AddDomainIntegrator(slqd_blfi);
+  }
   if (partial_assembly_) {
     LQ_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   }

@@ -8,6 +8,7 @@ setup() {
     REPORT_FILE=argon.gradient_error.txt
     MESH_FILE=beam-quad-o3-s1-r1-p.mesh
     TOL=2e-4
+    MPIRUN=`./sniff_mpirun.sh`
 }
 
 @test "[$TEST] check for input file $RUNFILE" {
@@ -22,7 +23,7 @@ setup() {
 
 @test "[$TEST] gradient test with input -> $RUNFILE" {
     test -s ./test_grad
-    mpirun -np 2 ./test_grad --runFile $RUNFILE
+    $MPIRUN -n 2 ./test_grad --runFile $RUNFILE
     test -s $REPORT_FILE
 }
 

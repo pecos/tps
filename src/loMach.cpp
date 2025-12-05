@@ -166,11 +166,12 @@ void LoMachSolver::initialize() {
   if (loMach_opts_.thermo_solver == "constant-property") {
     thermo_ = new ConstantPropertyThermoChem(pmesh_, loMach_opts_.order, tpsP_);
   } else if (loMach_opts_.thermo_solver == "calorically-perfect") {
-    thermo_ = new CaloricallyPerfectThermoChem(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_);
+    thermo_ =
+        new CaloricallyPerfectThermoChem(pmesh_, &loMach_opts_, temporal_coeff_, (meshData_->getGridScale()), tpsP_);
   } else if (loMach_opts_.thermo_solver == "lte-thermo-chem") {
-    thermo_ = new LteThermoChem(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_);
+    thermo_ = new LteThermoChem(pmesh_, &loMach_opts_, temporal_coeff_, meshData_->getGridScale(), tpsP_);
   } else if (loMach_opts_.thermo_solver == "reacting-flow") {
-    thermo_ = new ReactingFlow(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_);
+    thermo_ = new ReactingFlow(pmesh_, &loMach_opts_, temporal_coeff_, (meshData_->getGridScale()), tpsP_);
   } else {
     // Unknown choice... die
     if (rank0_) {
@@ -182,7 +183,7 @@ void LoMachSolver::initialize() {
   // Instantiate flow solver
   if (loMach_opts_.flow_solver == "zero-flow") {
     // No flow---set u = 0.  Primarily useful for testing thermochem models in isolation
-    flow_ = new ZeroFlow(pmesh_, 1);
+    flow_ = new ZeroFlow(pmesh_, 1, tpsP_);
   } else if (loMach_opts_.flow_solver == "tomboulides") {
     // Tomboulides flow solver
     flow_ = new Tomboulides(pmesh_, loMach_opts_.order, loMach_opts_.order, temporal_coeff_, tpsP_);
@@ -757,6 +758,9 @@ void LoMachSolver::parseSolverOptions() {
 
   // compute wall distance
   tpsP_->getInput("loMach/computeWallDistance", loMach_opts_.compute_wallDistance, false);
+
+  // check for species
+  tpsP_->getInput("plasma_models/species_number", loMach_opts_.nSpec, 0);
 
   // add all models here which require wall dist, eg: SA, k-e, etc...
   if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::ALGEBRAIC_RANS) {

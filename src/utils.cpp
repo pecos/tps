@@ -1133,23 +1133,32 @@ void scalarGrad3DV(FiniteElementSpace *fes, FiniteElementSpace *vfes, Vector u, 
   R1_gf.GetTrueDofs(*gu);
 }
 
-/*
-void vectorGrad3DV(FiniteElementSpace *fes, Vector u, Vector *gu, Vector *gv, Vector *gw) {
-  ParGridFunction R1_gf;
-  R1_gf.SetSpace(fes);
+void streamwiseTensor(const Vector &vel, DenseMatrix &swMgbl) {
+  int dim = vel.Size();
 
-  ParGridFunction R1a_gf, R1b_gf, R1c_gf;
-  R1a_gf.SetSpace(fes);
-  R1b_gf.SetSpace(fes);
-  R1c_gf.SetSpace(fes);
+  swMgbl.SetSize(dim, dim);
+  swMgbl = 0.0;
 
-  R1_gf.SetFromTrueDofs(u);
-  vectorGrad3D(R1_gf, R1a_gf, R1b_gf, R1c_gf);
-  R1a_gf.GetTrueDofs(*gu);
-  R1b_gf.GetTrueDofs(*gv);
-  R1c_gf.GetTrueDofs(*gw);
+  // compute velocity magnitude
+  double Umag2 = 0.0;
+  for (int i = 0; i < dim; i++) Umag2 += vel[i] * vel[i];
+  const double Umag = std::sqrt(Umag2);
+
+  // for zero-flow, quick return with swMgbl = 0 (necessary?)
+  if (Umag < 1.0e-8) return;
+
+  // swMgbl = (u u^T) / ||u||^2
+  for (int i = 0; i < dim; i++) {
+    for (int j = 0; j < dim; j++) {
+      swMgbl(i, j) = vel[i] * vel[j] / Umag2;
+    }
+  }
 }
-*/
+
+double csupgFactor(double Reh) {
+  // TODO(trevilo): This implementation has lost the re_factor and re_offset options.  Bring them back.
+  return 0.5 * (tanh(Reh) + 1.0);
+}
 
 void EliminateRHS(Operator &A, ConstrainedOperator &constrainedA, const Array<int> &ess_tdof_list, Vector &x, Vector &b,
                   Vector &X, Vector &B, int copy_interior) {
@@ -1303,7 +1312,15 @@ void GradientVectorGridFunctionCoefficient::Eval(DenseMatrix &G, ElementTransfor
     // NB: In mfem/fem/coefficients.cpp, the function RefinedToCoarse is defined.  Here we reproduce it explicitly.
     //
     // ElementTransformation *coarse_T = RefinedToCoarse(*gf_mesh, T, ip, coarse_ip);
+
+#if MFEM_VERSION >= 40700
+    // mfem 4.7 and later
+    const Mesh &fine_mesh = *T.mesh;
+#else
+    // older versions
     Mesh &fine_mesh = *T.mesh;
+#endif
+
     // Get the element transformation of the coarse element containing the
     // fine element.
     int fine_element = T.ElementNo;
@@ -1322,6 +1339,32 @@ void GradientVectorGridFunctionCoefficient::Eval(DenseMatrix &G, ElementTransfor
 
     GridFunc->GetVectorGradient(*coarse_T, G);
   }
+}
+
+VectorMagnitudeCoefficient::VectorMagnitudeCoefficient(VectorCoefficient &A) : a(&A), va(A.GetVDim()) {}
+
+void VectorMagnitudeCoefficient::SetTime(double t) {
+  if (a) {
+    a->SetTime(t);
+  }
+  this->Coefficient::SetTime(t);
+}
+
+double VectorMagnitudeCoefficient::Eval(ElementTransformation &T, const IntegrationPoint &ip) {
+  a->Eval(va, T, ip);
+  return std::max(std::sqrt(va * va), 1.0e-18);
+}
+
+void TransformedMatrixVectorCoefficient::SetTime(double t) {
+  Q1->SetTime(t);
+  this->MatrixCoefficient::SetTime(t);
+}
+
+void TransformedMatrixVectorCoefficient::Eval(DenseMatrix &G, ElementTransformation &T, const IntegrationPoint &ip) {
+  Vector buf;
+  buf.SetSize(Q1->GetVDim());
+  Q1->Eval(buf, T, ip);
+  Function(buf, G);
 }
 
 }  // namespace mfem

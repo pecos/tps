@@ -32,12 +32,19 @@
 
 #include "split_flow_base.hpp"
 
+#include "tps.hpp"
+
 using namespace mfem;
 
-ZeroFlow::ZeroFlow(mfem::ParMesh *pmesh, int vorder) : pmesh_(pmesh), vorder_(vorder), dim_(pmesh->Dimension()) {}
+ZeroFlow::ZeroFlow(mfem::ParMesh *pmesh, int vorder, TPS::Tps *tps)
+    : pmesh_(pmesh), vorder_(vorder), dim_(pmesh->Dimension()), tpsP_(tps) {
+  // nonzero flow option
+  tpsP_->getInput("loMach/zeroflow/nonzero-flow", nonzero_flow_, false);
+}
 
 ZeroFlow::~ZeroFlow() {
   delete velocity_;
+  delete zero_;
   delete fes_;
   delete fec_;
 }
@@ -46,13 +53,24 @@ void ZeroFlow::initializeSelf() {
   fec_ = new H1_FECollection(vorder_, dim_);
   fes_ = new ParFiniteElementSpace(pmesh_, fec_, dim_);
   velocity_ = new ParGridFunction(fes_);
+  zero_ = new ParGridFunction(fes_);
   *velocity_ = 0.0;
+  *zero_ = 0.0;
+  // set background velocity if nonzero
+  if (nonzero_flow_) {
+    Vector zero(dim_);
+    Vector velocity_value(dim_);
+    zero = 0.0;
+    tpsP_->getVec("loMach/zeroflow/nonzero-vel", velocity_value, dim_, zero);
+    VectorConstantCoefficient ub_coeff(velocity_value);
+    velocity_->ProjectCoefficient(ub_coeff);
+  }
 
   toThermoChem_interface_.velocity = velocity_;
   toThermoChem_interface_.swirl_supported = false;
 
-  // no need to create additional zero vectors
-  toTurbModel_interface_.gradU = velocity_;
-  toTurbModel_interface_.gradV = velocity_;
-  toTurbModel_interface_.gradW = velocity_;
+  // need to create additional zero vectors, in case of nonzero vel
+  toTurbModel_interface_.gradU = zero_;
+  toTurbModel_interface_.gradV = zero_;
+  toTurbModel_interface_.gradW = zero_;
 }

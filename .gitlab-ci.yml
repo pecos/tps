@@ -8,42 +8,14 @@ variables:
 ##  script:
 ##    - echo "hello world2"
 
-lassen:
- id_tokens:
-   SITE_ID_TOKEN:
-     aud: https://lc.llnl.gov/gitlab
- variables:
-   COMPILER:  "gcc/8.3.1"
-   CUDA_ARCH: "sm_70"
-   CUDA_VER:  "11.2.0"
-   CUDA_PATH: "/usr/tce/packages/cuda/cuda-${CUDA_VER}"   
-   SW_HOME:   "/usr/workspace/utaustin/software/lassen"
- stage: build
- tags:
-   - lassen
-   - shell
- script:
-   - echo "Lassen Build/Test -> ${COMPILER}"
-   - export MODULEPATH=${SW_HOME}/modules/gcc:$MODULEPATH
-   - module --force purge
-   - module load StdEnv
-   - module swap base-gcc/8.3.1 ${COMPILER}
-   - module load hdf5-parallel grvy hypre metis cuda/${CUDA_VER}
-   - module list
-   - export MFEM_DIR=/usr/workspace/oliver33/lassen/sw/mfem-4.5.2-cuda/
-   - ./bootstrap
-   - ./configure CUDA_ARCH=${CUDA_ARCH} --disable-valgrind --enable-gpu-cuda --with-cuda=${CUDA_PATH}
-   - make -j 2
-   - lalloc 1 -q pdebug make check
-
 tioga:
  id_tokens:
    SITE_ID_TOKEN:
      aud: https://lc.llnl.gov/gitlab
  variables:
-   ROCM_VER: "5.4.1"
-   CCE_VER: "15.0.0c"
-   MPICH_VER: "8.1.21"
+   ROCM_VER: "6.4.2"
+   CCE_VER: "20.0.0"
+   MPICH_VER: "9.0.1"
    SW_HOME: "/usr/workspace/oliver33/tioga/sw"
  stage: build
  tags:
@@ -54,19 +26,20 @@ tioga:
    - echo "Set up module environment"
    - module --force purge
    - module load StdEnv
-   - module load rocmcc-tce/${ROCM_VER}-cce-${CCE_VER}
-   - module load cray-mpich-tce/${MPICH_VER}
+   - module load rocmcc/${ROCM_VER}-cce-${CCE_VER}-magic
+   - module load cray-mpich/${MPICH_VER}
    - module list
    - echo "Set up tps dependencies"
-   - export GRVY_DIR=${SW_HOME}/grvy
-   - export METIS_DIR=${SW_HOME}/metis
-   - export HYPRE_DIR=${SW_HOME}/hypre-2.18.1
-   - export MFEM_DIR=${SW_HOME}/mfem-4.5.2-hip
-   - export HDF5_DIR=${SW_HOME}/hdf5
-   - export MPI_DIR=/usr/tce/packages/cray-mpich-tce/cray-mpich-8.1.21-rocmcc-5.4.1-cce-15.0.0c
-   - export RESOLVE_CRAY_LIB=/usr/tce/packages/cce-tce/cce-15.0.0c/cce/x86_64/lib/
+   - export TOOLCHAIN="rocm-${ROCM_VER}_cce-${CCE_VER}_mpich-${MPICH_VER}"
+   - export GRVY_DIR=${SW_HOME}/${TOOLCHAIN}/grvy
+   - export METIS_DIR=${SW_HOME}/${TOOLCHAIN}/metis
+   - export HYPRE_DIR=${SW_HOME}/${TOOLCHAIN}/hypre-2.18.1
+   - export MFEM_DIR=${SW_HOME}/${TOOLCHAIN}/mfem-4.5.2-hip
+   - export HDF5_DIR=${SW_HOME}/${TOOLCHAIN}/hdf5
+   - $(grep "MPI_DIR" $(which mpicxx))
+   - $(grep "MPI_ADD_FOR_LINK" $(which mpicxx))
+   - export ADD_FOR_LINK="-Wl,-rpath,$MPI_DIR/lib $MPI_ADD_FOR_LINK"
    - export LD_LIBRARY_PATH=$HYPRE_DIR/lib:$METIS_DIR/lib:$LD_LIBRARY_PATH
-   - export LD_LIBRARY_PATH=$RESOLVE_CRAY_LIB:$LD_LIBRARY_PATH
    - echo "Compiling tps"
    - ./bootstrap
    - ./configure CXXFLAGS="-g -O3" --enable-gpu-hip HIP_ARCH=gfx90a --without-masa --disable-valgrind
