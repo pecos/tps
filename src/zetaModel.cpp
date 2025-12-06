@@ -86,7 +86,7 @@ ZetaModel::ZetaModel(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalS
   tpsP_->getInput("ransModel/tls-coeff", Cl_, 0.23);
   tpsP_->getInput("ransModel/f-order", forder_, order_);
   tpsP_->getInput("ransModel/zfp-max", zfp_max_, 1.0e12);
-  tpsP_->getInput("ransModel/v2-production-rate-coeff-limit", v2Prod_fLimiter_coeff_, 1.0e12);
+  tpsP_->getInput("ransModel/v2-production-rate-coeff-limit", v2Prod_fLimiter_coeff_, 1.0e6);
     
   if (axisym_) {
     assert(dim_ == 2);
@@ -201,7 +201,7 @@ ZetaModel::~ZetaModel() {
   delete vfec_;
   delete vfes_;
 
-  std::cout << "okay 11" << endl;  
+  //std::cout << "okay 11" << endl;  
 }
 
 void ZetaModel::initializeSelf() {
@@ -1185,21 +1185,21 @@ void ZetaModel::updateMuT() {
     double wgt = 1.0;    
     double *muT = eddyVisc_.HostReadWrite();
     
-    //for (int i = 0; i < SdofInt_; i++) muT[i] *= std::min(dv2[i], twoThirds*dk[i]);
+    for (int i = 0; i < SdofInt_; i++) muT[i] *= std::min(dv2[i], twoThirds*dk[i]);
     // to prevent kinks    
-    for (int i = 0; i < SdofInt_; i++) {    
-     wgt = tanh(tanh_half_ * dv2[i]/(twoThirds*dk[i]));
-     wgt = wgt * wgt;
-     muT[i] *= ((1.0-wgt)*dv2[i] + wgt*twoThirds*dk[i]);
-    }
+    //for (int i = 0; i < SdofInt_; i++) {    
+    // wgt = std::tanh(tanh_half_ * dv2[i]/(twoThirds*dk[i]));
+    // wgt = wgt * wgt;
+    // muT[i] *= ((1.0-wgt)*dv2[i] + wgt*twoThirds*dk[i]);
+    //}
     
     //for (int i = 0; i < SdofInt_; i++) muT[i] *= std::min(dTTS[i], dTTS_strain[i]);
     // to prevent kinks    
-    for (int i = 0; i < SdofInt_; i++) {    
-      wgt = tanh(tanh_half_ * dTTS[i]/dTTS_strain[i]);
-      wgt = wgt * wgt;      
-      muT[i] *= ((1.0-wgt)*dTTS[i] + wgt*dTTS_strain[i]);
-    }
+    //for (int i = 0; i < SdofInt_; i++) {    
+    //  wgt = std::tanh(tanh_half_ * dTTS[i]/dTTS_strain[i]);
+    //  wgt = wgt * wgt;      
+    //  muT[i] *= ((1.0-wgt)*dTTS[i] + wgt*dTTS_strain[i]);
+    //}
     
     for (int i = 0; i < SdofInt_; i++) muT[i] = std::max(muT[i], mut_min_);
   }  
@@ -1299,9 +1299,10 @@ void ZetaModel::updateTTS() {
   double Ctime;
   Ctime = 0.6 / (std::sqrt(6.0) * Cmu_);
   for (int i = 0; i < SdofInt_; i++) {
+    
     double T1, T2, T3;
     T1 = dTKE[i] / std::max(dTDR[i], tdr_min_);
-    T2 = Ctime * dTKE[i] / (dSmag[i] * std::max(dv2[i], v2_min_));
+    T2 = Ctime * dTKE[i] / ( dSmag[i] * std::max(dv2[i], v2_min_) );
     T3 = Ct_ * std::sqrt( std::max(dMu[i] / (dRho[i] * std::max(dTDR[i], tdr_min_)),0.0) );
 
     // zeta ordering
@@ -1319,7 +1320,7 @@ void ZetaModel::updateTTS() {
     
     // to prevent kinks
     double wgt = 1.0;
-    wgt = tanh(tanh_half_ * T1/T3);    
+    wgt = std::tanh(tanh_half_ * T1/T3);    
     dTTS[i] = wgt * T1 + (1.0-wgt) * T3;
 
     // including stag-limit T in nuT only
@@ -1345,28 +1346,36 @@ void ZetaModel::updateTLS() {
   const double *dRho = rho_.HostRead();
   double *dTLS = tls_.HostReadWrite();
 
+  double wgt = 1.0;    
   double Clength;
   Clength = 1.0 / (std::sqrt(6.0) * Cmu_);
   for (int i = 0; i < SdofInt_; i++) {
+    
     double L1, L2, L3;
     L1 = std::pow(dTKE[i], 1.5) / std::max(dTDR[i], tdr_min_);
     L2 = Clength * std::pow(dTKE[i], 1.5) / (dSmag[i] * std::max(dv2[i], v2_min_));
     L3 = Cn_ * std::pow((std::pow(dMu[i] / dRho[i], 3.0) / std::max(dTDR[i], tdr_min_)), 0.25);
 
-    // basic
+    // basic => ignore stag anom L for now
     //dTLS[i] = std::min(L1, L2);
-    //dTLS[i] = Cl_ * std::max(dTLS[i], L3);
 
-    // to prevent kinks
-    double wgt = 1.0;
-    wgt = tanh(tanh_half_ * L1/L2);
-    dTLS[i] = (1.0-wgt) * L1 + wgt * L2;
-    wgt = tanh(tanh_half_ * dTLS[i]/L3);
-    dTLS[i] = Cl_ * (wgt * dTLS[i] + (1.0-wgt) * L3);  
+    // to prevent kink
+    //wgt = std::tanh(tanh_half_ * L1/L2);
+    //dTLS[i] = (1.0-wgt) * L1 + wgt * L2;
+
+    // basic
+    //dTLS[i] = Cl_ * std::max(dTLS[i], L3);
+    //dTLS[i] = Cl_ * std::max(L1, L3);    
+
+    // to prevent kinks    
+    //wgt = std::tanh(tanh_half_ * dTLS[i]/L3);
+    wgt = std::tanh(tanh_half_ * L1/L3);
+    dTLS[i] = Cl_ * (wgt * L1 + (1.0-wgt) * L3);  
     
     dTLS[i] = std::max(dTLS[i], tls_min_);
+    
     //dTLS[i] = std::min(dTLS[i], tls_max_);
-    wgt = tanh(tanh_half_ * dTLS[i]/tls_max_);
+    wgt = std::tanh(tanh_half_ * dTLS[i]/tls_max_);
     dTLS[i] = (1.0-wgt) * dTLS[i] + wgt * tls_max_;  
     
   }
@@ -1477,13 +1486,13 @@ void ZetaModel::updateProd() {
       Pk[i] += dmuT[i] * dGradS[i + SdofInt_] * dGradS[i + SdofInt_];
     }
 
-    //Pk[i] = std::max(Pk[i], 0.0);
+    //Pk[i] = std::max(Pk[i], pk_min_);
 
     // NOTE: can build-in mins to each scalar rhs to prevent need for hard-clips,
     // tke example: Pk = std::max(Pk, pk_min_) * (1 + (tke_min_/tke_)^p);
     // if done to prod_ for all, this should be a consistent way to enforce floors
-    // as all scalars use Pk as a production source on their rhs
-    Pk[i] = std::max(Pk[i], pk_min_) * (1 + (tke_min_/dTKE[i]));      
+    // as all scalars use Pk as a production source on their rhs (except v2 but that uses f which does so)
+    Pk[i] = std::max(Pk[i], pk_min_) * (1.0 + (2.0*tke_min_/std::max(dTKE[i],tke_min_)) );
     
   }
 
@@ -1904,10 +1913,10 @@ void ZetaModel::v2Step() {
     double *data = tmpR0_.HostReadWrite();
     for (int i = 0; i < SdofInt_; i++) {
       // data[i] *= std::min(df[i], 12.0/dtkol[i]);
-      // data[i] *= df[i];
+      data[i] *= df[i];
 
       // limiter on v2-production to make resistent to f craziness where both TLS and TTS are very small
-      data[i] *= std::min(df[i], v2Prod_fLimiter_coeff_/dTTS[i]);
+      //data[i] *= std::min(df[i], v2Prod_fLimiter_coeff_/dTTS[i]);
       
     }
   }
