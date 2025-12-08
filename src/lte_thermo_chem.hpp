@@ -91,6 +91,7 @@ class LteThermoChem final : public ThermoChemModelBase {
   bool domain_is_open_ = false;   /**< true if domain is open */
   bool axisym_ = false;
   bool sw_stab_ = false; /**< Enable/disable supg stabilization. */
+  double Reh_factor_, Reh_offset_; /**< supg stabilization parameters */
 
   // Linear-solver-related options
   int pl_solve_ = 0;    /**< Verbosity level passed to mfem solvers */
@@ -191,7 +192,7 @@ class LteThermoChem final : public ThermoChemModelBase {
   ProductCoefficient *reh1_coeff_ = nullptr;
   ProductCoefficient *reh2_coeff_ = nullptr;
   ProductCoefficient *Reh_coeff_ = nullptr;
-  TransformedCoefficient *csupg_coeff_ = nullptr;
+  ExtTransformedCoefficient *csupg_coeff_ = nullptr;
   ProductCoefficient *uw1_coeff_ = nullptr;
   ProductCoefficient *uw2_coeff_ = nullptr;
   ProductCoefficient *upwind_coeff_ = nullptr;

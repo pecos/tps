@@ -168,6 +168,8 @@ LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, t
   tps->getInput("loMach/ltethermo/linear-solver-verbosity", pl_solve_, 0);
 
   tpsP_->getInput("loMach/ltethermo/streamwise-stabilization", sw_stab_, false);
+  tpsP_->getInput("loMach/ltethermo/Reh_factor", Reh_factor_, 0.5);
+  tpsP_->getInput("loMach/ltethermo/Reh_offset", Reh_offset_, 1.0);
 }
 
 LteThermoChem::~LteThermoChem() {
@@ -586,7 +588,8 @@ void LteThermoChem::initializeOperators() {
     Reh_coeff_ = new ProductCoefficient(*reh2_coeff_, *umag_coeff_);
 
     // Csupg
-    csupg_coeff_ = new TransformedCoefficient(Reh_coeff_, csupgFactor);
+    std::function<double(double)> csupgLambda = std::bind(csupgFactor, std::placeholders::_1,  Reh_factor_, Reh_offset_);
+    csupg_coeff_ = new ExtTransformedCoefficient(Reh_coeff_, csupgLambda);
 
     // compute upwind magnitude
     if (axisym_) {

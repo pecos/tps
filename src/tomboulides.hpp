@@ -183,6 +183,7 @@ class Tomboulides final : public FlowBase {
 
   // streamwise-stabilization
   bool sw_stab_;
+  double Reh_factor_, Reh_offset_;
 
   StopWatch sw_press_, sw_helm_;
 
@@ -299,7 +300,7 @@ class Tomboulides final : public FlowBase {
   mfem::ProductCoefficient *reh1_coeff_ = nullptr;
   mfem::ProductCoefficient *reh2_coeff_ = nullptr;
   mfem::ProductCoefficient *Reh_coeff_ = nullptr;
-  mfem::TransformedCoefficient *csupg_coeff_ = nullptr;
+  mfem::ExtTransformedCoefficient *csupg_coeff_ = nullptr;
   mfem::ProductCoefficient *uw1_coeff_ = nullptr;
   mfem::ProductCoefficient *uw2_coeff_ = nullptr;
   mfem::ProductCoefficient *upwind_coeff_ = nullptr;

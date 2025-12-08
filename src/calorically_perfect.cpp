@@ -137,6 +137,8 @@ CaloricallyPerfectThermoChem::CaloricallyPerfectThermoChem(mfem::ParMesh *pmesh,
 
   // artificial diffusion (SUPG)
   tpsP_->getInput("loMach/calperfect/streamwise-stabilization", sw_stab_, false);
+  tpsP_->getInput("loMach/calperfect/Reh_factor", Reh_factor_, 0.5);
+  tpsP_->getInput("loMach/calperfect/Reh_offset", Reh_offset_, 1.0);
 }
 
 CaloricallyPerfectThermoChem::~CaloricallyPerfectThermoChem() {
@@ -481,7 +483,9 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
     Reh_coeff_ = new ProductCoefficient(*reh2_coeff_, *umag_coeff_);
 
     // Csupg
-    csupg_coeff_ = new TransformedCoefficient(Reh_coeff_, csupgFactor);
+    // auto csupgLambda = std::bind(csupgFactor, std::placeholders::_1,  Reh_factor_, Reh_offset_);
+    std::function<double(double)> csupgLambda = std::bind(csupgFactor, std::placeholders::_1,  Reh_factor_, Reh_offset_);
+    csupg_coeff_ = new ExtTransformedCoefficient(Reh_coeff_, csupgLambda);
 
     // compute upwind magnitude
     uw1_coeff_ = new ProductCoefficient(*rho_coeff_, *csupg_coeff_);

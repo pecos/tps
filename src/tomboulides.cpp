@@ -133,6 +133,8 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
 
     // artificial diffusion (SUPG)
     tpsP_->getInput("loMach/tomboulides/streamwise-stabilization", sw_stab_, false);
+    tpsP_->getInput("loMach/tomboulides/Reh_factor", Reh_factor_, 0.5);
+    tpsP_->getInput("loMach/tomboulides/Reh_offset", Reh_offset_, 1.0);
   }
 }
 
@@ -717,7 +719,8 @@ void Tomboulides::initializeOperators() {
     Reh_coeff_ = new ProductCoefficient(*reh2_coeff_, *umag_coeff_);
 
     // Csupg
-    csupg_coeff_ = new TransformedCoefficient(Reh_coeff_, csupgFactor);
+    std::function<double(double)> csupgLambda = std::bind(csupgFactor, std::placeholders::_1,  Reh_factor_, Reh_offset_);
+    csupg_coeff_ = new ExtTransformedCoefficient(Reh_coeff_, csupgLambda);
 
     if (axisym_) {
       // compute upwind magnitude

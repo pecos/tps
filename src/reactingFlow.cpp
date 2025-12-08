@@ -735,6 +735,8 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
 
   // artificial diffusion (SUPG)
   tpsP_->getInput("loMach/reactingFlow/streamwise-stabilization", sw_stab_, false);
+  tpsP_->getInput("loMach/reactingFlow/Reh_factor", Reh_factor_, 0.5);
+  tpsP_->getInput("loMach/reactingFlow/Reh_offset", Reh_offset_, 1.0);
 }  // NOLINT
 
 ReactingFlow::~ReactingFlow() {
@@ -1383,7 +1385,8 @@ void ReactingFlow::initializeOperators() {
     Reh_coeff_ = new ProductCoefficient(*reh2_coeff_, *umag_coeff_);
 
     // Csupg
-    csupg_coeff_ = new TransformedCoefficient(Reh_coeff_, csupgFactor);
+    std::function<double(double)> csupgLambda = std::bind(csupgFactor, std::placeholders::_1,  Reh_factor_, Reh_offset_);
+    csupg_coeff_ = new ExtTransformedCoefficient(Reh_coeff_, csupgLambda);
 
     // compute upwind magnitude
     if (axisym_) {
