@@ -519,10 +519,27 @@ void ZetaModel::initializeSelf() {
         inlet_attr[patch - 1] = 1;
 
         tke_field_ = new GridFunctionCoefficient(extData_interface_->TKEdata);
+        v2_field_ = new GridFunctionCoefficient(extData_interface_->V2data);
         AddTKEDirichletBC(tke_field_, inlet_attr);
-      // TODO: Same purpose, need to fix. 
-      // On the other hand, we are just implying Neumann TKE conditions
+        AddV2DirichletBC(v2_field_, inlet_attr);
+        // TODO: Same purpose, need to fix. 
+        // Interpolate instead
       } else if (type == "fully-developed-pipe") {
+        Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
+        inlet_attr = 0;
+        inlet_attr[patch - 1] = 1;
+
+        tke_field_ = new GridFunctionCoefficient(extData_interface_->TKEdata);
+        v2_field_ = new GridFunctionCoefficient(extData_interface_->V2data);
+        AddTKEDirichletBC(tke_field_, inlet_attr);
+        AddV2DirichletBC(v2_field_, inlet_attr);
+        // Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
+        // inlet_attr = 0;
+        // inlet_attr[patch - 1] = 1;
+        // double tke_value;
+        // tpsP_->getRequiredInput((basepath + "/tke").c_str(), tke_value);
+        // AddTKEDirichletBC(tke_value, inlet_attr);
+        // AddV2DirichletBC(2.0/3.0*tke_value, inlet_attr);	
       } else if (type == "fully-developed-pipe-swirl") {
       } else {
         if (rank0_) {

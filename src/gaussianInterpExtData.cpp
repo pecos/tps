@@ -60,6 +60,8 @@ GaussianInterpExtData::GaussianInterpExtData(mfem::ParMesh *pmesh, LoMachOptions
 
   // only allows one inlet now
   isInterpInlet_ = false;
+  isInterpTurbInlet_ = false;
+  isInterpTurbField_ = false;
 
   int numInlets;
   tpsP_->getInput("boundaryConditions/numInlets", numInlets, 0);
@@ -83,35 +85,50 @@ GaussianInterpExtData::GaussianInterpExtData(mfem::ParMesh *pmesh, LoMachOptions
     }
   }
 
-  // static turbulence model
-  if (rank0_)
-    std::cout << "Checking for requested interpolated eddy viscosity data..." << endl;
-  for (int i = 1; i <= numInlets; i++) {
-    std::string type;
-    std::string basepath("loMach/turb-model");
-    tpsP_->getRequiredInput((basepath).c_str(), type);
-    if (type == "static-rans") {
-      if (rank0_) std::cout << "...static-rans specified" << endl;
+  // axisymmetric
+  tpsP_->getInput("loMach/axisymmetric", axisym_, false);
+
+  // turbulence
+  tpsP_->getInput("loMach/turb-model", turb_type_, std::string("none"));
+
+
+  // tke and v2 inlet boundary condition for zeta-f model
+  if (turb_type_ == "zeta-f") {
+    if (rank0_)
+      std::cout << "Checking for requested interpolated zeta-f data..." << endl;
+    for (int i = 1; i <= numInlets; i++) {
+      std::string type;
+      std::string basepath("boundaryConditions/inlet" + std::to_string(i));
+      tpsP_->getRequiredInput((basepath + "/type").c_str(), type);
+      tpsP_->getInput((basepath + "/tke").c_str(), tke_const_, 0.0);
+      if (tke_const_ < 1e-12) { // if a constant tke is not specified, use interp
+        if (type == "interpolate" || type == "fully-developed-pipe"  || type == "fully-developed-pipe-swirl") {
+          if (rank0_) std::cout << "...zeta-f interpolation required" << endl;
+          if (isInterpTurbInlet_) {
+            // If we've already set isInterpInlet_, then user requested
+            // multiple interpolation BCs, which is not supported
+            if (rank0_) std::cout << "Only one interpolated inlet currently supported." << endl;
+          }
+          isInterpTurbInlet_ = true;
+          tpsP_->getInput("ransModel/zeta-f-file", fname_tke_, std::string("tke.csv"));
+        }
+      }
+    }
+  }
+
+  // static turbulence model, specify non-uniform mu_t field
+  if (turb_type_ == "static-rans") {
+    if (rank0_) 
+      std::cout << "...static-rans specified" << endl;
+    if (rank0_) {
+      std::cout << "Checking for requested interpolated eddy viscosity field data..." << endl;
+
+      isInterpTurbField_ = true;
       tpsP_->getInput("loMach/static-rans/visc-file", fname_turb_, std::string("nuT.csv"));
       tpsP_->getInput("loMach/static-rans/visc-fac", v_fac_, 1.0);
     }
   }
 
-  // tke inlet boundary condition for zeta-f model
-  if (rank0_)
-    std::cout << "Checking for requested interpolated turbulent kinetic energy data..." << endl;
-  for (int i = 1; i <= numInlets; i++) {
-    std::string type;
-    std::string basepath("loMach/turb-model");
-    tpsP_->getRequiredInput((basepath).c_str(), type);
-    if (type == "zeta-f") {
-      if (rank0_) std::cout << "...zeta-f specified" << endl;
-      tpsP_->getInput("loMach/static-rans/zeta-f-inlet", fname_tke_, std::string("tke.csv"));
-    }
-  }
-
-  // axisymmetric
-  tpsP_->getInput("loMach/axisymmetric", axisym_, false);
 }
 
 GaussianInterpExtData::~GaussianInterpExtData() {
@@ -122,7 +139,7 @@ GaussianInterpExtData::~GaussianInterpExtData() {
 }
 
 void GaussianInterpExtData::initializeSelf() {
-  if (!isInterpInlet_) {
+  if (!isInterpInlet_ && !isInterpTurbInlet_ && !isInterpTurbField_) {
     return;
   }
 
@@ -150,23 +167,17 @@ void GaussianInterpExtData::initializeSelf() {
   velocity_gf_ = 0.0;
   vel0_gf_.SetSpace(vfes_);
   vel0_gf_ = 0.0;
-  nut_gf_.SetSpace(sfes_);
-  nut_gf_ = 0.0;
-  tke_gf_.SetSpace(sfes_);
-  tke_gf_ = 0.0;
-
+  
   if (nSpec_ > 0) {
     yfec_ = new H1_FECollection(order_);
     yfes_ = new ParFiniteElementSpace(pmesh_, yfec_, nSpec_);
     Yn_gf_.SetSpace(yfes_);
     Yn_gf_ = 0.0;
   }
-
+  
   // exports
   toThermoChem_interface_.Tdata = &temperature_gf_;
   toFlow_interface_.Udata = &velocity_gf_;
-  toTurbModel_interface_.NuTdata = &nut_gf_;
-  toTurbModel_interface_.TKEdata = &tke_gf_;
 
   if (axisym_) {
     swirl_gf_.SetSpace(sfes_);
@@ -179,20 +190,41 @@ void GaussianInterpExtData::initializeSelf() {
   if (nSpec_ > 0) {
     toThermoChem_interface_.Ydata = &Yn_gf_;
   }
+  
+  // turb model
+  if (turb_type_ != "none") {
+    nut_gf_.SetSpace(sfes_);
+    nut_gf_ = 0.0;
+    tke_gf_.SetSpace(sfes_);
+    tke_gf_ = 0.0;
+    v2_gf_.SetSpace(sfes_);
+    v2_gf_ = 0.0;
+    toTurbModel_interface_.NuTdata = &nut_gf_;
+    toTurbModel_interface_.TKEdata = &tke_gf_;
+    toTurbModel_interface_.V2data = &v2_gf_;
+  }
+
 }
 
 void GaussianInterpExtData::initializeViz(ParaViewDataCollection &pvdc) {
-  if (!isInterpInlet_) {
-    return;
+  if (isInterpInlet_) {
+    pvdc.RegisterField("externalTemp", &temperature_gf_);
+    pvdc.RegisterField("externalU", &velocity_gf_);
+    if (axisym_) {
+      pvdc.RegisterField("externalTh", &swirl_gf_);
+    }
+    if (nSpec_ > 0) pvdc.RegisterField("externalSpecies", &Yn_gf_);
   }
-  pvdc.RegisterField("externalTemp", &temperature_gf_);
-  pvdc.RegisterField("externalU", &velocity_gf_);
-  pvdc.RegisterField("externalNuT", &nut_gf_);
-  pvdc.RegisterField("externalTKE", &tke_gf_);
-  if (axisym_) {
-    pvdc.RegisterField("externalTh", &swirl_gf_);
+
+  if (isInterpTurbInlet_) {
+    pvdc.RegisterField("externalTKE", &tke_gf_);
+    pvdc.RegisterField("externalV2", &v2_gf_);
   }
-  if (nSpec_ > 0) pvdc.RegisterField("externalSpecies", &Yn_gf_);
+
+  if (isInterpTurbField_) {
+    pvdc.RegisterField("externalNuT", &nut_gf_);
+  }
+
 }
 
 // TODO(swh): add a translation and rotation for external data plane
@@ -201,31 +233,48 @@ void GaussianInterpExtData::setup() {
     std::cout << "in interp setup..." << endl;
   }
 
-  if (!isInterpInlet_) {
+  if (!isInterpInlet_ && !isInterpTurbInlet_ && !isInterpTurbField_) {
     return;
   }
+
+
+  if (isInterpInlet_) {
+    setInlet();
+  }
+  
+  if (isInterpTurbInlet_) {
+    setInletTurbScalars();
+    
+  }
+  
+  if (isInterpTurbField_) {
+    setFieldTurbVisc();
+  }
+}
+
+void GaussianInterpExtData::setInlet() {
+  
   ParGridFunction coordsDof(vfes_);
   pmesh_->GetNodes(coordsDof);
-
-  double *Tdata = temperature_gf_.HostReadWrite();
-  double *Udata = velocity_gf_.HostReadWrite();
-  double *U0 = vel0_gf_.HostReadWrite();
-  double *Thdata = swirl_gf_.HostReadWrite();
-  double *Th0 = swirl0_gf_.HostReadWrite();
-  double *NuTdata = nut_gf_.HostReadWrite();
-  double *TKEdata = tke_gf_.HostReadWrite();
-  double *Ydata = Yn_gf_.HostReadWrite();
-  double *hcoords = coordsDof.HostReadWrite();
 
   // TODO(swh): need to generalize for more species...
   const int maxSpec = 10;
   if (nSpec_ > maxSpec) {
     if (rank0_) {
       std::cout << "Requesting more species than set in c-standard-required compile-time limit.  Increase maxSpec in "
-                   "gaussianInterpExtData.cpp"
+                    "gaussianInterpExtData.cpp"
                 << endl;
     }
   }
+    
+  double *Tdata = temperature_gf_.HostReadWrite();
+  double *Udata = velocity_gf_.HostReadWrite();
+  double *U0 = vel0_gf_.HostReadWrite();
+  double *Thdata = swirl_gf_.HostReadWrite();
+  double *Th0 = swirl0_gf_.HostReadWrite();
+  double *Ydata = Yn_gf_.HostReadWrite();
+  double *hcoords = coordsDof.HostReadWrite();
+
   struct inlet_profile {
     // double x, y, z, rho, temp, u, v, w;
     double x, y, z, rho, temp, u, v, w, yn[maxSpec];
@@ -334,176 +383,6 @@ void GaussianInterpExtData::setup() {
     fflush(stdout);
   }
 
-  // now repeat for the turb field data 
-  // TODO: no support for 3D
-  struct turb_profile {
-    double x, y, z, nut;
-  };
-
-  string fnameturbBase;
-  std::string basepathturb("./inputs/");
-  fnameturbBase = (basepathturb + fname_turb_);
-  const char *fnameturbRead = fnameturbBase.c_str();
-  int nCountTurb = 0;
-
-  // find size
-  if (rank0_) {
-    std::cout << " Attempting to open turb file for counting... " << fnameturbRead << " ";
-
-    FILE *inlet_file;
-    if ((inlet_file = fopen(fnameturbRead, "r"))) {
-      std::cout << " ...and open" << endl;
-      fflush(stdout);
-    } else {
-      std::cout << " ...CANNOT OPEN FILE" << endl;
-      fflush(stdout);
-    }
-
-    int ch = 0;
-    for (ch = getc(inlet_file); ch != EOF; ch = getc(inlet_file)) {
-      if (ch == '\n') {
-        nCountTurb++;
-      }
-    }
-    fclose(inlet_file);
-    std::cout << " final external data line count: " << nCountTurb << endl;
-    fflush(stdout);
-  }
-
-  MPI_Bcast(&nCountTurb, 1, MPI_INT, 0, tpsP_->getTPSCommWorld());
-  
-  // repeat for tke inlet field data 
-  // TODO: no support for 3D
-  struct tke_profile {
-    double x, y, z, tke;
-  };
-
-  string fnametkeBase;
-  std::string basepathtke("./inputs/");
-  fnametkeBase = (basepathtke + fname_tke_);
-  const char *fnametkeRead = fnametkeBase.c_str();
-  int nCountTKE = 0;
-
-  // find size
-  if (rank0_) {
-    std::cout << " Attempting to open TKE file for counting... " << fnametkeRead << " ";
-
-    FILE *inlet_file;
-    if ((inlet_file = fopen(fnametkeRead, "r"))) {
-      std::cout << " ...and open" << endl;
-      fflush(stdout);
-    } else {
-      std::cout << " ...CANNOT OPEN FILE" << endl;
-      fflush(stdout);
-    }
-
-    int ch = 0;
-    for (ch = getc(inlet_file); ch != EOF; ch = getc(inlet_file)) {
-      if (ch == '\n') {
-        nCountTKE++;
-      }
-    }
-    fclose(inlet_file);
-    std::cout << " final external data line count: " << nCountTKE << endl;
-    fflush(stdout);
-  }
-
-  // broadcast size
-  MPI_Bcast(&nCountTKE, 1, MPI_INT, 0, tpsP_->getTPSCommWorld());
-
-
-  struct turb_profile turb[nCountTurb];
-
-  // mean output from plane interpolation
-  // 0) x, 1) y, 3) nut
-  // TODO: z not provided
-
-  // open, read data
-  if (rank0_) {
-    ifstream file;
-    file.open(fnameturbRead);
-
-    string line;
-    getline(file, line);
-    int nLines = 0;
-    while (getline(file, line)) {
-      stringstream sline(line);
-      int entry = 0;
-      while (sline.good()) {
-        string substr;
-        getline(sline, substr, ',');  // csv delimited
-        double buffer = std::stod(substr);
-        entry++;
-
-        // using the current format, SHOULD CHANGE
-        if (entry == 1) {
-          turb[nLines].x = buffer;
-        } else if (entry == 2) {
-          turb[nLines].y = buffer;
-        } else if (entry == 3) {
-          turb[nLines].nut = buffer*v_fac_;
-        }
-      }
-      turb[nLines].z = 0.0;
-
-      nLines++;
-    }
-    file.close();
-  }
-
-  // broadcast data
-  MPI_Bcast(&turb, nCountTurb * 4, MPI_DOUBLE, 0, tpsP_->getTPSCommWorld());
-  if (rank0_) {
-    std::cout << " communicated turb data" << endl;
-    fflush(stdout);
-  }
-
-  struct tke_profile tke_pr[nCountTKE];
-
-  // mean output from plane interpolation
-  // 0) x, 1) y, 3) nut
-  // TODO: z not provided
-
-  // open, read data
-  if (rank0_) {
-    ifstream file;
-    file.open(fnametkeRead);
-
-    string line;
-    getline(file, line);
-    int nLines = 0;
-    while (getline(file, line)) {
-      stringstream sline(line);
-      int entry = 0;
-      while (sline.good()) {
-        string substr;
-        getline(sline, substr, ',');  // csv delimited
-        double buffer = std::stod(substr);
-        entry++;
-
-        // using the current format, SHOULD CHANGE
-        if (entry == 1) {
-          tke_pr[nLines].x = buffer;
-        } else if (entry == 2) {
-          tke_pr[nLines].y = buffer;
-        } else if (entry == 3) {
-          tke_pr[nLines].tke = buffer*v_fac_;
-        }
-      }
-      tke_pr[nLines].z = 0.0;
-
-      nLines++;
-    }
-    file.close();
-  }
-
-  // broadcast data
-  MPI_Bcast(&tke_pr, nCountTKE * 4, MPI_DOUBLE, 0, tpsP_->getTPSCommWorld());
-  if (rank0_) {
-    std::cout << " communicated tke data" << endl;
-    fflush(stdout);
-  }
-
 
   /*
   // width of interpolation stencil
@@ -521,8 +400,6 @@ void GaussianInterpExtData::setup() {
   double radius = 2.0 * torch_radius / nSamples; // 300 from nxn interp plane
   */
   double radius = 1.0;
-  double radius_turb = 1.0;
-  double radius_tke = 1.0;
   bool search = true;
   // NB: be careful with GetNBE (see comments in mfem/mesh/mesh.hpp)
   for (int be = 0; be < pmesh_->GetNBE(); be++) {
@@ -615,7 +492,7 @@ void GaussianInterpExtData::setup() {
             val_w = inlet[j].w;
             val_T = inlet[j].temp;
           }
-        */
+        */// double *hcoords = coordsDof.HostReadWrite();
       }
 
       if (wt_tot > 0.0) {
@@ -665,9 +542,103 @@ void GaussianInterpExtData::setup() {
       }
     }
   }
+}
 
 
-  // // now all interior points for nu_t
+void GaussianInterpExtData::setFieldTurbVisc() {
+  ParGridFunction coordsDof(vfes_);
+  pmesh_->GetNodes(coordsDof);
+  // now repeat for the turb field data 
+  // TODO: no support for 3D
+  double *NuTdata = nut_gf_.HostReadWrite();
+  double *hcoords = coordsDof.HostReadWrite();
+
+  struct turb_profile {
+    double x, y, z, nut;
+  };
+
+  string fnameturbBase;
+  std::string basepathturb("./inputs/");
+  fnameturbBase = (basepathturb + fname_turb_);
+  const char *fnameturbRead = fnameturbBase.c_str();
+  int nCountTurb = 0;
+
+  // find size
+  if (rank0_) {
+    std::cout << " Attempting to open turb file for counting... " << fnameturbRead << " ";
+
+    FILE *inlet_file;
+    if ((inlet_file = fopen(fnameturbRead, "r"))) {
+      std::cout << " ...and open" << endl;
+      fflush(stdout);
+    } else {
+      std::cout << " ...CANNOT OPEN FILE" << endl;
+      fflush(stdout);
+    }
+
+    int ch = 0;
+    for (ch = getc(inlet_file); ch != EOF; ch = getc(inlet_file)) {
+      if (ch == '\n') {
+        nCountTurb++;
+      }
+    }
+    fclose(inlet_file);
+    std::cout << " final external data line count: " << nCountTurb << endl;
+    fflush(stdout);
+  }
+
+  MPI_Bcast(&nCountTurb, 1, MPI_INT, 0, tpsP_->getTPSCommWorld());
+
+  struct turb_profile turb[nCountTurb];
+
+  // mean output from plane interpolation
+  // 0) x, 1) y, 3) nut
+  // TODO: z not provided
+
+  // open, read data
+  if (rank0_) {
+    ifstream file;
+    file.open(fnameturbRead);
+
+    string line;
+    getline(file, line);
+    int nLines = 0;
+    while (getline(file, line)) {
+      stringstream sline(line);
+      int entry = 0;
+      while (sline.good()) {
+        string substr;
+        getline(sline, substr, ',');  // csv delimited
+        double buffer = std::stod(substr);
+        entry++;
+
+        // using the current format, SHOULD CHANGE
+        if (entry == 1) {
+          turb[nLines].x = buffer;
+        } else if (entry == 2) {
+          turb[nLines].y = buffer;
+        } else if (entry == 3) {
+          turb[nLines].nut = buffer*v_fac_;
+        }
+      }
+      turb[nLines].z = 0.0;
+
+      nLines++;
+    }
+    file.close();
+  }
+
+  // broadcast data
+  MPI_Bcast(&turb, nCountTurb * 4, MPI_DOUBLE, 0, tpsP_->getTPSCommWorld());
+  if (rank0_) {
+    std::cout << " communicated turb data" << endl;
+    fflush(stdout);
+  }
+
+  bool search = true;
+  double radius_turb = 1.0;
+
+  // now all interior points for nu_t
   for (int ie = 0; ie < pmesh_->GetNE(); ie++) {
     Array<int> vdofs;
     sfes_->GetElementVDofs(ie, vdofs);
@@ -733,8 +704,109 @@ void GaussianInterpExtData::setup() {
       }
     }
   }
+}
 
-  // // now all boundary points for tke
+void GaussianInterpExtData::setInletTurbScalars() {
+
+  // repeat for tke inlet field data 
+  // TODO: no support for 3D
+  ParGridFunction coordsDof(vfes_);
+  pmesh_->GetNodes(coordsDof);
+
+  double *TKEdata = tke_gf_.HostReadWrite();
+  double *V2data = v2_gf_.HostReadWrite();
+  double *hcoords = coordsDof.HostReadWrite();
+
+  struct tke_profile {
+    double x, y, z, tke, v2;
+  };
+
+  string fnametkeBase;
+  std::string basepathtke("./inputs/");
+  fnametkeBase = (basepathtke + fname_tke_);
+  const char *fnametkeRead = fnametkeBase.c_str();
+  int nCountTKE = 0;
+
+  // find size
+  if (rank0_) {
+    std::cout << " Attempting to open zeta-f file for counting... " << fnametkeRead << " ";
+
+    FILE *inlet_file;
+    if ((inlet_file = fopen(fnametkeRead, "r"))) {
+      std::cout << " ...and open" << endl;
+      fflush(stdout);
+    } else {
+      std::cout << " ...CANNOT OPEN FILE" << endl;
+      fflush(stdout);
+    }
+
+    int ch = 0;
+    for (ch = getc(inlet_file); ch != EOF; ch = getc(inlet_file)) {
+      if (ch == '\n') {
+        nCountTKE++;
+      }
+    }
+    fclose(inlet_file);
+    std::cout << " final external data line count: " << nCountTKE << endl;
+    fflush(stdout);
+  }
+
+  // broadcast size
+  MPI_Bcast(&nCountTKE, 1, MPI_INT, 0, tpsP_->getTPSCommWorld());
+
+  struct tke_profile tke_pr[nCountTKE];
+
+  // mean output from plane interpolation
+  // 0) x, 1) y, 3) nut
+  // TODO: z not provided
+
+  // open, read data
+  if (rank0_) {
+    ifstream file;
+    file.open(fnametkeRead);
+
+    string line;
+    getline(file, line);
+    int nLines = 0;
+    while (getline(file, line)) {
+      stringstream sline(line);
+      int entry = 0;
+      while (sline.good()) {
+        string substr;
+        getline(sline, substr, ',');  // csv delimited
+        double buffer = std::stod(substr);
+        entry++;
+
+        // using the current format, SHOULD CHANGE
+        if (entry == 1) {
+          tke_pr[nLines].x = buffer;
+        } else if (entry == 2) {
+          tke_pr[nLines].y = buffer;
+        } else if (entry == 3) {
+          tke_pr[nLines].z = buffer;
+        } else if (entry == 4) {
+          tke_pr[nLines].tke = buffer;
+        } else if (entry == 5) {
+          tke_pr[nLines].v2 = buffer;
+        }
+      }
+      // tke_pr[nLines].z = 0.0;
+
+      nLines++;
+    }
+    file.close();
+  }
+
+  // broadcast data
+  MPI_Bcast(&tke_pr, nCountTKE * 5, MPI_DOUBLE, 0, tpsP_->getTPSCommWorld());
+  if (rank0_) {
+    std::cout << " communicated tke data" << endl;
+    fflush(stdout);
+  }
+
+  bool search = true;
+  double radius = 1.0;
+  // now all boundary points for tke
   for (int be = 0; be < pmesh_->GetNBE(); be++) {
     Array<int> vdofs;
     sfes_->GetBdrElementVDofs(be, vdofs);
@@ -758,14 +830,13 @@ void GaussianInterpExtData::setup() {
       double wt = 0.0;
       double wt_tot = 0.0;
       double val_TKE = 0.0;
-      double val_y[10];  // complaining even with maxSpec used
-      for (int is = 0; is < maxSpec; is++) val_y[is] = 0.0;
+      double val_V2 = 0.0;
 
       // minimum distance in interpolant field
       double distMin = 1.0e12;
-      for (int j = 0; j < nCount; j++) {
+      for (int j = 0; j < nCountTKE; j++) {
         // exclude points outside the domain
-        if (tke_pr[j].tke < 0.0) {
+        if (tke_pr[j].tke < 0.0 && tke_pr[j].v2 < 0.0) {
           continue;
         }
 
@@ -776,7 +847,7 @@ void GaussianInterpExtData::setup() {
 
       // find second closest data pt
       double distMinSecond = 1.0e12;
-      for (int j = 0; j < nCount; j++) {
+      for (int j = 0; j < nCountTKE; j++) {
         // exclude points outside the domain
         if (tke_pr[j].tke < 0.0) {
           continue;
@@ -792,9 +863,9 @@ void GaussianInterpExtData::setup() {
       // radius for Gaussian interpolation
       radius = distMinSecond;
 
-      for (int j = 0; j < nCount; j++) {
+      for (int j = 0; j < nCountTKE; j++) {
         // exclude points outside the domain
-        if (tke_pr[j].tke < 0.0) {
+        if (tke_pr[j].tke < 0.0 && tke_pr[j].v2 < 0.0) {
           continue;
         }
 
@@ -806,24 +877,33 @@ void GaussianInterpExtData::setup() {
           wt = exp(-(dist * dist) / (radius * radius));
           wt_tot += wt;
           val_TKE = val_TKE + wt * tke_pr[j].tke;
+          val_V2 = val_V2 + wt * tke_pr[j].tke;
         }
 
       }
 
       if (wt_tot > 0.0) {
+        // V2data[n] = val_V2 / wt_tot;
+        // TKEdata[n] = 1.5*V2data[n];
+        // std::cout << TKEdata[n] << std::endl;
         TKEdata[n] = val_TKE / wt_tot;
+        V2data[n] = std::min(val_V2 / wt_tot, (2./3.)*TKEdata[n]);
       } else {
         TKEdata[n] = 0.0;
+        V2data[n] = 0.0;
       }
     }
   }
+
 }
+
 
 void GaussianInterpExtData::step() {
   // empty for now, use for any updates/modifications
   // during simulation e.g. ramping up with time
   // double *Tdata = temperature_gf_.HostReadWrite();
 
+  // NOTE: No stepping routines implemented for the turb interps yet, change this if any are implemented
   if (!isInterpInlet_) {
     return;
   }

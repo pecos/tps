@@ -104,9 +104,14 @@ class GaussianInterpExtData : public ExternalDataBase {
   // int iter;
 
   bool isInterpInlet_;
+  bool isInterpTurbInlet_;
+  bool isInterpTurbField_;
+
+  double tke_const_;
 
   bool axisym_;
 
+  std::string turb_type_;
   std::string fname_;
   std::string fname_turb_;
   std::string fname_tke_;
@@ -133,6 +138,7 @@ class GaussianInterpExtData : public ExternalDataBase {
   ParGridFunction swirl0_gf_;
   ParGridFunction nut_gf_;
   ParGridFunction tke_gf_;
+  ParGridFunction v2_gf_;
   ParGridFunction Yn_gf_;
 
   // gradual increase of external bc over multiple steps
@@ -149,6 +155,9 @@ class GaussianInterpExtData : public ExternalDataBase {
   void initializeSelf();
   void initializeViz(ParaViewDataCollection &pvdc) final;
   void setup();
+  void setInlet();
+  void setInletTurbScalars();
+  void setFieldTurbVisc();
   void step();
 
   /// Return a pointer to the current temperature ParGridFunction.
@@ -159,6 +168,9 @@ class GaussianInterpExtData : public ExternalDataBase {
 
   /// Return a pointer to the current TKE ParGridFunction.
   ParGridFunction *GetExternalInterpolatedTurbKineticEnergy() { return &tke_gf_; }
+
+  /// Return a pointer to the current v2 ParGridFunction.
+  ParGridFunction *GetExternalInterpolatedTurbV2() { return &v2_gf_; }
 
   /// Return a pointer to the current eddy viscosity ParGridFunction.
   ParGridFunction *GetExternalInterpolatedEddyViscosity() { return &nut_gf_; }

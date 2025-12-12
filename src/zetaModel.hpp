@@ -342,6 +342,7 @@ class ZetaModel : public TurbModelBase {
   SumCoefficient *diag_coeff_ = nullptr;
 
   GridFunctionCoefficient *tke_field_ = nullptr;
+  GridFunctionCoefficient *v2_field_ = nullptr;
 
   /// operators and solvers
   ParBilinearForm *As_form_ = nullptr;

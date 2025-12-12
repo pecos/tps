@@ -295,7 +295,7 @@ public:
   /** \param TDF time-dependent function */
   ExtTransformedCoefficient(Coefficient * q1,Coefficient * q2,
       std::function<double(double, double)> F)
-    : Q1(q1), Q2(q2), Transform2(F) { Transform1 = 0; }
+    : Q1(q1), Q2(q2), Transform2(std::move(F)) { Transform1 = 0; }
 
   /// Set the time for internally stored coefficients
   void SetTime(double t);

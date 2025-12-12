@@ -62,6 +62,7 @@ struct extDataToThermoChem {
 struct extDataToTurbModel {
   const mfem::ParGridFunction *NuTdata = nullptr;
   const mfem::ParGridFunction *TKEdata = nullptr;
+  const mfem::ParGridFunction *V2data = nullptr;
 };
 
 /**
