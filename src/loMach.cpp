@@ -510,6 +510,8 @@ void LoMachSolver::solveEnd() {
     if (rank0_) std::cout << "At time = " << temporal_coeff_.time << ", flow L2 error = " << flow_err << std::endl;
   }
 
+  restart_files_hdf5("write");
+
   // paraview
   pvdc_->SetCycle(iter);
   pvdc_->SetTime(temporal_coeff_.time);
