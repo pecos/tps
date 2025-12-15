@@ -52,7 +52,8 @@ static double radius(const Vector &pos) { return pos[0]; }
 static FunctionCoefficient radius_coeff(radius);
 
 static double sigmaTorchStartUp(const Vector &pos) {
-  const double x = pos[0];  // radial location
+  //const double x = pos[0];  // radial location
+  const double x = std::sqrt(pos[0] * pos[0] + pos[2] * pos[2]);  // radial location
   const double y = pos[1];  // axial location
 
   const double r0 = 0.005;
@@ -906,9 +907,33 @@ void LteThermoChem::initializeOperators() {
 
 
   // Smooth the restart temperature field (if requested)
-  if (filter_restart_) {
-    if (rank0_) std::cout << "************ Filtering temperature restart ******************" << std::endl;
+  if (filter_restart_ && qt_filter_) {
+    if (rank0_) std::cout << "************ Filtering temperature restart (Qt) ******************" << std::endl;
+    resT_ = 0.0;
+    Ms_->AddMult(Tn_, resT_);
 
+    // Prepare for the solve
+    for (auto &temp_dbc : temp_dbcs_) {
+      Tn_next_gf_.ProjectBdrCoefficient(*temp_dbc.coeff, temp_dbc.attr);
+    }
+    sfes_->GetRestrictionMatrix()->MultTranspose(resT_, resT_gf_);
+
+    Vector Xt2, Bt2;
+    Mq_form_->FormLinearSystem(Qt_ess_tdof_, Tn_next_gf_, resT_gf_, Mq_, Xt2, Bt2, 1);
+
+    MqInv_->Mult(Bt2, Xt2);
+    assert(MqInv_->GetConverged());
+    Mq_form_->RecoverFEMSolution(Xt2, resT_gf_, Tn_next_gf_);
+
+    Tn_next_gf_.GetTrueDofs(Tn_next_);
+
+    Tn_gf_.SetFromTrueDofs(Tn_next_);
+
+    Tn_gf_.GetTrueDofs(Tn_);
+    Tn_next_gf_.SetFromTrueDofs(Tn_);
+    Tn_next_gf_.GetTrueDofs(Tn_next_);
+  } else if (filter_restart_) {
+    if (rank0_) std::cout << "************ Filtering temperature restart ******************" << std::endl;
     // Build the right-hand-side
     resT_ = 0.0;
     M_rho_Cp_->AddMult(Tn_, resT_);
