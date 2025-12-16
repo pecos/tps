@@ -90,8 +90,6 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   tpsP_->getInput("loMach/reacting/min-temperature", Tmin_, 0.0);
   tpsP_->getInput("loMach/reacting/max-temperature", Tmax_, 100000.0);
 
-
-
   workFluid_ = USER_DEFINED;
   gasModel_ = PERFECT_MIXTURE;
   chemistryModel_ = NUM_CHEMISTRYMODEL;
@@ -2148,10 +2146,12 @@ void ReactingFlow::temperatureStep() {
     double Tmin = Tmin_;
     double Tmax = Tmax_;
     auto d_Tn_gf = Tn_next_gf_.ReadWrite();
-    MFEM_FORALL(i, Tn_next_gf_.Size(),
-                { if (d_Tn_gf[i] < Tmin) d_Tn_gf[i] = Tmin; });
-    MFEM_FORALL(i, Tn_next_gf_.Size(),
-                { if (d_Tn_gf[i] > Tmax) d_Tn_gf[i] = Tmax; });
+    MFEM_FORALL(i, Tn_next_gf_.Size(), {
+      if (d_Tn_gf[i] < Tmin) d_Tn_gf[i] = Tmin;
+    });
+    MFEM_FORALL(i, Tn_next_gf_.Size(), {
+      if (d_Tn_gf[i] > Tmax) d_Tn_gf[i] = Tmax;
+    });
     Tn_next_gf_.GetTrueDofs(Tn_next_);
   }
 

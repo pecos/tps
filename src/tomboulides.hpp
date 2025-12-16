@@ -246,8 +246,8 @@ class Tomboulides final : public FlowBase {
 
   /// mfem::Coefficients used in forming necessary operators
   mfem::GridFunctionCoefficient *rho_coeff_ = nullptr;
-  //mfem::RatioCoefficient *iorho_coeff_ = nullptr;
-  //mfem::GridFunctionCoefficient *iorho_coeff_ = nullptr;
+  // mfem::RatioCoefficient *iorho_coeff_ = nullptr;
+  // mfem::GridFunctionCoefficient *iorho_coeff_ = nullptr;
   mfem::Coefficient *iorho_coeff_ = nullptr;
   mfem::ConstantCoefficient nlcoeff_;
   mfem::ConstantCoefficient one_coeff_;

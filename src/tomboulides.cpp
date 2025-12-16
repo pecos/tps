@@ -1243,7 +1243,6 @@ void Tomboulides::step() {
   (*iorho_gf_) = 1.0;
   (*iorho_gf_) /= (*thermo_interface_->density);
 
-
   // Update the variable coefficient Laplacian to account for change
   // in density
   sw_press_.Start();

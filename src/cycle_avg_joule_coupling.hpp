@@ -85,8 +85,7 @@ class CycleAvgJouleCoupling : public TPS::Solver {
 
   bool oscillating_power_;
   double power_amplitude_;
-  double power_period_; // in time steps
-
+  double power_period_;  // in time steps
 
   int rank_;
   int nprocs_;

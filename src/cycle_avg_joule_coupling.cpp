@@ -66,8 +66,8 @@ CycleAvgJouleCoupling::CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tp
   tps->getInput("cycle-avg-joule-coupled/fixed-conductivity", fixed_conductivity_, false);
 
   tps->getInput("cycle-avg-joule-coupled/oscillating-power", oscillating_power_, false);
-  tps->getInput("cycle-avg-joule-coupled/input-power-amplitude",  power_amplitude_, 0.0);
-  tps->getInput("cycle-avg-joule-coupled/input-power-period",  power_period_, 1.0);
+  tps->getInput("cycle-avg-joule-coupled/input-power-amplitude", power_amplitude_, 0.0);
+  tps->getInput("cycle-avg-joule-coupled/input-power-period", power_period_, 1.0);
 
   if (axisym) {
     qmsa_solver_ = new QuasiMagnetostaticSolverAxiSym(em_opt_, tps);

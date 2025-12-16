@@ -52,9 +52,9 @@ static double radius(const Vector &pos) { return pos[0]; }
 static FunctionCoefficient radius_coeff(radius);
 
 static double sigmaTorchStartUp(const Vector &pos) {
-  //const double x = pos[0];  // radial location
+  // const double x = pos[0];  // radial location
   const double x = std::sqrt(pos[0] * pos[0] + pos[2] * pos[2]);  // radial location
-  const double y = pos[1];  // axial location
+  const double y = pos[1];                                        // axial location
 
   const double r0 = 0.005;
   const double y0 = 0.135;
@@ -70,7 +70,11 @@ static FunctionCoefficient sigma_start_up(sigmaTorchStartUp);
 
 LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &time_coeff,
                              ParGridFunction *gridScale, TPS::Tps *tps)
-    : tpsP_(tps), pmesh_(pmesh), gll_rules_(0, Quadrature1D::GaussLobatto), time_coeff_(time_coeff), gridScale_gf_(gridScale)  {
+    : tpsP_(tps),
+      pmesh_(pmesh),
+      gll_rules_(0, Quadrature1D::GaussLobatto),
+      time_coeff_(time_coeff),
+      gridScale_gf_(gridScale) {
   rank0_ = (pmesh_->GetMyRank() == 0);
   order_ = loMach_opts->order;
 
@@ -183,7 +187,6 @@ LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, t
   if (qt_filter_) {
     if (rank0_) std::cout << "Using Qt filter in LTE thermo chem!" << std::endl;
   }
-
 }
 
 LteThermoChem::~LteThermoChem() {
@@ -503,7 +506,7 @@ void LteThermoChem::initializeSelf() {
       tpsP_->getRequiredInput((basepath + "/type").c_str(), type);
 
       if (type == "viscous_isothermal") {
-        if(rank0_) std::cout << "Adding patch = " << patch << " to isothermal wall list!" << std::endl;
+        if (rank0_) std::cout << "Adding patch = " << patch << " to isothermal wall list!" << std::endl;
 
         attr_wall = 0;
         attr_wall[patch - 1] = 1;
@@ -909,7 +912,6 @@ void LteThermoChem::initializeOperators() {
   Tn_next_gf_.SetFromTrueDofs(Tn_);
   Tn_next_gf_.GetTrueDofs(Tn_next_);
 
-
   // Smooth the restart temperature field (if requested)
   if (filter_restart_ && qt_filter_) {
     if (rank0_) std::cout << "************ Filtering temperature restart (Qt) ******************" << std::endl;
@@ -1019,8 +1021,8 @@ void LteThermoChem::initializeStats(Averaging &average, IODataOrganizer &io, boo
     average.registerField(std::string("temperature"), &Tn_gf_, false, 0, 1);
 
     // io init
-    io.registerIOFamily("Time-averaged temperature", "/meanTemp", average.GetMeanField(std::string("temperature")), false,
-                        continuation, sfec_);
+    io.registerIOFamily("Time-averaged temperature", "/meanTemp", average.GetMeanField(std::string("temperature")),
+                        false, continuation, sfec_);
     io.registerIOVar("/meanTemp", "<T>", 0, true);
   }
 }
@@ -1154,10 +1156,12 @@ void LteThermoChem::step() {
     double Tmin = Tmin_;
     double Tmax = Tmax_;
     auto d_Tn_gf = Tn_next_gf_.ReadWrite();
-    MFEM_FORALL(i, Tn_next_gf_.Size(),
-                { if (d_Tn_gf[i] < Tmin) d_Tn_gf[i] = Tmin; });
-    MFEM_FORALL(i, Tn_next_gf_.Size(),
-                { if (d_Tn_gf[i] > Tmax) d_Tn_gf[i] = Tmax; });
+    MFEM_FORALL(i, Tn_next_gf_.Size(), {
+      if (d_Tn_gf[i] < Tmin) d_Tn_gf[i] = Tmin;
+    });
+    MFEM_FORALL(i, Tn_next_gf_.Size(), {
+      if (d_Tn_gf[i] > Tmax) d_Tn_gf[i] = Tmax;
+    });
     Tn_next_gf_.GetTrueDofs(Tn_next_);
   }
 
