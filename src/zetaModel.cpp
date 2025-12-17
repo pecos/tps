@@ -541,6 +541,14 @@ void ZetaModel::initializeSelf() {
         // AddTKEDirichletBC(tke_value, inlet_attr);
         // AddV2DirichletBC(2.0/3.0*tke_value, inlet_attr);	
       } else if (type == "fully-developed-pipe-swirl") {
+        Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
+        inlet_attr = 0;
+        inlet_attr[patch - 1] = 1;
+
+        tke_field_ = new GridFunctionCoefficient(extData_interface_->TKEdata);
+        v2_field_ = new GridFunctionCoefficient(extData_interface_->V2data);
+        AddTKEDirichletBC(tke_field_, inlet_attr);
+        AddV2DirichletBC(v2_field_, inlet_attr);
       } else {
         if (rank0_) {
           std::cout << "ERROR: zeta-f inlet type = " << type << " not supported." << std::endl;
