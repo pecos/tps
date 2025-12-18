@@ -61,6 +61,7 @@ void Orthogonalize(Vector &v, const ParFiniteElementSpace *pfes) {
   int loc_size = v.Size();
   int global_size = 0;
 
+  // testing...
   MPI_Allreduce(&loc_sum, &global_sum, 1, MPI_DOUBLE, MPI_SUM, pfes->GetComm());
   MPI_Allreduce(&loc_size, &global_size, 1, MPI_INT, MPI_SUM, pfes->GetComm());
 
