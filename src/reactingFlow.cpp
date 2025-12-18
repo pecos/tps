@@ -113,6 +113,9 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     tpsP_->getInput("boltzmannSolver/blend-frac-change-freq", bl_frac_change_freq_, 1);
     bl_frac_ = bl_frac_init_;
     tpsP_->getInput("boltzmannSolver/solve-bte-every-n", solve_bte_every_n, 1);
+    tpsP_->getInput("boltzmannSolver/regrid-bte-every-n", regrid_bte_every_n, 1);
+    tpsP_->getInput("boltzmannSolver/n_grids", n_vspace_grids, 1);
+    grid_idx_to_npts.resize(n_vspace_grids);
   }
 #endif
 
@@ -895,6 +898,8 @@ void ReactingFlow::initializeSelf() {
   // reaction rate coefficients to be passed to kReac_gf_
   kReac_.SetSize(rDofInt_);
   kReac_ = 1.0e-12;
+
+  grid_idx_to_spatial_idx_map.resize(sDofInt_);
 #endif
 
   radiation_sink_gf_.SetSpace(sfes_);
@@ -1759,13 +1764,60 @@ void ReactingFlow::step() {
 #ifdef HAVE_PYTHON
     int iter = this->GetCurrentIter();
     int update_bte_rates = (iter - 1) % solve_bte_every_n;
+
+    int regrid_bte = (iter - 1) % regrid_bte_every_n;
     
     if (rank0_) {
       int iter_number_ = this->GetCurrentIter();
-      std::cout << "[C++] Iter = " << iter_number_ << ", bl_frac = " << bl_frac_
-      << "sDofInt = " << sDofInt_ << "\n";
+      std::cout << "[C++] Iter = " << iter_number_ << "sDofInt = " << sDofInt_ 
+      << ", update_bte_rates = " << update_bte_rates << ", regrid_bte = " << regrid_bte << ", " << regrid_bte_every_n << "\n";
     }
-    if(bte_from_tps_ && update_bte_rates == 0) {
+
+    if (bte_from_tps_ && regrid_bte == 0) {
+      if (rank0_) {
+        int iter_number_ = this->GetCurrentIter();
+        std::cout << "[C++] Iter = " << iter_number_ << ", Setting up the v-space grids for BTE..." << "\n";
+      }
+
+      int size = Tn_.Size();
+      auto Tarr = py::array_t<double>(
+          {size},                 // shape
+          {sizeof(double)},       // stride
+          dataT                    // const double* pointer
+      );
+      Tarr.attr("flags").attr("writeable") = false; // mark read-only
+
+      int n_bte_grids = n_vspace_grids;
+
+      py::object result;
+      try {
+        // IMPORT THE PYTHON SCRIPT
+        py::object script = py::module_::import("tps-get-bte-rates");
+        // CALL THE PYTHON FUNCTION
+        result = script.attr("bte_grid_setup")(Tarr, n_bte_grids);
+      } catch (const py::error_already_set &e) {
+        std::cerr << "ReactingFlow::step(), Python error in BTE grid setup: " << e.what() << std::endl;
+        exit(-1);
+      }
+      py::tuple arrays = result.cast<py::tuple>();
+
+      // Unpack arrays
+      py::array_t<int32_t> gid_to_npts_arr = arrays[0].cast<py::array_t<int32_t>>();
+      py::array_t<int64_t> gid_spatin_map  = arrays[1].cast<py::array_t<int64_t>>();
+
+      // Access data
+      auto buf_gid_npts_arr   = gid_to_npts_arr.request();
+      auto buf_gid_spatin_map = gid_spatin_map.request();
+
+      int32_t* ptr_gid_to_npts = static_cast<int32_t*>(buf_gid_npts_arr.ptr);
+      int64_t* ptr_gid_spatin_map = static_cast<int64_t*>(buf_gid_spatin_map.ptr);
+
+      grid_idx_to_npts.assign(ptr_gid_to_npts, ptr_gid_to_npts + buf_gid_npts_arr.size);
+
+      grid_idx_to_spatial_idx_map.assign(ptr_gid_spatin_map, ptr_gid_spatin_map + buf_gid_spatin_map.size);
+
+    }
+    if (bte_from_tps_ && update_bte_rates == 0) {
       // // Wrap const pointer into NumPy array (no copy)
       // // Dimensions given as {size}, stride as {sizeof(double)}
       int size = Tn_.Size();
@@ -1835,14 +1887,25 @@ void ReactingFlow::step() {
       );
       Eiarr.attr("flags").attr("writeable") = false; // mark read-only
 
+      // Convert the grid_idx_to_npts and grid_idx_to_spatial_idx_map to Python arrays of int32 and int64 type respectively
+      py::array_t<int32_t> py_grid_idx_to_npts(grid_idx_to_npts.size(), grid_idx_to_npts.data());
+      py::array_t<int64_t> py_grid_idx_to_spatial_idx_map(grid_idx_to_spatial_idx_map.size(), grid_idx_to_spatial_idx_map.data());
+
+      py_grid_idx_to_npts.attr("flags").attr("writeable") = false; // mark read-only
+      py_grid_idx_to_spatial_idx_map.attr("flags").attr("writeable") = false; // mark read-only
+
+      int n_bte_grids = n_vspace_grids;
+
       py::object result;
       try {
         // IMPORT THE PYTHON SCRIPT
         py::object script = py::module_::import("tps-get-bte-rates");
         // CALL THE PYTHON FUNCTION
-        result = script.attr("bte_from_tps")(Tarr, specarr, Erarr, Eiarr, collisionsFile, solver_type, ee_collisions);
+        result = script.attr("bte_from_tps")(Tarr, specarr, Erarr, Eiarr, collisionsFile, solver_type, ee_collisions, 
+                  n_bte_grids, py_grid_idx_to_npts, py_grid_idx_to_spatial_idx_map);
       } catch (const py::error_already_set &e) {
         std::cerr << "ReactingFlow::step(), Python error: " << e.what() << std::endl;
+        exit(-1);
       }
   
       // Convert "result" to an MFEM Vector
@@ -1907,6 +1970,8 @@ void ReactingFlow::step() {
       delete[] YT;
 #ifdef HAVE_PYTHON
       kReac_gf_.SetFromTrueDofs(kReac_);
+      reacR_gf_.SetFromTrueDofs(reacR_);
+      prodY_gf_.SetFromTrueDofs(prodY_);
       if (bte_from_tps_) {
         // UPDATE THE BLENDING FRACTION
         int iter_number_ = this->GetCurrentIter();
@@ -3353,7 +3418,22 @@ void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, 
 #endif
   chemistry_->computeEquilibriumConstants(Th, Te, keq.HostWrite());
   chemistry_->computeProgressRate(n_sp, kfwd, keq, progressRate);
+#ifdef HAVE_PYTHON
+  double *dataReac = reacR_.HostWrite();
+  // Write the reaction progress rates into dataReac
+  for(int nr = 0; nr < nReactions_; nr++){
+    dataReac[dofindex + nr * sDofInt_] = progressRate[nr];
+  }
+#endif
   chemistry_->computeCreationRate(progressRate, creationRate, emissionRate);
+
+#ifdef HAVE_PYTHON
+  double *dataProd = prodY_.HostWrite();
+  // Write the reaction progress rates into dataReac
+  for(int sp = 0; sp < nSpecies_; sp++){
+    dataProd[dofindex + sp * sDofInt_] = creationRate[sp];
+  }
+#endif
 
   // And store in returned variable
   for (int sp = 0; sp < nActiveSpecies_; sp++) {

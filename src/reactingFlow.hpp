@@ -424,6 +424,17 @@ class ReactingFlow : public ThermoChemModelBase {
   double bl_frac_init_, bl_frac_increment_, bl_frac_;
   int bl_frac_change_freq_ = 1;
   int solve_bte_every_n = 1;
+
+  // Number of v-space grids per MPI rank for the BTE solver
+  int n_vspace_grids = 1;
+  int regrid_bte_every_n = 1; // call the BTE grid_setup function to setup v-space grids every nth step
+
+  // grid_idx_to_npts : Vector of length n_vspace_grids where each element contains the number of points in that v-space grid
+  // grid_idx_to_spatial_idx_map: Vector of length sDofInt_ which contains the indices of the points in each v-space grid
+  // For example, if grid_idx = i contains ng_i points, grid_idx_to_spatial_idx_map[ilo:ilo+ng] contains the indices of the 
+  // points in the ith v-space grid. Here, ilo_{i} = (\sum_{m=0}^{m=i} ng_m) - ng_i
+  std::vector<std::int32_t> grid_idx_to_npts;
+  std::vector<std::int64_t> grid_idx_to_spatial_idx_map;
 #endif
 
  public:

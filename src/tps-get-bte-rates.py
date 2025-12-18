@@ -39,7 +39,7 @@ parser.add_argument("-threads", "--threads"                       , help="number
 parser.add_argument("-out_fname", "--out_fname"                   , help="output file name for the qois", type=str, default="bte")
 parser.add_argument("-solver_type", "--solver_type"               , help="solver type", type=str, default="steady-state")
 parser.add_argument("-l_max", "--l_max"                           , help="max polar modes in SH expansion", type=int, default=1)
-parser.add_argument("-c", "--collisions"                          , help="collisions model", type=str, default="/work2/10565/ashwathsv/frontera/tps-venv/frontera/tps-venv/tps/boltzmann/BESolver/python/lxcat_data/fully_lumped_argon_mechanism_cs.lxcat")
+parser.add_argument("-c", "--collisions"                          , help="collisions model", type=str, default="/work2/10565/ashwathsv/frontera/tps-venv/frontera/tps-venv/tps/boltzmann/BESolver/python/lxcat_data/fully_lumped_argon_mechanism_cs_recomb.lxcat")
 parser.add_argument("-sp_order", "--sp_order"                     , help="b-spline order", type=int, default=3)
 parser.add_argument("-spline_qpts", "--spline_qpts"               , help="q points per knots", type=int, default=5)
 parser.add_argument("-atol", "--atol"                             , help="absolute tolerance", type=float, default=1e-10)
@@ -48,7 +48,7 @@ parser.add_argument("-max_iter", "--max_iter"                     , help="max nu
 parser.add_argument("-Te", "--Te"                                 , help="approximate electron temperature (eV)" , type=float, default=0.5)
 parser.add_argument("-n0"    , "--n0"                             , help="heavy density (1/m^3)" , type=float, default=3.22e22)
 parser.add_argument("-ev_max", "--ev_max"                         , help="max energy in the v-space grid" , type=float, default=30)
-parser.add_argument("-Nr", "--Nr"                                 , help="radial refinement", type=int, default=128)
+parser.add_argument("-Nr", "--Nr"                                 , help="radial refinement", type=int, default=64)
 parser.add_argument("-profile", "--profile"                       , help="profile", type=int, default=0)
 parser.add_argument("-warm_up", "--warm_up"                       , help="warm up", type=int, default=5)
 parser.add_argument("-runs", "--runs"                             , help="runs "  , type=int, default=10)
@@ -66,7 +66,7 @@ parser.add_argument("-input", "--input"                           , help="tps da
 #python3 bte_0d3v_batched_driver.py --threads 1 -out_fname bte_ss -solver_type steady-state -c lxcat_data/eAr_crs.synthetic.3sp2r -sp_order 3 -spline_qpts 5 -atol 1e-10 -rtol 1e-10 -max_iter 300 -Te 3 -n0 3.22e22 -ev_max 30 -Nr 127 -n_pts 1 -ee_collisions 1 -cycles 2 -dt 1e-3
 args                  = parser.parse_args()
 
-def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, solver_type, ee_collisions):
+def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, solver_type, ee_collisions, n_grids, grid_idx_to_npts, grid_idx_to_spatial_idx_map_vec):
     # INPUTS:
     # Tarr : Array of heavies temperature (1D array of length sDofInt)
     # narr : Array of species number densities (1D array of length sDofInt * nspecies)
@@ -78,6 +78,16 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, solver_type, ee_collisions
     comm = MPI.COMM_WORLD
     rank_ = comm.Get_rank()
     size_ = comm.Get_size()
+
+    glo = 0
+    for gidx in range(n_grids):
+        ghi = glo + grid_idx_to_npts[gidx]
+        grid_idx_to_spatial_idx_map = grid_idx_to_spatial_idx_map_vec[glo:ghi]
+        if rank_ == 0:
+            print("[FROM bte_from_tps()] gidx = ", gidx, ", len(gtospanap) = ", len(grid_idx_to_spatial_idx_map), ", minmax(gtospamap) = ", np.amin(grid_idx_to_spatial_idx_map), np.amax(grid_idx_to_spatial_idx_map))
+        glo = ghi
+    if rank_ == 0:
+        print("[FROM bte_from_tps()] dtypes = ", grid_idx_to_npts.dtype, grid_idx_to_spatial_idx_map_vec.dtype)
 
     # First, get the number of species passed from TPS
     nSprem = len(narr) % len(Tarr)
@@ -110,6 +120,8 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, solver_type, ee_collisions
 
     args.collisions = collisions_file # collision cross-section file
     n0 = np.zeros(n_pts) # n0 = \sum_{sp} (n_{sp}) - n_e
+    if rank_ == 0:
+        print("nActSpecies = ", nActSpecies)
     for i in range(nActSpecies):
         n0 = n0 + narr[i*n_pts:i*n_pts+n_pts]
     
@@ -119,14 +131,19 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, solver_type, ee_collisions
     ne = narr[ELEIDX*n_pts:ELEIDX*n_pts+n_pts] + eps # electron number density
     ni = narr[IONIDX*n_pts:IONIDX*n_pts+n_pts] + eps # ion number density
 
-    print()
-
     ion_deg = (ne / n0) + eps
 
     ns_by_n0 = np.zeros((len(all_species), n_pts)) # ns_by_n0 defined for all background species with which electrons collide (ie Ar, Ar*)
     # In the collisions file, Ar is index 0, Ar* is index 1
-    ns_by_n0[0,0:n_pts] = narr[NEUIDX*n_pts:NEUIDX*n_pts+n_pts] / n0
-    ns_by_n0[1,0:n_pts] = narr[EXCIDX*n_pts:EXCIDX*n_pts+n_pts] / n0
+    for i in range(len(all_species)):
+        # if rank_ == 0:
+        #     print("i = ", i, "species = ", all_species[i])
+        if all_species[i] == 'Ar':
+            ns_by_n0[i,0:n_pts] = narr[NEUIDX*n_pts:NEUIDX*n_pts+n_pts] / n0
+        elif all_species[i] == 'Ar*':
+            ns_by_n0[i,0:n_pts] = narr[EXCIDX*n_pts:EXCIDX*n_pts+n_pts] / n0
+        elif all_species[i] == 'Ar+':
+            ns_by_n0[i,0:n_pts] = (ni / n0) + eps
 
     # Getting the electric field magnitude from real and imaginary components
     Emag = np.sqrt((Er+eps)**2 + (Ei+eps)**2)
@@ -162,7 +179,7 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, solver_type, ee_collisions
     bte_solver.set_boltzmann_parameter(grid_idx, "eIm"      , Ei + eps)
     bte_solver.set_boltzmann_parameter(grid_idx, "f0"       , f0)
     bte_solver.set_boltzmann_parameter(grid_idx,  "E"       , Emag)
-        
+
     collision_names = bte_solver.get_collision_names()
 
     if args.use_gpu==1:
@@ -185,19 +202,30 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, solver_type, ee_collisions
     else:
         rr_cpu = qoi["rates"]
 
+    # FIX THE RECOMBINATION RATES
+    # SINCE THE BTE ASSUMES A PSEUDO 2-BODY COLLISION MODEL,
+    # THE RECOMBINATION RATE COEFFICIENTS COMING FROM BTE HAVE UNITS OF m^6-s^{-1}
+    # WE NEED TO MULTIPLY THESE BY N_avo**2 TO CONVERT THE UNITS TO m^6-mol^{-2}-s^{-1} FOR USE IN TPS
+    cs_data_all   = cross_section.read_cross_section_data(args.collisions)
+    collision_count = 0
+    for col_str, col_data in cs_data_all.items():
+        if col_data["type"] == "ATTACHMENT":
+            # print("col_str = ", col_str)
+            rr_cpu[collision_count] = N_Avo*rr_cpu[collision_count]
+        collision_count+=1
+
     # FROM PYTHON, GET THE GLOBAL MAX AND MIN OF THE RATE COEFFICIENTS FOR EACH REACTION
+    rates = (rr_cpu * N_Avo) # OTHER REACTIONS CONVERTED TO UNITS OF m^3-mol^{-1}-s^{-1}
+    # for i in range(qoi["rates"].shape[0]):
+    #     rateloc = rates[i,:]
+        # locmin = np.amin(rateloc)
+        # locmax = np.amax(rateloc)
 
-    rates = (rr_cpu * N_Avo)
-    for i in range(qoi["rates"].shape[0]):
-        rateloc = rates[i,:]
-        locmin = np.amin(rateloc)
-        locmax = np.amax(rateloc)
+        # locnumneg = np.sum(rateloc < -1e5)
 
-        locnumneg = np.sum(rateloc < -1e5)
-
-        glomin = comm.allreduce(locmin, op=MPI.MIN)
-        glomax = comm.allreduce(locmax, op=MPI.MAX)
-        glonumneg = comm.allreduce(locnumneg, op=MPI.SUM)
+        # glomin = comm.allreduce(locmin, op=MPI.MIN)
+        # glomax = comm.allreduce(locmax, op=MPI.MAX)
+        # glonumneg = comm.allreduce(locnumneg, op=MPI.SUM)
 
         # if i == qoi["rates"].shape[0]-1:
             # lmi = np.argmin(rateloc)
@@ -207,8 +235,8 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, solver_type, ee_collisions
             # print("Rank = ", filestr)
             # with open("plasma_params_Nr120.txt", "a") as file:
             #     file.write(filestr)
-        if rank_ == 0 and i == qoi["rates"].shape[0]-1:
-            print("Global reaction ", i, ", min = ", glomin, ", max = ", glomax, ", num_negatives = ", glonumneg)
+        # if rank_ == 0 and i == qoi["rates"].shape[0]-1:
+        #     print("Global reaction ", i, ", min = ", glomin, ", max = ", glomax, ", num_negatives = ", glonumneg)
             # sampind = 1557
             # print("[Py] Index = ", sampind, "Sample rates = ", rates[:,sampind])
     
@@ -220,3 +248,60 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, solver_type, ee_collisions
     #     print("Rank = ", rank_, ", BTE solve complete...")
 
     return data
+
+# FUNCTION TO SETUP V-SPACE GRIDS FOR THE BTE SOLVE
+def bte_grid_setup(Tarr, n_grids):
+
+    # Set up the MPI communicators
+    comm = MPI.COMM_WORLD
+    rank_ = comm.Get_rank()
+    size_ = comm.Get_size()
+
+    Te = Tarr / ev_to_K # [eV]
+
+    # WHITEN THE DATA (Normalize such that the data has unit variance)
+    Tew           = scipy.cluster.vq.whiten(Te)
+    Tecw0         = Tew[np.random.choice(Tew.shape[0], n_grids, replace=False)]
+    # k-means clustering based on temperature
+    Tecw          = scipy.cluster.vq.kmeans(Tew, np.linspace(np.min(Tew), np.max(Tew), n_grids), iter=1000, thresh=1e-8, check_finite=False)[0]
+
+    Tecw0[0:len(Tecw)] = Tecw[:]
+    Tecw               = Tecw0
+    assert len(Tecw0) == n_grids
+
+    Te_b          = np.sort(Tecw * np.std(Te, axis=0))
+    dist_mat      = np.zeros((len(Te),n_grids))
+
+    print("rank [%d/%d] : K-means Te clusters "%(rank_, size_), Te_b, flush=True)
+    for i in range(n_grids):
+        dist_mat[:,i] = np.abs(Tew-Tecw[i])
+
+    membership = np.argmin(dist_mat, axis=1)
+    grid_idx_to_spatial_pts_map = list()
+    for b_idx in range(n_grids):
+        grid_idx_to_spatial_pts_map.append(np.argwhere(membership==b_idx)[:,0])
+
+    grid_idx_to_npts            = np.array([len(a) for a in grid_idx_to_spatial_pts_map], dtype=np.int32)
+    grid_idx_to_spatial_idx_map = grid_idx_to_spatial_pts_map
+
+    np.sum(grid_idx_to_npts)    == len(Te), "[Error] : TPS spatial points for v-space grid assignment is inconsitant"
+
+    active_grid_idx  = [i for i in range(n_grids)]
+
+    # grid_idx_to_spatial_pts_map is passed as a vector of int to C++
+    # Conver the list to a vector
+    grid_pts_to_spatial_index_map_vec = np.zeros(np.sum(grid_idx_to_npts), dtype=grid_idx_to_spatial_idx_map[0].dtype)
+    glo = 0
+    for gidx in range(n_grids):
+        if rank_ == 0:
+            print("[FROM bte_grid_setup()] gidx = ", gidx, ", len(gtospanap) = ", len(grid_idx_to_spatial_idx_map[gidx]), ", minmax(gtospamap) = ", np.amin(grid_idx_to_spatial_idx_map[gidx]), np.amax(grid_idx_to_spatial_idx_map[gidx]))
+        ghi = glo + grid_idx_to_npts[gidx]
+        grid_pts_to_spatial_index_map_vec[glo:ghi] = grid_idx_to_spatial_idx_map[gidx]
+        glo = ghi
+    if rank_ == 0:
+        print("[FROM bte_grid_setup()] dtypes = ", grid_idx_to_npts.dtype, grid_pts_to_spatial_index_map_vec.dtype)
+
+    return grid_idx_to_npts, grid_pts_to_spatial_index_map_vec
+
+
+
