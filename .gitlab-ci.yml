@@ -16,7 +16,7 @@ tioga:
    ROCM_VER: "6.4.2"
    CCE_VER: "20.0.0"
    MPICH_VER: "9.0.1"
-   SW_HOME: "/usr/workspace/oliver33/tioga/sw"
+   SW_HOME: "/usr/workspace/utaustin/tioga/sw"
  stage: build
  tags:
    - tioga
