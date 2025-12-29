@@ -397,17 +397,53 @@ void LoMachSolver::solveStep() {
   sw_step_.Start();
 
   if (loMach_opts_.ts_opts_.integrator_type_ == LoMachTemporalOptions::CURL_CURL) {
+
+    // timestep information
     SetTimeIntegrationCoefficients(iter - iter_start_);
+
+    // external data updates
     extData_->step();
-    sw_thermChem_.Start();
-    thermo_->step();
-    sw_thermChem_.Stop();
+
+    // flow: predictor
     sw_flow_.Start();
-    flow_->step();
+    flow_->predictorStep();
     sw_flow_.Stop();
+
+    // density: mass imbalance
+    sw_thermChem_.Start();    
+    thermo_->massImbalanceStep();
+    sw_thermChem_.Stop();
+
+    // pressure
+    sw_thermChem_.Start();
+    thermo_->pressureStep();
+    sw_thermChem_.Stop();
+    
+    // flow: pressure correction
+    sw_flow_.Start();
+    flow_->correctionStep();
+    sw_flow_.Stop();
+
+    // density: predictor
+    sw_thermChem_.Start();    
+    thermo_->densityPredictorStep();
+    sw_thermChem_.Stop();
+    
+    // temperature
+    sw_thermChem_.Start();    
+    thermo_->temperatureStep();
+    sw_thermChem_.Stop();
+
+    // density 
+    sw_thermChem_.Start();    
+    thermo_->densityStep();
+    sw_thermChem_.Stop();
+    
+    // update turbulence model
     sw_turb_.Start();
     turbModel_->step();
     sw_turb_.Stop();
+    
   } else {
     if (rank0_) std::cout << "Time integration not updated." << endl;
     exit(1);

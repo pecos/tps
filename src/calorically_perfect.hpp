@@ -151,9 +151,13 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   // Fields
   ParGridFunction Tnm1_gf_, Tnm2_gf_;
   ParGridFunction Tn_gf_, Tn_next_gf_, Text_gf_, resT_gf_;
-  ParGridFunction rn_gf_;
-  ParGridFunction rhoDt;
 
+  ParGridFunction rn_gf_, rnm1_gf_, rnm2_gf_;
+  ParGridFunction rn_next_gf_, rext_gf_, resr_gf_;
+  ParGridFunction rhoDt;  
+
+  ParGridFunction Pn_gf_, p_prime_gf_, mass_imbalance_;
+  
   ParGridFunction visc_gf_;
   ParGridFunction kappa_gf_;
   ParGridFunction R0PM0_gf_;
@@ -196,9 +200,13 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   ParBilinearForm *Ms_form_ = nullptr;
   ParBilinearForm *MsRho_form_ = nullptr;
   ParBilinearForm *Ht_form_ = nullptr;
+  ParBilinearForm *Hr_form_ = nullptr;
+  ParBilinearForm *D_rho_form_ = nullptr;  
   ParBilinearForm *Mq_form_ = nullptr;
+  ParBilinearForm *MsIORT_form_ = nullptr;  
   ParBilinearForm *LQ_form_ = nullptr;
   ParLinearForm *LQ_bdry_ = nullptr;
+  ParLinearForm *P_form_ = nullptr;  
 
   OperatorHandle LQ_;
   OperatorHandle At_;
@@ -206,6 +214,9 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   OperatorHandle Ms_;
   OperatorHandle MsRho_;
   OperatorHandle Mq_;
+  OperatorHandle P_op_;
+  OperatorHandle MsIORT_;
+  OperatorHandle Hr_;  
 
   mfem::Solver *MsInvPC_ = nullptr;
   mfem::CGSolver *MsInv_ = nullptr;
@@ -214,17 +225,30 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   mfem::Solver *HtInvPC_ = nullptr;
   mfem::CGSolver *HtInv_ = nullptr;
 
+  mfem::Solver *HrInvPC_ = nullptr;
+  mfem::GMRESSolver *HrInv_ = nullptr;  
+  mfem::Solver *P_InvPC_ = nullptr;
+  mfem::GMRESSolver *P_Inv_ = nullptr;  
+
+  
   // Vectors
   Vector Tn_, Tn_next_, Tnm1_, Tnm2_;
   Vector NTn_, NTnm1_, NTnm2_;
   Vector Text_;
   Vector resT_;
-  Vector tmpR0_, tmpR0b_;
 
+  Vector rn_, rn_next_, rnm1_, rnm2_;
+  Vector Nrn_, Nrnm1_, Nrnm2_;
+  Vector rext_;
+  Vector resr_;  
+
+  Vector Pn_, p_prime_, mass_imbalance_;
+  
   Vector Qt_;
-  Vector rn_;
   Vector kappa_;
   Vector visc_;
+
+  Vector tmpR0_, tmpR0b_;  
 
   // Parameters and objects used in filter-based stabilization
   bool filter_temperature_ = false;

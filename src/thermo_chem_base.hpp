@@ -54,6 +54,10 @@ struct extDataToThermoChem;
  */
 struct thermoChemToFlow {
   const mfem::ParGridFunction *density = nullptr;
+  const mfem::ParGridFunction *rn = nullptr;
+  const mfem::ParGridFunction *rnm1 = nullptr;
+  const mfem::ParGridFunction *rnm2 = nullptr;
+  const mfem::ParGridFunction *mass_imbalance = nullptr;      
   const mfem::ParGridFunction *viscosity = nullptr;
   const mfem::ParGridFunction *thermal_divergence = nullptr;
 };
@@ -214,6 +218,9 @@ class ConstantPropertyThermoChem final : public ThermoChemModelBase {
   mfem::ParFiniteElementSpace *fes_ = nullptr;
 
   mfem::ParGridFunction *density_ = nullptr;
+  mfem::ParGridFunction *rn_ = nullptr;
+  mfem::ParGridFunction *rnm1_ = nullptr;
+  mfem::ParGridFunction *rnm2_ = nullptr;  
   mfem::ParGridFunction *viscosity_ = nullptr;
   mfem::ParGridFunction *thermal_divergence_ = nullptr;
 
