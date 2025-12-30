@@ -82,6 +82,8 @@ class FlowBase {
   virtual void initializeSelf() = 0;
 
   virtual void step() = 0;
+  virtual void predictionStep() = 0;
+  virtual void correctionStep() = 0;    
 
   virtual mfem::ParGridFunction *getCurrentVelocity() = 0;
   virtual mfem::ParGridFunction *getCurrentVelocityGradientU() { return nullptr; }
@@ -175,6 +177,8 @@ class ZeroFlow final : public FlowBase {
 
   /// Velocity is always zero, so nothing to do
   void step() {}
+  void predictionStep() {}
+  void correctionStep() {}  
 
   mfem::ParGridFunction *getCurrentVelocity() final { return velocity_; }
 };

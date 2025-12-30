@@ -122,6 +122,7 @@ class GaussianInterpExtData : public ExternalDataBase {
   ParFiniteElementSpace *yfes_ = nullptr;
 
   ParGridFunction temperature_gf_;
+  ParGridFunction density_gf_;  
   ParGridFunction velocity_gf_;
   ParGridFunction vel0_gf_;
   ParGridFunction Yn_gf_;

@@ -2000,6 +2000,23 @@ void ReactingFlow::step() {
   updateDiffusivity();
 }
 
+//void ReactingFlow::temperatureStep() {
+//}
+
+/*
+void ReactingFlow::massImbalanceStep() {  
+}
+
+void ReactingFlow::pressureStep() {  
+}
+
+void ReactingFlow::densityStep() {  
+}
+
+void ReactingFlow::densityPredictionStep() {  
+}
+*/
+
 // should be Nsub s.t.: Nsub > dt * [Prod_Y{n}/rho{n}/Yn{n}]
 void ReactingFlow::evalSubstepNumber() {
   double myMaxProd = 0.0;

@@ -60,6 +60,7 @@ struct thermoChemToFlow {
   const mfem::ParGridFunction *mass_imbalance = nullptr;      
   const mfem::ParGridFunction *viscosity = nullptr;
   const mfem::ParGridFunction *thermal_divergence = nullptr;
+  const mfem::ParGridFunction *pressure = nullptr;        
 };
 
 /**
@@ -117,6 +118,11 @@ class ThermoChemModelBase {
    * @brief Take a single time step
    */
   virtual void step() = 0;
+  virtual void massImbalanceStep() = 0;
+  virtual void pressureStep() = 0;
+  virtual void densityPredictionStep() = 0;
+  virtual void temperatureStep() = 0;    
+  virtual void densityStep() = 0;  
 
   /**
    * @brief Hook to let derived classes register restart fields with the IODataOrganizer.
@@ -254,6 +260,12 @@ class ConstantPropertyThermoChem final : public ThermoChemModelBase {
 
   /// Since everything is constant, step is a no-op
   void step() final {}
+  void massImbalanceStep() final {};
+  void pressureStep() final {};
+  void densityPredictionStep() final {};
+  void temperatureStep() final {};
+  void densityStep() final {};
+  
 };
 
 #endif  // THERMO_CHEM_BASE_HPP_

@@ -116,6 +116,8 @@ void GaussianInterpExtData::initializeSelf() {
 
   temperature_gf_.SetSpace(sfes_);
   temperature_gf_ = 0.0;
+  density_gf_.SetSpace(sfes_);
+  density_gf_ = 1.0;  
   velocity_gf_.SetSpace(vfes_);
   velocity_gf_ = 0.0;
   vel0_gf_.SetSpace(vfes_);
@@ -130,6 +132,7 @@ void GaussianInterpExtData::initializeSelf() {
 
   // exports
   toThermoChem_interface_.Tdata = &temperature_gf_;
+  toThermoChem_interface_.Rdata = &density_gf_;  
   toFlow_interface_.Udata = &velocity_gf_;
 
   if (nSpec_ > 0) {

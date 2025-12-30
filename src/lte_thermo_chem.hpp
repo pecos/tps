@@ -266,9 +266,16 @@ class LteThermoChem final : public ThermoChemModelBase {
   // Functions overriden from base class
   void initializeSelf() final;
   void initializeOperators() final;
-  void step() final;
   void initializeIO(IODataOrganizer &io) final;
-  void initializeViz(ParaViewDataCollection &pvdc) final;
+  void initializeViz(ParaViewDataCollection &pvdc) final;  
+  
+  void step() final;
+  void massImbalanceStep() final {};
+  void pressureStep() final {};
+  void densityPredictionStep() final {};
+  void temperatureStep() final {};
+  void densityStep() final {};
+  
   void evaluatePlasmaConductivityGF() final;
 
   // Functions added here

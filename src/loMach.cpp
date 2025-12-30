@@ -406,7 +406,7 @@ void LoMachSolver::solveStep() {
 
     // flow: predictor
     sw_flow_.Start();
-    flow_->predictorStep();
+    flow_->predictionStep();
     sw_flow_.Stop();
 
     // density: mass imbalance
@@ -426,7 +426,7 @@ void LoMachSolver::solveStep() {
 
     // density: predictor
     sw_thermChem_.Start();    
-    thermo_->densityPredictorStep();
+    thermo_->densityPredictionStep();
     sw_thermChem_.Stop();
     
     // temperature

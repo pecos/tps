@@ -67,6 +67,8 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   // Mesh and discretization scheme info
   ParMesh *pmesh_ = nullptr;
   int order_;
+  int vorder_;
+  int dim_;  
   IntegrationRules gll_rules_;
   const temporalSchemeCoefficients &time_coeff_;
   double dt_;
@@ -92,6 +94,19 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   double hsmoother_relax_weight_ = 0.8;
   double hsmoother_relax_omega_ = 0.1;
 
+  //  Options: Jacobi, l1Jacobi, l1GS, l1GStr, lumpedJacobi,
+  //           GS, OPFS, Chebyshev, Taubin, FIR
+  mfem::HypreSmoother::Type smoother_type_ = HypreSmoother::Jacobi;
+
+  double pressure_strength_thres_ = 0.6;
+  int amg_aggresive_ = 4;
+  int amg_max_levels_ = 10;
+  int amg_max_iters_ =
+      1;  // should be 1 for precon, setting to zero is ~30-40% faster per step but effectively turns off solve
+  int amg_relax_ = 18;  // only 0 or 18 now
+  int amg_coarsening_ = 8;
+  int amg_interpolation_ = 14;  
+  
   // solver tolerance options
   int pl_solve_; /**< Verbosity level passed to mfem solvers */
   int max_iter_; /**< Maximum number of linear solver iterations */
@@ -111,15 +126,26 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   double hsolve_rtol_;
   double hsolve_atol_;
 
+  int psolve_pl_ = 0;
+  int psolve_max_iter_;
+  double psolve_rtol_;
+  double psolve_atol_;  
+
   // Boundary condition info
   Array<int> temp_ess_attr_; /**< List of patches with Dirichlet BC on temperature */
   Array<int> Qt_ess_attr_;   /**< List of patches with Dirichlet BC on Q (thermal divergence) */
+  Array<int> rho_ess_attr_;
+  Array<int> press_ess_attr_;    
 
   Array<int> temp_ess_tdof_; /**< List of true dofs with Dirichlet BC on temperature */
   Array<int> Qt_ess_tdof_;   /**< List of true dofs with Dirichlet BC on Q */
+  Array<int> rho_ess_tdof_;
+  Array<int> press_ess_tdof_;  
 
   std::vector<DirichletBC_T<Coefficient>> temp_dbcs_; /**< vector of Dirichlet BC coefficients for T*/
-  std::vector<DirichletBC_T<Coefficient>> Qt_dbcs_;   /**< vector of Dirichlet BC coefficients for Q*/
+  std::vector<DirichletBC_T<Coefficient>> Qt_dbcs_;   /**< vector of Dirichlet BC coefficients for Q*/ 
+  std::vector<DirichletBC_T<Coefficient>> rho_dbcs_;   
+  std::vector<DirichletBC_T<Coefficient>> press_dbcs_;  
 
   // Scalar modeling parameters
   double mu0_;           /**< Dynamic viscosity, either multiplier for Sutherland or constant */
@@ -148,6 +174,12 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   // Scalar \f$H^1\f$ finite element space.
   ParFiniteElementSpace *sfes_ = nullptr;
 
+  // Vector \f$H^1\f$ finite element collection.
+  FiniteElementCollection *vfec_ = nullptr;
+
+  // Vector \f$H^1\f$ finite element space.
+  ParFiniteElementSpace *vfes_ = nullptr;
+  
   // Fields
   ParGridFunction Tnm1_gf_, Tnm2_gf_;
   ParGridFunction Tn_gf_, Tn_next_gf_, Text_gf_, resT_gf_;
@@ -156,7 +188,7 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   ParGridFunction rn_next_gf_, rext_gf_, resr_gf_;
   ParGridFunction rhoDt;  
 
-  ParGridFunction Pn_gf_, p_prime_gf_, mass_imbalance_;
+  ParGridFunction Pn_gf_, p_prime_gf_, mass_imbalance_gf_;
   
   ParGridFunction visc_gf_;
   ParGridFunction kappa_gf_;
@@ -167,6 +199,7 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
 
   // ParGridFunction *buffer_tInlet_ = nullptr;
   GridFunctionCoefficient *temperature_bc_field_ = nullptr;
+  GridFunctionCoefficient *density_bc_field_ = nullptr;  
 
   VectorGridFunctionCoefficient *un_next_coeff_ = nullptr;
   GridFunctionCoefficient *rhon_next_coeff_ = nullptr;
@@ -195,18 +228,29 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   TransformedMatrixVectorCoefficient *swdiff_coeff_ = nullptr;
   ScalarMatrixProductCoefficient *supg_coeff_ = nullptr;
 
+  ConstantCoefficient *rgas_coeff_ = nullptr;
+  ConstantCoefficient *bdf_coeff_ = nullptr;
+  ConstantCoefficient *p_diff_coeff_ = nullptr;      
+  GridFunctionCoefficient *rho_tmp_coeff_ = nullptr;  
+  GridFunctionCoefficient *temperature_coeff_ = nullptr; 
+  ProductCoefficient *rt_coeff_ = nullptr;
+  RatioCoefficient *iort_coeff_ = nullptr; 
+  ProductCoefficient *p_diag_coeff_ = nullptr;
+  VectorGridFunctionCoefficient *ustar_coeff_ = nullptr;
+  ScalarVectorProductCoefficient *p_conv_coeff_ = nullptr;
+
   // operators and solvers
   ParBilinearForm *At_form_ = nullptr;
   ParBilinearForm *Ms_form_ = nullptr;
   ParBilinearForm *MsRho_form_ = nullptr;
   ParBilinearForm *Ht_form_ = nullptr;
   ParBilinearForm *Hr_form_ = nullptr;
-  ParBilinearForm *D_rho_form_ = nullptr;  
+  ParMixedBilinearForm *D_rho_form_ = nullptr;  
   ParBilinearForm *Mq_form_ = nullptr;
-  ParBilinearForm *MsIORT_form_ = nullptr;  
+  ParBilinearForm *MsIORT_form_ = nullptr;
+  ParBilinearForm *P_form_ = nullptr;    
   ParBilinearForm *LQ_form_ = nullptr;
   ParLinearForm *LQ_bdry_ = nullptr;
-  ParLinearForm *P_form_ = nullptr;  
 
   OperatorHandle LQ_;
   OperatorHandle At_;
@@ -215,6 +259,7 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   OperatorHandle MsRho_;
   OperatorHandle Mq_;
   OperatorHandle P_op_;
+  OperatorHandle D_rho_op_;  
   OperatorHandle MsIORT_;
   OperatorHandle Hr_;  
 
@@ -230,6 +275,12 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   mfem::Solver *P_InvPC_ = nullptr;
   mfem::GMRESSolver *P_Inv_ = nullptr;  
 
+  // solver objects
+  mfem::ParLORDiscretization *P_lor_ = nullptr;
+  mfem::OrthoSolver *P_inv_ortho_pc_ = nullptr;  
+  //mfem::HypreBoomerAMG *P_inv_pc_ = nullptr;
+  mfem::HypreSmoother *P_inv_pc_ = nullptr;
+  mfem::GMRESSolver *P_inv_ = nullptr;  
   
   // Vectors
   Vector Tn_, Tn_next_, Tnm1_, Tnm2_;
@@ -283,10 +334,17 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   // Functions overriden from base class
   void initializeSelf() final;
   void initializeOperators() final;
-  void step() final;
   void initializeIO(IODataOrganizer &io) final;
   void initializeViz(ParaViewDataCollection &pvdc) final;
-  void initializeStats(Averaging &average, IODataOrganizer &io, bool continuation) final;
+  void initializeStats(Averaging &average, IODataOrganizer &io, bool continuation) final;  
+
+  // soln advance steps
+  void step() final;
+  void massImbalanceStep() final;
+  void pressureStep() final;
+  void densityPredictionStep() final;
+  void temperatureStep() final;
+  void densityStep() final;
 
   void screenHeader(std::vector<std::string> &header) const final;
   void screenValues(std::vector<double> &values) final;
@@ -328,6 +386,15 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   void AddTempDirichletBC(const double &temp, Array<int> &attr);
   void AddTempDirichletBC(Coefficient *coeff, Array<int> &attr);
   void AddTempDirichletBC(ScalarFuncT *f, Array<int> &attr);
+
+  void AddRhoDirichletBC(const double &rho, Array<int> &attr);
+  void AddRhoDirichletBC(Coefficient *coeff, Array<int> &attr);
+  void AddRhoDirichletBC(ScalarFuncT *f, Array<int> &attr);
+
+  void AddPressDirichletBC(const double &press, Array<int> &attr);
+  void AddPressDirichletBC(Coefficient *coeff, Array<int> &attr);
+  void AddPressDirichletBC(ScalarFuncT *f, Array<int> &attr);
+  
   void AddQtDirichletBC(Coefficient *coeff, Array<int> &attr);
   void AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr);
 };

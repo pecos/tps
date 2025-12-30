@@ -226,7 +226,8 @@ class Tomboulides final : public FlowBase {
   // mfem::ParGridFunction *buffer_uInlet_ = nullptr;
   mfem::VectorGridFunctionCoefficient *velocity_field_ = nullptr;
   mfem::ParGridFunction *epsi_gf_ = nullptr;
-  mfem::ParGridFunction *ustar_gf_ = nullptr;  
+  mfem::ParGridFunction *ustar_gf_ = nullptr;
+  mfem::ParGridFunction *rho_tmp_gf_ = nullptr;  
 
   /// Pressure FEM objects and fields
   mfem::FiniteElementCollection *pfec_ = nullptr;
@@ -246,7 +247,8 @@ class Tomboulides final : public FlowBase {
   /// mfem::Coefficients used in forming necessary operators
   mfem::GridFunctionCoefficient *rho_coeff_ = nullptr;
   mfem::RatioCoefficient *iorho_coeff_ = nullptr;
-  mfem::ConstantCoefficient nlcoeff_;
+  mfem::ConstantCoefficient nlcoeff_const_;  
+  mfem::GridFunctionCoefficient *nlcoeff_ = nullptr;
   mfem::ConstantCoefficient one_coeff_;
   mfem::ConstantCoefficient Hv_bdfcoeff_;
   mfem::ProductCoefficient *rho_over_dt_coeff_ = nullptr;
@@ -291,6 +293,7 @@ class Tomboulides final : public FlowBase {
   mfem::ParBilinearForm *L_iorho_form_ = nullptr;  // \int (1/\rho) \nabla \phi_i \cdot \nabla \phi_j
   mfem::ParLinearForm *forcing_form_ = nullptr;    // \int \phi_i f
   mfem::ParNonlinearForm *Nconv_form_ = nullptr;   // \int \vphi_i \cdot [(u \cdot \nabla) u]
+  mfem::ParNonlinearForm *Nconv_rho_form_ = nullptr;  
   mfem::ParBilinearForm *Ms_form_ = nullptr;       // mass matrix = \int \vphi_i \cdot \vphi_j
   mfem::ParBilinearForm *Mv_form_ = nullptr;       // mass matrix = \int \vphi_i \cdot \vphi_j
   mfem::ParMixedBilinearForm *D_form_ = nullptr;   // divergence = \int \phi_i \nabla \cdot \vphi_j
@@ -331,6 +334,9 @@ class Tomboulides final : public FlowBase {
   mfem::Solver *Mv_inv_pc_ = nullptr;
   mfem::CGSolver *Mv_inv_ = nullptr;
 
+  mfem::Solver *Ms_inv_pc_ = nullptr;
+  mfem::CGSolver *Ms_inv_ = nullptr;
+  
   mfem::Solver *Mv_rho_inv_pc_ = nullptr;
   mfem::CGSolver *Mv_rho_inv_ = nullptr;
 
@@ -350,7 +356,6 @@ class Tomboulides final : public FlowBase {
   mfem::Vector N_vec_;
   mfem::Vector Nm1_vec_;
   mfem::Vector Nm2_vec_;
-  mfem::Vector ustar_vec_;
   mfem::Vector uext_vec_;
   mfem::Vector pp_div_vec_;
   mfem::Vector pp_div_bdr_vec_;
@@ -366,6 +371,7 @@ class Tomboulides final : public FlowBase {
   mfem::Vector Qt_vec_;
   mfem::Vector grad_Qt_vec_;
   mfem::Vector rho_vec_;
+  mfem::Vector rho_tmp_vec_;  
   mfem::Vector mu_vec_;
   mfem::Vector ress_vec_;
   mfem::Vector S_poisson_vec_;
@@ -439,6 +445,8 @@ class Tomboulides final : public FlowBase {
 
   /// Advance
   void step() final;
+  void predictionStep() final;
+  void correctionStep() final;    
 
   void screenHeader(std::vector<std::string> &header) const final {
     int nprint = 1;
