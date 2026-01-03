@@ -237,10 +237,14 @@ void Tomboulides::initializeSelf() {
   // Initialize minimal state and interface
   vfec_ = new H1_FECollection(vorder_, dim_);
   vfes_ = new ParFiniteElementSpace(pmesh_, vfec_, dim_);
+  sfec_ = new H1_FECollection(vorder_);
+  sfes_ = new ParFiniteElementSpace(pmesh_, sfec_);
+  pfec_ = new H1_FECollection(porder_);
+  pfes_ = new ParFiniteElementSpace(pmesh_, pfec_);
+  
   u_curr_gf_ = new ParGridFunction(vfes_);
   u_next_gf_ = new ParGridFunction(vfes_);
   ustar_gf_ = new ParGridFunction(vfes_);
-  rho_tmp_gf_ = new ParGridFunction(sfes_);    
   curl_gf_ = new ParGridFunction(vfes_);
   curlcurl_gf_ = new ParGridFunction(vfes_);
   resu_gf_ = new ParGridFunction(vfes_);
@@ -248,16 +252,12 @@ void Tomboulides::initializeSelf() {
   gradU_gf_ = new ParGridFunction(vfes_);
   gradV_gf_ = new ParGridFunction(vfes_);
   gradW_gf_ = new ParGridFunction(vfes_);
-  sfec_ = new H1_FECollection(vorder_);
-  sfes_ = new ParFiniteElementSpace(pmesh_, sfec_);
-
-  pfec_ = new H1_FECollection(porder_);
-  pfes_ = new ParFiniteElementSpace(pmesh_, pfec_);
+  
   p_gf_ = new ParGridFunction(pfes_);
   resp_gf_ = new ParGridFunction(pfes_);
 
   epsi_gf_ = new ParGridFunction(sfes_);
-
+  rho_tmp_gf_ = new ParGridFunction(sfes_);    
   mu_total_gf_ = new ParGridFunction(pfes_);
 
   // pp_div_rad_comp_gf_ = new ParGridFunction(pfes_, *pp_div_gf_);
@@ -277,7 +277,7 @@ void Tomboulides::initializeSelf() {
   *curl_gf_ = 0.0;
   *curlcurl_gf_ = 0.0;
   *resu_gf_ = 0.0;
-  *rho_tmp_gf_ = 0.0;  
+  *rho_tmp_gf_ = 1.0;  
 
   *gradU_gf_ = 0.0;
   *gradV_gf_ = 0.0;
@@ -806,8 +806,8 @@ void Tomboulides::initializeOperators() {
   }
   Ms_inv_ = new CGSolver(vfes_->GetComm());
   Ms_inv_->iterative_mode = false;
-  Ms_inv_->SetOperator(*Mv_op_);
-  Ms_inv_->SetPreconditioner(*Mv_inv_pc_);
+  Ms_inv_->SetOperator(*Ms_op_);
+  Ms_inv_->SetPreconditioner(*Ms_inv_pc_);
   Ms_inv_->SetPrintLevel(mass_inverse_pl_);
   Ms_inv_->SetAbsTol(mass_inverse_atol_);
   Ms_inv_->SetRelTol(mass_inverse_rtol_);
@@ -1323,7 +1323,6 @@ void Tomboulides::step() {
   Mv_rho_form_->Update();
   Mv_rho_form_->Assemble();
   Mv_rho_form_->FormSystemMatrix(empty, Mv_rho_op_);
-
   Mv_rho_inv_->SetOperator(*Mv_rho_op_);
 
   // Update the Helmholtz operator and inverse
@@ -1799,10 +1798,10 @@ void Tomboulides::predictionStep() {
   tmpR1_.Set(1.0,u_vec_);
   {
     const auto d_sqrtr = tmpR0_.Read();
-    auto d_rhu = tmpR1_.ReadWrite();
+    auto d_rhu = tmpR1_.ReadWrite();    
     MFEM_FORALL(i, tmpR0_.Size(), { d_rhu[i] *= d_sqrtr[i]; });
     MFEM_FORALL(i, tmpR0_.Size(), { d_rhu[i + tmpR0_.Size()] *= d_sqrtr[i]; });
-    MFEM_FORALL(i, tmpR0_.Size(), { d_rhu[i + 2*tmpR0_.Size()] *= d_sqrtr[i]; });    
+    if (dim_ == 3) MFEM_FORALL(i, tmpR0_.Size(), { d_rhu[i + 2*tmpR0_.Size()] *= d_sqrtr[i]; });    
   }
   Nconv_form_->Mult(tmpR1_, N_vec_);  
 
@@ -1819,7 +1818,7 @@ void Tomboulides::predictionStep() {
     auto d_rhu = tmpR1_.ReadWrite();
     MFEM_FORALL(i, tmpR0_.Size(), { d_rhu[i] *= d_sqrtr[i]; });
     MFEM_FORALL(i, tmpR0_.Size(), { d_rhu[i + tmpR0_.Size()] *= d_sqrtr[i]; });
-    MFEM_FORALL(i, tmpR0_.Size(), { d_rhu[i + 2*tmpR0_.Size()] *= d_sqrtr[i]; });    
+    if (dim_ == 3) MFEM_FORALL(i, tmpR0_.Size(), { d_rhu[i + 2*tmpR0_.Size()] *= d_sqrtr[i]; });    
   }
   Nconv_form_->Mult(tmpR1_, Nm1_vec_);  
 
@@ -1836,7 +1835,7 @@ void Tomboulides::predictionStep() {
     auto d_rhu = tmpR1_.ReadWrite();
     MFEM_FORALL(i, tmpR0_.Size(), { d_rhu[i] *= d_sqrtr[i]; });
     MFEM_FORALL(i, tmpR0_.Size(), { d_rhu[i + tmpR0_.Size()] *= d_sqrtr[i]; });
-    MFEM_FORALL(i, tmpR0_.Size(), { d_rhu[i + 2*tmpR0_.Size()] *= d_sqrtr[i]; });    
+    if (dim_ == 3) MFEM_FORALL(i, tmpR0_.Size(), { d_rhu[i + 2*tmpR0_.Size()] *= d_sqrtr[i]; });    
   }
   Nconv_form_->Mult(tmpR1_, Nm2_vec_);  
 
@@ -1884,7 +1883,7 @@ void Tomboulides::predictionStep() {
   Mv_rho_form_->Update();
   Mv_rho_form_->Assemble();
   Mv_rho_form_->FormSystemMatrix(empty, Mv_rho_op_);
-  Mv_rho_form_->Mult(u_vec_, tmpR1_);
+  Mv_rho_op_->Mult(u_vec_, tmpR1_);
   forcing_vec_.Add(-coeff_.bd1 / dt, tmpR1_);
 
   thermo_interface_->rnm1->GetTrueDofs(rho_vec_);  
@@ -1892,7 +1891,7 @@ void Tomboulides::predictionStep() {
   Mv_rho_form_->Update();
   Mv_rho_form_->Assemble();
   Mv_rho_form_->FormSystemMatrix(empty, Mv_rho_op_);
-  Mv_rho_form_->Mult(um1_vec_, tmpR1_);
+  Mv_rho_op_->Mult(um1_vec_, tmpR1_);
   forcing_vec_.Add(-coeff_.bd1 / dt, tmpR1_);
 
   thermo_interface_->rnm2->GetTrueDofs(rho_vec_);    
@@ -1900,9 +1899,10 @@ void Tomboulides::predictionStep() {
   Mv_rho_form_->Update();
   Mv_rho_form_->Assemble();
   Mv_rho_form_->FormSystemMatrix(empty, Mv_rho_op_);
-  Mv_rho_form_->Mult(um2_vec_, tmpR1_);
+  Mv_rho_op_->Mult(um2_vec_, tmpR1_);
   forcing_vec_.Add(-coeff_.bd3 / dt, tmpR1_);
-    
+
+  
   /*{
     const double bd1idt = -coeff_.bd1 / dt;
     const double bd2idt = -coeff_.bd2 / dt;
@@ -1954,7 +1954,7 @@ void Tomboulides::predictionStep() {
 
   // Negate b/c term that appears in residual is -curl curl u
   pp_div_vec_.Neg();
-  Mv_form_->Mult(pp_div_vec_,tmpR1_);
+  Mv_op_->Mult(pp_div_vec_,tmpR1_);
   pp_div_vec_.Set(1.0,tmpR1_);
 
   // TODO(trevilo): This calculation of the viscous terms

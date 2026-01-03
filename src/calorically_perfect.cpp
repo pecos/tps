@@ -358,6 +358,7 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
   }
 
   Tn_gf_.GetTrueDofs(Tn_);
+  Tn_next_gf_.SetFromTrueDofs(Tn_);  
   Tnm1_gf_.SetFromTrueDofs(Tn_);
   Tnm2_gf_.SetFromTrueDofs(Tn_);
   Tnm1_gf_.GetTrueDofs(Tnm1_);
@@ -445,11 +446,12 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
   }
 
   // outlet bc: only pressure and only one outlet at this time
-  {
+  if (numOutlets > 0) {
     int patch;
     std::string type;
-    //std::string basepath("boundaryConditions/outlet" + std::to_string(i));
-    std::string basepath("boundaryConditions/outlet");
+    int i = 1;
+    std::string basepath("boundaryConditions/outlet" + std::to_string(i));
+    //std::string basepath("boundaryConditions/outlet");
     
     Array<int> attr_outlet(pmesh_->bdr_attributes.Max());
     attr_outlet = 0;
@@ -561,15 +563,15 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   rhou_coeff_ = new ScalarVectorProductCoefficient(*rhon_next_coeff_, *un_next_coeff_);
 
   // pressure solve
-  rgas_coeff_->constant = Rgas_;  
+  rgas_coeff_.constant = Rgas_;  
   temperature_coeff_ = new GridFunctionCoefficient(&Tn_next_gf_);
-  rt_coeff_ = new ProductCoefficient(*rgas_coeff_, *temperature_coeff_);
+  rt_coeff_ = new ProductCoefficient(rgas_coeff_, *temperature_coeff_);
   iort_coeff_ = new RatioCoefficient(1.0, *rt_coeff_);
-  bdf_coeff_->constant = time_coeff_.bd0 / time_coeff_.dt;
-  p_diag_coeff_ = new ProductCoefficient(*bdf_coeff_, *iort_coeff_);
+  bdf_coeff_.constant = time_coeff_.bd0 / time_coeff_.dt;
+  p_diag_coeff_ = new ProductCoefficient(bdf_coeff_, *iort_coeff_);
   ustar_coeff_ = new VectorGridFunctionCoefficient(flow_interface_->ustar);  
   p_conv_coeff_ = new ScalarVectorProductCoefficient(*iort_coeff_, *ustar_coeff_);
-  p_diff_coeff_->constant = time_coeff_.dt / time_coeff_.bd0;
+  p_diff_coeff_.constant = time_coeff_.dt / time_coeff_.bd0;
     
   // artifical diffusion coefficients
   if (sw_stab_) {
@@ -628,7 +630,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   
   // Material derivative for density
   Hr_form_ = new ParBilinearForm(sfes_);
-  auto *hmr_blfi = new MassIntegrator(*bdf_coeff_);
+  auto *hmr_blfi = new MassIntegrator(bdf_coeff_);
   auto *hcr_blfi = new ConvectionIntegrator(*ustar_coeff_);
   if (numerical_integ_) {
     hmr_blfi->SetIntRule(&ir_nli);
@@ -707,7 +709,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   DiffusionIntegrator *pd_blfi;
   ConvectionIntegrator *pc_blfi;  
   pm_blfi = new MassIntegrator(*p_diag_coeff_);
-  pd_blfi = new DiffusionIntegrator(*p_diff_coeff_); // neg on lhs but also neq from ibp
+  pd_blfi = new DiffusionIntegrator(p_diff_coeff_); // neg on lhs but also neq from ibp
   pc_blfi = new ConvectionIntegrator(*p_conv_coeff_);  
   if (numerical_integ_) {
     pm_blfi->SetIntRule(&ir_nli);
@@ -922,6 +924,7 @@ void CaloricallyPerfectThermoChem::UpdateTimestepHistory(double dt) {
 void CaloricallyPerfectThermoChem::step() {
 }
 
+// NOTE: still in low-Mach form and missing some contributions
 void CaloricallyPerfectThermoChem::temperatureStep() {
   dt_ = time_coeff_.dt;
   time_ = time_coeff_.time;
@@ -1019,13 +1022,17 @@ void CaloricallyPerfectThermoChem::massImbalanceStep() {
   resr_ = 0.0;
 
   // div(rho_ext[n+1] * ustar)
+  Array<int> empty;  
   D_rho_form_->Update();
   D_rho_form_->Assemble();
   (flow_interface_->ustar)->GetTrueDofs(tmpR0_);
-  D_rho_form_->Mult(tmpR0_,resr_);
+  D_rho_form_->FormRectangularSystemMatrix(empty, empty, D_rho_op_);  
+  D_rho_op_->Mult(tmpR0_,resr_);
 
   // for unsteady term, compute and add known part of BDF unsteady term
-  tmpR0_.Set(time_coeff_.bd0 / dt_, rn_next_);
+  //tmpR0_.Set(time_coeff_.bd0 / dt_, rn_next_);
+  tmpR0_ = rn_next_;
+  tmpR0_ *= time_coeff_.bd0 / dt_;
   tmpR0_.Add(time_coeff_.bd1 / dt_, rn_);
   tmpR0_.Add(time_coeff_.bd2 / dt_, rnm1_);
   tmpR0_.Add(time_coeff_.bd3 / dt_, rnm2_);
@@ -1057,7 +1064,7 @@ void CaloricallyPerfectThermoChem::densityPredictionStep() {
   Ms_->AddMult(tmpR0_, resr_, +1.0);
   
   // update material derivative operator
-  bdf_coeff_->constant = time_coeff_.bd0 / dt_;  
+  bdf_coeff_.constant = time_coeff_.bd0 / dt_;  
   Hr_form_->Update();
   Hr_form_->Assemble();
   Hr_form_->FormSystemMatrix(rho_ess_tdof_, Hr_);
@@ -1155,8 +1162,8 @@ void CaloricallyPerfectThermoChem::pressureStep() {
   
   // Update operator
   Array<int> empty;  
-  bdf_coeff_->constant = time_coeff_.bd0 / time_coeff_.dt;
-  p_diff_coeff_->constant = time_coeff_.dt / time_coeff_.bd0;
+  bdf_coeff_.constant = time_coeff_.bd0 / time_coeff_.dt;
+  p_diff_coeff_.constant = time_coeff_.dt / time_coeff_.bd0;
   P_form_->Update();
   P_form_->Assemble();
   P_form_->FormSystemMatrix(press_ess_tdof_, P_op_);
@@ -1172,7 +1179,7 @@ void CaloricallyPerfectThermoChem::pressureStep() {
 
   Vector Xp, Bp;
   P_form_->FormLinearSystem(empty, p_prime_gf_, mass_imbalance_gf_, P_op_, Xp, Bp, 1);
-  P_inv_->Mult(Bp, Xp);
+  P_op_->Mult(Bp, Xp);
   if (!P_inv_->GetConverged()) {
     if (rank0_) std::cout << "ERROR: pressure solve did not converge." << std::endl;
     exit(1);

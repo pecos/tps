@@ -228,9 +228,9 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   TransformedMatrixVectorCoefficient *swdiff_coeff_ = nullptr;
   ScalarMatrixProductCoefficient *supg_coeff_ = nullptr;
 
-  ConstantCoefficient *rgas_coeff_ = nullptr;
-  ConstantCoefficient *bdf_coeff_ = nullptr;
-  ConstantCoefficient *p_diff_coeff_ = nullptr;      
+  ConstantCoefficient rgas_coeff_;
+  ConstantCoefficient bdf_coeff_;
+  ConstantCoefficient p_diff_coeff_;  
   GridFunctionCoefficient *rho_tmp_coeff_ = nullptr;  
   GridFunctionCoefficient *temperature_coeff_ = nullptr; 
   ProductCoefficient *rt_coeff_ = nullptr;
