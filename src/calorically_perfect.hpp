@@ -260,7 +260,7 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   OperatorHandle Mq_;
   OperatorHandle P_op_;
   OperatorHandle D_rho_op_;  
-  OperatorHandle MsIORT_;
+  OperatorHandle MsIORT_op_;
   OperatorHandle Hr_;  
 
   mfem::Solver *MsInvPC_ = nullptr;

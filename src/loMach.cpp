@@ -408,36 +408,43 @@ void LoMachSolver::solveStep() {
     sw_flow_.Start();
     flow_->predictionStep();
     sw_flow_.Stop();
+    if (rank0_) std::cout << "v* substep complete..." << endl;
 
     // density: mass imbalance
     sw_thermChem_.Start();    
     thermo_->massImbalanceStep();
     sw_thermChem_.Stop();
+    if (rank0_) std::cout << "mass-imbalance complete..." << endl;    
 
     // pressure
     sw_thermChem_.Start();
     thermo_->pressureStep();
     sw_thermChem_.Stop();
+    if (rank0_) std::cout << "pressure complete..." << endl;    
     
     // flow: pressure correction
     sw_flow_.Start();
     flow_->correctionStep();
     sw_flow_.Stop();
+    if (rank0_) std::cout << "v[n+1] complete..." << endl;    
 
     // density: predictor
     sw_thermChem_.Start();    
     thermo_->densityPredictionStep();
     sw_thermChem_.Stop();
+    if (rank0_) std::cout << "rho* substep complete..." << endl;    
     
     // temperature
     sw_thermChem_.Start();    
     thermo_->temperatureStep();
     sw_thermChem_.Stop();
+    if (rank0_) std::cout << "temperature complete..." << endl;    
 
     // density 
     sw_thermChem_.Start();    
     thermo_->densityStep();
     sw_thermChem_.Stop();
+    if (rank0_) std::cout << "rho[n+1] complete..." << endl;    
     
     // update turbulence model
     sw_turb_.Start();

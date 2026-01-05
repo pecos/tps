@@ -1116,7 +1116,8 @@ void Tomboulides::initializeIO(IODataOrganizer &io) const {
 
 void Tomboulides::initializeViz(mfem::ParaViewDataCollection &pvdc) const {
   pvdc.RegisterField("velocity", u_curr_gf_);
-  pvdc.RegisterField("pressure", p_gf_);
+  pvdc.RegisterField("v*", ustar_gf_);  
+  //pvdc.RegisterField("pressure(flow)", p_gf_);
   if (axisym_) {
     pvdc.RegisterField("swirl", utheta_gf_);
   }
@@ -1331,7 +1332,6 @@ void Tomboulides::step() {
   Hv_form_->Update();
   Hv_form_->Assemble();
   Hv_form_->FormSystemMatrix(vel_ess_tdof_, Hv_op_);
-
   Hv_inv_->SetOperator(*Hv_op_);
 
   sw_helm_.Stop();
@@ -2089,8 +2089,10 @@ void Tomboulides::correctionStep() {
   Mv_rho_inv_->SetOperator(*Mv_rho_op_);
 
   // pressure gradient
-  (thermo_interface_->pressure)->GetTrueDofs(tmpR0_);
-  G_op_->Mult(tmpR0_, resu_vec_);
+  //(thermo_interface_->pressure)->GetTrueDofs(tmpR0_);
+  (thermo_interface_->pressure)->GetTrueDofs(p_vec_);
+  p_gf_->SetFromTrueDofs(p_vec_);  
+  G_op_->Mult(p_vec_, resu_vec_);
   resu_vec_ *= -dt/coeff_.bd0;
 
   // solve system for v'
@@ -2115,7 +2117,20 @@ void Tomboulides::correctionStep() {
   u_next_gf_->GetTrueDofs(tmpR1_);    
   tmpR1_.Add(1.0,ustar_vec_);
   u_next_gf_->SetFromTrueDofs(tmpR1_);
+  u_next_gf_->GetTrueDofs(u_next_vec_);  
 
+  // Rotate values in solution history
+  um2_vec_ = um1_vec_;
+  um1_vec_ = u_vec_;
+
+  // Update the current solution and corresponding GridFunction
+  u_next_gf_->GetTrueDofs(u_next_vec_);
+  u_vec_ = u_next_vec_;
+  u_curr_gf_->SetFromTrueDofs(u_vec_);
+
+  // update gradients for turbulence model
+  evaluateVelocityGradient();
+  
   // May need a full momentum solve here instead of the update,
   // as-is, u[n+1] is consistent with grad(P),
   // however, if rho* and rho[n+1] are different (enough), mass will not be conserved
