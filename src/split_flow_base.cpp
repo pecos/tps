@@ -66,7 +66,7 @@ void ZeroFlow::initializeSelf() {
     velocity_->ProjectCoefficient(ub_coeff);
   }
 
-  toThermoChem_interface_.velocity = velocity_;
+  toThermoChem_interface_.velocity = velocity_;  
   toThermoChem_interface_.swirl_supported = false;
 
   // need to create additional zero vectors, in case of nonzero vel

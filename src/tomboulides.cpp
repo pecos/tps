@@ -1608,13 +1608,13 @@ void Tomboulides::step() {
   u_next_gf_->GetTrueDofs(u_next_vec_);
 
   // Rotate values in solution history
-  um2_vec_ = um1_vec_;
-  um1_vec_ = u_vec_;
+  //um2_vec_ = um1_vec_;
+  //um1_vec_ = u_vec_;
 
   // Update the current solution and corresponding GridFunction
-  u_next_gf_->GetTrueDofs(u_next_vec_);
-  u_vec_ = u_next_vec_;
-  u_curr_gf_->SetFromTrueDofs(u_vec_);
+  // u_next_gf_->GetTrueDofs(u_next_vec_);
+  // u_vec_ = u_next_vec_;
+  // u_curr_gf_->SetFromTrueDofs(u_vec_);
 
   // update gradients for turbulence model
   evaluateVelocityGradient();
@@ -1710,6 +1710,38 @@ void Tomboulides::step() {
   }
 }
 
+void Tomboulides::updateStep() {
+
+  // Rotate values in solution history
+  um2_vec_ = um1_vec_;
+  um1_vec_ = u_vec_;
+
+  u_next_gf_->GetTrueDofs(u_next_vec_);
+  u_vec_ = u_next_vec_;
+  u_curr_gf_->SetFromTrueDofs(u_vec_);
+  
+}  
+
+void Tomboulides::extrapolateStep() {
+  
+  // Extrapolate the velocity field
+  {
+    const auto d_u = u_vec_.Read();
+    const auto d_um1 = um1_vec_.Read();
+    const auto d_um2 = um2_vec_.Read();
+    auto d_uext = uext_vec_.Write();
+    const auto ab1 = coeff_.ab1;
+    const auto ab2 = coeff_.ab2;
+    const auto ab3 = coeff_.ab3;
+    MFEM_FORALL(i, uext_vec_.Size(), { d_uext[i] = ab1 * d_u[i] + ab2 * d_um1[i] + ab3 * d_um2[i]; });
+  }
+
+  // store in u_next_gf_
+  u_next_gf_->SetFromTrueDofs(uext_vec_);
+  u_next_gf_->GetTrueDofs(u_next_vec_);  
+
+}
+
 //
 //  - Solving for v (v* in f-p):
 //    3(rho[m-1]v - 4(rho*u)[n] + (rho*u)[n-1])/(2dt) + C(rho[m-1]*v) = V(v) - G(p[m-1])
@@ -1788,6 +1820,7 @@ void Tomboulides::predictionStep() {
   */
 
   // very hacky approach... not safe for gpu!
+  /*
   // div(rho[n]*u[n]*u[n])  
   thermo_interface_->rn->GetTrueDofs(rho_vec_);
   {
@@ -1852,7 +1885,30 @@ void Tomboulides::predictionStep() {
     // MFEM_FORALL(i, forcing_vec_.Size(), { d_force[i] += (ab1 * d_N[i] + ab2 * d_Nm1[i] + ab3 * d_Nm2[i]); });
     MFEM_FORALL(i, forcing_vec_.Size(), { d_force[i] -= (ab1*d_N[i] + ab2*d_Nm1[i] + ab3*d_Nm2[i]); });    
   }
+  */
 
+  // all at [n+1] iteration
+  thermo_interface_->density->GetTrueDofs(rho_vec_);
+  {
+    const auto d_r = rho_vec_.Read();
+    auto d_sqrtr = tmpR0_.ReadWrite();
+    MFEM_FORALL(i, tmpR0_.Size(), { d_sqrtr[i] = std::sqrt(d_r[i]); });    
+  }
+  tmpR1_.Set(1.0,u_next_vec_);
+  {
+    const auto d_sqrtr = tmpR0_.Read();
+    auto d_rhu = tmpR1_.ReadWrite();
+    int nS = tmpR0_.Size();
+    MFEM_FORALL(i, nS, { d_rhu[i] *= d_sqrtr[i]; });
+    MFEM_FORALL(i, nS, { d_rhu[i + nS] *= d_sqrtr[i]; });
+    if (dim_ == 3) MFEM_FORALL(i, nS, { d_rhu[i + 2*nS] *= d_sqrtr[i]; });    
+  }
+  Nconv_form_->Mult(tmpR1_, N_vec_);  
+
+  // add to rhs vector
+  forcing_vec_.Add(-1.0, N_vec_);
+  
+  // update axisym...  
   if (axisym_) {
     // Extrapolate the swirl velocity
     {
@@ -1892,7 +1948,7 @@ void Tomboulides::predictionStep() {
   Mv_rho_form_->Assemble();
   Mv_rho_form_->FormSystemMatrix(empty, Mv_rho_op_);
   Mv_rho_op_->Mult(um1_vec_, tmpR1_);
-  forcing_vec_.Add(-coeff_.bd1 / dt, tmpR1_);
+  forcing_vec_.Add(-coeff_.bd2 / dt, tmpR1_);
 
   thermo_interface_->rnm2->GetTrueDofs(rho_vec_);    
   rho_tmp_gf_->SetFromTrueDofs(rho_vec_);  
@@ -1925,6 +1981,7 @@ void Tomboulides::predictionStep() {
   //}
 
   // Extrapolate the velocity field (and store in u_next_gf_)
+  /*
   {
     const auto d_u = u_vec_.Read();
     const auto d_um1 = um1_vec_.Read();
@@ -1936,6 +1993,7 @@ void Tomboulides::predictionStep() {
     MFEM_FORALL(i, uext_vec_.Size(), { d_uext[i] = ab1 * d_u[i] + ab2 * d_um1[i] + ab3 * d_um2[i]; });
   }
   u_next_gf_->SetFromTrueDofs(uext_vec_);
+  */
 
   // Evaluate the double curl of the extrapolated velocity field
   if (axisym_) {
@@ -1967,7 +2025,7 @@ void Tomboulides::predictionStep() {
   // assert(thermo_interface_->thermal_divergence != nullptr);
   // thermo_interface_->thermal_divergence->GetTrueDofs(Qt_vec_);  
   // setting Qt as extrapolated div(u)_[n+1] for all-mach...
-  D_op_->Mult(uext_vec_, tmpR0_);
+  D_op_->Mult(u_next_vec_, tmpR0_);
   Ms_inv_->Mult(tmpR0_,Qt_vec_);
   //G_op_->Mult(Qt_vec_, resu_vec_);
   // Mv_inv_->Mult(resu_vec_, grad_Qt_vec_);
@@ -2018,15 +2076,18 @@ void Tomboulides::predictionStep() {
   // Note: hitting with Mrho^-1 in tomb because this was used for p-p and not ustar
   // Mv_rho_inv_->Mult(ress_vec_, S_poisson_vec_);
   // ustar_vec_ += S_poisson_vec_;
-  ustar_vec_ += ress_vec_;
+  forcing_vec_.Add(1.0, ress_vec_);
 
-  // add -grad(p[n])
-  G_op_->AddMult(p_vec_, ustar_vec_, -1.0);
+  // add -grad(p[n+1]) for current iteration
+  (thermo_interface_->pressure)->GetTrueDofs(p_vec_);
+  p_gf_->SetFromTrueDofs(p_vec_);  
+  G_op_->AddMult(p_vec_, forcing_vec_, -1.0);
   
   // now full explicit rhs gets hit with a (dt/beta0)
-  ustar_vec_ *= dt / coeff_.bd0;
+  forcing_vec_ *= dt / coeff_.bd0;
 
   // Extrapolate the rho field to rho[n+1]
+  /*
   thermo_interface_->rn->GetTrueDofs(rho_vec_);
   rho_vec_ *= coeff_.ab1;
   thermo_interface_->rnm1->GetTrueDofs(tmpR0_);
@@ -2035,16 +2096,20 @@ void Tomboulides::predictionStep() {
   thermo_interface_->rnm2->GetTrueDofs(tmpR0_);
   tmpR0_ *= coeff_.ab3;
   rho_vec_ += tmpR0_;
+  */
 
+  // Might need to set up the full system here for all bc's...
+  
   // update rho-weighted mass matrix
+  thermo_interface_->density->GetTrueDofs(rho_vec_);  
   rho_tmp_gf_->SetFromTrueDofs(rho_vec_);  
   Mv_rho_form_->Update();
   Mv_rho_form_->Assemble();
-  Mv_rho_form_->FormSystemMatrix(empty, Mv_rho_op_);
+  Mv_rho_form_->FormSystemMatrix(vel_ess_tdof_, Mv_rho_op_);
   Mv_rho_inv_->SetOperator(*Mv_rho_op_);
 
   // solve system with ustar = Mv_rho_inv_(rhs)
-  resu_vec_.Set(1.0,ustar_vec_);
+  resu_vec_.Set(1.0, forcing_vec_);
   Mv_rho_inv_->Mult(resu_vec_,ustar_vec_);
   if (!Mv_rho_inv_->GetConverged()) {
     if (rank0_) std::cout << "ERROR: Predictor  Mv_inv inverse did not converge." << std::endl;
@@ -2071,6 +2136,7 @@ void Tomboulides::correctionStep() {
   const double dt = coeff_.dt;
 
   // Extrapolate the rho field to rho[n+1]
+  /*
   thermo_interface_->rn->GetTrueDofs(rho_vec_);
   rho_vec_ *= coeff_.ab1;
   thermo_interface_->rnm1->GetTrueDofs(tmpR0_);
@@ -2079,25 +2145,29 @@ void Tomboulides::correctionStep() {
   thermo_interface_->rnm2->GetTrueDofs(tmpR0_);
   tmpR0_ *= coeff_.ab3;
   rho_vec_ += tmpR0_;
+  */
+
+  // current [n+1] density iteration
+  thermo_interface_->density->GetTrueDofs(rho_vec_);
+  rho_tmp_gf_->SetFromTrueDofs(rho_vec_);    
 
   // update rho-weighted mass matrix
   Array<int> empty;    
-  rho_tmp_gf_->SetFromTrueDofs(rho_vec_);  
   Mv_rho_form_->Update();
   Mv_rho_form_->Assemble();
   Mv_rho_form_->FormSystemMatrix(empty, Mv_rho_op_);
   Mv_rho_inv_->SetOperator(*Mv_rho_op_);
 
   // pressure gradient
-  //(thermo_interface_->pressure)->GetTrueDofs(tmpR0_);
   (thermo_interface_->pressure)->GetTrueDofs(p_vec_);
   p_gf_->SetFromTrueDofs(p_vec_);  
   G_op_->Mult(p_vec_, resu_vec_);
   resu_vec_ *= -dt/coeff_.bd0;
 
   // solve system for v'
-  //Mv_rho_inv_->Mult(resu_vec_,tmpR1_);
+  Mv_rho_inv_->Mult(resu_vec_,tmpR1_);
 
+  /*
   for (auto &vel_dbc : vel_dbcs_) {
     u_next_gf_->ProjectBdrCoefficient(*vel_dbc.coeff, vel_dbc.attr);
   }
@@ -2112,21 +2182,26 @@ void Tomboulides::correctionStep() {
     exit(1);
   }
   Mv_rho_form_->RecoverFEMSolution(Xu, *resu_gf_, *u_next_gf_);
+  //u_next_gf_->GetTrueDofs(tmpR1_);  
+  */
   
-  // update full velocity
-  u_next_gf_->GetTrueDofs(tmpR1_);    
-  tmpR1_.Add(1.0,ustar_vec_);
+  // update full velocity: u[n+1] = u' + u*
+  tmpR1_.Add(1.0, ustar_vec_);
   u_next_gf_->SetFromTrueDofs(tmpR1_);
   u_next_gf_->GetTrueDofs(u_next_vec_);  
 
+  // debug HACK
+  //u_next_gf_->SetFromTrueDofs(ustar_vec_);
+  //u_next_gf_->GetTrueDofs(u_next_vec_);  
+  
   // Rotate values in solution history
-  um2_vec_ = um1_vec_;
-  um1_vec_ = u_vec_;
+  // um2_vec_ = um1_vec_;
+  // um1_vec_ = u_vec_;
 
   // Update the current solution and corresponding GridFunction
-  u_next_gf_->GetTrueDofs(u_next_vec_);
-  u_vec_ = u_next_vec_;
-  u_curr_gf_->SetFromTrueDofs(u_vec_);
+  // u_next_gf_->GetTrueDofs(u_next_vec_);
+  // u_vec_ = u_next_vec_;
+  // u_curr_gf_->SetFromTrueDofs(u_vec_);
 
   // update gradients for turbulence model
   evaluateVelocityGradient();

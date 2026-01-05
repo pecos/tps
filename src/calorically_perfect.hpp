@@ -345,6 +345,8 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   void densityPredictionStep() final;
   void temperatureStep() final;
   void densityStep() final;
+  void extrapolateStep() final;
+  void updateStep() final;    
 
   void screenHeader(std::vector<std::string> &header) const final;
   void screenValues(std::vector<double> &values) final;
@@ -380,7 +382,10 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   // double SetCurrentThermoPressure(double Po) { thermo_pressure_ = Po;}
 
   /// Rotate entries in the time step and solution history arrays.
-  void UpdateTimestepHistory(double dt);
+  //void updateStep();
+
+  /// initial guess of next step values
+  //void extrapolateStep();
 
   /// Add a Dirichlet boundary condition to the temperature and Qt field.
   void AddTempDirichletBC(const double &temp, Array<int> &attr);

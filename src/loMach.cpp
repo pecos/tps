@@ -404,47 +404,62 @@ void LoMachSolver::solveStep() {
     // external data updates
     extData_->step();
 
-    // flow: predictor
-    sw_flow_.Start();
-    flow_->predictionStep();
-    sw_flow_.Stop();
-    if (rank0_) std::cout << "v* substep complete..." << endl;
+    // extrapolate for initial [n+1] guess
+    flow_->extrapolateStep();
+    thermo_->extrapolateStep();    
 
-    // density: mass imbalance
-    sw_thermChem_.Start();    
-    thermo_->massImbalanceStep();
-    sw_thermChem_.Stop();
-    if (rank0_) std::cout << "mass-imbalance complete..." << endl;    
+    // inner-iterations
+    int nInnerIters = 1;
+    for (int i = 0; i < nInnerIters; i++) {
+      if (rank0_) std::cout << "inner iteration: " << i << endl;
+      
+      // flow: predictor
+      sw_flow_.Start();
+      flow_->predictionStep();
+      sw_flow_.Stop();
+      //if (rank0_) std::cout << "v* substep complete..." << endl;    
 
-    // pressure
-    sw_thermChem_.Start();
-    thermo_->pressureStep();
-    sw_thermChem_.Stop();
-    if (rank0_) std::cout << "pressure complete..." << endl;    
+      // density: mass imbalance
+      sw_thermChem_.Start();    
+      thermo_->massImbalanceStep();
+      sw_thermChem_.Stop();
+      //if (rank0_) std::cout << "mass-imbalance complete..." << endl;    
+
+      // pressure
+      sw_thermChem_.Start();
+      thermo_->pressureStep();
+      sw_thermChem_.Stop();
+      //if (rank0_) std::cout << "pressure complete..." << endl;    
     
-    // flow: pressure correction
-    sw_flow_.Start();
-    flow_->correctionStep();
-    sw_flow_.Stop();
-    if (rank0_) std::cout << "v[n+1] complete..." << endl;    
+      // flow: pressure correction
+      sw_flow_.Start();
+      flow_->correctionStep();
+      sw_flow_.Stop();
+      //if (rank0_) std::cout << "v[n+1] complete..." << endl;    
 
-    // density: predictor
-    sw_thermChem_.Start();    
-    thermo_->densityPredictionStep();
-    sw_thermChem_.Stop();
-    if (rank0_) std::cout << "rho* substep complete..." << endl;    
+      // density: predictor
+      sw_thermChem_.Start();    
+      thermo_->densityPredictionStep();
+      sw_thermChem_.Stop();
+      //if (rank0_) std::cout << "rho* substep complete..." << endl;    
     
-    // temperature
-    sw_thermChem_.Start();    
-    thermo_->temperatureStep();
-    sw_thermChem_.Stop();
-    if (rank0_) std::cout << "temperature complete..." << endl;    
+      // temperature
+      sw_thermChem_.Start();    
+      thermo_->temperatureStep();
+      sw_thermChem_.Stop();
+      //if (rank0_) std::cout << "temperature complete..." << endl;    
 
-    // density 
-    sw_thermChem_.Start();    
-    thermo_->densityStep();
-    sw_thermChem_.Stop();
-    if (rank0_) std::cout << "rho[n+1] complete..." << endl;    
+      // density 
+      sw_thermChem_.Start();    
+      thermo_->densityStep();
+      sw_thermChem_.Stop();
+      //if (rank0_) std::cout << "rho[n+1] complete..." << endl;    
+
+    } // end inner-iteration loop
+
+    // rotate storage containers in solution history
+    flow_->updateStep();
+    thermo_->updateStep();        
     
     // update turbulence model
     sw_turb_.Start();

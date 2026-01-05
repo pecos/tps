@@ -122,7 +122,9 @@ class ThermoChemModelBase {
   virtual void pressureStep() = 0;
   virtual void densityPredictionStep() = 0;
   virtual void temperatureStep() = 0;    
-  virtual void densityStep() = 0;  
+  virtual void densityStep() = 0; 
+  virtual void extrapolateStep() = 0;
+  virtual void updateStep() = 0;     
 
   /**
    * @brief Hook to let derived classes register restart fields with the IODataOrganizer.
@@ -265,6 +267,8 @@ class ConstantPropertyThermoChem final : public ThermoChemModelBase {
   void densityPredictionStep() final {};
   void temperatureStep() final {};
   void densityStep() final {};
+  void extrapolateStep() final {};
+  void updateStep() final {};
   
 };
 

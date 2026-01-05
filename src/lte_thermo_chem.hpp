@@ -275,6 +275,8 @@ class LteThermoChem final : public ThermoChemModelBase {
   void densityPredictionStep() final {};
   void temperatureStep() final {};
   void densityStep() final {};
+  void extrapolateStep() final {};
+  void updateStep() final {};    
   
   void evaluatePlasmaConductivityGF() final;
 

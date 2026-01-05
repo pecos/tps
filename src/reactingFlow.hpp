@@ -395,6 +395,8 @@ class ReactingFlow : public ThermoChemModelBase {
   void densityPredictionStep() final {};
   void densityStep() final {};
   //void temperatureStep() final {};  
+  void extrapolateStep() final {};
+  void updateStep() final {};    
   
   void evaluatePlasmaConductivityGF() final;
 
