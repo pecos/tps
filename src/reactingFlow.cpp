@@ -114,8 +114,15 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     bl_frac_ = bl_frac_init_;
     tpsP_->getInput("boltzmannSolver/solve-bte-every-n", solve_bte_every_n, 1);
     tpsP_->getInput("boltzmannSolver/regrid-bte-every-n", regrid_bte_every_n, 1);
+    tpsP_->getInput("boltzmannSolver/do-bte-sub-cluster", do_bte_sub_cluster, 1);
+    tpsP_->getInput("boltzmannSolver/num-bte-sub-clusters", num_sub_clusters_bte, 50);
     tpsP_->getInput("boltzmannSolver/n_grids", n_vspace_grids, 1);
     grid_idx_to_npts.resize(n_vspace_grids);
+    Te_vec.resize(n_vspace_grids);
+    tpsP_->getInput("boltzmannSolver/Nr", Nr_BTE, 128);
+    tpsP_->getInput("boltzmannSolver/rtol", BTE_rtol, 1e-6);
+    tpsP_->getInput("boltzmannSolver/dt_BTE", dt_BTE, 5e-3);
+    tpsP_->getInput("boltzmannSolver/store_csv", store_csv, 1);
   }
 #endif
 
@@ -1788,7 +1795,6 @@ void ReactingFlow::step() {
       Tarr.attr("flags").attr("writeable") = false; // mark read-only
 
       int n_bte_grids = n_vspace_grids;
-
       py::object result;
       try {
         // IMPORT THE PYTHON SCRIPT
@@ -1804,17 +1810,22 @@ void ReactingFlow::step() {
       // Unpack arrays
       py::array_t<int32_t> gid_to_npts_arr = arrays[0].cast<py::array_t<int32_t>>();
       py::array_t<int64_t> gid_spatin_map  = arrays[1].cast<py::array_t<int64_t>>();
+      py::array_t<double> Te_arr  = arrays[2].cast<py::array_t<double>>();
 
       // Access data
       auto buf_gid_npts_arr   = gid_to_npts_arr.request();
       auto buf_gid_spatin_map = gid_spatin_map.request();
+      auto buf_Te_arr = Te_arr.request();
 
       int32_t* ptr_gid_to_npts = static_cast<int32_t*>(buf_gid_npts_arr.ptr);
       int64_t* ptr_gid_spatin_map = static_cast<int64_t*>(buf_gid_spatin_map.ptr);
+      double* ptr_Te_arr = static_cast<double*>(buf_Te_arr.ptr);
 
       grid_idx_to_npts.assign(ptr_gid_to_npts, ptr_gid_to_npts + buf_gid_npts_arr.size);
 
       grid_idx_to_spatial_idx_map.assign(ptr_gid_spatin_map, ptr_gid_spatin_map + buf_gid_spatin_map.size);
+
+      Te_vec.assign(ptr_Te_arr, ptr_Te_arr + buf_Te_arr.size);
 
     }
     if (bte_from_tps_ && update_bte_rates == 0) {
@@ -1890,19 +1901,28 @@ void ReactingFlow::step() {
       // Convert the grid_idx_to_npts and grid_idx_to_spatial_idx_map to Python arrays of int32 and int64 type respectively
       py::array_t<int32_t> py_grid_idx_to_npts(grid_idx_to_npts.size(), grid_idx_to_npts.data());
       py::array_t<int64_t> py_grid_idx_to_spatial_idx_map(grid_idx_to_spatial_idx_map.size(), grid_idx_to_spatial_idx_map.data());
+      py::array_t<double>  te_array(Te_vec.size(), Te_vec.data());
 
       py_grid_idx_to_npts.attr("flags").attr("writeable") = false; // mark read-only
       py_grid_idx_to_spatial_idx_map.attr("flags").attr("writeable") = false; // mark read-only
 
       int n_bte_grids = n_vspace_grids;
+      int use_interp = do_bte_sub_cluster;
+      int n_sub_clusters = num_sub_clusters_bte;
+      int n_bte_reactions = nBTEReactions_;
+      int Nr = Nr_BTE;
+      int csv_store = store_csv;
+      double rtolBTE = BTE_rtol;
+      double BTE_dt = dt_BTE;
 
       py::object result;
       try {
         // IMPORT THE PYTHON SCRIPT
         py::object script = py::module_::import("tps-get-bte-rates");
         // CALL THE PYTHON FUNCTION
-        result = script.attr("bte_from_tps")(Tarr, specarr, Erarr, Eiarr, collisionsFile, solver_type, ee_collisions, 
-                  n_bte_grids, py_grid_idx_to_npts, py_grid_idx_to_spatial_idx_map);
+        result = script.attr("bte_from_tps")(Tarr, specarr, Erarr, Eiarr, collisionsFile, n_bte_reactions, solver_type, ee_collisions, 
+                  n_bte_grids, py_grid_idx_to_npts, py_grid_idx_to_spatial_idx_map, use_interp, n_sub_clusters, te_array,
+                  Nr, rtolBTE, csv_store, BTE_dt);
       } catch (const py::error_already_set &e) {
         std::cerr << "ReactingFlow::step(), Python error: " << e.what() << std::endl;
         exit(-1);

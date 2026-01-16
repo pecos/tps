@@ -424,6 +424,8 @@ class ReactingFlow : public ThermoChemModelBase {
   double bl_frac_init_, bl_frac_increment_, bl_frac_;
   int bl_frac_change_freq_ = 1;
   int solve_bte_every_n = 1;
+  int do_bte_sub_cluster = 1; // Setting to 1 means we are doing sub-clustering to reduce DoFs for the BTE solver
+  int num_sub_clusters_bte = 50;
 
   // Number of v-space grids per MPI rank for the BTE solver
   int n_vspace_grids = 1;
@@ -435,6 +437,13 @@ class ReactingFlow : public ThermoChemModelBase {
   // points in the ith v-space grid. Here, ilo_{i} = (\sum_{m=0}^{m=i} ng_m) - ng_i
   std::vector<std::int32_t> grid_idx_to_npts;
   std::vector<std::int64_t> grid_idx_to_spatial_idx_map;
+  std::vector<double> Te_vec;
+
+  int Nr_BTE = 128; // Number of elements in the radial direction for the BTE solver
+  double dt_BTE = 5e-3; // timestep relative to electric field frequency if BTE uses transient solver
+  double BTE_rtol = 1e-6; // relative tolerance for the BTE solver to converge
+  int store_csv = 0; // store the BTE QoIs in CSV file
+
 #endif
 
  public:
