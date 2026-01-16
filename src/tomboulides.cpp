@@ -135,6 +135,9 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
     tpsP_->getInput("loMach/tomboulides/streamwise-stabilization", sw_stab_, false);
     tpsP_->getInput("loMach/tomboulides/Reh_factor", Reh_factor_, 0.5);
     tpsP_->getInput("loMach/tomboulides/Reh_offset", Reh_offset_, 1.0);
+
+    // option to disable Qt contributions to momentum equations for bad transients
+    tpsP_->getInput("loMach/tomboulides/disable-qt", disable_qt_, false);
   }
 }
 
@@ -1536,7 +1539,11 @@ void Tomboulides::step() {
     exit(1);
   }
   grad_Qt_vec_ *= (4. / 3);
-  pp_div_vec_ += grad_Qt_vec_;
+
+  // disable Qt 1
+  if (!disable_qt_) {
+    pp_div_vec_ += grad_Qt_vec_;
+  }
 
   // Multiply pp_div_vec_ by nu
   // TODO(trevilo): This is ugly.  Find a better way.
@@ -1600,7 +1607,10 @@ void Tomboulides::step() {
   D_op_->Mult(pp_div_vec_, resp_vec_);
 
   // Add Qt term (rhs += -bd0 * Qt / dt)
-  Ms_op_->AddMult(Qt_vec_, resp_vec_, -coeff_.bd0 / dt);
+  // disable Qt 2
+  if (!disable_qt_) {
+    Ms_op_->AddMult(Qt_vec_, resp_vec_, -coeff_.bd0 / dt);
+  }
 
   // Add axisymmetric "forcing" term to rhs
   if (axisym_) {
@@ -1683,7 +1693,10 @@ void Tomboulides::step() {
 
   // Add grad(mu * Qt) term
   Qt_vec_ *= mu_vec_;  // NB: pointwise multiply
-  G_op_->AddMult(Qt_vec_, resu_vec_, 1.0 / 3.0);
+  // disable Qt 3
+  if (!disable_qt_) {
+    G_op_->AddMult(Qt_vec_, resu_vec_, 1.0 / 3.0);
+  }
 
   // rho * vstar / dt term
   Mv_rho_op_->AddMult(ustar_vec_, resu_vec_);

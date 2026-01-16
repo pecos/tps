@@ -448,16 +448,16 @@ void LteThermoChem::initializeSelf() {
           std::cout << "Calorically Perfect: Setting interpolated Dirichlet temperature on patch = " << patch
                     << std::endl;
         }
-        AddTempDirichletBC(temperature_bc_field_, inlet_attr);
+        // AddTempDirichletBC(temperature_bc_field_, inlet_attr);
 
-        // Force the IC to agree with the interpolated inlet BC
-        //
-        // NB: It is still possible for Tn_gf_ on a restart to
-        // disagree with this BC.  Specifically, since the restart
-        // field is read after this projection, if it does not satisfy
-        // this BC, there will be a discrepancy (which will be
-        // eliminated after the first step).
-        Tn_gf_.ProjectBdrCoefficient(*temperature_bc_field_, inlet_attr);
+        // // Force the IC to agree with the interpolated inlet BC
+        // //
+        // // NB: It is still possible for Tn_gf_ on a restart to
+        // // disagree with this BC.  Specifically, since the restart
+        // // field is read after this projection, if it does not satisfy
+        // // this BC, there will be a discrepancy (which will be
+        // // eliminated after the first step).
+        // Tn_gf_.ProjectBdrCoefficient(*temperature_bc_field_, inlet_attr);
       } else {
         if (rank0_) {
           std::cout << "ERROR: Calorically Perfect inlet type = " << type << " not supported." << std::endl;
@@ -478,7 +478,7 @@ void LteThermoChem::initializeSelf() {
 
   // Wall BCs
   {
-    std::cout << "There are " << pmesh_->bdr_attributes.Max() << " boundary attributes!" << std::endl;
+    if (rank0_) std::cout << "There are " << pmesh_->bdr_attributes.Max() << " boundary attributes!" << std::endl;
     Array<int> attr_wall(pmesh_->bdr_attributes.Max());
     attr_wall = 0;
 
@@ -491,7 +491,7 @@ void LteThermoChem::initializeSelf() {
       tpsP_->getRequiredInput((basepath + "/type").c_str(), type);
 
       if (type == "viscous_isothermal") {
-        std::cout << "Adding patch = " << patch << " to isothermal wall list!" << std::endl;
+        if (rank0_) std::cout << "Adding patch = " << patch << " to isothermal wall list!" << std::endl;
 
         attr_wall = 0;
         attr_wall[patch - 1] = 1;

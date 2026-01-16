@@ -111,6 +111,7 @@ GaussianInterpExtData::GaussianInterpExtData(mfem::ParMesh *pmesh, LoMachOptions
           }
           isInterpTurbInlet_ = true;
           tpsP_->getInput("ransModel/zeta-f-file", fname_tke_, std::string("tke.csv"));
+          tpsP_->getInput("ransModel/bc-fac", tke_bc_fac_, 1.0);
         }
       }
     }
@@ -785,9 +786,9 @@ void GaussianInterpExtData::setInletTurbScalars() {
         } else if (entry == 3) {
           tke_pr[nLines].z = buffer;
         } else if (entry == 4) {
-          tke_pr[nLines].tke = buffer;
+          tke_pr[nLines].tke = buffer * tke_bc_fac_;
         } else if (entry == 5) {
-          tke_pr[nLines].v2 = buffer;
+          tke_pr[nLines].v2 = buffer * tke_bc_fac_;
         }
       }
       // tke_pr[nLines].z = 0.0;

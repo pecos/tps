@@ -504,9 +504,9 @@ void ZetaModel::initializeSelf() {
         AddTKEDirichletBC(tke_value, inlet_attr);
         AddV2DirichletBC(2.0/3.0*tke_value, inlet_attr);	
       } else if (type == "interpolate") {
-        // if (rank0_) {
-        //   std::cout << "Zeta Model: Setting interpolated Dirichlet TKE on patch = " << patch << std::endl;
-        // }
+        if (rank0_) {
+          std::cout << "Zeta Model: Setting interpolated Dirichlet TKE on patch = " << patch << std::endl;
+        }
         // Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
         // inlet_attr = 0;
         // inlet_attr[patch - 1] = 1;
@@ -597,15 +597,15 @@ void ZetaModel::initializeSelf() {
         //ConstantCoefficient *tke_wall_coeff = new ConstantCoefficient();
         //tke_wall_coeff->constant = 0.0;
         //AddTKEDirichletBC(tke_wall_coeff, attr_wall);
-	AddTKEDirichletBC(0.0, attr_wall);
-	AddV2DirichletBC(0.0, attr_wall);	
+	      AddTKEDirichletBC(0.0, attr_wall);
+	      AddV2DirichletBC(0.0, attr_wall);	
 
         // tdr handled through Hs_bdry
         // ConstantCoefficient *tdr_wall_coeff = new ConstantCoefficient();
         // tdr_wall_coeff->constant = 0.0;
-	// AddTDRDirichletBC(0.0, attr_wall);
-	AddTDRDirichletBC(tdr_wall_coeff_, attr_wall);	
-	//DivergenceGridFunctionCoefficient *tdr_wall_coeff = new DivergenceGridFunctionCoefficient(*nu_gradTKE_coeff_);
+	      // AddTDRDirichletBC(0.0, attr_wall);
+	      AddTDRDirichletBC(tdr_wall_coeff_, attr_wall);	
+	      //DivergenceGridFunctionCoefficient *tdr_wall_coeff = new DivergenceGridFunctionCoefficient(*nu_gradTKE_coeff_);
         //AddTDRDirichletBC(tdr_wall_coeff, attr_wall);
 	
         //tdr_bc_ = new GridFunctionCoefficient(&tdr_wall_gf_);
@@ -1218,7 +1218,7 @@ void ZetaModel::updateMuT() {
     // muT[i] *= ((1.0-wgt)*dv2[i] + wgt*twoThirds*dk[i]);
     //}
     
-    //for (int i = 0; i < SdofInt_; i++) muT[i] *= std::min(dTTS[i], dTTS_strain[i]);
+    for (int i = 0; i < SdofInt_; i++) muT[i] *= std::min(dTTS[i], dTTS_strain[i]);
     // to prevent kinks    
     //for (int i = 0; i < SdofInt_; i++) {    
     //  wgt = std::tanh(tanh_half_ * dTTS[i]/dTTS_strain[i]);
@@ -1938,10 +1938,10 @@ void ZetaModel::v2Step() {
     double *data = tmpR0_.HostReadWrite();
     for (int i = 0; i < SdofInt_; i++) {
       // data[i] *= std::min(df[i], 12.0/dtkol[i]);
-      data[i] *= df[i];
+      // data[i] *= df[i];
 
       // limiter on v2-production to make resistent to f craziness where both TLS and TTS are very small
-      //data[i] *= std::min(df[i], v2Prod_fLimiter_coeff_/dTTS[i]);
+      data[i] *= std::min(df[i], v2Prod_fLimiter_coeff_/dTTS[i]);
       
     }
   }

@@ -184,6 +184,8 @@ class Tomboulides final : public FlowBase {
   // streamwise-stabilization
   bool sw_stab_;
   double Reh_factor_, Reh_offset_;
+  
+  bool disable_qt_;
 
   StopWatch sw_press_, sw_helm_;
 
