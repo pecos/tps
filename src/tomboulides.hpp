@@ -144,7 +144,7 @@ class Tomboulides final : public FlowBase {
   int amg_interpolation_ = 14;
 
   // solver tolerance options
-  int default_max_iter_ = 1000;
+  int default_max_iter_ = 10000;
   double default_rtol_ = 1e-10;
   double default_atol_ = 1e-12;
 
@@ -216,6 +216,8 @@ class Tomboulides final : public FlowBase {
   mfem::ParFiniteElementSpace *sfes_ = nullptr;
   mfem::ParGridFunction *u_curr_gf_ = nullptr;
   mfem::ParGridFunction *u_next_gf_ = nullptr;
+  mfem::ParGridFunction *unm1_gf_ = nullptr;
+  mfem::ParGridFunction *unm2_gf_ = nullptr;  
   mfem::ParGridFunction *curl_gf_ = nullptr;
   mfem::ParGridFunction *curlcurl_gf_ = nullptr;
   mfem::ParGridFunction *resu_gf_ = nullptr;
@@ -235,22 +237,28 @@ class Tomboulides final : public FlowBase {
   mfem::ParGridFunction *p_gf_ = nullptr;
   mfem::ParGridFunction *resp_gf_ = nullptr;
   mfem::ParGridFunction *pp_div_rad_comp_gf_ = nullptr;
-
+  
   /// Swirl
   mfem::ParGridFunction *utheta_gf_ = nullptr;
   mfem::ParGridFunction *utheta_next_gf_ = nullptr;
   mfem::ParGridFunction *u_next_rad_comp_gf_ = nullptr;
 
+  mfem::ParGridFunction *rho_sqrt_gf_ = nullptr;
+  mfem::ParGridFunction *rhu_gf_ = nullptr;
+  mfem::ParGridFunction *div_rhu_gf_ = nullptr;    
+  
   /// "total" viscosity, including fluid, turbulence, sponge
   mfem::ParGridFunction *mu_total_gf_ = nullptr;
 
   /// mfem::Coefficients used in forming necessary operators
   mfem::GridFunctionCoefficient *rho_coeff_ = nullptr;
+  mfem::ScalarVectorProductCoefficient *rhou_coeff_ = nullptr;  
   mfem::RatioCoefficient *iorho_coeff_ = nullptr;
   mfem::ConstantCoefficient nlcoeff_const_;  
   mfem::GridFunctionCoefficient *nlcoeff_ = nullptr;
   mfem::ConstantCoefficient one_coeff_;
   mfem::ConstantCoefficient Hv_bdfcoeff_;
+  mfem::ConstantCoefficient Hvs_bdfcoeff_;  
   mfem::ProductCoefficient *rho_over_dt_coeff_ = nullptr;
   mfem::GridFunctionCoefficient *mu_coeff_ = nullptr;
   mfem::VectorGridFunctionCoefficient *pp_div_coeff_ = nullptr;
@@ -289,6 +297,12 @@ class Tomboulides final : public FlowBase {
   mfem::VectorArrayCoefficient *utheta_vec_coeff_ = nullptr;
   mfem::InnerProductCoefficient *swirl_var_viscosity_coeff_ = nullptr;
 
+  mfem::GridFunctionCoefficient *sqrt_rho_coeff_ = nullptr;
+  //mfem::ScalarVectorProductCoefficient *rhu_coeff_ = nullptr;
+  mfem::GridFunctionCoefficient *rhu_coeff_ = nullptr;  
+  //mfem::DivergenceGridFunctionCoefficient *div_rhu_coeff_ = nullptr;
+  mfem::GridFunctionCoefficient *div_rhu_coeff_ = nullptr;    
+  
   // mfem "form" objects used to create operators
   mfem::ParBilinearForm *L_iorho_form_ = nullptr;  // \int (1/\rho) \nabla \phi_i \cdot \nabla \phi_j
   mfem::ParLinearForm *forcing_form_ = nullptr;    // \int \phi_i f
@@ -299,7 +313,9 @@ class Tomboulides final : public FlowBase {
   mfem::ParMixedBilinearForm *D_form_ = nullptr;   // divergence = \int \phi_i \nabla \cdot \vphi_j
   mfem::ParMixedBilinearForm *G_form_ = nullptr;   // gradient = \int \vphi_i \cdot \nabla \phi_j
   mfem::ParBilinearForm *Mv_rho_form_ = nullptr;   // mass matrix (density weighted) = \int \rho \vphi_i \cdot \vphi_j
+  mfem::ParBilinearForm *Mv_rhu_form_ = nullptr;  
   mfem::ParBilinearForm *Hv_form_ = nullptr;
+  mfem::ParBilinearForm *Hvs_form_ = nullptr;  
   mfem::ParLinearForm *pp_div_bdr_form_ = nullptr;
   mfem::ParLinearForm *u_bdr_form_ = nullptr;
   mfem::ParLinearForm *S_poisson_form_ = nullptr;
@@ -318,9 +334,11 @@ class Tomboulides final : public FlowBase {
   mfem::OperatorHandle Ms_op_;
   mfem::OperatorHandle Mv_op_;
   mfem::OperatorHandle Mv_rho_op_;
+  mfem::OperatorHandle Mv_rhu_op_;  
   mfem::OperatorHandle D_op_;
   mfem::OperatorHandle G_op_;
   mfem::OperatorHandle Hv_op_;
+  mfem::OperatorHandle Hvs_op_;  
   mfem::OperatorHandle Ms_rho_op_;
   mfem::OperatorHandle Hs_op_;
   mfem::OperatorHandle As_op_;
@@ -343,6 +361,9 @@ class Tomboulides final : public FlowBase {
   mfem::Solver *Hv_inv_pc_ = nullptr;
   mfem::CGSolver *Hv_inv_ = nullptr;
 
+  mfem::Solver *Hvs_inv_pc_ = nullptr;
+  mfem::GMRESSolver *Hvs_inv_ = nullptr;
+  
   mfem::Solver *Hs_inv_pc_ = nullptr;
   mfem::CGSolver *Hs_inv_ = nullptr;
 
@@ -364,6 +385,7 @@ class Tomboulides final : public FlowBase {
   mfem::Vector p_vec_;
   mfem::Vector resu_vec_;
   mfem::Vector tmpR0_;
+  mfem::Vector tmpR0b_;  
   mfem::Vector tmpR1_;
   mfem::Vector gradU_;
   mfem::Vector gradV_;
@@ -446,8 +468,10 @@ class Tomboulides final : public FlowBase {
   /// Advance
   void step() final;
   void predictionStep() final;
-  void correctionStep() final;    
+  void correctionStep() final;
 
+  void correctionStepSimple();
+  
   void screenHeader(std::vector<std::string> &header) const final {
     int nprint = 1;
     header.resize(nprint);

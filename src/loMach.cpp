@@ -411,7 +411,7 @@ void LoMachSolver::solveStep() {
     // inner-iterations
     int nInnerIters = 1;
     for (int i = 0; i < nInnerIters; i++) {
-      if (rank0_) std::cout << "inner iteration: " << i << endl;
+      if (rank0_) std::cout << "inner iteration: " << i+1 << endl;
       
       // flow: predictor
       sw_flow_.Start();

@@ -112,7 +112,7 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   int max_iter_; /**< Maximum number of linear solver iterations */
   double rtol_;  /**< Linear solver relative tolerance */
 
-  int default_max_iter_ = 1000;
+  int default_max_iter_ = 10000;
   double default_rtol_ = 1.0e-10;
   double default_atol_ = 1.0e-12;
 
@@ -170,9 +170,11 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
 
   // Scalar \f$H^1\f$ finite element collection.
   FiniteElementCollection *sfec_ = nullptr;
+  // FiniteElementCollection *sfec_filter_ = nullptr;  
 
   // Scalar \f$H^1\f$ finite element space.
   ParFiniteElementSpace *sfes_ = nullptr;
+  // ParFiniteElementSpace *sfes_filter_ = nullptr;  
 
   // Vector \f$H^1\f$ finite element collection.
   FiniteElementCollection *vfec_ = nullptr;
@@ -189,17 +191,29 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   ParGridFunction rhoDt;  
 
   ParGridFunction Pn_gf_, p_prime_gf_, mass_imbalance_gf_;
+  ParGridFunction Pnm1_gf_, Pnm2_gf_, Pn_next_gf_;
+  ParGridFunction Pn_NM1_gf_;  // for p-1 filter
+
+  ParGridFunction density_isothermal_bc_gf_;
+  ParGridFunction density_adiabatic_bc_gf_;
+  ParGridFunction pressure_isothermal_bc_gf_;
+  ParGridFunction pressure_adiabatic_bc_gf_;      
   
   ParGridFunction visc_gf_;
   ParGridFunction kappa_gf_;
   ParGridFunction R0PM0_gf_;
   ParGridFunction Qt_gf_;
+  ParGridFunction sos_gf_;  
 
   ParGridFunction *gridScale_gf_ = nullptr;
 
   // ParGridFunction *buffer_tInlet_ = nullptr;
   GridFunctionCoefficient *temperature_bc_field_ = nullptr;
-  GridFunctionCoefficient *density_bc_field_ = nullptr;  
+  GridFunctionCoefficient *density_bc_field_ = nullptr;
+  GridFunctionCoefficient *pressure_iso_bc_field_ = nullptr;
+  GridFunctionCoefficient *pressure_adi_bc_field_ = nullptr;
+  GridFunctionCoefficient *density_iso_bc_field_ = nullptr;          
+  GridFunctionCoefficient *density_adi_bc_field_ = nullptr;        
 
   VectorGridFunctionCoefficient *un_next_coeff_ = nullptr;
   GridFunctionCoefficient *rhon_next_coeff_ = nullptr;
@@ -239,6 +253,11 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   VectorGridFunctionCoefficient *ustar_coeff_ = nullptr;
   ScalarVectorProductCoefficient *p_conv_coeff_ = nullptr;
 
+  GridFunctionCoefficient *c_coeff_ = nullptr;
+  RatioCoefficient *ioc_coeff_ = nullptr;
+  GradientGridFunctionCoefficient *gradP_coeff_ = nullptr;
+  ScalarVectorProductCoefficient *gradPoC_coeff_ = nullptr;      
+
   // operators and solvers
   ParBilinearForm *At_form_ = nullptr;
   ParBilinearForm *Ms_form_ = nullptr;
@@ -251,7 +270,8 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   ParBilinearForm *P_form_ = nullptr;    
   ParBilinearForm *LQ_form_ = nullptr;
   ParLinearForm *LQ_bdry_ = nullptr;
-
+  ParLinearForm *rho_bdr_form_ = nullptr;
+  
   OperatorHandle LQ_;
   OperatorHandle At_;
   OperatorHandle Ht_;
@@ -294,12 +314,15 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   Vector resr_;  
 
   Vector Pn_, p_prime_, mass_imbalance_;
+  Vector Pnm1_, Pnm2_;  
+  Vector Pn_next_;
   
   Vector Qt_;
   Vector kappa_;
   Vector visc_;
 
-  Vector tmpR0_, tmpR0b_;  
+  Vector tmpR0_, tmpR0b_;
+  Vector tmpR1_;  
 
   // Parameters and objects used in filter-based stabilization
   bool filter_temperature_ = false;
@@ -361,6 +384,7 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   void computeExplicitTempConvectionOP(bool extrap);
   void computeQt();
   void computeQtTO();
+  void updateSpeedOfSound();
 
   /// Return a pointer to the current temperature ParGridFunction.
   ParGridFunction *GetCurrentTemperature() { return &Tn_gf_; }

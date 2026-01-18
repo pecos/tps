@@ -51,7 +51,10 @@ struct extDataToFlow;
 
 struct flowToThermoChem {
   const mfem::ParGridFunction *velocity = nullptr;
-  const mfem::ParGridFunction *ustar = nullptr;  
+  const mfem::ParGridFunction *ustar = nullptr;
+  const mfem::ParGridFunction *un = nullptr;
+  const mfem::ParGridFunction *unm1 = nullptr;
+  const mfem::ParGridFunction *unm2 = nullptr;      
 
   bool swirl_supported = false;
   const mfem::ParGridFunction *swirl = nullptr;
