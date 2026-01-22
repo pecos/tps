@@ -749,6 +749,7 @@ void ZetaModel::initializeOperators() {
   }
   As_form_->Assemble();
   As_form_->FormSystemMatrix(empty, As_);
+  if (rank0_) std::cout << "... op 0 ..." << endl;
 
   // mass matrix
   Ms_form_ = new ParBilinearForm(sfes_);
@@ -767,6 +768,7 @@ void ZetaModel::initializeOperators() {
   }
   Ms_form_->Assemble();
   Ms_form_->FormSystemMatrix(empty, Ms_);
+  if (rank0_) std::cout << "... op 1 ..." << endl;
 
   // mass matrix with rho
   MsRho_form_ = new ParBilinearForm(sfes_);
@@ -786,7 +788,6 @@ void ZetaModel::initializeOperators() {
   }
   MsRho_form_->Assemble();
   MsRho_form_->FormSystemMatrix(empty, MsRho_);
-
   Mf_form_ = new ParBilinearForm(ffes_);
   MassIntegrator *mf_blfi;
   if (axisym_) {
@@ -803,6 +804,7 @@ void ZetaModel::initializeOperators() {
   }
   Mf_form_->Assemble();
   Mf_form_->FormSystemMatrix(empty, Mf_);
+  if (rank0_) std::cout << "... op 3 ..." << endl;
 
   // diffusion of tke for tdr bc
   /*
@@ -831,6 +833,8 @@ void ZetaModel::initializeOperators() {
   
   // Helmholtz operators for lhs of all scalars  
   Hk_form_ = new ParBilinearForm(sfes_);
+  if (rank0_) std::cout << "... op 4 1..." << endl;
+
   // auto *hmk_blfi = new MassIntegrator(*tke_diag_coeff_);
   // auto *hmk_blfi = new MassIntegrator(*rhoDt_coeff_);  
   // auto *hdk_blfi = new DiffusionIntegrator(*tke_diff_total_coeff_);
@@ -843,14 +847,18 @@ void ZetaModel::initializeOperators() {
     hmk_blfi = new MassIntegrator(*tke_diag_coeff_);
     hdk_blfi = new DiffusionIntegrator(*tke_diff_total_coeff_);
   }
+  if (rank0_) std::cout << "... op 4 2..." << endl;
   if (numerical_integ_) {
     hmk_blfi->SetIntRule(&ir_di);
     hdk_blfi->SetIntRule(&ir_i);
   }
   Hk_form_->AddDomainIntegrator(hmk_blfi);
   Hk_form_->AddDomainIntegrator(hdk_blfi);
+  if (rank0_) std::cout << "... op 4 3 ..." << endl;
   Hk_form_->Assemble();
+  if (rank0_) std::cout << "... op 4 4 ..." << endl;
   Hk_form_->FormSystemMatrix(tke_ess_tdof_, Hk_);
+  if (rank0_) std::cout << "... op 4 5 ..." << endl;
 
   He_form_ = new ParBilinearForm(sfes_);
   // auto *hme_blfi = new MassIntegrator(*tdr_diag_coeff_);
@@ -874,6 +882,7 @@ void ZetaModel::initializeOperators() {
   He_form_->AddDomainIntegrator(hde_blfi);
   He_form_->Assemble();
   He_form_->FormSystemMatrix(tdr_ess_tdof_, He_);
+  if (rank0_) std::cout << "... op 5 ..." << endl;
 
   Hv_form_ = new ParBilinearForm(sfes_);
   // auto *hmv_blfi = new MassIntegrator(*v2_diag_coeff_);
@@ -896,6 +905,7 @@ void ZetaModel::initializeOperators() {
   Hv_form_->AddDomainIntegrator(hdv_blfi);
   Hv_form_->Assemble();
   Hv_form_->FormSystemMatrix(v2_ess_tdof_, Hv_);
+  if (rank0_) std::cout << "... op 6 ..." << endl;
 
   Hf_form_ = new ParBilinearForm(ffes_);
   // dividing all by L^2
@@ -921,6 +931,7 @@ void ZetaModel::initializeOperators() {
   Hf_form_->AddDomainIntegrator(hdf_blfi);
   Hf_form_->Assemble();
   Hf_form_->FormSystemMatrix(fRate_ess_tdof_, Hf_);
+  if (rank0_) std::cout << "... op 7 ..." << endl;
 
   Hz_form_ = new ParBilinearForm(sfes_);
   // auto *hmz_blfi = new MassIntegrator(*zeta_diag_coeff_);
@@ -942,6 +953,7 @@ void ZetaModel::initializeOperators() {
   Hz_form_->AddDomainIntegrator(hdz_blfi);
   Hz_form_->Assemble();
   Hz_form_->FormSystemMatrix(fRate_ess_tdof_, Hz_);
+  if (rank0_) std::cout << "... op 8 ..." << endl;
 
   // boundary terms for tdr
   /*
