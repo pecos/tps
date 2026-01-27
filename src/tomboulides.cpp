@@ -2373,7 +2373,7 @@ void Tomboulides::correctionStep() {
   // p' bit
   thermo_interface_->p_prime->GetTrueDofs(tmpR0_);
   thermo_interface_->sos->GetTrueDofs(tmpR0b_);
-  tmpR1_.Set(1.0,un_next_);
+  tmpR1_.Set(1.0,u_next_vec_);
   {
     int nS = tmpR0_.Size();
     double *dataP = tmpR0_.ReadWrite();
@@ -2402,12 +2402,14 @@ void Tomboulides::correctionStep() {
   }  
   
   // u* bit
-  un_next_.Set(1.0,resu_vec_);
-  un_next_.Add(1.0,ustar_);
+  u_next_vec_.Set(1.0,resu_vec_);
+  u_next_vec_.Add(1.0,ustar_vec_);
 
   // done
-  un_next_gf_.SetFromTrueDofs(un_next_);
+  u_next_gf_->SetFromTrueDofs(u_next_vec_);
 
+  // subtract curl-curl explicit diffusion and include simple diffusion in an operator solve?
+  
   // update gradients for turbulence model
   evaluateVelocityGradient();
 

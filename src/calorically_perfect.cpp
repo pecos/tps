@@ -311,6 +311,8 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
 
   sos_gf_.SetSpace(sfes_);
   sos_gf_ = 343.0;
+  sos_.SetSize(sfes_truevsize);
+  sos_ = 343.0;
   
   density_isothermal_bc_gf_.SetSpace(sfes_);
   density_adiabatic_bc_gf_.SetSpace(sfes_);  
@@ -333,10 +335,12 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
   visc_gf_.SetSpace(sfes_);
   visc_gf_ = 0.0;
 
-  tmpR1_.SetSize(vfes_->GetTrueVSize());  
+  tmpR1_.SetSize(vfes_->GetTrueVSize());
+  tmpR1b_.SetSize(vfes_->GetTrueVSize());    
   tmpR0_.SetSize(sfes_truevsize);
   tmpR0b_.SetSize(sfes_truevsize);
   tmpR1_ = 0.0;
+  tmpR1b_ = 0.0;  
   tmpR0_ = 0.0;  
   tmpR0b_ = 0.0;
   
@@ -640,7 +644,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   // pressure solve
   rgas_coeff_.constant = Rgas_;
   bdf_coeff_.constant = time_coeff_.bd0 / time_coeff_.dt;
-  p_diff_coeff_const_.constant = -1.0; %time_coeff_.dt / time_coeff_.bd0;
+  p_diff_coeff_const_.constant = -1.0; //time_coeff_.dt / time_coeff_.bd0;
   p_conv_coeff_const_.constant = -2.0 / time_coeff_.dt;
   p_diag_coeff_const_.constant = -4.0 / (time_coeff_.dt * time_coeff_.dt);  
   c_coeff_ = new GridFunctionCoefficient(&sos_gf_);
@@ -885,11 +889,11 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
 
 
   // bare Laplacian
-  L_const_.constant = -1.0; // neg from ibp  
+  L_coeff_.constant = -1.0; // neg from ibp  
   L_form_ = new ParBilinearForm(sfes_);
-  auto *L_blfi = new DiffusionIntegrator(L_const_);
+  auto *L_blfi = new DiffusionIntegrator(L_coeff_);
   if (numerical_integ_) {
-    L_blfi->SetIntRule(&ir_ni_p);
+    L_blfi->SetIntRule(&ir_di);
   }
   L_form_->AddDomainIntegrator(L_blfi);
   L_form_->Assemble();
@@ -1061,7 +1065,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   // initialize density with P,R, & T
   // this should really only be done at t=0 start
   // restarts should write n-1 and n-2 steps
-  densityStep();
+  densityPredictionStep();
   
   rn_ = rn_next_;  
   rnm1_ = rn_next_;

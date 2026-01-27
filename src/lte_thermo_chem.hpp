@@ -273,8 +273,9 @@ class LteThermoChem final : public ThermoChemModelBase {
   void massImbalanceStep() final {};
   void pressureStep() final {};
   void densityPredictionStep() final {};
-  void temperatureStep() final {};
-  void densityStep() final {};
+  void temperaturePredictionStep() final {};  
+  void densityCorrectionStep() final {};
+  void temperatureCorrectionStep() final {};  
   void extrapolateStep() final {};
   void updateStep() final {};    
   

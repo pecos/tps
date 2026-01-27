@@ -244,12 +244,18 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
 
   ConstantCoefficient rgas_coeff_;
   ConstantCoefficient bdf_coeff_;
-  ConstantCoefficient p_diff_coeff_;  
+  ConstantCoefficient p_diff_coeff_const_;
+  ConstantCoefficient p_diag_coeff_const_;
+  ConstantCoefficient p_conv_coeff_const_;    
+  ConstantCoefficient L_coeff_;  
+  //ConstantCoefficient p_conv_coeff_;
+  RatioCoefficient *p_diag_coeff_ = nullptr;    
   GridFunctionCoefficient *rho_tmp_coeff_ = nullptr;  
   GridFunctionCoefficient *temperature_coeff_ = nullptr; 
   ProductCoefficient *rt_coeff_ = nullptr;
-  RatioCoefficient *iort_coeff_ = nullptr; 
-  ProductCoefficient *p_diag_coeff_ = nullptr;
+  RatioCoefficient *iort_coeff_ = nullptr;
+  RatioCoefficient *toc2dt_coeff_ = nullptr;
+  //ProductCoefficient *p_diag_coeff_ = nullptr;
   VectorGridFunctionCoefficient *ustar_coeff_ = nullptr;
   ScalarVectorProductCoefficient *p_conv_coeff_ = nullptr;
 
@@ -265,13 +271,15 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   ParBilinearForm *MsRho_form_ = nullptr;
   ParBilinearForm *Ht_form_ = nullptr;
   ParBilinearForm *Hr_form_ = nullptr;
-  ParMixedBilinearForm *D_rho_form_ = nullptr;  
+  ParMixedBilinearForm *D_rho_form_ = nullptr;
+  ParMixedBilinearForm *D_form_ = nullptr;    
   ParBilinearForm *Mq_form_ = nullptr;
   ParBilinearForm *MsIORT_form_ = nullptr;
   ParBilinearForm *P_form_ = nullptr;    
   ParBilinearForm *LQ_form_ = nullptr;
   ParLinearForm *LQ_bdry_ = nullptr;
   ParLinearForm *rho_bdr_form_ = nullptr;
+  ParBilinearForm *L_form_ = nullptr;  
   
   OperatorHandle LQ_;
   OperatorHandle At_;
@@ -280,9 +288,11 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   OperatorHandle MsRho_;
   OperatorHandle Mq_;
   OperatorHandle P_op_;
-  OperatorHandle D_rho_op_;  
+  OperatorHandle D_rho_op_;
+  OperatorHandle D_op_;    
   OperatorHandle MsIORT_op_;
-  OperatorHandle Hr_;  
+  OperatorHandle Hr_;
+  OperatorHandle L_op_;    
 
   mfem::Solver *MsInvPC_ = nullptr;
   mfem::CGSolver *MsInv_ = nullptr;
@@ -317,13 +327,14 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   Vector Pn_, p_prime_, mass_imbalance_;
   Vector Pnm1_, Pnm2_;  
   Vector Pn_next_;
+  Vector sos_;  
   
   Vector Qt_;
   Vector kappa_;
   Vector visc_;
 
   Vector tmpR0_, tmpR0b_;
-  Vector tmpR1_;  
+  Vector tmpR1_, tmpR1b_;  
 
   // Parameters and objects used in filter-based stabilization
   bool filter_temperature_ = false;
@@ -367,8 +378,9 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   void massImbalanceStep() final;
   void pressureStep() final;
   void densityPredictionStep() final;
-  void temperatureStep() final;
-  void densityStep() final;
+  void temperaturePredictionStep() final;
+  void densityCorrectionStep() final;
+  void temperatureCorrectionStep() final;  
   void extrapolateStep() final;
   void updateStep() final;    
 

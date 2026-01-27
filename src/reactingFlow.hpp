@@ -392,9 +392,10 @@ class ReactingFlow : public ThermoChemModelBase {
   void step() final;
   void massImbalanceStep() final {};
   void pressureStep() final {};
-  void densityPredictionStep() final {};
-  void densityStep() final {};
-  //void temperatureStep() final {};  
+  void densityPredictionStep() final {};  
+  void densityCorrectionStep() final {};
+  void temperaturePredictionStep() final {};
+  void temperatureCorrectionStep() final {};    
   void extrapolateStep() final {};
   void updateStep() final {};    
   

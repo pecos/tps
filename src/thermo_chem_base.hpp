@@ -61,6 +61,8 @@ struct thermoChemToFlow {
   const mfem::ParGridFunction *viscosity = nullptr;
   const mfem::ParGridFunction *thermal_divergence = nullptr;
   const mfem::ParGridFunction *pressure = nullptr;
+  const mfem::ParGridFunction *pn = nullptr;
+  const mfem::ParGridFunction *sos = nullptr;    
   const mfem::ParGridFunction *p_prime = nullptr;  
 };
 
@@ -122,8 +124,9 @@ class ThermoChemModelBase {
   virtual void massImbalanceStep() = 0;
   virtual void pressureStep() = 0;
   virtual void densityPredictionStep() = 0;
-  virtual void temperatureStep() = 0;    
-  virtual void densityStep() = 0; 
+  virtual void temperaturePredictionStep() = 0;    
+  virtual void densityCorrectionStep() = 0;
+  virtual void temperatureCorrectionStep() = 0;   
   virtual void extrapolateStep() = 0;
   virtual void updateStep() = 0;     
 
@@ -266,8 +269,9 @@ class ConstantPropertyThermoChem final : public ThermoChemModelBase {
   void massImbalanceStep() final {};
   void pressureStep() final {};
   void densityPredictionStep() final {};
-  void temperatureStep() final {};
-  void densityStep() final {};
+  void temperaturePredictionStep() final {};
+  void densityCorrectionStep() final {};
+  void temperatureCorrectionStep() final {};  
   void extrapolateStep() final {};
   void updateStep() final {};
   
