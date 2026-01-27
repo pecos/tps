@@ -1912,7 +1912,7 @@ void Tomboulides::extrapolateStep() {
 
 }
 
-/* // semi-implicit with conntinuty used directly
+/**/ // semi-implicit with conntinuty used directly
 void Tomboulides::predictionStep() {
 
   // For convenience, get time and dt
@@ -1925,7 +1925,8 @@ void Tomboulides::predictionStep() {
   // Update total viscosity field
   updateTotalViscosity();
 
-  Hvs_bdfcoeff_.constant = coeff_.bd0 / dt;
+  // operator has rho for both parts
+  Hv_bdfcoeff_.constant = coeff_.bd0 / dt; // Hv_ not Hvs_
   Hvs_form_->Update();
   Hvs_form_->Assemble();
   Hvs_form_->FormSystemMatrix(vel_ess_tdof_, Hvs_op_);
@@ -1955,18 +1956,20 @@ void Tomboulides::predictionStep() {
   
   // "ustar_vec" now has unsteady and forcing terms (pointwise form)
 
-  // explicit portion of nl (missing grad(rho) part...)
+  // explicit portion of nl 
   Nconv_form_->Mult(u_vec_, tmpR1_);
-  Ms_inv_->Mult(tmpR1_,N_vec_);  
+  Ms_inv_->Mult(tmpR1_,N_vec_);
+  ustar_vec_.Add(0.5,N_vec_);
+  // now ustar has 1/2 convection, uns, and forcing w/o rho
+
+  // multiply by rho
   thermo_interface_->density->GetTrueDofs(rho_vec_);
   {
     const auto d_rho = rho_vec_.Read();
-    auto d_conv = tmpR1_.ReadWrite();
-    MFEM_FORALL(i, tmpR1_.Size(), { d_conv[i] *= d_rho[i]; });    
-
+    auto d_rhs = ustar_vec_.ReadWrite();
+    MFEM_FORALL(i, tmpR1_.Size(), { d_rhs[i] *= d_rho[i]; });
   }
-  ustar_vec_.Add(0.5,tmpR1_);
-  // now ustar has 1/2 convection
+  // now ustar has 1/2 convection, uns, and forcing w/rho  
   
 
   // Evaluate the double curl of the extrapolated velocity field
@@ -1999,8 +2002,7 @@ void Tomboulides::predictionStep() {
   grad_Qt_vec_ *= (4. / 3);
   pp_div_vec_ += grad_Qt_vec_;
 
-  // Multiply pp_div_vec_ by nu
-  // TODO(trevilo): This is ugly.  Find a better way.
+  // Multiply pp_div_vec_ by mu
   thermo_interface_->density->GetTrueDofs(rho_vec_);
   mu_total_gf_->GetTrueDofs(mu_vec_);
   {
@@ -2009,14 +2011,17 @@ void Tomboulides::predictionStep() {
     auto d_mu = mu_vec_.Read();
     auto nnode = rho_vec_.Size();
     MFEM_FORALL(i, nnode, {
-      d_pp_div_vec[i] *= (d_mu[i] / d_rho[i]);
+	//      d_pp_div_vec[i] *= (d_mu[i] / d_rho[i]);
+      d_pp_div_vec[i] *= d_mu[i];	
     });
     MFEM_FORALL(i, nnode, {
-      d_pp_div_vec[nnode + i] *= (d_mu[i] / d_rho[i]);
+	//      d_pp_div_vec[nnode + i] *= (d_mu[i] / d_rho[i]);
+      d_pp_div_vec[nnode + i] *= d_mu[i];	
     });
     if (dim_ == 3) {
       MFEM_FORALL(i, nnode, {
-      d_pp_div_vec[2 * nnode + i] *= (d_mu[i] / d_rho[i]);    
+	  //      d_pp_div_vec[2 * nnode + i] *= (d_mu[i] / d_rho[i]);
+      d_pp_div_vec[2 * nnode + i] *= d_mu[i];    	  
       });
     }
   }
@@ -2030,7 +2035,7 @@ void Tomboulides::predictionStep() {
   // intercept full explicit viscous term held in pp_div_vec (if needed later)
   // diff_vec_ = pp_div_vec_;
   
-  // Add (ustar/dt + f) contribution
+  // Add rho*(ustar/dt + f + CN(NL)) contribution
   pp_div_vec_ += ustar_vec_;
 
   // fill grid function
@@ -2038,16 +2043,15 @@ void Tomboulides::predictionStep() {
 
   // now pp_div_gf_ (PRE_DIVERGENCE AND QT FROM div(u){n+1}) is the rhs of the ustar equation
   // solve for u* or finish with explicit nl term 
-  {    
-    resu_vec_ = 0.0;
-  
-    // rho * vstar / dt term (less implicit part of nl-term)
-    Mv_rho_op_->AddMult(pp_div_vec_, resu_vec_);
+  {
+    
+    resu_vec_ = 0.0;  
+    Mv_op_->AddMult(pp_div_vec_, resu_vec_);
 
-    // add -grad(p[n+1]) for current iteration
-    (thermo_interface_->pressure)->GetTrueDofs(p_vec_);
-    p_gf_->SetFromTrueDofs(p_vec_);  
-    G_op_->AddMult(p_vec_, resu_vec_, -1.0);    
+    // No gradP in ustar step
+    //(thermo_interface_->pressure)->GetTrueDofs(p_vec_);
+    //p_gf_->SetFromTrueDofs(p_vec_);  
+    //G_op_->AddMult(p_vec_, resu_vec_, -1.0);    
   
     for (auto &vel_dbc : vel_dbcs_) {
       u_next_gf_->ProjectBdrCoefficient(*vel_dbc.coeff, vel_dbc.attr);
@@ -2066,7 +2070,7 @@ void Tomboulides::predictionStep() {
     // res_hsolve = HInv->GetFinalNorm();
     Hvs_form_->RecoverFEMSolution(X2s, *resu_gf_, *ustar_gf_);
     ustar_gf_->GetTrueDofs(ustar_vec_);
-
+ 
     // now have u* from star eq, which comes from convection with u_next convecting u*
 
     // evaluate and store corresponding nl term if necessary
@@ -2077,7 +2081,7 @@ void Tomboulides::predictionStep() {
   }    
   
 }  // end linearized-implicit predictorStep
-*/
+/**/
 
 //
 //  - Solving for v (v* in f-p):
@@ -2087,7 +2091,7 @@ void Tomboulides::predictionStep() {
 //  - even if C is implicit, convective vel must be extrapolated 
 //  - f-p is set bdf2/ab2
 //
-/**/
+/*
 void Tomboulides::predictionStep() {
 
   Array<int> empty;
@@ -2267,7 +2271,6 @@ void Tomboulides::predictionStep() {
   thermo_interface_->density->GetTrueDofs(rho_vec_);  
   rho_tmp_gf_->SetFromTrueDofs(rho_vec_);  
   // solve system with ustar = Mv_rho_inv_(rhs)
-  /**/
   for (int ius = 0; ius < 1; ius++) {
 
     resu_vec_.Set(1.0, forcing_vec_);
@@ -2288,75 +2291,11 @@ void Tomboulides::predictionStep() {
     ustar_gf_->SetFromTrueDofs(ustar_vec_);
     tmpR1_.Add(-1.0, ustar_vec_); // for diag
 
-    // diagnostics (comment otherwise!)
-    /*
-    double uAll = 0.0;
-    double uLocal = 0.0;
-    double umAll = 0.0;
-    double umLocal = 0.0;
-    int nRanks = (pmesh_->GetNRanks());
-    const double *error = tmpR1_.HostRead();
-    const int nS = tmpR0_.Size();
-    for (int i = 0; i < nS; i++) {
-      const double err = error[i + 0*nS]*error[i + 0*nS] + error[i + 1*nS]*error[i + 1*nS] + error[i + 2*nS]*error[i + 2*nS];
-      umLocal += err;
-      if (err > uLocal) uLocal = err;
-    }
-    umLocal /= static_cast<double>(nS);
-    MPI_Reduce(&uLocal, &uAll, 1, MPI_DOUBLE, MPI_MAX, 0, sfes_->GetComm());
-    MPI_Reduce(&umLocal, &umAll, 1, MPI_DOUBLE, MPI_SUM, 0, sfes_->GetComm());
-    umAll /= static_cast<double>(nRanks);
-    if(rank0_) std::cout << "u* (max/mean): " << std::sqrt(uAll) << " / " << std::sqrt(umAll) << endl;
-    */
     
   }
-  /**/
-
-  // solve linearize-implicit system
-  /*
-  if(rank0_) std::cout << "attempting Hvs solve..." << endl;
-  {    
-    resu_vec_.Set(1.0, forcing_vec_);    
-
-    // update linearized us-conv operator
-    Hvs_bdfcoeff_.constant = coeff_.bd0 / dt;
-    Hvs_form_->Update();
-    Hvs_form_->Assemble();
-    Hvs_form_->FormSystemMatrix(vel_ess_tdof_, Hvs_op_);
-    Hvs_inv_->SetOperator(*Hvs_op_);
-    
-    for (auto &vel_dbc : vel_dbcs_) {
-      u_next_gf_->ProjectBdrCoefficient(*vel_dbc.coeff, vel_dbc.attr);
-    }
-
-    vfes_->GetRestrictionMatrix()->MultTranspose(resu_vec_, *resu_gf_);
-
-    Vector X2s, B2s;
-    Hvs_form_->FormLinearSystem(vel_ess_tdof_, *u_next_gf_, *resu_gf_, Hvs_op_, X2s, B2s, 1);
-    Hvs_inv_->Mult(B2s, X2s);
-    if (!Hvs_inv_->GetConverged()) {
-      if (rank0_) std::cout << "ERROR: Solve for u* solve did not converge." << std::endl;
-      exit(1);
-    }
-    // iter_hsolve = HInv->GetNumIterations();
-    // res_hsolve = HInv->GetFinalNorm();
-    Hvs_form_->RecoverFEMSolution(X2s, *resu_gf_, *ustar_gf_);
-    ustar_gf_->GetTrueDofs(ustar_vec_);    
-
-    // compute NL term with u[n+1] and ustar for later use
-    // 0.5 is from CN
-    if(rank0_) std::cout << "attempting Lconv..." << endl;    
-    Lconv_form_->Update();
-    Lconv_form_->Assemble();
-    //Lconv_form_->FormSystemMatrix(vel_ess_tdof_, Lconv_op_);
-    Lconv_form_->FormSystemMatrix(empty, Lconv_op_);
-    Lconv_op_->AddMult(ustar_vec_, N_vec_, 0.5);
-
-  }
-  */
-
   
 }  // end predictorStep
+*/
 
 void Tomboulides::computeConvection(int inm){
 
@@ -2415,83 +2354,69 @@ void Tomboulides::computeConvection(int inm){
 //  -- (bdf0/dt * C_rho) * p' + div(C_rho * ustar * p') = dt/dbf0 * nabla^2(p') - mass_imbalance
 //  pressure should be updated (w/p') by this point
 //
-void Tomboulides::correctionStepSimple(){//}
-  //void Tomboulides::correctionStep() {
+void Tomboulides::correctionStepSimple(){}
+void Tomboulides::correctionStep() {
 
   // For convenience, get time and dt
   const double time = coeff_.time;
   const double dt = coeff_.dt;
 
-  // current [n+1] density iteration
-  thermo_interface_->density->GetTrueDofs(rho_vec_);
-  rho_tmp_gf_->SetFromTrueDofs(rho_vec_);    
-
-  // update rho-weighted mass matrix
-  Array<int> empty;    
-  Mv_rho_form_->Update();
-  Mv_rho_form_->Assemble();
-  Mv_rho_form_->FormSystemMatrix(empty, Mv_rho_op_);
-  Mv_rho_inv_->SetOperator(*Mv_rho_op_);
-  
-  // pressure gradient (p', not full pressure)
-  (thermo_interface_->p_prime)->GetTrueDofs(p_vec_);
-  p_gf_->SetFromTrueDofs(p_vec_);  
+  // pressure bits
+  thermo_interface_->pressure->GetTrueDofs(p_vec_);
+  thermo_interface_->pn->GetTrueDofs(tmpR0_);
+  p_vec_.Add(1.0,tmpR0_);
   G_op_->Mult(p_vec_, resu_vec_);
-  resu_vec_ *= -dt/coeff_.bd0;
+  Mv_inv_->Mult(resu_vec_,tmpR1_);
+  double Cp = -0.5*dt/coeff_.bd0;
+  resu_vec_.Set(Cp,tmpR1_);
 
-  // solve system for v'
-  tmpR1_ = 0.0;
-  Mv_rho_inv_->Mult(resu_vec_,tmpR1_);
-
-  /*
-  for (auto &vel_dbc : vel_dbcs_) {
-    u_next_gf_->ProjectBdrCoefficient(*vel_dbc.coeff, vel_dbc.attr);
+  // p' bit
+  thermo_interface_->p_prime->GetTrueDofs(tmpR0_);
+  thermo_interface_->sos->GetTrueDofs(tmpR0b_);
+  tmpR1_.Set(1.0,un_next_);
+  {
+    int nS = tmpR0_.Size();
+    double *dataP = tmpR0_.ReadWrite();
+    const double *dataC = tmpR0b_.Read();
+    double *dataU = tmpR1_.ReadWrite();    
+    MFEM_FORALL(i, nS, { dataP[i] /= (dataC[i] * dataC[i]); });
+    MFEM_FORALL(i, nS, { dataU[i + 0*nS] *= dataP[i]; });
+    MFEM_FORALL(i, nS, { dataU[i + 1*nS] *= dataP[i]; });
+    if (dim_ > 2) {
+      MFEM_FORALL(i, nS, { dataU[i + 2*nS] *= dataP[i]; });
+    }
   }
+  resu_vec_.Add(1.0,tmpR1_);
 
-  vfes_->GetRestrictionMatrix()->MultTranspose(resu_vec_, *resu_gf_);
-
-  Vector Xu, Bu;
-  Mv_rho_form_->FormLinearSystem(vel_ess_tdof_, *u_next_gf_, *resu_gf_, Mv_rho_op_, Xu, Bu, 1);
-  Mv_rho_inv_->Mult(Bu, Xu);
-  if (!Mv_rho_inv_->GetConverged()) {
-    if (rank0_) std::cout << "ERROR: Mass solve for u-prime did not converge." << std::endl;
-    exit(1);
-  }
-  Mv_rho_form_->RecoverFEMSolution(Xu, *resu_gf_, *u_next_gf_);
-  //u_next_gf_->GetTrueDofs(tmpR1_);  
-  */
+  // divide by rho (ambiguous which rho in doc)
+  thermo_interface_->density->GetTrueDofs(rho_vec_);
+  {
+    int nS = tmpR0_.Size();
+    const double *dataR = rho_vec_.Read();
+    double *dataU = resu_vec_.ReadWrite();    
+    MFEM_FORALL(i, nS, { dataU[i + 0*nS] /= dataR[i]; });
+    MFEM_FORALL(i, nS, { dataU[i + 1*nS] /= dataR[i]; });
+    if (dim_ > 2) {
+      MFEM_FORALL(i, nS, { dataU[i + 2*nS] /= dataR[i]; });
+    }
+  }  
   
-  // update full velocity: u[n+1] = u' + u*
-  tmpR1_.Add(1.0, ustar_vec_);
-  u_next_gf_->SetFromTrueDofs(tmpR1_);
-  u_next_gf_->GetTrueDofs(u_next_vec_);  
+  // u* bit
+  un_next_.Set(1.0,resu_vec_);
+  un_next_.Add(1.0,ustar_);
 
-  // debug HACK
-  //u_next_gf_->SetFromTrueDofs(ustar_vec_);
-  //u_next_gf_->GetTrueDofs(u_next_vec_);  
-  
-  // Rotate values in solution history
-  // um2_vec_ = um1_vec_;
-  // um1_vec_ = u_vec_;
-
-  // Update the current solution and corresponding GridFunction
-  // u_next_gf_->GetTrueDofs(u_next_vec_);
-  // u_vec_ = u_next_vec_;
-  // u_curr_gf_->SetFromTrueDofs(u_vec_);
+  // done
+  un_next_gf_.SetFromTrueDofs(un_next_);
 
   // update gradients for turbulence model
   evaluateVelocityGradient();
-  
-  // May need a full momentum solve here instead of the update,
-  // as-is, u[n+1] is consistent with grad(P),
-  // however, if rho* and rho[n+1] are different (enough), mass will not be conserved
 
 } //end correction step (simple)
 
 
 // full solve correction step
-void Tomboulides::correctionStepFull() {}
-void Tomboulides::correctionStep() {  
+void Tomboulides::correctionStepFull() {//}
+//void Tomboulides::correctionStep() {  
 
   // For convenience, get time and dt
   const double time = coeff_.time;

@@ -412,6 +412,12 @@ void LoMachSolver::solveStep() {
     int nInnerIters = 1;
     for (int i = 0; i < nInnerIters; i++) {
       //if (rank0_) std::cout << "inner iteration: " << i+1 << endl;
+
+      // density: predictor
+      sw_thermChem_.Start();    
+      thermo_->densityPredictionStep();
+      sw_thermChem_.Stop();
+      //if (rank0_) std::cout << "rho* substep complete..." << endl;    
       
       // flow: predictor
       sw_flow_.Start();
@@ -419,10 +425,15 @@ void LoMachSolver::solveStep() {
       sw_flow_.Stop();
       //if (rank0_) std::cout << "v* substep complete..." << endl;    
 
-      // density: mass imbalance
+      // temperature: predictor
       sw_thermChem_.Start();    
-      thermo_->massImbalanceStep();
-      sw_thermChem_.Stop();
+      thermo_->temperaturePredictionStep();
+      sw_thermChem_.Stop();      
+
+      // density: mass imbalance
+      //sw_thermChem_.Start();    
+      //thermo_->massImbalanceStep();
+      //sw_thermChem_.Stop();
       //if (rank0_) std::cout << "mass-imbalance complete..." << endl;    
 
       // pressure
@@ -430,30 +441,24 @@ void LoMachSolver::solveStep() {
       thermo_->pressureStep();
       sw_thermChem_.Stop();
       //if (rank0_) std::cout << "pressure complete..." << endl;    
-    
+
+      // density 
+      sw_thermChem_.Start();    
+      thermo_->densityCorrectionStep();
+      sw_thermChem_.Stop();
+      //if (rank0_) std::cout << "rho[n+1] complete..." << endl;
+      
       // flow: pressure correction [n+1]* vel state
       sw_flow_.Start();
       flow_->correctionStep();
       sw_flow_.Stop();
       //if (rank0_) std::cout << "v[n+1] complete..." << endl;    
-
-      // density: predictor
-      sw_thermChem_.Start();    
-      thermo_->densityPredictionStep();
-      sw_thermChem_.Stop();
-      //if (rank0_) std::cout << "rho* substep complete..." << endl;    
     
       // temperature
       sw_thermChem_.Start();    
-      thermo_->temperatureStep();
+      thermo_->temperatureCorrectionStep();
       sw_thermChem_.Stop();
       //if (rank0_) std::cout << "temperature complete..." << endl;    
-
-      // density 
-      sw_thermChem_.Start();    
-      thermo_->densityStep();
-      sw_thermChem_.Stop();
-      //if (rank0_) std::cout << "rho[n+1] complete..." << endl;
 
       // density: mass imbalance at [n+1]* state
       //sw_thermChem_.Start();    
