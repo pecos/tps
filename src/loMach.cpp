@@ -411,7 +411,7 @@ void LoMachSolver::solveStep() {
     // inner-iterations
     int nInnerIters = 1;
     for (int i = 0; i < nInnerIters; i++) {
-      if (rank0_) std::cout << "inner iteration: " << i+1 << endl;
+      //if (rank0_) std::cout << "inner iteration: " << i+1 << endl;
       
       // flow: predictor
       sw_flow_.Start();
@@ -431,7 +431,7 @@ void LoMachSolver::solveStep() {
       sw_thermChem_.Stop();
       //if (rank0_) std::cout << "pressure complete..." << endl;    
     
-      // flow: pressure correction
+      // flow: pressure correction [n+1]* vel state
       sw_flow_.Start();
       flow_->correctionStep();
       sw_flow_.Stop();
@@ -453,8 +453,18 @@ void LoMachSolver::solveStep() {
       sw_thermChem_.Start();    
       thermo_->densityStep();
       sw_thermChem_.Stop();
-      //if (rank0_) std::cout << "rho[n+1] complete..." << endl;    
+      //if (rank0_) std::cout << "rho[n+1] complete..." << endl;
 
+      // density: mass imbalance at [n+1]* state
+      //sw_thermChem_.Start();    
+      //thermo_->massImbalanceStep();
+      //sw_thermChem_.Stop();      
+
+      // flow: phi correction to get mass conserving u[n+1]
+      //sw_flow_.Start();
+      //flow_->phiStep();
+      //sw_flow_.Stop();
+      
     } // end inner-iteration loop
 
     // rotate storage containers in solution history

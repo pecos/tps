@@ -60,7 +60,8 @@ struct thermoChemToFlow {
   const mfem::ParGridFunction *mass_imbalance = nullptr;      
   const mfem::ParGridFunction *viscosity = nullptr;
   const mfem::ParGridFunction *thermal_divergence = nullptr;
-  const mfem::ParGridFunction *pressure = nullptr;        
+  const mfem::ParGridFunction *pressure = nullptr;
+  const mfem::ParGridFunction *p_prime = nullptr;  
 };
 
 /**

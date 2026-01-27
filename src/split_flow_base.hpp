@@ -88,7 +88,8 @@ class FlowBase {
   virtual void predictionStep() = 0;
   virtual void correctionStep() = 0;
   virtual void extrapolateStep() = 0;
-  virtual void updateStep() = 0;    
+  virtual void updateStep() = 0;
+  virtual void phiStep() = 0;      
 
   virtual mfem::ParGridFunction *getCurrentVelocity() = 0;
   virtual mfem::ParGridFunction *getCurrentVelocityGradientU() { return nullptr; }
@@ -185,7 +186,8 @@ class ZeroFlow final : public FlowBase {
   void predictionStep() {}
   void correctionStep() {}
   void extrapolateStep() {}
-  void updateStep() {}    
+  void updateStep() {}
+  void phiStep() {}      
 
   mfem::ParGridFunction *getCurrentVelocity() final { return velocity_; }
 };

@@ -88,6 +88,9 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
 
     pres_ess_attr_.SetSize(pmesh_->bdr_attributes.Max());
     pres_ess_attr_ = 0;
+
+    phi_ess_attr_.SetSize(pmesh_->bdr_attributes.Max());
+    phi_ess_attr_ = 0;    
   }
 
   if (tps != nullptr) {
@@ -254,9 +257,12 @@ void Tomboulides::initializeSelf() {
   gradU_gf_ = new ParGridFunction(vfes_);
   gradV_gf_ = new ParGridFunction(vfes_);
   gradW_gf_ = new ParGridFunction(vfes_);
+  //forcing_gf_ = new ParGridFunction(vfes_);  
   
   p_gf_ = new ParGridFunction(pfes_);
   resp_gf_ = new ParGridFunction(pfes_);
+  ress_gf_ = new ParGridFunction(sfes_);
+  phi_gf_ = new ParGridFunction(sfes_);    
 
   epsi_gf_ = new ParGridFunction(sfes_);
   rho_tmp_gf_ = new ParGridFunction(sfes_);    
@@ -267,6 +273,12 @@ void Tomboulides::initializeSelf() {
 
   // pp_div_rad_comp_gf_ = new ParGridFunction(pfes_, *pp_div_gf_);
   // u_next_rad_comp_gf_ = new ParGridFunction(pfes_, *u_next_gf_);
+
+  // for p-1 filtering
+  sfec_filter_ = new H1_FECollection(vorder_ - 1);
+  sfes_filter_ = new ParFiniteElementSpace(pmesh_, sfec_filter_);
+  phi_NM1_gf_ = new ParGridFunction(sfes_filter_);  
+  *phi_NM1_gf_ = 0.0;  
 
   if (axisym_) {
     pp_div_rad_comp_gf_ = new ParGridFunction(pfes_);
@@ -284,7 +296,13 @@ void Tomboulides::initializeSelf() {
   *curl_gf_ = 0.0;
   *curlcurl_gf_ = 0.0;
   *resu_gf_ = 0.0;
-  *rho_tmp_gf_ = 1.0;  
+  
+  *ress_gf_ = 0.0;
+  *phi_gf_ = 1.0;    
+  *rho_tmp_gf_ = 1.0;
+  *rho_sqrt_gf_ = 1.0;
+  *rhu_gf_ = 1.0;
+  *div_rhu_gf_ = 1.0;
 
   *gradU_gf_ = 0.0;
   *gradV_gf_ = 0.0;
@@ -363,6 +381,7 @@ void Tomboulides::initializeSelf() {
   tmpR0_.SetSize(sfes_truevsize);
   tmpR0b_.SetSize(sfes_truevsize);  
   tmpR1_.SetSize(vfes_truevsize);
+  tmpR1b_.SetSize(vfes_truevsize);  
 
   gradU_.SetSize(vfes_truevsize);
   gradV_.SetSize(vfes_truevsize);
@@ -466,8 +485,9 @@ void Tomboulides::initializeSelf() {
 
       Vector velocity_value(dim_);
       tpsP_->getVec((basepath + "/velocity").c_str(), velocity_value, dim_, zero);
-
       addVelDirichletBC(velocity_value, inlet_attr);
+      double cz = 0.0;
+      //addPhiDirichletBC(cz, inlet_attr);      
 
       if (axisym_) {
         double swirl;
@@ -483,8 +503,13 @@ void Tomboulides::initializeSelf() {
       inlet_attr = 0;
       inlet_attr[patch - 1] = 1;
 
+      Vector zero(dim_);
+      zero = 0.0;
+      
       velocity_field_ = new VectorGridFunctionCoefficient(extData_interface_->Udata);
       addVelDirichletBC(velocity_field_, inlet_attr);
+      double cz = 0.0;      
+      //addPhiDirichletBC(cz, inlet_attr);            
 
       // axisymmetric not testsed with interpolation BCs yet.  For now, just stop.
       assert(!axisym_);
@@ -494,8 +519,13 @@ void Tomboulides::initializeSelf() {
       inlet_attr = 0;
       inlet_attr[patch - 1] = 1;
 
+      Vector zero(dim_);
+      zero = 0.0;
+      
       vfptr user_func = vel_bc(type);
       addVelDirichletBC(user_func, inlet_attr);
+      double cz = 0.0;      
+      //addPhiDirichletBC(cz, inlet_attr);      
 
       if (axisym_) {
         addSwirlDirichletBC(0.0, inlet_attr);
@@ -551,6 +581,8 @@ void Tomboulides::initializeSelf() {
       tpsP_->getVec((basepath + "/velocity").c_str(), velocity_value, dim_, zero);
 
       addVelDirichletBC(velocity_value, wall_attr);
+      double cz = 0.0;      
+      //addPhiDirichletBC(cz, wall_attr);      
 
       if (axisym_) {
         double swirl;
@@ -582,7 +614,7 @@ void Tomboulides::initializeSelf() {
       Array<int> outlet_attr(pmesh_->bdr_attributes.Max());
       outlet_attr = 0;
       outlet_attr[patch - 1] = 1;
-
+      
       double pback;
       tpsP_->getInput((basepath + "/pressure").c_str(), pback, 0.0);
 
@@ -590,6 +622,12 @@ void Tomboulides::initializeSelf() {
         std::cout << "Tomboulides: Setting uniform outlet pressure on patch = " << patch << std::endl;
       }
       addPresDirichletBC(pback, outlet_attr);
+
+      Vector zero(dim_);
+      zero = 0.0;
+      double cz = 0.0;      
+      //addPhiDirichletBC(cz, outlet_attr);
+      
     } else {
       if (pmesh_->GetMyRank() == 0) {
         std::cout << "Tomboulides: When reading " << basepath << ", encountered outlet type = " << type << std::endl;
@@ -712,6 +750,7 @@ void Tomboulides::initializeOperators() {
   if (axisym_) {
     pfes_->GetEssentialTrueDofs(swirl_ess_attr_, swirl_ess_tdof_);
   }
+  pfes_->GetEssentialTrueDofs(phi_ess_attr_, phi_ess_tdof_);  
 
   // Create the operators
 
@@ -745,6 +784,41 @@ void Tomboulides::initializeOperators() {
   L_iorho_inv_->SetAbsTol(pressure_solve_atol_);
   L_iorho_inv_->SetMaxIter(pressure_solve_max_iter_);
 
+  
+  // bare Laplacian
+  L_const_.constant = -1.0;  
+  L_form_ = new ParBilinearForm(sfes_);
+  auto *L_blfi = new DiffusionIntegrator(L_const_);
+  if (numerical_integ_) {
+    L_blfi->SetIntRule(&ir_ni_p);
+  }
+  L_form_->AddDomainIntegrator(L_blfi);
+  L_form_->Assemble();
+  L_form_->FormSystemMatrix(phi_ess_tdof_, L_op_);
+  //L_form_->FormSystemMatrix(empty, L_op_);
+
+  // Laplacian inverse 
+  L_lor_ = new ParLORDiscretization(*L_form_, phi_ess_tdof_);
+  //L_lor_ = new ParLORDiscretization(*L_form_, empty);
+  L_inv_pc_ = new HypreBoomerAMG(L_lor_->GetAssembledMatrix());
+  L_inv_pc_->SetPrintLevel(pressure_solve_pl_);
+  L_inv_ortho_pc_ = new OrthoSolver(sfes_->GetComm());
+  L_inv_ortho_pc_->SetSolver(*L_inv_pc_);
+
+  L_inv_ = new CGSolver(sfes_->GetComm());
+  L_inv_->iterative_mode = true;
+  L_inv_->SetOperator(*L_op_);
+  if (phi_dbcs_.empty()) {
+    L_inv_->SetPreconditioner(*L_inv_ortho_pc_);
+  } else {
+    L_inv_->SetPreconditioner(*L_inv_pc_);
+  }
+  L_inv_->SetPrintLevel(pressure_solve_pl_);
+  L_inv_->SetRelTol(pressure_solve_rtol_);
+  L_inv_->SetAbsTol(pressure_solve_atol_);
+  L_inv_->SetMaxIter(pressure_solve_max_iter_);  
+
+  
   // Forcing term in the velocity equation: du/dt + ... = ... + f
   forcing_form_ = new ParLinearForm(vfes_);
   for (auto &force : forcing_terms_) {
@@ -770,6 +844,27 @@ void Tomboulides::initializeOperators() {
     Nconv_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
     Nconv_form_->Setup();
   }
+
+  /*
+  Lconv_form_ = new ParBilinearForm(vfes_);
+  ConvectionIntegrator *llc_nlfi;
+  //if (axisym_) {
+  //  llc_nlfi = new VectorConvectionIntegrator(negative_radius_coeff);
+  //} else {
+  llc_nlfi = new ConvectionIntegrator(*rhou_coeff_,1.0);
+  //}
+  if (numerical_integ_) {
+    llc_nlfi->SetIntRule(&ir_ni_v);
+  }
+  Lconv_form_->AddDomainIntegrator(llc_nlfi);
+  Lconv_form_->Assemble();
+  Lconv_form_->FormSystemMatrix(vel_ess_tdof_, Lconv_op_);  
+  //if (partial_assembly_) {
+  //  Lconv_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+  //  Lconv_form_->Setup();
+  //}
+  */
+
   
   // The nonlinear (i.e., convection) term
   // Coefficient is -1 so we can just add to rhs
@@ -1186,7 +1281,9 @@ void Tomboulides::initializeIO(IODataOrganizer &io) const {
 
 void Tomboulides::initializeViz(mfem::ParaViewDataCollection &pvdc) const {
   pvdc.RegisterField("velocity", u_curr_gf_);
-  pvdc.RegisterField("v*", ustar_gf_);  
+  pvdc.RegisterField("v*", ustar_gf_);
+  pvdc.RegisterField("phi", phi_gf_);  
+  //pvdc.RegisterField("Fi", forcing_gf_);    
   //pvdc.RegisterField("pressure(flow)", p_gf_);
   if (axisym_) {
     pvdc.RegisterField("swirl", utheta_gf_);
@@ -1993,49 +2090,36 @@ void Tomboulides::predictionStep() {
 /**/
 void Tomboulides::predictionStep() {
 
+  Array<int> empty;
+  
   // For convenience, get time and dt
   const double time = coeff_.time;
   const double dt = coeff_.dt;
 
   // Ensure u_vec_ consistent with u_curr_gf_
   u_curr_gf_->GetTrueDofs(u_vec_);
-
-  //------------------------------------------------------------------------
-  // Step 1: Update any operators invalidated by changing data
-  // external to this class
-  // ------------------------------------------------------------------------
+  ustar_gf_->SetFromTrueDofs(u_next_vec_);
+  ustar_gf_->GetTrueDofs(ustar_vec_);  
 
   // Update total viscosity field
   updateTotalViscosity();
-
-  // Update density weighted mass
-  Array<int> empty;
-  //Mv_rho_form_->Update();
-  //Mv_rho_form_->Assemble();
-  //Mv_rho_form_->FormSystemMatrix(empty, Mv_rho_op_);
-  //Mv_rho_inv_->SetOperator(*Mv_rho_op_);
-
-  // Update the Helmholtz operator and inverse
-  //sw_helm_.Start();
-  //Hv_bdfcoeff_.constant = coeff_.bd0 / dt;
-  //Hv_form_->Update();
-  //Hv_form_->Assemble();
-  //Hv_form_->FormSystemMatrix(vel_ess_tdof_, Hv_op_);
-  //Hv_inv_->SetOperator(*Hv_op_);
-  //sw_helm_.Stop();
-
-  //------------------------------------------------------------------------
-  // Step 2: Compute vstar / dt (as in eqn 2.3 from Tomboulides)
-  // ------------------------------------------------------------------------
-
+  
   // Evaluate the forcing at the end of the time step
   for (auto &force : forcing_terms_) {
     force.coeff->SetTime(time + dt);
   }
   forcing_form_->Assemble();
   forcing_form_->ParallelAssemble(forcing_vec_);
+  Mv_inv_->Mult(forcing_vec_,tmpR1_);
 
-  // replace convection with implicit solve?
+  thermo_interface_->density->GetTrueDofs(rho_vec_);
+  rho_tmp_gf_->SetFromTrueDofs(rho_vec_);  
+  Mv_rho_form_->Update();
+  Mv_rho_form_->Assemble();
+  Mv_rho_form_->FormSystemMatrix(empty, Mv_rho_op_);
+  Mv_rho_op_->Mult(tmpR1_, forcing_vec_);
+  
+  //forcing_gf_->SetFromTrueDofs(tmpR1_);
   
   // Evaluate convection term in the velocity eqn
   // need appropriate rho at each stage here as well
@@ -2044,111 +2128,15 @@ void Tomboulides::predictionStep() {
 
   // d_j (rho u_i u_j), ut = sqrt(rho)*u
   // d_j (ut_i ut_j) = ut_j d_j(u_i) + ut_i * divu => CI + Mv{ut_i * div(ut)}
+
+  // helper routine that stores full term for step in tmpR1b_;
+  computeConvection(1);
+  N_vec_.Set(coeff_.ab1, tmpR1b_);
+  computeConvection(2);
+  N_vec_.Add(coeff_.ab2, tmpR1b_);  
+  computeConvection(3);
+  N_vec_.Add(coeff_.ab3, tmpR1b_);  
   
-  // all at [n+1] iteration (very hacky approach... not safe for gpu!)
-  /**/
-  thermo_interface_->density->GetTrueDofs(rho_vec_);
-  {
-    const auto d_r = rho_vec_.Read();
-    auto d_sqrtr = tmpR0_.ReadWrite();
-    // MFEM_FORALL(i, tmpR0_.Size(), { d_sqrtr[i] = std::sqrt(d_r[i]); });    
-    for (int i = 0; i < tmpR0_.Size(); i++) {
-      d_sqrtr[i] = std::sqrt(d_r[i]);
-    }
-  }
-  tmpR1_.Set(1.0,u_next_vec_);
-  {
-    const auto d_sqrtr = tmpR0_.Read();
-    auto d_rhu = tmpR1_.ReadWrite();
-    int nS = tmpR0_.Size();
-    MFEM_FORALL(i, nS, { d_rhu[i] *= d_sqrtr[i]; });
-    MFEM_FORALL(i, nS, { d_rhu[i + nS] *= d_sqrtr[i]; });
-    if (dim_ == 3) {
-      MFEM_FORALL(i, nS, { d_rhu[i + 2*nS] *= d_sqrtr[i]; });
-    }
-  }
-  Nconv_form_->Mult(tmpR1_, N_vec_);
-  /**/
-
-  // now need Mv{ut_i * MsInv{D_op{ut}}} part
-  // rho_sqrt_gf_->SetFromTrueDofs(tmpR0_);
-  rhu_gf_->SetFromTrueDofs(tmpR1_);
-  D_op_->Mult(tmpR1_,tmpR0b_);
-  Ms_inv_->Mult(tmpR0b_,tmpR0_);
-  div_rhu_gf_->SetFromTrueDofs(tmpR0_);
-  Mv_rhu_form_->Update();
-  Mv_rhu_form_->Assemble();
-  Mv_rhu_form_->FormSystemMatrix(empty, Mv_rhu_op_);    
-  Mv_rhu_op_->AddMult(tmpR1_,N_vec_,1.0);
-
-  /*
-  // extrapolating NL-product
-  // all at [n+1] iteration (very hacky approach... not safe for gpu!)
-  thermo_interface_->rn->GetTrueDofs(rho_vec_);
-  {
-    const auto d_r = rho_vec_.Read();
-    auto d_sqrtr = tmpR0_.ReadWrite();
-    for (int i = 0; i < tmpR0_.Size(); i++) {
-      d_sqrtr[i] = std::sqrt(d_r[i]);
-    }
-  }  
-  tmpR1_.Set(1.0,u_vec_);
-  {
-    const auto d_sqrtr = tmpR0_.Read();
-    auto d_rhu = tmpR1_.ReadWrite();
-    int nS = tmpR0_.Size();
-    MFEM_FORALL(i, nS, { d_rhu[i] *= d_sqrtr[i]; });
-    MFEM_FORALL(i, nS, { d_rhu[i + nS] *= d_sqrtr[i]; });
-    if (dim_ == 3) {
-      MFEM_FORALL(i, nS, { d_rhu[i + 2*nS] *= d_sqrtr[i]; });
-    }
-  }
-  Nconv_form_->Mult(tmpR1_, N_vec_);
-  N_vec_ *= coeff_.ab1;
-
-  thermo_interface_->rnm1->GetTrueDofs(rho_vec_);
-  {
-    const auto d_r = rho_vec_.Read();
-    auto d_sqrtr = tmpR0_.ReadWrite();
-    for (int i = 0; i < tmpR0_.Size(); i++) {
-      d_sqrtr[i] = std::sqrt(d_r[i]);
-    }
-  }  
-  tmpR1_.Set(1.0,um1_vec_);
-  {
-    const auto d_sqrtr = tmpR0_.Read();
-    auto d_rhu = tmpR1_.ReadWrite();
-    int nS = tmpR0_.Size();
-    MFEM_FORALL(i, nS, { d_rhu[i] *= d_sqrtr[i]; });
-    MFEM_FORALL(i, nS, { d_rhu[i + nS] *= d_sqrtr[i]; });
-    if (dim_ == 3) {
-      MFEM_FORALL(i, nS, { d_rhu[i + 2*nS] *= d_sqrtr[i]; });
-    }
-  }
-  Nconv_form_->AddMult(tmpR1_, N_vec_, coeff_.ab2);
-  
-  thermo_interface_->rnm2->GetTrueDofs(rho_vec_);
-  {
-    const auto d_r = rho_vec_.Read();
-    auto d_sqrtr = tmpR0_.ReadWrite();
-    for (int i = 0; i < tmpR0_.Size(); i++) {
-      d_sqrtr[i] = std::sqrt(d_r[i]);
-    }
-  }  
-  tmpR1_.Set(1.0,um2_vec_);
-  {
-    const auto d_sqrtr = tmpR0_.Read();
-    auto d_rhu = tmpR1_.ReadWrite();
-    int nS = tmpR0_.Size();
-    MFEM_FORALL(i, nS, { d_rhu[i] *= d_sqrtr[i]; });
-    MFEM_FORALL(i, nS, { d_rhu[i + nS] *= d_sqrtr[i]; });
-    if (dim_ == 3) {
-      MFEM_FORALL(i, nS, { d_rhu[i + 2*nS] *= d_sqrtr[i]; });
-    }
-  }
-  Nconv_form_->AddMult(tmpR1_, N_vec_, coeff_.ab3);
-  */
-
   // add to rhs vector
   forcing_vec_.Add(-1.0, N_vec_);
   
@@ -2253,7 +2241,8 @@ void Tomboulides::predictionStep() {
   }
 
   // Add contribution to vstar (beta0/dt * rho[m+1] * vstar = ...)
-  ustar_vec_ += pp_div_vec_;
+  //ustar_vec_ += pp_div_vec_;
+  forcing_vec_.Add(1.0, pp_div_vec_);    
 
   // Evaluate and add variable viscosity terms
   S_poisson_form_->Assemble();
@@ -2263,37 +2252,161 @@ void Tomboulides::predictionStep() {
   // ustar_vec_ += S_poisson_vec_;
   forcing_vec_.Add(1.0, ress_vec_);
 
-  // add -grad(p[n+1]) for current iteration
+  // add -grad(p[n]) for current iteration
   (thermo_interface_->pressure)->GetTrueDofs(p_vec_);
   p_gf_->SetFromTrueDofs(p_vec_);  
   G_op_->AddMult(p_vec_, forcing_vec_, -1.0);
   
   // now full explicit rhs gets hit with a (dt/beta0)
-  forcing_vec_ *= dt / coeff_.bd0;
+  double Cf = dt / coeff_.bd0;
+  forcing_vec_ *= Cf;
 
   // Might need to set up the full system here for all bc's...
   
   // update rho-weighted mass matrix
   thermo_interface_->density->GetTrueDofs(rho_vec_);  
   rho_tmp_gf_->SetFromTrueDofs(rho_vec_);  
-  Mv_rho_form_->Update();
-  Mv_rho_form_->Assemble();
-  Mv_rho_form_->FormSystemMatrix(vel_ess_tdof_, Mv_rho_op_);
-  Mv_rho_inv_->SetOperator(*Mv_rho_op_);
-
   // solve system with ustar = Mv_rho_inv_(rhs)
-  resu_vec_.Set(1.0, forcing_vec_);
-  Mv_rho_inv_->Mult(resu_vec_,ustar_vec_);
-  if (!Mv_rho_inv_->GetConverged()) {
-    if (rank0_) std::cout << "ERROR: Predictor  Mv_inv inverse did not converge." << std::endl;
-    exit(1);
-  }
+  /**/
+  for (int ius = 0; ius < 1; ius++) {
 
-  // and complete
-  ustar_gf_->SetFromTrueDofs(ustar_vec_);
+    resu_vec_.Set(1.0, forcing_vec_);
+    
+    Mv_rho_form_->Update();
+    Mv_rho_form_->Assemble();
+    Mv_rho_form_->FormSystemMatrix(vel_ess_tdof_, Mv_rho_op_);
+    Mv_rho_inv_->SetOperator(*Mv_rho_op_);
+
+    tmpR1_.Set(1.0, ustar_vec_); // for diag    
+    Mv_rho_inv_->Mult(resu_vec_, ustar_vec_);
+    if (!Mv_rho_inv_->GetConverged()) {
+      if (rank0_) std::cout << "ERROR: Predictor  Mv_rho_inv inverse did not converge." << std::endl;
+      exit(1);
+    }
+    
+    // and complete
+    ustar_gf_->SetFromTrueDofs(ustar_vec_);
+    tmpR1_.Add(-1.0, ustar_vec_); // for diag
+
+    // diagnostics (comment otherwise!)
+    /*
+    double uAll = 0.0;
+    double uLocal = 0.0;
+    double umAll = 0.0;
+    double umLocal = 0.0;
+    int nRanks = (pmesh_->GetNRanks());
+    const double *error = tmpR1_.HostRead();
+    const int nS = tmpR0_.Size();
+    for (int i = 0; i < nS; i++) {
+      const double err = error[i + 0*nS]*error[i + 0*nS] + error[i + 1*nS]*error[i + 1*nS] + error[i + 2*nS]*error[i + 2*nS];
+      umLocal += err;
+      if (err > uLocal) uLocal = err;
+    }
+    umLocal /= static_cast<double>(nS);
+    MPI_Reduce(&uLocal, &uAll, 1, MPI_DOUBLE, MPI_MAX, 0, sfes_->GetComm());
+    MPI_Reduce(&umLocal, &umAll, 1, MPI_DOUBLE, MPI_SUM, 0, sfes_->GetComm());
+    umAll /= static_cast<double>(nRanks);
+    if(rank0_) std::cout << "u* (max/mean): " << std::sqrt(uAll) << " / " << std::sqrt(umAll) << endl;
+    */
+    
+  }
+  /**/
+
+  // solve linearize-implicit system
+  /*
+  if(rank0_) std::cout << "attempting Hvs solve..." << endl;
+  {    
+    resu_vec_.Set(1.0, forcing_vec_);    
+
+    // update linearized us-conv operator
+    Hvs_bdfcoeff_.constant = coeff_.bd0 / dt;
+    Hvs_form_->Update();
+    Hvs_form_->Assemble();
+    Hvs_form_->FormSystemMatrix(vel_ess_tdof_, Hvs_op_);
+    Hvs_inv_->SetOperator(*Hvs_op_);
+    
+    for (auto &vel_dbc : vel_dbcs_) {
+      u_next_gf_->ProjectBdrCoefficient(*vel_dbc.coeff, vel_dbc.attr);
+    }
+
+    vfes_->GetRestrictionMatrix()->MultTranspose(resu_vec_, *resu_gf_);
+
+    Vector X2s, B2s;
+    Hvs_form_->FormLinearSystem(vel_ess_tdof_, *u_next_gf_, *resu_gf_, Hvs_op_, X2s, B2s, 1);
+    Hvs_inv_->Mult(B2s, X2s);
+    if (!Hvs_inv_->GetConverged()) {
+      if (rank0_) std::cout << "ERROR: Solve for u* solve did not converge." << std::endl;
+      exit(1);
+    }
+    // iter_hsolve = HInv->GetNumIterations();
+    // res_hsolve = HInv->GetFinalNorm();
+    Hvs_form_->RecoverFEMSolution(X2s, *resu_gf_, *ustar_gf_);
+    ustar_gf_->GetTrueDofs(ustar_vec_);    
+
+    // compute NL term with u[n+1] and ustar for later use
+    // 0.5 is from CN
+    if(rank0_) std::cout << "attempting Lconv..." << endl;    
+    Lconv_form_->Update();
+    Lconv_form_->Assemble();
+    //Lconv_form_->FormSystemMatrix(vel_ess_tdof_, Lconv_op_);
+    Lconv_form_->FormSystemMatrix(empty, Lconv_op_);
+    Lconv_op_->AddMult(ustar_vec_, N_vec_, 0.5);
+
+  }
+  */
+
   
 }  // end predictorStep
 
+void Tomboulides::computeConvection(int inm){
+
+  Array<int> empty;
+  
+  // select step based on [n-inm]
+  if (inm == 0) {
+    thermo_interface_->density->GetTrueDofs(rho_vec_);
+    tmpR1_.Set(1.0,u_next_vec_);  
+  } else if (inm == 1) {
+    thermo_interface_->rn->GetTrueDofs(rho_vec_);
+    tmpR1_.Set(1.0,u_vec_);
+  } else if (inm == 2) {
+    thermo_interface_->rnm1->GetTrueDofs(rho_vec_);
+    tmpR1_.Set(1.0,um1_vec_);
+  } else if (inm == 3) {
+    thermo_interface_->rnm2->GetTrueDofs(rho_vec_);
+    tmpR1_.Set(1.0,um2_vec_);
+  }
+
+  int nS = tmpR0_.Size();  
+  {
+    const auto d_r = rho_vec_.Read();
+    auto d_sqrtr = tmpR0_.ReadWrite();
+    for (int i = 0; i < tmpR0_.Size(); i++) {
+      d_sqrtr[i] = std::sqrt(d_r[i]);
+    }
+  }  
+  {
+    const auto d_sqrtr = tmpR0_.Read();
+    auto d_rhu = tmpR1_.ReadWrite();
+    MFEM_FORALL(i, nS, { d_rhu[i] *= d_sqrtr[i]; });
+    MFEM_FORALL(i, nS, { d_rhu[i + nS] *= d_sqrtr[i]; });
+    if (dim_ == 3) {
+      MFEM_FORALL(i, nS, { d_rhu[i + 2*nS] *= d_sqrtr[i]; });
+    }
+  }
+  Nconv_form_->Mult(tmpR1_, tmpR1b_);
+
+  // u \cdot div(u)
+  rhu_gf_->SetFromTrueDofs(tmpR1_);
+  D_op_->Mult(tmpR1_,tmpR0b_);
+  Ms_inv_->Mult(tmpR0b_,tmpR0_);
+  div_rhu_gf_->SetFromTrueDofs(tmpR0_);
+  Mv_rhu_form_->Update();
+  Mv_rhu_form_->Assemble();
+  Mv_rhu_form_->FormSystemMatrix(empty, Mv_rhu_op_);    
+  Mv_rhu_op_->AddMult(tmpR1_,tmpR1b_,1.0);      
+  
+}
 
 //
 // Correct v* using the pressure-solve:
@@ -2302,7 +2415,8 @@ void Tomboulides::predictionStep() {
 //  -- (bdf0/dt * C_rho) * p' + div(C_rho * ustar * p') = dt/dbf0 * nabla^2(p') - mass_imbalance
 //  pressure should be updated (w/p') by this point
 //
-void Tomboulides::correctionStepSimple() {
+void Tomboulides::correctionStepSimple(){//}
+  //void Tomboulides::correctionStep() {
 
   // For convenience, get time and dt
   const double time = coeff_.time;
@@ -2319,8 +2433,8 @@ void Tomboulides::correctionStepSimple() {
   Mv_rho_form_->FormSystemMatrix(empty, Mv_rho_op_);
   Mv_rho_inv_->SetOperator(*Mv_rho_op_);
   
-  // pressure gradient
-  (thermo_interface_->pressure)->GetTrueDofs(p_vec_);
+  // pressure gradient (p', not full pressure)
+  (thermo_interface_->p_prime)->GetTrueDofs(p_vec_);
   p_gf_->SetFromTrueDofs(p_vec_);  
   G_op_->Mult(p_vec_, resu_vec_);
   resu_vec_ *= -dt/coeff_.bd0;
@@ -2375,7 +2489,9 @@ void Tomboulides::correctionStepSimple() {
 } //end correction step (simple)
 
 
-void Tomboulides::correctionStep() {
+// full solve correction step
+void Tomboulides::correctionStepFull() {}
+void Tomboulides::correctionStep() {  
 
   // For convenience, get time and dt
   const double time = coeff_.time;
@@ -2408,7 +2524,15 @@ void Tomboulides::correctionStep() {
     force.coeff->SetTime(time + dt);
   }
   forcing_form_->Assemble();
-  forcing_form_->ParallelAssemble(forcing_vec_); 
+  forcing_form_->ParallelAssemble(tmpR1_);
+
+  thermo_interface_->density->GetTrueDofs(rho_vec_);
+  rho_tmp_gf_->SetFromTrueDofs(rho_vec_);  
+  Mv_rho_form_->Update();
+  Mv_rho_form_->Assemble();
+  Mv_rho_form_->FormSystemMatrix(empty, Mv_rho_op_);
+  Mv_rho_op_->Mult(tmpR1_, forcing_vec_);
+  
 
   // BDF contributions
   thermo_interface_->rn->GetTrueDofs(rho_vec_);
@@ -2439,8 +2563,10 @@ void Tomboulides::correctionStep() {
   S_mom_form_->Assemble();
   S_mom_form_->ParallelAssemble(resu_vec_);
 
-  // -grad(p)
+  // -grad(p) (full p[n+1])
   (thermo_interface_->pressure)->GetTrueDofs(p_vec_);
+  (thermo_interface_->p_prime)->GetTrueDofs(tmpR0_);
+  p_vec_.Add(1.0, tmpR0_);  
   p_gf_->SetFromTrueDofs(p_vec_);  
   G_op_->AddMult(p_vec_, resu_vec_, -1.0);  
 
@@ -2472,11 +2598,226 @@ void Tomboulides::correctionStep() {
   Hv_form_->RecoverFEMSolution(X2, *resu_gf_, *u_next_gf_);
   u_next_gf_->GetTrueDofs(u_next_vec_);
 
+  // filter
+  /*
+  for (int jj = 0; jj < dim_; jj++) {
+    int nS = tmpR0_.Size();      
+    {
+      const auto d_u = u_next_vec_.Read();
+      auto d_phi = tmpR0_.ReadWrite();
+      for (int i = 0; i < nS; i++) {
+        d_phi[i] = d_u[i + jj*nS];
+      }
+    }
+    ress_gf_->SetFromTrueDofs(tmpR0_);    
+  
+    phi_NM1_gf_->ProjectGridFunction(*ress_gf_);
+    ress_gf_->ProjectGridFunction(*phi_NM1_gf_);
+    ress_gf_->GetTrueDofs(tmpR0_);
+    
+    {
+      auto d_u = u_next_vec_.ReadWrite();
+      const auto d_phi = tmpR0_.Read();
+      for (int i = 0; i < nS; i++) {
+        d_u[i + jj*nS] = d_phi[i];
+      }
+    }
+
+  }
+  u_next_gf_->SetFromTrueDofs(u_next_vec_);
+  */
+  
   // update gradients for turbulence model
   evaluateVelocityGradient();
+
+  // if performing second correction later
+  ustar_vec_.Set(1.0, u_next_vec_);
+  ustar_gf_->SetFromTrueDofs(ustar_vec_);  
   
 } // end correction step (full)
 
+
+// Additional set of elliptic solves strongly enforces conservation of
+// mass for whatever density, pressure, and temperature are at [n+1]
+// via modification of the velocity
+void Tomboulides::phiStep() {
+
+  Array<int> empty;
+  int nS = tmpR0_.Size();  
+
+  // mass imbalance from rho[n+1] and u[n+1]*
+  (thermo_interface_->mass_imbalance)->GetTrueDofs(tmpR0_);
+
+  // divide by rho to use with 1/rho laplacian operator
+  thermo_interface_->density->GetTrueDofs(rho_vec_);  
+  {
+    auto d_mdot = tmpR0_.ReadWrite();
+    auto d_rho = rho_vec_.Read();
+    MFEM_FORALL(i, nS, { d_mdot[i] /= d_rho[i]; });
+  }    
+
+  // gradient to form source  
+  G_op_->Mult(tmpR0_, tmpR1_);  
+
+  // solve correction for each velocity component  
+  for (int ivel = 0; ivel < dim_; ivel++) {
+  
+    {
+      auto d_rhs = ress_vec_.ReadWrite();
+      auto d_gmi = tmpR1_.Read();
+      MFEM_FORALL(i, nS, { d_rhs[i] = -d_gmi[i + nS*ivel]; });
+    }    
+ 
+    // Update the variable coefficient Laplacian to account for change
+    // in density
+    sw_press_.Start();
+    L_iorho_form_->Update();
+    L_iorho_form_->Assemble();
+    L_iorho_form_->FormSystemMatrix(phi_ess_tdof_, L_iorho_op_);
+
+    // Update inverse for the variable coefficient Laplacian
+    // TODO(trevilo): Really need to delete and recreate???
+    delete L_iorho_inv_;
+    delete L_iorho_inv_ortho_pc_;
+    delete L_iorho_inv_pc_;
+    delete L_iorho_lor_;
+
+    L_iorho_lor_ = new ParLORDiscretization(*L_iorho_form_, phi_ess_tdof_);
+    L_iorho_inv_pc_ = new HypreBoomerAMG(L_iorho_lor_->GetAssembledMatrix());
+    L_iorho_inv_pc_->SetPrintLevel(pressure_solve_pl_);
+    L_iorho_inv_pc_->SetCoarsening(amg_coarsening_);
+    L_iorho_inv_pc_->SetAggressiveCoarsening(amg_aggresive_);
+    L_iorho_inv_pc_->SetInterpolation(amg_interpolation_);
+    L_iorho_inv_pc_->SetStrengthThresh(pressure_strength_thres_);
+    L_iorho_inv_pc_->SetRelaxType(amg_relax_);
+    L_iorho_inv_pc_->SetMaxLevels(amg_max_levels_);
+    L_iorho_inv_pc_->SetMaxIter(amg_max_iters_);
+    L_iorho_inv_pc_->SetTol(0);
+    // NOTE: other cycle types (i.e. not V-cycle) do not scale well in parallel, so option removed for now
+    // L_iorho_inv_pc_->SetCycleType(1);
+    L_iorho_inv_ortho_pc_ = new OrthoSolver(pfes_->GetComm());
+    L_iorho_inv_ortho_pc_->SetSolver(*L_iorho_inv_pc_);
+
+    L_iorho_inv_ = new CGSolver(pfes_->GetComm());
+    L_iorho_inv_->iterative_mode = true;
+    L_iorho_inv_->SetOperator(*L_iorho_op_);
+    if (pres_dbcs_.empty()) {
+      L_iorho_inv_->SetPreconditioner(*L_iorho_inv_ortho_pc_);
+    } else {
+      L_iorho_inv_->SetPreconditioner(*L_iorho_inv_pc_);
+    }
+    L_iorho_inv_->SetPrintLevel(pressure_solve_pl_);
+    L_iorho_inv_->SetRelTol(pressure_solve_rtol_);
+    L_iorho_inv_->SetAbsTol(pressure_solve_atol_);
+    L_iorho_inv_->SetMaxIter(pressure_solve_max_iter_);
+    sw_press_.Stop();
+
+    // Orthogonalize rhs if no Dirichlet BCs on pressure
+    sw_press_.Start();
+    if (pres_dbcs_.empty()) {
+      Orthogonalize(ress_vec_, pfes_);
+    }
+
+    for (auto &phi_dbc : phi_dbcs_) {
+      phi_gf_->ProjectBdrCoefficient(*phi_dbc.coeff, phi_dbc.attr);
+    }
+
+    // Isn't this the same as SetFromTrueDofs????
+    pfes_->GetRestrictionMatrix()->MultTranspose(ress_vec_, *ress_gf_);
+
+    Vector X1, B1;
+    L_iorho_form_->FormLinearSystem(phi_ess_tdof_, *phi_gf_, *ress_gf_, L_iorho_op_, X1, B1, 1);
+    L_iorho_inv_->Mult(B1, X1);
+    if (!L_iorho_inv_->GetConverged()) {
+      if (rank0_) std::cout << "ERROR: Poisson solve did not converge." << std::endl;
+      //exit(1);
+    }
+    sw_press_.Stop();
+
+    // iter_spsolve = SpInv->GetNumIterations();
+    // res_spsolve = SpInv->GetFinalNorm();
+    L_iorho_form_->RecoverFEMSolution(X1, *ress_gf_, *phi_gf_);
+
+    // If the boundary conditions on the pressure are pure Neumann remove the
+    // nullspace by removing the mean of the pressure solution. This is also
+    // ensured by the OrthoSolver wrapper for the preconditioner which removes
+    // the nullspace after every application.
+    if (pres_dbcs_.empty()) {
+      meanZero(*phi_gf_);
+    }
+    phi_gf_->GetTrueDofs(tmpR0_);
+
+    // correct u[n+1]* to conserve mass
+    {
+      auto d_phi = tmpR0_.Read();
+      auto d_vel = u_next_vec_.ReadWrite();
+      MFEM_FORALL(i, nS, { d_vel[i + nS*ivel] += d_phi[i]; });
+    }
+    
+  }
+  u_next_gf_->SetFromTrueDofs(u_next_vec_);  
+
+  /*
+  // gradient of mass imbalance form rho[n+1] and u[n+1]*
+  (thermo_interface_->mass_imbalance)->GetTrueDofs(tmpR0_);
+  // tmpR0_ = 0.0; // hack
+  G_op_->Mult(tmpR0_, tmpR1_);
+  
+  // solve correction for each velocity component
+  int nS = tmpR0_.Size();  
+  for (int ivel = 0; ivel < dim_; ivel++) {
+  
+    {
+      auto d_rhs = ress_vec_.ReadWrite();
+      auto d_gmi = tmpR1_.Read();
+      MFEM_FORALL(i, nS, { d_rhs[i] = -d_gmi[i + nS*ivel]; });
+    }    
+
+    //L_form_->Update();
+    //L_form_->Assemble();
+    //L_form_->FormSystemMatrix(phi_ess_tdof_, L_op_);
+    
+    for (auto &phi_dbc : phi_dbcs_) {
+      phi_gf_->ProjectBdrCoefficient(*phi_dbc.coeff, phi_dbc.attr);
+    }
+
+    sfes_->GetRestrictionMatrix()->MultTranspose(ress_vec_, *ress_gf_);
+
+    Vector X2ls, B2ls;
+    L_form_->FormLinearSystem(phi_ess_tdof_, *phi_gf_, *ress_gf_, L_op_, X2ls, B2ls, 1);
+    //L_form_->FormLinearSystem(empty, *phi_gf_, *ress_gf_, L_op_, X2ls, B2ls, 1);
+    L_inv_->Mult(B2ls, X2ls);
+    if (L_inv_->GetConverged()) {
+      if (rank0_) std::cout << "Warning: Laplacian solve for phi did not converge." << std::endl;
+      //exit(1);
+
+      // iter_hsolve = L_inv->GetNumIterations();
+      // res_hsolve = L_inv->GetFinalNorm();
+      L_form_->RecoverFEMSolution(X2ls, *ress_gf_, *phi_gf_);
+
+      // divide by rho[n+1]
+      phi_gf_->GetTrueDofs(tmpR0_);
+      thermo_interface_->density->GetTrueDofs(rho_vec_);    
+      {
+        auto d_rho = rho_vec_.Read();
+        auto d_phi = tmpR0_.ReadWrite();
+        MFEM_FORALL(i, nS, { d_phi[i] /= d_rho[i]; });
+      }    
+
+      // correct u[n+1]* to conserve mass
+      {
+        auto d_phi = tmpR0_.Read();
+        auto d_vel = u_next_vec_.ReadWrite();
+        MFEM_FORALL(i, nS, { d_vel[i + nS*ivel] += d_phi[i]; });
+      }
+
+    }
+    
+  }
+  u_next_gf_->SetFromTrueDofs(u_next_vec_);
+  */
+  
+}
 
 double Tomboulides::computeL2Error() const {
   double err = -1.0;
@@ -2572,6 +2913,34 @@ void Tomboulides::addSwirlDirichletBC(double ut, mfem::Array<int> &attr) {
     }
   }
 }
+
+
+/// Add a Dirichlet boundary condition to phi
+void Tomboulides::addPhiDirichletBC(const double &phi, Array<int> &attr) {
+  phi_dbcs_.emplace_back(attr, new ConstantCoefficient(phi));
+  for (int i = 0; i < attr.Size(); ++i) {
+    if (attr[i] == 1) {
+      assert(!phi_ess_attr_[i]);
+      phi_ess_attr_[i] = 1;
+    }
+  }
+}
+
+void Tomboulides::addPhiDirichletBC(Coefficient *coeff, Array<int> &attr) {
+  phi_dbcs_.emplace_back(attr, coeff);
+  for (int i = 0; i < attr.Size(); ++i) {
+    if (attr[i] == 1) {
+      assert(!phi_ess_attr_[i]);
+      phi_ess_attr_[i] = 1;
+    }
+  }
+
+}
+
+void Tomboulides::addPhiDirichletBC(ScalarFuncT *f, Array<int> &attr) {
+  addPhiDirichletBC(new FunctionCoefficient(f), attr);
+}
+
 
 double Tomboulides::maxVelocityMagnitude() {
   double local_max_vel_magnitude = 0.0;

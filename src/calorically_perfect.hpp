@@ -254,6 +254,7 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   ScalarVectorProductCoefficient *p_conv_coeff_ = nullptr;
 
   GridFunctionCoefficient *c_coeff_ = nullptr;
+  ProductCoefficient *c2_coeff_ = nullptr;  
   RatioCoefficient *ioc_coeff_ = nullptr;
   GradientGridFunctionCoefficient *gradP_coeff_ = nullptr;
   ScalarVectorProductCoefficient *gradPoC_coeff_ = nullptr;      
