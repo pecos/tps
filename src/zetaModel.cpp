@@ -87,7 +87,12 @@ ZetaModel::ZetaModel(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalS
   tpsP_->getInput("ransModel/f-order", forder_, order_);
   tpsP_->getInput("ransModel/zfp-max", zfp_max_, 1.0e12);
   tpsP_->getInput("ransModel/v2-production-rate-coeff-limit", v2Prod_fLimiter_coeff_, 1.0e6);
-    
+  
+  // solver options
+  tpsP_->getInput("ransModel/hsolve-maxIters", max_iter_, 2000);
+  tpsP_->getInput("ransModel/fsolve-maxIters", f_max_iter_, 4000);
+
+
   if (axisym_) {
     assert(dim_ == 2);
     assert(!numerical_integ_);

@@ -106,15 +106,18 @@ class GaussianInterpExtData : public ExternalDataBase {
   bool isInterpInlet_;
   bool isInterpTurbInlet_;
   bool isInterpTurbField_;
+  bool isInitSpeciesField_;
 
   double tke_const_;
 
   bool axisym_;
+  bool species_init_;
 
   std::string turb_type_;
   std::string fname_;
   std::string fname_turb_;
   std::string fname_tke_;
+  std::string fname_spec_;
   double v_fac_;
   double tke_bc_fac_;
 
@@ -141,6 +144,7 @@ class GaussianInterpExtData : public ExternalDataBase {
   ParGridFunction tke_gf_;
   ParGridFunction v2_gf_;
   ParGridFunction Yn_gf_;
+  ParGridFunction Yfull_gf_;
 
   // gradual increase of external bc over multiple steps
   int rampSteps_;
@@ -159,6 +163,7 @@ class GaussianInterpExtData : public ExternalDataBase {
   void setInlet();
   void setInletTurbScalars();
   void setFieldTurbVisc();
+  void setFieldInitSpec();
   void step();
 
   /// Return a pointer to the current temperature ParGridFunction.

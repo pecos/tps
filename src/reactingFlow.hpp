@@ -121,6 +121,7 @@ class ReactingFlow : public ThermoChemModelBase {
   bool constant_density_ = false;   /**< Enable/disable constant density */
   bool domain_is_open_ = false;     /**< true if domain is open */
   bool axisym_ = false;             /**< true if simulation is axisymmetric */
+  bool species_init_ = false;       /**< true if species are initialized from file */
 
   // Linear-solver-related options
   int pl_solve_ = 0;    /**< Verbosity level passed to mfem solvers */
@@ -224,6 +225,7 @@ class ReactingFlow : public ThermoChemModelBase {
   // ParGridFunction *buffer_tInlet_ = nullptr;
   GridFunctionCoefficient *temperature_bc_field_ = nullptr;
   GridFunctionCoefficient *species_bc_field_ = nullptr;
+  VectorGridFunctionCoefficient *species_init_field_ = nullptr;
 
   VectorGridFunctionCoefficient *un_next_coeff_ = nullptr;
   GridFunctionCoefficient *rhon_next_coeff_ = nullptr;

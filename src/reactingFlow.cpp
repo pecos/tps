@@ -737,6 +737,9 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   tpsP_->getInput("loMach/reactingFlow/streamwise-stabilization", sw_stab_, false);
   tpsP_->getInput("loMach/reactingFlow/Reh_factor", Reh_factor_, 0.5);
   tpsP_->getInput("loMach/reactingFlow/Reh_offset", Reh_offset_, 1.0);
+
+  // specified plasma initial condition
+  tpsP_->getInput("plasma_models/initialize_species", species_init_, false);
 }  // NOLINT
 
 ReactingFlow::~ReactingFlow() {
@@ -1079,6 +1082,7 @@ void ReactingFlow::initializeSelf() {
   toFlow_interface_.viscosity = &visc_gf_;
   toFlow_interface_.thermal_divergence = &Qt_gf_;
   toTurbModel_interface_.density = &rn_gf_;
+  toTurbModel_interface_.viscosity = &visc_gf_;  
 
   plasma_conductivity_gf_ = &sigma_gf_;
   joule_heating_gf_ = &jh_gf_;
@@ -1158,10 +1162,12 @@ void ReactingFlow::initializeSelf() {
       setVectorFromScalar(tmpR0_, sp, &Yn_);
     }
   }
+  
   Ynm1_ = Yn_;
   Ynm2_ = Yn_;
   Yn_next_gf_ = Yn_gf_;
   YnFull_gf_.SetFromTrueDofs(Yn_);
+
 
   ConstantCoefficient t_ic_coef;
   t_ic_coef.constant = T_ic_;
@@ -1229,8 +1235,8 @@ void ReactingFlow::initializeSelf() {
         if (rank0_) {
           std::cout << "Rx Flow: Setting interpolated Dirichlet species on patch = " << patch << std::endl;
         }
-        AddSpecDirichletBC(species_bc_field_, inlet_attr);
-        Yn_gf_.ProjectBdrCoefficient(*species_bc_field_, inlet_attr);
+        // AddSpecDirichletBC(species_bc_field_, inlet_attr);
+        // Yn_gf_.ProjectBdrCoefficient(*species_bc_field_, inlet_attr);
 
       } else {
         if (rank0_) {
@@ -1832,6 +1838,27 @@ void ReactingFlow::initializeOperators() {
   // YnFull_gf_ after the Yn_ IC is set.
   YnFull_gf_.GetTrueDofs(Yn_);
 
+    
+  // override species initial condition
+  if (species_init_) {
+    if (rank0_) std::cout << "Projecting initial species fields." << endl;
+    species_init_field_ = new VectorGridFunctionCoefficient(extData_interface_->Yfulldata);
+    // for (int sp = 0; sp < nSpecies_; sp++) {
+    //   // Yn_gf_.ProjectCoefficient(species_init_field_);
+    //   // Yn_gf_.GetTrueDofs(tmpR0_);
+    //   // setVectorFromScalar(tmpR0_, sp, &Yn_);
+    //   setVectorFromScalar(tmpR0_, sp, &Yn_);
+    // }
+    // Ynm1_ = Yn_;
+    // Ynm2_ = Yn_;
+    // Yn_next_gf_ = Yn_gf_;
+    // YnFull_gf_.SetFromTrueDofs(Yn_);
+    YnFull_gf_.ProjectCoefficient(*species_init_field_);
+    Yn_ = YnFull_gf_.GetTrueVector();
+    Ynm1_ = Yn_;
+    Ynm2_ = Yn_;
+  }
+
   // and initialize system mass
   updateMixture();
   updateDensity(0.0);
@@ -2082,6 +2109,7 @@ void ReactingFlow::step() {
 
   updateMixture();
   updateDiffusivity();
+  // if (rank0_) std::cout << "step success" << std::endl;
 }
 
 // should be Nsub s.t.: Nsub > dt * [Prod_Y{n}/rho{n}/Yn{n}]

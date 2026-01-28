@@ -105,10 +105,10 @@ class ZetaModel : public TurbModelBase {
 
   // Linear-solver-related options
   int pl_solve_ = 0;
-  int max_iter_ = 2000;
+  int max_iter_; // = 2000;
   double rtol_ = 1e-10;
   
-  int f_max_iter_ = 4000;
+  int f_max_iter_; // = 4000;
   double f_rtol_ = 1e-8;  
 
   double tanh_half_ = 0.54930615;
