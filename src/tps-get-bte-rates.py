@@ -50,9 +50,9 @@ parser.add_argument("-solver_type", "--solver_type"               , help="solver
 parser.add_argument("-l_max", "--l_max"                           , help="max polar modes in SH expansion", type=int, default=1)
 parser.add_argument("-c", "--collisions"                          , help="collisions model", type=str, default="/work2/10565/ashwathsv/frontera/tps-venv/frontera/tps-venv/tps/boltzmann/BESolver/python/lxcat_data/fully_lumped_argon_mechanism_cs_recomb.lxcat")
 parser.add_argument("-sp_order", "--sp_order"                     , help="b-spline order", type=int, default=3)
-parser.add_argument("-spline_qpts", "--spline_qpts"               , help="q points per knots", type=int, default=5)
+parser.add_argument("-spline_qpts", "--spline_qpts"               , help="q points per knots", type=int, default=11)
 parser.add_argument("-atol", "--atol"                             , help="absolute tolerance", type=float, default=1e-10)
-parser.add_argument("-rtol", "--rtol"                             , help="relative tolerance", type=float, default=1e-4)
+parser.add_argument("-rtol", "--rtol"                             , help="relative tolerance", type=float, default=1e-6)
 parser.add_argument("-max_iter", "--max_iter"                     , help="max number of iterations for newton solve", type=int, default=100)
 parser.add_argument("-Te", "--Te"                                 , help="approximate electron temperature (eV)" , type=float, default=0.5)
 parser.add_argument("-n0"    , "--n0"                             , help="heavy density (1/m^3)" , type=float, default=3.22e22)
@@ -121,7 +121,7 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
     args.ee_collisions = ee_collisions
 
     if rank_ == 0:
-        print("BTE solver_type = ", args.solver_type, ", ee_collisions = ", args.ee_collisions, ", rtol = ", args.rtol, ", Nr = ", args.Nr, ", max-iter = ", args.max_iter, "do_sub_clust = ", use_interp, ", n_sub_clusters = ", n_sub_clusters, ", store_csv = ", store_csv, ", dt_BTE = ", dt_bte)
+        print("[Python] BTE solver_type = ", args.solver_type, ", ee_collisions = ", args.ee_collisions, ", rtol = ", args.rtol, ", Nr = ", args.Nr, ", max-iter = ", args.max_iter, "do_sub_clust = ", use_interp, ", n_sub_clusters = ", n_sub_clusters, ", store_csv = ", store_csv, ", dt_BTE = ", dt_bte)
 
     # The species indices are based on the TPS ordering
     NEUIDX = nSpecies - 1
@@ -135,7 +135,7 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
     n_pts = len(Te)
     # args.n_pts = n_pts
 
-    print("[BTE rates] rank [%d/%d] : K-means Te clusters "%(rank_, size_), Te_vec, flush=True)
+    print("[Python] Rank [%d/%d] : K-means Te clusters "%(rank_, size_), Te_vec, flush=True)
 
     args.collisions = collisions_file # collision cross-section file
     cs_data_all   = cross_section.read_cross_section_data(args.collisions)
@@ -162,6 +162,15 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
             ns_by_n0[i,0:n_pts] = narr[EXCIDX*n_pts:EXCIDX*n_pts+n_pts] / n0
         elif all_species[i] == 'Ar+':
             ns_by_n0[i,0:n_pts] = (ni / n0)
+            # ns_by_n0[i,0:n_pts] = (ni/n0)**2 * n0
+
+    # enforce mixture mass is normalized
+    ns_by_n0 = ns_by_n0/np.sum(ns_by_n0, axis=0)
+
+    # FIX FOR RECOMBINATION (HARDCODED) (ASSUME AMBIPOLARITY i.e. ne = ni)
+    for i in range(len(all_species)):
+        if all_species[i] == 'Ar+':
+            ns_by_n0[i,0:n_pts] = (ne/n0)**2 * n0
 
     # INITIALIZE THE BOLTZMANN SOLVER OBJECT
     lm_modes                         = [[[l,0] for l in range(args.l_max+1)] for grid_idx in range(n_grids)]
@@ -191,10 +200,7 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
         else:
             bte_solver.set_boltzmann_parameter(grid_idx, "f_mw", bte_solver.initialize(grid_idx, grid_idx_to_npts[grid_idx], "maxwellian"))
 
-    comm.Barrier()
     active_grid_idx  = [i for i in range(n_grids)]
-
-    # print("rank = ", rank_, ", initialized the BTE solver.., len(Tg) = ", len(Tg), ", use_interp = ", use_interp)
 
     # Setting up the Boltzmann solver (solve_init())
     num_gpus = 1
@@ -210,7 +216,7 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
         if n_grids == num_gpus:
             dev_id = grid_idx % num_gpus
         def t1(dev_id, bte_solver):
-            print("rank [%d/%d] setting grid %d to device %d"%(rank_, size_, grid_idx, dev_id), flush=True)
+            # print("rank [%d/%d] setting grid %d to device %d"%(rank_, size_, grid_idx, dev_id), flush=True)
             bte_solver.host_to_device_setup(dev_id, grid_idx)
             
         t1(dev_id, bte_solver)
@@ -289,6 +295,9 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
     if (use_interp == 1):
         sub_cluster_c           = [None for i in range(n_grids)]
         sub_cluster_c_lbl       = [None for i in range(n_grids)]
+
+        # print("[Python] Rank [%d/%d]: Entered sub-clustering function"%(rank_, size_), flush=True)
+        # comm.Barrier()
             
         def normalize(obs, xp):
             std_obs   = xp.std(obs, axis=0)
@@ -312,16 +321,35 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
                 else:
                     mcw0                         = mw[np.random.choice(mw.shape[0], n_sub_clusters, replace=True)]
 
-                mcw                          = scipy.cluster.vq.kmeans(mw, mcw0, iter=clstr_maxiter, thresh=clstr_threshold, check_finite=False)[0]
+                # print("[Python] Rank [%d/%d]: grid_idx %d, about to do k-mean subclustering" %(rank_, size_, grid_idx), flush=True)
+                # if rank_ == 0 and grid_idx == 3:
+                #     print("[Python] Rank = ", rank_, ", gidx = ", grid_idx, ", NaN/Inf check = ", np.isnan(mw).any(), np.isnan(mcw0).any(), np.isinf(mw).any(), np.isinf(mcw0).any(), flush=True)
+                #     print("[Python] Rank = ", rank_, ", gidx = ", grid_idx, ", Shapes = ", mw.shape, mcw0.shape, clstr_maxiter, clstr_threshold, flush=True)
+                #     np.savetxt('mw.txt', mw, delimiter='\t')
+                #     np.savetxt('mcw0.txt', mcw0, delimiter='\t')
+                # comm.Barrier()
+
+                # gidx 3, Rank 0 fails in below line (hangs without any error)
+                mcw                          = scipy.cluster.vq.kmeans2(mw, mcw0, iter=clstr_maxiter, thresh=clstr_threshold, check_finite=False)[0]
+
+                # print("[Python] Rank [%d/%d]: grid_idx %d, completed k-mean subclustering" %(rank_, size_, grid_idx), flush=True)
+                # comm.Barrier()
+
                 mcw0[0:mcw.shape[0], :]      = mcw[:,:]
                 mcw                          = mcw0
                 dist_mat                     = xp.linalg.norm(mw[:, None, :] - mcw[None, : , :], axis=2)
                 membership_m                 = xp.argmin(dist_mat, axis=1)
 
+                # print("[Python] Rank [%d/%d]: grid_idx %d, defined membership_m" %(rank_, size_, grid_idx), flush=True)
+                # comm.Barrier()
+
                 assert mcw.shape[0]          == n_sub_clusters
                 mc                           = mcw * mw_std
                 sub_cluster_c[grid_idx]      = mc
                 sub_cluster_c_lbl[grid_idx]  = membership_m
+
+                # print("[Python] Rank [%d/%d]: grid_idx %d, completed sub_cluster_c" %(rank_, size_, grid_idx), flush=True)
+                # comm.Barrier()
 
                 n0       = xp.ones(mc.shape[0]) * n0_param
                 Ex       = mc[: , 0] * n0_param * Td_fac
@@ -331,6 +359,9 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
                 ni       = mc[: , 3] * n0_param
                 ns_by_n0 = xp.transpose(mc[: , 4:])
                 EMag     = xp.sqrt(Ex**2 + Ey**2)
+
+                # print("[Python] Rank [%d/%d]: grid_idx %d, constructed plasma parameters for sub-clusters" %(rank_, size_, grid_idx), flush=True)
+                # comm.Barrier()
 
                 if args.verbose == 1 :
                     print("rank [%d/%d] Boltzmann solver inputs for v-space grid id %d"%(rank_, size_, grid_idx), flush=True)
@@ -358,6 +389,9 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
                         EMag = cp.sqrt(Ex**2 + Ey**2)
                         ns_by_n0 = cp.array(ns_by_n0)
                 
+                # print("[Python] Rank [%d/%d]: grid_idx %d, converted np arrays to cp arrays" %(rank_, size_, grid_idx), flush=True)
+                # comm.Barrier()
+                
                 bte_solver.set_boltzmann_parameter(grid_idx, "ns_by_n0", ns_by_n0)    
                 bte_solver.set_boltzmann_parameter(grid_idx, "n0" , n0)
                 bte_solver.set_boltzmann_parameter(grid_idx, "ne" , ne)
@@ -366,6 +400,9 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
                 bte_solver.set_boltzmann_parameter(grid_idx, "eRe", Ex)
                 bte_solver.set_boltzmann_parameter(grid_idx, "eIm", Ey)
                 bte_solver.set_boltzmann_parameter(grid_idx,  "E" , EMag)
+
+                # print("[Python] Rank [%d/%d]: grid_idx %d, set the Boltzmann parameters" %(rank_, size_, grid_idx), flush=True)
+                # comm.Barrier()
 
                 return
             
@@ -416,6 +453,7 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
                         EMag = cp.sqrt(Ex**2 + Ey**2)
                         ns_by_n0 = cp.array(ns_by_n0)
                 
+                # ns_by_n0 obtained here for Ar+ is actually (ni/n0)**2 * n0. Need to fix this
                 bte_solver.set_boltzmann_parameter(grid_idx, "ns_by_n0", ns_by_n0)
                 bte_solver.set_boltzmann_parameter(grid_idx, "n0" , n0)
                 bte_solver.set_boltzmann_parameter(grid_idx, "ne" , ne)
@@ -430,9 +468,16 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
             with cp.cuda.Device(dev_id):
                 t1(bte_solver)
 
+    # Rank 0 does not get here at the 6th iteration!!
+    # print("[Python] Rank [%d/%d]: Sub-clustering complete"%(rank_, size_), flush=True)
+    # comm.Barrier()
+
     # Do the Boltzmann solve
     qoi_list                = [None for grid_idx in range(n_grids)]
     ff_list                 = [None for grid_idx in range(n_grids)]
+
+    # print("[Python] rank [%d/%d] about to start BTE solve"%(rank_, size_), flush=True)
+    # comm.Barrier()
 
     for grid_idx in active_grid_idx:
         if n_grids == num_gpus:
@@ -440,11 +485,12 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
 
         def t1(bte_solver, ff_list, qoi_list):
             try:
-                print("rank [%d/%d] BTE launching grid %d on %s"%(rank_, size_, grid_idx, dev_id), flush=True)
+                # print("rank [%d/%d] BTE launching grid %d on %s"%(rank_, size_, grid_idx, dev_id), flush=True)
                 f0 = bte_solver.get_boltzmann_parameter(grid_idx, "u0")
                 ff , qoi = bte_solver.solve(grid_idx, f0, args.atol, args.rtol, args.max_iter, args.solver_type)
                 ff_list[grid_idx]  = ff
                 qoi_list[grid_idx] = qoi
+                # print("rank [%d/%d] BTE solve done for grid %d on %s"%(rank_, size_, grid_idx, dev_id), flush=True)
             except Exception as e:
                 print(e)
                 print("rank [%d/%d] solver failed for v-space grid no %d"%(rank_, size_, grid_idx), flush=True)
@@ -459,16 +505,13 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
         def t1(bte_solver, ff_list):
             bte_solver.set_boltzmann_parameter(grid_idx, "u_avg", ff_list[grid_idx])
         t1(bte_solver, ff_list)
-    
-    # print("rank = ", rank_, ", completed the Boltzmann solve...")
 
+    # print("[Python] rank [%d/%d] completed BTE solve"%(rank_, size_), flush=True)
+    
     # PREPARE THE RATES FOR PUSHING TO TPS
     heavy_temp = Tg
     tps_npts    = len(heavy_temp)
     rates       = np.zeros((collision_count, tps_npts))
-
-    # if rank_ == 0:
-    #     print("before push(), rank = ", rank_, ", num(collisions) = ", collision_count, ", tps_npts = ", tps_npts, len(Er))
 
     cs_data_all   = cross_section.read_cross_section_data(args.collisions)
     if (use_interp==1):
@@ -653,8 +696,8 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
 
     data = rates[1:rates.shape[0]].flatten()
     data[data < 0.0] = 0.0
-    if rank_ == 0:
-        print("Rank = ", rank_, ", BTE solve complete...")
+    # comm.Barrier()
+    # print("[Python] Rank = ", rank_, ", BTE solve complete...", flush=True)
 
     return data
             
@@ -746,7 +789,7 @@ def bte_grid_setup(Tarr, n_grids):
     size_ = comm.Get_size()
 
     if n_grids == 1:
-        Te = np.array([np.mean(Tarr / ev_to_K)])
+        Te = np.array([max(0.1,np.mean(Tarr / ev_to_K))])
         grid_idx_to_npts = np.array([len(Tarr)], dtype=np.int32)
         grid_pts_to_spatial_index_map_vec = np.array([i for i in range(len(Tarr))], dtype=np.int64)
     else:
@@ -782,7 +825,7 @@ def bte_grid_setup(Tarr, n_grids):
         # grid_idx_to_spatial_pts_map is passed as a vector of int to C++
         # Conver the list to a vector
         grid_pts_to_spatial_index_map_vec = np.zeros(np.sum(grid_idx_to_npts), dtype=grid_idx_to_spatial_idx_map[0].dtype)
-        Te = np.array([Te_b[b_idx]  for b_idx in range(n_grids)]) # xp.ones(self.param.n_grids) * self.param.Te 
+        Te = np.array([max(0.1,Te_b[b_idx])  for b_idx in range(n_grids)]) # xp.ones(self.param.n_grids) * self.param.Te 
         glo = 0
         for gidx in range(n_grids):
             ghi = glo + grid_idx_to_npts[gidx]
