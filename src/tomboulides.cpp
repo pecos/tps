@@ -1963,7 +1963,7 @@ void Tomboulides::step() {
   D_op_->Mult(u_next_vec_, tmpR0_);
   Ms_inv_->Mult(tmpR0_,Qt_vec_);  
   Qt_vec_ *= mu_vec_;  // NB: pointwise multiply
-  G_op_->AddMult(Qt_vec_, resu_vec_, 1.0 / 3.0);
+  G_op_->AddMult(Qt_vec_, resu_vec_, 1.0/3.0);
 
   // rho * vstar / dt term
   Mv_rho_op_->AddMult(ustar_vec_, resu_vec_);
@@ -1995,98 +1995,39 @@ void Tomboulides::step() {
   // u_vec_ = u_next_vec_;
   // u_curr_gf_->SetFromTrueDofs(u_vec_);
 
+  // filter
+  /*
+  for (int ivel = 0; ivel < dim_; ivel++) {
+    
+    int nS = tmpR0_.Size();      
+    {
+      const auto d_u = u_next_vec_.Read();
+      auto d_phi = tmpR0_.ReadWrite();
+      for (int i = 0; i < nS; i++) {
+        d_phi[i] = d_u[i + ivel*nS];
+      }
+    }
+    ress_gf_->SetFromTrueDofs(tmpR0_);    
+  
+    phi_NM1_gf_->ProjectGridFunction(*ress_gf_);
+    ress_gf_->ProjectGridFunction(*phi_NM1_gf_);
+    ress_gf_->GetTrueDofs(tmpR0_);
+    
+    {
+      auto d_u = u_next_vec_.ReadWrite();
+      const auto d_phi = tmpR0_.Read();
+      for (int i = 0; i < nS; i++) {
+        d_u[i + ivel*nS] = d_phi[i];
+      }
+    }
+
+  }
+  u_next_gf_->SetFromTrueDofs(u_next_vec_);
+  */  
+  
   // update gradients for turbulence model
   evaluateVelocityGradient();
 
-  if (axisym_) {
-    u_next_gf_->HostRead();
-    {
-      // Copy radial components of u_next_gf_.  Same comments here
-      // about pp_div_rad_comp_gf_ above.
-      auto d_u_next_rad = u_next_rad_comp_gf_->Write();
-      auto d_u_next = u_next_gf_->Read();
-      MFEM_FORALL(i, u_next_rad_comp_gf_->Size(), { d_u_next_rad[i] = d_u_next[i]; });
-    }
-    u_next_rad_comp_gf_->HostRead();
-
-    // Update the Helmholtz operator and inverse
-    Hv_bdfcoeff_.constant = coeff_.bd0 / dt;
-    Hs_form_->Update();
-    Hs_form_->Assemble();
-    Hs_form_->FormSystemMatrix(swirl_ess_tdof_, Hs_op_);
-    Hs_inv_->SetOperator(*Hs_op_);
-
-    // Update scalar, density weighted mass matrix
-    Ms_rho_form_->Update();
-    Ms_rho_form_->Assemble();
-    Ms_rho_form_->FormSystemMatrix(empty, Ms_rho_op_);
-
-    // Update convection operator
-    As_form_->Update();
-    As_form_->Assemble();
-    As_form_->FormSystemMatrix(empty, As_op_);
-
-    rho_ur_ut_form_->Update();
-    rho_ur_ut_form_->Assemble();
-
-    swirl_var_viscosity_form_->Update();
-    swirl_var_viscosity_form_->Assemble();
-
-    // Form variable viscosity contribution (d(mu)/dr * utheta)
-    swirl_var_viscosity_form_->ParallelAssemble(Faxi_poisson_vec_);
-
-    // Form convection contribution, starting with -rho*ur*utheta
-    rho_ur_ut_form_->ParallelAssemble(resp_vec_);
-    resp_vec_ += Faxi_poisson_vec_;
-
-    // res -> -d(mu)/dr * utheta - rho*ur*utheta
-    resp_vec_.Neg();
-
-    // Convection contribution to the rhs (NB: utheta_next_vec_ contains extrapolated utheta at this point)
-    As_op_->AddMult(utheta_next_vec_, resp_vec_);
-
-    // Unsteady contribution to RHS (overwrites extrapolated utheta b/c no longer necessary)
-    {
-      const double bd1idt = -coeff_.bd1 / dt;
-      const double bd2idt = -coeff_.bd2 / dt;
-      const double bd3idt = -coeff_.bd3 / dt;
-      const auto d_u = utheta_vec_.Read();
-      const auto d_um1 = utheta_m1_vec_.Read();
-      const auto d_um2 = utheta_m2_vec_.Read();
-      auto d_ut_next = utheta_next_vec_.Write();
-      MFEM_FORALL(i, utheta_next_vec_.Size(),
-                  { d_ut_next[i] = bd1idt * d_u[i] + bd2idt * d_um1[i] + bd3idt * d_um2[i]; });
-    }
-
-    Ms_rho_op_->AddMult(utheta_next_vec_, resp_vec_);
-
-    // Apply swirl Dirichlet BC
-    for (auto &swirl_dbc : swirl_dbcs_) {
-      utheta_next_gf_->ProjectBdrCoefficient(*swirl_dbc.coeff, swirl_dbc.attr);
-    }
-
-    pfes_->GetRestrictionMatrix()->MultTranspose(resp_vec_, *resp_gf_);
-
-    Vector Xs, Bs;
-    Hs_form_->FormLinearSystem(swirl_ess_tdof_, *utheta_next_gf_, *resp_gf_, Hs_op_, Xs, Bs, 1);
-
-    Hs_inv_->Mult(Bs, Xs);
-    if (!Hs_inv_->GetConverged()) {
-      if (rank0_) std::cout << "ERROR: Helmholtz solve did not converge." << std::endl;
-      exit(1);
-    }
-    Hs_form_->RecoverFEMSolution(Xs, *resp_gf_, *utheta_next_gf_);
-    utheta_next_gf_->GetTrueDofs(utheta_next_vec_);
-
-    // Rotate values in solution history
-    utheta_m2_vec_ = utheta_m1_vec_;
-    utheta_m1_vec_ = utheta_vec_;
-
-    // Update the current solution and corresponding GridFunction
-    utheta_next_gf_->GetTrueDofs(utheta_next_vec_);
-    utheta_vec_ = utheta_next_vec_;
-    utheta_gf_->SetFromTrueDofs(utheta_vec_);
-  }
 } // end full step
 
 
@@ -2334,16 +2275,16 @@ void Tomboulides::predictionStep() {
   Mv_inv_->AddMult(tmpR1_,N_vec_,0.5);
   // N_vec_ now has full convection term, less rho, consistent with CN and u* (on lhs and pointwise)
 
-  {
-    int nS = rho_vec_.Size();
-    const auto d_rho = rho_vec_.Read();
-    auto d_N = N_vec_.ReadWrite();
-    MFEM_FORALL(i, nS, { d_N[i+0*nS] *= d_rho[i]; });
-    MFEM_FORALL(i, nS, { d_N[i+1*nS] *= d_rho[i]; });
-    if (dim_ > 2) {
-    MFEM_FORALL(i, nS, { d_N[i+2*nS] *= d_rho[i]; });      
-    }
-  }
+  //{
+  //  int nS = rho_vec_.Size();
+  //  const auto d_rho = rho_vec_.Read();
+  //  auto d_N = N_vec_.ReadWrite();
+  //  MFEM_FORALL(i, nS, { d_N[i+0*nS] *= d_rho[i]; });
+  //  MFEM_FORALL(i, nS, { d_N[i+1*nS] *= d_rho[i]; });
+  //  if (dim_ > 2) {
+  //  MFEM_FORALL(i, nS, { d_N[i+2*nS] *= d_rho[i]; });      
+  //  }
+  //}
   // and now has rho
     
   }    

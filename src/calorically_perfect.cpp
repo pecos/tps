@@ -1572,7 +1572,7 @@ void CaloricallyPerfectThermoChem::pressureStep() {
   {
     Pn_NM1_gf_.ProjectGridFunction(p_prime_gf_);
     p_prime_gf_.ProjectGridFunction(Pn_NM1_gf_);
-    p_prime_gf_.GetTrueDofs(p_prime_);    
+    p_prime_gf_.GetTrueDofs(p_prime_);
   }
   
   // update total pressure (P[n+1] = P* + P')
@@ -1827,6 +1827,7 @@ void CaloricallyPerfectThermoChem::temperatureCorrectionStep() {
   Tn_next_gf_.SetFromTrueDofs(Tn_next_);
 
   // but we have rho[n+1] and P[n+1] not, so this is not necessary
+  /*
   {
     int nS = Tn_next_.Size();
     const double *dataP = Pn_next_.Read();
@@ -1835,6 +1836,7 @@ void CaloricallyPerfectThermoChem::temperatureCorrectionStep() {
     MFEM_FORALL(i, nS, { dataT[i] = dataP[i] / (Rgas_ * dataR[i]); });     
   }
   Tn_next_gf_.SetFromTrueDofs(Tn_next_);
+  */
 
   // filter to p-1 space, then back to p-space
   {

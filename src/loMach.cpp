@@ -462,9 +462,9 @@ void LoMachSolver::solveStep() {
       //if (rank0_) std::cout << "T[n+1] complete..." << endl;    
 
       // flow: full step
-      sw_flow_.Start();
-      flow_->step();
-      sw_flow_.Stop();
+      //sw_flow_.Start();
+      //flow_->step();
+      //sw_flow_.Stop();
       
       // density: mass imbalance at [n+1]* state
       //sw_thermChem_.Start();    
