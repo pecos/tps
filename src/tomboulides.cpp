@@ -377,6 +377,7 @@ void Tomboulides::initializeSelf() {
     utheta_m2_vec_.SetSize(pfes_truevsize);
     utheta_next_vec_.SetSize(pfes_truevsize);
   }
+  diff_vec_.SetSize(vfes_truevsize);  
 
   tmpR0_.SetSize(sfes_truevsize);
   tmpR0b_.SetSize(sfes_truevsize);  
@@ -411,6 +412,7 @@ void Tomboulides::initializeSelf() {
   rho_vec_ = 0.0;
   rho_tmp_vec_ = 0.0;  
   mu_vec_ = 0.0;
+  diff_vec_ = 0.0;
 
   if (axisym_) {
     utheta_vec_ = 0.0;
@@ -641,6 +643,7 @@ void Tomboulides::initializeSelf() {
 
 void Tomboulides::initializeOperators() {
   assert(thermo_interface_ != NULL);
+  Array<int> empty;  
 
   // polynomial order for smoother of precons
   smoother_poly_order_ = vorder_ + 1;
@@ -654,6 +657,7 @@ void Tomboulides::initializeOperators() {
 
   // Create all the Coefficient objects we need
   rho_coeff_ = new GridFunctionCoefficient(thermo_interface_->density);
+  //rho_coeff_ = new GridFunctionCoefficient(thermo_interface_->rn);  
   nlcoeff_ = new GridFunctionCoefficient(rho_tmp_gf_);
   nlcoeff_const_.constant = -1.0;
 
@@ -740,9 +744,6 @@ void Tomboulides::initializeOperators() {
   // has the nice consequence that the mass matrix is diagonal.
   const IntegrationRule &ir_ni_v = gll_rules.Get(vfes_->GetFE(0)->GetGeomType(), 2 * vorder_ - 1);
   const IntegrationRule &ir_ni_p = gll_rules.Get(pfes_->GetFE(0)->GetGeomType(), 2 * porder_ - 1);
-
-  // Empty array, use where we want operators without BCs
-  Array<int> empty;
 
   // Get Dirichlet dofs
   vfes_->GetEssentialTrueDofs(vel_ess_attr_, vel_ess_tdof_);
@@ -1108,6 +1109,16 @@ void Tomboulides::initializeOperators() {
   Hv_inv_->SetRelTol(hsolve_rtol_);
   Hv_inv_->SetMaxIter(hsolve_max_iter_);
 
+  // this guy is necessary to compute implicit part of convection
+  Av_form_ = new ParBilinearForm(sfes_);
+  auto *av_blfi = new ConvectionIntegrator(*rhou_coeff_);
+  if (numerical_integ_) {
+    av_blfi->SetIntRule(&ir_ni_v);
+  }
+  Av_form_->AddDomainIntegrator(av_blfi);
+  Av_form_->Assemble();
+  Av_form_->FormSystemMatrix(empty, Av_op_);
+  
   // semi-imp momentum solve: solver for ustar
   // (not really a Helmholtz anymore)
   Hvs_form_ = new ParBilinearForm(vfes_);
@@ -1130,7 +1141,8 @@ void Tomboulides::initializeOperators() {
   dynamic_cast<HypreSmoother *>(Hvs_inv_pc_)->SetSOROptions(hsmoother_relax_weight_, hsmoother_relax_omega_);
   dynamic_cast<HypreSmoother *>(Hvs_inv_pc_)
       ->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_, smoother_eig_est_);
-  Hvs_inv_ = new GMRESSolver(vfes_->GetComm());  
+  Hvs_inv_ = new GMRESSolver(vfes_->GetComm());
+  //Hvs_inv_ = new CGSolver(vfes_->GetComm());  
   Hvs_inv_->iterative_mode = true;
   Hvs_inv_->SetOperator(*Hvs_op_);
   Hvs_inv_->SetPreconditioner(*Hvs_inv_pc_);
@@ -1282,7 +1294,7 @@ void Tomboulides::initializeIO(IODataOrganizer &io) const {
 void Tomboulides::initializeViz(mfem::ParaViewDataCollection &pvdc) const {
   pvdc.RegisterField("velocity", u_curr_gf_);
   pvdc.RegisterField("v*", ustar_gf_);
-  pvdc.RegisterField("phi", phi_gf_);  
+  //pvdc.RegisterField("phi", phi_gf_);  
   //pvdc.RegisterField("Fi", forcing_gf_);    
   //pvdc.RegisterField("pressure(flow)", p_gf_);
   if (axisym_) {
@@ -1409,7 +1421,8 @@ void Tomboulides::computeDissipation(Averaging &average, const int iter) {
   }
 }
 
-void Tomboulides::step() {
+//void Tomboulides::step() {
+void Tomboulides::stepLoMach() {
   //------------------------------------------------------------------------
   // The time step is split into 4 large chunks:
   //
@@ -1875,7 +1888,207 @@ void Tomboulides::step() {
     utheta_vec_ = utheta_next_vec_;
     utheta_gf_->SetFromTrueDofs(utheta_vec_);
   }
-}
+} // end old full step
+
+
+void Tomboulides::step() {
+
+  // For convenience, get time and dt
+  const double time = coeff_.time;
+  const double dt = coeff_.dt;
+
+  // Ensure u_vec_ consistent with u_curr_gf_
+  //u_curr_gf_->GetTrueDofs(u_vec_);
+
+  // Update total viscosity field
+  updateTotalViscosity();
+
+  // Update density weighted mass
+  Array<int> empty;
+  Mv_rho_form_->Update();
+  Mv_rho_form_->Assemble();
+  Mv_rho_form_->FormSystemMatrix(empty, Mv_rho_op_);
+  Mv_rho_inv_->SetOperator(*Mv_rho_op_);
+
+  // Update the Helmholtz operator and inverse
+  sw_helm_.Start();
+  Hv_bdfcoeff_.constant = coeff_.bd0 / coeff_.dt;
+  Hv_form_->Update();
+  Hv_form_->Assemble();
+  Hv_form_->FormSystemMatrix(vel_ess_tdof_, Hv_op_);
+  Hv_inv_->SetOperator(*Hv_op_);
+  sw_helm_.Stop();
+
+  // Evaluate the forcing at the end of the time step
+  for (auto &force : forcing_terms_) {
+    force.coeff->SetTime(time + dt);
+  }
+  forcing_form_->Assemble();
+  forcing_form_->ParallelAssemble(forcing_vec_);
+
+  // vstar / dt = M^{-1} (extrapolated nonlinear + forcing) --- eqn.
+  Mv_inv_->Mult(forcing_vec_, ustar_vec_);
+  if (!Mv_inv_->GetConverged()) {
+    if (rank0_) std::cout << "ERROR: Mv inverse did not converge." << std::endl;
+    exit(1);
+  }
+  
+  // vstar / dt += BDF contribution
+  {
+    const double bd1idt = -coeff_.bd1 / dt;
+    const double bd2idt = -coeff_.bd2 / dt;
+    const double bd3idt = -coeff_.bd3 / dt;
+    const auto d_u = u_vec_.Read();
+    const auto d_um1 = um1_vec_.Read();
+    const auto d_um2 = um2_vec_.Read();
+    auto d_ustar = ustar_vec_.ReadWrite();
+    MFEM_FORALL(i, ustar_vec_.Size(), { d_ustar[i] += bd1idt * d_u[i] + bd2idt * d_um1[i] + bd3idt * d_um2[i]; });
+  }
+
+  // add same conveciton as used to solve for P
+  ustar_vec_.Add(-1.0,N_vec_);
+
+  // build rhs
+  resu_vec_ = 0.0;
+
+  // Variable viscosity term
+  S_mom_form_->Assemble();
+  S_mom_form_->ParallelAssemble(resu_vec_);
+
+  // -grad(p)
+  thermo_interface_->pressure->GetTrueDofs(p_vec_);  
+  G_op_->AddMult(p_vec_, resu_vec_, -1.0);
+
+  // Add grad(mu * Qt) term
+  D_op_->Mult(u_next_vec_, tmpR0_);
+  Ms_inv_->Mult(tmpR0_,Qt_vec_);  
+  Qt_vec_ *= mu_vec_;  // NB: pointwise multiply
+  G_op_->AddMult(Qt_vec_, resu_vec_, 1.0 / 3.0);
+
+  // rho * vstar / dt term
+  Mv_rho_op_->AddMult(ustar_vec_, resu_vec_);
+
+  for (auto &vel_dbc : vel_dbcs_) {
+    u_next_gf_->ProjectBdrCoefficient(*vel_dbc.coeff, vel_dbc.attr);
+  }
+
+  vfes_->GetRestrictionMatrix()->MultTranspose(resu_vec_, *resu_gf_);
+
+  Vector X2, B2;
+  Hv_form_->FormLinearSystem(vel_ess_tdof_, *u_next_gf_, *resu_gf_, Hv_op_, X2, B2, 1);
+  Hv_inv_->Mult(B2, X2);
+  if (!Hv_inv_->GetConverged()) {
+    if (rank0_) std::cout << "ERROR: Helmholtz solve did not converge." << std::endl;
+    exit(1);
+  }
+  // iter_hsolve = HInv->GetNumIterations();
+  // res_hsolve = HInv->GetFinalNorm();
+  Hv_form_->RecoverFEMSolution(X2, *resu_gf_, *u_next_gf_);
+  u_next_gf_->GetTrueDofs(u_next_vec_);
+
+  // Rotate values in solution history
+  //um2_vec_ = um1_vec_;
+  //um1_vec_ = u_vec_;
+
+  // Update the current solution and corresponding GridFunction
+  // u_next_gf_->GetTrueDofs(u_next_vec_);
+  // u_vec_ = u_next_vec_;
+  // u_curr_gf_->SetFromTrueDofs(u_vec_);
+
+  // update gradients for turbulence model
+  evaluateVelocityGradient();
+
+  if (axisym_) {
+    u_next_gf_->HostRead();
+    {
+      // Copy radial components of u_next_gf_.  Same comments here
+      // about pp_div_rad_comp_gf_ above.
+      auto d_u_next_rad = u_next_rad_comp_gf_->Write();
+      auto d_u_next = u_next_gf_->Read();
+      MFEM_FORALL(i, u_next_rad_comp_gf_->Size(), { d_u_next_rad[i] = d_u_next[i]; });
+    }
+    u_next_rad_comp_gf_->HostRead();
+
+    // Update the Helmholtz operator and inverse
+    Hv_bdfcoeff_.constant = coeff_.bd0 / dt;
+    Hs_form_->Update();
+    Hs_form_->Assemble();
+    Hs_form_->FormSystemMatrix(swirl_ess_tdof_, Hs_op_);
+    Hs_inv_->SetOperator(*Hs_op_);
+
+    // Update scalar, density weighted mass matrix
+    Ms_rho_form_->Update();
+    Ms_rho_form_->Assemble();
+    Ms_rho_form_->FormSystemMatrix(empty, Ms_rho_op_);
+
+    // Update convection operator
+    As_form_->Update();
+    As_form_->Assemble();
+    As_form_->FormSystemMatrix(empty, As_op_);
+
+    rho_ur_ut_form_->Update();
+    rho_ur_ut_form_->Assemble();
+
+    swirl_var_viscosity_form_->Update();
+    swirl_var_viscosity_form_->Assemble();
+
+    // Form variable viscosity contribution (d(mu)/dr * utheta)
+    swirl_var_viscosity_form_->ParallelAssemble(Faxi_poisson_vec_);
+
+    // Form convection contribution, starting with -rho*ur*utheta
+    rho_ur_ut_form_->ParallelAssemble(resp_vec_);
+    resp_vec_ += Faxi_poisson_vec_;
+
+    // res -> -d(mu)/dr * utheta - rho*ur*utheta
+    resp_vec_.Neg();
+
+    // Convection contribution to the rhs (NB: utheta_next_vec_ contains extrapolated utheta at this point)
+    As_op_->AddMult(utheta_next_vec_, resp_vec_);
+
+    // Unsteady contribution to RHS (overwrites extrapolated utheta b/c no longer necessary)
+    {
+      const double bd1idt = -coeff_.bd1 / dt;
+      const double bd2idt = -coeff_.bd2 / dt;
+      const double bd3idt = -coeff_.bd3 / dt;
+      const auto d_u = utheta_vec_.Read();
+      const auto d_um1 = utheta_m1_vec_.Read();
+      const auto d_um2 = utheta_m2_vec_.Read();
+      auto d_ut_next = utheta_next_vec_.Write();
+      MFEM_FORALL(i, utheta_next_vec_.Size(),
+                  { d_ut_next[i] = bd1idt * d_u[i] + bd2idt * d_um1[i] + bd3idt * d_um2[i]; });
+    }
+
+    Ms_rho_op_->AddMult(utheta_next_vec_, resp_vec_);
+
+    // Apply swirl Dirichlet BC
+    for (auto &swirl_dbc : swirl_dbcs_) {
+      utheta_next_gf_->ProjectBdrCoefficient(*swirl_dbc.coeff, swirl_dbc.attr);
+    }
+
+    pfes_->GetRestrictionMatrix()->MultTranspose(resp_vec_, *resp_gf_);
+
+    Vector Xs, Bs;
+    Hs_form_->FormLinearSystem(swirl_ess_tdof_, *utheta_next_gf_, *resp_gf_, Hs_op_, Xs, Bs, 1);
+
+    Hs_inv_->Mult(Bs, Xs);
+    if (!Hs_inv_->GetConverged()) {
+      if (rank0_) std::cout << "ERROR: Helmholtz solve did not converge." << std::endl;
+      exit(1);
+    }
+    Hs_form_->RecoverFEMSolution(Xs, *resp_gf_, *utheta_next_gf_);
+    utheta_next_gf_->GetTrueDofs(utheta_next_vec_);
+
+    // Rotate values in solution history
+    utheta_m2_vec_ = utheta_m1_vec_;
+    utheta_m1_vec_ = utheta_vec_;
+
+    // Update the current solution and corresponding GridFunction
+    utheta_next_gf_->GetTrueDofs(utheta_next_vec_);
+    utheta_vec_ = utheta_next_vec_;
+    utheta_gf_->SetFromTrueDofs(utheta_vec_);
+  }
+} // end full step
+
 
 void Tomboulides::updateStep() {
 
@@ -1938,10 +2151,13 @@ void Tomboulides::predictionStep() {
   }
   forcing_form_->Assemble();
   forcing_form_->ParallelAssemble(forcing_vec_);
-
-  // vstar / dt = M^{-1} (forcing)
+  
+  // vstar / dt = M^{-1} (forcing) ustar just used as a container here, clean-up to avoid confusion!
+  ustar_vec_ = 0.0;
   Mv_inv_->Mult(forcing_vec_, ustar_vec_);
 
+  // ustar_vec_ = 0.0; // HACK
+  
   // vstar / dt += BDF contribution
   {
     const double bd1idt = -coeff_.bd1 / dt;
@@ -1954,23 +2170,30 @@ void Tomboulides::predictionStep() {
     MFEM_FORALL(i, ustar_vec_.Size(), { d_ustar[i] += bd1idt*d_u[i] + bd2idt*d_um1[i] + bd3idt*d_um2[i]; });
   }
   
-  // "ustar_vec" now has unsteady and forcing terms (pointwise form)
+  // "ustar_vec" now has unsteady and forcing terms on rhs (pointwise form)
 
-  // explicit portion of nl 
+  //ustar_vec_ = 0.0; // HACK
+  
+  // explicit portion of nl (this will take u_vec_*grad(u_vec_), while Hvs is u_next_*grad(u*))
   Nconv_form_->Mult(u_vec_, tmpR1_);
-  Ms_inv_->Mult(tmpR1_,N_vec_);
-  ustar_vec_.Add(0.5,N_vec_);
+  Mv_inv_->Mult(tmpR1_,N_vec_);
+  ustar_vec_.Add(-0.5,N_vec_);
   // now ustar has 1/2 convection, uns, and forcing w/o rho
 
   // multiply by rho
   thermo_interface_->density->GetTrueDofs(rho_vec_);
+  //thermo_interface_->rn->GetTrueDofs(rho_vec_);
   {
+    int nS = rho_vec_.Size();
     const auto d_rho = rho_vec_.Read();
     auto d_rhs = ustar_vec_.ReadWrite();
-    MFEM_FORALL(i, tmpR1_.Size(), { d_rhs[i] *= d_rho[i]; });
+    MFEM_FORALL(i, nS, { d_rhs[i+0*nS] *= d_rho[i]; });
+    MFEM_FORALL(i, nS, { d_rhs[i+1*nS] *= d_rho[i]; });
+    if (dim_ > 2) {
+    MFEM_FORALL(i, nS, { d_rhs[i+2*nS] *= d_rho[i]; });      
+    }
   }
-  // now ustar has 1/2 convection, uns, and forcing w/rho  
-  
+  // now ustar has 1/2 convection, uns, and forcing w/rho on rhs
 
   // Evaluate the double curl of the extrapolated velocity field
   if (axisym_) {
@@ -1997,8 +2220,8 @@ void Tomboulides::predictionStep() {
   // divergence from current iteration
   D_op_->Mult(u_next_vec_, tmpR0_);
   Ms_inv_->Mult(tmpR0_,Qt_vec_);  
-  G_op_->Mult(Qt_vec_, resu_vec_);
-  Mv_inv_->Mult(resu_vec_, grad_Qt_vec_);
+  G_op_->Mult(Qt_vec_, tmpR1_);
+  Mv_inv_->Mult(tmpR1_, grad_Qt_vec_);
   grad_Qt_vec_ *= (4. / 3);
   pp_div_vec_ += grad_Qt_vec_;
 
@@ -2011,16 +2234,16 @@ void Tomboulides::predictionStep() {
     auto d_mu = mu_vec_.Read();
     auto nnode = rho_vec_.Size();
     MFEM_FORALL(i, nnode, {
-	//      d_pp_div_vec[i] *= (d_mu[i] / d_rho[i]);
+      // d_pp_div_vec[i] *= (d_mu[i] / d_rho[i]);
       d_pp_div_vec[i] *= d_mu[i];	
     });
     MFEM_FORALL(i, nnode, {
-	//      d_pp_div_vec[nnode + i] *= (d_mu[i] / d_rho[i]);
+      // d_pp_div_vec[nnode + i] *= (d_mu[i] / d_rho[i]);
       d_pp_div_vec[nnode + i] *= d_mu[i];	
     });
     if (dim_ == 3) {
       MFEM_FORALL(i, nnode, {
-	  //      d_pp_div_vec[2 * nnode + i] *= (d_mu[i] / d_rho[i]);
+      // d_pp_div_vec[2 * nnode + i] *= (d_mu[i] / d_rho[i]);
       d_pp_div_vec[2 * nnode + i] *= d_mu[i];    	  
       });
     }
@@ -2029,22 +2252,26 @@ void Tomboulides::predictionStep() {
   // Evaluate and add variable viscosity terms
   S_poisson_form_->Assemble();
   S_poisson_form_->ParallelAssemble(ress_vec_);
-  Mv_rho_inv_->Mult(ress_vec_, S_poisson_vec_);
+  //Mv_rho_inv_->Mult(ress_vec_, S_poisson_vec_);
+  Mv_inv_->Mult(ress_vec_, S_poisson_vec_);
   pp_div_vec_ += S_poisson_vec_;
 
-  // intercept full explicit viscous term held in pp_div_vec (if needed later)
-  // diff_vec_ = pp_div_vec_;
+  // intercept full viscous term here for later use
+  diff_vec_.Set(1.0,pp_div_vec_);
   
+  //pp_div_vec_ = 0.0; //HACK HACK hack HACK
+    
   // Add rho*(ustar/dt + f + CN(NL)) contribution
-  pp_div_vec_ += ustar_vec_;
+  pp_div_vec_ += ustar_vec_; // HACK
 
   // fill grid function
-  pp_div_gf_->SetFromTrueDofs(pp_div_vec_);
+  //pp_div_gf_->SetFromTrueDofs(pp_div_vec_);
 
   // now pp_div_gf_ (PRE_DIVERGENCE AND QT FROM div(u){n+1}) is the rhs of the ustar equation
   // solve for u* or finish with explicit nl term 
   {
     
+    // rhs
     resu_vec_ = 0.0;  
     Mv_op_->AddMult(pp_div_vec_, resu_vec_);
 
@@ -2077,7 +2304,48 @@ void Tomboulides::predictionStep() {
     // note this guys already has a negative
     //Nconv_form_->Mult(u_next_vec_, N_vec_);
     //Nconv_form_->AddMult(u_vec_, N_vec_,1.0);
-    //cn only... N_vec_ *= 0.5; 
+    //cn only... N_vec_ *= 0.5;
+    Array<int> empty;    
+    Av_form_->Update();
+    Av_form_->Assemble();
+    Av_form_->FormSystemMatrix(empty, Av_op_);
+    {
+      
+      int nS = tmpR0_.Size();      
+      const auto d_u = ustar_vec_.Read();
+      auto data = tmpR0_.Write();
+      auto dataB = tmpR0b_.Write();      
+      auto d_N = tmpR1_.Write();
+      
+      MFEM_FORALL(i, nS, {data[i] = d_u[i + 0*nS];});
+      Av_op_->Mult(tmpR0_, tmpR0b_);
+      MFEM_FORALL(i, nS, {d_N[i + 0*nS] = dataB[i];}); 
+
+      MFEM_FORALL(i, nS, {data[i] = d_u[i + 1*nS];});
+      Av_op_->Mult(tmpR0_, tmpR0b_);
+      MFEM_FORALL(i, nS, {d_N[i + 1*nS] = dataB[i];}); 
+
+      if (dim_ > 2) {
+        MFEM_FORALL(i, nS, {data[i] = d_u[i + 2*nS];});
+        Av_op_->Mult(tmpR0_, tmpR0b_);
+        MFEM_FORALL(i, nS, {d_N[i + 2*nS] = dataB[i];}); 
+      }      
+  }
+  Mv_inv_->AddMult(tmpR1_,N_vec_,0.5);
+  // N_vec_ now has full convection term, less rho, consistent with CN and u* (on lhs and pointwise)
+
+  {
+    int nS = rho_vec_.Size();
+    const auto d_rho = rho_vec_.Read();
+    auto d_N = N_vec_.ReadWrite();
+    MFEM_FORALL(i, nS, { d_N[i+0*nS] *= d_rho[i]; });
+    MFEM_FORALL(i, nS, { d_N[i+1*nS] *= d_rho[i]; });
+    if (dim_ > 2) {
+    MFEM_FORALL(i, nS, { d_N[i+2*nS] *= d_rho[i]; });      
+    }
+  }
+  // and now has rho
+    
   }    
   
 }  // end linearized-implicit predictorStep
@@ -2356,7 +2624,7 @@ void Tomboulides::computeConvection(int inm){
 //
 void Tomboulides::correctionStepSimple(){}
 void Tomboulides::correctionStep() {
-
+  
   // For convenience, get time and dt
   const double time = coeff_.time;
   const double dt = coeff_.dt;
@@ -2390,6 +2658,9 @@ void Tomboulides::correctionStep() {
 
   // divide by rho (ambiguous which rho in doc)
   thermo_interface_->density->GetTrueDofs(rho_vec_);
+  //thermo_interface_->rn->GetTrueDofs(rho_vec_);
+  // if doing solve again, dont remove rho
+  /**/
   {
     int nS = tmpR0_.Size();
     const double *dataR = rho_vec_.Read();
@@ -2399,16 +2670,116 @@ void Tomboulides::correctionStep() {
     if (dim_ > 2) {
       MFEM_FORALL(i, nS, { dataU[i + 2*nS] /= dataR[i]; });
     }
-  }  
+  }
+  /**/
   
   // u* bit
-  u_next_vec_.Set(1.0,resu_vec_);
-  u_next_vec_.Add(1.0,ustar_vec_);
+  //basic
+  u_next_vec_.Set(1.0,ustar_vec_);  
+  //basic
+  u_next_vec_.Add(1.0,resu_vec_);
 
   // done
+  //basic
   u_next_gf_->SetFromTrueDofs(u_next_vec_);
 
+  // mixing in tomboulides here...
+  // alternatively, take div(u), convection, and P[n+1] form above and solve momentum again
+  /*
   // subtract curl-curl explicit diffusion and include simple diffusion in an operator solve?
+  // or just a full u-solve with helmholtz (saved convection terms), explict visc bits:
+
+  // add rho*ustar to rhs
+  thermo_interface_->density->GetTrueDofs(rho_vec_);
+  //thermo_interface_->rn->GetTrueDofs(rho_vec_);
+  tmpR1_.Set(1.0,ustar_vec_);
+  {
+    int nS = tmpR0_.Size();
+    const double *dataR = rho_vec_.Read();
+    double *dataU = tmpR1_.ReadWrite();    
+    MFEM_FORALL(i, nS, { dataU[i + 0*nS] *= dataR[i]; });
+    MFEM_FORALL(i, nS, { dataU[i + 1*nS] *= dataR[i]; });
+    if (dim_ > 2) {
+      MFEM_FORALL(i, nS, { dataU[i + 2*nS] *= dataR[i]; });
+    }
+  }  
+  resu_vec_.Add(-1.0,tmpR1_);  
+
+  // removing explicit viscous term using curl-curl
+  resu_vec_.Add(-1.0,diff_vec_);
+
+  // iwf
+  Mv_op_->Mult(resu_vec_,tmpR1_);
+  resu_vec_.Set(1.0,tmpR1_);
+  
+  // Evaluate and add variable viscosity terms
+  S_poisson_form_->Assemble();
+  S_poisson_form_->ParallelAssemble(tmpR1_);
+  Mv_inv_->AddMult(tmpR1_, resu_vec_);
+  
+  // Add explcit divu part: grad(mu * Qt) term
+  Qt_vec_ *= mu_vec_; // Qt not modified since prediction step
+  G_op_->AddMult(Qt_vec_, resu_vec_, 1.0/3.0);
+
+  // Hv solve requires rhs to be in 1/dt form;
+  resu_vec_ *= 1.0/coeff_.dt;
+
+  // this may need to be done in prediciton step for consistency
+  Hv_bdfcoeff_.constant = coeff_.bd0 / coeff_.dt;
+  Hv_form_->Update();
+  Hv_form_->Assemble();
+  Hv_form_->FormSystemMatrix(vel_ess_tdof_, Hv_op_);
+  Hv_inv_->SetOperator(*Hv_op_);
+  
+  // solve for u[n+1]
+  for (auto &vel_dbc : vel_dbcs_) {
+    u_next_gf_->ProjectBdrCoefficient(*vel_dbc.coeff, vel_dbc.attr);
+  }
+
+  vfes_->GetRestrictionMatrix()->MultTranspose(resu_vec_, *resu_gf_);
+
+  Vector X2, B2;
+  Hv_form_->FormLinearSystem(vel_ess_tdof_, *u_next_gf_, *resu_gf_, Hv_op_, X2, B2, 1);
+  Hv_inv_->Mult(B2, X2);
+  if (!Hv_inv_->GetConverged()) {
+    if (rank0_) std::cout << "ERROR: Helmholtz solve did not converge." << std::endl;
+    exit(1);
+  }
+  // iter_hsolve = HInv->GetNumIterations();
+  // res_hsolve = HInv->GetFinalNorm();
+  Hv_form_->RecoverFEMSolution(X2, *resu_gf_, *u_next_gf_);
+  u_next_gf_->GetTrueDofs(u_next_vec_);
+  */
+
+  // filter
+  /*
+  for (int jj = 0; jj < dim_; jj++) {
+    
+    int nS = tmpR0_.Size();      
+    {
+      const auto d_u = u_next_vec_.Read();
+      auto d_phi = tmpR0_.ReadWrite();
+      for (int i = 0; i < nS; i++) {
+        d_phi[i] = d_u[i + jj*nS];
+      }
+    }
+    ress_gf_->SetFromTrueDofs(tmpR0_);    
+  
+    phi_NM1_gf_->ProjectGridFunction(*ress_gf_);
+    ress_gf_->ProjectGridFunction(*phi_NM1_gf_);
+    ress_gf_->GetTrueDofs(tmpR0_);
+    
+    {
+      auto d_u = u_next_vec_.ReadWrite();
+      const auto d_phi = tmpR0_.Read();
+      for (int i = 0; i < nS; i++) {
+        d_u[i + jj*nS] = d_phi[i];
+      }
+    }
+
+  }
+  u_next_gf_->SetFromTrueDofs(u_next_vec_);
+  */  
   
   // update gradients for turbulence model
   evaluateVelocityGradient();

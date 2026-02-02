@@ -185,14 +185,17 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   // Fields
   ParGridFunction Tnm1_gf_, Tnm2_gf_;
   ParGridFunction Tn_gf_, Tn_next_gf_, Text_gf_, resT_gf_;
+  ParGridFunction Tn_star_gf_;
 
   ParGridFunction rn_gf_, rnm1_gf_, rnm2_gf_;
   ParGridFunction rn_next_gf_, rext_gf_, resr_gf_;
+  ParGridFunction rn_star_gf_; 
   ParGridFunction rhoDt;  
 
   ParGridFunction Pn_gf_, p_prime_gf_, mass_imbalance_gf_;
   ParGridFunction Pnm1_gf_, Pnm2_gf_, Pn_next_gf_;
   ParGridFunction Pn_NM1_gf_;  // for p-1 filter
+  ParGridFunction Pn_star_gf_;  
 
   ParGridFunction density_isothermal_bc_gf_;
   ParGridFunction density_adiabatic_bc_gf_;
@@ -267,6 +270,7 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
 
   // operators and solvers
   ParBilinearForm *At_form_ = nullptr;
+  ParBilinearForm *Ar_form_ = nullptr;  
   ParBilinearForm *Ms_form_ = nullptr;
   ParBilinearForm *MsRho_form_ = nullptr;
   ParBilinearForm *Ht_form_ = nullptr;
@@ -283,6 +287,7 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   
   OperatorHandle LQ_;
   OperatorHandle At_;
+  OperatorHandle Ar_;  
   OperatorHandle Ht_;
   OperatorHandle Ms_;
   OperatorHandle MsRho_;
@@ -317,16 +322,19 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   Vector Tn_, Tn_next_, Tnm1_, Tnm2_;
   Vector NTn_, NTnm1_, NTnm2_;
   Vector Text_;
+  Vector Tn_star_;  
   Vector resT_;
 
   Vector rn_, rn_next_, rnm1_, rnm2_;
   Vector Nrn_, Nrnm1_, Nrnm2_;
+  Vector rn_star_;  
   Vector rext_;
   Vector resr_;  
 
   Vector Pn_, p_prime_, mass_imbalance_;
   Vector Pnm1_, Pnm2_;  
   Vector Pn_next_;
+  Vector Pn_star_;  
   Vector sos_;  
   
   Vector Qt_;

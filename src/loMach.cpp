@@ -428,7 +428,8 @@ void LoMachSolver::solveStep() {
       // temperature: predictor
       sw_thermChem_.Start();    
       thermo_->temperaturePredictionStep();
-      sw_thermChem_.Stop();      
+      sw_thermChem_.Stop();
+      //if (rank0_) std::cout << "T* substep complete..." << endl;          
 
       // density: mass imbalance
       //sw_thermChem_.Start();    
@@ -458,8 +459,13 @@ void LoMachSolver::solveStep() {
       sw_thermChem_.Start();    
       thermo_->temperatureCorrectionStep();
       sw_thermChem_.Stop();
-      //if (rank0_) std::cout << "temperature complete..." << endl;    
+      //if (rank0_) std::cout << "T[n+1] complete..." << endl;    
 
+      // flow: full step
+      sw_flow_.Start();
+      flow_->step();
+      sw_flow_.Stop();
+      
       // density: mass imbalance at [n+1]* state
       //sw_thermChem_.Start();    
       //thermo_->massImbalanceStep();

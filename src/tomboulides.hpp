@@ -338,7 +338,8 @@ class Tomboulides final : public FlowBase {
   mfem::ParLinearForm *S_mom_form_ = nullptr;
   mfem::ParLinearForm *Faxi_poisson_form_ = nullptr;
   mfem::ParLinearForm *ur_conv_axi_form_ = nullptr;
-  mfem::ParBilinearForm *L_form_ = nullptr;  
+  mfem::ParBilinearForm *L_form_ = nullptr;
+  mfem::ParBilinearForm *Av_form_ = nullptr;    
 
   mfem::ParBilinearForm *Ms_rho_form_ = nullptr;
   mfem::ParBilinearForm *Hs_form_ = nullptr;
@@ -360,7 +361,8 @@ class Tomboulides final : public FlowBase {
   mfem::OperatorHandle Hs_op_;
   mfem::OperatorHandle As_op_; 
   mfem::OperatorHandle Lconv_op_;
-  mfem::OperatorHandle L_op_;  
+  mfem::OperatorHandle L_op_;
+  mfem::OperatorHandle Av_op_;    
 
   // solver objects
   mfem::ParLORDiscretization *L_iorho_lor_ = nullptr;
@@ -387,6 +389,7 @@ class Tomboulides final : public FlowBase {
 
   mfem::Solver *Hvs_inv_pc_ = nullptr;
   mfem::GMRESSolver *Hvs_inv_ = nullptr;
+  //mfem::CGSolver *Hvs_inv_ = nullptr;  
   
   mfem::Solver *Hs_inv_pc_ = nullptr;
   mfem::CGSolver *Hs_inv_ = nullptr;
@@ -428,6 +431,7 @@ class Tomboulides final : public FlowBase {
   mfem::Vector utheta_m1_vec_;
   mfem::Vector utheta_m2_vec_;
   mfem::Vector utheta_next_vec_;
+  mfem::Vector diff_vec_;  
 
   // miscellaneous
   double volume_;
@@ -551,7 +555,9 @@ class Tomboulides final : public FlowBase {
 
   /// helper routine for convection with density
   void computeConvection(int inm);
-  
+
+  /// reference
+  void stepLoMach();
 };
 
 #endif  // TOMBOULIDES_HPP_
