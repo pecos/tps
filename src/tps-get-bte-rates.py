@@ -130,12 +130,10 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
     EXCIDX = 0 # Index of lumped excited state Ar* in TPS
 
     # SETUP THE INPUT ARRAYS CONTAINING Temperature, number densities, electric field
-    Te = Tarr 
+    # Te = Tarr 
     Tg = Tarr 
-    n_pts = len(Te)
+    n_pts = len(Tg)
     # args.n_pts = n_pts
-
-    print("[Python] Rank [%d/%d] : K-means Te clusters "%(rank_, size_), Te_vec, flush=True)
 
     args.collisions = collisions_file # collision cross-section file
     cs_data_all   = cross_section.read_cross_section_data(args.collisions)
@@ -176,8 +174,14 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
     lm_modes                         = [[[l,0] for l in range(args.l_max+1)] for grid_idx in range(n_grids)]
     nr                               = np.ones(n_grids, dtype=np.int32) * args.Nr
     Te                               = Te_vec
-    vth                              = np.sqrt(2 * kB * Te * ev_to_K  / me)
+    vth                              = np.sqrt(Te) * c_gamma
+    # vth                              = np.sqrt(2 * kB * Te * ev_to_K  / me)
     ev_max                           = (6 * vth / c_gamma)**2 
+    # Replace ev_max based on the mean electron energy in each grid
+    for idx in range(n_grids):
+        ev_max[idx] = 36 * np.mean( Tg[grid_idx_to_spatial_idx_map[idx]] / ev_to_K) 
+
+    print("[Python] Rank [%d/%d] : K-means Te clusters and ev_max "%(rank_, size_), Te_vec, ev_max, vth, flush=True)
 
     #  generate crs Tg depended crs data 
     col_cs = list()
@@ -359,6 +363,8 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
                 ni       = mc[: , 3] * n0_param
                 ns_by_n0 = xp.transpose(mc[: , 4:])
                 EMag     = xp.sqrt(Ex**2 + Ey**2)
+
+                # print("[Python] Rank [%d/%d]: grid_idx %d, min(Tg) = %f, max(Tg) = %f, Tg_c = %f" %(rank_, size_, grid_idx, np.amin(Tg), np.amax(Tg), Te[grid_idx]), flush=True)
 
                 # print("[Python] Rank [%d/%d]: grid_idx %d, constructed plasma parameters for sub-clusters" %(rank_, size_, grid_idx), flush=True)
                 # comm.Barrier()
@@ -553,17 +559,17 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
                     dev_id = grid_idx % num_gpus
 
                 def t1(bte_solver, grid_idx_to_spatial_idx_map, coll_count):
-                        qA       = bte_solver._op_diag_dg[grid_idx]
-                        u0       = bte_solver.get_boltzmann_parameter(grid_idx, "u_avg")
-                        h_curr   = bte_solver.normalized_distribution(grid_idx, u0)
-                        qoi      = bte_solver.compute_QoIs(grid_idx, h_curr, effective_mobility=False)
-                        rr_cpu   = xp.asnumpy(qoi["rates"])
+                    qA       = bte_solver._op_diag_dg[grid_idx]
+                    u0       = bte_solver.get_boltzmann_parameter(grid_idx, "u_avg")
+                    h_curr   = bte_solver.normalized_distribution(grid_idx, u0)
+                    qoi      = bte_solver.compute_QoIs(grid_idx, h_curr, effective_mobility=False)
+                    rr_cpu   = xp.asnumpy(qoi["rates"])
                         
-                        for r_idx in range(coll_count):
-                            rates[r_idx][grid_idx_to_spatial_idx_map[grid_idx]] = rr_cpu[r_idx] * N_Avo
+                    for r_idx in range(coll_count):
+                        rates[r_idx][grid_idx_to_spatial_idx_map[grid_idx]] = rr_cpu[r_idx] * N_Avo
 
-                        with cp.cuda.Device(dev_id):
-                            t1(bte_solver, grid_idx_to_spatial_idx_map, collision_count)
+                    with cp.cuda.Device(dev_id):
+                        t1(bte_solver, grid_idx_to_spatial_idx_map, collision_count)
 
     
     # FIX THE RECOMBINATION RATES
@@ -658,7 +664,7 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
                     num_plt_rows = np.int64(np.ceil(num_subplots/num_plt_cols))
                     fig          = plt.figure(figsize=(num_plt_cols * 8 + 0.5*(num_plt_cols-1), num_plt_rows * 8 + 0.5*(num_plt_rows-1)), dpi=200, constrained_layout=True)
                     plt_idx      =  1
-                    n_pts_step   =  n_pts // 20
+                    n_pts_step   =  n_pts // 4
 
                     for lm_idx, lm in enumerate(bte_solver._par_lm[grid_idx]):
                         plt.subplot(num_plt_rows, num_plt_cols, plt_idx)
@@ -696,7 +702,7 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
 
     data = rates[1:rates.shape[0]].flatten()
     data[data < 0.0] = 0.0
-    # comm.Barrier()
+    comm.Barrier()
     # print("[Python] Rank = ", rank_, ", BTE solve complete...", flush=True)
 
     return data

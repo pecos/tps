@@ -1827,6 +1827,11 @@ void ReactingFlow::step() {
 
       Te_vec.assign(ptr_Te_arr, ptr_Te_arr + buf_Te_arr.size);
 
+      int myRank;
+      MPI_Comm_rank(tpsP_->getTPSCommWorld(), &myRank);
+
+      std::cout << "Rank " << myRank << ", back to TPS after setting up BTE grids\n";
+
     }
     if (bte_from_tps_ && update_bte_rates == 0) {
       // // Wrap const pointer into NumPy array (no copy)
@@ -1927,6 +1932,11 @@ void ReactingFlow::step() {
         std::cerr << "ReactingFlow::step(), Python error: " << e.what() << std::endl;
         exit(-1);
       }
+
+      int myRank;
+      MPI_Comm_rank(tpsP_->getTPSCommWorld(), &myRank);
+
+      std::cout << "Rank " << myRank << ", back to TPS after solving BTE in Python\n";
   
       // Convert "result" to an MFEM Vector
       py::array res_array = result.cast<py::array>();
@@ -1988,7 +1998,11 @@ void ReactingFlow::step() {
         h_Tn[i] = YT[nActiveSpecies_];
       }
       delete[] YT;
+
 #ifdef HAVE_PYTHON
+      int myRank;
+      MPI_Comm_rank(tpsP_->getTPSCommWorld(), &myRank);
+
       kReac_gf_.SetFromTrueDofs(kReac_);
       reacR_gf_.SetFromTrueDofs(reacR_);
       prodY_gf_.SetFromTrueDofs(prodY_);
@@ -2019,6 +2033,8 @@ void ReactingFlow::step() {
                     << global_min << " to " << global_max << "\n";
         }
       }
+
+      // std::cout << "Rank " << myRank << ", TPS Obtained global max/min of rate coefficients\n";
 #endif
 
       if (mixtureInput_.ambipolar) {
@@ -2119,6 +2135,7 @@ void ReactingFlow::step() {
 
   updateMixture();
   updateDiffusivity();
+
 }
 
 void ReactingFlow::evalSubstepNumber() {
@@ -3423,7 +3440,6 @@ void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, 
   chemistry_->computeForwardRateCoeffs(n_sp.Read(), Th, Te, dofindex, kfwd.HostWrite());
 #ifdef HAVE_PYTHON
   if (bte_from_tps_) {
-    int iter_number_ = this->GetCurrentIter();
     const double* mapping = bte_rr_mapping_.HostRead();
     for (int rr = 0; rr < nBTEReactions_; rr++) {
       int tpi = int(mapping[rr]); // tpi stores TPS index of reaction given by BTE index rr
