@@ -51,9 +51,9 @@ parser.add_argument("-l_max", "--l_max"                           , help="max po
 parser.add_argument("-c", "--collisions"                          , help="collisions model", type=str, default="/work2/10565/ashwathsv/frontera/tps-venv/frontera/tps-venv/tps/boltzmann/BESolver/python/lxcat_data/fully_lumped_argon_mechanism_cs_recomb.lxcat")
 parser.add_argument("-sp_order", "--sp_order"                     , help="b-spline order", type=int, default=3)
 parser.add_argument("-spline_qpts", "--spline_qpts"               , help="q points per knots", type=int, default=11)
-parser.add_argument("-atol", "--atol"                             , help="absolute tolerance", type=float, default=1e-10)
-parser.add_argument("-rtol", "--rtol"                             , help="relative tolerance", type=float, default=1e-6)
-parser.add_argument("-max_iter", "--max_iter"                     , help="max number of iterations for newton solve", type=int, default=100)
+parser.add_argument("-atol", "--atol"                             , help="absolute tolerance", type=float, default=1e-20)
+parser.add_argument("-rtol", "--rtol"                             , help="relative tolerance", type=float, default=1e-8)
+parser.add_argument("-max_iter", "--max_iter"                     , help="max number of iterations for newton solve", type=int, default=500)
 parser.add_argument("-Te", "--Te"                                 , help="approximate electron temperature (eV)" , type=float, default=0.5)
 parser.add_argument("-n0"    , "--n0"                             , help="heavy density (1/m^3)" , type=float, default=3.22e22)
 parser.add_argument("-ev_max", "--ev_max"                         , help="max energy in the v-space grid" , type=float, default=30)
@@ -181,7 +181,7 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
     for idx in range(n_grids):
         ev_max[idx] = 36 * np.mean( Tg[grid_idx_to_spatial_idx_map[idx]] / ev_to_K) 
 
-    print("[Python] Rank [%d/%d] : K-means Te clusters and ev_max "%(rank_, size_), Te_vec, ev_max, vth, flush=True)
+    print("[Python] Rank [%d/%d] : K-means Te clusters "%(rank_, size_), Te_vec, flush=True)
 
     #  generate crs Tg depended crs data 
     col_cs = list()
@@ -493,7 +493,15 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
             try:
                 # print("rank [%d/%d] BTE launching grid %d on %s"%(rank_, size_, grid_idx, dev_id), flush=True)
                 f0 = bte_solver.get_boltzmann_parameter(grid_idx, "u0")
-                ff , qoi = bte_solver.solve(grid_idx, f0, args.atol, args.rtol, args.max_iter, args.solver_type)
+                
+                eRe      = asnumpy(bte_solver.get_boltzmann_parameter(grid_idx, "eRe"))
+                eIm      = asnumpy(bte_solver.get_boltzmann_parameter(grid_idx, "eIm"))
+                ef       = np.sqrt(eRe**2 + eIm**2)
+
+                ls_c     = max(1e-4, min(0.9, np.exp(-(np.min(np.abs(ef))/2)**2)))
+                ff , qoi = bte_solver.solve(grid_idx, f0, args.atol, args.rtol, args.max_iter, args.solver_type,
+                            alpha_min = 1e-16, alpha_rho=0.5, line_search_c = ls_c)
+                
                 ff_list[grid_idx]  = ff
                 qoi_list[grid_idx] = qoi
                 # print("rank [%d/%d] BTE solve done for grid %d on %s"%(rank_, size_, grid_idx, dev_id), flush=True)
