@@ -34,8 +34,8 @@
 
 using namespace mfem;
 
-// Implementation of class RiemannSolver
-MFEM_HOST_DEVICE RiemannSolver::RiemannSolver(int _num_equation, GasMixture *_mixture, Equations _eqSystem,
+// Implementation of class RiemannSolverTPS
+MFEM_HOST_DEVICE RiemannSolverTPS::RiemannSolverTPS(int _num_equation, GasMixture *_mixture, Equations _eqSystem,
                                               Fluxes *_fluxClass, bool _useRoe, bool axisym, int rank)
     : num_equation(_num_equation),
       mixture(_mixture),
@@ -46,12 +46,12 @@ MFEM_HOST_DEVICE RiemannSolver::RiemannSolver(int _num_equation, GasMixture *_mi
       rank_(rank) {}
 
 // Compute the scalar F(u).n
-void RiemannSolver::ComputeFluxDotN(const Vector &state, const Vector &nor, Vector &fluxN) {
+void RiemannSolverTPS::ComputeFluxDotN(const Vector &state, const Vector &nor, Vector &fluxN) {
   ComputeFluxDotN(state.GetData(), nor.GetData(), fluxN.GetData());
 }
 
 // Compute the scalar F(u).n
-MFEM_HOST_DEVICE void RiemannSolver::ComputeFluxDotN(const double *state, const double *nor, double *fluxN) const {
+MFEM_HOST_DEVICE void RiemannSolverTPS::ComputeFluxDotN(const double *state, const double *nor, double *fluxN) const {
   const int dim = mixture->GetDimension();
 
   double fluxes[gpudata::MAXEQUATIONS * gpudata::MAXDIM];  // double fluxes[5 * 3];
@@ -64,7 +64,7 @@ MFEM_HOST_DEVICE void RiemannSolver::ComputeFluxDotN(const double *state, const 
   }
 }
 
-void RiemannSolver::EvalCheck(const double s10, const double s11, const double s12, const double s13, const double s14, const double s20, const double s21, const double s22, const double s23, const double s24, const Vector &nor, Vector &flux, bool LF) {
+void RiemannSolverTPS::EvalCheck(const double s10, const double s11, const double s12, const double s13, const double s14, const double s20, const double s21, const double s22, const double s23, const double s24, const Vector &nor, Vector &flux, bool LF) {
   
     if (s24>1.0e10) {
       std::cout << rank_ << ") BAD s24 in EvalCheck 1: " << s24 << endl;
@@ -88,7 +88,7 @@ void RiemannSolver::EvalCheck(const double s10, const double s11, const double s
     Eval_LF(state1, state2, nor, flux);
 }
 
-void RiemannSolver::Eval(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux, bool LF) {
+void RiemannSolverTPS::Eval(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux, bool LF) {
   if (useRoe && !LF) {
     Eval_Roe(state1, state2, nor, flux);
   } else {
@@ -96,22 +96,22 @@ void RiemannSolver::Eval(const Vector &state1, const Vector &state2, const Vecto
   }
 }
 
-MFEM_HOST_DEVICE void RiemannSolver::Eval(const double *state1, const double *state2, const double *nor, double *flux,
+MFEM_HOST_DEVICE void RiemannSolverTPS::Eval(const double *state1, const double *state2, const double *nor, double *flux,
                                           bool LF) {
   if (useRoe && !LF) {
     // TODO(kevin): implement MFEM_HOST_DEVICE Eval_Roe.
-    printf("Roe RiemannSolver is not implmented for gpu!");
+    printf("Roe RiemannSolverTPS is not implmented for gpu!");
     // Eval_Roe(state1, state2, nor, flux);
   } else {
     Eval_LF(state1, state2, nor, flux);
   }
 }
 
-void RiemannSolver::Eval_LF(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux) {
+void RiemannSolverTPS::Eval_LF(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux) {
   Eval_LF(state1.GetData(), state2.GetData(), nor.GetData(), flux.GetData());
 }
 
-MFEM_HOST_DEVICE void RiemannSolver::Eval_LF(const double *state1, const double *state2, const double *nor,
+MFEM_HOST_DEVICE void RiemannSolverTPS::Eval_LF(const double *state1, const double *state2, const double *nor,
                                              double *flux) const {
   const int dim = mixture->GetDimension();
   
@@ -140,7 +140,7 @@ MFEM_HOST_DEVICE void RiemannSolver::Eval_LF(const double *state1, const double 
 }
 
 // TODO(kevin): need to write for multiple species and two temperature.
-void RiemannSolver::Eval_Roe(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux) {
+void RiemannSolverTPS::Eval_Roe(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux) {
   const int dim = nor.Size();
   assert(!axisymmetric_);  // Roe doesn't support axisymmetric yet
 

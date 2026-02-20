@@ -56,6 +56,7 @@ GaussianInterpExtData::GaussianInterpExtData(mfem::ParMesh *pmesh, LoMachOptions
   rank_ = pmesh_->GetMyRank();
   rank0_ = (pmesh_->GetMyRank() == 0);
   order_ = loMach_opts->order;
+  //nSpec_ = loMach_opts->nSpec;  
 
   // only allows one inlet now
   isInterpInlet_ = false;
@@ -119,6 +120,13 @@ void GaussianInterpExtData::initializeSelf() {
   velocity_gf_ = 0.0;
   vel0_gf_.SetSpace(vfes_);
   vel0_gf_ = 0.0;
+
+  //if (nSpec > 0) {
+  //  yfec_ = new H1_FECollection(order_);
+  //  yfes_ = new ParFiniteElementSpace(pmesh_, yfec_, nSpec_);
+  //  Yn_gf_.SetSpace(yfes_);
+  //  Yn_gf_ = 0.0;    
+  //} 
 
   // exports
   toThermoChem_interface_.Tdata = &temperature_gf_;
@@ -189,7 +197,7 @@ void GaussianInterpExtData::setup() {
   struct inlet_profile inlet[nCount];
 
   // mean output from plane interpolation
-  // 0) no, 1) x, 2) y, 3) z, 4) rho, 5) u, 6) v, 7) w
+  // 0) no, 1) x, 2) y, 3) z, 4) rho, 5) u, 6) v, 7) w [8) Y1, 9) Y2,...]
   // Change format so temp is given instead of rho!
 
   // open, read data
@@ -230,6 +238,13 @@ void GaussianInterpExtData::setup() {
           inlet[nLines].v = buffer;
         } else if (entry == 8) {
           inlet[nLines].w = buffer;
+
+	// (swh)TODO: need to generalize multiple species
+        //} else if (entry == 9) {
+        //  inlet[nLines].y1 = buffer;
+        //} else if (entry == 10) {
+        //  inlet[nLines].y2 = buffer;
+	  
         }
       }
       nLines++;
@@ -239,6 +254,7 @@ void GaussianInterpExtData::setup() {
 
   // broadcast data
   MPI_Bcast(&inlet, nCount * 8, MPI_DOUBLE, 0, tpsP_->getTPSCommWorld());
+  //MPI_Bcast(&inlet, nCount * (8+nSpec_), MPI_DOUBLE, 0, tpsP_->getTPSCommWorld());  
   if (rank0_) {
     std::cout << " communicated inlet data" << endl;
     fflush(stdout);
@@ -329,13 +345,17 @@ void GaussianInterpExtData::setup() {
                     (xp[2] - inlet[j].z) * (xp[2] - inlet[j].z));
 
         // gaussian interpolation
-        if (dist <= 1.5 * radius) {
+        if (dist <= 2.0 * radius) {
           wt = exp(-(dist * dist) / (radius * radius));
           wt_tot += wt;
           val_u = val_u + wt * inlet[j].u;
           val_v = val_v + wt * inlet[j].v;
           val_w = val_w + wt * inlet[j].w;
           val_T = val_T + wt * inlet[j].temp;
+	  //if (nSpec_ > 0) {
+          //  val_y1 = val_y1 + wt * inlet[j].Y1;
+          //  val_y2 = val_y2 + wt * inlet[j].Y2;  	  
+	  //}
         }
 
         // nearest, just for testing
@@ -356,11 +376,19 @@ void GaussianInterpExtData::setup() {
         Udata[n + 1 * Sdof_] = val_v / wt_tot;
         Udata[n + 2 * Sdof_] = val_w / wt_tot;
         Tdata[n] = val_T / wt_tot;
+
+        //Ydata[n + 0 * Sdof_] = val_y1 / wt_tot;
+        //Ydata[n + 1 * Sdof_] = val_y2 / wt_tot;	
+	
       } else {
         Udata[n + 0 * Sdof_] = 0.0;
         Udata[n + 1 * Sdof_] = 0.0;
         Udata[n + 2 * Sdof_] = 0.0;
         Tdata[n] = 0.0;
+
+        //Ydata[n + 0 * Sdof_] = 0.0;
+        //Ydata[n + 1 * Sdof_] = 0.0;
+	
       }
 
       // store initial interpolated field to ramp from

@@ -132,7 +132,7 @@ __global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSyste
                                         const int _num_equation, const int _dim, bool axisym, int sgs_model,
                                         double sgs_floor, double sgs_const, viscositySpongeData vsd, void *f);
 
-//! Instantiate RiemannSolver object on the device with placement new
+//! Instantiate RiemannSolverTPS object on the device with placement new
 __global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture, Equations _eqSystem,
                                          Fluxes *_fluxClass, bool _useRoe, bool axisym, void *r);
 
@@ -151,8 +151,8 @@ __global__ void freeDeviceTransport(TransportProperties *transport);
 //! Explicit call to Fluxes destructor on the device
 __global__ void freeDeviceFluxes(Fluxes *f);
 
-//! Explicit call to RiemannSolver destructor on the device
-__global__ void freeDeviceRiemann(RiemannSolver *r);
+//! Explicit call to RiemannSolverTPS destructor on the device
+__global__ void freeDeviceRiemann(RiemannSolverTPS *r);
 
 //! Explicit call to Chemistry destructor on the device
 __global__ void freeDeviceChemistry(Chemistry *chem);

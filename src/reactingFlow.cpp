@@ -899,10 +899,12 @@ void ReactingFlow::initializeSelf() {
         inlet_attr = 0;
         inlet_attr[patch - 1] = 1;
         temperature_bc_field_ = new GridFunctionCoefficient(extData_interface_->Tdata);
+        //species_bc_field_ = new GridFunctionCoefficient(extData_interface_->Ydata);	
         if (rank0_) {
           std::cout << "Rx Flow: Setting interpolated Dirichlet temperature on patch = " << patch << std::endl;
         }
         AddTempDirichletBC(temperature_bc_field_, inlet_attr);
+        //AddSpeciesDirichletBC(species_value, inlet_attr);
 
         // Force the IC to agree with the interpolated inlet BC
         //
@@ -912,6 +914,21 @@ void ReactingFlow::initializeSelf() {
         // this BC, there will be a discrepancy (which will be
         // eliminated after the first step).
         Tn_gf_.ProjectBdrCoefficient(*temperature_bc_field_, inlet_attr);
+
+      } else if (type == "normal") {
+
+        Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
+        inlet_attr = 0;
+        inlet_attr[patch - 1] = 1;
+        double temperature_value;
+        tpsP_->getRequiredInput((basepath + "/temperature").c_str(), temperature_value);
+        if (rank0_) {
+          std::cout << "Rx Flow: Setting uniform Dirichlet temperature on patch = " << patch << std::endl;
+        }
+        AddTempDirichletBC(temperature_value, inlet_attr);
+
+	// do nothing for species for time being
+	
       } else {
         if (rank0_) {
           std::cout << "ERROR: Rx Flow inlet type = " << type << " not supported." << std::endl;
@@ -1756,6 +1773,46 @@ void ReactingFlow::temperatureStep() {
   Tn_next_gf_.GetTrueDofs(Tn_next_);
 }
 
+/*
+void ReactingFlow::temperatureSubstep(int iSub) {
+  // substep dt
+  double dtSub = dt_ / (double)nSub_;
+
+  CpMix_gf_.GetTrueDofs(CpMix_);
+
+  // heat of formation term
+  tmpR0_.Set(1.0, hw_);
+
+  // pressure
+  tmpR0_ += dtP_;
+
+  // contribution to temperature update is dt * rhs / (rho * Cp)
+  tmpR0_ /= rn_;
+  tmpR0_ /= CpMix_;
+  tmpR0_ *= dtSub;
+
+  double *data = tmpR0_.HostReadWrite();
+  double *dTstar = TnStar_.HostReadWrite();
+  double *dTn = Tn_.HostReadWrite();
+  for (int i = 0; i < sDofInt_; i++) {
+    // increasing T
+    if (data[i] > 0.0) {
+      data[i] += dTstar[i];
+      data[i] += dTn[i];
+
+    // reducing T
+    } else {
+      double tmp = 1.0 - data[i] / dTn[i];
+      data[i] = dTn[i] / tmp + dTstar[i];
+    }
+  }
+
+  // Tn now has full state at substep
+  Tn_.Set(1.0, tmpR0_);
+}
+*/
+
+/**/
 void ReactingFlow::temperatureSubstep(int iSub) {
   // substep dt
   double dtSub = dt_ / (double)nSub_;
@@ -1780,6 +1837,7 @@ void ReactingFlow::temperatureSubstep(int iSub) {
   // Tn now has full state at substep
   Tn_.Set(1.0, tmpR0_);
 }
+/**/
 
 void ReactingFlow::speciesLastStep() {
   tmpR0_ = 0.0;
@@ -1900,6 +1958,47 @@ void ReactingFlow::speciesStep(int iSpec) {
   setVectorFromScalar(tmpR0_, iSpec, &Yn_next_);
 }
 
+/*
+void ReactingFlow::speciesSubstep(int iSpec, int iSub) {
+  // substep dt
+  double dtSub = dt_ / (double)nSub_;
+
+  // production of iSpec
+  setScalarFromVector(prodY_, iSpec, &tmpR0_);
+  tmpR0_ /= rn_;
+  tmpR0_ *= dtSub;
+
+  const double *dYstar = YnStar_.HostRead();
+  const double *dYn = Yn_.HostRead();
+  double *data = tmpR0_.HostReadWrite();
+  for (int i = 0; i < sDofInt_; i++) {
+  
+    // increasing Y(sp)
+    if (data[i] > 0.0) {
+      data[i] += dYstar[i + iSpec * sDofInt_];
+      data[i] += dYn[i + iSpec * sDofInt_];
+
+    // reducing Y(sp)
+    } else {
+      double tmp = 1.0 - data[i] / dYn[i + iSpec * sDofInt_];
+      data[i] = dYn[i + iSpec * sDofInt_] / tmp + dYstar[i + iSpec * sDofInt_];
+    }
+  }
+
+  // clip any small negative values
+  {
+    double *data = tmpR0_.HostReadWrite();
+    for (int i = 0; i < sDofInt_; i++) {
+      data[i] = max(data[i], 0.0);
+    }
+  }
+
+  // Yn now has full state at substep
+  setVectorFromScalar(tmpR0_, iSpec, &Yn_);
+}
+*/
+
+/**/
 // Y{n + (substep+1)} = dt * wdot(Y{n + (substep)} + Y{n + (substep+1)}*
 void ReactingFlow::speciesSubstep(int iSpec, int iSub) {
   // substep dt
@@ -1928,6 +2027,7 @@ void ReactingFlow::speciesSubstep(int iSpec, int iSub) {
   // Yn now has full state at substep
   setVectorFromScalar(tmpR0_, iSpec, &Yn_);
 }
+/**/
 
 void ReactingFlow::speciesProduction() {
   const double *dataT = Tn_.HostRead();
