@@ -8,12 +8,13 @@ setup() {
     REF_FILE=ref_solns/rings.centerline.By.np1.h5
     OUT_FILE=ref_solns/By.h5
     CMD_LINE="--runFile inputs/rings.ini"
+    MPIRUN=`./sniff_mpirun.sh`
 }
 
 @test "[$TEST] verify tps quasimagnetostatic solver runs with np = 1" {
     rm -f $OUT_FILE
     test -s $MESH_FILE
-    run mpirun -np 1 ../src/tps $CMD_LINE
+    run $MPIRUN -n 1 ../src/tps $CMD_LINE
     [[ "${status}" -eq 0 ]]
     [[ "${output}" =~ "EM simulation complete" ]]
     test -s $OUT_FILE
@@ -23,7 +24,7 @@ setup() {
 @test "[$TEST] verify tps quasimagnetostatic solver runs with np = 4" {
     rm -f $OUT_FILE
     test -s $MESH_FILE
-    run mpirun -np 4 ../src/tps $CMD_LINE
+    run $MPIRUN -n 4 ../src/tps $CMD_LINE
     [[ "${status}" -eq 0 ]]
     [[ "${output}" =~ "EM simulation complete" ]]
     test -s $OUT_FILE

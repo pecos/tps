@@ -40,6 +40,15 @@ for binary in $binaries; do
     fi
 done
 
+m4_binaries="snarf_mfem.py"
+for binary in $m4_binaries; do
+    if [ ! -x $binary ];then
+        if [ -x $testDir/../m4/$binary ];then
+           ln -s $testDir/../m4/$binary $binary
+        fi
+    fi
+done
+
 # necessary text files
 files="valgrind.suppressions"
 for file in $files; do

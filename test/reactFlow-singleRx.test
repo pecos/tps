@@ -4,6 +4,7 @@
 TEST="singleReaction"
 RUNFILE="inputs/input.reactSingleRx.ini"
 RUNFILE_STIFF="inputs/input.reactStiffRx.ini"
+RUNFILE_IMP="inputs/input.reactImplicitRx.ini"
 RUNFILE_TORCH="inputs/lomach.torch.reacting.ini"
 EXE="../src/tps"
 RESTART="ref_solns/reactSingleRx/restart_output.sol.h5"
@@ -53,6 +54,28 @@ setup() {
     test -s $REF_FILE_STIFF
     h5diff -r --relative=1e-12 $SOLN_FILE_STIFF $REF_FILE_STIFF /species
     h5diff -r --relative=1e-12 $SOLN_FILE_STIFF $REF_FILE_STIFF /temperature/temperature
+}
+
+@test "[$TEST] build input file $RUNFILE_IMP" {
+    rm -f $RUNFILE_IMP
+    cat $RUNFILE_STIFF | sed "s/openSystem = False/openSystem = True/" | \
+        sed "s/sub-steps = 20/sub-steps = 1/" | \
+        sed "s/# ic = 'step'/implicit-chemistry = true/" > $RUNFILE_IMP
+    test -s $RUNFILE_IMP
+}
+
+@test "[$TEST] run tps with input -> $RUNFILE_IMP" {
+    rm -rf output-stiff
+    rm -f $SOLN_FILE_STIFF
+    $EXE --runFile $RUNFILE_IMP
+    test -s $SOLN_FILE_STIFF
+}
+
+@test "[$TEST] verify tps output with input -> $RUNFILE_IMP" {
+    test -s $SOLN_FILE_STIFF
+    test -s $REF_FILE_STIFF
+    h5diff -r --relative=0.05 $SOLN_FILE_STIFF $REF_FILE_STIFF /species
+    h5diff -r --relative=0.05 $SOLN_FILE_STIFF $REF_FILE_STIFF /temperature/temperature
 }
 
 @test "[$TEST] check for input file $RUNFILE_TORCH" {

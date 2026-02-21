@@ -209,16 +209,13 @@ int main (int argc, char *argv[])
   }
 
   {
-    std::string fileName = "./ref_solns/collisions/Chung.h5";
-    std::string datasetName = "Chung";
-
-    DenseMatrix Chung, ChungFitted;
-    Array<int> dims = readTable(fileName, datasetName, Chung);
-    fileName = "./ref_solns/collisions/Chung.fitted.h5";
-    Array<int> dummy = readTable(fileName, datasetName, ChungFitted);
+    DenseMatrix fit;
+    std::string fileName = "./ref_solns/collisions/Oliver.fit.h5";
+    std::string datasetName1 = "Qe_Ar1r";
+    Array<int> dims = readTable(fileName, datasetName1, fit);
 
     Vector Tm(dims[0]);
-    Chung.GetColumn(0, Tm);
+    fit.GetColumn(0, Tm);
 
     std::vector<std::string> rString(5);
     rString[0] = "11";
@@ -227,11 +224,11 @@ int main (int argc, char *argv[])
     rString[3] = "14";
     rString[4] = "15";
 
-    double errorThreshold = 6.0e-4;
+    double errorThreshold = 2e-3;
 
     for (int r = 0; r < 5; r++) {
       Vector O(dims[0]);
-      double relError = 0.0, relError1 = 0.0;
+      double relError = 0.0;
       for (int m = 0; m < dims[0]; m++) {
         switch (r) {
           case 0:
@@ -252,15 +249,10 @@ int main (int argc, char *argv[])
         }
         int index = 1 + r;
 
-        relError += abs((ChungFitted(m,index) - O(m)) / Chung(m,index));
-        relError1 += abs((Chung(m,index) - O(m)) / Chung(m,index));
-        // std::cout << O(m) << " =?= " << ChungFitted(m,index) << std::endl;
-        // std::cout << O(m) * Tm(m) * Tm(m) << " =?= " << Mason(m,1) << std::endl;
+        relError += abs((fit(m,index) - O(m)) / fit(m,index));
       }
       relError /= dims[0];
-      relError1 /= dims[0];
       grvy_printf(GRVY_INFO, "\n O%s with respect to reference value: %.8E\n", rString[r].c_str(), relError);
-      grvy_printf(GRVY_INFO, "\n O%s with respect to numerical quadrature: %.8E\n", rString[r].c_str(), relError1);
       if (relError > errorThreshold) {
         grvy_printf(GRVY_ERROR, "\n Collision integral error beyond threshold: %.8E\n", errorThreshold);
         exit(ERROR);

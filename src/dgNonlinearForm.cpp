@@ -704,7 +704,7 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
         double d2 = d_dist2[f * maxIntPoints + k];
 
         // evaluate flux
-	//std::cout << "Eval_LF dgNonlin 2" << endl;	
+        // std::cout << "Eval_LF dgNonlin 2" << endl;
         d_rsolver->Eval_LF(u1, u2, nor, Rflux);
         d_flux->ComputeViscousFluxes(u1, gradUp1, xyz, d_delta_el1[f], d1, vFlux1);
         d_flux->ComputeViscousFluxes(u2, gradUp2, xyz, d_delta_el2[f], d2, vFlux2);

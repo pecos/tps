@@ -78,11 +78,12 @@ class Tomboulides final : public FlowBase {
   // true if this is root rank
   bool rank0_;
   bool axisym_;
-  bool writePressure_;  
+  bool writePressure_;
 
   // Options
   bool numerical_integ_ = false;
   bool partial_assembly_ = false;
+  bool use_iorho_gf_ = false;
 
   // linear-solver options
   int smoother_poly_order_;
@@ -171,7 +172,7 @@ class Tomboulides final : public FlowBase {
   // To use "numerical integration", quadrature rule must persist
   mfem::IntegrationRules gll_rules;
   mfem::IntegrationRules *intRules;
-  
+
   // Options-related structures
   TPS::Tps *tpsP_ = nullptr;
 
@@ -235,12 +236,13 @@ class Tomboulides final : public FlowBase {
   mfem::ParGridFunction *tmpR0_gf_ = nullptr;
   mfem::ParGridFunction *tmpR1_gf_ = nullptr;
   mfem::ParGridFunction *epsi_gf_ = nullptr;
-  mfem::ParGridFunction *uface_gf_ = nullptr;  
+  mfem::ParGridFunction *uface_gf_ = nullptr;
 
   /// Pressure FEM objects and fields
   mfem::FiniteElementCollection *pfec_ = nullptr;
   mfem::ParFiniteElementSpace *pfes_ = nullptr;
   mfem::ParGridFunction *p_gf_ = nullptr;
+  mfem::ParGridFunction *iorho_gf_ = nullptr;
   mfem::ParGridFunction *resp_gf_ = nullptr;
   mfem::ParGridFunction *pp_div_rad_comp_gf_ = nullptr;
 
@@ -256,7 +258,9 @@ class Tomboulides final : public FlowBase {
 
   /// mfem::Coefficients used in forming necessary operators
   mfem::GridFunctionCoefficient *rho_coeff_ = nullptr;
-  mfem::RatioCoefficient *iorho_coeff_ = nullptr;
+  // mfem::RatioCoefficient *iorho_coeff_ = nullptr;
+  // mfem::GridFunctionCoefficient *iorho_coeff_ = nullptr;
+  mfem::Coefficient *iorho_coeff_ = nullptr;
   mfem::ConstantCoefficient nlcoeff_;
   mfem::ConstantCoefficient one_coeff_;
   mfem::ConstantCoefficient Hv_bdfcoeff_;
@@ -299,7 +303,7 @@ class Tomboulides final : public FlowBase {
   mfem::InnerProductCoefficient *swirl_var_viscosity_coeff_ = nullptr;
 
   mfem::VectorGridFunctionCoefficient *uface_coeff_ = nullptr;
-  
+
   // mfem "form" objects used to create operators
   mfem::ParBilinearForm *L_iorho_form_ = nullptr;  // \int (1/\rho) \nabla \phi_i \cdot \nabla \phi_j
   mfem::ParLinearForm *forcing_form_ = nullptr;    // \int \phi_i f

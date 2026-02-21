@@ -404,7 +404,7 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
         // iGradUp(eq+d*num_equation) = sum;
       }
     }
-    
+
     double d1 = 0;
     if (distance_ != NULL) {
       d1 = dist * shape1;
@@ -426,11 +426,11 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
     // remove assert in COmputeTemp, and check here so
     // coords can be dumped
     double T = mixture->ComputeTemperature(funval1);
-      //if (T < 10.0) {
-      //  std::cout << "TEMPERATURE TOO LOW: " << transip[0] << " " << transip[1] << " " << transip[2] << endl;
-      //}
-    T = max(298.15, T); // HACK HACK HACK    
-    
+    // if (T < 10.0) {
+    //   std::cout << "TEMPERATURE TOO LOW: " << transip[0] << " " << transip[1] << " " << transip[2] << endl;
+    // }
+    T = max(298.15, T);  // HACK HACK HACK
+
     computeBdrFlux(Tr.Attribute, nor, funval1, iGradUp, transip, delta, *pTime, d1, fluxN);
     fluxN *= ip.weight;
 

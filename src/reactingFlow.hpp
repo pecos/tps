@@ -44,11 +44,11 @@ class Tps;
 #include <fstream>
 #include <iostream>
 
-#include "argon_transport.hpp"
 #include "chemistry.hpp"
 #include "dataStructures.hpp"
 #include "dirichlet_bc_helper.hpp"
 #include "equation_of_state.hpp"
+#include "gas_transport.hpp"
 #include "gpu_constructor.hpp"
 #include "io.hpp"
 #include "mpi_groups.hpp"
@@ -89,6 +89,7 @@ class ReactingFlow : public ThermoChemModelBase {
   int yDof_, yDofInt_;
 
   WorkingFluid workFluid_;
+  GasType gasType_;
   GasModel gasModel_;
   TransportModel transportModel_;
   ChemistryModel chemistryModel_;
@@ -96,11 +97,11 @@ class ReactingFlow : public ThermoChemModelBase {
 
   // packaged inputs
   PerfectMixtureInput mixtureInput_;
-  ArgonTransportInput argonInput_;
+  GasTransportInput gasInput_;
   ChemistryInput chemistryInput_;
 
   PerfectMixture *mixture_ = NULL;
-  ArgonMixtureTransport *transport_ = NULL;
+  GasMixtureTransport *transport_ = NULL;
   Chemistry *chemistry_ = NULL;
 
   std::vector<std::string> speciesNames_;
@@ -108,6 +109,7 @@ class ReactingFlow : public ThermoChemModelBase {
   DenseMatrix speciesComposition_;
   DenseMatrix gasParams_;
   double const_plasma_conductivity_;
+  bool radiative_decay_NECincluded_;
 
   // Flags
   bool rank0_;                      /**< true if this is rank 0 */
@@ -145,12 +147,19 @@ class ReactingFlow : public ThermoChemModelBase {
   double Sc_, invSc_;
   double static_rho_;
 
+  bool Tclip_ = false;
+  double Tmin_ = 0.0;
+  double Tmax_ = 100000.0;
+
   /// pressure-related, closed-system thermo pressure changes
   double ambient_pressure_, thermo_pressure_, system_mass_;
   double dtP_;
 
   // Initial temperature value (if constant IC)
   double T_ic_;
+
+  // streamwise-stabilization
+  bool sw_stab_;
 
   // FEM related fields and objects
 
@@ -172,6 +181,8 @@ class ReactingFlow : public ThermoChemModelBase {
   // Vector \f$H^1\f$ finite element space.
   ParFiniteElementSpace *vfes_ = nullptr;
 
+  ParGridFunction *gridScale_gf_ = nullptr;
+
   // Fields
   ParGridFunction Tnm1_gf_, Tnm2_gf_;
   ParGridFunction Tn_gf_, Tn_next_gf_, Text_gf_, resT_gf_;
@@ -188,6 +199,7 @@ class ReactingFlow : public ThermoChemModelBase {
   ParGridFunction CpMix_gf_;
   ParGridFunction Rmix_gf_;
   ParGridFunction Mmix_gf_;
+  ParGridFunction emission_gf_;
 
   ParGridFunction visc_gf_;
   ParGridFunction kappa_gf_;
@@ -203,6 +215,7 @@ class ReactingFlow : public ThermoChemModelBase {
 
   // ParGridFunction *buffer_tInlet_ = nullptr;
   GridFunctionCoefficient *temperature_bc_field_ = nullptr;
+  GridFunctionCoefficient *species_bc_field_ = nullptr;
 
   VectorGridFunctionCoefficient *un_next_coeff_ = nullptr;
   GridFunctionCoefficient *rhon_next_coeff_ = nullptr;
@@ -242,6 +255,21 @@ class ReactingFlow : public ThermoChemModelBase {
   ProductCoefficient *rad_jh_coeff_ = nullptr;
   ProductCoefficient *rad_radiation_sink_coeff_ = nullptr;
   ScalarVectorProductCoefficient *rad_kap_gradT_coeff_ = nullptr;
+
+  VectorMagnitudeCoefficient *umag_coeff_ = nullptr;
+  GridFunctionCoefficient *gscale_coeff_ = nullptr;
+  GridFunctionCoefficient *visc_coeff_ = nullptr;
+  PowerCoefficient *visc_inv_coeff_ = nullptr;
+  ProductCoefficient *reh1_coeff_ = nullptr;
+  ProductCoefficient *reh2_coeff_ = nullptr;
+  ProductCoefficient *Reh_coeff_ = nullptr;
+  TransformedCoefficient *csupg_coeff_ = nullptr;
+  ProductCoefficient *uw1_coeff_ = nullptr;
+  ProductCoefficient *uw2_coeff_ = nullptr;
+  ProductCoefficient *upwind_coeff_ = nullptr;
+  TransformedMatrixVectorCoefficient *swdiff_coeff_ = nullptr;
+  ScalarMatrixProductCoefficient *supg_coeff_ = nullptr;
+  ScalarMatrixProductCoefficient *supg_cp_coeff_ = nullptr;
 
   // operators and solvers
   ParBilinearForm *At_form_ = nullptr;
@@ -303,6 +331,7 @@ class ReactingFlow : public ThermoChemModelBase {
   Vector Xn_;
   Vector resY_;
   Vector prodY_;
+  Vector prodE_;
   Vector hw_;
   Vector CpY_;
   Vector crossDiff_;
@@ -324,9 +353,18 @@ class ReactingFlow : public ThermoChemModelBase {
   Vector YnStar_, spec_buffer_;
   Vector TnStar_, temp_buffer_;
   bool operator_split_ = false;
+  bool implicit_chemistry_ = false;
+  bool explicit_destruction_ = false;
   int nSub_;
   bool dynamic_substepping_ = true;
-  int stabFrac_;
+  double stabFrac_;
+
+  bool implicit_chemistry_verbose_ = false;
+  int implicit_chemistry_maxiter_ = 200;
+  double implicit_chemistry_fd_eps_ = 1e-7;
+  double implicit_chemistry_rtol_ = 1e-8;
+  double implicit_chemistry_atol_ = 1e-12;
+  double implicit_chemistry_smin_ = 1e-12;
 
   // Parameters and objects used in filter-based stabilization
   bool filter_temperature_ = false;
@@ -345,7 +383,8 @@ class ReactingFlow : public ThermoChemModelBase {
   std::vector<std::string> vizSpecNames_;
 
  public:
-  ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff, TPS::Tps *tps);
+  ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff,
+               ParGridFunction *gridScale, TPS::Tps *tps);
   virtual ~ReactingFlow();
 
   // Functions overriden from base class
@@ -363,7 +402,7 @@ class ReactingFlow : public ThermoChemModelBase {
   void updateMixture();
   void updateThermoP();
   void extrapolateState();
-  void updateDensity(double tStep);
+  void updateDensity(double tStep, bool update_mass_matrix = true);
   void updateBC(int current_step);
   void updateDiffusivity();
   void computeSystemMass();
@@ -375,6 +414,32 @@ class ReactingFlow : public ThermoChemModelBase {
   void heatOfFormation();
   void crossDiffusion();
 
+  /**
+   * @brief Evaluate reaction source terms at single point
+   *
+   * Given the mass fractions and temperature at a point, evaluate the
+   * reaction source terms.  This functionality is used in building
+   * the residual needed for nonlinear, implicit thermochemistry
+   * within the operator split paradigm where the local-in-space terms
+   * are split from the convection-diffusion terms.
+   *
+   * The incoming YT must contain the nActiveSpecies_ mass fractions
+   * for the active species and temperature.
+   */
+  void evaluateReactingSource(const double *YT, const int dofindex, double *omega);
+
+  /**
+   * @brief Solve the thermochemistry update
+   *
+   * Given the mass fractions and temperature at a point, the backward
+   * Euler update for the local thermochemistry solve.
+   *
+   * The incoming YT must contain the nActiveSpecies_ mass fractions
+   * for the active species and temperature.  This state is
+   * overwritten with the new local state at the end of the time step.
+   */
+  void solveChemistryStep(double *YT, const int dofindex, const double dt);
+
   // time-splitting
   void substepState();
   void speciesLastSubstep();
@@ -382,8 +447,8 @@ class ReactingFlow : public ThermoChemModelBase {
   void temperatureSubstep(int iSub);
 
   /// for creation of structs to interface with old plasma/chem stuff
-  void identifySpeciesType(Array<ArgonSpcs> &speciesType);
-  void identifyCollisionType(const Array<ArgonSpcs> &speciesType, ArgonColl *collisionIndex);
+  void identifySpeciesType(Array<GasSpcs> &speciesType);
+  void identifyCollisionType(const Array<GasSpcs> &speciesType, GasColl *collisionIndex);
 
   /// Return a pointer to the current temperature ParGridFunction.
   ParGridFunction *GetCurrentTemperature() { return &Tn_gf_; }
@@ -407,8 +472,13 @@ class ReactingFlow : public ThermoChemModelBase {
   void AddTempDirichletBC(const double &temp, Array<int> &attr);
   void AddTempDirichletBC(Coefficient *coeff, Array<int> &attr);
   void AddTempDirichletBC(ScalarFuncT *f, Array<int> &attr);
+
   void AddQtDirichletBC(Coefficient *coeff, Array<int> &attr);
   void AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr);
+
+  void AddSpecDirichletBC(const double &spec, Array<int> &attr);
+  void AddSpecDirichletBC(Coefficient *coeff, Array<int> &attr);
+  void AddSpecDirichletBC(ScalarFuncT *f, Array<int> &attr);
 
   void evalSubstepNumber();
   void readTableWrapper(std::string inputPath, TableInput &result);

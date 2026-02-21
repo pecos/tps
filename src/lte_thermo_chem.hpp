@@ -49,6 +49,7 @@ class Tps;
 #include "table.hpp"
 #include "thermo_chem_base.hpp"
 #include "tps_mfem_wrap.hpp"
+#include "utils.hpp"
 
 using VecFuncT = void(const Vector &x, double t, Vector &u);
 using ScalarFuncT = double(const Vector &x, double t);
@@ -90,6 +91,9 @@ class LteThermoChem final : public ThermoChemModelBase {
   bool numerical_integ_ = false;  /**< Enable/disable numerical integration rules of forms. */
   bool domain_is_open_ = false;   /**< true if domain is open */
   bool axisym_ = false;
+  bool sw_stab_ = false; /**< Enable/disable supg stabilization. */
+  bool filter_restart_ = false;
+  bool qt_filter_ = false; /**< Enable/disable filter in thermal div calc. */
 
   // Linear-solver-related options
   int smoother_poly_order_;
@@ -121,7 +125,7 @@ class LteThermoChem final : public ThermoChemModelBase {
   double hsolve_atol_;
 
   // streamwise-stabilization
-  bool sw_stab_;
+  // bool sw_stab_;
   double re_offset_;
   double re_factor_;
 
@@ -152,6 +156,10 @@ class LteThermoChem final : public ThermoChemModelBase {
 
   double Prt_;
   double invPrt_;
+
+  bool Tclip_ = false;
+  double Tmin_ = 0.0;
+  double Tmax_ = 100000.0;
 
   // FEM related fields and objects
 
@@ -185,6 +193,7 @@ class LteThermoChem final : public ThermoChemModelBase {
   ParGridFunction tmpR0_gf_;
   ParGridFunction tmpR1_gf_;
   ParGridFunction vel_gf_;
+
   ParGridFunction *gridScale_gf_ = nullptr;
 
   // ParGridFunction *buffer_tInlet_ = nullptr;
@@ -218,6 +227,21 @@ class LteThermoChem final : public ThermoChemModelBase {
   ProductCoefficient *rad_jh_coeff_ = nullptr;
   ProductCoefficient *rad_radiation_sink_coeff_ = nullptr;
   ScalarVectorProductCoefficient *rad_kap_gradT_coeff_ = nullptr;
+
+  VectorMagnitudeCoefficient *umag_coeff_ = nullptr;
+  GridFunctionCoefficient *gscale_coeff_ = nullptr;
+  ProductCoefficient *gscale2_coeff_ = nullptr;
+  GridFunctionCoefficient *visc_coeff_ = nullptr;
+  PowerCoefficient *visc_inv_coeff_ = nullptr;
+  ProductCoefficient *reh1_coeff_ = nullptr;
+  ProductCoefficient *reh2_coeff_ = nullptr;
+  ProductCoefficient *Reh_coeff_ = nullptr;
+  TransformedCoefficient *csupg_coeff_ = nullptr;
+  ProductCoefficient *uw1_coeff_ = nullptr;
+  ProductCoefficient *uw2_coeff_ = nullptr;
+  ProductCoefficient *upwind_coeff_ = nullptr;
+  TransformedMatrixVectorCoefficient *swdiff_coeff_ = nullptr;
+  ScalarMatrixProductCoefficient *supg_coeff_ = nullptr;
 
   // operators and solvers
   ParBilinearForm *At_form_ = nullptr;
@@ -299,6 +323,7 @@ class LteThermoChem final : public ThermoChemModelBase {
   // Functions overriden from base class
   void initializeSelf() final;
   void initializeOperators() final;
+  void initializeStats(Averaging &average, IODataOrganizer &io, bool continuation) final;
   void step() final;
   void initializeIO(IODataOrganizer &io) final;
   void initializeViz(ParaViewDataCollection &pvdc) final;

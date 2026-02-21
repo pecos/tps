@@ -613,7 +613,7 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
   // gradient of pressure in normal direction
   double dpdn = mixture->ComputePressureDerivative(normGrad, stateIn, false);
 
-  //std::cout << " ComputeSoS inletBC 1" << endl;
+  // std::cout << " ComputeSoS inletBC 1" << endl;
   const double speedSound = mixture->ComputeSpeedOfSound(meanUp);
 
   double meanK = 0.;
@@ -724,7 +724,7 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
   for (int eq = 0; eq < num_equation_; eq++) boundaryU[eq + bdrN * num_equation_] = newU[eq];
   bdrN++;
 
-  //std::cout << " Eval iBc 1" << endl;
+  // std::cout << " Eval iBc 1" << endl;
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }
 
@@ -754,7 +754,7 @@ void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn,
   // NOTE: If two-temperature, BC for electron temperature is T_e = T_h, where the total pressure is p.
   mixture->modifyEnergyForPressure(state2, state2, p, true);
 
-  //std::cout << " Eval iBc 2" << endl;  
+  // std::cout << " Eval iBc 2" << endl;
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }
 
@@ -765,7 +765,7 @@ void InletBC::subsonicReflectingDensityVelocityFace(Vector &normal, Vector tange
   const double p = mixture->ComputePressure(stateIn);
 
   Vector state2(num_equation_);
-  Vector stateTmp(num_equation_);  
+  Vector stateTmp(num_equation_);
   state2 = stateIn;
 
   // double Rgas = mixture->GetGasConstant();
@@ -822,8 +822,8 @@ void InletBC::subsonicReflectingDensityVelocityFace(Vector &normal, Vector tange
   Vector ruFace;
   ruFace.SetSize(dim_);
   ruFace = 0.0;
-  for (int d = 0; d < dim_; d++) ruFace[d] = state2[d+1];
-  
+  for (int d = 0; d < dim_; d++) ruFace[d] = state2[d + 1];
+
   if (eqSystem == NS_PASSIVE) {
     state2[num_equation_ - 1] = 0.;
   } else if (numActiveSpecies_ > 0) {
@@ -843,21 +843,20 @@ void InletBC::subsonicReflectingDensityVelocityFace(Vector &normal, Vector tange
       M(1, d) = tangent1[d];
       if (dim_ == 3) M(2, d) = tangent2[d];
     }
-    
-    //DenseMatrix invM(dim_, dim_);
-    //mfem::CalcInverse(M, invM);
-    //Vector momN(dim_), momX(dim_);
-    //for (int d = 0; d < dim_; d++) momN[d] = state2[1 + d];
-    //invM.Mult(momN, momX);
-    //for (int d = 0; d < dim_; d++) state2[1 + d] = momX[d];
+
+    // DenseMatrix invM(dim_, dim_);
+    // mfem::CalcInverse(M, invM);
+    // Vector momN(dim_), momX(dim_);
+    // for (int d = 0; d < dim_; d++) momN[d] = state2[1 + d];
+    // invM.Mult(momN, momX);
+    // for (int d = 0; d < dim_; d++) state2[1 + d] = momX[d];
 
     for (int ii = 0; ii < dim_; ii++) {
       for (int jj = 0; jj < dim_; jj++) {
-        ruGlobal[ii] = ruGlobal[ii] + M(jj,ii) * ruFace[jj];
+        ruGlobal[ii] = ruGlobal[ii] + M(jj, ii) * ruFace[jj];
       }
     }
-    for (int d = 0; d < dim_; d++) state2[d+1] = ruGlobal[d];
-    
+    for (int d = 0; d < dim_; d++) state2[d + 1] = ruGlobal[d];
   }
 
   if (eqSystem == NS_PASSIVE) {
@@ -876,16 +875,17 @@ void InletBC::subsonicReflectingDensityVelocityFace(Vector &normal, Vector tange
   for (int eq = 1; eq <= dim_; eq++) tmpU[eq] = 2.0 * state2[eq] - stateIn[eq];
   mixture->modifyEnergyForPressure(tmpU, tmpU, p, true);
 
-  //if (tmpU[4] > 1.0e10) {
-  //  std::cout << " Eval iBc 3, BAD tmpU[4]: " << tmpU[4] << endl;
-  //  std::cout << " stateTmp: " << stateTmp[0] << " " << stateTmp[1] << " "<< stateTmp[2] << " "<< stateTmp[3] << " "<< stateTmp[4] << endl;    
-  //  std::cout << " state2: " << state2[0] << " " << state2[1] << " "<< state2[2] << " "<< state2[3] << " "<< state2[4] << endl;
-  //  std::cout << " stateIn: " << stateIn[0] << " " << stateIn[1] << " "<< stateIn[2] << " "<< stateIn[3] << " "<< stateIn[4] << endl;
-  //  std::cout << " tmpU: " << tmpU[0] << " " << tmpU[1] << " "<< tmpU[2] << " "<< tmpU[3] << " "<< tmpU[4] << endl;    
-  //}
-  
+  // if (tmpU[4] > 1.0e10) {
+  //   std::cout << " Eval iBc 3, BAD tmpU[4]: " << tmpU[4] << endl;
+  //   std::cout << " stateTmp: " << stateTmp[0] << " " << stateTmp[1] << " "<< stateTmp[2] << " "<< stateTmp[3] << "
+  //   "<< stateTmp[4] << endl; std::cout << " state2: " << state2[0] << " " << state2[1] << " "<< state2[2] << " "<<
+  //   state2[3] << " "<< state2[4] << endl; std::cout << " stateIn: " << stateIn[0] << " " << stateIn[1] << " "<<
+  //   stateIn[2] << " "<< stateIn[3] << " "<< stateIn[4] << endl; std::cout << " tmpU: " << tmpU[0] << " " << tmpU[1]
+  //   << " "<< tmpU[2] << " "<< tmpU[3] << " "<< tmpU[4] << endl;
+  // }
+
   rsolver->Eval(stateIn, tmpU, normal, bdrFlux, true);
-  //rsolver->EvalCheck(stateIn[0],stateIn[1],stateIn[2],stateIn[3],stateIn[4],tmpU[0],tmpU[1],tmpU[2],tmpU[3],tmpU[4],normal,bdrFlux,true);      
+  // rsolver->EvalCheck(stateIn[0],stateIn[1],stateIn[2],stateIn[3],stateIn[4],tmpU[0],tmpU[1],tmpU[2],tmpU[3],tmpU[4],normal,bdrFlux,true);
 
   // store primitive in boundaryU for gradient calcs
   Vector iUp(num_equation_);
@@ -900,7 +900,7 @@ void InletBC::integrateInlets_gpu(Vector &y, const Vector &x, const elementIndex
                                   const boundaryFaceIntegrationData &boundary_face_data, Array<int> &listElems,
                                   Array<int> &offsetsBoundaryU) {
 #ifdef _GPU_
-  double *d_y = y.Write();
+  double *d_y = y.ReadWrite();
   const int *d_elem_dofs_list = elem_index_data.dofs_list.Read();
   const int *d_elem_dof_off = elem_index_data.dof_offset.Read();
   const int *d_elem_dof_num = elem_index_data.dof_number.Read();
@@ -1083,7 +1083,7 @@ void InletBC::interpInlet_gpu(const mfem::Vector &x, const elementIndexingData &
       }
 
       // compute flux
-      //std::cout << " Eval_LF inletBC 1" << endl;
+      // std::cout << " Eval_LF inletBC 1" << endl;
       d_rsolver->Eval_LF(u1, u2, nor, Rflux);
 
       if (d_rsolver->isAxisymmetric()) {

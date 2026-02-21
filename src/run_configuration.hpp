@@ -300,7 +300,7 @@ class RunConfiguration {
   DryAirInput dryAirInput;
   PerfectMixtureInput perfectMixtureInput;
   LteMixtureInput lteMixtureInput;
-  ArgonTransportInput argonTransportInput;
+  GasTransportInput gasTransportInput;
   ChemistryInput chemistryInput;
   RadiationInput radiationInput;
 
@@ -318,10 +318,10 @@ class RunConfiguration {
   bool compute_distance;
   bool read_distance;
 
-  // restart flag indicating starting from a Low-Mach solution 
+  // restart flag indicating starting from a Low-Mach solution
   bool restartFromLoMach;
   double restartFromLoMachPressure;
-  double restartFromLoMachRgas;  
+  double restartFromLoMachRgas;
 
   RunConfiguration();
   ~RunConfiguration();

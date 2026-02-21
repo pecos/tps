@@ -65,6 +65,10 @@ CycleAvgJouleCoupling::CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tp
   tps->getInput("cycle-avg-joule-coupled/initial-input-power", initial_input_power_, -1.);
   tps->getInput("cycle-avg-joule-coupled/fixed-conductivity", fixed_conductivity_, false);
 
+  tps->getInput("cycle-avg-joule-coupled/oscillating-power", oscillating_power_, false);
+  tps->getInput("cycle-avg-joule-coupled/input-power-amplitude", power_amplitude_, 0.0);
+  tps->getInput("cycle-avg-joule-coupled/input-power-period", power_period_, 1.0);
+
   if (axisym) {
     qmsa_solver_ = new QuasiMagnetostaticSolverAxiSym(em_opt_, tps);
   } else {
@@ -145,7 +149,7 @@ void CycleAvgJouleCoupling::initializeInterpolationData() {
   ParMesh *em_mesh = qmsa_solver_->getMesh();
   assert(flow_mesh != NULL);
   assert(em_mesh != NULL);
-  
+
   assert(flow_mesh->GetNodes() != NULL);
   if (em_mesh->GetNodes() == NULL) {
     em_mesh->SetCurvature(1, false, -1, 0);
@@ -171,7 +175,7 @@ void CycleAvgJouleCoupling::initializeInterpolationData() {
   for (int i = 0; i < flow_mesh->GetNE(); i++) {
     n_flow_interp_nodes_ += flow_fespace->GetFE(i)->GetNodes().GetNPoints();
   }
-  if (verbose) grvy_printf(ginfo, "Completed em-flow interpolation setup.\n");  
+  if (verbose) grvy_printf(ginfo, "Completed em-flow interpolation setup.\n");
 
 #else
   mfem_error("Cannot initialize interpolation without GSLIB support.");
@@ -451,18 +455,29 @@ void CycleAvgJouleCoupling::solveStep() {
 
     // scale the Joule heating (if we are controlling the power input)
     if (input_power_ > 0) {
-      double ratio;      
+      double target_power = initial_input_power_ + (current_iter_ / solve_em_every_n_ + 1) * delta_power;
+      if (oscillating_power_) {
+        const double tau = ((double)current_iter_) / power_period_;
+        target_power = input_power_ + power_amplitude_ * sin(2 * M_PI * tau);
+        if (rank0_) {
+          grvy_printf(GRVY_INFO, "target_power = %.6e\n", target_power);
+        }
+      }
+
+      double ratio;
       if (initial_input_power_ > -1.0e-8) {
         double target_power = initial_input_power_ + (current_iter_ / solve_em_every_n_ + 1) * delta_power;
         ratio = target_power / tot_jh;
       } else {
         ratio = input_power_ / tot_jh;
       }
+
       qmsa_solver_->scaleJouleHeating(ratio);
-      const double upd_jh = qmsa_solver_->totalJouleHeating();      
+      const double upd_jh = qmsa_solver_->totalJouleHeating();
       if (rank0_) {
+        grvy_printf(GRVY_INFO, "current_iter = %d\n", current_iter_);
         grvy_printf(GRVY_INFO, "The total input Joule heating after scaling = %.6e\n", upd_jh);
-      }            
+      }
     }
 
     // interpolate the Joule heating to the flow mesh

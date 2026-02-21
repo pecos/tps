@@ -186,8 +186,8 @@ MFEM_HOST_DEVICE bool LteMixture::ComputeTemperatureInternal(const double *state
 
   const int niter_max = 20;
   int niter = 0;
-  //printf("------------------------------------\n"); fflush(stdout);
-  //printf("Iter %d: res = %.6e, T = %.6e\n", niter, res, T); fflush(stdout);
+  // printf("------------------------------------\n"); fflush(stdout);
+  // printf("Iter %d: res = %.6e, T = %.6e\n", niter, res, T); fflush(stdout);
 
   // Newton loop
   while (!converged && (niter < niter_max)) {
@@ -200,11 +200,11 @@ MFEM_HOST_DEVICE bool LteMixture::ComputeTemperatureInternal(const double *state
 
     // Newton step
     double dT = res / dedT;
-    T += dT;    
+    T += dT;
     // clip instead? assert(T > 0);
-    //if (T <= 298.0) {
+    // if (T <= 298.0) {
     //  printf("Iter %d: res = %.6e, T = %.6e\n", niter, res, T); fflush(stdout);
-    //  std::cout << state[0] << " " << state[1] << " " << state[2] << " " <<state[3] << " " <<state[4] << endl;      
+    //  std::cout << state[0] << " " << state[1] << " " << state[2] << " " <<state[3] << " " <<state[4] << endl;
     //}
 
     // Update residual
@@ -217,7 +217,7 @@ MFEM_HOST_DEVICE bool LteMixture::ComputeTemperatureInternal(const double *state
     // Declare convergence if residual OR dT is sufficient small
     converged = ((abs(res) < atol) || (abs(res) / res0 < rtol) || (abs(dT) < dT_atol) || (abs(dT) / T < dT_rtol));
     niter++;
-    //printf("Iter %d: res = %.6e, T = %.6e\n", niter, res, T); fflush(stdout);
+    // printf("Iter %d: res = %.6e, T = %.6e\n", niter, res, T); fflush(stdout);
   }
 
   // clip
@@ -225,7 +225,7 @@ MFEM_HOST_DEVICE bool LteMixture::ComputeTemperatureInternal(const double *state
     converged = true;
     T = 298.0;
   }
-  
+
   if (!converged) {
     return false;
   }
@@ -288,7 +288,7 @@ MFEM_HOST_DEVICE double LteMixture::ComputeTemperatureFromDensityPressure(const 
     // Newton step
     double dT = res / dpdT;
     T += dT;
-    //HERE HERE HERE assert(T > 0);
+    // HERE HERE HERE assert(T > 0);
 
     // Update residual
 #ifdef _GPU_
@@ -380,14 +380,14 @@ MFEM_HOST_DEVICE double LteMixture::ComputeSpeedOfSound(const double *Uin, bool 
     T = Uin[1 + nvel_];
   } else {
     // T = ComputeTemperature(Uin);
-    //if (Uin[4] > 1e12) {
+    // if (Uin[4] > 1e12) {
     //  std::cout << "BAD ComputeSoS Uin:" << Uin[4] << endl;
     //}
     const bool success = ComputeTemperatureInternal(Uin, T);
     assert(success);
 
     // HACK HACK HACK
-    //T = 298.15;
+    // T = 298.15;
   }
 #ifdef _GPU_
   return c_table_.eval(T, rho);
@@ -409,7 +409,7 @@ MFEM_HOST_DEVICE double LteMixture::ComputeMaxCharSpeed(const double *state) {
   }
   den_vel2 /= den;
 
-  //std::cout << "ComputeSoS lte_mixture 1" << endl;
+  // std::cout << "ComputeSoS lte_mixture 1" << endl;
   const double sound = ComputeSpeedOfSound(state, false);
   const double vel = sqrt(den_vel2 / den);
 

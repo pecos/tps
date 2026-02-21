@@ -54,9 +54,9 @@ void GasMixture::SetConstantPlasmaConductivity(ParGridFunction *pc, const ParGri
 
   // To a constant
   const int nnode = pc->FESpace()->GetNDofs();
-  //for (int n = 0; n < nnode; n++) {
-  //  plasma_conductivity_gf[n] = const_plasma_conductivity_;
-  //}
+  // for (int n = 0; n < nnode; n++) {
+  //   plasma_conductivity_gf[n] = const_plasma_conductivity_;
+  // }
 
   // You may use the primitive state if you wish
   // const double *UpData = Up->HostRead();
@@ -69,34 +69,34 @@ void GasMixture::SetConstantPlasmaConductivity(ParGridFunction *pc, const ParGri
   // torch cyl radius
   const double rCyl = 0.029;
   if (coords != NULL) {
-    //if(rank0) {std::cout << " ***Setting plasma conductivity for " << nnode << " dofs" << endl;}
+    // if(rank0) {std::cout << " ***Setting plasma conductivity for " << nnode << " dofs" << endl;}
     for (int n = 0; n < nnode; n++) {
-       // FWHM = 2.355*r0, FWTHM = 4.29*r0
-       // radius of ~28.1mm => r0 = 13.1mm for FWTHM @ torch wall
-       const double rsig = 0.005; // 5mm
-       const double ysig = 0.01;       
-       const double y0 = 0.15; // step location
-       const double x = (*coords)[n + 0 * nnode];
-       const double y = (*coords)[n + 1 * nnode];
-       const double z = (*coords)[n + 2 * nnode];
-       double radius = std::sqrt(x*x + z*z);
-       double rwgt, hwgt;
-       rwgt = std::exp(-0.5 * (radius / rsig) * (radius / rsig));
-       hwgt = std::exp(-0.5 * ((y - y0) / ysig) * ((y - y0) / ysig));
-       if (radius >= rCyl) rwgt = 0.0;       
-       plasma_conductivity_gf[n] = const_plasma_conductivity_ * rwgt * hwgt;
-       //plasma_conductivity_gf[n] = 10.0 * const_plasma_conductivity_ * std::exp(-0.5 * (x / r0) * (x / r0));
-       //if (rwgt > 1.0e-3 && hwgt > 1.0e-3) {
-       // std::cout << " + At radius of " << radius << ", height of " << y << ", set sigma to " << plasma_conductivity_gf[n] << " with weights " << rwgt << " & " << hwgt << endl;
-       //}
-       plasma_conductivity_gf[n] = std::max(plasma_conductivity_gf[n],0.0);       
-     }
-   } else {
-     for (int n = 0; n < nnode; n++) {
-       plasma_conductivity_gf[n] = const_plasma_conductivity_;
-     }
-   }
-   
+      // FWHM = 2.355*r0, FWTHM = 4.29*r0
+      // radius of ~28.1mm => r0 = 13.1mm for FWTHM @ torch wall
+      const double rsig = 0.005;  // 5mm
+      const double ysig = 0.01;
+      const double y0 = 0.15;  // step location
+      const double x = (*coords)[n + 0 * nnode];
+      const double y = (*coords)[n + 1 * nnode];
+      const double z = (*coords)[n + 2 * nnode];
+      double radius = std::sqrt(x * x + z * z);
+      double rwgt, hwgt;
+      rwgt = std::exp(-0.5 * (radius / rsig) * (radius / rsig));
+      hwgt = std::exp(-0.5 * ((y - y0) / ysig) * ((y - y0) / ysig));
+      if (radius >= rCyl) rwgt = 0.0;
+      plasma_conductivity_gf[n] = const_plasma_conductivity_ * rwgt * hwgt;
+      // plasma_conductivity_gf[n] = 10.0 * const_plasma_conductivity_ * std::exp(-0.5 * (x / r0) * (x / r0));
+      // if (rwgt > 1.0e-3 && hwgt > 1.0e-3) {
+      //  std::cout << " + At radius of " << radius << ", height of " << y << ", set sigma to " <<
+      //  plasma_conductivity_gf[n] << " with weights " << rwgt << " & " << hwgt << endl;
+      // }
+      plasma_conductivity_gf[n] = std::max(plasma_conductivity_gf[n], 0.0);
+    }
+  } else {
+    for (int n = 0; n < nnode; n++) {
+      plasma_conductivity_gf[n] = const_plasma_conductivity_;
+    }
+  }
 }
 
 void GasMixture::UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up) {
@@ -1386,7 +1386,7 @@ MFEM_HOST_DEVICE double PerfectMixture::ComputeMaxCharSpeed(const double *state)
   }
   den_vel2 /= den;
 
-  std::cout << "EOS CSoS 2" << endl;  
+  std::cout << "EOS CSoS 2" << endl;
   const double sound = ComputeSpeedOfSound(state, false);
   const double vel = sqrt(den_vel2 / den);
 

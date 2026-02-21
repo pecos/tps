@@ -7,11 +7,12 @@ RUNFILE="inputs/coupled-3d.ini"
 setup() {
     SOLN_FILE=restart_output-coupled-3d.sol.h5
     REF_FILE=ref_solns/coupled-3d.sol.h5
+    MPIRUN=`./sniff_mpirun.sh`
 }
 
 @test "[$TEST] verify tps runs in cylce-avg-joule-coupling mode (3D)" {
     test -s $RUNFILE
-    mpirun -np 2 ../src/tps --runFile $RUNFILE
+    $MPIRUN -n 2 ../src/tps --runFile $RUNFILE
 
     test -s $SOLN_FILE
     test -s $REF_FILE

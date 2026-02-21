@@ -125,10 +125,15 @@ void LoMachSolver::initialize() {
   // local pointers
   serial_mesh_ = meshData_->getSerialMesh();
   pmesh_ = meshData_->getMesh();
+
+  if (pmesh_->GetNodes() == NULL) {
+    pmesh_->SetCurvature(1);
+  }
+
   partitioning_ = meshData_->getPartition();
 
-  //fec_ = meshData_->getFec();
-  //fes_ = meshData_->getFes();    
+  // fec_ = meshData_->getFec();
+  // fes_ = meshData_->getFes();
 
   // Stash mesh dimension (convenience)
   dim_ = serial_mesh_->Dimension();
@@ -174,9 +179,9 @@ void LoMachSolver::initialize() {
     thermo_ =
         new CaloricallyPerfectThermoChem(pmesh_, &loMach_opts_, temporal_coeff_, (meshData_->getGridScale()), tpsP_);
   } else if (loMach_opts_.thermo_solver == "lte-thermo-chem") {
-    thermo_ = new LteThermoChem(pmesh_, &loMach_opts_, temporal_coeff_, (meshData_->getGridScale()), tpsP_);
+    thermo_ = new LteThermoChem(pmesh_, &loMach_opts_, temporal_coeff_, meshData_->getGridScale(), tpsP_);
   } else if (loMach_opts_.thermo_solver == "reacting-flow") {
-    thermo_ = new ReactingFlow(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_);
+    thermo_ = new ReactingFlow(pmesh_, &loMach_opts_, temporal_coeff_, (meshData_->getGridScale()), tpsP_);
   } else {
     // Unknown choice... die
     if (rank0_) {
@@ -188,7 +193,7 @@ void LoMachSolver::initialize() {
   // Instantiate flow solver
   if (loMach_opts_.flow_solver == "zero-flow") {
     // No flow---set u = 0.  Primarily useful for testing thermochem models in isolation
-    flow_ = new ZeroFlow(pmesh_, 1);
+    flow_ = new ZeroFlow(pmesh_, 1, tpsP_);
   } else if (loMach_opts_.flow_solver == "tomboulides") {
     // Tomboulides flow solver
     flow_ = new Tomboulides(pmesh_, loMach_opts_.order, loMach_opts_.order, temporal_coeff_,
@@ -240,14 +245,14 @@ void LoMachSolver::initialize() {
   extData_->setup();
   flow_->initializeFromExtData(&extData_->toFlow_interface_);
   thermo_->initializeFromExtData(&extData_->toThermoChem_interface_);
-  if(rank0_) std::cout << "External data section complete." << endl;
+  if (rank0_) std::cout << "External data section complete." << endl;
 
   // Initialize model-owned data
   sponge_->initializeSelf();
   turbModel_->initializeSelf();
   flow_->initializeSelf();
   thermo_->initializeSelf();
-  if(rank0_) std::cout << "Initialize self section complete." << endl;
+  if (rank0_) std::cout << "Initialize self section complete." << endl;
 
   // Exchange interface information
   turbModel_->initializeFromThermoChem(&thermo_->toTurbModel_interface_);
@@ -258,17 +263,17 @@ void LoMachSolver::initialize() {
   thermo_->initializeFromFlow(&flow_->toThermoChem_interface_);
   flow_->initializeFromSponge(&sponge_->toFlow_interface_);
   thermo_->initializeFromSponge(&sponge_->toThermoChem_interface_);
-  if(rank0_) std::cout << "Exchange section complete."  << endl;
+  if (rank0_) std::cout << "Exchange section complete." << endl;
 
   // Initialize restart read/write capability
   flow_->initializeIO(ioData);
   thermo_->initializeIO(ioData);
-  if(rank0_) std::cout << "I/O section complete."  << endl;
+  if (rank0_) std::cout << "I/O section complete." << endl;
 
   // Initialize statistics
   flow_->initializeStats(*average_, ioData, average_->ContinueMean());
   thermo_->initializeStats(*average_, ioData, average_->ContinueMean());
-  if(rank0_) std::cout << "Statistics section complete."  << endl;
+  if (rank0_) std::cout << "Statistics section complete." << endl;
 
   const bool restart_serial =
       (loMach_opts_.io_opts_.restart_serial_read_ || loMach_opts_.io_opts_.restart_serial_write_);
@@ -285,17 +290,17 @@ void LoMachSolver::initialize() {
 
   // static sponge
   sponge_->setup();
-  if(rank0_) std::cout << "Sponge section complete."  << endl;
+  if (rank0_) std::cout << "Sponge section complete." << endl;
 
   // Finish initializing operators
   flow_->initializeOperators();
-  if(rank0_) std::cout << "Operators (flow) section complete."  << endl;    
+  if (rank0_) std::cout << "Operators (flow) section complete." << endl;
   turbModel_->setup();
-  if(rank0_) std::cout << "Operators (turbModel) setup complete."  << endl;    
+  if (rank0_) std::cout << "Operators (turbModel) setup complete." << endl;
   turbModel_->initializeOperators();
-  if(rank0_) std::cout << "Operators (turbModel) section complete."  << endl;  
+  if (rank0_) std::cout << "Operators (turbModel) section complete." << endl;
   thermo_->initializeOperators();
-  if(rank0_) std::cout << "Operators section complete."  << endl;  
+  if (rank0_) std::cout << "Operators section complete." << endl;
 
   // Initialize visualization
   pvdc_ = new ParaViewDataCollection(loMach_opts_.io_opts_.output_dir_, pmesh_);
@@ -310,11 +315,10 @@ void LoMachSolver::initialize() {
   sponge_->initializeViz(*pvdc_);
   extData_->initializeViz(*pvdc_);
   average_->initializeViz();
-  if(rank0_) std::cout << "Viz section complete."  << endl;
+  if (rank0_) std::cout << "Viz section complete." << endl;
 
   sw_setup_.Stop();
-  if(rank0_) std::cout << "All initialization completed!" << endl;
-  
+  if (rank0_) std::cout << "All initialization completed!" << endl;
 }
 
 void LoMachSolver::UpdateTimestepHistory(double dt) {
@@ -524,6 +528,8 @@ void LoMachSolver::solveEnd() {
     if (rank0_) std::cout << "At time = " << temporal_coeff_.time << ", flow L2 error = " << flow_err << std::endl;
   }
 
+  restart_files_hdf5("write");
+
   // paraview
   pvdc_->SetCycle(iter);
   pvdc_->SetTime(temporal_coeff_.time);
@@ -702,8 +708,8 @@ void LoMachSolver::SetTimeIntegrationCoefficients(int step) {
     temporal_coeff_.bd1 = -(1.0 + rho1);
     temporal_coeff_.bd2 = pow(rho1, 2.0) / (1.0 + rho1);
     temporal_coeff_.bd3 = 0.0;
-    temporal_coeff_.ab1 = (1.0 + rho1); // * 1.5/2.0;
-    temporal_coeff_.ab2 = -rho1; // * 0.5;
+    temporal_coeff_.ab1 = (1.0 + rho1);  // * 1.5/2.0;
+    temporal_coeff_.ab2 = -rho1;         // * 0.5;
     temporal_coeff_.ab3 = 0.0;
   } else if (step >= 2 && bdf_order == 3) {
     temporal_coeff_.bd0 = 1.0 + rho1 / (1.0 + rho1) + (rho2 * rho1) / (1.0 + rho2 * (1 + rho1));
@@ -711,16 +717,15 @@ void LoMachSolver::SetTimeIntegrationCoefficients(int step) {
     temporal_coeff_.bd2 = pow(rho1, 2.0) * (rho2 + 1.0 / (1.0 + rho1));
     temporal_coeff_.bd3 =
         -(pow(rho2, 3.0) * pow(rho1, 2.0) * (1.0 + rho1)) / ((1.0 + rho2) * (1.0 + rho2 + rho2 * rho1));
-    temporal_coeff_.ab1 = ((1.0 + rho1) * (1.0 + rho2 * (1.0 + rho1))) / (1.0 + rho2); // () * (5.0/2.0) / 3.0
-    temporal_coeff_.ab2 = -rho1 * (1.0 + rho2 * (1.0 + rho1)); // () * 2.0 / 3.0
-    temporal_coeff_.ab3 = (pow(rho2, 2.0) * rho1 * (1.0 + rho1)) / (1.0 + rho2); // () * 0.5
+    temporal_coeff_.ab1 = ((1.0 + rho1) * (1.0 + rho2 * (1.0 + rho1))) / (1.0 + rho2);  // () * (5.0/2.0) / 3.0
+    temporal_coeff_.ab2 = -rho1 * (1.0 + rho2 * (1.0 + rho1));                          // () * 2.0 / 3.0
+    temporal_coeff_.ab3 = (pow(rho2, 2.0) * rho1 * (1.0 + rho1)) / (1.0 + rho2);        // () * 0.5
   }
 
-  //temporal_coeff_.akima = false;
-  //if (step >= 5) {
-  //  temporal_coeff_.akima = true;    
-  //}
-  
+  // temporal_coeff_.akima = false;
+  // if (step >= 5) {
+  //   temporal_coeff_.akima = true;
+  // }
 }
 
 // query solver-specific runtime controls
@@ -783,6 +788,9 @@ void LoMachSolver::parseSolverOptions() {
 
   // compute wall distance
   tpsP_->getInput("loMach/computeWallDistance", loMach_opts_.compute_wallDistance, false);
+
+  // check for species
+  tpsP_->getInput("plasma_models/species_number", loMach_opts_.nSpec, 0);
 
   // add all models here which require wall dist, eg: SA, k-e, etc...
   if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::ALGEBRAIC_RANS) {

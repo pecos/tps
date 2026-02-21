@@ -42,8 +42,8 @@ AC_DEFUN([AX_HIP_CHECK],[
         fi
         CC=hipcc
         CXX=hipcc
-        HIP_CXXFLAGS="-I$MPI_DIR/include"
-        HIP_LDFLAGS="-L$MPI_DIR/lib -lmpi"
+        HIP_CXXFLAGS="-I$MPI_DIR/include -fPIC -fgpu-rdc"
+        HIP_LDFLAGS="-fgpu-rdc -L$MPI_DIR/lib -lmpi"
 
         ENABLE_GPU=yes
         ENABLE_HIP=yes

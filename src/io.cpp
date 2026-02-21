@@ -112,14 +112,14 @@ void M2ulPhyS::read_restart_files_hdf5(hid_t file, bool serialized_read) {
   // -------------------------------------------------------------------
   // Attributes - read relevant solution metadata for this Solver
   // -------------------------------------------------------------------
-  //if (rank0_) std::cout << " meta data read for file " << file << endl;
-  
+  // if (rank0_) std::cout << " meta data read for file " << file << endl;
+
   if (rank0_ || !serialized_read) {
     h5_read_attribute(file, "iteration", iter);
     h5_read_attribute(file, "time", time);
     h5_read_attribute(file, "dt", dt);
     h5_read_attribute(file, "order", read_order);
-    //if (rank0_) std::cout << " ...basic meta data success!" << endl;    
+    // if (rank0_) std::cout << " ...basic meta data success!" << endl;
     if (average->ComputeMean() && config.GetRestartMean()) {
       int samplesMean, samplesRMS, intervals;
       h5_read_attribute(file, "samplesMean", samplesMean);
@@ -171,7 +171,7 @@ void M2ulPhyS::read_restart_files_hdf5(hid_t file, bool serialized_read) {
   // -------------------------------------------------------------------
   // Data - actual data read handled by IODataOrganizer class
   // -------------------------------------------------------------------
-  if (rank0_) std::cout << " ...attempting actual data read for file" << file << endl;  
+  if (rank0_) std::cout << " ...attempting actual data read for file" << file << endl;
   ioData.read(file, serialized_read, read_order);
 
   if (loadFromAuxSol) {
@@ -201,8 +201,8 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
   grvy_timer_begin(__func__);
 #endif
 
-  //if (rank0_) cout << "...in io:restart_files_hdf5" << endl;
-  
+  // if (rank0_) cout << "...in io:restart_files_hdf5" << endl;
+
   string serialName;
   if (inputFileName.length() > 0) {
     if (inputFileName.substr(inputFileName.length() - 3) != ".h5") {
@@ -242,9 +242,8 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
         assert(file >= 0);
       }
     } else {
-
       if (rank0_) cout << "...verifying all files" << endl;
-      
+
       // verify we have all desired files and open on each process
       int gstatus;
       int status = static_cast<int>(file_exists(fileName));
@@ -258,7 +257,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
       if (rank0_) cout << "...calling H5Fopen for " << fileName.c_str() << endl;
       file = H5Fopen(fileName.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
       assert(file >= 0);
-      if (rank0_) cout << "...success! " << fileName.c_str() << endl;      
+      if (rank0_) cout << "...success! " << fileName.c_str() << endl;
     }
   }
 
@@ -269,7 +268,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
   if (mode == "write") {
     write_restart_files_hdf5(file, config.isRestartSerialized(mode));
   } else {  // read
-    if (rank0_) cout << "...calling read_restart_files_hdf5" << endl;    
+    if (rank0_) cout << "...calling read_restart_files_hdf5" << endl;
     read_restart_files_hdf5(file, config.isRestartSerialized(mode));
   }
 
@@ -398,17 +397,16 @@ void partitioning_file_hdf5(std::string mode, MPI_Groups *groupsMPI, int nelemGl
 
 // convenience function to check size of variable in hdf5 file
 hsize_t get_variable_size_hdf5(hid_t file, std::string name) {
-
   // these checks dont work
-  //int exists = H5Lexists(file, name.c_str(), H5P_DEFAULT);
-  //int exists = H5Aexists(file, name.c_str());
+  // int exists = H5Lexists(file, name.c_str(), H5P_DEFAULT);
+  // int exists = H5Aexists(file, name.c_str());
   hsize_t numInSoln;
-  
-  //if(exists) {
-  //std::cout << "Good: " << name.c_str() << endl;
-    hid_t data_soln = H5Dopen2(file, name.c_str(), H5P_DEFAULT);
-    //assert(data_soln >= 0);
- if (data_soln >= 0) {
+
+  // if(exists) {
+  // std::cout << "Good: " << name.c_str() << endl;
+  hid_t data_soln = H5Dopen2(file, name.c_str(), H5P_DEFAULT);
+  // assert(data_soln >= 0);
+  if (data_soln >= 0) {
     hid_t dataspace;
     dataspace = H5Dget_space(data_soln);
     numInSoln = H5Sget_simple_extent_npoints(dataspace);
@@ -416,7 +414,7 @@ hsize_t get_variable_size_hdf5(hid_t file, std::string name) {
   } else {
     numInSoln = 0;
   }
-  
+
   return numInSoln;
 }
 
@@ -432,7 +430,7 @@ void read_variable_data_hdf5(hid_t file, string varName, size_t index, double *d
     assert(status >= 0);
     H5Dclose(data_soln);
   } else {
-    if (rank0) std::cout << "WARNING: data " << varName.c_str() << " not found in restart file" << endl;    
+    if (rank0) std::cout << "WARNING: data " << varName.c_str() << " not found in restart file" << endl;
   }
 }
 
@@ -649,32 +647,81 @@ void IOFamily::serializeForWrite() {
       this->serial_sol_->SetSubVector(gvdofs, lsoln);
     }
 
-    // have rank 0 receive data from other tasks and copy its own
+    // have rank 0 receive data from other tasks
+    // each rank sends one vector, so must figure out how much data to expect, receive it, and then unpack
+
+    // First, count how many values each rank will send
+    const int nprocs = pfunc_->ParFESpace()->GetNRanks();
+    std::vector<int> nvar(nprocs);
+    for (int irank = 0; irank < nprocs; irank++) nvar[irank] = 0;
+
     for (int gelem = 0; gelem < global_ne_; gelem++) {
       int from_rank = partitioning[gelem];
       if (from_rank != 0) {
         this->serial_fes_->GetElementVDofs(gelem, gvdofs);
-        lsoln.SetSize(gvdofs.Size());
-
-        MPI_Recv(lsoln.HostReadWrite(), gvdofs.Size(), MPI_DOUBLE, from_rank, gelem, comm, MPI_STATUS_IGNORE);
-
-        this->serial_sol_->SetSubVector(gvdofs, lsoln);
+        nvar[from_rank] += gvdofs.Size();
       }
     }
 
+    // Second, receive the messages
+    Vector *soln = new Vector[nprocs];
+    for (int irank = 1; irank < nprocs; irank++) {
+      soln[irank].SetSize(nvar[irank]);
+      MPI_Recv(soln[irank].HostReadWrite(), nvar[irank], MPI_DOUBLE, irank, 0, comm, MPI_STATUS_IGNORE);
+    }
+
+    // Finally, extract data
+    for (int irank = 0; irank < nprocs; irank++) nvar[irank] = 0;
+
+    for (int gelem = 0; gelem < global_ne_; gelem++) {
+      int from_rank = partitioning[gelem];
+      if (from_rank != 0) {
+        const double *d_soln = soln[from_rank].HostRead();
+
+        this->serial_fes_->GetElementVDofs(gelem, gvdofs);
+        lsoln.SetSize(gvdofs.Size());
+        double *d_lsoln = lsoln.HostWrite();
+
+        for (int i = 0; i < lsoln.Size(); i++) {
+          d_lsoln[i] = d_soln[nvar[from_rank] + i];
+        }
+
+        this->serial_sol_->SetSubVector(gvdofs, lsoln);
+        nvar[from_rank] += gvdofs.Size();
+      }
+    }
   } else {
     // have non-zero ranks send their data to rank 0
+    // each rank concatenates its data into a single send
+
+    // First, count number of variables to send from this rank so that
+    // we can size the send buffer
     Array<int> lvdofs;
     Vector lsoln;
+
+    int nvar = 0;
     for (int elem = 0; elem < local_ne_; elem++) {
-      int gelem = locToGlobElem[elem];
-      //       assert(gelem > 0);
       this->pfunc_->ParFESpace()->GetElementVDofs(elem, lvdofs);
       pfunc->GetSubVector(lvdofs, lsoln);  // work for gpu build?
-
-      // send to task 0
-      MPI_Send(lsoln.HostReadWrite(), lsoln.Size(), MPI_DOUBLE, 0, gelem, comm);
+      nvar += lsoln.Size();
     }
+
+    // Second, fill the send buffer
+    Vector send_buffer(nvar);
+    double *h_send_buffer = send_buffer.HostWrite();
+    int n = 0;
+    for (int elem = 0; elem < local_ne_; elem++) {
+      this->pfunc_->ParFESpace()->GetElementVDofs(elem, lvdofs);
+      pfunc->GetSubVector(lvdofs, lsoln);  // work for gpu build?
+      const double *h_lsoln = lsoln.HostRead();
+      for (int i = 0; i < lsoln.Size(); i++) {
+        h_send_buffer[n + i] = h_lsoln[i];
+      }
+      n += lsoln.Size();
+    }
+
+    // Finally, send
+    MPI_Send(send_buffer.HostReadWrite(), send_buffer.Size(), MPI_DOUBLE, 0, 0, comm);
   }
 }
 
@@ -736,15 +783,13 @@ void IOFamily::writeSerial(hid_t file) {
   }
 }
 
-void IOFamily::readPartitioned(hid_t file) {  
-  
+void IOFamily::readPartitioned(hid_t file) {
   // Ensure that size of read matches expectations
   std::string varGroupName = group_ + "/" + vars_[0].varName_;
   const hsize_t numInSoln = get_variable_size_hdf5(file, varGroupName);
-  //assert((int)numInSoln == local_ndofs_);
+  // assert((int)numInSoln == local_ndofs_);
 
   if ((int)numInSoln == local_ndofs_) {
-
     // get pointer to raw data
     double *data = pfunc_->HostWrite();
 
@@ -754,11 +799,11 @@ void IOFamily::readPartitioned(hid_t file) {
         std::string h5Path = group_ + "/" + var.varName_;
         if (rank0_) grvy_printf(ginfo, "--> Reading h5 path = %s\n", h5Path.c_str());
         read_variable_data_hdf5(file, h5Path.c_str(), var.index_ * numInSoln, data, rank0_);
-      }    
+      }
     }
 
   } else {
-    for (auto var : vars_) {    
+    for (auto var : vars_) {
       if (rank0_) grvy_printf(ginfo, "--> Skipping = %s\n", var.varName_.c_str());
     }
   }
@@ -911,7 +956,6 @@ void IODataOrganizer::write(hid_t file, bool serial) {
       nprocs_max = nprocs_tmp;
     }
   }
-  assert(nprocs_max > 0);
 
   // Do we need to serialize the data prior to the write?
   const bool require_serialization = (serial && nprocs_max > 1);
@@ -920,6 +964,8 @@ void IODataOrganizer::write(hid_t file, bool serial) {
   for (auto fam : families_) {
     const int rank = fam.pfunc_->ParFESpace()->GetMyRank();
     const bool rank0 = (rank == 0);
+
+    assert(nprocs_max > 0);
 
     if (rank0) {
       grvy_printf(ginfo, "\nCreating HDF5 group for defined IO families\n");
@@ -953,7 +999,7 @@ void IODataOrganizer::read(hid_t file, bool serial, int read_order) {
 
   // Loop over defined IO families to load desired input
   for (auto fam : families_) {
-    //std::cout << "...checking if fam is in restart file" << endl;    
+    // std::cout << "...checking if fam is in restart file" << endl;
     if (fam.inRestartFile_) {  // read mode
       const int rank = fam.pfunc_->ParFESpace()->GetMyRank();
       const bool rank0 = (rank == 0);
@@ -966,7 +1012,7 @@ void IODataOrganizer::read(hid_t file, bool serial, int read_order) {
         assert(!fam.pfunc_->ParFESpace()->IsVariableOrder());
         fam_order = fam.pfunc_->ParFESpace()->FEColl()->GetOrder();
         change_order = (fam_order != read_order);
-        if (rank0 && change_order) std::cout << "Going from " << read_order << " to " << fam_order << endl;	
+        if (rank0 && change_order) std::cout << "Going from " << read_order << " to " << fam_order << endl;
       }
 
       // Read handled by appropriate method from IOFamily
@@ -980,12 +1026,12 @@ void IODataOrganizer::read(hid_t file, bool serial, int read_order) {
         if (serial && nprocs_max > 1) {
           fam.readSerial(file);
         } else {
-          if (rank0) cout << "...attempting readParititioned(file)" << endl;	  
+          if (rank0) cout << "...attempting readParititioned(file)" << endl;
           fam.readPartitioned(file);
         }
       }
-    } // end of if family name in restart file
-  } // end of all registered families loop
+    }  // end of if family name in restart file
+  }  // end of all registered families loop
 }
 
 IODataOrganizer::~IODataOrganizer() {

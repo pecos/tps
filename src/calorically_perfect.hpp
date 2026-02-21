@@ -48,6 +48,7 @@ class Tps;
 #include "io.hpp"
 #include "thermo_chem_base.hpp"
 #include "tps_mfem_wrap.hpp"
+#include "utils.hpp"
 
 using VecFuncT = void(const Vector &x, double t, Vector &u);
 using ScalarFuncT = double(const Vector &x, double t);
@@ -112,7 +113,7 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   double hsolve_atol_;
 
   // streamwise-stabilization
-  bool sw_stab_;
+  // bool sw_stab_;
   double re_offset_;
   double re_factor_;
 
@@ -142,6 +143,9 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   // Initial temperature value (if constant IC)
   double T_ic_;
 
+  // streamwise-stabilization
+  bool sw_stab_;
+
   // FEM related fields and objects
 
   // Scalar \f$H^1\f$ finite element collection.
@@ -168,6 +172,7 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   ParGridFunction tmpR0_gf_;
   ParGridFunction tmpR1_gf_;
   ParGridFunction vel_gf_;
+
   ParGridFunction *gridScale_gf_ = nullptr;
 
   // ParGridFunction *buffer_tInlet_ = nullptr;
@@ -185,6 +190,20 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   ScalarVectorProductCoefficient *kap_gradT_coeff_ = nullptr;
   GridFunctionCoefficient *rho_over_dt_coeff_ = nullptr;
   GridFunctionCoefficient *rho_coeff_ = nullptr;
+
+  VectorMagnitudeCoefficient *umag_coeff_ = nullptr;
+  GridFunctionCoefficient *gscale_coeff_ = nullptr;
+  GridFunctionCoefficient *visc_coeff_ = nullptr;
+  PowerCoefficient *visc_inv_coeff_ = nullptr;
+  ProductCoefficient *reh1_coeff_ = nullptr;
+  ProductCoefficient *reh2_coeff_ = nullptr;
+  ProductCoefficient *Reh_coeff_ = nullptr;
+  TransformedCoefficient *csupg_coeff_ = nullptr;
+  ProductCoefficient *uw1_coeff_ = nullptr;
+  ProductCoefficient *uw2_coeff_ = nullptr;
+  ProductCoefficient *upwind_coeff_ = nullptr;
+  TransformedMatrixVectorCoefficient *swdiff_coeff_ = nullptr;
+  ScalarMatrixProductCoefficient *supg_coeff_ = nullptr;
 
   // operators and solvers
   ParBilinearForm *At_form_ = nullptr;

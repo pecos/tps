@@ -49,7 +49,7 @@ FaceIntegrator::FaceIntegrator(IntegrationRules *_intRules, RiemannSolverTPS *rs
       intRules(_intRules),
       useLinear(_useLinear),
       axisymmetric_(axisym),
-      rank_(rank){
+      rank_(rank) {
   assert(!useLinear);
   totDofs = vfes->GetNDofs();
 }
@@ -283,14 +283,14 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
   for (int i = 0; i < ir->GetNPoints(); i++) {
     const IntegrationPoint &ip = ir->IntPoint(i);
 
-    // set face and element int. points    
-    Tr.SetAllIntPoints(&ip);  
+    // set face and element int. points
+    Tr.SetAllIntPoints(&ip);
 
-    // x-y-z coordinates of int pts    
+    // x-y-z coordinates of int pts
     double x[3];
     Vector transip(x, 3);
-    Tr.Transform(ip, transip);  
-    
+    Tr.Transform(ip, transip);
+
     // Calculate basis functions on both elements at the face
     el1.CalcShape(Tr.GetElement1IntPoint(), shape1);
     el2.CalcShape(Tr.GetElement2IntPoint(), shape2);
@@ -298,7 +298,7 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
     // Interpolate elfun at the point
     elfun1_mat.MultTranspose(shape1, funval1);
     elfun2_mat.MultTranspose(shape2, funval2);
-    
+
     // TODO(malamast): We force negative (unphysical) values of species that occur due to interpolation error to be
     // zero.
     for (int sp = 0; sp < numActiveSpecies; sp++) {
@@ -330,9 +330,9 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
     CalcOrtho(Tr.Jacobian(), nor);
     rsolver->Eval(funval1, funval2, nor, fluxN);
 
-    //double x[3];
-    //Vector transip(x, 3);
-    //Tr.Transform(ip, transip);
+    // double x[3];
+    // Vector transip(x, 3);
+    // Tr.Transform(ip, transip);
 
     // compute viscous fluxes
     viscF1 = viscF2 = 0.;

@@ -69,13 +69,16 @@ int main (int argc, char *argv[])
   double pressure = 101325.0;
 
   PerfectMixture *mixture = new PerfectMixture(srcConfig, dim, dim);
+
+  srcConfig.gasTransportInput.constantActive = false;
+
   TransportProperties *transport;
   switch (srcConfig.GetTranportModel()) {
     case ARGON_MINIMAL:
-      transport = new ArgonMinimalTransport(mixture, srcConfig);
+      transport = new GasMinimalTransport(mixture, srcConfig);
       break;
     case ARGON_MIXTURE:
-      transport = new ArgonMixtureTransport(mixture, srcConfig);
+      transport = new GasMixtureTransport(mixture, srcConfig);
       break;
     default:
       printf("test_argon_minimal only supports argon transport models.\n"); fflush(stdout);
@@ -96,6 +99,7 @@ int main (int argc, char *argv[])
   DenseMatrix refValues;
   Array<int> dims1 = readTable(fileName, datasetName, refValues);
   grvy_printf(GRVY_INFO, "\n T\t Viscosity \t Thermal cond. (H) \t Thermal cond. (E) \t Ion. degree \n");
+  std::cout << "Reference data:" << std::endl;
   for (int i = 0; i < dims1[0]; i++) {
     for (int j = 0; j < dims1[1]; j++) {
       std::cout << refValues(i,j) << ",\t";
@@ -188,9 +192,9 @@ int main (int argc, char *argv[])
     }
 
     // Check if the artificial multipliers are applied correctly.
-    if (srcConfig.argonTransportInput.multiply) {
+    if (srcConfig.gasTransportInput.multiply) {
       for (int t = 0; t < FluxTrns::NUM_FLUX_TRANS; t++)
-        transportBuffer[t] /= srcConfig.argonTransportInput.fluxTrnsMultiplier[t];
+        transportBuffer[t] /= srcConfig.gasTransportInput.fluxTrnsMultiplier[t];
     }
 
     // error = max(error, abs(refValues(i,1) - transportBuffer[FluxTrns::VISCOSITY]) / refValues(i,1));
@@ -209,15 +213,19 @@ int main (int argc, char *argv[])
     if (i < 4) {
       error(2) = abs(refValues(i,3) - transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY]);
       if (error(2) > absErrorThreshold(2)) {
-        grvy_printf(GRVY_ERROR, "\n Heavy-species thermal conductivity deviates from the reference value.");
-        grvy_printf(GRVY_ERROR, "\n Absolute Error: %.15E", error(1));
+        grvy_printf(GRVY_ERROR, "\n Electron thermal conductivity deviates from the reference value.");
+        grvy_printf(GRVY_ERROR, "\n Computed = %.15E, Expected = %.15E", transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY],
+                    refValues(i,3));
+        grvy_printf(GRVY_ERROR, "\n Absolute Error: %.15E", error(2));
         exit(ERROR);
       }
     } else {
       error(2) = abs(refValues(i,3) - transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY]) / refValues(i,3);
       if (error(2) > relErrorThreshold(2)) {
-        grvy_printf(GRVY_ERROR, "\n Heavy-species thermal conductivity deviates from the reference value.");
-        grvy_printf(GRVY_ERROR, "\n Relative Error: %.15E", error(1));
+        grvy_printf(GRVY_ERROR, "\n Electron thermal conductivity deviates from the reference value.");
+        grvy_printf(GRVY_ERROR, "\n Computed = %.15E, Expected = %.15E", transportBuffer[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY],
+                    refValues(i,3));
+        grvy_printf(GRVY_ERROR, "\n Relative Error: %.15E", error(2));
         exit(ERROR);
       }
     }

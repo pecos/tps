@@ -159,10 +159,12 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
       Te = Th;
     }
 
-    double progressRates[gpudata::MAXREACTIONS], creationRates[gpudata::MAXSPECIES];
+    double progressRates[gpudata::MAXREACTIONS];
+    double creationRates[gpudata::MAXSPECIES];
+    double emissionRates[gpudata::MAXSPECIES];
     if (_numSpecies > 1 && _numReactions > 0) {
       double kfwd[gpudata::MAXREACTIONS], kC[gpudata::MAXREACTIONS];
-      _chemistry->computeForwardRateCoeffs(Th, Te, n, kfwd);
+      _chemistry->computeForwardRateCoeffs(ns, Th, Te, n, kfwd);
       _chemistry->computeEquilibriumConstants(Th, Te, kC);
 
       // get reaction rates
@@ -170,7 +172,7 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
       for (int sp = 0; sp < _numSpecies; sp++) creationRates[sp] = 0.0;
 
       _chemistry->computeProgressRate(ns, kfwd, kC, progressRates);
-      _chemistry->computeCreationRate(progressRates, creationRates);
+      _chemistry->computeCreationRate(progressRates, creationRates, emissionRates);
 
       // add species creation rates
       for (int sp = 0; sp < _numActiveSpecies; sp++) {
@@ -183,7 +185,7 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
       if (_mixture->IsAmbipolar()) {  // diffusion current using electric conductivity.
         // const double mho = globalTransport(SrcTrns::ELECTRIC_CONDUCTIVITY);
         // Jd = mho * Efield
-	/// HACK HACK HACK        if (h_pc != NULL) h_pc[n] = globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY];
+        /// HACK HACK HACK        if (h_pc != NULL) h_pc[n] = globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY];
 
       } else {  // diffusion current by definition.
         for (int sp = 0; sp < _numSpecies; sp++) {

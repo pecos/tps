@@ -91,7 +91,7 @@ struct temporalSchemeCoefficients {
   double dt2;
   double dt3;
   double dt4;
-  double dt5;  
+  double dt5;
 
   // "Adams-Bashforth" coefficients (explicit)
   double ab1;
@@ -105,8 +105,7 @@ struct temporalSchemeCoefficients {
   double bd3;
 
   // Akima-spline flag
-  //bool akima;
-  
+  // bool akima;
 };
 
 /**
@@ -170,9 +169,9 @@ class LoMachSolver : public TPS::PlasmaSolver {
   /// Scalar \f$H^1\f$ finite element space.
   ParFiniteElementSpace *sfes_ = nullptr;
 
-  //mfem::FiniteElementCollection *fec_ = nullptr;
-  //mfem::ParFiniteElementSpace *fes_ = nullptr;
-  
+  // mfem::FiniteElementCollection *fec_ = nullptr;
+  // mfem::ParFiniteElementSpace *fes_ = nullptr;
+
   /*
   Vector gridScaleSml;
   Vector gridScaleXSml;

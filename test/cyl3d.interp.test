@@ -19,13 +19,7 @@ setup() {
     RUNFILE_INTERP0="inputs/input.refine0.cyl.ini"
 #    RUNFILE_INTERP1="inputs/input.refine1.cyl"
 
-    # defaut to mpirun if available
-    MPIRUN=$(type -P mpirun) || found=0
-
-    # if not, try flux
-    if [ $found -eq 0 ]; then
-        type -P flux && MPIRUN="$(type -P flux) run" || found=0
-    fi
+    MPIRUN=`./sniff_mpirun.sh`
 }
 
 @test "[$TEST] check for pfield_interpolate executable and input files" {

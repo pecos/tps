@@ -260,7 +260,7 @@ class IODataOrganizer {
    */
   void registerIOFamily(std::string description, std::string group, mfem::ParGridFunction *pfunc,
                         bool auxRestart = true, bool inRestartFile = true, mfem::FiniteElementCollection *fec = NULL);
-  void unregisterIOFamily(std::string description, std::string group, mfem::ParGridFunction *pfunc);  
+  void unregisterIOFamily(std::string description, std::string group, mfem::ParGridFunction *pfunc);
   /** Destructor */
   ~IODataOrganizer();
 

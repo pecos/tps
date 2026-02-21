@@ -10,6 +10,7 @@ setup() {
     REPORT_TRI="euler_2d.rhs_error.tri.p2.txt"
     QUAD_MESH=beam-quad-o3-s1-p.mesh
     TRI_MESH=beam-tri-o3-s1-p.mesh
+    MPIRUN=`./sniff_mpirun.sh`
 }
 
 @test "[$TEST] check for input file $RUNFILE" {
@@ -26,7 +27,7 @@ setup() {
 
 @test "[$TEST] compare rhs for a manufactured solution with input -> $RUNFILE_QUAD" {
     test -e ../utils/compute_rhs
-    mpirun -np 2 ../utils/compute_rhs --runFile $RUNFILE_QUAD
+    $MPIRUN -n 2 ../utils/compute_rhs --runFile $RUNFILE_QUAD
 
     test -s $REPORT_QUAD
 
@@ -56,7 +57,7 @@ setup() {
 
 @test "[$TEST] compare rhs for a manufactured solution with input -> $RUNFILE_TRI" {
     test -e ../utils/compute_rhs
-    mpirun -np 2 ../utils/compute_rhs --runFile $RUNFILE_TRI
+    $MPIRUN -n 2 ../utils/compute_rhs --runFile $RUNFILE_TRI
 
     test -s $REPORT_TRI
 
