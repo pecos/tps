@@ -76,6 +76,7 @@ class CycleAvgJouleCoupling : public TPS::Solver {
   bool bte_from_tps_ = false;       /**< true if the BTE solver is called from within TPS (C++ call Python) */
   std::string bte_path;
   std::string tps_src_path;
+  std::string torch_chem_path;
 #endif
 
 

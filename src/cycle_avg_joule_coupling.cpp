@@ -100,6 +100,7 @@ CycleAvgJouleCoupling::CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tp
     tps->getInput("cycle-avg-joule-coupled/bte-from-tps", bte_from_tps_, false);
     tps->getRequiredInput("boltzmannSolver/bte-path", bte_path);
     tps->getRequiredInput("boltzmannSolver/tps-src-path", tps_src_path);
+    tps->getRequiredInput("boltzmannSolver/torch-chem-path", torch_chem_path);
 #endif
 
   } else {
@@ -549,6 +550,7 @@ void CycleAvgJouleCoupling::solve() {
       // Add the TPS src path to sys.path
       sys_path.insert(0, tps_src_path); // Insert at the beginning of sys.path
       sys_path.insert(0, bte_path); // Path to BTE scripts
+      sys_path.insert(0, torch_chem_path); // Path to torch chemistry scripts (needed for temperature dependent collision cross-sections)
 
       // Verify that the paths were added
       if(rank0_) {

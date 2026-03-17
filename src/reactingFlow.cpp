@@ -609,6 +609,36 @@ ReactingFlow::~ReactingFlow() {
     delete vizSpecFields_[i];
   }
 
+#ifdef HAVE_PYTHON
+  for (unsigned int i = 0; i < vizReacFields_.size(); i++) {
+    delete vizReacFields_[i];
+  }
+
+  for (unsigned int i = 0; i < vizProdFields_.size(); i++) {
+    delete vizProdFields_[i];
+  }
+
+  for (unsigned int i = 0; i < vizkReacFields_.size(); i++) {
+    delete vizkReacFields_[i];
+  }
+
+  for (unsigned int i = 0; i < vizrrfbyrrbFields_.size(); i++) {
+    delete vizrrfbyrrbFields_[i];
+  }
+
+  for (unsigned int i = 0; i < vizBTEReacFields_.size(); i++) {
+    delete vizBTEReacFields_[i];
+  }
+
+  for (unsigned int i = 0; i < vizBTEkReacFields_.size(); i++) {
+    delete vizBTEkReacFields_[i];
+  }
+
+  for (unsigned int i = 0; i < vizBTErrfbyrrbFields_.size(); i++) {
+    delete vizBTErrfbyrrbFields_[i];
+  }
+#endif
+
   // allocated in initializeOperators
   delete sfes_filter_;
   delete sfec_filter_;
@@ -691,6 +721,11 @@ ReactingFlow::~ReactingFlow() {
   delete yfec_;
   delete rfes_;
   delete rfec_;
+
+#ifdef HAVE_PYTHON
+  delete rrf_by_rrbfes_;
+  delete rrf_by_rrbfec_;
+#endif
 }
 
 void ReactingFlow::initializeSelf() {
@@ -718,6 +753,12 @@ void ReactingFlow::initializeSelf() {
   rfec_ = new H1_FECollection(order_, dim_);
   rfes_ = new ParFiniteElementSpace(pmesh_, yfec_, nReactions_);
 
+#ifdef HAVE_PYTHON
+  // PREPARING FINITE ELEMENT SPACE FOR REACTION RATE RATIO (forward rate / backward rate)
+  rrf_by_rrbfec_ = new H1_FECollection(order_, dim_);
+  rrf_by_rrbfes_ = new ParFiniteElementSpace(pmesh_, yfec_, int(nReactions_/2));
+#endif
+
   // Check if fully periodic mesh
   if (!(pmesh_->bdr_attributes.Size() == 0)) {
     temp_ess_attr_.SetSize(pmesh_->bdr_attributes.Max());
@@ -738,6 +779,12 @@ void ReactingFlow::initializeSelf() {
   // SETTING Dof PARAMETERS FOR REACTION PROGRESS RATES
   rDof_ = rfes_->GetVSize();
   rDofInt_ = rfes_->GetTrueVSize();
+
+#ifdef HAVE_PYTHON
+  // SETTING Dof PARAMETERS FOR RATIO OF FORWARD TO BACKWARD REACTION RATES
+  rrf_by_rrbDof_ = rrf_by_rrbfes_->GetVSize();
+  rrf_by_rrbDofInt_ = rrf_by_rrbfes_->GetTrueVSize();
+#endif
 
   weff_gf_.SetSpace(vfes_);
   weff_gf_ = 0.0;
@@ -811,8 +858,8 @@ void ReactingFlow::initializeSelf() {
   YnFull_gf_ = 0.0;
 
   // prodY for plotting
-  prodY_gf_.SetSpace(yfes_);
-  prodY_gf_ = 0.0;
+  productY_gf_.SetSpace(yfes_);
+  productY_gf_ = 0.0;
 
   // reaction progress rates for plotting
   reacR_gf_.SetSpace(rfes_);
@@ -822,6 +869,21 @@ void ReactingFlow::initializeSelf() {
   // reaction rate coefficients for plotting
   kReac_gf_.SetSpace(rfes_);
   kReac_gf_ = 0.0;
+
+  // reaction rate coefficients for plotting
+  rrf_by_rrb_gf_.SetSpace(rrf_by_rrbfes_);
+  rrf_by_rrb_gf_ = 0.0;
+
+  BTEkReac_gf_.SetSpace(rfes_);
+  BTEkReac_gf_ = 0.0;
+
+  // reaction progress rates for plotting
+  BTEreacR_gf_.SetSpace(rfes_);
+  BTEreacR_gf_ = 0.0;
+
+  // reaction rate coefficients for plotting
+  BTErrf_by_rrb_gf_.SetSpace(rrf_by_rrbfes_);
+  BTErrf_by_rrb_gf_ = 0.0;
 #endif
 
   // rest can just be sfes
@@ -858,12 +920,23 @@ void ReactingFlow::initializeSelf() {
   prodY_.SetSize(yDofInt_);
   prodY_ = 1.0e-12;
 
+  prodY_gf_.SetSpace(sfes_);
+  prodY_gf_ = 0.0;
+
   // reaction progress rates to be passed to reacR_gf
   reacR_.SetSize(rDofInt_);
-  reacR_ = 1.0e-12;
+  reacR_ = 0.0;
 
-  // prodY_gf_.SetSpace(sfes_);
-  // prodY_gf_ = 0.0;
+#ifdef HAVE_PYTHON
+  BTEreacR_.SetSize(rDofInt_);
+  BTEreacR_ = 0.0; 
+
+  rrf_by_rrb_.SetSize(int(rDofInt_/2));
+  rrf_by_rrb_ = 0.0;
+
+  BTErrf_by_rrb_.SetSize(int(rDofInt_/2));
+  BTErrf_by_rrb_ = 0.0;
+#endif
 
   prodE_.SetSize(yDofInt_);
   prodE_ = 1.0e-12;
@@ -904,7 +977,10 @@ void ReactingFlow::initializeSelf() {
 
   // reaction rate coefficients to be passed to kReac_gf_
   kReac_.SetSize(rDofInt_);
-  kReac_ = 1.0e-12;
+  kReac_ = 0.0;
+
+  BTEkReac_.SetSize(rDofInt_);
+  BTEkReac_ = 0.0;
 
   grid_idx_to_spatial_idx_map.resize(sDofInt_);
 #endif
@@ -1037,6 +1113,17 @@ void ReactingFlow::initializeSelf() {
   Ynm2_ = Yn_;
   Yn_next_gf_ = Yn_gf_;
   YnFull_gf_.SetFromTrueDofs(Yn_);
+
+#ifdef HAVE_PYTHON
+  productY_gf_.SetFromTrueDofs(prodY_);
+  reacR_gf_.SetFromTrueDofs(reacR_);
+  kReac_gf_.SetFromTrueDofs(kReac_);
+  rrf_by_rrb_gf_.SetFromTrueDofs(rrf_by_rrb_);
+
+  BTEreacR_gf_.SetFromTrueDofs(BTEreacR_);
+  BTEkReac_gf_.SetFromTrueDofs(BTEkReac_);
+  BTErrf_by_rrb_gf_.SetFromTrueDofs(BTErrf_by_rrb_);
+#endif
 
   ConstantCoefficient t_ic_coef;
   t_ic_coef.constant = T_ic_;
@@ -1622,12 +1709,34 @@ void ReactingFlow::initializeOperators() {
     Ynm1_ = Yn_;
     Ynm2_ = Yn_;
     YnFull_gf_.SetFromTrueDofs(Yn_);
+
+#ifdef HAVE_PYTHON
+    productY_gf_.SetFromTrueDofs(prodY_);
+    reacR_gf_.SetFromTrueDofs(reacR_);
+    kReac_gf_.SetFromTrueDofs(kReac_);
+    rrf_by_rrb_gf_.SetFromTrueDofs(rrf_by_rrb_);
+
+    BTEreacR_gf_.SetFromTrueDofs(BTEreacR_);
+    BTEkReac_gf_.SetFromTrueDofs(BTEkReac_);
+    BTErrf_by_rrb_gf_.SetFromTrueDofs(BTErrf_by_rrb_);
+#endif
   }
 
   // Ensure Yn_ is consistent with YnFull_gf_.  Specifically this is
   // necessary on standard restart, when the solution is read into
   // YnFull_gf_ after the Yn_ IC is set.
   YnFull_gf_.GetTrueDofs(Yn_);
+
+#ifdef HAVE_PYTHON
+  productY_gf_.GetTrueDofs(prodY_);  
+  reacR_gf_.GetTrueDofs(reacR_);  
+  kReac_gf_.GetTrueDofs(kReac_);  
+  rrf_by_rrb_gf_.GetTrueDofs(rrf_by_rrb_);  
+
+  BTEreacR_gf_.GetTrueDofs(BTEreacR_);  
+  BTEkReac_gf_.GetTrueDofs(BTEkReac_);  
+  BTErrf_by_rrb_gf_.GetTrueDofs(BTErrf_by_rrb_);  
+#endif
 
   // and initialize system mass
   updateMixture();
@@ -2005,7 +2114,13 @@ void ReactingFlow::step() {
 
       kReac_gf_.SetFromTrueDofs(kReac_);
       reacR_gf_.SetFromTrueDofs(reacR_);
-      prodY_gf_.SetFromTrueDofs(prodY_);
+      productY_gf_.SetFromTrueDofs(prodY_);
+      rrf_by_rrb_gf_.SetFromTrueDofs(rrf_by_rrb_);
+
+      BTEkReac_gf_.SetFromTrueDofs(BTEkReac_);
+      BTEreacR_gf_.SetFromTrueDofs(BTEreacR_);
+      BTErrf_by_rrb_gf_.SetFromTrueDofs(BTErrf_by_rrb_);
+
       if (bte_from_tps_) {
         // UPDATE THE BLENDING FRACTION
         int iter_number_ = this->GetCurrentIter();
@@ -2017,22 +2132,65 @@ void ReactingFlow::step() {
       
       for (int rr = 0; rr < nReactions_; rr++) {
         mfem::Vector rr_view(kReac_.GetData() + rr*sDofInt_, sDofInt_);
+        mfem::Vector BTErr_view(BTEkReac_.GetData() + rr*sDofInt_, sDofInt_);
 
         double local_min = rr_view.Min();
         double local_max = rr_view.Max();
 
+        double BTElocal_min = BTErr_view.Min();
+        double BTElocal_max = BTErr_view.Max();
+
         double global_min, global_max;
+        double BTEglobal_min, BTEglobal_max;
 
         MPI_Allreduce(&local_min, &global_min, 1, MPI_DOUBLE, MPI_MIN, tpsP_->getTPSCommWorld());
         MPI_Allreduce(&local_max, &global_max, 1, MPI_DOUBLE, MPI_MAX, tpsP_->getTPSCommWorld());
+
+        MPI_Allreduce(&BTElocal_min, &BTEglobal_min, 1, MPI_DOUBLE, MPI_MIN, tpsP_->getTPSCommWorld());
+        MPI_Allreduce(&BTElocal_max, &BTEglobal_max, 1, MPI_DOUBLE, MPI_MAX, tpsP_->getTPSCommWorld());
 
         if (rank0_) {
           std::cout << "[C++], Reaction " << rr << ", Rate coefficient Local = " 
                     << local_min << " to " << local_max 
                     << ", Global = " 
-                    << global_min << " to " << global_max << "\n";
+                    << global_min << " to " << global_max << ", BTE global = " << BTEglobal_min << ", to " << BTEglobal_max << "\n";
+        }
+
+        if (rr % 2 == 0) {
+          mfem::Vector rrf_by_rrb_view(rrf_by_rrb_.GetData() + int(rr/2)*sDofInt_, sDofInt_);
+          mfem::Vector BTErrf_by_rrb_view(BTErrf_by_rrb_.GetData() + int(rr/2)*sDofInt_, sDofInt_);
+
+          double loc_min = rrf_by_rrb_view.Min();
+          double loc_max = rrf_by_rrb_view.Max();
+
+          double BTEloc_min = BTErrf_by_rrb_view.Min();
+          double BTEloc_max = BTErrf_by_rrb_view.Max();
+
+          double glob_min, glob_max;
+          double BTEglob_min, BTEglob_max;
+
+          MPI_Allreduce(&loc_min, &glob_min, 1, MPI_DOUBLE, MPI_MIN, tpsP_->getTPSCommWorld());
+          MPI_Allreduce(&loc_max, &glob_max, 1, MPI_DOUBLE, MPI_MAX, tpsP_->getTPSCommWorld());
+
+          MPI_Allreduce(&BTEloc_min, &BTEglob_min, 1, MPI_DOUBLE, MPI_MIN, tpsP_->getTPSCommWorld());
+          MPI_Allreduce(&BTEloc_max, &BTEglob_max, 1, MPI_DOUBLE, MPI_MAX, tpsP_->getTPSCommWorld());
+
+          if (rank0_) {
+            std::cout << "Reaction set " << int(rr/2) << ", Ratio of forward to backward rates Local = " 
+                      << loc_min << " to " << loc_max 
+                      << ", Global = " 
+                      << glob_min << " to " << glob_max 
+                      << ", BTE local = " << BTEloc_min << " to " << BTEloc_max
+                      << ", Global = " << BTEglob_min << " to " << BTEglob_max << "\n";
+          }
         }
       }
+
+      if(rank0_) { std::cout << "bl_frac = " << bl_frac_ << ", sdof = " << sDof_ << ", " << sDofInt_ 
+                    << ", ydof = " << yDof_ << ", " << yDofInt_ 
+                    << ", rdof = " << rDof_ << ", " << rDofInt_
+                    << ", rrf_by_rrb_dof = " << rrf_by_rrbDof_ << ",  " << rrf_by_rrbDofInt_ << "\n";
+                  }
 
       // std::cout << "Rank " << myRank << ", TPS Obtained global max/min of rate coefficients\n";
 #endif
@@ -2117,6 +2275,17 @@ void ReactingFlow::step() {
     Yn_ = spec_buffer_;
     Tn_ = temp_buffer_;
     Tn_gf_.SetFromTrueDofs(Tn_);
+
+#ifdef HAVE_PYTHON
+    kReac_gf_.SetFromTrueDofs(kReac_);
+    reacR_gf_.SetFromTrueDofs(reacR_);
+    productY_gf_.SetFromTrueDofs(prodY_);
+    rrf_by_rrb_gf_.SetFromTrueDofs(rrf_by_rrb_);
+
+    BTEkReac_gf_.SetFromTrueDofs(BTEkReac_);
+    BTEreacR_gf_.SetFromTrueDofs(BTEreacR_);
+    BTErrf_by_rrb_gf_.SetFromTrueDofs(BTErrf_by_rrb_);
+#endif
   }
 
   /// PART III: prepare for external use
@@ -2507,7 +2676,7 @@ void ReactingFlow::speciesProduction() {
 
   // prodY_gf stores the species production rates for each species
   // reacR_gf stores the reaction progress rates for each reaction
-  prodY_gf_.SetFromTrueDofs(prodY_);
+  productY_gf_.SetFromTrueDofs(prodY_);
   reacR_gf_.SetFromTrueDofs(reacR_);
 }
 
@@ -2681,7 +2850,7 @@ void ReactingFlow::initializeViz(ParaViewDataCollection &pvdc) {
   vizProdFields_.clear();
   vizProdNames_.clear();
   for (int sp = 0; sp < nSpecies_; sp++) {
-    vizProdFields_.push_back(new ParGridFunction(sfes_, prodY_gf_, (sp * sDof_)));
+    vizProdFields_.push_back(new ParGridFunction(sfes_, productY_gf_, (sp * sDof_)));
     vizProdNames_.push_back(std::string("prodYn_" + speciesNames_[sp]));
     pvdc.RegisterField(vizProdNames_[sp], vizProdFields_[sp]);
   }
@@ -2705,6 +2874,44 @@ void ReactingFlow::initializeViz(ParaViewDataCollection &pvdc) {
     vizkReacFields_.push_back(new ParGridFunction(sfes_, kReac_gf_, (nr * sDof_)));
     vizkReacNames_.push_back(std::string("kReac_" + sr));
     pvdc.RegisterField(vizkReacNames_[nr], vizkReacFields_[nr]);
+  }
+
+  // WRITING THE RATIO OF FORWARD TO BACKWARD REACTION RATES TO THE PARAVIEW FILE
+  vizrrfbyrrbFields_.clear();
+  vizrrfbyrrbNames_.clear();
+  for (int nr = 0; nr < int(nReactions_/2); nr++) {
+      auto sr = std::to_string(nr);
+      vizrrfbyrrbFields_.push_back(new ParGridFunction(sfes_, rrf_by_rrb_gf_, (nr * sDof_)));
+      vizrrfbyrrbNames_.push_back(std::string("rrf_by_rrb_" + sr));
+      pvdc.RegisterField(vizrrfbyrrbNames_[nr], vizrrfbyrrbFields_[nr]);
+  }
+
+  // WRITING THE BTE REACTION PROGRESS RATES TO THE PARAVIEW FILE
+  vizBTEReacFields_.clear();
+  vizBTEReacNames_.clear();
+  for (int nr = 0; nr < nReactions_; nr++) {
+    auto sr = std::to_string(nr);
+    vizBTEReacFields_.push_back(new ParGridFunction(sfes_, BTEreacR_gf_, (nr * sDof_)));
+    vizBTEReacNames_.push_back(std::string("BTEreacR_" + sr));
+    pvdc.RegisterField(vizBTEReacNames_[nr], vizBTEReacFields_[nr]);
+  }
+
+  vizBTEkReacFields_.clear();
+  vizBTEkReacNames_.clear();
+  for (int nr = 0; nr < nReactions_; nr++) {
+    auto sr = std::to_string(nr);
+    vizBTEkReacFields_.push_back(new ParGridFunction(sfes_, BTEkReac_gf_, (nr * sDof_)));
+    vizBTEkReacNames_.push_back(std::string("BTEkReac_" + sr));
+    pvdc.RegisterField(vizBTEkReacNames_[nr], vizBTEkReacFields_[nr]);
+  }
+
+  vizBTErrfbyrrbFields_.clear();
+  vizBTErrfbyrrbNames_.clear();
+  for (int nr = 0; nr < int(nReactions_/2); nr++) {
+      auto sr = std::to_string(nr);
+      vizBTErrfbyrrbFields_.push_back(new ParGridFunction(sfes_, BTErrf_by_rrb_gf_, (nr * sDof_)));
+      vizBTErrfbyrrbNames_.push_back(std::string("BTErrf_by_rrb_" + sr));
+      pvdc.RegisterField(vizBTErrfbyrrbNames_[nr], vizBTErrfbyrrbFields_[nr]);
   }
 #endif
 }
@@ -3439,26 +3646,41 @@ void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, 
   // Evaluate the chemical source terms
   chemistry_->computeForwardRateCoeffs(n_sp.Read(), Th, Te, dofindex, kfwd.HostWrite());
 #ifdef HAVE_PYTHON
+  Vector BTEkfwd;          // set to size nReactions_ in computeForwardRareCoeffs  
+  Vector BTEprogressRate;  // set to size nReactions_ in computeProgressRate
+  BTEkfwd.SetSize(chemistry_->getNumReactions());
   if (bte_from_tps_) {
     const double* mapping = bte_rr_mapping_.HostRead();
     for (int rr = 0; rr < nBTEReactions_; rr++) {
       int tpi = int(mapping[rr]); // tpi stores TPS index of reaction given by BTE index rr
       double kblend = bl_frac_ * BTErr[rr] + (1.0 - bl_frac_) * kfwd[tpi];
       kfwd[tpi] = std::max(kblend, 0.0);
+      BTEkfwd[tpi] = BTErr[rr];
     }
   }
   double *datakfwd = kReac_.HostWrite();
+  double *dataBTEkfwd = BTEkReac_.HostWrite();
   for (int nr = 0; nr < nReactions_; nr++) {
-    datakfwd[dofindex + nr*sDofInt_] = kfwd[nr];
+    datakfwd[dofindex + nr*sDofInt_] = std::max(0.0,kfwd[nr]);
+    dataBTEkfwd[dofindex + nr*sDofInt_] = std::max(0.0,BTEkfwd[nr]);
   }
 #endif
   chemistry_->computeEquilibriumConstants(Th, Te, keq.HostWrite());
   chemistry_->computeProgressRate(n_sp, kfwd, keq, progressRate);
 #ifdef HAVE_PYTHON
+  chemistry_->computeProgressRate(n_sp, BTEkfwd, keq, BTEprogressRate); //will be accurate only if detailed balance is False
   double *dataReac = reacR_.HostWrite();
+  double *datarrfbyrrb = rrf_by_rrb_.HostWrite();
+  double *dataBTEReac = BTEreacR_.HostWrite();
+  double *dataBTErrfbyrrb = BTErrf_by_rrb_.HostWrite();
   // Write the reaction progress rates into dataReac
   for(int nr = 0; nr < nReactions_; nr++){
     dataReac[dofindex + nr * sDofInt_] = progressRate[nr];
+    dataBTEReac[dofindex + nr * sDofInt_] = BTEprogressRate[nr];
+    if (nr % 2 == 0){
+      datarrfbyrrb[dofindex + int(nr/2) * sDofInt_] = std::max(0.0, progressRate[nr] / (1e-28 + progressRate[nr + 1]));
+      dataBTErrfbyrrb[dofindex + int(nr/2) * sDofInt_] = std::max(0.0, BTEprogressRate[nr] / (1e-28 + BTEprogressRate[nr + 1]));
+    }
   }
 #endif
   chemistry_->computeCreationRate(progressRate, creationRate, emissionRate);

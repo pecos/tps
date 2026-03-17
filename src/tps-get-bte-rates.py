@@ -1,3 +1,4 @@
+import argon.scripts.synthetic_cs as synthetic_cs
 import numpy as np
 from mpi4py import MPI
 import scipy
@@ -28,6 +29,7 @@ import sys
 import scipy.cluster
 from itertools import cycle
 import cross_section
+import os
 
 ev_to_K               = collisions.TEMP_K_1EV
 Td_fac                = 1e-21
@@ -43,6 +45,9 @@ clstr_threshold       = 1e-3
 n0_param              = 3.22e22 
 kB                    = scipy.constants.Boltzmann
 
+varyT_cs = 0
+append_recomb_cs = 1
+
 parser = argparse.ArgumentParser()
 parser.add_argument("-threads", "--threads"                       , help="number of cpu threads", type=int, default=4)
 parser.add_argument("-out_fname", "--out_fname"                   , help="output file name for the qois", type=str, default="bte")
@@ -52,12 +57,12 @@ parser.add_argument("-c", "--collisions"                          , help="collis
 parser.add_argument("-sp_order", "--sp_order"                     , help="b-spline order", type=int, default=3)
 parser.add_argument("-spline_qpts", "--spline_qpts"               , help="q points per knots", type=int, default=11)
 parser.add_argument("-atol", "--atol"                             , help="absolute tolerance", type=float, default=1e-20)
-parser.add_argument("-rtol", "--rtol"                             , help="relative tolerance", type=float, default=1e-8)
-parser.add_argument("-max_iter", "--max_iter"                     , help="max number of iterations for newton solve", type=int, default=500)
+parser.add_argument("-rtol", "--rtol"                             , help="relative tolerance", type=float, default=1e-10)
+parser.add_argument("-max_iter", "--max_iter"                     , help="max number of iterations for newton solve", type=int, default=50)
 parser.add_argument("-Te", "--Te"                                 , help="approximate electron temperature (eV)" , type=float, default=0.5)
 parser.add_argument("-n0"    , "--n0"                             , help="heavy density (1/m^3)" , type=float, default=3.22e22)
 parser.add_argument("-ev_max", "--ev_max"                         , help="max energy in the v-space grid" , type=float, default=30)
-parser.add_argument("-Nr", "--Nr"                                 , help="radial refinement", type=int, default=64)
+parser.add_argument("-Nr", "--Nr"                                 , help="radial refinement", type=int, default=128)
 parser.add_argument("-profile", "--profile"                       , help="profile", type=int, default=0)
 parser.add_argument("-warm_up", "--warm_up"                       , help="warm up", type=int, default=5)
 parser.add_argument("-runs", "--runs"                             , help="runs "  , type=int, default=10)
@@ -135,6 +140,14 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
     n_pts = len(Tg)
     # args.n_pts = n_pts
 
+    crs_folder = "lxcat_data/argon/crs_lxcat"
+    if rank_ == 0:
+        if varyT_cs == 1:
+            if not os.path.exists(crs_folder):
+                os.makedirs(crs_folder)
+    
+    comm.Barrier()
+
     args.collisions = collisions_file # collision cross-section file
     cs_data_all   = cross_section.read_cross_section_data(args.collisions)
     collision_count = 0
@@ -180,14 +193,28 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
     # Replace ev_max based on the mean electron energy in each grid
     for idx in range(n_grids):
         ev_max[idx] = 36 * np.mean( Tg[grid_idx_to_spatial_idx_map[idx]] / ev_to_K) 
+        if args.ee_collisions==1:
+            ev_max[idx] = 100 * np.mean( Tg[grid_idx_to_spatial_idx_map[idx]] / ev_to_K) 
 
-    print("[Python] Rank [%d/%d] : K-means Te clusters "%(rank_, size_), Te_vec, flush=True)
+    # print("[Python] Rank [%d/%d] : K-means Te clusters "%(rank_, size_), Te_vec, flush=True)
 
     #  generate crs Tg depended crs data 
     col_cs = list()
+    # Tlfile = "%s/Tlump.txt" %(crs_folder)
+    # Tlarr = np.loadtxt(Tlfile, delimiter='\t', ndmin=1)
     for idx in range(n_grids):
         cs_fname = collisions_file
+        if varyT_cs == 1:
+            # Tc = Te[idx] * ev_to_K
+            # print("Tlarr = ", Tlarr, Tlarr.shape)
+            # cs_T = Tlarr[np.argmin(np.abs(Tlarr-Tc))]
+            # cs_fname = "%s/crs_Tlump%06d.lxcat"%(crs_folder, int(cs_T)) 
+            cs_fname = "%s/crs_rank_%06d_npes_%06d_%06d.txt"%(crs_folder, rank_, size_, idx) 
+            synthetic_cs.gen_lxcat_file(cs_fname, Te[idx] * ev_to_K, append_recomb_cs)
         col_cs.append(cs_fname)
+    
+    if rank_ == 0 or rank_ == 22:
+        print("rank_ = ", rank_, ", col_cs = ", col_cs, "Te = ", Te * ev_to_K, flush=True)
 
     bte_solver  = bte_0d3v_batched(args, ev_max, Te, nr, lm_modes, n_grids, col_cs)
 
@@ -494,11 +521,27 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
                 # print("rank [%d/%d] BTE launching grid %d on %s"%(rank_, size_, grid_idx, dev_id), flush=True)
                 f0 = bte_solver.get_boltzmann_parameter(grid_idx, "u0")
                 
-                eRe      = asnumpy(bte_solver.get_boltzmann_parameter(grid_idx, "eRe"))
-                eIm      = asnumpy(bte_solver.get_boltzmann_parameter(grid_idx, "eIm"))
+                eRe      = xp.asnumpy(bte_solver.get_boltzmann_parameter(grid_idx, "eRe"))
+                eIm      = xp.asnumpy(bte_solver.get_boltzmann_parameter(grid_idx, "eIm"))
                 ef       = np.sqrt(eRe**2 + eIm**2)
 
-                ls_c     = max(1e-4, min(0.9, np.exp(-(np.min(np.abs(ef))/2)**2)))
+                # ls_c     = max(1e-4, min(0.9, np.exp(-(np.min(np.abs(ef))/2)**2)))
+                ls_c     = 1e-4
+                if args.ee_collisions == 1:
+                # disabling ee-collisions temporary by force to get a good initial guess. 
+                    args.ee_collisions = 0  
+                    # actual_rtol = args.rtol
+                    # args.rtol = 1e-6
+                    ff , qoi = bte_solver.solve(grid_idx, f0, args.atol, args.rtol, args.max_iter, args.solver_type,
+                                alpha_min = 1e-16, alpha_rho=0.5, line_search_c = ls_c)
+                    bte_solver.set_boltzmann_parameter(grid_idx, "u0"       , ff)
+                    print("Rank ", rank_, ", gidx ", grid_idx, ", setup initial conditions for ee interactions solve", flush=True)
+
+                # enable ee-collisions
+                    args.ee_collisions = 1
+                    # args.rtol = actual_rtol
+                
+                f0       = bte_solver.get_boltzmann_parameter(grid_idx,"u0")
                 ff , qoi = bte_solver.solve(grid_idx, f0, args.atol, args.rtol, args.max_iter, args.solver_type,
                             alpha_min = 1e-16, alpha_rho=0.5, line_search_c = ls_c)
                 
@@ -576,8 +619,8 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
                     for r_idx in range(coll_count):
                         rates[r_idx][grid_idx_to_spatial_idx_map[grid_idx]] = rr_cpu[r_idx] * N_Avo
 
-                    with cp.cuda.Device(dev_id):
-                        t1(bte_solver, grid_idx_to_spatial_idx_map, collision_count)
+                with cp.cuda.Device(dev_id):
+                    t1(bte_solver, grid_idx_to_spatial_idx_map, collision_count)
 
     
     # FIX THE RECOMBINATION RATES
@@ -586,9 +629,11 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
     # WE NEED TO MULTIPLY THESE BY N_avo**2 TO CONVERT THE UNITS TO m^6-mol^{-2}-s^{-1} FOR USE IN TPS
     col_count = 0
     for col_str, col_data in cs_data_all.items():
+        print("col_count = ", col_count, col_str)
         if col_data["type"] == "ATTACHMENT":
             rates[col_count][:] = N_Avo*rates[col_count][:]
         col_count+=1
+        
 
     # STORE THE QoIs TO CSV FILE AND PLOT DATA
     if args.store_csv==1:
@@ -709,7 +754,7 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
     #         print(printstr)
 
     data = rates[1:rates.shape[0]].flatten()
-    data[data < 0.0] = 0.0
+    data[data < 1.0e-21] = 0.0
     comm.Barrier()
     # print("[Python] Rank = ", rank_, ", BTE solve complete...", flush=True)
 

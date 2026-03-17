@@ -96,6 +96,10 @@ class ReactingFlow : public ThermoChemModelBase {
   // Number of reactions and dofs
   int rDof_, rDofInt_;
 
+  #ifdef HAVE_PYTHON
+  int rrf_by_rrbDof_, rrf_by_rrbDofInt_;
+  #endif
+
   WorkingFluid workFluid_;
   GasModel gasModel_;
   TransportModel transportModel_;
@@ -196,6 +200,20 @@ class ReactingFlow : public ThermoChemModelBase {
   // Reactions \f$H^1\f$ finite element space.
   ParFiniteElementSpace *rfes_ = nullptr;
 
+#ifdef HAVE_PYTHON
+  // Reaction rate ratio (forward to backward) \f$H^1\f$ finite element collection (stores ratio of rates used to advance TPS, can be from tabulated, BTE, or blended).
+  FiniteElementCollection *rrf_by_rrbfec_ = nullptr;
+
+  // Reaction rate ratio \f$H^1\f$ finite element space.
+  ParFiniteElementSpace *rrf_by_rrbfes_ = nullptr;
+
+  // BTE Reaction rate ratio (forward to backward) \f$H^1\f$ finite element collection (stores the rate ratio computed from BTE).
+  FiniteElementCollection *BTErrf_by_rrbfec_ = nullptr;
+
+  // Reaction rate ratio \f$H^1\f$ finite element space.
+  ParFiniteElementSpace *BTErrf_by_rrbfes_ = nullptr;
+#endif
+
   // Fields
   ParGridFunction Tnm1_gf_, Tnm2_gf_;
   ParGridFunction Tn_gf_, Tn_next_gf_, Text_gf_, resT_gf_;
@@ -206,7 +224,7 @@ class ReactingFlow : public ThermoChemModelBase {
   // additions for species
   ParGridFunction Ynm1_gf_, Ynm2_gf_;
   ParGridFunction Yn_gf_, Yn_next_gf_, Yext_gf_, resY_gf_;
-  ParGridFunction prodY_gf_;
+  ParGridFunction prodY_gf_, productY_gf_;
   ParGridFunction YnFull_gf_;
   ParGridFunction CpY_gf_;
   ParGridFunction CpMix_gf_;
@@ -217,6 +235,10 @@ class ReactingFlow : public ThermoChemModelBase {
 
   // additions for reaction progress rates
   ParGridFunction reacR_gf_;
+
+#ifdef HAVE_PYTHON
+ParGridFunction BTEreacR_gf_;
+#endif
 
   ParGridFunction visc_gf_;
   ParGridFunction kappa_gf_;
@@ -236,8 +258,13 @@ class ReactingFlow : public ThermoChemModelBase {
   ParGridFunction er_gf_;
   ParGridFunction ei_gf_;
 
+  ParGridFunction rrf_by_rrb_gf_;
+
+  ParGridFunction BTErrf_by_rrb_gf_;
+
   // additions for rate coefficients
   ParGridFunction kReac_gf_;
+  ParGridFunction BTEkReac_gf_;
 #endif
 
   // ParGridFunction *buffer_tInlet_ = nullptr;
@@ -341,7 +368,9 @@ class ReactingFlow : public ThermoChemModelBase {
   Vector bterates_;
   Vector bte_rr_mapping_;
   // additions for reaction rate coefficients
-  Vector kReac_;
+  Vector kReac_, BTEkReac_;
+  // Ratio of forward to reverse reaction rates
+  Vector rrf_by_rrb_, BTErrf_by_rrb_;
 #endif
 
   // additions for species
@@ -364,6 +393,10 @@ class ReactingFlow : public ThermoChemModelBase {
 
   // additions for reaction progress rates
   Vector reacR_;
+
+#ifdef HAVE_PYTHON
+  Vector BTEreacR_;
+#endif
 
   Vector Qt_;
   Vector rn_;
@@ -413,8 +446,23 @@ class ReactingFlow : public ThermoChemModelBase {
 
 #ifdef HAVE_PYTHON
   // PARGRID FUNCTION AND STRING FOR REACTION PROGRESS RATES
+  std::vector<ParGridFunction *> vizBTEReacFields_;
+  std::vector<std::string> vizBTEReacNames_;
+
+  // PARGRID FUNCTION AND STRING FOR REACTION PROGRESS RATES
   std::vector<ParGridFunction *> vizkReacFields_;
   std::vector<std::string> vizkReacNames_;
+
+  // PARGRID FUNCTION AND STRING FOR REACTION PROGRESS RATES
+  std::vector<ParGridFunction *> vizBTEkReacFields_;
+  std::vector<std::string> vizBTEkReacNames_;
+
+  // PARGRID FUNCTION AND STRING FOR REACTION PROGRESS RATES
+  std::vector<ParGridFunction *> vizrrfbyrrbFields_;
+  std::vector<std::string> vizrrfbyrrbNames_;
+
+  std::vector<ParGridFunction *> vizBTErrfbyrrbFields_;
+  std::vector<std::string> vizBTErrfbyrrbNames_;
 
   // k_blend = bl_frac * k_BTE + (1 - bl_frac)*k_LTE
   // bl_frac is the blending coefficient which is initialized as bl_frac_init
