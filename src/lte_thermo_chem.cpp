@@ -72,12 +72,12 @@ static double sigmaTorchStartUp(const Vector &pos) {
   const double ysig = 0.01;
   const double y0 = 0.15;  // step location
 
-  double radius = std::sqrt(x * x + z * z);
+  double radius_here = std::sqrt(x * x + z * z);
   double rwgt, hwgt;
   double sigma;
-  rwgt = std::exp(-0.5 * (radius / rsig) * (radius / rsig));
+  rwgt = std::exp(-0.5 * (radius_here / rsig) * (radius_here / rsig));
   hwgt = std::exp(-0.5 * ((y - y0) / ysig) * ((y - y0) / ysig));
-  if (radius >= rCyl) rwgt = 0.0;
+  if (radius_here >= rCyl) rwgt = 0.0;
   sigma = 2000. * rwgt * hwgt;
 
   return sigma;
@@ -210,8 +210,10 @@ LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, t
   tpsP_->getInput("loMach/ltethermo/msolve-max-iter", mass_inverse_max_iter_, max_iter_);
   tpsP_->getInput("loMach/ltethermo/msolve-verbosity", mass_inverse_pl_, pl_solve_);
 
+  tps->getInput("loMach/torch-cold-start", torch_cold_start_, false);
+  
   tps->getInput("loMach/ltethermo/Reh_offset", re_offset_, 1.0);
-  tps->getInput("loMach/ltethermo/Reh_factor", re_factor_, 0.1);
+  tps->getInput("loMach/ltethermo/Reh_factor", re_factor_, 0.1);  
 
   tpsP_->getInput("loMach/ltethermo/streamwise-stabilization", sw_stab_, false);
   if (sw_stab_) {
@@ -607,7 +609,9 @@ void LteThermoChem::initializeOperators() {
   const double dt_ = time_coeff_.dt;
 
   // TODO(trevilo): Put a flag for this!!!!
-  sigma_gf_.ProjectCoefficient(sigma_start_up);
+  if(torch_cold_start_) {
+    sigma_gf_.ProjectCoefficient(sigma_start_up);
+  }
 
   Array<int> empty;
 

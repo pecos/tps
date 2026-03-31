@@ -371,6 +371,9 @@ class ReactingFlow : public ThermoChemModelBase {
   int filter_cutoff_modes_ = 0;
   double filter_alpha_ = 0.0;
 
+  // set a static sigma field
+  bool torch_cold_start_ = false;
+  
   FiniteElementCollection *sfec_filter_ = nullptr;
   ParFiniteElementSpace *sfes_filter_ = nullptr;
   ParGridFunction Tn_NM1_gf_;
