@@ -1327,7 +1327,7 @@ void ReactingFlow::initializeSelf() {
         Qt_bc_coeff->constant = 0.0;
         AddQtDirichletBC(Qt_bc_coeff, attr_wall);
 
-        if (neumann_species_wall_) {
+        if (!neumann_species_wall_) {
           AddSpecDirichletBC(0.0, attr_wall);
         }
       }
