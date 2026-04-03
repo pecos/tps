@@ -122,14 +122,12 @@ ZetaModel::~ZetaModel() {
   delete Hf_form_;
   delete Hz_form_;
   delete Lk_form_;
-  //std::cout << "okay 1" << endl;
   delete Lf_form_;  
   delete MsRho_form_;
   delete Ms_form_;
   delete Mf_form_;  
   delete As_form_;
   //delete He_bdry_;
-  //std::cout << "okay 2" << endl;  
 
   delete zero_coeff_;
   delete unity_coeff_;
@@ -138,49 +136,45 @@ ZetaModel::~ZetaModel() {
   delete delta_coeff_;
   delete rho_coeff_;
   delete mu_coeff_;
-  //std::cout << "okay 3" << endl;  
   delete tts_coeff_;
   delete tls2_coeff_;
   delete prod_coeff_;
   delete tke_coeff_;
   delete nu_coeff_;
-  //std::cout << "okay 4" << endl;  
   //delete nu_delta_coeff_;
   delete gradTKE_coeff_;
   //delete two_nu_delta_coeff_;
-  delete tdr_wall_coeff_;
+
+  //NOTE: seg fault originates from deleting coeffs used for BCs, which is done automatically in dirichlet_bc_helper.hpp
+  //delete tdr_wall_coeff_; 
+  
   //delete gradZeta_coeff_;
   //delete two_nuNeg_delta_coeff_;
   //delete fRate_wall_coeff_;
   delete vel_coeff_;
   delete rhou_coeff_;
   delete scalar_diff_coeff_;
-  //std::cout << "okay 5" << endl;  
   delete mut_coeff_;
   delete mult_coeff_;
   delete tke_diff_sum_coeff_;
   delete tdr_diff_sum_coeff_;
   delete zeta_diff_sum_coeff_;
-  //std::cout << "okay 6" << endl;  
   delete tke_diff_total_coeff_;
   delete tdr_diff_total_coeff_;
   delete zeta_diff_total_coeff_;
   delete unity_diff_total_coeff_;
   delete rhoDt_coeff_;
   delete rhoTTS_coeff_;
-  // std::cout << "okay 7" << endl;  
   delete Ce2_coeff_;
   delete Ce2rhoTTS_coeff_;
   delete Pk_coeff_;
   delete ek_coeff_;  
   delete tke_diag_coeff_;
   delete tdr_diag_coeff_;
-  // std::cout << "okay 8" << endl;  
   delete zeta_diag_coeff_;
   delete v2_diag_coeff_;  
   delete f_diag_coeff_;
   delete f_diag_total_coeff_;
-  // std::cout << "okay 9" << endl;
   
   delete swirl_coeff_;
   delete rad_rho_coeff_;
@@ -197,8 +191,6 @@ ZetaModel::~ZetaModel() {
   delete rad_scalar_diff_coeff_;
   delete rad_nu_gradTKE_coeff_;
 
-  // std::cout << "okay 10" << endl; 
-
   delete ffec_;
   delete ffes_;  
   delete sfec_;
@@ -206,7 +198,6 @@ ZetaModel::~ZetaModel() {
   delete vfec_;
   delete vfes_;
 
-  //std::cout << "okay 11" << endl;  
 }
 
 void ZetaModel::initializeSelf() {
@@ -571,14 +562,6 @@ void ZetaModel::initializeSelf() {
   }
 
   // Wall BCs
-  //Array<int> wall_tags(pmesh_->bdr_attributes.Max());
-  //wall_tags= 0;
-  //rho_coeff_ = new GridFunctionCoefficient(thermoChem_interface_->density);
-  //mu_coeff_ = new GridFunctionCoefficient(thermoChem_interface_->viscosity);  
-  //nu_coeff_ = new RatioCoefficient(*mu_coeff_, *rho_coeff_);
-  //gradTKE_coeff_ = new GradientGridFunctionCoefficient(&tke_next_gf_);  
-  //nu_gradTKE_coeff_ = new ScalarVectorProductCoefficient(*nu_coeff_, *gradTKE_coeff_);  
-  //tdr_wall_coeff_ = new DivergenceGridFunctionCoefficient(*nu_gradTKE_coeff_);
   tdr_wall_coeff_ = new GridFunctionCoefficient(&tke_lapl_gf_);    
   {
     Array<int> attr_wall(pmesh_->bdr_attributes.Max());
