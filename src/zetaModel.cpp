@@ -1354,16 +1354,16 @@ void ZetaModel::updateTTS() {
 void ZetaModel::updateTLS() {
   const double *dTKE = tke_next_.HostRead();
   const double *dTDR = tdr_next_.HostRead();
-  const double *dv2 = v2_next_.HostRead();
+  // const double *dv2 = v2_next_.HostRead();
   // const double *dZeta = zeta_next_.HostRead();
-  const double *dSmag = sMag_.HostRead();
+  // const double *dSmag = sMag_.HostRead();
   const double *dMu = mu_.HostRead();
   const double *dRho = rho_.HostRead();
   double *dTLS = tls_.HostReadWrite();
 
   double wgt = 1.0;
-  double Clength;
-  Clength = 1.0 / (std::sqrt(6.0) * Cmu_);
+  // double Clength;
+  // Clength = 1.0 / (std::sqrt(6.0) * Cmu_);
   for (int i = 0; i < SdofInt_; i++) {
     double L1, L3;
     // double L2;

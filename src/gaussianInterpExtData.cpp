@@ -504,7 +504,6 @@ void GaussianInterpExtData::setInlet() {
           }
         */
         // double *hcoords = coordsDof.HostReadWrite();
-
       }
 
       if (wt_tot > 0.0) {
