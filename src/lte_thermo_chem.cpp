@@ -517,11 +517,7 @@ void LteThermoChem::initializeSelf() {
 
   // Wall BCs
   {
-<<<<<<< HEAD
     if (rank0_) std::cout << "There are " << pmesh_->bdr_attributes.Max() << " boundary attributes!" << std::endl;
-=======
-    // std::cout << "There are " << pmesh_->bdr_attributes.Max() << " boundary attributes!" << std::endl;
->>>>>>> main
     Array<int> attr_wall(pmesh_->bdr_attributes.Max());
     attr_wall = 0;
 
