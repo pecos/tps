@@ -185,9 +185,6 @@ void LoMachSolver::initialize() {
     thermo_ = new LteThermoChem(pmesh_, &loMach_opts_, temporal_coeff_, meshData_->getGridScale(), tpsP_);
   } else if (loMach_opts_.thermo_solver == "reacting-flow") {
     thermo_ = new ReactingFlow(pmesh_, &loMach_opts_, temporal_coeff_, (meshData_->getGridScale()), tpsP_);
-  } else if (loMach_opts_.thermo_solver == "static-thermo") {
-    // similar to ConstantPropertyThermoChem, probably unnecessary
-    thermo_ = new StaticThermo(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_);
   } else {
     // Unknown choice... die
     if (rank0_) {
