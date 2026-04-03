@@ -4,7 +4,6 @@
 TEST="pipe-zeta-f"
 RUNFILE="inputs/lomach.pipe.zf.ini"
 EXE="../src/tps"
-RESTART="ref_solns/stabChan/restart_output.sol.h5"
 
 setup() {
     SOLN_FILE="restart_output-pipe-zeta-f.sol.h5"
