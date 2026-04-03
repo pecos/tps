@@ -101,4 +101,4 @@ class StaticRans : public TurbModelBase {
   mfem::ParGridFunction *getCurrentEddyViscosity() override { return mut_; }
 };
 
-#endif  // ALGEBRAIC_RANS_HPP_
+#endif  // STATIC_RANS_HPP_

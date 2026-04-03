@@ -502,7 +502,9 @@ void GaussianInterpExtData::setInlet() {
             val_w = inlet[j].w;
             val_T = inlet[j].temp;
           }
-        */// double *hcoords = coordsDof.HostReadWrite();
+        */
+        // double *hcoords = coordsDof.HostReadWrite();
+
       }
 
       if (wt_tot > 0.0) {
@@ -558,7 +560,7 @@ void GaussianInterpExtData::setFieldInitSpec() {
   ParGridFunction coordsDof(vfes_);
   pmesh_->GetNodes(coordsDof);
   // now repeat for the spec field data
-  // TODO: no support for 3D
+  // TODO(garobed1): no support for 3D
   double *Yfulldata = Yfull_gf_.HostReadWrite();
   double *hcoords = coordsDof.HostReadWrite();
 
@@ -668,7 +670,7 @@ void GaussianInterpExtData::setFieldInitSpec() {
     for (int i = 0; i < vdofs.Size(); i++) {
       // index in gf of element
       int n = vdofs[i];
-      // TODO: This check is causing issues in parallel
+      // TODO(garobed1): This check is causing issues in parallel
       // if (n >= Sdof_) {
       //   std::cout << " ERROR: problem with GetNE in external data interpolation " << n << " of " << Sdof_ << " dofs"
       //             << endl;
@@ -749,7 +751,7 @@ void GaussianInterpExtData::setFieldTurbVisc() {
   ParGridFunction coordsDof(vfes_);
   pmesh_->GetNodes(coordsDof);
   // now repeat for the turb field data
-  // TODO: no support for 3D
+  // TODO(garobed1): no support for 3D
   double *NuTdata = nut_gf_.HostReadWrite();
   double *hcoords = coordsDof.HostReadWrite();
 
@@ -793,7 +795,7 @@ void GaussianInterpExtData::setFieldTurbVisc() {
 
   // mean output from plane interpolation
   // 0) x, 1) y, 3) nut
-  // TODO: z not provided
+  // TODO(garobed1): z not provided
 
   // open, read data
   if (rank0_) {
@@ -845,7 +847,7 @@ void GaussianInterpExtData::setFieldTurbVisc() {
     for (int i = 0; i < vdofs.Size(); i++) {
       // index in gf of element
       int n = vdofs[i];
-      // TODO: This check is causing issues in parallel
+      // TODO(garobed1): This check is causing issues in parallel
       // if (n >= Sdof_) {
       //   std::cout << " ERROR: problem with GetNE in external data interpolation " << n << " of " << Sdof_ << " dofs"
       //             << endl;
@@ -907,7 +909,7 @@ void GaussianInterpExtData::setFieldTurbVisc() {
 
 void GaussianInterpExtData::setInletTurbScalars() {
   // repeat for tke inlet field data
-  // TODO: no support for 3D
+  // TODO(garobed1): no support for 3D
   ParGridFunction coordsDof(vfes_);
   pmesh_->GetNodes(coordsDof);
 
@@ -956,7 +958,7 @@ void GaussianInterpExtData::setInletTurbScalars() {
 
   // mean output from plane interpolation
   // 0) x, 1) y, 3) nut
-  // TODO: z not provided
+  // TODO(garobed1): z not provided
 
   // open, read data
   if (rank0_) {
@@ -1011,7 +1013,7 @@ void GaussianInterpExtData::setInletTurbScalars() {
     for (int i = 0; i < vdofs.Size(); i++) {
       // index in gf of bndry element
       int n = vdofs[i];
-      // TODO: Same issue
+      // TODO(garobed1): Same issue
       // if (n >= Sdof_) {
       //   std::cout << " ERROR: problem with GetNBE in external data interpolation " << n << " of " << Sdof_ << " dofs"
       //             << endl;
