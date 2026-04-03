@@ -190,9 +190,6 @@ void GaussianInterpExtData::initializeSelf() {
     yfes_ = new ParFiniteElementSpace(pmesh_, yfec_, nSpec_);
     Yn_gf_.SetSpace(yfes_);
     Yn_gf_ = 0.0;
-
-    Yfull_gf_.SetSpace(yfes_);
-    Yfull_gf_ = 0.0;
   }
   
   // exports
@@ -209,7 +206,6 @@ void GaussianInterpExtData::initializeSelf() {
   }
   if (nSpec_ > 0) {
     toThermoChem_interface_.Ydata = &Yn_gf_;
-    toThermoChem_interface_.Yfulldata = &Yfull_gf_;
   }
   
   // turb model
@@ -274,10 +270,6 @@ void GaussianInterpExtData::setup() {
   
   if (isInterpTurbField_) {
     setFieldTurbVisc();
-  }
-
-  if (isInitSpeciesField_) {
-    setFieldInitSpec();
   }
 }
 

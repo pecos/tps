@@ -170,6 +170,8 @@ LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, t
   tpsP_->getInput("loMach/ltethermo/streamwise-stabilization", sw_stab_, false);
   tpsP_->getInput("loMach/ltethermo/Reh_factor", Reh_factor_, 0.5);
   tpsP_->getInput("loMach/ltethermo/Reh_offset", Reh_offset_, 1.0);
+
+  tpsP_->getInput("loMach/ltethermo/neumann-temp", neumann_temp_, false);
 }
 
 LteThermoChem::~LteThermoChem() {
@@ -429,35 +431,53 @@ void LteThermoChem::initializeSelf() {
 
       if (type == "uniform") {
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
-        inlet_attr = 0;
-        inlet_attr[patch - 1] = 1;
-        double temperature_value;
-        tpsP_->getRequiredInput((basepath + "/temperature").c_str(), temperature_value);
-        if (rank0_) {
-          std::cout << "Calorically Perfect: Setting uniform Dirichlet temperature on patch = " << patch << std::endl;
+        if (!neumann_temp_) {
+          inlet_attr = 0;
+          inlet_attr[patch - 1] = 1;
+          double temperature_value;
+          tpsP_->getRequiredInput((basepath + "/temperature").c_str(), temperature_value);
+          if (rank0_) {
+            std::cout << "Calorically Perfect: Setting uniform Dirichlet temperature on patch = " << patch << std::endl;
+          }
+          AddTempDirichletBC(temperature_value, inlet_attr);
+
+        } else {
+          if (rank0_) {
+            std::cout << "Calorically Perfect: Setting zero Neumann temperature on patch = " << patch
+                      << std::endl;
+          }
         }
-        AddTempDirichletBC(temperature_value, inlet_attr);
 
       } else if (type == "interpolate") {
-        Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
-        inlet_attr = 0;
-        inlet_attr[patch - 1] = 1;
-        temperature_bc_field_ = new GridFunctionCoefficient(extData_interface_->Tdata);
-        if (rank0_) {
-          // std::cout << "Tdata[0] = " << *extData_interface_->Tdata[0] << std::endl;
-          std::cout << "Calorically Perfect: Setting interpolated Dirichlet temperature on patch = " << patch
-                    << std::endl;
-        }
-        // AddTempDirichletBC(temperature_bc_field_, inlet_attr);
+        if (!neumann_temp_) {
+          Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
+          inlet_attr = 0;
+          inlet_attr[patch - 1] = 1;
+          temperature_bc_field_ = new GridFunctionCoefficient(extData_interface_->Tdata);
+          if (rank0_) {
+            // std::cout << "Tdata[0] = " << *extData_interface_->Tdata[0] << std::endl;
+            std::cout << "Calorically Perfect: Setting interpolated Dirichlet temperature on patch = " << patch
+                      << std::endl;
+          }
 
-        // // Force the IC to agree with the interpolated inlet BC
-        // //
-        // // NB: It is still possible for Tn_gf_ on a restart to
-        // // disagree with this BC.  Specifically, since the restart
-        // // field is read after this projection, if it does not satisfy
-        // // this BC, there will be a discrepancy (which will be
-        // // eliminated after the first step).
-        // Tn_gf_.ProjectBdrCoefficient(*temperature_bc_field_, inlet_attr);
+          
+          AddTempDirichletBC(temperature_bc_field_, inlet_attr);
+
+          // // Force the IC to agree with the interpolated inlet BC
+          // //
+          // // NB: It is still possible for Tn_gf_ on a restart to
+          // // disagree with this BC.  Specifically, since the restart
+          // // field is read after this projection, if it does not satisfy
+          // // this BC, there will be a discrepancy (which will be
+          // // eliminated after the first step).
+          // Tn_gf_.ProjectBdrCoefficient(*temperature_bc_field_, inlet_attr);
+        } else {
+          if (rank0_) {
+            std::cout << "Calorically Perfect: Setting zero Neumann temperature on patch = " << patch
+                      << std::endl;
+          }
+        }
+
       } else {
         if (rank0_) {
           std::cout << "ERROR: Calorically Perfect inlet type = " << type << " not supported." << std::endl;

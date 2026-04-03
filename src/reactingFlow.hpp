@@ -122,6 +122,9 @@ class ReactingFlow : public ThermoChemModelBase {
   bool domain_is_open_ = false;     /**< true if domain is open */
   bool axisym_ = false;             /**< true if simulation is axisymmetric */
   bool species_init_ = false;       /**< true if species are initialized from file */
+  bool neumann_temp_ = false;       /**< only applies to inlet */
+  bool neumann_species_inlet_ = true;       /**< only applies to inlet */
+  bool neumann_species_wall_  = true;       /**< only applies to inlet */
 
   // Linear-solver-related options
   int pl_solve_ = 0;    /**< Verbosity level passed to mfem solvers */

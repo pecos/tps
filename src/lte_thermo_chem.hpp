@@ -91,6 +91,7 @@ class LteThermoChem final : public ThermoChemModelBase {
   bool domain_is_open_ = false;   /**< true if domain is open */
   bool axisym_ = false;
   bool sw_stab_ = false; /**< Enable/disable supg stabilization. */
+  bool neumann_temp_ = false;      /**< only applies to the inlet */
   double Reh_factor_, Reh_offset_; /**< supg stabilization parameters */
 
   // Linear-solver-related options

@@ -86,6 +86,10 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   tpsP_->getInput("loMach/reacting/eddy-Pr", Pr_, 0.72);
   tpsP_->getInput("loMach/reacting/eddy-Sc", Sc_, 1.0);
 
+  tpsP_->getInput("loMach/reacting/neumann-temp", neumann_temp_, false);
+  tpsP_->getInput("loMach/reacting/neumann-species-inlet", neumann_species_inlet_, true);
+  tpsP_->getInput("loMach/reacting/neumann-species-wall", neumann_species_wall_, true);
+
   workFluid_ = USER_DEFINED;
   gasModel_ = PERFECT_MIXTURE;
   chemistryModel_ = NUM_CHEMISTRYMODEL;
@@ -1201,42 +1205,69 @@ void ReactingFlow::initializeSelf() {
 
       if (type == "uniform") {
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
-        inlet_attr = 0;
-        inlet_attr[patch - 1] = 1;
-        double temperature_value;
-        tpsP_->getRequiredInput((basepath + "/temperature").c_str(), temperature_value);
-        if (rank0_) {
-          std::cout << "Rx Flow: Setting uniform Dirichlet temperature on patch = " << patch << std::endl;
+        if (!neumann_temp_) {
+          inlet_attr = 0;
+          inlet_attr[patch - 1] = 1;
+          double temperature_value;
+          tpsP_->getRequiredInput((basepath + "/temperature").c_str(), temperature_value);
+          if (rank0_) {
+            std::cout << "Rx Flow: Setting uniform Dirichlet temperature on patch = " << patch << std::endl;
+          }
+          AddTempDirichletBC(temperature_value, inlet_attr);
+        } else {
+          if (rank0_) {
+            std::cout << "Rx Flow: Setting zero Neumann temperature on patch = " << patch << std::endl;
+          }
         }
-        AddTempDirichletBC(temperature_value, inlet_attr);
 
-        // AddSpecDirichletBC(0.0, inlet_attr);
+        if (neumann_species_inlet_) {
+          if (rank0_) {
+            std::cout << "Rx Flow: Setting zero Neumann species on patch = " << patch << std::endl;
+          }
+        } else {
+          if (rank0_) {
+            std::cout << "Rx Flow: Setting zero Dirichlet species on patch = " << patch << std::endl;
+          }
+          AddSpecDirichletBC(0.0, inlet_attr);
+        }
 
       } else if (type == "interpolate") {
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
-        inlet_attr = 0;
-        inlet_attr[patch - 1] = 1;
-        temperature_bc_field_ = new GridFunctionCoefficient(extData_interface_->Tdata);
-        if (rank0_) {
-          std::cout << "Rx Flow: Setting interpolated Dirichlet temperature on patch = " << patch << std::endl;
-        }
-        // AddTempDirichletBC(temperature_bc_field_, inlet_attr);
+        if (!neumann_temp_) {
+          inlet_attr = 0;
+          inlet_attr[patch - 1] = 1;
+          temperature_bc_field_ = new GridFunctionCoefficient(extData_interface_->Tdata);
+          if (rank0_) {
+            std::cout << "Rx Flow: Setting interpolated Dirichlet temperature on patch = " << patch << std::endl;
+          }
+          AddTempDirichletBC(temperature_bc_field_, inlet_attr);
 
-        // Force the IC to agree with the interpolated inlet BC
-        //
-        // NB: It is still possible for Tn_gf_ on a restart to
-        // disagree with this BC.  Specifically, since the restart
-        // field is read after this projection, if it does not satisfy
-        // this BC, there will be a discrepancy (which will be
-        // eliminated after the first step).
-        Tn_gf_.ProjectBdrCoefficient(*temperature_bc_field_, inlet_attr);
-
-        species_bc_field_ = new GridFunctionCoefficient(extData_interface_->Ydata);
-        if (rank0_) {
-          std::cout << "Rx Flow: Setting interpolated Dirichlet species on patch = " << patch << std::endl;
+          // Force the IC to agree with the interpolated inlet BC
+          //
+          // NB: It is still possible for Tn_gf_ on a restart to
+          // disagree with this BC.  Specifically, since the restart
+          // field is read after this projection, if it does not satisfy
+          // this BC, there will be a discrepancy (which will be
+          // eliminated after the first step).
+          Tn_gf_.ProjectBdrCoefficient(*temperature_bc_field_, inlet_attr);
+        } else {
+          if (rank0_) {
+            std::cout << "Rx Flow: Setting zero Neumann temperature on patch = " << patch << std::endl;
+          }
         }
-        // AddSpecDirichletBC(species_bc_field_, inlet_attr);
-        // Yn_gf_.ProjectBdrCoefficient(*species_bc_field_, inlet_attr);
+        
+        if (neumann_species_inlet_) {
+          if (rank0_) {
+            std::cout << "Rx Flow: Setting zero Neumann species on patch = " << patch << std::endl;
+          }
+        } else {
+          species_bc_field_ = new GridFunctionCoefficient(extData_interface_->Ydata);
+          if (rank0_) {
+            std::cout << "Rx Flow: Setting interpolated Dirichlet species on patch = " << patch << std::endl;
+          }
+          AddSpecDirichletBC(species_bc_field_, inlet_attr);
+          Yn_gf_.ProjectBdrCoefficient(*species_bc_field_, inlet_attr);
+        }
 
       } else {
         if (rank0_) {
@@ -1294,7 +1325,9 @@ void ReactingFlow::initializeSelf() {
         Qt_bc_coeff->constant = 0.0;
         AddQtDirichletBC(Qt_bc_coeff, attr_wall);
 
-        // AddSpecDirichletBC(0.0, attr_wall);
+        if (neumann_species_wall_) {
+          AddSpecDirichletBC(0.0, attr_wall);
+        }
       }
     }
     if (rank0_) std::cout << "Temp wall bc completed: " << numWalls << endl;
