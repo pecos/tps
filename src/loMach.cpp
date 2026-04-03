@@ -54,7 +54,6 @@
 #include "logger.hpp"
 #include "lte_thermo_chem.hpp"
 #include "reactingFlow.hpp"
-#include "static_thermo.hpp"
 #include "tomboulides.hpp"
 #include "tps.hpp"
 #include "utils.hpp"
