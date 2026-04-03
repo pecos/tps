@@ -57,7 +57,7 @@ EXTRA_DIST  = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes lte-
 	      	  lomach-flow.test lomach-lequere.test interpInlet.test sgsLoMach.test autoPeriodic.test aveLoMach.test \
               reactFlow-binDiff.test reactFlow-singleRx.test reactFlow-table.test radiativeDecay.test \
 			  lomach-chan-stab.test reactFlow-nitrogen.test argon_minimal.test argon_minimal.binary.test \
-			supg-scalars.test
+			  supg-scalars.test lomach-pipe-zf.test
 
 
 TESTS = vpath.sh
@@ -132,7 +132,8 @@ TESTS += cyl3d.test \
          reactFlow-singleRx.test \
          reactFlow-table.test \
          radiativeDecay.test \
-		 lomach-chan-stab.test
+		 lomach-chan-stab.test \
+		 lomach-pipe-zf.test \
          reactFlow-nitrogen.test \
 	 supg-scalars.test
 
