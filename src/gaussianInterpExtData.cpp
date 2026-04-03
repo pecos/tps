@@ -90,22 +90,20 @@ GaussianInterpExtData::GaussianInterpExtData(mfem::ParMesh *pmesh, LoMachOptions
 
   // turbulence
   tpsP_->getInput("loMach/turb-model", turb_type_, std::string("none"));
-  
+
   // specify species
   tpsP_->getInput("plasma_models/initialize_species", species_init_, false);
 
-
   // tke and v2 inlet boundary condition for zeta-f model
   if (turb_type_ == "zeta-f") {
-    if (rank0_)
-      std::cout << "Checking for requested interpolated zeta-f data..." << endl;
+    if (rank0_) std::cout << "Checking for requested interpolated zeta-f data..." << endl;
     for (int i = 1; i <= numInlets; i++) {
       std::string type;
       std::string basepath("boundaryConditions/inlet" + std::to_string(i));
       tpsP_->getRequiredInput((basepath + "/type").c_str(), type);
       tpsP_->getInput((basepath + "/tke").c_str(), tke_const_, 0.0);
-      if (tke_const_ < 1e-12) { // if a constant tke is not specified, use interp
-        if (type == "interpolate" || type == "fully-developed-pipe"  || type == "fully-developed-pipe-swirl") {
+      if (tke_const_ < 1e-12) {  // if a constant tke is not specified, use interp
+        if (type == "interpolate" || type == "fully-developed-pipe" || type == "fully-developed-pipe-swirl") {
           if (rank0_) std::cout << "...zeta-f interpolation required" << endl;
           if (isInterpTurbInlet_) {
             // If we've already set isInterpInlet_, then user requested
@@ -122,8 +120,7 @@ GaussianInterpExtData::GaussianInterpExtData(mfem::ParMesh *pmesh, LoMachOptions
 
   // static turbulence model, specify non-uniform mu_t field
   if (turb_type_ == "static-rans") {
-    if (rank0_) 
-      std::cout << "...static-rans specified" << endl;
+    if (rank0_) std::cout << "...static-rans specified" << endl;
     if (rank0_) {
       std::cout << "Checking for requested interpolated eddy viscosity field data..." << endl;
 
@@ -135,8 +132,7 @@ GaussianInterpExtData::GaussianInterpExtData(mfem::ParMesh *pmesh, LoMachOptions
 
   // specify initial species fraction fields
   if (species_init_) {
-    if (rank0_) 
-      std::cout << "...initial species fractions specified" << endl;
+    if (rank0_) std::cout << "...initial species fractions specified" << endl;
     if (rank0_) {
       std::cout << "Checking for requested species fraction field data..." << endl;
 
@@ -145,7 +141,6 @@ GaussianInterpExtData::GaussianInterpExtData(mfem::ParMesh *pmesh, LoMachOptions
       // tpsP_->getInput("loMach/static-rans/visc-fac", v_fac_, 1.0);
     }
   }
-
 }
 
 GaussianInterpExtData::~GaussianInterpExtData() {
@@ -156,7 +151,7 @@ GaussianInterpExtData::~GaussianInterpExtData() {
 }
 
 void GaussianInterpExtData::initializeSelf() {
-  if (!isInterpInlet_ && !isInterpTurbInlet_ && !isInterpTurbField_  && !isInitSpeciesField_) {
+  if (!isInterpInlet_ && !isInterpTurbInlet_ && !isInterpTurbField_ && !isInitSpeciesField_) {
     return;
   }
 
@@ -184,14 +179,14 @@ void GaussianInterpExtData::initializeSelf() {
   velocity_gf_ = 0.0;
   vel0_gf_.SetSpace(vfes_);
   vel0_gf_ = 0.0;
-  
+
   if (nSpec_ > 0) {
     yfec_ = new H1_FECollection(order_);
     yfes_ = new ParFiniteElementSpace(pmesh_, yfec_, nSpec_);
     Yn_gf_.SetSpace(yfes_);
     Yn_gf_ = 0.0;
   }
-  
+
   // exports
   toThermoChem_interface_.Tdata = &temperature_gf_;
   toFlow_interface_.Udata = &velocity_gf_;
@@ -207,7 +202,7 @@ void GaussianInterpExtData::initializeSelf() {
   if (nSpec_ > 0) {
     toThermoChem_interface_.Ydata = &Yn_gf_;
   }
-  
+
   // turb model
   if (turb_type_ != "none") {
     nut_gf_.SetSpace(sfes_);
@@ -220,7 +215,6 @@ void GaussianInterpExtData::initializeSelf() {
     toTurbModel_interface_.TKEdata = &tke_gf_;
     toTurbModel_interface_.V2data = &v2_gf_;
   }
-
 }
 
 void GaussianInterpExtData::initializeViz(ParaViewDataCollection &pvdc) {
@@ -245,7 +239,6 @@ void GaussianInterpExtData::initializeViz(ParaViewDataCollection &pvdc) {
   // if (isInitSpeciesField_) {
   //   pvdc.RegisterField("externalNuT", &nut_gf_);
   // }
-
 }
 
 // TODO(swh): add a translation and rotation for external data plane
@@ -258,23 +251,20 @@ void GaussianInterpExtData::setup() {
     return;
   }
 
-
   if (isInterpInlet_) {
     setInlet();
   }
-  
+
   if (isInterpTurbInlet_) {
     setInletTurbScalars();
-    
   }
-  
+
   if (isInterpTurbField_) {
     setFieldTurbVisc();
   }
 }
 
 void GaussianInterpExtData::setInlet() {
-  
   ParGridFunction coordsDof(vfes_);
   pmesh_->GetNodes(coordsDof);
 
@@ -283,11 +273,11 @@ void GaussianInterpExtData::setInlet() {
   if (nSpec_ > maxSpec) {
     if (rank0_) {
       std::cout << "Requesting more species than set in c-standard-required compile-time limit.  Increase maxSpec in "
-                    "gaussianInterpExtData.cpp"
+                   "gaussianInterpExtData.cpp"
                 << endl;
     }
   }
-    
+
   double *Tdata = temperature_gf_.HostReadWrite();
   double *Udata = velocity_gf_.HostReadWrite();
   double *U0 = vel0_gf_.HostReadWrite();
@@ -404,7 +394,6 @@ void GaussianInterpExtData::setInlet() {
     fflush(stdout);
   }
 
-
   /*
   // width of interpolation stencil
   // double Lx, Ly, Lz, Lmax;
@@ -421,7 +410,7 @@ void GaussianInterpExtData::setInlet() {
   double radius = 2.0 * torch_radius / nSamples; // 300 from nxn interp plane
   */
   double radius = 1.0;
-  bool search = true;
+  // bool search = true;
   // NB: be careful with GetNBE (see comments in mfem/mesh/mesh.hpp)
   for (int be = 0; be < pmesh_->GetNBE(); be++) {
     Array<int> vdofs;
@@ -565,11 +554,10 @@ void GaussianInterpExtData::setInlet() {
   }
 }
 
-
 void GaussianInterpExtData::setFieldInitSpec() {
   ParGridFunction coordsDof(vfes_);
   pmesh_->GetNodes(coordsDof);
-  // now repeat for the spec field data 
+  // now repeat for the spec field data
   // TODO: no support for 3D
   double *Yfulldata = Yfull_gf_.HostReadWrite();
   double *hcoords = coordsDof.HostReadWrite();
@@ -622,7 +610,6 @@ void GaussianInterpExtData::setFieldInitSpec() {
     ifstream file;
     file.open(fnamespecRead);
 
-
     string line;
     getline(file, line);
     int nLines = 0;
@@ -661,7 +648,7 @@ void GaussianInterpExtData::setFieldInitSpec() {
   }
 
   // broadcast data
-  if (rank0_) { 
+  if (rank0_) {
     std::cout << " precom species data" << endl;
     fflush(stdout);
   }
@@ -671,7 +658,7 @@ void GaussianInterpExtData::setFieldInitSpec() {
     fflush(stdout);
   }
 
-  bool search = true;
+  // bool search = true;
   double radius_spec = 1.0;
 
   // now all interior points for nu_t
@@ -729,7 +716,7 @@ void GaussianInterpExtData::setFieldInitSpec() {
         if (dist <= 1.5 * radius_spec) {
           wt = exp(-(dist * dist) / (radius_spec * radius_spec));
           wt_tot += wt;
-          
+
           for (int is = 0; is < nSpec_; is++) {
             val_y[is] = val_y[is] + wt * spec[j].yn[is];
           }
@@ -761,7 +748,7 @@ void GaussianInterpExtData::setFieldInitSpec() {
 void GaussianInterpExtData::setFieldTurbVisc() {
   ParGridFunction coordsDof(vfes_);
   pmesh_->GetNodes(coordsDof);
-  // now repeat for the turb field data 
+  // now repeat for the turb field data
   // TODO: no support for 3D
   double *NuTdata = nut_gf_.HostReadWrite();
   double *hcoords = coordsDof.HostReadWrite();
@@ -831,7 +818,7 @@ void GaussianInterpExtData::setFieldTurbVisc() {
         } else if (entry == 2) {
           turb[nLines].y = buffer;
         } else if (entry == 3) {
-          turb[nLines].nut = buffer*v_fac_;
+          turb[nLines].nut = buffer * v_fac_;
         }
       }
       turb[nLines].z = 0.0;
@@ -848,7 +835,7 @@ void GaussianInterpExtData::setFieldTurbVisc() {
     fflush(stdout);
   }
 
-  bool search = true;
+  // bool search = true;
   double radius_turb = 1.0;
 
   // now all interior points for nu_t
@@ -907,7 +894,6 @@ void GaussianInterpExtData::setFieldTurbVisc() {
           wt_tot += wt;
           val_nu_T = val_nu_T + wt * turb[j].nut;
         }
-
       }
 
       if (wt_tot > 0.0) {
@@ -920,8 +906,7 @@ void GaussianInterpExtData::setFieldTurbVisc() {
 }
 
 void GaussianInterpExtData::setInletTurbScalars() {
-
-  // repeat for tke inlet field data 
+  // repeat for tke inlet field data
   // TODO: no support for 3D
   ParGridFunction coordsDof(vfes_);
   pmesh_->GetNodes(coordsDof);
@@ -1017,7 +1002,7 @@ void GaussianInterpExtData::setInletTurbScalars() {
     fflush(stdout);
   }
 
-  bool search = true;
+  // bool search = true;
   double radius = 1.0;
   // now all boundary points for tke
   for (int be = 0; be < pmesh_->GetNBE(); be++) {
@@ -1092,7 +1077,6 @@ void GaussianInterpExtData::setInletTurbScalars() {
           val_TKE = val_TKE + wt * tke_pr[j].tke;
           val_V2 = val_V2 + wt * tke_pr[j].tke;
         }
-
       }
 
       if (wt_tot > 0.0) {
@@ -1100,16 +1084,14 @@ void GaussianInterpExtData::setInletTurbScalars() {
         // TKEdata[n] = 1.5*V2data[n];
         // std::cout << TKEdata[n] << std::endl;
         TKEdata[n] = val_TKE / wt_tot;
-        V2data[n] = std::min(val_V2 / wt_tot, (2./3.)*TKEdata[n]);
+        V2data[n] = std::min(val_V2 / wt_tot, (2. / 3.) * TKEdata[n]);
       } else {
         TKEdata[n] = 0.0;
         V2data[n] = 0.0;
       }
     }
   }
-
 }
-
 
 void GaussianInterpExtData::step() {
   // empty for now, use for any updates/modifications

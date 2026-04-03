@@ -38,15 +38,12 @@
 using namespace mfem;
 
 StaticRans::StaticRans(ParMesh *pmesh, const Array<int> &partitioning, int order, TPS::Tps *tps)
-: pmesh_(pmesh), order_(order) {
-
-
+    : pmesh_(pmesh), order_(order) {
   // tps->getInput("loMach/static-rans/visc-file", visc_file_);
 
   // Scalar FEM space
   sfec_ = new H1_FECollection(order_);
   sfes_ = new ParFiniteElementSpace(pmesh_, sfec_);
-
 }
 
 StaticRans::~StaticRans() {
@@ -68,12 +65,9 @@ void StaticRans::initializeSelf() {
   nut_field_ = new GridFunctionCoefficient(extData_interface_->NuTdata);
 }
 
-void StaticRans::initializeViz(mfem::ParaViewDataCollection &pvdc) {
-  pvdc.RegisterField("muT", mut_);
-}
+void StaticRans::initializeViz(mfem::ParaViewDataCollection &pvdc) { pvdc.RegisterField("muT", mut_); }
 
 void StaticRans::step() {
-
   mut_->ProjectCoefficient(*nut_field_);
   *mut_ *= *thermoChem_interface_->density;
 }

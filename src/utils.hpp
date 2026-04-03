@@ -273,29 +273,29 @@ class TransformedMatrixVectorCoefficient : public MatrixCoefficient {
   virtual ~TransformedMatrixVectorCoefficient() {}
 };
 
-
 /// TransformedCoefficient that accepts std::function instead of C-like function pointers
 /// easier to implement wrapped functions with fixed arguments
-class ExtTransformedCoefficient : public Coefficient
-{
-protected:
-  Coefficient * Q1;
-  Coefficient * Q2;
+class ExtTransformedCoefficient : public Coefficient {
+ protected:
+  Coefficient *Q1;
+  Coefficient *Q2;
   std::function<double(double)> Transform1;
   std::function<double(double, double)> Transform2;
 
-public:
+ public:
   /// Define a time-independent coefficient from a std function
   /** \param F time-independent std::function */
-  ExtTransformedCoefficient(Coefficient * q,
-      std::function<double(double)> F)
-    : Q1(q), Transform1(std::move(F)) { Q2 = 0; Transform2 = 0; }
+  ExtTransformedCoefficient(Coefficient *q, std::function<double(double)> F) : Q1(q), Transform1(std::move(F)) {
+    Q2 = 0;
+    Transform2 = 0;
+  }
 
   /// Define a time-dependent coefficient from a std function
   /** \param TDF time-dependent function */
-  ExtTransformedCoefficient(Coefficient * q1,Coefficient * q2,
-      std::function<double(double, double)> F)
-    : Q1(q1), Q2(q2), Transform2(std::move(F)) { Transform1 = 0; }
+  ExtTransformedCoefficient(Coefficient *q1, Coefficient *q2, std::function<double(double, double)> F)
+      : Q1(q1), Q2(q2), Transform2(std::move(F)) {
+    Transform1 = 0;
+  }
 
   /// Set the time for internally stored coefficients
   void SetTime(double t);

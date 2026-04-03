@@ -55,83 +55,82 @@ static double radius(const Vector &pos) { return pos[0]; }
 static FunctionCoefficient radius_coeff(radius);
 
 ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &time_coeff,
-  ParGridFunction *gridScale, TPS::Tps *tps)
-  : tpsP_(tps), pmesh_(pmesh), dim_(pmesh->Dimension()), time_coeff_(time_coeff) {
-    rank0_ = (pmesh_->GetMyRank() == 0);
-    order_ = loMach_opts->order;
-    gridScale_gf_ = gridScale;
-    
-    /// Basic input information
-    tpsP_->getInput("loMach/ambientPressure", ambient_pressure_, 101325.0);
-    thermo_pressure_ = ambient_pressure_;
-    Pnm1_ = thermo_pressure_;
-    Pnm2_ = Pnm1_;
-    Pnm3_ = Pnm1_;
-    dtP_ = 0.0;
-    
-    tps->getInput("loMach/axisymmetric", axisym_, false);
-    
-    tpsP_->getInput("initialConditions/temperature", T_ic_, 300.0);
-    
-    filter_temperature_ = loMach_opts->filterTemp;
-    filter_alpha_ = loMach_opts->filterWeight;
-    filter_cutoff_modes_ = loMach_opts->nFilter;
-    
-    tpsP_->getInput("loMach/openSystem", domain_is_open_, false);
-    
-    tpsP_->getInput("loMach/reacting/linear-solver-rtol", rtol_, 1e-12);
-    tpsP_->getInput("loMach/reacting/linear-solver-max-iter", max_iter_, 2000);
-    tpsP_->getInput("loMach/reacting/linear-solver-verbosity", pl_solve_, 0);
-    
-    tpsP_->getInput("loMach/reacting/eddy-Pr", Pr_, 0.72);
-    tpsP_->getInput("loMach/reacting/eddy-Sc", Sc_, 1.0);
-    
-  
-    tpsP_->getInput("loMach/reacting/clip-temperature", Tclip_, false);
-    tpsP_->getInput("loMach/reacting/min-temperature", Tmin_, 0.0);
-    tpsP_->getInput("loMach/reacting/max-temperature", Tmax_, 100000.0);
-    
-    workFluid_ = USER_DEFINED;
-    gasModel_ = PERFECT_MIXTURE;
-    chemistryModel_ = NUM_CHEMISTRYMODEL;
-    
-    std::string gas;
-    tpsP_->getInput("plasma_models/gas", gas, std::string("argon"));
-    
-    if (gas == "Ar" || gas == "argon") {
-      gasType_ = Ar;
-      gasInput_.gas = GasType::Ar;
-    } else if (gas == "Ni" || gas == "nitrogen") {
-      gasType_ = Ni;
-      gasInput_.gas = GasType::Ni;
-    } else {
-      printf("Unknown gasType.");
-      assert(false);
-    }
-    
-    std::string transportModelStr;
-    tpsP_->getRequiredInput("plasma_models/transport_model", transportModelStr);
-    switch (gasType_) {
-      case Ar:
+                           ParGridFunction *gridScale, TPS::Tps *tps)
+    : tpsP_(tps), pmesh_(pmesh), dim_(pmesh->Dimension()), time_coeff_(time_coeff) {
+  rank0_ = (pmesh_->GetMyRank() == 0);
+  order_ = loMach_opts->order;
+  gridScale_gf_ = gridScale;
+
+  /// Basic input information
+  tpsP_->getInput("loMach/ambientPressure", ambient_pressure_, 101325.0);
+  thermo_pressure_ = ambient_pressure_;
+  Pnm1_ = thermo_pressure_;
+  Pnm2_ = Pnm1_;
+  Pnm3_ = Pnm1_;
+  dtP_ = 0.0;
+
+  tps->getInput("loMach/axisymmetric", axisym_, false);
+
+  tpsP_->getInput("initialConditions/temperature", T_ic_, 300.0);
+
+  filter_temperature_ = loMach_opts->filterTemp;
+  filter_alpha_ = loMach_opts->filterWeight;
+  filter_cutoff_modes_ = loMach_opts->nFilter;
+
+  tpsP_->getInput("loMach/openSystem", domain_is_open_, false);
+
+  tpsP_->getInput("loMach/reacting/linear-solver-rtol", rtol_, 1e-12);
+  tpsP_->getInput("loMach/reacting/linear-solver-max-iter", max_iter_, 2000);
+  tpsP_->getInput("loMach/reacting/linear-solver-verbosity", pl_solve_, 0);
+
+  tpsP_->getInput("loMach/reacting/eddy-Pr", Pr_, 0.72);
+  tpsP_->getInput("loMach/reacting/eddy-Sc", Sc_, 1.0);
+
+  tpsP_->getInput("loMach/reacting/clip-temperature", Tclip_, false);
+  tpsP_->getInput("loMach/reacting/min-temperature", Tmin_, 0.0);
+  tpsP_->getInput("loMach/reacting/max-temperature", Tmax_, 100000.0);
+
+  workFluid_ = USER_DEFINED;
+  gasModel_ = PERFECT_MIXTURE;
+  chemistryModel_ = NUM_CHEMISTRYMODEL;
+
+  std::string gas;
+  tpsP_->getInput("plasma_models/gas", gas, std::string("argon"));
+
+  if (gas == "Ar" || gas == "argon") {
+    gasType_ = Ar;
+    gasInput_.gas = GasType::Ar;
+  } else if (gas == "Ni" || gas == "nitrogen") {
+    gasType_ = Ni;
+    gasInput_.gas = GasType::Ni;
+  } else {
+    printf("Unknown gasType.");
+    assert(false);
+  }
+
+  std::string transportModelStr;
+  tpsP_->getRequiredInput("plasma_models/transport_model", transportModelStr);
+  switch (gasType_) {
+    case Ar:
       if (transportModelStr == "gas_mixture" || transportModelStr == "argon_mixture") {
         transportModel_ = ARGON_MIXTURE;
       } else if (transportModelStr == "constant") {
         transportModel_ = CONSTANT;
       }
       break;
-      case Ni:
+    case Ni:
       if (transportModelStr == "gas_mixture" || transportModelStr == "nitrogen_mixture") {
         transportModel_ = NITROGEN_MIXTURE;
       } else if (transportModelStr == "constant") {
         transportModel_ = CONSTANT;
       }
       break;
-      default:  // will already have exited but this is needed to make the style check happy
+    default:  // will already have exited but this is needed to make the style check happy
       assert(false);
       break;
-    }
+  }
 
-    /// Minimal amount of info for mixture input struct
+  /// Minimal amount of info for mixture input struct
   mixtureInput_.f = workFluid_;
   tpsP_->getInput("plasma_models/species_number", nSpecies_, 3);
   mixtureInput_.numSpecies = nSpecies_;
@@ -139,43 +138,43 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   tpsP_->getInput("plasma_models/two_temperature", mixtureInput_.twoTemperature, false);
   tpsP_->getInput("plasma_models/const_plasma_conductivity", const_plasma_conductivity_, 0.0);
   tpsP_->getInput("plasma_models/is_rad_decay_in_NEC", radiative_decay_NECincluded_, true);
-  
+
   if (mixtureInput_.twoTemperature) {
     if (rank0_) std::cout << "Two temperature is not yet supported in low Mach reacting flow." << std::endl;
     exit(ERROR);
   }
-  
+
   gasParams_.SetSize(nSpecies_, GasParams::NUM_GASPARAMS);
   gasParams_ = 0.0;
   speciesMolarCv_.SetSize(nSpecies_);
   speciesMolarCp_.SetSize(nSpecies_);
   specificHeatRatios_.SetSize(nSpecies_);
   initialMassFraction_.SetSize(nSpecies_);
-  
+
   for (int i = 0; i < nSpecies_ * GasParams::NUM_GASPARAMS; i++) {
     mixtureInput_.gasParams[i] = 0.0;
   }
   for (int i = 0; i < nSpecies_; i++) {
     mixtureInput_.molarCV[i] = 0.0;
   }
-  
+
   for (int i = 1; i <= nSpecies_; i++) {
     double formEnergy, levelDegeneracy;
     std::string basepath("species/species" + std::to_string(i));
-    
+
     tpsP_->getRequiredInput((basepath + "/formation_energy").c_str(), formEnergy);
     tpsP_->getInput((basepath + "/level_degeneracy").c_str(), levelDegeneracy, 1.0);
     tpsP_->getRequiredInput((basepath + "/perfect_mixture/constant_molar_cv").c_str(), speciesMolarCv_[i - 1]);
-    
+
     gasParams_((i - 1), GasParams::FORMATION_ENERGY) = formEnergy;
     gasParams_((i - 1), GasParams::SPECIES_DEGENERACY) = levelDegeneracy;
-    
+
     mixtureInput_.gasParams[(i - 1) + nSpecies_ * GasParams::FORMATION_ENERGY] = formEnergy;
     mixtureInput_.gasParams[(i - 1) + nSpecies_ * GasParams::SPECIES_DEGENERACY] = levelDegeneracy;
     tpsP_->getRequiredInput((basepath + "/perfect_mixture/constant_molar_cv").c_str(), mixtureInput_.molarCV[i - 1]);
     tpsP_->getRequiredInput((basepath + "/initialMassFraction").c_str(), initialMassFraction_(i - 1));
   }
-  
+
   /// Minimal amount of info for transport input struct
   std::vector<std::string> InputSpeciesNames;
   InputSpeciesNames.resize(nSpecies_);
@@ -184,7 +183,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   int backgroundIndex;
   int paramIdx = 0;
   int targetIdx;
-  
+
   tpsP_->getRequiredInput("atoms/numAtoms", nAtoms_);
   if (nSpecies_ > 1) {
     tpsP_->getRequiredInput("species/background_index", backgroundIndex);
@@ -196,72 +195,72 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
       tpsP_->getRequiredInput((basepath + "/mass").c_str(), atomMW_(a - 1));
       atomMap_[atomName] = a - 1;
       // if (rank0_) {
-        //   std::cout << " Atom: " << a << " is named " << atomName << " and has mass " << atomMW_(a - 1) << endl;
-        // }
-      }
+      //   std::cout << " Atom: " << a << " is named " << atomName << " and has mass " << atomMW_(a - 1) << endl;
+      // }
     }
-    speciesNames_.resize(nSpecies_);
-    speciesComposition_.SetSize(nSpecies_, nAtoms_);
-    speciesComposition_ = 0.0;
-    
-    for (int i = 1; i <= nSpecies_; i++) {
-      std::string speciesName;
-      std::string basepath("species/species" + std::to_string(i));
-      tpsP_->getRequiredInput((basepath + "/name").c_str(), speciesName);
-      InputSpeciesNames[i - 1] = speciesName;
-    }
-    
-    gasInput_.thirdOrderkElectron = true;
-    gasInput_.multiply = false;
-    switch (transportModel_) {
-      case ARGON_MIXTURE:
-      case NITROGEN_MIXTURE: {
-        // if (rank0_) std::cout << " parsing mixture transport inputs... " << endl;
-        tpsP_->getInput("plasma_models/transport_model/gas_mixture/third_order_thermal_conductivity",
-          gasInput_.thirdOrderkElectron, true);
-          if (!(gasInput_.thirdOrderkElectron) && rank0_)
-          std::cout << "Notice: Using 1st order electron thermal conductivity." << endl;
-          tpsP_->getInput("plasma_models/transport_model/artificial_multiplier/enabled", gasInput_.multiply, false);
-          if (gasInput_.multiply) {
-            tpsP_->getInput("plasma_models/transport_model/artificial_multiplier/viscosity",
-              gasInput_.fluxTrnsMultiplier[FluxTrns::VISCOSITY], 1.0);
+  }
+  speciesNames_.resize(nSpecies_);
+  speciesComposition_.SetSize(nSpecies_, nAtoms_);
+  speciesComposition_ = 0.0;
+
+  for (int i = 1; i <= nSpecies_; i++) {
+    std::string speciesName;
+    std::string basepath("species/species" + std::to_string(i));
+    tpsP_->getRequiredInput((basepath + "/name").c_str(), speciesName);
+    InputSpeciesNames[i - 1] = speciesName;
+  }
+
+  gasInput_.thirdOrderkElectron = true;
+  gasInput_.multiply = false;
+  switch (transportModel_) {
+    case ARGON_MIXTURE:
+    case NITROGEN_MIXTURE: {
+      // if (rank0_) std::cout << " parsing mixture transport inputs... " << endl;
+      tpsP_->getInput("plasma_models/transport_model/gas_mixture/third_order_thermal_conductivity",
+                      gasInput_.thirdOrderkElectron, true);
+      if (!(gasInput_.thirdOrderkElectron) && rank0_)
+        std::cout << "Notice: Using 1st order electron thermal conductivity." << endl;
+      tpsP_->getInput("plasma_models/transport_model/artificial_multiplier/enabled", gasInput_.multiply, false);
+      if (gasInput_.multiply) {
+        tpsP_->getInput("plasma_models/transport_model/artificial_multiplier/viscosity",
+                        gasInput_.fluxTrnsMultiplier[FluxTrns::VISCOSITY], 1.0);
         tpsP_->getInput("plasma_models/transport_model/artificial_multiplier/bulk_viscosity",
-          gasInput_.fluxTrnsMultiplier[FluxTrns::BULK_VISCOSITY], 1.0);
-          tpsP_->getInput("plasma_models/transport_model/artificial_multiplier/heavy_thermal_conductivity",
-            gasInput_.fluxTrnsMultiplier[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY], 1.0);
-            tpsP_->getInput("plasma_models/transport_model/artificial_multiplier/electron_thermal_conductivity",
-              gasInput_.fluxTrnsMultiplier[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY], 1.0);
-              tpsP_->getInput("plasma_models/transport_model/artificial_multiplier/momentum_transfer_frequency",
-                gasInput_.spcsTrnsMultiplier[SpeciesTrns::MF_FREQUENCY], 1.0);
-                tpsP_->getInput("plasma_models/transport_model/artificial_multiplier/diffusivity", gasInput_.diffMult, 1.0);
-                tpsP_->getInput("plasma_models/transport_model/artificial_multiplier/mobility", gasInput_.mobilMult, 1.0);
-              }
-            } break;
-            
-            case CONSTANT: {
-              // if (rank0_) {
-                //   std::cout << " parsing constant transport inputs... " << endl;
-                // }
-                tpsP_->getRequiredInput("plasma_models/transport_model/constant/viscosity",
-                  gasInput_.constantTransport.viscosity);
-                  tpsP_->getRequiredInput("plasma_models/transport_model/constant/bulk_viscosity",
-                    gasInput_.constantTransport.bulkViscosity);
-                    tpsP_->getRequiredInput("plasma_models/transport_model/constant/thermal_conductivity",
-                      gasInput_.constantTransport.thermalConductivity);
-                      tpsP_->getRequiredInput("plasma_models/transport_model/constant/electron_thermal_conductivity",
-                        gasInput_.constantTransport.electronThermalConductivity);
-                        std::string diffpath("plasma_models/transport_model/constant/diffusivity");
-                        std::string mtpath("plasma_models/transport_model/constant/momentum_transfer_frequency");
-                        for (int sp = 0; sp < nSpecies_; sp++) {
-                          gasInput_.constantTransport.diffusivity[sp] = 0.0;
-                          gasInput_.constantTransport.mtFreq[sp] = 0.0;
-                        }
-                        for (int sp = 0; sp < nSpecies_; sp++) {  // mixture species index.
-                          int inputSp = sp;
-                          tpsP_->getRequiredInput((diffpath + "/species" + std::to_string(inputSp + 1)).c_str(),
-                          gasInput_.constantTransport.diffusivity[sp]);
-                          if (mixtureInput_.twoTemperature)
-                          tpsP_->getRequiredInput((mtpath + "/species" + std::to_string(inputSp + 1)).c_str(),
+                        gasInput_.fluxTrnsMultiplier[FluxTrns::BULK_VISCOSITY], 1.0);
+        tpsP_->getInput("plasma_models/transport_model/artificial_multiplier/heavy_thermal_conductivity",
+                        gasInput_.fluxTrnsMultiplier[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY], 1.0);
+        tpsP_->getInput("plasma_models/transport_model/artificial_multiplier/electron_thermal_conductivity",
+                        gasInput_.fluxTrnsMultiplier[FluxTrns::ELECTRON_THERMAL_CONDUCTIVITY], 1.0);
+        tpsP_->getInput("plasma_models/transport_model/artificial_multiplier/momentum_transfer_frequency",
+                        gasInput_.spcsTrnsMultiplier[SpeciesTrns::MF_FREQUENCY], 1.0);
+        tpsP_->getInput("plasma_models/transport_model/artificial_multiplier/diffusivity", gasInput_.diffMult, 1.0);
+        tpsP_->getInput("plasma_models/transport_model/artificial_multiplier/mobility", gasInput_.mobilMult, 1.0);
+      }
+    } break;
+
+    case CONSTANT: {
+      // if (rank0_) {
+      //   std::cout << " parsing constant transport inputs... " << endl;
+      // }
+      tpsP_->getRequiredInput("plasma_models/transport_model/constant/viscosity",
+                              gasInput_.constantTransport.viscosity);
+      tpsP_->getRequiredInput("plasma_models/transport_model/constant/bulk_viscosity",
+                              gasInput_.constantTransport.bulkViscosity);
+      tpsP_->getRequiredInput("plasma_models/transport_model/constant/thermal_conductivity",
+                              gasInput_.constantTransport.thermalConductivity);
+      tpsP_->getRequiredInput("plasma_models/transport_model/constant/electron_thermal_conductivity",
+                              gasInput_.constantTransport.electronThermalConductivity);
+      std::string diffpath("plasma_models/transport_model/constant/diffusivity");
+      std::string mtpath("plasma_models/transport_model/constant/momentum_transfer_frequency");
+      for (int sp = 0; sp < nSpecies_; sp++) {
+        gasInput_.constantTransport.diffusivity[sp] = 0.0;
+        gasInput_.constantTransport.mtFreq[sp] = 0.0;
+      }
+      for (int sp = 0; sp < nSpecies_; sp++) {  // mixture species index.
+        int inputSp = sp;
+        tpsP_->getRequiredInput((diffpath + "/species" + std::to_string(inputSp + 1)).c_str(),
+                                gasInput_.constantTransport.diffusivity[sp]);
+        if (mixtureInput_.twoTemperature)
+          tpsP_->getRequiredInput((mtpath + "/species" + std::to_string(inputSp + 1)).c_str(),
                                   gasInput_.constantTransport.mtFreq[sp]);
       }
       if (speciesMapping.count("E")) {
@@ -270,13 +269,13 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
         gasInput_.constantTransport.electronIndex = -1;
       }
     } break;
-    
+
     default: {
       std::cout << "Unhandled case being accessed in reactingFlow..." << endl;
       assert(false);
     } break;
   }
-  
+
   // input file species index.
   for (int sp = 0; sp < nSpecies_; sp++) {
     if (sp == backgroundIndex - 1) {
@@ -292,7 +291,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     speciesNames_[targetIdx] = InputSpeciesNames[sp];
     mixtureToInputMap[targetIdx] = sp;
   }
-  
+
   DenseMatrix inputSpeciesComposition;
   inputSpeciesComposition.SetSize(nSpecies_, nAtoms_);
   inputSpeciesComposition = 0.0;
@@ -300,67 +299,67 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     std::string type, speciesName;
     std::vector<std::pair<std::string, std::string>> composition;
     std::string basepath("species/species" + std::to_string(i));
-    
+
     tpsP_->getRequiredInput((basepath + "/name").c_str(), speciesName);
-    
+
     tpsP_->getRequiredPairs((basepath + "/composition").c_str(), composition);
-    
+
     for (size_t c = 0; c < composition.size(); c++) {
       if (atomMap_.count(composition[c].first)) {
         int atomIdx = atomMap_[composition[c].first];
         inputSpeciesComposition(i - 1, atomIdx) = stoi(composition[c].second);
       } else {
         grvy_printf(GRVY_ERROR, "Requested atom %s for species %s is not available!\n", composition[c].first.c_str(),
-        speciesName.c_str());
+                    speciesName.c_str());
       }
     }
   }
-  
+
   Vector speciesCharge(nSpecies_);
   switch (gasType_) {
     case Ar:
-    for (int sp = 0; sp < nSpecies_; sp++) {
-      if (speciesNames_[sp] == "Ar.+1") {
-        speciesCharge[sp] = +1.0;
-      } else if (speciesNames_[sp] == "E") {
-        speciesCharge[sp] = -1.0;
-      } else {
-        speciesCharge[sp] = 0.0;
+      for (int sp = 0; sp < nSpecies_; sp++) {
+        if (speciesNames_[sp] == "Ar.+1") {
+          speciesCharge[sp] = +1.0;
+        } else if (speciesNames_[sp] == "E") {
+          speciesCharge[sp] = -1.0;
+        } else {
+          speciesCharge[sp] = 0.0;
+        }
       }
-    }
-    break;
+      break;
     case Ni:
-    for (int sp = 0; sp < nSpecies_; sp++) {
-      if (speciesNames_[sp] == "Ni.+1") {
-        speciesCharge[sp] = +1.0;
-      } else if (speciesNames_[sp] == "N2.+1") {
-        speciesCharge[sp] = +1.0;
-      } else if (speciesNames_[sp] == "E") {
-        speciesCharge[sp] = -1.0;
-      } else {
-        speciesCharge[sp] = 0.0;
+      for (int sp = 0; sp < nSpecies_; sp++) {
+        if (speciesNames_[sp] == "Ni.+1") {
+          speciesCharge[sp] = +1.0;
+        } else if (speciesNames_[sp] == "N2.+1") {
+          speciesCharge[sp] = +1.0;
+        } else if (speciesNames_[sp] == "E") {
+          speciesCharge[sp] = -1.0;
+        } else {
+          speciesCharge[sp] = 0.0;
+        }
       }
-    }
-    break;
-    
+      break;
+
     default:
-    printf("Unknown gasType.");
-    assert(false);
-    break;
+      printf("Unknown gasType.");
+      assert(false);
+      break;
   }
   gasParams_.SetCol(GasParams::SPECIES_CHARGES, speciesCharge);
-  
+
   for (int sp = 0; sp < nSpecies_; sp++) {
     mixtureInput_.gasParams[sp + nSpecies_ * GasParams::SPECIES_CHARGES] = speciesCharge[sp];
   }
-  
+
   for (int sp = 0; sp < nSpecies_; sp++) {
     int inputIdx = mixtureToInputMap[sp];
     for (int a = 0; a < nAtoms_; a++) {
       speciesComposition_(sp, a) = inputSpeciesComposition(inputIdx, a);
     }
   }
-  
+
   Vector speciesMass(nSpecies_);
   speciesMass = 0.0;
   for (int sp = 0; sp < nSpecies_; sp++) {
@@ -369,48 +368,48 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     }
   }
   gasParams_.SetCol(GasParams::SPECIES_MW, speciesMass);
-  
+
   for (int sp = 0; sp < nSpecies_; sp++) {
     mixtureInput_.gasParams[sp + nSpecies_ * GasParams::SPECIES_MW] = speciesMass[sp];
   }
-  
+
   Rgas_ = UNIVERSALGASCONSTANT;  // for convience
-  
+
   for (int sp = 0; sp < nSpecies_; sp++) {
     specificHeatRatios_[sp] = (speciesMolarCv_[sp] + 1.0) / speciesMolarCv_[sp];
     speciesMolarCp_[sp] = specificHeatRatios_[sp] * speciesMolarCv_[sp];
   }
-  
+
   switch (gasType_) {
     case Ar:
-    if (speciesMapping.count("Ar")) {
-      gasInput_.neutralIndex = speciesMapping["Ar"];
-    } else {
-      grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar' !\n");
-      exit(ERROR);
-    }
-    if (speciesMapping.count("Ar.+1")) {
-      gasInput_.ionIndex = speciesMapping["Ar.+1"];
-    } else {
-      grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar.+1' !\n");
-      exit(ERROR);
-    }
-    if (speciesMapping.count("E")) {
-      gasInput_.electronIndex = speciesMapping["E"];
-    } else {
-      grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'E' !\n");
-      exit(ERROR);
-    }
-    break;
-    
+      if (speciesMapping.count("Ar")) {
+        gasInput_.neutralIndex = speciesMapping["Ar"];
+      } else {
+        grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar' !\n");
+        exit(ERROR);
+      }
+      if (speciesMapping.count("Ar.+1")) {
+        gasInput_.ionIndex = speciesMapping["Ar.+1"];
+      } else {
+        grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'Ar.+1' !\n");
+        exit(ERROR);
+      }
+      if (speciesMapping.count("E")) {
+        gasInput_.electronIndex = speciesMapping["E"];
+      } else {
+        grvy_printf(GRVY_ERROR, "\nArgon ternary transport requires the species 'E' !\n");
+        exit(ERROR);
+      }
+      break;
+
     case Ni:
-    if (speciesMapping.count("Ni")) {
-      gasInput_.neutralIndex2 = speciesMapping["Ni"];
-    } else {
-      grvy_printf(GRVY_ERROR, "\nNitrogen transport missing required species!\n");
-      exit(ERROR);
-    }
-    if (speciesMapping.count("N2")) {
+      if (speciesMapping.count("Ni")) {
+        gasInput_.neutralIndex2 = speciesMapping["Ni"];
+      } else {
+        grvy_printf(GRVY_ERROR, "\nNitrogen transport missing required species!\n");
+        exit(ERROR);
+      }
+      if (speciesMapping.count("N2")) {
         gasInput_.neutralIndex = speciesMapping["N2"];
       } else {
         grvy_printf(GRVY_ERROR, "\nNitrogen transport missing required species!\n");
@@ -435,30 +434,30 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
         exit(ERROR);
       }
       break;
-      
-      default:
+
+    default:
       printf("Unknown gasType.");
       assert(false);
       break;
-    }
-    
-    Array<GasSpcs> speciesType(nSpecies_);
-    identifySpeciesType(speciesType);
-    identifyCollisionType(speciesType, gasInput_.collisionIndex);
-    
-    mixture_ = new PerfectMixture(mixtureInput_, dim_, dim_, const_plasma_conductivity_);
-    
-    gasInput_.constantActive = false;
-    switch (transportModel_) {
-      case ARGON_MIXTURE:
-      case NITROGEN_MIXTURE: {
-        if (rank0_) std::cout << "Gas mixture tranport model will be used." << endl;
-        gasInput_.constantActive = false;
-        transport_ = new GasMixtureTransport(mixture_, gasInput_);
-      } break;
-      case CONSTANT: {
-        if (rank0_) std::cout << "Constant tranport model will be used." << endl;
-        gasInput_.constantActive = true;
+  }
+
+  Array<GasSpcs> speciesType(nSpecies_);
+  identifySpeciesType(speciesType);
+  identifyCollisionType(speciesType, gasInput_.collisionIndex);
+
+  mixture_ = new PerfectMixture(mixtureInput_, dim_, dim_, const_plasma_conductivity_);
+
+  gasInput_.constantActive = false;
+  switch (transportModel_) {
+    case ARGON_MIXTURE:
+    case NITROGEN_MIXTURE: {
+      if (rank0_) std::cout << "Gas mixture tranport model will be used." << endl;
+      gasInput_.constantActive = false;
+      transport_ = new GasMixtureTransport(mixture_, gasInput_);
+    } break;
+    case CONSTANT: {
+      if (rank0_) std::cout << "Constant tranport model will be used." << endl;
+      gasInput_.constantActive = true;
       transport_ = new GasMixtureTransport(mixture_, gasInput_);
     } break;
     default: {
@@ -466,12 +465,12 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
       assert(false);
     } break;
   }
-  
+
   /// Minimal amount of info for chemistry input struct
   chemistryInput_.model = chemistryModel_;
   tpsP_->getInput("reactions/number_of_reactions", nReactions_, 0);
   tpsP_->getInput("reactions/minimum_chemistry_temperature", chemistryInput_.minimumTemperature, 0.0);
-  
+
   Vector reactionEnergies(nReactions_);
   Vector detailedBalance(nReactions_);
   Array<ReactionModel> reactionModels;
@@ -479,25 +478,25 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   Vector equilibriumConstantParams(nSpecies_ * nReactions_);
   DenseMatrix reactantStoich(nSpecies_, nReactions_);
   DenseMatrix productStoich(nSpecies_, nReactions_);
-  
+
   std::vector<mfem::Vector> rxnModelParamsHost;
   rxnModelParamsHost.clear();
-  
+
   std::vector<std::string> reactionEquations;
   reactionEquations.resize(nReactions_);
-  
+
   for (int r = 1; r <= nReactions_; r++) {
     std::string basepath("reactions/reaction" + std::to_string(r));
-    
+
     std::string equation, model;
     tpsP_->getRequiredInput((basepath + "/equation").c_str(), equation);
     reactionEquations[r - 1] = equation;
     tpsP_->getRequiredInput((basepath + "/model").c_str(), model);
-    
+
     double energy;
     tpsP_->getRequiredInput((basepath + "/reaction_energy").c_str(), energy);
     reactionEnergies[r - 1] = energy;
-    
+
     if (model == "arrhenius") {
       reactionModels[r - 1] = ARRHENIUS;
       double A, b, E;
@@ -505,7 +504,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
       tpsP_->getRequiredInput((basepath + "/arrhenius/b").c_str(), b);
       tpsP_->getRequiredInput((basepath + "/arrhenius/E").c_str(), E);
       rxnModelParamsHost.push_back(Vector({A, b, E}));
-      
+
     } else if (model == "hoffert_lien") {
       reactionModels[r - 1] = HOFFERTLIEN;
       double A, b, E;
@@ -513,60 +512,60 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
       tpsP_->getRequiredInput((basepath + "/arrhenius/b").c_str(), b);
       tpsP_->getRequiredInput((basepath + "/arrhenius/E").c_str(), E);
       rxnModelParamsHost.push_back(Vector({A, b, E}));
-      
+
     } else if (model == "tabulated") {
       reactionModels[r - 1] = TABULATED_RXN;
       std::string inputPath(basepath + "/tabulated");
       readTableWrapper(inputPath, chemistryInput_.reactionInputs[r - 1].tableInput);
-      
+
     } else if (model == "radiative_decay") {
       reactionModels[r - 1] = RADIATIVE_DECAY;
       double R;
       tpsP_->getRequiredInput((basepath + "/radius").c_str(), R);
       rxnModelParamsHost.push_back(Vector({R}));
-      
+
     } else {
       grvy_printf(GRVY_ERROR, "\nUnknown reaction_model -> %s", model.c_str());
       exit(ERROR);
     }
-    
+
     bool detailedBal;
     tpsP_->getInput((basepath + "/detailed_balance").c_str(), detailedBal, false);
     detailedBalance[r - 1] = detailedBal;
-    
+
     if (detailedBal) {
       double A, b, E;
       tpsP_->getRequiredInput((basepath + "/equilibrium_constant/A").c_str(), A);
       tpsP_->getRequiredInput((basepath + "/equilibrium_constant/b").c_str(), b);
       tpsP_->getRequiredInput((basepath + "/equilibrium_constant/E").c_str(), E);
-      
+
       // NOTE(kevin): array keeps max param in the indexing, as reactions can have diff no of params.
       equilibriumConstantParams[0 + (r - 1) * gpudata::MAXCHEMPARAMS] = A;
       equilibriumConstantParams[1 + (r - 1) * gpudata::MAXCHEMPARAMS] = b;
       equilibriumConstantParams[2 + (r - 1) * gpudata::MAXCHEMPARAMS] = E;
     }
-    
+
     Array<double> stoich(nSpecies_);
     tpsP_->getRequiredVec((basepath + "/reactant_stoichiometry").c_str(), stoich, nSpecies_);
-    
+
     for (int sp = 0; sp < nSpecies_; sp++) {
       int inputSp = mixtureToInputMap[sp];
       reactantStoich(sp, r - 1) = stoich[inputSp];
     }
-    
+
     tpsP_->getRequiredVec((basepath + "/product_stoichiometry").c_str(), stoich, nSpecies_);
     for (int sp = 0; sp < nSpecies_; sp++) {
       int inputSp = mixtureToInputMap[sp];
       productStoich(sp, r - 1) = stoich[inputSp];
     }
   }
-  
+
   if (speciesMapping.count("E")) {
     chemistryInput_.electronIndex = speciesMapping["E"];
   } else {
     chemistryInput_.electronIndex = -1;
   }
-  
+
   size_t rxn_param_idx = 0;
   chemistryInput_.numReactions = nReactions_;
   for (int r = 0; r < nReactions_; r++) {
@@ -576,20 +575,20 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
       chemistryInput_.reactantStoich[sp + r * nSpecies_] = reactantStoich(sp, r);
       chemistryInput_.productStoich[sp + r * nSpecies_] = productStoich(sp, r);
     }
-    
+
     chemistryInput_.reactionModels[r] = reactionModels[r];
     for (int p = 0; p < gpudata::MAXCHEMPARAMS; p++) {
       chemistryInput_.equilibriumConstantParams[p + r * gpudata::MAXCHEMPARAMS] =
-      equilibriumConstantParams[p + r * gpudata::MAXCHEMPARAMS];
+          equilibriumConstantParams[p + r * gpudata::MAXCHEMPARAMS];
     }
-    
+
     if (reactionModels[r] != TABULATED_RXN) {
       assert(rxn_param_idx < rxnModelParamsHost.size());
       chemistryInput_.reactionInputs[r].modelParams = rxnModelParamsHost[rxn_param_idx].Read();
       rxn_param_idx += 1;
     }
   }
-  
+
   // radiative decay needs this information as well
   chemistryInput_.speciesNames.resize(nSpecies_);
   paramIdx = 0;
@@ -605,9 +604,9 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     chemistryInput_.speciesMapping[InputSpeciesNames[sp]] = targetIdx;
     chemistryInput_.speciesNames[targetIdx] = InputSpeciesNames[sp];
   }
-  
+
   chemistry_ = new Chemistry(mixture_, chemistryInput_);
-  
+
   // ramping changes between chemistry models
   tpsP_->getInput("loMach/reactingFlow/ramp-chem", ramp_chem_, false);
   if (ramp_chem_) {
@@ -617,43 +616,41 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
 
   // retain access to baseline chemistry models if ramping from one to another
   if (ramp_chem_) {
-    
     chemistryInputBase_ = chemistryInput_;
     for (int r = 1; r <= nReactions_; r++) {
       std::string basepath("reactions_base/reaction" + std::to_string(r));
-      
+
       std::string equation, model;
       tpsP_->getRequiredInput((basepath + "/equation").c_str(), equation);
       tpsP_->getRequiredInput((basepath + "/model").c_str(), model);
-      
+
       double energy;
       tpsP_->getRequiredInput((basepath + "/reaction_energy").c_str(), energy);
-      
+
       // not implemented for non-tabulated
       if (model == "tabulated") {
         std::string inputPath(basepath + "/tabulated");
         readTableWrapper(inputPath, chemistryInputBase_.reactionInputs[r - 1].tableInput);
-        
+
       } else {
         grvy_printf(GRVY_ERROR, "\nUnknown reaction_model for chem_ramp settings -> %s", model.c_str());
         exit(ERROR);
       }
-      
     }
     chemistryBase_ = new Chemistry(mixture_, chemistryInputBase_);
   }
-  
+
   // Initialize radiation (just NEC for now) model
   std::string type;
   std::string basepath("plasma_models/radiation_model");
-  
+
   tpsP_->getInput(basepath.c_str(), type, std::string("none"));
   std::string model_input_path(basepath + "/" + type);
-  
+
   RadiationInput rad_model_input;
   if (type == "net_emission") {
     rad_model_input.model = NET_EMISSION;
-    
+
     std::string coefficient_type;
     tpsP_->getRequiredInput((model_input_path + "/coefficient").c_str(), coefficient_type);
     if (coefficient_type == "tabulated") {
@@ -668,22 +665,22 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
         rad_tables[i].xLogScale = false;
         rad_tables[i].fLogScale = false;
       }
-      
+
       // Read data from hdf5 file containing 4 columns: T, energy, gas constant, speed of sound
       DenseMatrix rad_data;
       bool success =
-      h5ReadBcastMultiColumnTable(filename, std::string("table"), pmesh_->GetComm(), rad_data, rad_tables);
+          h5ReadBcastMultiColumnTable(filename, std::string("table"), pmesh_->GetComm(), rad_data, rad_tables);
       if (!success) exit(ERROR);
-      
+
       rad_model_input.necTableInput.order = 1;
       rad_model_input.necTableInput.xLogScale = false;
       rad_model_input.necTableInput.fLogScale = false;
       rad_model_input.necTableInput.Ndata = rad_tables[0].Ndata;
       rad_model_input.necTableInput.xdata = rad_tables[0].xdata;
       rad_model_input.necTableInput.fdata = rad_tables[0].fdata;
-      
+
       radiation_ = new NetEmission(rad_model_input);
-      
+
     } else {
       grvy_printf(GRVY_ERROR, "\nUnknown net emission coefficient type -> %s\n", coefficient_type.c_str());
       exit(ERROR);
@@ -694,12 +691,12 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     grvy_printf(GRVY_ERROR, "\nUnknown radiation model -> %s\n", type.c_str());
     exit(ERROR);
   }
-  
+
   tpsP_->getInput("loMach/reactingFlow/ic", ic_string_, std::string(""));
-  
+
   // will be over-written if dynamic is active
   tpsP_->getInput("loMach/reactingFlow/implicit-chemistry", implicit_chemistry_, false);
-  
+
   if (implicit_chemistry_) {
     tpsP_->getInput("loMach/reactingFlow/implicit-chemistry/verbose", implicit_chemistry_verbose_, false);
     tpsP_->getInput("loMach/reactingFlow/implicit-chemistry/maxiter", implicit_chemistry_maxiter_, 200);
@@ -708,15 +705,15 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     tpsP_->getInput("loMach/reactingFlow/implicit-chemistry/atol", implicit_chemistry_atol_, 1e-12);
     tpsP_->getInput("loMach/reactingFlow/implicit-chemistry/species-min", implicit_chemistry_smin_, 1e-12);
   }
-  
+
   tpsP_->getInput("loMach/reactingFlow/explicit-destruction", explicit_destruction_, false);
   tpsP_->getInput("loMach/reactingFlow/sub-steps", nSub_, 1);
   tpsP_->getInput("loMach/reactingFlow/dynamic-substep", dynamic_substepping_, false);
   if (dynamic_substepping_) nSub_ = 2;
-  
+
   // default value is purely empirical atm
   tpsP_->getInput("loMach/reactingFlow/dynamic-fraction", stabFrac_, 1.0);
-  
+
   // Check time marching order.  Operator split (i.e., nSub_ > 1) not supported for order > 1.
   if ((nSub_ > 1) && (time_coeff_.order > 1)) {
     if (rank0_) {
@@ -726,7 +723,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     assert(false);
     exit(1);
   }
-  
+
   // By default, do not use operator split scheme.
   operator_split_ = false;
   if (nSub_ > 1) {
@@ -737,12 +734,12 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     operator_split_ = true;
     assert(nSub_ == 1);
   }
-  
+
   // artificial diffusion (SUPG)
   tpsP_->getInput("loMach/reactingFlow/streamwise-stabilization", sw_stab_, false);
   tpsP_->getInput("loMach/reactingFlow/Reh_factor", Reh_factor_, 0.5);
   tpsP_->getInput("loMach/reactingFlow/Reh_offset", Reh_offset_, 1.0);
-  
+
   // specified plasma initial condition
   tpsP_->getInput("plasma_models/initialize_species", species_init_, false);
 
@@ -756,7 +753,7 @@ ReactingFlow::~ReactingFlow() {
   for (unsigned int i = 0; i < vizSpecFields_.size(); i++) {
     delete vizSpecFields_[i];
   }
-  
+
   // allocated in initializeOperators
   delete sfes_filter_;
   delete sfec_filter_;
@@ -1092,7 +1089,7 @@ void ReactingFlow::initializeSelf() {
   toFlow_interface_.viscosity = &visc_gf_;
   toFlow_interface_.thermal_divergence = &Qt_gf_;
   toTurbModel_interface_.density = &rn_gf_;
-  toTurbModel_interface_.viscosity = &visc_gf_;  
+  toTurbModel_interface_.viscosity = &visc_gf_;
 
   plasma_conductivity_gf_ = &sigma_gf_;
   joule_heating_gf_ = &jh_gf_;
@@ -1172,12 +1169,11 @@ void ReactingFlow::initializeSelf() {
       setVectorFromScalar(tmpR0_, sp, &Yn_);
     }
   }
-  
+
   Ynm1_ = Yn_;
   Ynm2_ = Yn_;
   Yn_next_gf_ = Yn_gf_;
   YnFull_gf_.SetFromTrueDofs(Yn_);
-
 
   ConstantCoefficient t_ic_coef;
   t_ic_coef.constant = T_ic_;
@@ -1261,7 +1257,7 @@ void ReactingFlow::initializeSelf() {
             std::cout << "Rx Flow: Setting zero Neumann temperature on patch = " << patch << std::endl;
           }
         }
-        
+
         if (neumann_species_inlet_) {
           if (rank0_) {
             std::cout << "Rx Flow: Setting zero Neumann species on patch = " << patch << std::endl;
@@ -1430,7 +1426,7 @@ void ReactingFlow::initializeOperators() {
     Reh_coeff_ = new ProductCoefficient(*reh2_coeff_, *umag_coeff_);
 
     // Csupg
-    std::function<double(double)> csupgLambda = std::bind(csupgFactor, std::placeholders::_1,  Reh_factor_, Reh_offset_);
+    std::function<double(double)> csupgLambda = std::bind(csupgFactor, std::placeholders::_1, Reh_factor_, Reh_offset_);
     csupg_coeff_ = new ExtTransformedCoefficient(Reh_coeff_, csupgLambda);
 
     // compute upwind magnitude
@@ -1877,7 +1873,6 @@ void ReactingFlow::initializeOperators() {
   // YnFull_gf_ after the Yn_ IC is set.
   YnFull_gf_.GetTrueDofs(Yn_);
 
-    
   // override species initial condition
   if (species_init_) {
     if (rank0_) std::cout << "Projecting initial species fields." << endl;
@@ -2595,15 +2590,14 @@ void ReactingFlow::speciesProduction() {
       kfwd_base.SetSize(chemistryBase_->getNumReactions());
       chemistryBase_->computeForwardRateCoeffs(n_sp.Read(), Th, Te, i, kfwd_base.HostWrite());
       for (int r = 0; r < chemistryBase_->getNumReactions(); r++) {
-        kfwd[r] = kfwd_base[r] + (time_ - ramp_start)*(kfwd[r] - kfwd_base[r])/ramp_time;
+        kfwd[r] = kfwd_base[r] + (time_ - ramp_start) * (kfwd[r] - kfwd_base[r]) / ramp_time;
       }
       // if (i == 100) {
-      //   // kfwd new = %.6e, 
+      //   // kfwd new = %.6e,
       //   printf("kfwd old = %.6e, kfwd star = %.6e\n", kfwd_base[0], kfwd[0]);
       // }
     }
-    
-    
+
     chemistry_->computeEquilibriumConstants(Th, Te, keq.HostWrite());
     chemistry_->computeProgressRate(n_sp, kfwd, keq, progressRate);
     chemistry_->computeCreationRate(progressRate, creationRate, emissionRate);
@@ -3700,7 +3694,7 @@ void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, 
     kfwd_base.SetSize(chemistryBase_->getNumReactions());
     chemistryBase_->computeForwardRateCoeffs(n_sp.Read(), Th, Te, dofindex, kfwd_base.HostWrite());
     for (int r = 0; r < chemistryBase_->getNumReactions(); r++) {
-      kfwd[r] = kfwd_base[r] + (time_ - ramp_start)*(kfwd[r] - kfwd_base[r])/ramp_time;
+      kfwd[r] = kfwd_base[r] + (time_ - ramp_start) * (kfwd[r] - kfwd_base[r]) / ramp_time;
     }
   }
 

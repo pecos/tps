@@ -138,7 +138,7 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
 
     // option to disable Qt contributions to momentum equations for bad transients
     tpsP_->getInput("loMach/tomboulides/disable-qt", disable_qt_, false);
-    
+
     tps->getInput("loMach/tomboulides/iorho_gf", use_iorho_gf_, false);
   }
 }
@@ -432,7 +432,7 @@ void Tomboulides::initializeSelf() {
   } else {
     forcing_terms_.emplace_back(domain_attr, gravity_vec_);
   }
-  
+
   // Initial condition function.  For options, see cases.cpp
   tpsP_->getInput("loMach/tomboulides/ic", ic_string_, std::string(""));
 
@@ -740,7 +740,7 @@ void Tomboulides::initializeOperators() {
     Reh_coeff_ = new ProductCoefficient(*reh2_coeff_, *umag_coeff_);
 
     // Csupg
-    std::function<double(double)> csupgLambda = std::bind(csupgFactor, std::placeholders::_1,  Reh_factor_, Reh_offset_);
+    std::function<double(double)> csupgLambda = std::bind(csupgFactor, std::placeholders::_1, Reh_factor_, Reh_offset_);
     csupg_coeff_ = new ExtTransformedCoefficient(Reh_coeff_, csupgLambda);
 
     if (axisym_) {
@@ -1981,9 +1981,7 @@ double Tomboulides::maxVelocityMagnitude() {
   return global_max_vel_magnitude;
 }
 
-void Tomboulides::setup() {
-  evaluateVelocityGradient();
-}
+void Tomboulides::setup() { evaluateVelocityGradient(); }
 
 void Tomboulides::evaluateVelocityGradient() {
   setScalarFromVector(u_next_vec_, 0, &tmpR0_);

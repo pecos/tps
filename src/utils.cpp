@@ -1155,9 +1155,7 @@ void streamwiseTensor(const Vector &vel, DenseMatrix &swMgbl) {
   }
 }
 
-double csupgFactor(double Reh, double Reh_factor, double Reh_offset) {
-  return Reh_factor * (tanh(Reh) + Reh_offset);
-}
+double csupgFactor(double Reh, double Reh_factor, double Reh_offset) { return Reh_factor * (tanh(Reh) + Reh_offset); }
 
 void EliminateRHS(Operator &A, ConstrainedOperator &constrainedA, const Array<int> &ess_tdof_list, Vector &x, Vector &b,
                   Vector &X, Vector &B, int copy_interior) {
@@ -1366,25 +1364,22 @@ void TransformedMatrixVectorCoefficient::Eval(DenseMatrix &G, ElementTransformat
   Function(buf, G);
 }
 
-void ExtTransformedCoefficient::SetTime(double t)
-{
-   if (Q1) { Q1->SetTime(t); }
-   if (Q2) { Q2->SetTime(t); }
-   this->Coefficient::SetTime(t);
+void ExtTransformedCoefficient::SetTime(double t) {
+  if (Q1) {
+    Q1->SetTime(t);
+  }
+  if (Q2) {
+    Q2->SetTime(t);
+  }
+  this->Coefficient::SetTime(t);
 }
 
-double ExtTransformedCoefficient::Eval(ElementTransformation &T,
-                                    const IntegrationPoint &ip)
-{
-   if (Q2)
-   {
-      return Transform2(Q1->Eval(T, ip, GetTime()),
-                        Q2->Eval(T, ip, GetTime()));
-   }
-   else
-   {
-      return Transform1(Q1->Eval(T, ip, GetTime()));
-   }
+double ExtTransformedCoefficient::Eval(ElementTransformation &T, const IntegrationPoint &ip) {
+  if (Q2) {
+    return Transform2(Q1->Eval(T, ip, GetTime()), Q2->Eval(T, ip, GetTime()));
+  } else {
+    return Transform1(Q1->Eval(T, ip, GetTime()));
+  }
 }
 
 }  // namespace mfem

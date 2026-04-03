@@ -35,10 +35,10 @@
  * @brief Contains class implementing a static constant eddy viscosity as a RANS model
  */
 
+#include "externalData_base.hpp"
 #include "tps.hpp"
 #include "tps_mfem_wrap.hpp"
 #include "turb_model_base.hpp"
-#include "externalData_base.hpp"
 
 /**
  * Provides RANS models to compute eddy viscosity

@@ -462,8 +462,7 @@ void LteThermoChem::initializeSelf() {
 
         } else {
           if (rank0_) {
-            std::cout << "Calorically Perfect: Setting zero Neumann temperature on patch = " << patch
-                      << std::endl;
+            std::cout << "Calorically Perfect: Setting zero Neumann temperature on patch = " << patch << std::endl;
           }
         }
 
@@ -479,7 +478,6 @@ void LteThermoChem::initializeSelf() {
                       << std::endl;
           }
 
-          
           AddTempDirichletBC(temperature_bc_field_, inlet_attr);
 
           // // Force the IC to agree with the interpolated inlet BC
@@ -492,8 +490,7 @@ void LteThermoChem::initializeSelf() {
           // Tn_gf_.ProjectBdrCoefficient(*temperature_bc_field_, inlet_attr);
         } else {
           if (rank0_) {
-            std::cout << "Calorically Perfect: Setting zero Neumann temperature on patch = " << patch
-                      << std::endl;
+            std::cout << "Calorically Perfect: Setting zero Neumann temperature on patch = " << patch << std::endl;
           }
         }
 
@@ -634,7 +631,7 @@ void LteThermoChem::initializeOperators() {
     Reh_coeff_ = new ProductCoefficient(*reh2_coeff_, *umag_coeff_);
 
     // Csupg
-    std::function<double(double)> csupgLambda = std::bind(csupgFactor, std::placeholders::_1,  Reh_factor_, Reh_offset_);
+    std::function<double(double)> csupgLambda = std::bind(csupgFactor, std::placeholders::_1, Reh_factor_, Reh_offset_);
     csupg_coeff_ = new ExtTransformedCoefficient(Reh_coeff_, csupgLambda);
 
     // compute upwind magnitude

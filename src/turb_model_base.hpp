@@ -64,7 +64,7 @@ struct extDataToTurbModel;
  * Provides wrapper for fields that need to be provided by the
  * turbulence model to the thermo chem model.
  */
-struct turbModelToExtData { };
+struct turbModelToExtData {};
 
 /**
  * Provides interface for turbulence model implementation
@@ -99,7 +99,7 @@ class TurbModelBase {
    */
   virtual void initializeViz(mfem::ParaViewDataCollection &pvdc) {}
 
-  virtual void initializeIO(IODataOrganizer &io) {}  
+  virtual void initializeIO(IODataOrganizer &io) {}
 
   /**
    * @brief Initialize model operators
@@ -131,7 +131,7 @@ class TurbModelBase {
 
   /// Get interface provided by flow model
   const spongeToTurbModel *getSpongeInterface() const { return sponge_interface_; }
-  
+
   /**
    * @brief Initialize data from the flow class
    *
@@ -159,7 +159,7 @@ class TurbModelBase {
 
   /// Interface object, provides fields necessary for the turbModel
   turbModelToThermoChem toThermoChem_interface_;
-  
+
   /**
    * @brief Initialize data from the external data class
    *

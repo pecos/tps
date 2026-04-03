@@ -45,8 +45,6 @@
 
 #include "algebraicSubgridModels.hpp"
 #include "algebraic_rans.hpp"
-#include "static_rans.hpp"
-#include "zetaModel.hpp"
 #include "calorically_perfect.hpp"
 #include "gaussianInterpExtData.hpp"
 #include "geometricSponge.hpp"
@@ -54,9 +52,11 @@
 #include "logger.hpp"
 #include "lte_thermo_chem.hpp"
 #include "reactingFlow.hpp"
+#include "static_rans.hpp"
 #include "tomboulides.hpp"
 #include "tps.hpp"
 #include "utils.hpp"
+#include "zetaModel.hpp"
 
 using namespace mfem;
 using namespace mfem::common;
@@ -190,7 +190,7 @@ void LoMachSolver::initialize() {
       grvy_printf(GRVY_ERROR, "Unknown loMach/thermo-solver option > %s\n", loMach_opts_.thermo_solver.c_str());
     }
     exit(ERROR);
-  }  
+  }
 
   // Instantiate flow solver
   if (loMach_opts_.flow_solver == "zero-flow") {
@@ -255,7 +255,7 @@ void LoMachSolver::initialize() {
   thermo_->initializeSelf();
 
   // Exchange interface information
-  turbModel_->initializeFromSponge(&sponge_->toTurbModel_interface_);  
+  turbModel_->initializeFromSponge(&sponge_->toTurbModel_interface_);
   turbModel_->initializeFromThermoChem(&thermo_->toTurbModel_interface_);
   turbModel_->initializeFromFlow(&flow_->toTurbModel_interface_);
   flow_->initializeFromTurbModel(&turbModel_->toFlow_interface_);
@@ -266,7 +266,7 @@ void LoMachSolver::initialize() {
   thermo_->initializeFromSponge(&sponge_->toThermoChem_interface_);
 
   // Initialize restart read/write capability
-  turbModel_->initializeIO(ioData);    
+  turbModel_->initializeIO(ioData);
   flow_->initializeIO(ioData);
   thermo_->initializeIO(ioData);
 
@@ -292,8 +292,8 @@ void LoMachSolver::initialize() {
 
   // Finish initializing operators
   flow_->initializeOperators();
-  flow_->setup();      
-  turbModel_->setup();    
+  flow_->setup();
+  turbModel_->setup();
   turbModel_->initializeOperators();
   thermo_->initializeOperators();
 

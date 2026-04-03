@@ -165,7 +165,7 @@ vfptr vel_ic(std::string ic_string_) {
   } else if (ic_string_ == "channel") {
     return vel_channel;
   } else if (ic_string_ == "channel-uniform") {
-    return vel_channel_uniform;    
+    return vel_channel_uniform;
   } else if (ic_string_ == "user") {
     return velIC_user;
   } else {

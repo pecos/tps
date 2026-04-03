@@ -484,7 +484,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
 
     // Csupg
     // auto csupgLambda = std::bind(csupgFactor, std::placeholders::_1,  Reh_factor_, Reh_offset_);
-    std::function<double(double)> csupgLambda = std::bind(csupgFactor, std::placeholders::_1,  Reh_factor_, Reh_offset_);
+    std::function<double(double)> csupgLambda = std::bind(csupgFactor, std::placeholders::_1, Reh_factor_, Reh_offset_);
     csupg_coeff_ = new ExtTransformedCoefficient(Reh_coeff_, csupgLambda);
 
     // compute upwind magnitude
