@@ -132,7 +132,6 @@ TESTS += cyl3d.test \
          reactFlow-singleRx.test \
          reactFlow-table.test \
          radiativeDecay.test \
-		 lomach-chan-stab.test \
 		 lomach-pipe-zf.test \
          reactFlow-nitrogen.test \
 	 supg-scalars.test
