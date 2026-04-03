@@ -128,6 +128,11 @@ void LoMachSolver::initialize() {
   // local pointers
   serial_mesh_ = meshData_->getSerialMesh();
   pmesh_ = meshData_->getMesh();
+
+  if (pmesh_->GetNodes() == NULL) {
+    pmesh_->SetCurvature(1);
+  }
+
   partitioning_ = meshData_->getPartition();
 
   // Stash mesh dimension (convenience)
@@ -521,6 +526,8 @@ void LoMachSolver::solveEnd() {
   if (flow_err >= 0.0) {
     if (rank0_) std::cout << "At time = " << temporal_coeff_.time << ", flow L2 error = " << flow_err << std::endl;
   }
+
+  restart_files_hdf5("write");
 
   // paraview
   pvdc_->SetCycle(iter);

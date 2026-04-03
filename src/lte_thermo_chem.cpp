@@ -52,8 +52,9 @@ static double radius(const Vector &pos) { return pos[0]; }
 static FunctionCoefficient radius_coeff(radius);
 
 static double sigmaTorchStartUp(const Vector &pos) {
-  const double x = pos[0];  // radial location
-  const double y = pos[1];  // axial location
+  // const double x = pos[0];  // radial location
+  const double x = std::sqrt(pos[0] * pos[0] + pos[2] * pos[2]);  // radial location
+  const double y = pos[1];                                        // axial location
 
   const double r0 = 0.005;
   const double y0 = 0.135;
@@ -69,7 +70,11 @@ static FunctionCoefficient sigma_start_up(sigmaTorchStartUp);
 
 LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &time_coeff,
                              ParGridFunction *gridScale, TPS::Tps *tps)
-    : tpsP_(tps), pmesh_(pmesh), time_coeff_(time_coeff), gridScale_gf_(gridScale) {
+    : tpsP_(tps),
+      pmesh_(pmesh),
+      gll_rules_(0, Quadrature1D::GaussLobatto),
+      time_coeff_(time_coeff),
+      gridScale_gf_(gridScale) {
   rank0_ = (pmesh_->GetMyRank() == 0);
   order_ = loMach_opts->order;
 
@@ -85,6 +90,8 @@ LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, t
 
   std::string table_file;
   tps->getRequiredInput("loMach/ltethermo/table-file", table_file);
+
+  tps->getInput("loMach/ltethermo/filter-restart", filter_restart_, false);
 
   // Read data from hdf5 file containing 6 columns: T, mu, kappa, sigma, Rgas, Cp
   DenseMatrix table_data;
@@ -163,6 +170,10 @@ LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, t
   tps->getInput("loMach/ltethermo/turb-Prandtl", Prt_, 0.9);
   invPrt_ = 1.0 / Prt_;
 
+  tps->getInput("loMach/ltethermo/clip-temperature", Tclip_, false);
+  tps->getInput("loMach/ltethermo/min-temperature", Tmin_, 0.0);
+  tps->getInput("loMach/ltethermo/max-temperature", Tmax_, 100000.0);
+
   tps->getInput("loMach/ltethermo/linear-solver-rtol", rtol_, 1e-12);
   tps->getInput("loMach/ltethermo/linear-solver-max-iter", max_iter_, 1000);
   tps->getInput("loMach/ltethermo/linear-solver-verbosity", pl_solve_, 0);
@@ -172,6 +183,14 @@ LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, t
   tpsP_->getInput("loMach/ltethermo/Reh_offset", Reh_offset_, 1.0);
 
   tpsP_->getInput("loMach/ltethermo/neumann-temp", neumann_temp_, false);
+  if (sw_stab_) {
+    if (rank0_) std::cout << "Using SUPG in LTE thermo chem!" << std::endl;
+  }
+
+  tpsP_->getInput("loMach/ltethermo/filter-Q", qt_filter_, false);
+  if (qt_filter_) {
+    if (rank0_) std::cout << "Using Qt filter in LTE thermo chem!" << std::endl;
+  }
 }
 
 LteThermoChem::~LteThermoChem() {
@@ -498,7 +517,11 @@ void LteThermoChem::initializeSelf() {
 
   // Wall BCs
   {
+<<<<<<< HEAD
     if (rank0_) std::cout << "There are " << pmesh_->bdr_attributes.Max() << " boundary attributes!" << std::endl;
+=======
+    // std::cout << "There are " << pmesh_->bdr_attributes.Max() << " boundary attributes!" << std::endl;
+>>>>>>> main
     Array<int> attr_wall(pmesh_->bdr_attributes.Max());
     attr_wall = 0;
 
@@ -549,9 +572,12 @@ void LteThermoChem::initializeOperators() {
   // unsteady: p+p [+p] = 2p [3p]
   // convection: p+p+(p-1) [+p] = 3p-1 [4p-1]
   // diffusion: (p-1)+(p-1) [+p] = 2p-2 [3p-2]
-  const IntegrationRule &ir_i = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 2 * order_ + 1);
-  const IntegrationRule &ir_nli = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 4 * order_);
-  const IntegrationRule &ir_di = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 3 * order_ - 1);
+  // const IntegrationRule &ir_i = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 2 * order_ + 1);
+  // const IntegrationRule &ir_nli = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 4 * order_);
+  // const IntegrationRule &ir_di = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 3 * order_ - 1);
+  const IntegrationRule &ir_i = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 2 * order_ - 1);
+  const IntegrationRule &ir_nli = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 2 * order_ - 1);
+  const IntegrationRule &ir_di = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 2 * order_ - 1);
   if (rank0_) std::cout << "Integration rules set" << endl;
 
   // coefficients for operators
@@ -596,9 +622,13 @@ void LteThermoChem::initializeOperators() {
   }
 
   // artifical diffusion coefficients
+  if (sw_stab_ || qt_filter_) {
+    gscale_coeff_ = new GridFunctionCoefficient(gridScale_gf_);
+  }
+
   if (sw_stab_) {
     umag_coeff_ = new VectorMagnitudeCoefficient(*un_next_coeff_);
-    gscale_coeff_ = new GridFunctionCoefficient(gridScale_gf_);
+
     visc_coeff_ = new GridFunctionCoefficient(&mu_gf_);
     visc_inv_coeff_ = new PowerCoefficient(*visc_coeff_, -1.0);
 
@@ -624,6 +654,10 @@ void LteThermoChem::initializeOperators() {
     swdiff_coeff_ = new TransformedMatrixVectorCoefficient(un_next_coeff_, &streamwiseTensor);
 
     supg_coeff_ = new ScalarMatrixProductCoefficient(*upwind_coeff_, *swdiff_coeff_);
+  }
+
+  if (qt_filter_) {
+    gscale2_coeff_ = new ProductCoefficient(*gscale_coeff_, *gscale_coeff_);
   }
 
   // Convection: Atemperature(i,j) = \int_{\Omega} \phi_i \rho Cp u \cdot \nabla \phi_j
@@ -830,6 +864,16 @@ void LteThermoChem::initializeOperators() {
     mq_blfi->SetIntRule(&ir_i);
   }
   Mq_form_->AddDomainIntegrator(mq_blfi);
+
+  if (qt_filter_) {
+    DiffusionIntegrator *qtf_blfi;
+    qtf_blfi = new DiffusionIntegrator(*gscale2_coeff_);
+    if (numerical_integ_) {
+      qtf_blfi->SetIntRule(&ir_i);
+    }
+    Mq_form_->AddDomainIntegrator(qtf_blfi);
+  }
+
   if (partial_assembly_) {
     Mq_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   }
@@ -897,6 +941,82 @@ void LteThermoChem::initializeOperators() {
   Tn_next_gf_.SetFromTrueDofs(Tn_);
   Tn_next_gf_.GetTrueDofs(Tn_next_);
 
+  // Smooth the restart temperature field (if requested)
+  if (filter_restart_ && qt_filter_) {
+    if (rank0_) std::cout << "************ Filtering temperature restart (Qt) ******************" << std::endl;
+    resT_ = 0.0;
+    Ms_->AddMult(Tn_, resT_);
+
+    // Prepare for the solve
+    for (auto &temp_dbc : temp_dbcs_) {
+      Tn_next_gf_.ProjectBdrCoefficient(*temp_dbc.coeff, temp_dbc.attr);
+    }
+    sfes_->GetRestrictionMatrix()->MultTranspose(resT_, resT_gf_);
+
+    Vector Xt2, Bt2;
+    Mq_form_->FormLinearSystem(Qt_ess_tdof_, Tn_next_gf_, resT_gf_, Mq_, Xt2, Bt2, 1);
+
+    MqInv_->Mult(Bt2, Xt2);
+    assert(MqInv_->GetConverged());
+    Mq_form_->RecoverFEMSolution(Xt2, resT_gf_, Tn_next_gf_);
+
+    Tn_next_gf_.GetTrueDofs(Tn_next_);
+
+    Tn_gf_.SetFromTrueDofs(Tn_next_);
+
+    Tn_gf_.GetTrueDofs(Tn_);
+    Tn_next_gf_.SetFromTrueDofs(Tn_);
+    Tn_next_gf_.GetTrueDofs(Tn_next_);
+  } else if (filter_restart_) {
+    if (rank0_) std::cout << "************ Filtering temperature restart ******************" << std::endl;
+    // Build the right-hand-side
+    resT_ = 0.0;
+    M_rho_Cp_->AddMult(Tn_, resT_);
+
+    bd0_over_dt.constant = 1.0;
+    kappa_gf_ = 0.01;
+
+    Ht_form_->Update();
+    Ht_form_->Assemble();
+    Ht_form_->FormSystemMatrix(temp_ess_tdof_, Ht_);
+
+    HtInv_->SetOperator(*Ht_);
+    if (partial_assembly_) {
+      delete HtInvPC_;
+      Vector diag_pa(sfes_->GetTrueVSize());
+      Ht_form_->AssembleDiagonal(diag_pa);
+      HtInvPC_ = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof_);
+      HtInv_->SetPreconditioner(*HtInvPC_);
+    }
+
+    // Prepare for the solve
+    for (auto &temp_dbc : temp_dbcs_) {
+      Tn_next_gf_.ProjectBdrCoefficient(*temp_dbc.coeff, temp_dbc.attr);
+    }
+    sfes_->GetRestrictionMatrix()->MultTranspose(resT_, resT_gf_);
+
+    Vector Xt2, Bt2;
+    if (partial_assembly_) {
+      auto *HC = Ht_.As<ConstrainedOperator>();
+      EliminateRHS(*Ht_form_, *HC, temp_ess_tdof_, Tn_next_gf_, resT_gf_, Xt2, Bt2, 1);
+    } else {
+      Ht_form_->FormLinearSystem(temp_ess_tdof_, Tn_next_gf_, resT_gf_, Ht_, Xt2, Bt2, 1);
+    }
+
+    // solve helmholtz eq for temp
+    HtInv_->Mult(Bt2, Xt2);
+    assert(HtInv_->GetConverged());
+
+    Ht_form_->RecoverFEMSolution(Xt2, resT_gf_, Tn_next_gf_);
+    Tn_next_gf_.GetTrueDofs(Tn_next_);
+
+    Tn_gf_.SetFromTrueDofs(Tn_next_);
+
+    Tn_gf_.GetTrueDofs(Tn_);
+    Tn_next_gf_.SetFromTrueDofs(Tn_);
+    Tn_next_gf_.GetTrueDofs(Tn_next_);
+  }
+
   // After IC is filled, compute density
   updateDensity();
 
@@ -919,6 +1039,21 @@ void LteThermoChem::initializeOperators() {
 
   // and initialize system mass
   computeSystemMass();
+
+  // Get the initial props into the viz field at time 0
+  updateProperties();
+}
+
+void LteThermoChem::initializeStats(Averaging &average, IODataOrganizer &io, bool continuation) {
+  if (average.ComputeMean()) {
+    // fields for averaging
+    average.registerField(std::string("temperature"), &Tn_gf_, false, 0, 1);
+
+    // io init
+    io.registerIOFamily("Time-averaged temperature", "/meanTemp", average.GetMeanField(std::string("temperature")),
+                        false, continuation, sfec_);
+    io.registerIOVar("/meanTemp", "<T>", 0, true);
+  }
 }
 
 /**
@@ -1046,6 +1181,19 @@ void LteThermoChem::step() {
     Tn_next_gf_.GetTrueDofs(Tn_next_);
   }
 
+  if (Tclip_) {
+    double Tmin = Tmin_;
+    double Tmax = Tmax_;
+    auto d_Tn_gf = Tn_next_gf_.ReadWrite();
+    MFEM_FORALL(i, Tn_next_gf_.Size(), {
+      if (d_Tn_gf[i] < Tmin) d_Tn_gf[i] = Tmin;
+    });
+    MFEM_FORALL(i, Tn_next_gf_.Size(), {
+      if (d_Tn_gf[i] > Tmax) d_Tn_gf[i] = Tmax;
+    });
+    Tn_next_gf_.GetTrueDofs(Tn_next_);
+  }
+
   // prepare for external use and next step
   updateProperties();
   updateDensity();
@@ -1071,7 +1219,7 @@ void LteThermoChem::computeExplicitTempConvectionOP() {
 }
 
 void LteThermoChem::initializeIO(IODataOrganizer &io) {
-  io.registerIOFamily("Temperature", "/temperature", &Tn_gf_, false);
+  io.registerIOFamily("Temperature", "/temperature", &Tn_gf_, true, true, sfec_);
   io.registerIOVar("/temperature", "temperature", 0);
 }
 
@@ -1079,6 +1227,7 @@ void LteThermoChem::initializeViz(ParaViewDataCollection &pvdc) {
   pvdc.RegisterField("temperature", &Tn_gf_);
   pvdc.RegisterField("density", &rn_gf_);
   pvdc.RegisterField("kappa", &kappa_gf_);
+  pvdc.RegisterField("mu", &mu_gf_);
   pvdc.RegisterField("sigma", &sigma_gf_);
   pvdc.RegisterField("kappaT", &thermal_diff_total_gf_);
   pvdc.RegisterField("Qt", &Qt_gf_);
@@ -1124,7 +1273,8 @@ void LteThermoChem::updateThermoP() {
 void LteThermoChem::updateProperties() {
   // TODO(trevilo): Refactor for gpu support
   {
-    const double *d_T = Tn_.Read();
+    // const double *d_T = Tn_.Read();
+    const double *d_T = Tn_next_.Read();
 
     double *d_visc = visc_.Write();
     MFEM_FORALL(i, Tn_.Size(), { d_visc[i] = mu_table_->eval(d_T[i]); });
@@ -1303,7 +1453,8 @@ void LteThermoChem::computeQt() {
   sfes_->GetRestrictionMatrix()->MultTranspose(tmpR0_, resT_gf_);
 
   Qt_ = 0.0;
-  Qt_gf_.SetFromTrueDofs(tmpR0_);
+  // Qt_gf_.SetFromTrueDofs(tmpR0_);
+  Qt_gf_.SetFromTrueDofs(Qt_);
 
   Vector Xqt, Bqt;
   Mq_form_->FormLinearSystem(Qt_ess_tdof_, Qt_gf_, resT_gf_, Mq_, Xqt, Bqt, 1);

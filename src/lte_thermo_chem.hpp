@@ -93,6 +93,8 @@ class LteThermoChem final : public ThermoChemModelBase {
   bool sw_stab_ = false; /**< Enable/disable supg stabilization. */
   bool neumann_temp_ = false;      /**< only applies to the inlet */
   double Reh_factor_, Reh_offset_; /**< supg stabilization parameters */
+  bool filter_restart_ = false;
+  bool qt_filter_ = false; /**< Enable/disable filter in thermal div calc. */
 
   // Linear-solver-related options
   int pl_solve_ = 0;    /**< Verbosity level passed to mfem solvers */
@@ -126,6 +128,10 @@ class LteThermoChem final : public ThermoChemModelBase {
 
   double Prt_;
   double invPrt_;
+
+  bool Tclip_ = false;
+  double Tmin_ = 0.0;
+  double Tmax_ = 100000.0;
 
   // FEM related fields and objects
 
@@ -188,6 +194,7 @@ class LteThermoChem final : public ThermoChemModelBase {
 
   VectorMagnitudeCoefficient *umag_coeff_ = nullptr;
   GridFunctionCoefficient *gscale_coeff_ = nullptr;
+  ProductCoefficient *gscale2_coeff_ = nullptr;
   GridFunctionCoefficient *visc_coeff_ = nullptr;
   PowerCoefficient *visc_inv_coeff_ = nullptr;
   ProductCoefficient *reh1_coeff_ = nullptr;
@@ -268,6 +275,7 @@ class LteThermoChem final : public ThermoChemModelBase {
   // Functions overriden from base class
   void initializeSelf() final;
   void initializeOperators() final;
+  void initializeStats(Averaging &average, IODataOrganizer &io, bool continuation) final;
   void step() final;
   void initializeIO(IODataOrganizer &io) final;
   void initializeViz(ParaViewDataCollection &pvdc) final;
