@@ -467,11 +467,11 @@ void LteThermoChem::initializeSelf() {
         }
 
       } else if (type == "interpolate") {
+        temperature_bc_field_ = new GridFunctionCoefficient(extData_interface_->Tdata);
         if (!neumann_temp_) {
           Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
           inlet_attr = 0;
           inlet_attr[patch - 1] = 1;
-          temperature_bc_field_ = new GridFunctionCoefficient(extData_interface_->Tdata);
           if (rank0_) {
             // std::cout << "Tdata[0] = " << *extData_interface_->Tdata[0] << std::endl;
             std::cout << "Calorically Perfect: Setting interpolated Dirichlet temperature on patch = " << patch

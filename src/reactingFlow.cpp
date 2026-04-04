@@ -826,7 +826,7 @@ ReactingFlow::~ReactingFlow() {
   delete mixture_;
   delete transport_;
   delete chemistry_;
-  if (axisym_) {
+  if (ramp_chem_) {
     delete chemistryBase_;
   }
 
@@ -1235,10 +1235,10 @@ void ReactingFlow::initializeSelf() {
 
       } else if (type == "interpolate") {
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
+        temperature_bc_field_ = new GridFunctionCoefficient(extData_interface_->Tdata);
         if (!neumann_temp_) {
           inlet_attr = 0;
           inlet_attr[patch - 1] = 1;
-          temperature_bc_field_ = new GridFunctionCoefficient(extData_interface_->Tdata);
           if (rank0_) {
             std::cout << "Rx Flow: Setting interpolated Dirichlet temperature on patch = " << patch << std::endl;
           }
@@ -1258,12 +1258,12 @@ void ReactingFlow::initializeSelf() {
           }
         }
 
+        species_bc_field_ = new GridFunctionCoefficient(extData_interface_->Ydata);
         if (neumann_species_inlet_) {
           if (rank0_) {
             std::cout << "Rx Flow: Setting zero Neumann species on patch = " << patch << std::endl;
           }
         } else {
-          species_bc_field_ = new GridFunctionCoefficient(extData_interface_->Ydata);
           if (rank0_) {
             std::cout << "Rx Flow: Setting interpolated Dirichlet species on patch = " << patch << std::endl;
           }

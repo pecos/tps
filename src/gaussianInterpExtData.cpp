@@ -62,6 +62,7 @@ GaussianInterpExtData::GaussianInterpExtData(mfem::ParMesh *pmesh, LoMachOptions
   isInterpInlet_ = false;
   isInterpTurbInlet_ = false;
   isInterpTurbField_ = false;
+  isInitSpeciesField_ = false;
 
   int numInlets;
   tpsP_->getInput("boundaryConditions/numInlets", numInlets, 0);

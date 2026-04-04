@@ -302,6 +302,8 @@ class ExtTransformedCoefficient : public Coefficient {
 
   /// Evaluate the coefficient at @a ip.
   virtual double Eval(ElementTransformation &T, const IntegrationPoint &ip);
+
+  virtual ~ExtTransformedCoefficient() {}
 };
 
 }  // namespace mfem

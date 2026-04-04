@@ -50,6 +50,7 @@ StaticRans::~StaticRans() {
   delete sfes_;
   delete sfec_;
   delete mut_;
+  delete nut_field_;
   delete extData_;
 }
 

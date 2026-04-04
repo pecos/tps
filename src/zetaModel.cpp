@@ -100,6 +100,17 @@ ZetaModel::ZetaModel(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalS
 }
 
 ZetaModel::~ZetaModel() {
+  delete As_form_;
+  delete Ms_form_;
+  delete MsRho_form_;
+  delete Mf_form_;
+  delete Hk_form_;
+  delete He_form_;
+  delete Hv_form_;
+  delete Hf_form_;
+  delete Hz_form_;
+  delete Lk_form_;
+  delete Lf_form_;
   delete HkInv_;
   delete HkInvPC_;
   delete HeInv_;
@@ -114,17 +125,6 @@ ZetaModel::~ZetaModel() {
   delete MsInvPC_;
   delete MsRhoInv_;
   delete MsRhoInvPC_;
-  delete Hk_form_;
-  delete He_form_;
-  delete Hv_form_;
-  delete Hf_form_;
-  delete Hz_form_;
-  delete Lk_form_;
-  delete Lf_form_;
-  delete MsRho_form_;
-  delete Ms_form_;
-  delete Mf_form_;
-  delete As_form_;
   // delete He_bdry_;
 
   delete zero_coeff_;
@@ -160,13 +160,14 @@ ZetaModel::~ZetaModel() {
   delete tke_diff_total_coeff_;
   delete tdr_diff_total_coeff_;
   delete zeta_diff_total_coeff_;
-  delete unity_diff_total_coeff_;
+  // delete unity_diff_total_coeff_;
   delete rhoDt_coeff_;
   delete rhoTTS_coeff_;
   delete Ce2_coeff_;
   delete Ce2rhoTTS_coeff_;
   delete Pk_coeff_;
   delete ek_coeff_;
+  delete ek_rho_coeff_;
   delete tke_diag_coeff_;
   delete tdr_diag_coeff_;
   delete zeta_diag_coeff_;

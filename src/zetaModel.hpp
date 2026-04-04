@@ -318,7 +318,7 @@ class ZetaModel : public TurbModelBase {
   ProductCoefficient *tdr_diff_total_coeff_ = nullptr;
   ProductCoefficient *zeta_diff_total_coeff_ = nullptr;
   ConstantCoefficient *unity_diff_coeff_ = nullptr;
-  ProductCoefficient *unity_diff_total_coeff_ = nullptr;
+  // ProductCoefficient *unity_diff_total_coeff_ = nullptr;
   ConstantCoefficient *unity_coeff_ = nullptr;
   ConstantCoefficient *zero_coeff_ = nullptr;
   ConstantCoefficient *posTwo_coeff_ = nullptr;
