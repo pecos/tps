@@ -492,6 +492,9 @@ ParGridFunction BTEreacR_gf_;
   double BTE_rtol = 1e-6; // relative tolerance for the BTE solver to converge
   int store_csv = 0; // store the BTE QoIs in CSV file
 
+  int clip_rr = 0; // Set to 1 if you want to clip the forward reaction rate to a multiple of the backward reaction rate (to deal with transients)
+  double clip_frac = 10; // The forward reaction rate is clipped to a maximum = clip_frac*backward reaction rate
+
 #endif
 
  public:
@@ -537,11 +540,15 @@ ParGridFunction BTEreacR_gf_;
    * The incoming YT must contain the nActiveSpecies_ mass fractions
    * for the active species and temperature.
    */
-  void evaluateReactingSource(const double *YT, const int dofindex, double *omega
-  #ifdef HAVE_PYTHON
-    , double *BTErr
-  #endif
-  );
+  void evaluateReactingSource(const double *YT, const int dofindex, double *omega, 
+    double *kf, double *prograte, double *rrfrrb, double *prodYsp);
+
+#ifdef HAVE_PYTHON
+// This function does the same job as evaluateReactingSource when BTE rates are used
+  void evaluateReactingSourceBTE(const double *YT, const int dofindex, double *omega, double *BTErr,
+  double *kf, double *prograte, double *rrfrrb,
+  double *kfBTE, double *prograteBTE, double *rrfrrbBTE, double *prodYsp);
+#endif
 
   /**
    * @brief Solve the thermochemistry update
@@ -553,11 +560,16 @@ ParGridFunction BTEreacR_gf_;
    * for the active species and temperature.  This state is
    * overwritten with the new local state at the end of the time step.
    */
-  void solveChemistryStep(double *YT, const int dofindex, const double dt
-  #ifdef HAVE_PYTHON
-    , double *BTErr
-  #endif
+  void solveChemistryStep(double *YT, const int dofindex, const double dt, 
+    double *kf, double* prograte, double* rrfrrb, double *prodYsp);
+
+#ifdef HAVE_PYTHON
+// Solve the thermochemistry update at a point when BTE is used to model chemical reactions
+void solveChemistryStepBTE(double *YT, const int dofindex, const double dt, double *BTErr,
+  double *kf, double *prograte, double *rrfrrb,
+  double *kfBTE, double *prograteBTE, double *rrfrrbBTE, double *prodYsp
   );
+#endif
 
   // time-splitting
   void substepState();

@@ -123,6 +123,8 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     tpsP_->getInput("boltzmannSolver/rtol", BTE_rtol, 1e-6);
     tpsP_->getInput("boltzmannSolver/dt_BTE", dt_BTE, 5e-3);
     tpsP_->getInput("boltzmannSolver/store_csv", store_csv, 1);
+    tpsP_->getInput("boltzmannSolver/clip_rr", clip_rr, 0);
+    tpsP_->getInput("boltzmannSolver/clip_frac", clip_frac, 10.0);
   }
 #endif
 
@@ -1858,7 +1860,6 @@ void ReactingFlow::step() {
 
   if (operator_split_) {
     /// PART II: time-splitting of reaction
-
     // Save Yn_ and Tn_ because substep routines overwrite these as
     // with the {n}+iSub substates, which is convenient b/c helper
     // functions (like speciesProduction) use these Vectors
@@ -1869,15 +1870,15 @@ void ReactingFlow::step() {
       auto h_Yn = Yn_next_.HostReadWrite();
       auto h_Tn = Tn_next_.HostReadWrite();
       double *YT = new double[nActiveSpecies_ + 1];
-
-// -----------------------OBTAIN BTE RATE COEFFICIENTS HERE BEFORE CALLING IMPLICIT TIME STEPPING ----------------------------------------
-      // Get the BTE rates by calling Python solver
-     // Pass temperature as input to Python function
-      const double *dataT = Tn_.HostRead();
-      const double *dataRho = rn_.HostRead();
-      const double *dataY = Yn_.HostRead();
     
 #ifdef HAVE_PYTHON
+// -----------------------OBTAIN BTE RATE COEFFICIENTS HERE BEFORE CALLING IMPLICIT TIME STEPPING ----------------------------------------
+    // Get the BTE rates by calling Python solver
+    // Pass temperature as input to Python function
+    const double *dataT = Tn_.HostRead();
+    const double *dataRho = rn_.HostRead();
+    const double *dataY = Yn_.HostRead();
+
     int iter = this->GetCurrentIter();
     int update_bte_rates = (iter - 1) % solve_bte_every_n;
 
@@ -1886,7 +1887,9 @@ void ReactingFlow::step() {
     if (rank0_) {
       int iter_number_ = this->GetCurrentIter();
       std::cout << "[C++] Iter = " << iter_number_ << "sDofInt = " << sDofInt_ 
-      << ", update_bte_rates = " << update_bte_rates << ", regrid_bte = " << regrid_bte << ", " << regrid_bte_every_n << "\n";
+      << ", update_bte_rates = " << update_bte_rates << ", regrid_bte = " << regrid_bte << ", " << regrid_bte_every_n <<
+      ", clip_rr = " << clip_rr << ", clip_frac = " << clip_frac 
+      << ", nBTEReactions, nReactions = " << nBTEReactions_ << ", " << nReactions_ << ", bte_from_tps = " << bte_from_tps_ << "\n";
     }
 
     if (bte_from_tps_ && regrid_bte == 0) {
@@ -1942,6 +1945,7 @@ void ReactingFlow::step() {
       std::cout << "Rank " << myRank << ", back to TPS after setting up BTE grids\n";
 
     }
+
     if (bte_from_tps_ && update_bte_rates == 0) {
       // // Wrap const pointer into NumPy array (no copy)
       // // Dimensions given as {size}, stride as {sizeof(double)}
@@ -2055,17 +2059,16 @@ void ReactingFlow::step() {
         throw std::runtime_error("Expected 1D array from Python");
       }
 
+      // SET THE bterates_ Vector to zero before writing the new rates
+      bterates_ = 0.0;
+
       // MFEM::Vector bterates_ stores the returned Python array
       double *dst = bterates_.HostWrite();
       double *src = static_cast<double *>(buf.ptr);
 
       int bterr_size = bterates_.Size();
 
-      if (buf.shape[0] != bterr_size) {
-        std::cerr << "ReactingFlow::step(), size of returned reaction rate vector = "
-                  << buf.shape[0] << ", size of BTE reaction rate vector = " << bterr_size << 
-                  ". Both not equal, so aborting... \n"; 
-      }
+      assert(buf.shape[0] == bterr_size);
 
       for (int i = 0; i < buf.shape[0]; i++) {
         dst[i] = src[i];
@@ -2073,11 +2076,18 @@ void ReactingFlow::step() {
     } 
 #endif
 
-#ifdef HAVE_PYTHON
-        int bterr_size = bterates_.Size();
-        assert( sDofInt_ == int(bterr_size / nBTEReactions_));
-#endif
+      auto btearr = bterates_.HostRead();
+      
+      auto datakfwd = kReac_.HostWrite();
+      auto dataReac = reacR_.HostWrite();
+      auto datarrfbyrrb = rrf_by_rrb_.HostWrite();
 
+      auto dataProd = prodY_.HostWrite();
+
+      auto dataBTEkfwd = BTEkReac_.HostWrite();
+      auto dataBTEReac = BTEreacR_.HostWrite();
+      auto dataBTErrfbyrrb = BTErrf_by_rrb_.HostWrite();
+      
       for (int i = 0; i < sDofInt_; i++) {
         // Extract point state
         for (int sp = 0; sp < nActiveSpecies_; sp++) {
@@ -2086,20 +2096,65 @@ void ReactingFlow::step() {
         YT[nActiveSpecies_] = h_Tn[i];
 
 #ifdef HAVE_PYTHON
-        // Extract point state for the BTE rates
-        double *bterates = new double[nBTEReactions_];
-        auto btearr = bterates_.HostReadWrite();
-        for (int rr = 0; rr < nBTEReactions_; rr++) {
-          bterates[rr] = btearr[i + rr*sDofInt_];
+        if (bte_from_tps_) {
+          // Extract point state for the BTE rates
+          double *bterates = new double[nBTEReactions_];
+          for (int rr = 0; rr < nBTEReactions_; rr++) {
+            bterates[rr] = btearr[i + rr*sDofInt_];
+          }
+
+          // Create some vectors for storing point values of rate coefficients, rates and forward to backward rate ratio
+          double *kfBTE = new double[nReactions_];
+          double *prograteBTE = new double[nReactions_];
+          double *rrfrrbBTE = new double[int(nReactions_/2)];
+          double *kf = new double[nReactions_];
+          double *prograte = new double[nReactions_];
+          double *rrfrrb = new double[int(nReactions_/2)];
+
+          double *prodYsp = new double[nSpecies_];
+          
+          for (int nr = 0; nr < nReactions_; nr++) {
+            kfBTE[nr] = 0.0;
+            prograteBTE[nr] = 0.0;
+            rrfrrbBTE[nr] = 0.0;
+          }
+          // Solve backward Euler update (with BTE rates)
+          solveChemistryStepBTE(YT, i, dt_, bterates, 
+            kf, prograte, rrfrrb,
+            kfBTE, prograteBTE, rrfrrbBTE, prodYsp);
+
+          for (int nr = 0; nr < nReactions_; nr++) {
+            datakfwd[i + nr*sDofInt_] = std::max(0.0,kf[nr]);
+            dataBTEkfwd[i + nr*sDofInt_] = std::max(0.0,kfBTE[nr]);
+            dataReac[i + nr * sDofInt_] = prograte[nr];
+            dataBTEReac[i + nr * sDofInt_] = prograteBTE[nr];
+            if (nr % 2 == 0) {
+              datarrfbyrrb[i + int(nr/2) * sDofInt_] = std::max(0.0, prograte[nr] / (1e-28 + prograte[nr + 1]));
+              dataBTErrfbyrrb[i + int(nr/2) * sDofInt_] = std::max(0.0, prograteBTE[nr] / (1e-28 + prograteBTE[nr + 1]));
+            }
+          }
+        } else{
+#endif
+          double *kf = new double[nReactions_];
+          double *prograte = new double[nReactions_];
+          double *rrfrrb = new double[int(nReactions_/2)];
+          double *prodYsp = new double[nSpecies_];
+          // Solve backward Euler update (with tabulated rates)
+        solveChemistryStep(YT, i, dt_, kf, prograte, rrfrrb, prodYsp);
+
+        // Fill in the vectors storing rate coefficients (kf), reaction rates, rate of forward / backward rate from values
+        // returned by solveChemistryStep()
+        for(int nr = 0; nr < nReactions_; nr++) {
+          datakfwd[i + nr * sDofInt_] = std::max(0.0,kf[nr]);
+          dataReac[i + nr * sDofInt_] = prograte[nr];
+          if (nr % 2 == 0) {
+            datarrfbyrrb[i + int(nr/2) * sDofInt_] = std::max(0.0, prograte[nr] / (1e-28 + prograte[nr + 1]));
+          }
+        }
+#ifdef HAVE_PYTHON
         }
 #endif
-        // Solve backward Euler update
-        solveChemistryStep(YT, i, dt_,
-#ifdef HAVE_PYTHON
-        bterates
-#endif
-        );
-
+        
         // Overwrite point state data
         for (int sp = 0; sp < nActiveSpecies_; sp++) {
           h_Yn[sp * sDofInt_ + i] = YT[sp];
@@ -2130,67 +2185,61 @@ void ReactingFlow::step() {
         bl_frac_ = std::min(bl_frac_, 1.0);
       }
       
-      for (int rr = 0; rr < nReactions_; rr++) {
-        mfem::Vector rr_view(kReac_.GetData() + rr*sDofInt_, sDofInt_);
-        mfem::Vector BTErr_view(BTEkReac_.GetData() + rr*sDofInt_, sDofInt_);
+      // for (int rr = 0; rr < nReactions_; rr++) {
+      //   mfem::Vector rr_view(kReac_.GetData() + rr*sDofInt_, sDofInt_);
+      //   mfem::Vector BTErr_view(BTEkReac_.GetData() + rr*sDofInt_, sDofInt_);
 
-        double local_min = rr_view.Min();
-        double local_max = rr_view.Max();
+      //   double local_min = rr_view.Min();
+      //   double local_max = rr_view.Max();
 
-        double BTElocal_min = BTErr_view.Min();
-        double BTElocal_max = BTErr_view.Max();
+      //   double BTElocal_min = BTErr_view.Min();
+      //   double BTElocal_max = BTErr_view.Max();
 
-        double global_min, global_max;
-        double BTEglobal_min, BTEglobal_max;
+      //   double global_min, global_max;
+      //   double BTEglobal_min, BTEglobal_max;
 
-        MPI_Allreduce(&local_min, &global_min, 1, MPI_DOUBLE, MPI_MIN, tpsP_->getTPSCommWorld());
-        MPI_Allreduce(&local_max, &global_max, 1, MPI_DOUBLE, MPI_MAX, tpsP_->getTPSCommWorld());
+      //   MPI_Allreduce(&local_min, &global_min, 1, MPI_DOUBLE, MPI_MIN, tpsP_->getTPSCommWorld());
+      //   MPI_Allreduce(&local_max, &global_max, 1, MPI_DOUBLE, MPI_MAX, tpsP_->getTPSCommWorld());
 
-        MPI_Allreduce(&BTElocal_min, &BTEglobal_min, 1, MPI_DOUBLE, MPI_MIN, tpsP_->getTPSCommWorld());
-        MPI_Allreduce(&BTElocal_max, &BTEglobal_max, 1, MPI_DOUBLE, MPI_MAX, tpsP_->getTPSCommWorld());
+      //   MPI_Allreduce(&BTElocal_min, &BTEglobal_min, 1, MPI_DOUBLE, MPI_MIN, tpsP_->getTPSCommWorld());
+      //   MPI_Allreduce(&BTElocal_max, &BTEglobal_max, 1, MPI_DOUBLE, MPI_MAX, tpsP_->getTPSCommWorld());
 
-        if (rank0_) {
-          std::cout << "[C++], Reaction " << rr << ", Rate coefficient Local = " 
-                    << local_min << " to " << local_max 
-                    << ", Global = " 
-                    << global_min << " to " << global_max << ", BTE global = " << BTEglobal_min << ", to " << BTEglobal_max << "\n";
-        }
+      //   if (rank0_) {
+      //     std::cout << "[C++], Reaction " << rr << ", Rate coefficient Local = " 
+      //               << local_min << " to " << local_max 
+      //               << ", Global = " 
+      //               << global_min << " to " << global_max << ", BTE global = " << BTEglobal_min << ", to " << BTEglobal_max << "\n";
+      //   }
 
-        if (rr % 2 == 0) {
-          mfem::Vector rrf_by_rrb_view(rrf_by_rrb_.GetData() + int(rr/2)*sDofInt_, sDofInt_);
-          mfem::Vector BTErrf_by_rrb_view(BTErrf_by_rrb_.GetData() + int(rr/2)*sDofInt_, sDofInt_);
+      //   if (rr % 2 == 0) {
+      //     mfem::Vector rrf_by_rrb_view(rrf_by_rrb_.GetData() + int(rr/2)*sDofInt_, sDofInt_);
+      //     mfem::Vector BTErrf_by_rrb_view(BTErrf_by_rrb_.GetData() + int(rr/2)*sDofInt_, sDofInt_);
 
-          double loc_min = rrf_by_rrb_view.Min();
-          double loc_max = rrf_by_rrb_view.Max();
+      //     double loc_min = rrf_by_rrb_view.Min();
+      //     double loc_max = rrf_by_rrb_view.Max();
 
-          double BTEloc_min = BTErrf_by_rrb_view.Min();
-          double BTEloc_max = BTErrf_by_rrb_view.Max();
+      //     double BTEloc_min = BTErrf_by_rrb_view.Min();
+      //     double BTEloc_max = BTErrf_by_rrb_view.Max();
 
-          double glob_min, glob_max;
-          double BTEglob_min, BTEglob_max;
+      //     double glob_min, glob_max;
+      //     double BTEglob_min, BTEglob_max;
 
-          MPI_Allreduce(&loc_min, &glob_min, 1, MPI_DOUBLE, MPI_MIN, tpsP_->getTPSCommWorld());
-          MPI_Allreduce(&loc_max, &glob_max, 1, MPI_DOUBLE, MPI_MAX, tpsP_->getTPSCommWorld());
+      //     MPI_Allreduce(&loc_min, &glob_min, 1, MPI_DOUBLE, MPI_MIN, tpsP_->getTPSCommWorld());
+      //     MPI_Allreduce(&loc_max, &glob_max, 1, MPI_DOUBLE, MPI_MAX, tpsP_->getTPSCommWorld());
 
-          MPI_Allreduce(&BTEloc_min, &BTEglob_min, 1, MPI_DOUBLE, MPI_MIN, tpsP_->getTPSCommWorld());
-          MPI_Allreduce(&BTEloc_max, &BTEglob_max, 1, MPI_DOUBLE, MPI_MAX, tpsP_->getTPSCommWorld());
+      //     MPI_Allreduce(&BTEloc_min, &BTEglob_min, 1, MPI_DOUBLE, MPI_MIN, tpsP_->getTPSCommWorld());
+      //     MPI_Allreduce(&BTEloc_max, &BTEglob_max, 1, MPI_DOUBLE, MPI_MAX, tpsP_->getTPSCommWorld());
 
-          if (rank0_) {
-            std::cout << "Reaction set " << int(rr/2) << ", Ratio of forward to backward rates Local = " 
-                      << loc_min << " to " << loc_max 
-                      << ", Global = " 
-                      << glob_min << " to " << glob_max 
-                      << ", BTE local = " << BTEloc_min << " to " << BTEloc_max
-                      << ", Global = " << BTEglob_min << " to " << BTEglob_max << "\n";
-          }
-        }
-      }
-
-      if(rank0_) { std::cout << "bl_frac = " << bl_frac_ << ", sdof = " << sDof_ << ", " << sDofInt_ 
-                    << ", ydof = " << yDof_ << ", " << yDofInt_ 
-                    << ", rdof = " << rDof_ << ", " << rDofInt_
-                    << ", rrf_by_rrb_dof = " << rrf_by_rrbDof_ << ",  " << rrf_by_rrbDofInt_ << "\n";
-                  }
+      //     if (rank0_) {
+      //       std::cout << "Reaction set " << int(rr/2) << ", Ratio of forward to backward rates Local = " 
+      //                 << loc_min << " to " << loc_max 
+      //                 << ", Global = " 
+      //                 << glob_min << " to " << glob_max 
+      //                 << ", BTE local = " << BTEloc_min << " to " << BTEloc_max
+      //                 << ", Global = " << BTEglob_min << " to " << BTEglob_max << "\n";
+      //     }
+      //   }
+      // }
 
       // std::cout << "Rank " << myRank << ", TPS Obtained global max/min of rate coefficients\n";
 #endif
@@ -3533,11 +3582,8 @@ void ReactingFlow::identifyCollisionType(const Array<ArgonSpcs> &speciesType, Ar
   return;
 }
 
-void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, double *omega
-#ifdef HAVE_PYTHON
-  , double *BTErr
-#endif
-) {
+void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, double *omega, 
+  double *kf, double *prograte, double *rrfrrb, double *prodYsp) {
   // This function evaluates the reacting flow source terms at a given
   // state (i.e., at a point in the grid) which is necessary for a
   // nonlinear solve for an implicit time step at each point.  The
@@ -3645,53 +3691,22 @@ void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, 
 
   // Evaluate the chemical source terms
   chemistry_->computeForwardRateCoeffs(n_sp.Read(), Th, Te, dofindex, kfwd.HostWrite());
-#ifdef HAVE_PYTHON
-  Vector BTEkfwd;          // set to size nReactions_ in computeForwardRareCoeffs  
-  Vector BTEprogressRate;  // set to size nReactions_ in computeProgressRate
-  BTEkfwd.SetSize(chemistry_->getNumReactions());
-  if (bte_from_tps_) {
-    const double* mapping = bte_rr_mapping_.HostRead();
-    for (int rr = 0; rr < nBTEReactions_; rr++) {
-      int tpi = int(mapping[rr]); // tpi stores TPS index of reaction given by BTE index rr
-      double kblend = bl_frac_ * BTErr[rr] + (1.0 - bl_frac_) * kfwd[tpi];
-      kfwd[tpi] = std::max(kblend, 0.0);
-      BTEkfwd[tpi] = BTErr[rr];
-    }
-  }
-  double *datakfwd = kReac_.HostWrite();
-  double *dataBTEkfwd = BTEkReac_.HostWrite();
-  for (int nr = 0; nr < nReactions_; nr++) {
-    datakfwd[dofindex + nr*sDofInt_] = std::max(0.0,kfwd[nr]);
-    dataBTEkfwd[dofindex + nr*sDofInt_] = std::max(0.0,BTEkfwd[nr]);
-  }
-#endif
   chemistry_->computeEquilibriumConstants(Th, Te, keq.HostWrite());
   chemistry_->computeProgressRate(n_sp, kfwd, keq, progressRate);
-#ifdef HAVE_PYTHON
-  chemistry_->computeProgressRate(n_sp, BTEkfwd, keq, BTEprogressRate); //will be accurate only if detailed balance is False
-  double *dataReac = reacR_.HostWrite();
-  double *datarrfbyrrb = rrf_by_rrb_.HostWrite();
-  double *dataBTEReac = BTEreacR_.HostWrite();
-  double *dataBTErrfbyrrb = BTErrf_by_rrb_.HostWrite();
-  // Write the reaction progress rates into dataReac
-  for(int nr = 0; nr < nReactions_; nr++){
-    dataReac[dofindex + nr * sDofInt_] = progressRate[nr];
-    dataBTEReac[dofindex + nr * sDofInt_] = BTEprogressRate[nr];
-    if (nr % 2 == 0){
-      datarrfbyrrb[dofindex + int(nr/2) * sDofInt_] = std::max(0.0, progressRate[nr] / (1e-28 + progressRate[nr + 1]));
-      dataBTErrfbyrrb[dofindex + int(nr/2) * sDofInt_] = std::max(0.0, BTEprogressRate[nr] / (1e-28 + BTEprogressRate[nr + 1]));
-    }
-  }
-#endif
   chemistry_->computeCreationRate(progressRate, creationRate, emissionRate);
 
-#ifdef HAVE_PYTHON
-  double *dataProd = prodY_.HostWrite();
+  for (int nr = 0; nr < nReactions_; nr++) {
+    kf[nr] = kfwd[nr];
+    prograte[nr] = progressRate[nr];
+    if (nr % 2 == 0) {
+      rrfrrb[int(nr/2)] = progressRate[nr] / (1e-20 + progressRate[nr+1]);
+    }
+  }
+
   // Write the reaction progress rates into dataReac
   for(int sp = 0; sp < nSpecies_; sp++){
-    dataProd[dofindex + sp * sDofInt_] = creationRate[sp];
+    prodYsp[sp] = creationRate[sp];
   }
-#endif
 
   // And store in returned variable
   for (int sp = 0; sp < nActiveSpecies_; sp++) {
@@ -3727,11 +3742,8 @@ void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, 
   omega[nActiveSpecies_] = hw / rho / Cpmix;
 }
 
-void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const double dt
-#ifdef HAVE_PYTHON
-  , double *BTErr
-#endif
-) {
+void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const double dt, 
+  double *kf, double *prograte, double *rrfrrb, double *prodYsp) {
   const int nState = nActiveSpecies_ + 1;         // Number of variables in YT
   const double eps = implicit_chemistry_fd_eps_;  // Perturbation for finite difference Jacobian
 
@@ -3751,11 +3763,7 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
   // Jacobian for a backward Euler step
 
   // Evaluate RHS...
-  this->evaluateReactingSource(YT, dofindex, rhs
-#ifdef HAVE_PYTHON
-    , BTErr
-#endif
-  );
+  this->evaluateReactingSource(YT, dofindex, rhs, kf, prograte, rrfrrb, prodYsp);
 
   // ... and Jacobian (via finite difference)
   for (int i = 0; i < nState; i++) {
@@ -3768,11 +3776,7 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
       YT1[i] *= (1 + eps);
     }
 
-    this->evaluateReactingSource(YT1, dofindex, rhs1
-#ifdef HAVE_PYTHON
-      , BTErr
-#endif  
-    );
+    this->evaluateReactingSource(YT1, dofindex, rhs1, kf, prograte, rrfrrb, prodYsp);
 
     for (int j = 0; j < nState; j++) {
       Jac(j, i) = (rhs1[j] - rhs[j]) / (YT1[i] - YT[i]);
@@ -3808,11 +3812,7 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
     }
 
     // Compute rhs and Jacobian, in preparation for next step
-    this->evaluateReactingSource(YT, dofindex, rhs
-#ifdef HAVE_PYTHON
-      , BTErr
-#endif
-    );
+    this->evaluateReactingSource(YT, dofindex, rhs, kf, prograte, rrfrrb, prodYsp);
 
     for (int i = 0; i < nState; i++) {
       for (int j = 0; j < nState; j++) {
@@ -3824,11 +3824,7 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
         YT1[i] *= (1 + eps);
       }
 
-      this->evaluateReactingSource(YT1, dofindex, rhs1
-#ifdef HAVE_PYTHON
-        , BTErr
-#endif
-      );
+      this->evaluateReactingSource(YT1, dofindex, rhs1, kf, prograte, rrfrrb, prodYsp);
       for (int j = 0; j < nState; j++) {
         Jac(j, i) = (rhs1[j] - rhs[j]) / (YT1[i] - YT[i]);
       }
@@ -3867,6 +3863,323 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
   delete[] rhs1;
   delete[] rhs;
 }
+
+#ifdef HAVE_PYTHON
+void ReactingFlow::evaluateReactingSourceBTE(const double *YT, const int dofindex, double *omega, double *BTErr, 
+  double *kf, double *prograte, double *rrfrrb, double *kfBTE, double *prograteBTE, double *rrfrrbBTE, double *prodYsp) {
+    // This function evaluates the reacting flow source terms at a given
+    // state (i.e., at a point in the grid) which is necessary for a
+    // nonlinear solve for an implicit time step at each point.  The
+    // sequence of calls that does this for the full field is below:
+    //
+    // updateMixture();
+    // updateThermoP();
+    // updateDensity(0.0, false);
+    // speciesProduction();
+    // heatOfFormation();
+    //
+  
+    // Extract data from incoming state and populate full set of mass & mole fractions
+    std::vector<double> Y(nSpecies_);  // mass fractions
+    std::vector<double> X(nSpecies_);  // mole fractions
+    double T = 0.0;                    // temperature
+  
+    // Set the species we are carrying, and evaluate charge density as we go
+    double ne = 0.0;
+    double sumy = 0.0;
+    for (int sp = 0; sp < nActiveSpecies_; sp++) {
+      Y[sp] = YT[sp];
+  
+      sumy += Y[sp];
+  
+      const double q_sp = mixture_->GetGasParams(sp, GasParams::SPECIES_CHARGES);
+      const double m_sp = mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
+      const double fac = q_sp / m_sp;
+      ne += fac * Y[sp];
+    }
+  
+    if (mixtureInput_.ambipolar) {
+      // Electron density is determined from charge neutrality
+      const int iElectron = nSpecies_ - 2;
+      const double m_electron = mixture_->GetGasParams(iElectron, GasParams::SPECIES_MW);
+      Y[iElectron] = ne * m_electron;
+      sumy += Y[iElectron];
+    }
+  
+    // 'Background' species density is 1 - sum of the rest
+    Y[nSpecies_ - 1] = 1.0 - sumy;
+  
+    // Temperature is the last element of the incoming state
+    T = YT[nActiveSpecies_];
+  
+    double Rmix = 0;
+    double Mmix = 0;
+  
+    // Evaluate mixture molecular weight and gas constant
+    for (int sp = 0; sp < nSpecies_; sp++) {
+      Mmix += Y[sp] / gasParams_(sp, GasParams::SPECIES_MW);
+    }
+    Mmix = 1.0 / Mmix;
+    Rmix = Rgas_ / Mmix;
+  
+    // Evaluate mole fractions
+    for (int sp = 0; sp < nSpecies_; sp++) {
+      X[sp] = Y[sp] * Mmix / gasParams_(sp, GasParams::SPECIES_MW);
+    }
+  
+    // Compute mixture density
+    assert(domain_is_open_);  // TODO(trevilo): handle variable pressure case!!
+    double rho = thermo_pressure_ / (Rmix * T);
+  
+    // int nEq = dim_ + 2 + nActiveSpecies_;
+    Vector state(gpudata::MAXEQUATIONS);
+    state = 0.0;
+  
+    Vector n_sp;
+  
+    // Set up conserved state (just the mass densities, which is all we need here)
+    state[0] = rho;
+    for (int sp = 0; sp < nActiveSpecies_; sp++) {
+      state[dim_ + 1 + sp + 1] = rho * Y[sp];
+    }
+  
+    // Evaluate the mole densities (from mass densities)
+    mixture_->computeNumberDensities(state, n_sp);
+  
+    // GetMixtureCp returns cpMix = sum_s X_s Cp_s, where X_s is
+    // mole density of species s and Cp_s is molar specific heat
+    // (constant pressure) of species s, so cpMix at this point
+    // (units J/m^3), which is rho*Cp, where rho is the mixture
+    // density (kg/m^3) and Cp is the is the mixture mass specific
+    // heat (units J/(kg*K).
+    double Cpmix = 0;
+    mixture_->GetMixtureCp(n_sp, rho, Cpmix);
+  
+    // Everything else expects CpMix_gf_ to be the mixture mass Cp
+    // (with units J/(kg*K)), so divide by mixture density
+    Cpmix /= rho;
+  
+    // Vectors used in computing chemical sources at each point
+    Vector kfwd;          // set to size nReactions_ in computeForwardRareCoeffs
+    Vector keq;           // set to size nReactions_ in computeEquilibriumConstants
+    Vector progressRate;  // set to size nReactions_ in computeProgressRate
+    Vector creationRate;  // set to size nSpecies_ in computeCreationRate
+    Vector emissionRate;  // set to size nSpecies_ in computeCreationRate
+  
+    kfwd.SetSize(chemistry_->getNumReactions());
+    keq.SetSize(chemistry_->getNumReactions());
+  
+    const double Th = T;
+    const double Te = Th;
+  
+    // Evaluate the chemical source terms
+    chemistry_->computeForwardRateCoeffs(n_sp.Read(), Th, Te, dofindex, kfwd.HostWrite());
+    
+    Vector BTEkfwd;          // set to size nReactions_ in computeForwardRareCoeffs  
+    Vector BTEprogressRate;  // set to size nReactions_ in computeProgressRate
+    BTEkfwd.SetSize(chemistry_->getNumReactions());
+    BTEkfwd = 0.0;
+    
+    const double* mapping = bte_rr_mapping_.HostRead();
+    for (int rr = 0; rr < nBTEReactions_; rr++) {
+        int tpi = int(mapping[rr]); // tpi stores TPS index of reaction given by BTE index rr
+        double kblend = bl_frac_ * BTErr[rr] + (1.0 - bl_frac_) * kfwd[tpi];
+        kfwd[tpi] = std::max(kblend, 0.0);
+        BTEkfwd[tpi] = BTErr[rr];
+    }
+    chemistry_->computeEquilibriumConstants(Th, Te, keq.HostWrite());
+    chemistry_->computeProgressRate(n_sp, kfwd, keq, progressRate);
+    
+    chemistry_->computeProgressRate(n_sp, BTEkfwd, keq, BTEprogressRate); //will be accurate only if detailed balance is False
+    
+    // Write the reaction progress rates into dataReac
+    for(int nr = 0; nr < nReactions_; nr++){
+      kf[nr] = std::max(0.0, kfwd[nr]);
+      kfBTE[nr] = std::max(0.0, BTEkfwd[nr]);
+
+      if (nr % 2 == 0) {
+        if (clip_rr == 1) {
+          // Clip the forward reaction rate to a fraction of backward reaction rate (ONLY FOR DEBUGGING)
+          progressRate[nr] = std::max(0.0, std::min(clip_frac*progressRate[nr+1], progressRate[nr]));
+        }
+      }
+      prograte[nr] = progressRate[nr];
+      prograteBTE[nr] = BTEprogressRate[nr];
+  
+      if (nr % 2 == 0){
+        rrfrrb[int(nr/2)] = std::max(0.0, progressRate[nr] / (1e-28 + progressRate[nr + 1]));
+        rrfrrbBTE[int(nr/2)] = std::max(0.0, BTEprogressRate[nr] / (1e-28 + BTEprogressRate[nr + 1]));
+      }
+    }
+    chemistry_->computeCreationRate(progressRate, creationRate, emissionRate);
+    
+    // Write the reaction progress rates into dataReac
+    for(int sp = 0; sp < nSpecies_; sp++){
+      prodYsp[sp] = creationRate[sp];
+    }
+  
+    // And store in returned variable
+    for (int sp = 0; sp < nActiveSpecies_; sp++) {
+      omega[sp] = creationRate[sp] / rho;
+    }
+  
+    // And finally, handle the temperature source term
+    double hw = 0.0;
+    double hspecies;
+  
+    if (radiative_decay_NECincluded_) {
+      // Sum over species to get enthalpy term
+      for (int sp = 0; sp < nSpecies_; sp++) {
+        double molarCV = speciesMolarCv_[sp];
+        molarCV *= UNIVERSALGASCONSTANT;
+        double molarCP = molarCV + UNIVERSALGASCONSTANT;
+  
+        hspecies = (molarCP * T + gasParams_(sp, GasParams::FORMATION_ENERGY)) / gasParams_(sp, GasParams::SPECIES_MW);
+        hw -= hspecies * (creationRate[sp] - emissionRate[sp]);
+      }
+    } else {
+      // Sum over species to get enthalpy term
+      for (int sp = 0; sp < nSpecies_; sp++) {
+        double molarCV = speciesMolarCv_[sp];
+        molarCV *= UNIVERSALGASCONSTANT;
+        double molarCP = molarCV + UNIVERSALGASCONSTANT;
+  
+        hspecies = (molarCP * T + gasParams_(sp, GasParams::FORMATION_ENERGY)) / gasParams_(sp, GasParams::SPECIES_MW);
+        hw -= hspecies * creationRate[sp];
+      }
+    }
+  
+    omega[nActiveSpecies_] = hw / rho / Cpmix;
+  }
+
+void ReactingFlow::solveChemistryStepBTE(double *YT, const int dofindex, const double dt, double *BTErr,
+  double *kf, double *prograte, double *rrfrrb,
+  double *kfBTE, double *prograteBTE, double *rrfrrbBTE, double *prodYsp) {
+    const int nState = nActiveSpecies_ + 1;         // Number of variables in YT
+    const double eps = implicit_chemistry_fd_eps_;  // Perturbation for finite difference Jacobian
+  
+    double *YT1 = new double[nState];
+    double *YT0 = new double[nState];
+    double *rhs1 = new double[nState];
+    double *rhs = new double[nState];
+  
+    mfem::DenseMatrix Jac(nState);
+  
+    // Store state at beginning of the step
+    for (int i = 0; i < nState; i++) {
+      YT0[i] = YT[i];
+    }
+  
+    // Before starting the Newton iteration, evaluate the rhs and
+    // Jacobian for a backward Euler step
+  
+    // Evaluate RHS...
+    this->evaluateReactingSourceBTE(YT, dofindex, rhs, BTErr, 
+      kf, prograte, rrfrrb, kfBTE, prograteBTE, rrfrrbBTE, prodYsp);
+  
+    // ... and Jacobian (via finite difference)
+    for (int i = 0; i < nState; i++) {
+      for (int j = 0; j < nState; j++) {
+        YT1[j] = YT[j];
+      }
+      if (YT[i] < implicit_chemistry_smin_) {
+        YT1[i] = implicit_chemistry_smin_ * (1 + eps);
+      } else {
+        YT1[i] *= (1 + eps);
+      }
+  
+      this->evaluateReactingSourceBTE(YT1, dofindex, rhs1, BTErr,
+      kf, prograte, rrfrrb, kfBTE, prograteBTE, rrfrrbBTE, prodYsp);
+  
+      for (int j = 0; j < nState; j++) {
+        Jac(j, i) = (rhs1[j] - rhs[j]) / (YT1[i] - YT[i]);
+      }
+    }
+  
+    for (int i = 0; i < nState; i++) {
+      rhs[i] *= -dt;
+  
+      for (int j = 0; j < nState; j++) {
+        Jac(j, i) *= -dt;
+      }
+      Jac(i, i) += 1.0;
+    }
+  
+    double res_norm0 = 0;
+    for (int i = 0; i < nState; i++) {
+      res_norm0 += rhs[i] * rhs[i];
+    }
+    res_norm0 = sqrt(res_norm0);
+  
+    int iiter = 0;
+    double res_norm = res_norm0;
+  
+    // Newton solver loop
+    while (iiter < implicit_chemistry_maxiter_ && res_norm > implicit_chemistry_atol_ &&
+           (res_norm / res_norm0) > implicit_chemistry_rtol_) {
+      mfem::LinearSolve(Jac, rhs, 1.e-9);
+  
+      // Update the solution
+      for (int i = 0; i < nState; i++) {
+        YT[i] += -rhs[i];
+      }
+  
+      // Compute rhs and Jacobian, in preparation for next step
+      this->evaluateReactingSourceBTE(YT, dofindex, rhs, BTErr,
+      kf, prograte, rrfrrb, kfBTE, prograteBTE, rrfrrbBTE, prodYsp);
+  
+      for (int i = 0; i < nState; i++) {
+        for (int j = 0; j < nState; j++) {
+          YT1[j] = YT[j];
+        }
+        if (YT[i] < 1e-10) {
+          YT1[i] = 1e-17;
+        } else {
+          YT1[i] *= (1 + eps);
+        }
+  
+        this->evaluateReactingSourceBTE(YT1, dofindex, rhs1, BTErr,
+        kf, prograte, rrfrrb, kfBTE, prograteBTE, rrfrrbBTE, prodYsp);
+
+        for (int j = 0; j < nState; j++) {
+          Jac(j, i) = (rhs1[j] - rhs[j]) / (YT1[i] - YT[i]);
+        }
+      }
+  
+      for (int i = 0; i < nState; i++) {
+        rhs[i] *= -dt;
+        rhs[i] += YT[i] - YT0[i];
+  
+        for (int j = 0; j < nState; j++) {
+          Jac(j, i) *= -dt;
+        }
+        Jac(i, i) += 1.0;
+      }
+  
+      res_norm = 0;
+      for (int i = 0; i < nState; i++) {
+        res_norm += rhs[i] * rhs[i];
+      }
+      res_norm = sqrt(res_norm);
+      iiter += 1;
+    }
+  
+    if (iiter >= implicit_chemistry_maxiter_ && implicit_chemistry_verbose_) {
+      std::cout << "WARNING: Implicit chemistry Newton solve did not converge." << std::endl;
+      std::cout << "    YT =";
+      for (int i = 0; i < nState; i++) {
+        std::cout << " " << YT[i];
+      }
+      std::cout << std::endl;
+      std::cout << "    iiter = " << iiter << ", r0 = " << res_norm0 << ", r/r0 = " << res_norm / res_norm0 << std::endl;
+    }
+  
+    delete[] YT1;
+    delete[] YT0;
+    delete[] rhs1;
+    delete[] rhs;
+  }
+#endif
 
 double binaryTest(const Vector &coords, double t) {
   double x = coords(0);

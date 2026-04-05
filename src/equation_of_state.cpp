@@ -635,13 +635,13 @@ MFEM_HOST_DEVICE double PerfectMixture::computeBackgroundMassDensity(const doubl
     rhoB -= n_e * GetGasParams(iElectron, GasParams::SPECIES_MW);
   }
 
-  // assert(rhoB >= 0.0);
   if (rhoB < 0.) {
     // grvy_printf(GRVY_ERROR, "\nNegative background density -> %f\n", rhoB);
     printf("\nERROR: Negative background density -> %f\n", rhoB);
 #ifdef _GPU_
     assert(rhoB >= 0.0);
 #else
+    assert(rhoB >= 0.0);
     exit(-1);
 #endif
   }
