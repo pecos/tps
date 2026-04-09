@@ -1879,6 +1879,9 @@ void ReactingFlow::step() {
     const double *dataRho = rn_.HostRead();
     const double *dataY = Yn_.HostRead();
 
+    ei_gf_.GetTrueDofs(ei_);
+    er_gf_.GetTrueDofs(er_);
+
     int iter = this->GetCurrentIter();
     int update_bte_rates = (iter - 1) % solve_bte_every_n;
 
@@ -2087,6 +2090,19 @@ void ReactingFlow::step() {
       auto dataBTEkfwd = BTEkReac_.HostWrite();
       auto dataBTEReac = BTEreacR_.HostWrite();
       auto dataBTErrfbyrrb = BTErrf_by_rrb_.HostWrite();
+
+      // Define Vectors to be passed to solveChemistryStep
+      mfem::Vector bterates(nBTEReactions_);
+      mfem::Vector kfBTE(nReactions_);
+      mfem::Vector prograteBTE(nReactions_);
+      mfem::Vector rrfrrbBTE(nReactions_/2);
+      
+      mfem::Vector kf(nReactions_);
+      mfem::Vector prograte(nReactions_);
+      mfem::Vector rrfrrb(nReactions_/2);
+      mfem::Vector prodYsp(nSpecies_);
+
+      bterates = 0.0;
       
       for (int i = 0; i < sDofInt_; i++) {
         // Extract point state
@@ -2098,30 +2114,47 @@ void ReactingFlow::step() {
 #ifdef HAVE_PYTHON
         if (bte_from_tps_) {
           // Extract point state for the BTE rates
-          double *bterates = new double[nBTEReactions_];
+          // double *bterates = new double[nBTEReactions_];
           for (int rr = 0; rr < nBTEReactions_; rr++) {
             bterates[rr] = btearr[i + rr*sDofInt_];
           }
 
-          // Create some vectors for storing point values of rate coefficients, rates and forward to backward rate ratio
-          double *kfBTE = new double[nReactions_];
-          double *prograteBTE = new double[nReactions_];
-          double *rrfrrbBTE = new double[int(nReactions_/2)];
-          double *kf = new double[nReactions_];
-          double *prograte = new double[nReactions_];
-          double *rrfrrb = new double[int(nReactions_/2)];
+          // // Create some vectors for storing point values of rate coefficients, rates and forward to backward rate ratio
+          // double *kfBTE = new double[nReactions_];
+          // double *prograteBTE = new double[nReactions_];
+          // double *rrfrrbBTE = new double[int(nReactions_/2)];
+          // double *kf = new double[nReactions_];
+          // double *prograte = new double[nReactions_];
+          // double *rrfrrb = new double[int(nReactions_/2)];
 
-          double *prodYsp = new double[nSpecies_];
+          // double *prodYsp = new double[nSpecies_];
           
-          for (int nr = 0; nr < nReactions_; nr++) {
-            kfBTE[nr] = 0.0;
-            prograteBTE[nr] = 0.0;
-            rrfrrbBTE[nr] = 0.0;
-          }
+          // for (int nr = 0; nr < nReactions_; nr++) {
+          //   kfBTE[nr] = 0.0;
+          //   prograteBTE[nr] = 0.0;
+          //   if(nr % 2 == 0) {
+          //     rrfrrbBTE[int(nr/2)] = 0.0;
+          //   }    
+          // }
+
+          // for (int sp = 0; sp < nSpecies_; sp++) {
+          //   prodYsp[sp] = 0.0;
+          // }
+
+          kfBTE = 0.0; 
+          prograteBTE = 0.0;
+          rrfrrbBTE = 0.0;
+          prodYsp = 0.0;
+
+          kf = 0.0;
+          prograte = 0.0;
+          rrfrrb = 0.0;
+
           // Solve backward Euler update (with BTE rates)
-          solveChemistryStepBTE(YT, i, dt_, bterates, 
-            kf, prograte, rrfrrb,
-            kfBTE, prograteBTE, rrfrrbBTE, prodYsp);
+          solveChemistryStepBTE(YT, i, dt_, bterates.GetData(), 
+            kf.GetData(), prograte.GetData(), rrfrrb.GetData(),
+            kfBTE.GetData(), prograteBTE.GetData(), rrfrrbBTE.GetData(), prodYsp.GetData()
+          );
 
           for (int nr = 0; nr < nReactions_; nr++) {
             datakfwd[i + nr*sDofInt_] = std::max(0.0,kf[nr]);
@@ -2133,24 +2166,62 @@ void ReactingFlow::step() {
               dataBTErrfbyrrb[i + int(nr/2) * sDofInt_] = std::max(0.0, prograteBTE[nr] / (1e-28 + prograteBTE[nr + 1]));
             }
           }
+
+          for (int sp = 0; sp < nSpecies_; sp++) {
+            dataProd[i + sp*sDofInt_] = prodYsp[sp];
+          }
+
+          // --------------------------BELOW IS FOR TESTING--------------------------
+          // double *kf = new double[nReactions_];
+          // double *prograte = new double[nReactions_];
+          // double *rrfrrb = new double[int(nReactions_/2)];
+          // double *prodYsp = new double[nSpecies_];
+          // Solve backward Euler update (with tabulated rates)
+          // solveChemistryStep(YT, i, dt_, kf, prograte, rrfrrb, prodYsp);
+
+          // Fill in the vectors storing rate coefficients (kf), reaction rates, rate of forward / backward rate from values
+          // returned by solveChemistryStep()
+          // for(int nr = 0; nr < nReactions_; nr++) {
+          //   datakfwd[i + nr * sDofInt_] = std::max(0.0,kf[nr]);
+          //   dataReac[i + nr * sDofInt_] = prograte[nr];
+          //   if (nr % 2 == 0) {
+          //     datarrfbyrrb[i + int(nr/2) * sDofInt_] = std::max(0.0, prograte[nr] / (1e-28 + prograte[nr + 1]));
+          //   }
+          // }
+
+          // for (int sp = 0; sp < nSpecies_; sp++) {
+          //   dataProd[i + sp*sDofInt_] = prodYsp[sp];
+          // }
+          // --------------------------END OF TESTING--------------------------
         } else{
 #endif
-          double *kf = new double[nReactions_];
-          double *prograte = new double[nReactions_];
-          double *rrfrrb = new double[int(nReactions_/2)];
-          double *prodYsp = new double[nSpecies_];
-          // Solve backward Euler update (with tabulated rates)
-        solveChemistryStep(YT, i, dt_, kf, prograte, rrfrrb, prodYsp);
+          // double *kf = new double[nReactions_];
+          // double *prograte = new double[nReactions_];
+          // double *rrfrrb = new double[int(nReactions_/2)];
+          // double *prodYsp = new double[nSpecies_];
+          
+          prodYsp = 0.0;
+          kf = 0.0;
+          prograte = 0.0;
+          rrfrrb = 0.0;
 
-        // Fill in the vectors storing rate coefficients (kf), reaction rates, rate of forward / backward rate from values
-        // returned by solveChemistryStep()
-        for(int nr = 0; nr < nReactions_; nr++) {
-          datakfwd[i + nr * sDofInt_] = std::max(0.0,kf[nr]);
-          dataReac[i + nr * sDofInt_] = prograte[nr];
-          if (nr % 2 == 0) {
-            datarrfbyrrb[i + int(nr/2) * sDofInt_] = std::max(0.0, prograte[nr] / (1e-28 + prograte[nr + 1]));
+          // Solve backward Euler update (with tabulated rates)
+          solveChemistryStep(YT, i, dt_, kf.GetData(), prograte.GetData(), rrfrrb.GetData(), prodYsp.GetData()
+        );
+
+          // Fill in the vectors storing rate coefficients (kf), reaction rates, rate of forward / backward rate from values
+          // returned by solveChemistryStep()
+          for(int nr = 0; nr < nReactions_; nr++) {
+            datakfwd[i + nr * sDofInt_] = std::max(0.0,kf[nr]);
+            dataReac[i + nr * sDofInt_] = prograte[nr];
+            if (nr % 2 == 0) {
+              datarrfbyrrb[i + int(nr/2) * sDofInt_] = std::max(0.0, prograte[nr] / (1e-28 + prograte[nr + 1]));
+            }
           }
-        }
+
+          for (int sp = 0; sp < nSpecies_; sp++) {
+            dataProd[i + sp*sDofInt_] = prodYsp[sp];
+          }
 #ifdef HAVE_PYTHON
         }
 #endif
@@ -2175,6 +2246,11 @@ void ReactingFlow::step() {
       BTEkReac_gf_.SetFromTrueDofs(BTEkReac_);
       BTEreacR_gf_.SetFromTrueDofs(BTEreacR_);
       BTErrf_by_rrb_gf_.SetFromTrueDofs(BTErrf_by_rrb_);
+
+      er_gf_.SetFromTrueDofs(er_);
+      ei_gf_.SetFromTrueDofs(ei_);
+
+
 
       if (bte_from_tps_) {
         // UPDATE THE BLENDING FRACTION
@@ -3703,10 +3779,9 @@ void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, 
     }
   }
 
-  // Write the reaction progress rates into dataReac
-  for(int sp = 0; sp < nSpecies_; sp++){
-    prodYsp[sp] = creationRate[sp];
-  }
+  // for(int sp = 0; sp < nSpecies_; sp++){
+  //   prodYsp[sp] = creationRate[sp];
+  // }
 
   // And store in returned variable
   for (int sp = 0; sp < nActiveSpecies_; sp++) {
@@ -3994,7 +4069,7 @@ void ReactingFlow::evaluateReactingSourceBTE(const double *YT, const int dofinde
     
     // Write the reaction progress rates into dataReac
     for(int nr = 0; nr < nReactions_; nr++){
-      kf[nr] = std::max(0.0, kfwd[nr]);
+      kf[nr] = kfwd[nr];
       kfBTE[nr] = std::max(0.0, BTEkfwd[nr]);
 
       if (nr % 2 == 0) {
@@ -4007,7 +4082,7 @@ void ReactingFlow::evaluateReactingSourceBTE(const double *YT, const int dofinde
       prograteBTE[nr] = BTEprogressRate[nr];
   
       if (nr % 2 == 0){
-        rrfrrb[int(nr/2)] = std::max(0.0, progressRate[nr] / (1e-28 + progressRate[nr + 1]));
+        rrfrrb[int(nr/2)] = progressRate[nr] / (1e-20 + progressRate[nr + 1]);
         rrfrrbBTE[int(nr/2)] = std::max(0.0, BTEprogressRate[nr] / (1e-28 + BTEprogressRate[nr + 1]));
       }
     }

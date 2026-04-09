@@ -600,14 +600,14 @@ void CycleAvgJouleCoupling::solve() {
 
 void CycleAvgJouleCoupling::solveBegin() {
 #ifdef HAVE_PYTHON
-  if (bte_from_tps_) {
+  // if (bte_from_tps_) {
   // Tell the EM solver to store the electric fields.
   // Electric fields are stored now irrespective of the initialization of
   // TPS-BTE interface
     bool storeE = qmsa_solver_->getStoreE();
     qmsa_solver_->setStoreE(true);
     storeE = qmsa_solver_->getStoreE();
-  }
+  // }
 #endif
   flow_solver_->solveBegin();
   qmsa_solver_->solveBegin();
@@ -673,9 +673,9 @@ void CycleAvgJouleCoupling::solveStep() {
 #ifdef HAVE_PYTHON
     // Electrid field is interpolated from EM to Flow for calling BTE from TPS
     // Interface is not used for this
-    if (bte_from_tps_) {
+    // if (bte_from_tps_) {
       interpElectricFieldFromEMToFlowforBTE();
-    }
+    // }
 #endif
     // Electric field is interpolated from EM to Flow for the Interface
     if (efieldFES_) interpElectricFieldFromEMToFlow();

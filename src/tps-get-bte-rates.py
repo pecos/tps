@@ -45,7 +45,7 @@ clstr_threshold       = 1e-3
 n0_param              = 3.22e22 
 kB                    = scipy.constants.Boltzmann
 
-varyT_cs = 0
+varyT_cs = 1
 append_recomb_cs = 1
 
 logfile = "outlog.txt"
@@ -408,9 +408,9 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
                 bte_solver.set_boltzmann_parameter(grid_idx, "ne" , ne)
                 bte_solver.set_boltzmann_parameter(grid_idx, "ni" , ni)
                 bte_solver.set_boltzmann_parameter(grid_idx, "Tg" , Tg)
-                bte_solver.set_boltzmann_parameter(grid_idx, "eRe", Ex)
-                bte_solver.set_boltzmann_parameter(grid_idx, "eIm", Ey)
-                bte_solver.set_boltzmann_parameter(grid_idx,  "E" , EMag)
+                bte_solver.set_boltzmann_parameter(grid_idx, "eRe", 0.0*Ex)
+                bte_solver.set_boltzmann_parameter(grid_idx, "eIm", 0.0*Ey)
+                bte_solver.set_boltzmann_parameter(grid_idx,  "E" , 0.0*EMag)
 
                 return
             
@@ -472,9 +472,9 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
                 bte_solver.set_boltzmann_parameter(grid_idx, "ne" , ne)
                 bte_solver.set_boltzmann_parameter(grid_idx, "ni" , ni)
                 bte_solver.set_boltzmann_parameter(grid_idx, "Tg" , Tg)
-                bte_solver.set_boltzmann_parameter(grid_idx, "eRe", Ex)
-                bte_solver.set_boltzmann_parameter(grid_idx, "eIm", Ey)
-                bte_solver.set_boltzmann_parameter(grid_idx,  "E" , EMag)
+                bte_solver.set_boltzmann_parameter(grid_idx, "eRe", 0.0*Ex)
+                bte_solver.set_boltzmann_parameter(grid_idx, "eIm", 0.0*Ey)
+                bte_solver.set_boltzmann_parameter(grid_idx,  "E" , 0.0*EMag)
 
                 return
             
