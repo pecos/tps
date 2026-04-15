@@ -42,6 +42,8 @@ int main(int argc, char *argv[]) {
   {
     TPS::Tps tps(MPI_COMM_WORLD);
 
+    // force check...
+    
     tps.parseCommandLineArgs(argc, argv);
     tps.parseInput();
     tps.chooseDevices();
