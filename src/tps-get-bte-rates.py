@@ -107,15 +107,6 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
     comm.Barrier()
 
     Te                               = Te_vec
-    #  generate crs Tg depended crs data 
-    col_cs = list()
-    for idx in range(n_grids):
-        cs_fname = collisions_file
-        if varyT_cs == 1:
-            cs_fname = "%s/crs_rank_%06d_npes_%06d_%06d.txt"%(crs_folder, rank_, size_, idx) 
-            synthetic_cs.gen_lxcat_file(cs_fname, Te[idx] * ev_to_K, append_recomb_cs, rank_, idx)
-        col_cs.append(cs_fname)
-    comm.Barrier()
 
     args.collisions = collisions_file # collision cross-section file
     if varyT_cs == 1:
@@ -203,6 +194,16 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
         ev_max[idx] = 36 * np.mean( Tg[grid_idx_to_spatial_idx_map[idx]] / ev_to_K) 
         if args.ee_collisions==1:
             ev_max[idx] = 100 * np.mean( Tg[grid_idx_to_spatial_idx_map[idx]] / ev_to_K) 
+    
+    #  generate crs Tg depended crs data 
+    col_cs = list()
+    for idx in range(n_grids):
+        cs_fname = collisions_file
+        if varyT_cs == 1:
+            cs_fname = "%s/crs_rank_%06d_npes_%06d_%06d.txt"%(crs_folder, rank_, size_, idx) 
+            synthetic_cs.gen_lxcat_file_coupledsolve(cs_fname, Te[idx] * ev_to_K, append_recomb_cs, rank_, idx, ev_max[idx])
+        col_cs.append(cs_fname)
+    comm.Barrier()
 
     #  generate crs Tg depended crs data 
     # col_cs = list()
@@ -408,9 +409,9 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
                 bte_solver.set_boltzmann_parameter(grid_idx, "ne" , ne)
                 bte_solver.set_boltzmann_parameter(grid_idx, "ni" , ni)
                 bte_solver.set_boltzmann_parameter(grid_idx, "Tg" , Tg)
-                bte_solver.set_boltzmann_parameter(grid_idx, "eRe", 0.0*Ex)
-                bte_solver.set_boltzmann_parameter(grid_idx, "eIm", 0.0*Ey)
-                bte_solver.set_boltzmann_parameter(grid_idx,  "E" , 0.0*EMag)
+                bte_solver.set_boltzmann_parameter(grid_idx, "eRe", Ex)
+                bte_solver.set_boltzmann_parameter(grid_idx, "eIm", Ey)
+                bte_solver.set_boltzmann_parameter(grid_idx,  "E" , EMag)
 
                 return
             
@@ -472,9 +473,9 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
                 bte_solver.set_boltzmann_parameter(grid_idx, "ne" , ne)
                 bte_solver.set_boltzmann_parameter(grid_idx, "ni" , ni)
                 bte_solver.set_boltzmann_parameter(grid_idx, "Tg" , Tg)
-                bte_solver.set_boltzmann_parameter(grid_idx, "eRe", 0.0*Ex)
-                bte_solver.set_boltzmann_parameter(grid_idx, "eIm", 0.0*Ey)
-                bte_solver.set_boltzmann_parameter(grid_idx,  "E" , 0.0*EMag)
+                bte_solver.set_boltzmann_parameter(grid_idx, "eRe", Ex)
+                bte_solver.set_boltzmann_parameter(grid_idx, "eIm", Ey)
+                bte_solver.set_boltzmann_parameter(grid_idx,  "E" , EMag)
 
                 return
             
@@ -741,6 +742,9 @@ def bte_grid_setup(Tarr, n_grids):
         grid_pts_to_spatial_index_map_vec = np.array([i for i in range(len(Tarr))], dtype=np.int64)
     else:
         Te = Tarr / ev_to_K # [eV]
+
+        if np.std(Te) < 1e-10:
+            Te = Te + np.random.normal(0, 1e-6, Te.shape)  # Add tiny noise if the standard deviation is very small
 
         # WHITEN THE DATA (Normalize such that the data has unit variance)
         Tew           = scipy.cluster.vq.whiten(Te)
