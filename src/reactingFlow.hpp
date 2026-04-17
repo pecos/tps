@@ -151,6 +151,8 @@ class ReactingFlow : public ThermoChemModelBase {
   double Tmin_ = 0.0;
   double Tmax_ = 100000.0;
 
+  bool fixed_conductivity_ = false;  
+
   /// pressure-related, closed-system thermo pressure changes
   double ambient_pressure_, thermo_pressure_, system_mass_;
   double dtP_;
