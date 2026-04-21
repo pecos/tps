@@ -11,13 +11,14 @@ parser.add_argument("--dir",type=str,help="MFEM directory to scan")
 parser.add_argument("--libs",     dest='parseLibs',action='store_true',help="Parse external libraries")
 parser.add_argument("--includes", dest='parseIncs',action='store_true',help="Parse include paths")
 parser.add_argument("--noreplace",dest='noReplace',action='store_true',help="Do not replace paths with env variables")
+parser.add_argument("--version",  dest='parseVer', action='store_true',help="Extract version number")
 args = parser.parse_args()
 
 if args.parseLibs and args.parseIncs:
     logging.error("[ERROR]: Options --libs and --includes cannot be run simultaneously.")
     exit(1)
 
-if not args.parseLibs and not args.parseIncs:
+if not args.parseLibs and not args.parseIncs and not args.parseVer:
     logging.error("[ERROR]: Please run with either the --libs or --includes option defined.")
     exit(1)    
 
@@ -113,6 +114,14 @@ def parse_libs(libs,match):
 
     return(' '.join(libs))
 
+def parse_version(line,match):
+    mylibs = line.lstrip(match)    # strip leading variable name (match)
+    mylibs = mylibs.lstrip()       # strip spaces after variable name
+    mylibs = mylibs.lstrip("=")    # strip equal sign
+    mylibs = mylibs.lstrip()       # strip spaces after equal sign
+    return mylibs
+
+
 with open(configFile,"r") as infile:
     for line in infile:
         if args.parseLibs:
@@ -123,4 +132,9 @@ with open(configFile,"r") as infile:
             if line.startswith("MFEM_TPLFLAGS"):
                 incs = parse_includes(line.strip(),"MFEM_TPLFLAGS")
                 print(incs)
-            
+        if args.parseVer:
+            # trailing space below to avoid matching MFEM_VERSION_STRING
+            if line.startswith("MFEM_VERSION "):
+                ver = parse_version(line.strip(),"MFEM_VERSION")
+                print(ver)
+

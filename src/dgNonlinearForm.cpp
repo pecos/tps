@@ -35,7 +35,7 @@
 
 #include "riemann_solver.hpp"
 
-DGNonLinearForm::DGNonLinearForm(RiemannSolver *rsolver, Fluxes *_flux, ParFiniteElementSpace *_vfes,
+DGNonLinearForm::DGNonLinearForm(RiemannSolverTPS *rsolver, Fluxes *_flux, ParFiniteElementSpace *_vfes,
                                  ParFiniteElementSpace *_gradFes, ParGridFunction *_gradUp, BCintegrator *_bcIntegrator,
                                  IntegrationRules *_intRules, const int _dim, const int _num_equation,
                                  GasMixture *_mixture, const precomputedIntegrationData &gpu_precomputed_data,
@@ -254,7 +254,7 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
   const int num_equation = num_equation_;
   const int maxIntPoints = maxIntPoints_;
 
-  const RiemannSolver *d_rsolver = rsolver_;
+  const RiemannSolverTPS *d_rsolver = rsolver_;
   Fluxes *d_flux = fluxes;
 
   // clang-format off
@@ -309,6 +309,7 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
       // problem seems to have something to do with virtual functions
       // and pointer arguments, but I don't understand it.  However,
       // this approach is working.
+      //std::cout << "Eval_LF dgNonlin 1" << endl;
       d_rsolver->Eval_LF(d_uk_el1 + k * num_equation + iface * maxIntPoints * num_equation,
                          d_uk_el2 + k * num_equation + iface * maxIntPoints * num_equation,
                          d_normal + offset + k * dim,
@@ -607,7 +608,7 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
 
   double *d_shared_flux = shared_flux.Write();
 
-  const RiemannSolver *d_rsolver = rsolver_;
+  const RiemannSolverTPS *d_rsolver = rsolver_;
   Fluxes *d_flux = fluxes;
 
   MFEM_FORALL_2D(el, maxNumElems, maxIntPoints, 1, 1, {
@@ -703,6 +704,7 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
         double d2 = d_dist2[f * maxIntPoints + k];
 
         // evaluate flux
+        // std::cout << "Eval_LF dgNonlin 2" << endl;
         d_rsolver->Eval_LF(u1, u2, nor, Rflux);
         d_flux->ComputeViscousFluxes(u1, gradUp1, xyz, d_delta_el1[f], d1, vFlux1);
         d_flux->ComputeViscousFluxes(u2, gradUp2, xyz, d_delta_el2[f], d2, vFlux2);

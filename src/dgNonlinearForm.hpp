@@ -48,7 +48,7 @@ using namespace std;
 // so that we can use GPU
 class DGNonLinearForm : public ParNonlinearForm {
  private:
-  RiemannSolver *rsolver_;
+  RiemannSolverTPS *rsolver_;
   Fluxes *fluxes;
   ParFiniteElementSpace *vfes;
   ParFiniteElementSpace *gradFes;
@@ -77,7 +77,7 @@ class DGNonLinearForm : public ParNonlinearForm {
   Vector shared_flux;
 
  public:
-  DGNonLinearForm(RiemannSolver *rsolver, Fluxes *_flux, ParFiniteElementSpace *f, ParFiniteElementSpace *gradFes,
+  DGNonLinearForm(RiemannSolverTPS *rsolver, Fluxes *_flux, ParFiniteElementSpace *f, ParFiniteElementSpace *gradFes,
                   ParGridFunction *_gradUp, BCintegrator *_bcIntegrator, IntegrationRules *intRules, const int dim,
                   const int num_equation, GasMixture *mixture, const precomputedIntegrationData &gpu_precomputed_data,
                   const int &maxIntPoints, const int &maxDofs);

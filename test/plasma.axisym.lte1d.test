@@ -12,6 +12,20 @@ setup() {
     REF_FILE_1D=ref_solns/plasma.lte1d.final.h5
 
     MPIRUN=`./sniff_mpirun.sh`
+
+    # figure out if mfem is pre or post 4.6 (4.6 and before has
+    # different behavior for gslib interpolation of points on
+    # inter-element boundaries)
+    MFEM_POST_46=0
+    if [ $(./snarf_mfem.py --version) -gt 40600 ]; then
+        echo "Detected post v4.6 mfem"
+        MFEM_POST_46=1
+    fi
+
+    # If post v4.6, use difference reference soln
+    if [ $MFEM_POST_46 == 1 ]; then
+        REF_FILE_1D=ref_solns/plasma.lte1d.v48.h5
+    fi
 }
 
 @test "[$TEST] verify axisymmetric LTE (1D) plasma case with input from -> $RUNFILE_1D" {

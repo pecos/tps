@@ -5,7 +5,7 @@ AM_CPPFLAGS += -dc $(CUDA_CXXFLAGS)
 endif
 
 if HIP_ENABLED
-AM_CPPFLAGS += -fgpu-rdc $(HIP_CXXFLAGS)
+AM_CPPFLAGS += $(HIP_CXXFLAGS)
 endif
 
 if MASA_ENABLED
@@ -25,7 +25,7 @@ tps_LDADD            = libtps.la
 tps_LDFLAGS         += $(MPI4PY_LIBS) $(PYTHON_LIBS) $(MFEM_LIBS)
 
 if HIP_ENABLED
-tps_LDFLAGS += -fgpu-rdc
+tps_LDFLAGS += $(HIP_LDFLAGS)
 endif
 
 # C++ solver library sources
@@ -34,7 +34,7 @@ cxx_sources          = averaging.cpp faceGradientIntegration.cpp M2ulPhyS.cpp rh
                        masa_handler.cpp run_configuration.cpp domain_integrator.cpp forcing_terms.cpp mpi_groups.cpp \
 	               equation_of_state.cpp transport_properties.cpp inletBC.cpp outletBC.cpp utils.cpp io.cpp \
 		       dgNonlinearForm.cpp gradients.cpp gradNonLinearForm.cpp quasimagnetostatic.cpp tps.cpp chemistry.cpp \
-                       reaction.cpp collision_integrals.cpp argon_transport.cpp source_term.cpp gpu_constructor.cpp \
+                       reaction.cpp collision_integrals.cpp gas_transport.cpp source_term.cpp gpu_constructor.cpp \
                        independent_coupling.cpp cycle_avg_joule_coupling.cpp table.cpp radiation.cpp lte_mixture.cpp \
                        lte_transport_properties.cpp mixing_length_transport.cpp tps2Boltzmann.cpp  M2ulPhyS2Boltzmann.cpp \
                        pybindings.cpp gslib_interpolator.cpp loMach.cpp loMachIO.cpp loMach_options.cpp calorically_perfect.cpp \
@@ -51,7 +51,7 @@ headers              = averaging.hpp equation_of_state.hpp transport_properties.
 	               wallBC.hpp domain_integrator.hpp fluxes.hpp masa_handler.hpp riemann_solver.hpp \
 		       dgNonlinearForm.hpp gradNonLinearForm.hpp dataStructures.hpp utils.hpp io.hpp em_options.hpp \
 		       quasimagnetostatic.hpp gradients.hpp logger.hpp solver.hpp tps.hpp chemistry.hpp reaction.hpp \
-	               collision_integrals.hpp argon_transport.hpp source_term.hpp tps_mfem_wrap.hpp gpu_constructor.hpp \
+	               collision_integrals.hpp gas_transport.hpp source_term.hpp tps_mfem_wrap.hpp gpu_constructor.hpp \
                        independent_coupling.hpp cycle_avg_joule_coupling.hpp table.hpp radiation.hpp lte_mixture.hpp \
                        lte_transport_properties.hpp mixing_length_transport.hpp tps2Boltzmann.hpp gslib_interpolator.hpp \
                        loMach.hpp loMach_options.hpp calorically_perfect.hpp \

@@ -187,6 +187,16 @@ void scalarGrad3DV(FiniteElementSpace *fes, FiniteElementSpace *vfes, Vector u, 
 void makeContinuous(ParGridFunction &u);
 
 bool copyFile(const char *SRC, const char *DEST);
+// void streamwiseGrad(int dim, ParGridFunction &phi, ParGridFunction &u, ParGridFunction &swGrad);
+void streamwiseGrad(int dim, ParGridFunction &u, ParGridFunction &swGrad);
+void upwindDiff(int dim, double re_factor, double re_offset, Vector &u_vec, Vector &rho_vec, Vector &del_vec,
+                Vector &Reh_vec, Vector &swDiff);
+
+/// upwind diffusion support: evaluate u * u^T / ||u||^2
+void streamwiseTensor(const Vector &vel, DenseMatrix &swMgbl);
+
+/// upwind diffusion support: evaluate supg constant
+double csupgFactor(double Reh);
 
 /// Eliminate essential BCs in an Operator and apply to RHS.
 /// rename this to something sensible "ApplyEssentialBC" or something
@@ -223,6 +233,48 @@ class GradientVectorGridFunctionCoefficient : public MatrixCoefficient {
   virtual void Eval(DenseMatrix &G, ElementTransformation &T, const IntegrationPoint &ip);
 
   virtual ~GradientVectorGridFunctionCoefficient() {}
+};
+
+/// Scalar coefficient defined as the magnitude of a vector coefficient
+class VectorMagnitudeCoefficient : public Coefficient {
+ private:
+  VectorCoefficient *a;
+
+  mutable Vector va;
+
+ public:
+  /// Construct with the vector coefficient.  Result is \sqrt{(\f$ A \cdot a \f$}.
+  VectorMagnitudeCoefficient(VectorCoefficient &A);
+
+  /// Set the time for internally stored coefficients
+  void SetTime(double t);
+
+  /// Reset the vector
+  void SetACoef(VectorCoefficient &A) { a = &A; }
+  /// Return the vector coefficient
+  VectorCoefficient *GetACoef() const { return a; }
+
+  /// Evaluate the coefficient at @a ip.
+  virtual double Eval(ElementTransformation &T, const IntegrationPoint &ip);
+};
+
+/// Matrix coefficient computed from a function F(v(x)) of a dim-sized vector coefficient, v(x)
+class TransformedMatrixVectorCoefficient : public MatrixCoefficient {
+ protected:
+  VectorCoefficient *Q1;
+  std::function<void(const Vector &, DenseMatrix &)> Function;
+
+ public:
+  TransformedMatrixVectorCoefficient(VectorCoefficient *vc, std::function<void(const Vector &, DenseMatrix &)> F)
+      : MatrixCoefficient(vc->GetVDim()), Q1(vc), Function(std::move(F)) {}
+
+  /// Set the time for internally stored coefficients
+  void SetTime(double t);
+
+  // using MatrixCoefficient::Eval;
+  virtual void Eval(DenseMatrix &G, ElementTransformation &T, const IntegrationPoint &ip);
+
+  virtual ~TransformedMatrixVectorCoefficient() {}
 };
 }  // namespace mfem
 

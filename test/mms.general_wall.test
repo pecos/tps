@@ -9,6 +9,7 @@ setup() {
     REPORT_WALL="ternary_2d_2t_ambipolar_general_wall.rhs_error.p2.txt"
     REPORT_SHEATH="ternary_2d_sheath.rhs_error.p2.txt"
     MESH_FILE=beam-quad-o3-s1-xp.mesh
+    MPIRUN=`./sniff_mpirun.sh`
 }
 
 @test "[$TEST] check for input file $RUNFILE" {
@@ -30,7 +31,7 @@ setup() {
 
 @test "[$TEST] compare rhs for a manufactured solution with input -> $RUNFILE_WALL" {
     test -e ../utils/compute_rhs
-    mpirun -np 2 ../utils/compute_rhs --runFile $RUNFILE_WALL >& plasma_ternary_mms.wall.log
+    $MPIRUN -n 2 ../utils/compute_rhs --runFile $RUNFILE_WALL >& plasma_ternary_mms.wall.log
 
     test -s $REPORT_WALL
 
@@ -69,7 +70,7 @@ setup() {
 
 @test "[$TEST] compare rhs for a manufactured solution with input -> $RUNFILE_SHEATH" {
     test -e ../utils/compute_rhs
-    mpirun -np 2 ../utils/compute_rhs --runFile $RUNFILE_SHEATH >& plasma_ternary_mms.wall.log
+    $MPIRUN -n 2 ../utils/compute_rhs --runFile $RUNFILE_SHEATH >& plasma_ternary_mms.wall.log
 
     test -s $REPORT_SHEATH
 

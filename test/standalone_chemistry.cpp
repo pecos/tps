@@ -32,7 +32,7 @@ int main(int argc, char *argv[]) {
   temporalSchemeCoefficients temporal_coeff;
   temporal_coeff.order = 1;
 
-  ReactingFlow *thermo = new ReactingFlow(pmesh, &loMach_opts, temporal_coeff, &tps);
+  ReactingFlow *thermo = new ReactingFlow(pmesh, &loMach_opts, temporal_coeff, nullptr, &tps);
   thermo->initializeSelf();
 
   int nSpecies;

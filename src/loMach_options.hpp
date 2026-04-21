@@ -48,7 +48,7 @@ class TurbulenceModelOptions {
   TurbulenceModelOptions();
   void read(TPS::Tps *tps, std::string prefix = std::string(""));
 
-  enum TurbulenceModelType { NONE, SMAGORINSKY, SIGMA, ALGEBRAIC_RANS };
+  enum TurbulenceModelType { NONE, SMAGORINSKY, SIGMA, WALE, ALGEBRAIC_RANS };
 
   std::string turb_model_string_;
   std::map<std::string, TurbulenceModelType> turb_model_map_;
@@ -138,6 +138,7 @@ class LoMachOptions {
   double filterWeight;
   bool filterTemp, filterVel;
   bool solveTemp;
+  int nSpec;
 
 #ifdef HAVE_PYTHON
   bool doFlowStep;
@@ -151,6 +152,7 @@ class LoMachOptions {
     rtol = 1.0e-8;
     atol = 1.0e-12;
     compute_wallDistance = false;
+    nSpec = 0;
   }
 
   void print(std::ostream &out) {

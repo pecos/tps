@@ -51,7 +51,6 @@ class Tps;
 #include <mfem/general/forall.hpp>
 
 #include "BCintegrator.hpp"
-#include "argon_transport.hpp"
 #include "averaging.hpp"
 #include "chemistry.hpp"
 #include "dataStructures.hpp"
@@ -61,6 +60,7 @@ class Tps;
 #include "faceGradientIntegration.hpp"
 #include "face_integrator.hpp"
 #include "fluxes.hpp"
+#include "gas_transport.hpp"
 #include "gpu_constructor.hpp"
 #include "gradNonLinearForm.hpp"
 #include "io.hpp"
@@ -196,6 +196,19 @@ class M2ulPhyS : public TPS::PlasmaSolver {
   // Finite element space for all variables together (total thermodynamic state)
   ParFiniteElementSpace *vfes;
 
+  // used to restart from loMach sims
+  FiniteElementCollection *vfecTmp;
+  FiniteElementCollection *sfecTmp;
+  ParFiniteElementSpace *vfesTmp;
+  ParFiniteElementSpace *sfesTmp;
+  ParGridFunction *u_gf;
+  ParGridFunction *T_gf;
+  ParGridFunction *rho_gf;
+  ParGridFunction *P_gf;
+  Vector rhoTmp;
+  Vector TnTmp;
+  Vector PnTmp;
+
   // nodes IDs and indirection array
   const int maxIntPoints = gpudata::MAXINTPOINTS;  // corresponding to HEX face with p=5
   const int maxDofs = gpudata::MAXDOFS;            // corresponding to HEX with p=5
@@ -214,7 +227,7 @@ class M2ulPhyS : public TPS::PlasmaSolver {
   // DataCollection *visitColl = NULL;
 
   // Riemann Solver
-  RiemannSolver *rsolver;
+  RiemannSolverTPS *rsolver;
 
   // RHS operators
   // ParNonlinearForm *A;
@@ -398,8 +411,8 @@ class M2ulPhyS : public TPS::PlasmaSolver {
   void readTableWrapper(std::string inputPath, TableInput &result);
 
   void packUpGasMixtureInput();
-  void identifySpeciesType(Array<ArgonSpcs> &speciesType);
-  void identifyCollisionType(const Array<ArgonSpcs> &speciesType, ArgonColl *collisionIndex);
+  void identifySpeciesType(Array<GasSpcs> &speciesType);
+  void identifyCollisionType(const Array<GasSpcs> &speciesType, GasColl *collisionIndex);
 
   void checkSolverOptions() const;
   void projectInitialSolution();
@@ -446,13 +459,14 @@ class M2ulPhyS : public TPS::PlasmaSolver {
 
   static int Check_NaN_GPU(ParGridFunction *U, int lengthU, Array<int> &loc_print);
   void Check_Undershoot();
+  void clipOutflow();
 
-  void setConstantPlasmaConductivityGF() {
-    ParGridFunction *coordsDof = new ParGridFunction(dfes);
-    mesh->GetNodes(*coordsDof);
-    mixture->SetConstantPlasmaConductivity(plasma_conductivity_, Up, coordsDof);
-    delete coordsDof;
-  }
+  //  void setConstantPlasmaConductivityGF() {
+  //    ParGridFunction *coordsDof = new ParGridFunction(dfes);
+  //    mesh->GetNodes(*coordsDof);
+  //    mixture->SetConstantPlasmaConductivity(plasma_conductivity_, Up, coordsDof, rank0_);
+  //    delete coordsDof;
+  //  }
 
   // tps2Boltzmann interface (implemented in M2ulPhyS2Boltzmann.cpp)
   /// Push solver variables to interface

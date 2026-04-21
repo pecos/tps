@@ -272,9 +272,7 @@ void QuasiMagnetostaticSolver3D::InitializeCurrent() {
   }
 
   if (rank0_) {
-    std::cout << "J0 = " << J0(0) << ", " << J0(1)
-              << ", " << J0(2) << ", " << J0(3)
-              << ", " << J0(4) << endl;
+    std::cout << "J0 = " << J0(0) << ", " << J0(1) << ", " << J0(2) << ", " << J0(3) << ", " << J0(4) << endl;
   }
 
   PWConstCoefficient J0coef(J0);
@@ -728,6 +726,7 @@ double QuasiMagnetostaticSolver3D::totalJouleHeating() {
     joule_heating_->GetSubVector(vdofs, el_x);
 #endif
 
+    // following bad fields here (el_x has the actual data)...
     int_jh += elementJouleHeating(*fe, *T, el_x);
   }
 
@@ -924,9 +923,7 @@ void QuasiMagnetostaticSolverAxiSym::InitializeCurrent() {
   }
 
   if (rank0_) {
-    std::cout << "J0 = " << J0(0) << ", " << J0(1)
-              << ", " << J0(2) << ", " << J0(3)
-              << ", " << J0(4) << endl;
+    std::cout << "J0 = " << J0(0) << ", " << J0(1) << ", " << J0(2) << ", " << J0(3) << ", " << J0(4) << endl;
   }
 
   FunctionCoefficient radius_coeff(radius);
@@ -1074,7 +1071,7 @@ void QuasiMagnetostaticSolverAxiSym::solveStep() {
   // TODO(trevilo): Compute B field (maybe... we only need it for validation comparisons)
 
   // Compute Joule heating (on em mesh obviously)
-  const double omega = (2 * M_PI * em_opts_.current_frequency);
+  const double omega = (2.0 * M_PI * em_opts_.current_frequency);
   const double omega2 = omega * omega;
 
   Vector tmp1 = (*Atheta_real_);
@@ -1082,6 +1079,7 @@ void QuasiMagnetostaticSolverAxiSym::solveStep() {
   Vector tmp2 = (*Atheta_imag_);
   tmp2 *= (*Atheta_imag_);
 
+  // connection between fluid side (sigma/plasma_conductivity) and em is here
   tmp2 += tmp1;
   tmp2 *= (*plasma_conductivity_);
   tmp2 *= 2.0 * omega2;

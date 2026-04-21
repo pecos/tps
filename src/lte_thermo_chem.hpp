@@ -49,6 +49,7 @@ class Tps;
 #include "table.hpp"
 #include "thermo_chem_base.hpp"
 #include "tps_mfem_wrap.hpp"
+#include "utils.hpp"
 
 using VecFuncT = void(const Vector &x, double t, Vector &u);
 using ScalarFuncT = double(const Vector &x, double t);
@@ -79,6 +80,7 @@ class LteThermoChem final : public ThermoChemModelBase {
 
   // Mesh and discretization scheme info
   ParMesh *pmesh_ = nullptr;
+  int dim_;
   int order_;
   IntegrationRules gll_rules_;
   const temporalSchemeCoefficients &time_coeff_;
@@ -89,11 +91,43 @@ class LteThermoChem final : public ThermoChemModelBase {
   bool numerical_integ_ = false;  /**< Enable/disable numerical integration rules of forms. */
   bool domain_is_open_ = false;   /**< true if domain is open */
   bool axisym_ = false;
+  bool sw_stab_ = false; /**< Enable/disable supg stabilization. */
+  bool filter_restart_ = false;
+  bool qt_filter_ = false; /**< Enable/disable filter in thermal div calc. */
 
   // Linear-solver-related options
+  int smoother_poly_order_;
+  double smoother_poly_fraction_ = 0.75;
+  int smoother_eig_est_ = 10;
+  int smoother_passes_ = 1;
+  double smoother_relax_weight_ = 0.4;
+  double smoother_relax_omega_ = 1.0;
+  double hsmoother_relax_weight_ = 0.8;
+  double hsmoother_relax_omega_ = 0.1;
+
+  // solver tolerance options
   int pl_solve_ = 0;    /**< Verbosity level passed to mfem solvers */
   int max_iter_;        /**< Maximum number of linear solver iterations */
   double rtol_ = 1e-12; /**< Linear solver relative tolerance */
+
+  int default_max_iter_ = 1000;
+  double default_rtol_ = 1.0e-10;
+  double default_atol_ = 1.0e-12;
+
+  int mass_inverse_pl_ = 0;
+  int mass_inverse_max_iter_;
+  double mass_inverse_rtol_;
+  double mass_inverse_atol_;
+
+  int hsolve_pl_ = 0;
+  int hsolve_max_iter_;
+  double hsolve_rtol_;
+  double hsolve_atol_;
+
+  // streamwise-stabilization
+  // bool sw_stab_;
+  double re_offset_;
+  double re_factor_;
 
   // Boundary condition info
   Array<int> temp_ess_attr_; /**< List of patches with Dirichlet BC on temperature */
@@ -123,6 +157,10 @@ class LteThermoChem final : public ThermoChemModelBase {
   double Prt_;
   double invPrt_;
 
+  bool Tclip_ = false;
+  double Tmin_ = 0.0;
+  double Tmax_ = 100000.0;
+
   // FEM related fields and objects
 
   // Scalar \f$H^1\f$ finite element collection.
@@ -130,6 +168,10 @@ class LteThermoChem final : public ThermoChemModelBase {
 
   // Scalar \f$H^1\f$ finite element space.
   ParFiniteElementSpace *sfes_ = nullptr;
+
+  // Vector fe collection and space
+  FiniteElementCollection *vfec_ = nullptr;
+  ParFiniteElementSpace *vfes_ = nullptr;
 
   // Fields
   ParGridFunction Tnm1_gf_, Tnm2_gf_;
@@ -147,6 +189,12 @@ class LteThermoChem final : public ThermoChemModelBase {
 
   ParGridFunction R0PM0_gf_;
   ParGridFunction Qt_gf_;
+
+  ParGridFunction tmpR0_gf_;
+  ParGridFunction tmpR1_gf_;
+  ParGridFunction vel_gf_;
+
+  ParGridFunction *gridScale_gf_ = nullptr;
 
   // ParGridFunction *buffer_tInlet_ = nullptr;
   GridFunctionCoefficient *temperature_bc_field_ = nullptr;
@@ -180,9 +228,25 @@ class LteThermoChem final : public ThermoChemModelBase {
   ProductCoefficient *rad_radiation_sink_coeff_ = nullptr;
   ScalarVectorProductCoefficient *rad_kap_gradT_coeff_ = nullptr;
 
+  VectorMagnitudeCoefficient *umag_coeff_ = nullptr;
+  GridFunctionCoefficient *gscale_coeff_ = nullptr;
+  ProductCoefficient *gscale2_coeff_ = nullptr;
+  GridFunctionCoefficient *visc_coeff_ = nullptr;
+  PowerCoefficient *visc_inv_coeff_ = nullptr;
+  ProductCoefficient *reh1_coeff_ = nullptr;
+  ProductCoefficient *reh2_coeff_ = nullptr;
+  ProductCoefficient *Reh_coeff_ = nullptr;
+  TransformedCoefficient *csupg_coeff_ = nullptr;
+  ProductCoefficient *uw1_coeff_ = nullptr;
+  ProductCoefficient *uw2_coeff_ = nullptr;
+  ProductCoefficient *upwind_coeff_ = nullptr;
+  TransformedMatrixVectorCoefficient *swdiff_coeff_ = nullptr;
+  ScalarMatrixProductCoefficient *supg_coeff_ = nullptr;
+
   // operators and solvers
   ParBilinearForm *At_form_ = nullptr;
   ParBilinearForm *Ms_form_ = nullptr;
+  ParBilinearForm *Mv_form_ = nullptr;
   ParBilinearForm *M_rho_Cp_form_ = nullptr;
   ParBilinearForm *Ht_form_ = nullptr;
 
@@ -195,14 +259,20 @@ class LteThermoChem final : public ThermoChemModelBase {
   ParBilinearForm *LQ_form_ = nullptr;
   ParLinearForm *LQ_bdry_ = nullptr;
 
+  ParMixedBilinearForm *D_form_ = nullptr;
+  ParMixedBilinearForm *G_form_ = nullptr;
+
   OperatorHandle At_;
   OperatorHandle Ht_;
   OperatorHandle Ms_;
+  OperatorHandle Mv_;
   OperatorHandle Mq_;
   OperatorHandle LQ_;
   OperatorHandle M_rho_Cp_;
   OperatorHandle M_rho_;
   OperatorHandle A_rho_;
+  OperatorHandle D_op_;
+  OperatorHandle G_op_;
 
   mfem::Solver *MsInvPC_ = nullptr;
   mfem::CGSolver *MsInv_ = nullptr;
@@ -212,13 +282,18 @@ class LteThermoChem final : public ThermoChemModelBase {
   mfem::CGSolver *MrhoInv_ = nullptr;
   mfem::Solver *HtInvPC_ = nullptr;
   mfem::CGSolver *HtInv_ = nullptr;
+  mfem::Solver *Mv_inv_pc_ = nullptr;
+  mfem::CGSolver *Mv_inv_ = nullptr;
 
   // Vectors
   Vector Tn_, Tn_next_, Tnm1_, Tnm2_;
   Vector NTn_, NTnm1_, NTnm2_;
   Vector Text_;
   Vector resT_;
-  Vector tmpR0_, tmpR0b_;
+  Vector tmpR0_, tmpR0a_, tmpR0b_, tmpR0c_;
+  Vector tmpR1_;
+  Vector swDiff_;
+  Vector gradT_;
 
   Vector Qt_;
   Vector rn_, rnm1_, rnm2_, rnm3_;
@@ -235,18 +310,23 @@ class LteThermoChem final : public ThermoChemModelBase {
   int filter_cutoff_modes_ = 0;
   double filter_alpha_ = 0.0;
 
+  // set a static sigma field
+  bool torch_cold_start_ = false;
+  
   FiniteElementCollection *sfec_filter_ = nullptr;
   ParFiniteElementSpace *sfes_filter_ = nullptr;
   ParGridFunction Tn_NM1_gf_;
   ParGridFunction Tn_filtered_gf_;
 
  public:
-  LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff, TPS::Tps *tps);
+  LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff,
+                ParGridFunction *gridScale, TPS::Tps *tps);
   virtual ~LteThermoChem();
 
   // Functions overriden from base class
   void initializeSelf() final;
   void initializeOperators() final;
+  void initializeStats(Averaging &average, IODataOrganizer &io, bool continuation) final;
   void step() final;
   void initializeIO(IODataOrganizer &io) final;
   void initializeViz(ParaViewDataCollection &pvdc) final;
@@ -261,6 +341,8 @@ class LteThermoChem final : public ThermoChemModelBase {
   void computeExplicitTempConvectionOP();
   void computeQt();
   void updateHistory();
+  // void streamwiseDiffusion(Vector &phi, Vector &swDiff);
+  void streamwiseDiffusion(Vector &gradPhi, Vector &swDiff);
 
   /// Return a pointer to the current temperature ParGridFunction.
   ParGridFunction *GetCurrentTemperature() { return &Tn_gf_; }

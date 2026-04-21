@@ -9,6 +9,7 @@ setup() {
     SOLN_FILE=restart_output.sol.h5
     REF_FILE=ref_solns/cyl3d.dtconst.cpu.h5
     REF_FILE_HEAT=ref_solns/cyl3d.dtconst.heatSource.cpu.h5
+    MPIRUN=`./sniff_mpirun.sh`
 }
 
 @test "[$TEST] check for input file $RUNFILE" {
@@ -37,7 +38,7 @@ setup() {
     REF_FILE_0=ref_solns/cyl.r0.p2.iter4.h5
     REF_FILE_1=ref_solns/cyl.r1.p2.iter4.h5
 
-    mpirun -np 2 ../src/tps --runFile $RUNFILE
+    $MPIRUN -n 2 ../src/tps --runFile $RUNFILE
 
     test -s $SOLN_FILE_0
     test -s $REF_FILE_0

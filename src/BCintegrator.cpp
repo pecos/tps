@@ -38,7 +38,7 @@
 #include "wallBC.hpp"
 
 BCintegrator::BCintegrator(bool _mpiRoot, MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElementSpace *_vfes,
-                           IntegrationRules *_intRules, RiemannSolver *rsolver_, double &_dt, double *_time,
+                           IntegrationRules *_intRules, RiemannSolverTPS *rsolver_, double &_dt, double *_time,
                            GasMixture *_mixture, GasMixture *d_mixture, Fluxes *_fluxClass, ParGridFunction *_Up,
                            ParGridFunction *_gradUp, const boundaryFaceIntegrationData &boundary_face_data,
                            const int _dim, const int _num_equation, double &_max_char_speed, RunConfiguration &_runFile,
@@ -420,6 +420,16 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
     if (config.isAxisymmetric()) {
       radius = transip[0];
     }
+
+    // HERE HERE HERE
+    // add state comp and temp calc (conserved or prim?)
+    // remove assert in COmputeTemp, and check here so
+    // coords can be dumped
+    double T = mixture->ComputeTemperature(funval1);
+    // if (T < 10.0) {
+    //   std::cout << "TEMPERATURE TOO LOW: " << transip[0] << " " << transip[1] << " " << transip[2] << endl;
+    // }
+    T = max(298.15, T);  // HACK HACK HACK
 
     computeBdrFlux(Tr.Attribute, nor, funval1, iGradUp, transip, delta, *pTime, d1, fluxN);
     fluxN *= ip.weight;

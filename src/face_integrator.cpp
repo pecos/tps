@@ -33,10 +33,10 @@
 #include "face_integrator.hpp"
 
 // Implementation of class FaceIntegrator
-FaceIntegrator::FaceIntegrator(IntegrationRules *_intRules, RiemannSolver *rsolver_, Fluxes *_fluxClass,
+FaceIntegrator::FaceIntegrator(IntegrationRules *_intRules, RiemannSolverTPS *rsolver_, Fluxes *_fluxClass,
                                ParFiniteElementSpace *_vfes, bool _useLinear, const int _dim, const int _num_equation,
                                ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes, double &_max_char_speed,
-                               bool axisym, ParGridFunction *distance)
+                               bool axisym, ParGridFunction *distance, int rank)
     : rsolver(rsolver_),
       fluxClass(_fluxClass),
       vfes(_vfes),
@@ -48,7 +48,8 @@ FaceIntegrator::FaceIntegrator(IntegrationRules *_intRules, RiemannSolver *rsolv
       distance_(distance),
       intRules(_intRules),
       useLinear(_useLinear),
-      axisymmetric_(axisym) {
+      axisymmetric_(axisym),
+      rank_(rank) {
   assert(!useLinear);
   totDofs = vfes->GetNDofs();
 }
@@ -282,7 +283,13 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
   for (int i = 0; i < ir->GetNPoints(); i++) {
     const IntegrationPoint &ip = ir->IntPoint(i);
 
-    Tr.SetAllIntPoints(&ip);  // set face and element int. points
+    // set face and element int. points
+    Tr.SetAllIntPoints(&ip);
+
+    // x-y-z coordinates of int pts
+    double x[3];
+    Vector transip(x, 3);
+    Tr.Transform(ip, transip);
 
     // Calculate basis functions on both elements at the face
     el1.CalcShape(Tr.GetElement1IntPoint(), shape1);
@@ -300,7 +307,7 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
       funval2[eq] = max(funval2[eq], 0.0);
     }
 
-    // // Interpolate the distance function
+    // Interpolate the distance function
     double d1 = 0;
     double d2 = 0;
     if (distance_ != NULL) {
@@ -323,9 +330,9 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
     CalcOrtho(Tr.Jacobian(), nor);
     rsolver->Eval(funval1, funval2, nor, fluxN);
 
-    double x[3];
-    Vector transip(x, 3);
-    Tr.Transform(ip, transip);
+    // double x[3];
+    // Vector transip(x, 3);
+    // Tr.Transform(ip, transip);
 
     // compute viscous fluxes
     viscF1 = viscF2 = 0.;
