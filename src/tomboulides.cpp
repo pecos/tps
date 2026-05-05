@@ -1925,7 +1925,6 @@ void Tomboulides::step() {
     });
   }
 
-
   // Add streamwise stability to rhs
   if (sw_stab_) {
     // Update matrix

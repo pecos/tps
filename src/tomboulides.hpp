@@ -165,7 +165,7 @@ class Tomboulides final : public FlowBase {
   double hsolve_rtol_;
   double hsolve_atol_;
 
-  //bool sw_stab_;
+  // bool sw_stab_;
   double re_offset_;
   double re_factor_;
 
@@ -261,7 +261,7 @@ class Tomboulides final : public FlowBase {
   mfem::ParGridFunction *utheta_next_gf_ = nullptr;
   mfem::ParGridFunction *u_next_rad_comp_gf_ = nullptr;
 
-  //mfem::ParGridFunction *gridScale_gf_ = nullptr;
+  // mfem::ParGridFunction *gridScale_gf_ = nullptr;
 
   /// "total" viscosity, including fluid, turbulence, sponge
   mfem::ParGridFunction *mu_total_gf_ = nullptr;
@@ -425,8 +425,8 @@ class Tomboulides final : public FlowBase {
   mfem::Vector utheta_m2_vec_;
   mfem::Vector utheta_next_vec_;
 
-  //mfem::Vector tmpR0b_;
-  //mfem::Vector swDiff_vec_;
+  // mfem::Vector tmpR0b_;
+  // mfem::Vector swDiff_vec_;
 
   // miscellaneous
   double volume_;

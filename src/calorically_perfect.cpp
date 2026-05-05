@@ -139,7 +139,6 @@ CaloricallyPerfectThermoChem::CaloricallyPerfectThermoChem(mfem::ParMesh *pmesh,
   tpsP_->getInput("loMach/calperfect/streamwise-stabilization", sw_stab_, false);
   tpsP_->getInput("loMach/calperfect/Reh_factor", Reh_factor_, 0.5);
   tpsP_->getInput("loMach/calperfect/Reh_offset", Reh_offset_, 1.0);
-
 }
 
 CaloricallyPerfectThermoChem::~CaloricallyPerfectThermoChem() {
