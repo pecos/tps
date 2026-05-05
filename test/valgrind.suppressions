@@ -49,7 +49,6 @@
    fun:(below main)
 }
 
-
 {
    <grvy-parse-leak>
    Memcheck:Leak
