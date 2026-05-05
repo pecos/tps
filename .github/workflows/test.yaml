@@ -34,7 +34,7 @@ jobs:
        - name: Bootstrap
          run:  ./bootstrap
        - name: Configure
-         run:  ./configure
+         run:  ./configure --disable-dependency-tracking
        - name: Style check
          run:  make style
    build:
