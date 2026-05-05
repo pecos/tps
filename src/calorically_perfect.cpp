@@ -136,9 +136,10 @@ CaloricallyPerfectThermoChem::CaloricallyPerfectThermoChem(mfem::ParMesh *pmesh,
   tpsP_->getInput("loMach/calperfect/msolve-verbosity", mass_inverse_pl_, pl_solve_);
 
   // artificial diffusion (SUPG)
-  tps->getInput("loMach/calperfect/streamwise-stabilization", sw_stab_, false);
-  tps->getInput("loMach/calperfect/Reh_offset", re_offset_, 1.0);
-  tps->getInput("loMach/calperfect/Reh_factor", re_factor_, 0.1);
+  tpsP_->getInput("loMach/calperfect/streamwise-stabilization", sw_stab_, false);
+  tpsP_->getInput("loMach/calperfect/Reh_factor", Reh_factor_, 0.5);
+  tpsP_->getInput("loMach/calperfect/Reh_offset", Reh_offset_, 1.0);
+
 }
 
 CaloricallyPerfectThermoChem::~CaloricallyPerfectThermoChem() {
@@ -286,7 +287,7 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
 
   R0PM0_gf_.SetSpace(sfes_);
 
-  rhoDt.SetSpace(sfes_);
+  rhoDt_gf_.SetSpace(sfes_);
 
   if (rank0_) grvy_printf(ginfo, "CaloricallyPerfectThermoChem vectors and gf initialized...\n");
 
@@ -295,6 +296,7 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
   toFlow_interface_.viscosity = &visc_gf_;
   toFlow_interface_.thermal_divergence = &Qt_gf_;
   toTurbModel_interface_.density = &rn_gf_;
+  toTurbModel_interface_.viscosity = &visc_gf_;
   if (rank0_) {
     std::cout << "exports set..." << endl;
   }
@@ -484,9 +486,9 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   // coefficients for operators
   rho_coeff_ = new GridFunctionCoefficient(&rn_gf_);
 
-  rhoDt = rn_gf_;
-  rhoDt /= dt_;
-  rho_over_dt_coeff_ = new GridFunctionCoefficient(&rhoDt);
+  rhoDt_gf_ = rn_gf_;
+  rhoDt_gf_ /= dt_;
+  rho_over_dt_coeff_ = new GridFunctionCoefficient(&rhoDt_gf_);
 
   // thermal_diff_coeff.constant = thermal_diff;
   thermal_diff_coeff_ = new GridFunctionCoefficient(&kappa_gf_);
@@ -515,7 +517,9 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
     Reh_coeff_ = new ProductCoefficient(*reh2_coeff_, *umag_coeff_);
 
     // Csupg
-    csupg_coeff_ = new TransformedCoefficient(Reh_coeff_, csupgFactor);
+    // auto csupgLambda = std::bind(csupgFactor, std::placeholders::_1,  Reh_factor_, Reh_offset_);
+    std::function<double(double)> csupgLambda = std::bind(csupgFactor, std::placeholders::_1, Reh_factor_, Reh_offset_);
+    csupg_coeff_ = new ExtTransformedCoefficient(Reh_coeff_, csupgLambda);
 
     // compute upwind magnitude
     uw1_coeff_ = new ProductCoefficient(*rho_coeff_, *csupg_coeff_);
@@ -622,7 +626,6 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   Ht_form_ = new ParBilinearForm(sfes_);
   auto *hmt_blfi = new MassIntegrator(*rho_over_dt_coeff_);
   auto *hdt_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
-
   if (numerical_integ_) {
     hmt_blfi->SetIntRule(&ir_di);
     hdt_blfi->SetIntRule(&ir_di);
@@ -856,8 +859,8 @@ void CaloricallyPerfectThermoChem::step() {
   // NB: adiabatic natural BC is handled, but don't have ability to impose non-zero heat flux yet
 
   // Update Helmholtz operator to account for changing dt, rho, and kappa
-  rhoDt = rn_gf_;
-  rhoDt *= (time_coeff_.bd0 / dt_);
+  rhoDt_gf_ = rn_gf_;
+  rhoDt_gf_ *= (time_coeff_.bd0 / dt_);
 
   Ht_form_->Update();
   Ht_form_->Assemble();

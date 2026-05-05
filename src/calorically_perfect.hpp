@@ -145,6 +145,7 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
 
   // streamwise-stabilization
   bool sw_stab_;
+  double Reh_factor_, Reh_offset_;
 
   // FEM related fields and objects
 
@@ -162,7 +163,7 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   ParGridFunction Tnm1_gf_, Tnm2_gf_;
   ParGridFunction Tn_gf_, Tn_next_gf_, Text_gf_, resT_gf_;
   ParGridFunction rn_gf_;
-  ParGridFunction rhoDt;
+  ParGridFunction rhoDt_gf_;
 
   ParGridFunction visc_gf_;
   ParGridFunction kappa_gf_;
@@ -198,7 +199,7 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   ProductCoefficient *reh1_coeff_ = nullptr;
   ProductCoefficient *reh2_coeff_ = nullptr;
   ProductCoefficient *Reh_coeff_ = nullptr;
-  TransformedCoefficient *csupg_coeff_ = nullptr;
+  ExtTransformedCoefficient *csupg_coeff_ = nullptr;
   ProductCoefficient *uw1_coeff_ = nullptr;
   ProductCoefficient *uw2_coeff_ = nullptr;
   ProductCoefficient *upwind_coeff_ = nullptr;

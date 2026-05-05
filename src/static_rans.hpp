@@ -29,47 +29,76 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
+#ifndef STATIC_RANS_HPP_
+#define STATIC_RANS_HPP_
+/** @file
+ * @brief Contains class implementing a static constant eddy viscosity as a RANS model
+ */
 
-#include "thermo_chem_base.hpp"
-
+#include "externalData_base.hpp"
 #include "tps.hpp"
+#include "tps_mfem_wrap.hpp"
+#include "turb_model_base.hpp"
 
-using namespace mfem;
+/**
+ * Provides RANS models to compute eddy viscosity
+ * to be used for time split schemes, such as those available through
+ * LoMachSolver
+ */
+class StaticRans : public TurbModelBase {
+ protected:
+  mfem::ParMesh *pmesh_ = nullptr;
+  int order_;
+  int dim_;
+  bool axisym_;
 
-ConstantPropertyThermoChem::ConstantPropertyThermoChem(ParMesh *pmesh, int sorder, double rho, double mu)
-    : pmesh_(pmesh), sorder_(sorder), rho_(rho), mu_(mu) {}
+  mfem::FiniteElementCollection *sfec_ = nullptr;
+  mfem::ParFiniteElementSpace *sfes_ = nullptr;
 
-ConstantPropertyThermoChem::ConstantPropertyThermoChem(ParMesh *pmesh, int sorder, TPS::Tps *tps)
-    : pmesh_(pmesh), sorder_(sorder) {
-  assert(tps != nullptr);
-  tps->getInput("loMach/constprop/rho", rho_, 1.0);
-  tps->getInput("loMach/constprop/mu", mu_, 1.0);
-}
+  mfem::ParGridFunction *mut_ = nullptr;
+  mfem::GridFunctionCoefficient *nut_field_ = nullptr;
 
-ConstantPropertyThermoChem::~ConstantPropertyThermoChem() {
-  delete thermal_divergence_;
-  delete viscosity_;
-  delete density_;
-  delete fes_;
-  delete fec_;
-}
+  ExternalDataBase *extData_ = nullptr;
 
-void ConstantPropertyThermoChem::initializeSelf() {
-  fec_ = new H1_FECollection(sorder_);
-  fes_ = new ParFiniteElementSpace(pmesh_, fec_);
+ public:
+  /// Constructor
+  //  StaticRans(mfem::Mesh *smesh, mfem::ParMesh *pmesh, const mfem::Array<int> &partitioning, int order, TPS::Tps
+  //  *tps);
+  StaticRans(mfem::ParMesh *pmesh, const mfem::Array<int> &partitioning, int order, TPS::Tps *tps);
 
-  density_ = new ParGridFunction(fes_);
-  viscosity_ = new ParGridFunction(fes_);
-  thermal_divergence_ = new ParGridFunction(fes_);
+  /// Destructor
+  virtual ~StaticRans();
 
-  *density_ = rho_;
-  *viscosity_ = mu_;
-  *thermal_divergence_ = 0.0;
+  /**
+   * @brief Allocate the eddy viscosity
+   *
+   * Initialized from constant file using gaussian interpolation
+   */
+  void initializeSelf() override;
 
-  toFlow_interface_.density = density_;
-  toFlow_interface_.viscosity = viscosity_;
-  toFlow_interface_.thermal_divergence = thermal_divergence_;
+  /**
+   * @brief Add eddy viscosity and distance function to the visualization output
+   */
+  void initializeViz(mfem::ParaViewDataCollection &pvdc) override;
 
-  toTurbModel_interface_.density = density_;
-  toTurbModel_interface_.viscosity = viscosity_;
-}
+  /**
+   * @brief Initialize the eddy viscosity.
+   *
+   * Compute the eddy viscosity by calling "step".
+   */
+  void initializeOperators() override { this->step(); }
+
+  /**
+   * @brief Compute the current eddy viscosity using the current velocity field.
+   */
+  void step() override;
+
+  /**
+   * @brief No-op for this class
+   */
+  void setup() override {}
+
+  mfem::ParGridFunction *getCurrentEddyViscosity() override { return mut_; }
+};
+
+#endif  // STATIC_RANS_HPP_
