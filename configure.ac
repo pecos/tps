@@ -8,12 +8,17 @@ AC_CONFIG_HEADERS([tps_config.h])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIRS([m4])
 AM_INIT_AUTOMAKE([subdir-objects])
+AM_EXTRA_RECURSIVE_TARGETS([style enforcestyle])
+
 #AM_INIT_AUTOMAKE([NO_DEP_TRACKING])
 #AM_INIT_AUTOMAKE(no-dependencies)
 #AM_INIT_AUTOMAKE([no-dependencies])
-AM_EXTRA_RECURSIVE_TARGETS([style enforcestyle])
+#AM_INIT_AUTOMAKE([foreign no-dependencies])
+#AM_INIT_AUTOMAKE([--disable-dependency-tracking])
 #AM_CONDITIONAL([NO_DEP_TRACKING],[test x"$enable_dependency_tracking" = x"no"])
-AM_CONDITIONAL(NO_DEP_TRACKING,test x$enable_dependency_tracking = xno)
+#NO_DEP_TRACKING=yes
+#AM_CONDITIONAL(NO_DEP_TRACKING,test x$enable_dependency_tracking = xno)
+#AM_CONDITIONAL(NO_DEP_TRACKING,test x$disable-dependency-tracking = xyes)
 
 AX_SUMMARIZE_ENV
 # MPI

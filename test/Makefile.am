@@ -27,19 +27,19 @@ EXTRA_DIST  = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes lte-
 	          ref_solns/*.h5 ref_solns/collisions/*.h5 ref_solns/transport/*.h5 \
 			  ref_solns/reaction/*.h5 ref_solns/noSGM1K/*.h5 ref_solns/smag1K_1/*.h5 \
 			  ref_solns/sigma1K_1/*.h5 ref_solns/plate150K/*.h5 ref_solns/plate150K_1step/*.h5 \
-              ref_solns/heatedBox/*.h5 ref_solns/spongeBox/*.h5 ref_solns/interpInlet/*.h5 \
-              ref_solns/sgsLoMach/*.h5 \
+	      ref_solns/heatedBox/*.h5 ref_solns/spongeBox/*.h5 ref_solns/interpInlet/*.h5 \
+	      ref_solns/sgsLoMach/*.h5 \
 	      ref_solns/lequere-varmu/*.h5 \
 	      ref_solns/taylor-couette/*.h5 \
 	      ref_solns/pipe/*.h5 \
 	      ref_solns/aveLoMach/*.h5 \
-              ref_solns/reactBinDiff/*.h5 \
-              ref_solns/reactSingleRx/*.h5 \
-              ref_solns/reactTable/*.h5 \
-              ref_solns/stabChan/*.h5 \
-              ref_solns/radDecay/*.h5 \
-              ref_solns/reactNitrogen/*.h5 \
-              ref_solns/supg/*.h5 \
+	      ref_solns/reactBinDiff/*.h5 \
+	      ref_solns/reactSingleRx/*.h5 \
+	      ref_solns/reactTable/*.h5 \
+	      ref_solns/stabChan/*.h5 \
+	      ref_solns/radDecay/*.h5 \
+	      ref_solns/reactNitrogen/*.h5 \
+	      ref_solns/supg/*.h5 \
 			  ref_solns/pipe.zeta-f/*.h5 \
 		      vpath.sh die.sh count_gpus.sh sniff_mpirun.sh \
 		      cyl3d.gpu.test cyl3d.mflow.gpu.test wedge.gpu.test \
@@ -47,16 +47,16 @@ EXTRA_DIST  = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes lte-
 		      die.test averaging.test wedge.test cyl3d.interp.test qms.rings.test qms.axisym.test \
 		      sponge_zone.test annulus.test pipe.test valgrind.test valgrind.suppressions \
 		      mms.euler.test reaction.test perfect_gas.test collision_integrals.test \
-                      diffusion_wall.test \
+	              diffusion_wall.test \
 	 	      inflow_outflow.test mms.ternary_2d.test mms.ternary_2d_wall.test \
 	 	      mms.ternary_2d_inout.test cuda-memcheck.test mms.general_wall.test \
 		      independent_coupling.test interp_em.test mms.euler_2d.test mms.cns_2d.test \
 		      gradient.test coupled-3d.test coupled-3d.splitcomm.test coupled-3d.py-loop.test \
 		      tabulated.test lte_mixture.test distance_fcn.test \
-              sgsSmag.test sgsSigma.test heatEq.test sponge.test plate.test pipe.mix.test lte2noneq-restart.test \
-              coupled-3d.interface.test plasma.axisym.test plasma.axisym.lte1d.test \
+	      sgsSmag.test sgsSigma.test heatEq.test sponge.test plate.test pipe.mix.test lte2noneq-restart.test \
+	      coupled-3d.interface.test plasma.axisym.test plasma.axisym.lte1d.test \
 	      	  lomach-flow.test lomach-lequere.test interpInlet.test sgsLoMach.test autoPeriodic.test aveLoMach.test \
-              reactFlow-binDiff.test reactFlow-singleRx.test reactFlow-table.test radiativeDecay.test \
+	      reactFlow-binDiff.test reactFlow-singleRx.test reactFlow-table.test radiativeDecay.test \
 			  reactFlow-nitrogen.test argon_minimal.test argon_minimal.binary.test \
 			  supg-scalars.test lomach-pipe-zf.test
 
@@ -76,10 +76,10 @@ TESTS += cyl3d.gpu.test \
 	 sgsSmag.test \
 	 sgsSigma.test \
 	 heatEq.test \
-         plate.test \
+	 plate.test \
 	 pipe.mix.test \
 	 plasma.axisym.lte1d.test \
-         sgsLoMach.test \
+	 sgsLoMach.test \
 	 lomach-flow.test \
 	 lomach-lequere.test
 
@@ -112,34 +112,34 @@ TESTS += cyl3d.test \
 	 coupled-3d.splitcomm.test \
 	 tabulated.test \
 	 lte_mixture.test \
-         sgsSmag.test \
-         sgsSigma.test \
-         heatEq.test \
+	 sgsSmag.test \
+	 sgsSigma.test \
+	 heatEq.test \
 	 sponge.test \
-         sgsLoMach.test \
-         plate.test \
-         pipe.mix.test \
+	 sgsLoMach.test \
+	 plate.test \
+	 pipe.mix.test \
 	 lte2noneq-restart.test \
 	 coupled-3d.interface.test \
 	 plasma.axisym.test \
 	 plasma.axisym.lte1d.test \
 	 lomach-flow.test \
 	 lomach-lequere.test \
-         interpInlet.test \
-         autoPeriodic.test \
-         aveLoMach.test \
-         reactFlow-binDiff.test \
-         reactFlow-singleRx.test \
-         reactFlow-table.test \
-         lomach-chan-stab.test
-         radiativeDecay.test \
+	 interpInlet.test \
+	 autoPeriodic.test \
+	 aveLoMach.test \
+	 reactFlow-binDiff.test \
+	 reactFlow-singleRx.test \
+	 reactFlow-table.test \
+	 lomach-chan-stab.test
+	 radiativeDecay.test \
 		 lomach-pipe-zf.test \
-         reactFlow-nitrogen.test \
+	 reactFlow-nitrogen.test \
 	 supg-scalars.test
 
 if PYTHON_ENABLED
 TESTS += cyl3d.python.test \
-         cyl3d.python.splitcomm.test \
+	 cyl3d.python.splitcomm.test \
 		 coupled-3d.py-loop.test
 endif
 
