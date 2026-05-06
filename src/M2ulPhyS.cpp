@@ -1954,8 +1954,7 @@ void M2ulPhyS::projectInitialSolution() {
       restart_files_hdf5("read");
 
       // start a run from a loMach solution <jump>
-      // NOTE: this is NOT setup for reacting flow
-      // TODO: move to separate subroutine
+      // NOTE: this is NOT setup for reacting flow. move to separate subroutine
     } else {
       if (rank0_) std::cout << "restarting from low-Mach field..." << std::endl;
 
@@ -2692,8 +2691,8 @@ void M2ulPhyS::clipOutflow() {
   // make readable and general if we keep this
   // double wOut = 0.5;
   // double clipPlane = 0.355;
-  double clipPlane = 0.15;
-  double clipWidth = 0.2;
+  // double clipPlane = 0.15;
+  // double clipWidth = 0.2;
   double neckStart = 0.324;
   double neckEnd = 0.355;
   double neckRad = 0.0155;
@@ -2714,7 +2713,7 @@ void M2ulPhyS::clipOutflow() {
   // double uNeck;
   // tpsP->getInput("flow/uNeck", uNeck, 0.0);
 
-  int nv = nvel;
+  // int nv = nvel;
   double *dataU = U->HostReadWrite();
   for (int i = 0; i < dof; i++) {
     auto hcoords = coordsDof.HostRead();
@@ -2724,7 +2723,8 @@ void M2ulPhyS::clipOutflow() {
     }
 
     double rho = dataU[i + 0 * dof];
-    double vel[nvel];
+    // double vel[nvel];
+    double vel[3];
     for (int d = 0; d < nvel; d++) vel[d] = dataU[i + (d + 1) * dof] / rho;
 
     double ke0 = 0.;
@@ -2739,12 +2739,7 @@ void M2ulPhyS::clipOutflow() {
       double unLcl = uNeck * 4.18879 * (1.0 + leak) * (1.0 - std::pow(rad / neckRad, 2.0));
       dataU[i + (eq + 1) * dof] = rho * min(vel[eq], unLcl);
       dataU[i + (eq + 1) * dof] = max(dataU[i + (eq + 1) * dof], 0.0);
-    } /*else if (yy >= clipPlane) {
-      double dist = yy - clipPlane;
-      double wOut = tanh(dist/clipWidth);
-      int eq = 1;
-      dataU[i + (eq+1)*dof] = rho * ((1.0-wOut)*vel[eq] + wOut*max(vel[eq], 0.0));
-      }*/
+    }
 
     double ke = 0.;
     for (int d = 0; d < nvel; d++) ke += dataU[i + (d + 1) * dof] * dataU[i + (d + 1) * dof] / (rho * rho);
