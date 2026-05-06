@@ -47,11 +47,12 @@ FaceIntegrator::FaceIntegrator(IntegrationRules *_intRules, RiemannSolverTPS *rs
       gradUpfes(_gradUpfes),
       distance_(distance),
       intRules(_intRules),
-      useLinear(_useLinear),
-      axisymmetric_(axisym),
-      rank_(rank) {
+      useLinear(_useLinear) {
   assert(!useLinear);
   totDofs = vfes->GetNDofs();
+
+  axisymmetric_ = axisym;
+  rank_ = rank;  
 }
 
 FaceIntegrator::~FaceIntegrator() {
@@ -348,7 +349,7 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
     viscF1.AddMult(nor, fluxN);
     fluxN *= ip.weight;
 
-    if (axisymmetric_) {
+    if (axisymmetricHere_) {
       fluxN *= transip[0];
     }
 
