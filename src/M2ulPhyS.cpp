@@ -2138,7 +2138,7 @@ void M2ulPhyS::solveStep() {
   if (mixture->GetWorkingFluid() == WorkingFluid::USER_DEFINED) Check_Undershoot();
 
   // Hack for torch transients
-  clipOutflow();
+  // clipOutflow();
 
   // MPI_Barrier(MPI_COMM_WORLD);
   // if (rank0_) cout << "skata : " << " Check_Undershoot 2" << endl;
