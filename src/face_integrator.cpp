@@ -1,4 +1,3 @@
-
 // -----------------------------------------------------------------------------------bl-
 // BSD 3-Clause License
 //
@@ -52,7 +51,7 @@ FaceIntegrator::FaceIntegrator(IntegrationRules *_intRules, RiemannSolverTPS *rs
   totDofs = vfes->GetNDofs();
 
   axisymmetric_ = axisym;
-  rank_ = rank;  
+  rank_ = rank;
 }
 
 FaceIntegrator::~FaceIntegrator() {

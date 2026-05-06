@@ -1281,10 +1281,10 @@ void ReactingFlow::initializeSelf() {
         temperature_bc_field_ = new GridFunctionCoefficient(extData_interface_->Tdata);
 
         // species_bc_field_ = new GridFunctionCoefficient(extData_interface_->Ydata);
-        ////if (rank0_) {
-        ////  std::cout << "Rx Flow: Setting interpolated Dirichlet temperature on patch = " << patch << std::endl;
-        ////}
-        ////AddTempDirichletBC(temperature_bc_field_, inlet_attr);
+        // if (rank0_) {
+        // std::cout << "Rx Flow: Setting interpolated Dirichlet temperature on patch = " << patch << std::endl;
+        // }
+        // AddTempDirichletBC(temperature_bc_field_, inlet_attr);
         // AddSpeciesDirichletBC(species_value, inlet_attr);
 
         // Force the IC to agree with the interpolated inlet BC
@@ -1294,7 +1294,7 @@ void ReactingFlow::initializeSelf() {
         // field is read after this projection, if it does not satisfy
         // this BC, there will be a discrepancy (which will be
         // eliminated after the first step).
-        ////Tn_gf_.ProjectBdrCoefficient(*temperature_bc_field_, inlet_attr);
+        // Tn_gf_.ProjectBdrCoefficient(*temperature_bc_field_, inlet_attr);
 
         if (!neumann_temp_) {
           inlet_attr = 0;

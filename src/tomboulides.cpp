@@ -575,7 +575,7 @@ void Tomboulides::initializeSelf() {
 
       // stores actual boundary conditions
       // uface_gf_ = new ParGridFunction(vfes_);
-      //*uface_gf_ = 0.0;
+      // *uface_gf_ = 0.0;
 
       // gets passed to dirichlet bc
       // uface_coeff_ = new VectorGridFunctionCoefficient(uface_gf_);
@@ -618,7 +618,6 @@ void Tomboulides::initializeSelf() {
             // std::cout << patch << "/" << i << ") normal: (" << normal[0] << ", " << normal[1] << ", " << normal[2] <<
             // ")" << endl;
           }
-
         }  // attr patch check
       }  // bel loop
 
@@ -703,11 +702,11 @@ void Tomboulides::initializeSelf() {
         // addVelDirichletBC(uface_coeff_, inlet_attr);
 
         // if (nCount > 0) {
-        //	for (int ii = 0; ii < dim_; ii++) uSingleInlet[ii] /= (double)nCount;
-        //         std::cout <<  patch << ") Inlet BC: " << uSingleInlet[0] << ", " << uSingleInlet[1] << ", " <<
-        //         uSingleInlet[2] << " cnt: " << nCount << endl;
-        //       }
-        //       addVelDirichletBC(uSingleInlet, inlet_attr);
+        // for (int ii = 0; ii < dim_; ii++) uSingleInlet[ii] /= (double)nCount;
+        // std::cout <<  patch << ") Inlet BC: " << uSingleInlet[0] << ", " << uSingleInlet[1] << ", " <<
+        // uSingleInlet[2] << " cnt: " << nCount << endl;
+        // }
+        // addVelDirichletBC(uSingleInlet, inlet_attr);
         std::cout << patch << ") Inlet BC: " << uGlobal[0] << ", " << uGlobal[1] << ", " << uGlobal[2]
                   << " cnt: " << nCount << endl;
       }
