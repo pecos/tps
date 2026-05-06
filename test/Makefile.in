@@ -1440,11 +1440,11 @@ uninstall-am:
 
 .PRECIOUS: Makefile
 
-@GPU_ENABLED_FALSE@	radiativeDecay.test \
-@GPU_ENABLED_FALSE@	lomach-pipe-zf.test \
-@GPU_ENABLED_FALSE@	reactFlow-nitrogen.test \
-@GPU_ENABLED_FALSE@	supg-scalars.test
-
+#@GPU_ENABLED_FALSE@	radiativeDecay.test \
+#@GPU_ENABLED_FALSE@	lomach-pipe-zf.test \
+#@GPU_ENABLED_FALSE@	reactFlow-nitrogen.test \
+#@GPU_ENABLED_FALSE@	supg-scalars.test
+#
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
 .NOEXPORT:
