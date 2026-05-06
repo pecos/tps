@@ -606,7 +606,7 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
   // gradient of pressure in normal direction
   double dpdn = mixture->ComputePressureDerivative(normGrad, stateIn, false);
 
-  std::cout << "ComputeSoS outletBC 1" << endl;
+  // std::cout << "ComputeSoS outletBC 1" << endl;
   const double speedSound = mixture->ComputeSpeedOfSound(meanUp);
 
   double meanK = 0.;
@@ -804,7 +804,7 @@ void OutletBC::subsonicNonRefMassFlow(Vector &normal, Vector &stateIn, DenseMatr
   // gradient of pressure in normal direction
   double dpdn = mixture->ComputePressureDerivative(normGrad, stateIn, false);
 
-  std::cout << "ComputeSoS outletBC 2" << endl;
+  // std::cout << "ComputeSoS outletBC 2" << endl;
   const double speedSound = mixture->ComputeSpeedOfSound(meanUp);
 
   double meanK = 0.;
@@ -961,7 +961,7 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal, Vector &stateIn, DenseMa
   // gradient of pressure in normal direction
   double dpdn = mixture->ComputePressureDerivative(normGrad, stateIn, false);
 
-  std::cout << "ComputeSoS outletBC 3" << endl;
+  // std::cout << "ComputeSoS outletBC 3" << endl;
   const double speedSound = mixture->ComputeSpeedOfSound(meanUp);
 
   double normVel = 0.;
