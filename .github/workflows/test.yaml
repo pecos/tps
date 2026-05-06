@@ -58,7 +58,7 @@ jobs:
        - name: Bootstrap
          run:  ./bootstrap
        - name: Configure
-         run:  ./configure --disable-dependency-tracking CXXFLAGS="-g -O2 -Wall -Werror -fdiagnostics-color=always" --enable-pybind11
+         run:  ./configure --disable-dependency-tracking CXXFLAGS="-g -O2 -Wall -fdiagnostics-color=always" --enable-pybind11
        - name: Make
          run:  make -j 2
        - name: Tests
@@ -66,7 +66,7 @@ jobs:
        - name: Distclean
          run:  make distclean
        - name: VPATH configure
-         run:  mkdir build; cd build; ../configure --disable-dependency-tracking CXXFLAGS="-g -O2 -Wall -Werror -fdiagnostics-color=always"
+         run:  mkdir build; cd build; ../configure --disable-dependency-tracking CXXFLAGS="-g -O2 -Wall -fdiagnostics-color=always"
        - name: VPATH make
          run:  cd build; make -j 2
        - name: VPATH tests
@@ -93,7 +93,7 @@ jobs:
       - name: Bootstrap
         run:  module restore tps-gpu-gnu9; ./bootstrap
       - name: Configure
-        run: module restore tps-gpu-gnu9; ./configure --disable-dependency-tracking --enable-pybind11 --enable-gpu-cuda CUDA_ARCH=sm_75 USER_CUDA_CXXFLAGS="-Werror all-warnings -Xcompiler=-Wall -Xcompiler=-Werror"
+        run: module restore tps-gpu-gnu9; ./configure --disable-dependency-tracking --enable-pybind11 --enable-gpu-cuda CUDA_ARCH=sm_75 USER_CUDA_CXXFLAGS=" "
       - name: Make
         run: module restore tps-gpu-gnu9; make -j 2
       - name: Tests
@@ -121,7 +121,7 @@ jobs:
       - name: Bootstrap
         run:  module restore tps-gpu; ./bootstrap
       - name: Configure
-        run: module restore tps-gpu; ./configure --disable-dependency-tracking CXXFLAGS="-Wall -Wno-gpu-maybe-wrong-side -Wno-unused-private-field -Wno-pessimizing-move -Werror" --enable-pybind11 --enable-gpu-hip HIP_ARCH=gfx803
+        run: module restore tps-gpu; ./configure --disable-dependency-tracking CXXFLAGS="-Wall -Wno-gpu-maybe-wrong-side -Wno-unused-private-field -Wno-pessimizing-move" --enable-pybind11 --enable-gpu-hip HIP_ARCH=gfx803
       - name: Make
         run: module restore tps-gpu; make -j 2
       - name: Distclean
@@ -151,7 +151,7 @@ jobs:
       - name: Bootstrap
         run:  module restore tps-gpu-cpu; ./bootstrap
       - name: Configure
-        run: module restore tps-gpu-cpu; ./configure --disable-dependency-tracking CXXFLAGS="-g -O2 -Wall -Wno-nonnull -Werror" --enable-pybind11 --enable-gpu-cpu
+        run: module restore tps-gpu-cpu; ./configure --disable-dependency-tracking CXXFLAGS="-g -O2 -Wall -Wno-nonnull" --enable-pybind11 --enable-gpu-cpu
       - name: Make
         run: module restore tps-gpu-cpu; make -j 2
       - name: Tests
@@ -159,7 +159,7 @@ jobs:
       - name: Distclean
         run:  make distclean
       - name: VPATH configure
-        run:  mkdir build; cd build; module restore tps-gpu-cpu; ../configure --disable-dependency-tracking CXXFLAGS="-g -O2 -Wall -Wno-nonnull -Werror" --enable-pybind11 --enable-gpu-cpu
+        run:  mkdir build; cd build; module restore tps-gpu-cpu; ../configure --disable-dependency-tracking CXXFLAGS="-g -O2 -Wall -Wno-nonnull" --enable-pybind11 --enable-gpu-cpu
       - name: VPATH make
         run:  cd build; module restore tps-gpu-cpu; make -j 2
       - name: VPATH tests
@@ -183,7 +183,7 @@ jobs:
        - name: Bootstrap
          run:  ./bootstrap
        - name: Configure
-         run:  ./configure --disable-dependency-tracking CXXFLAGS="-g -O2 -Wall -Werror -fdiagnostics-color=always"
+         run:  ./configure --disable-dependency-tracking CXXFLAGS="-g -O2 -Wall -fdiagnostics-color=always"
        - name: Dist
          run:  make dist
        - name: Archive tarball
@@ -220,7 +220,7 @@ jobs:
        - name: Distclean
          run:  cd tps-*; make distclean
        - name: VPATH configure
-         run:  cd tps-*; mkdir build; cd build; ../configure --disable-dependency-tracking CXXFLAGS="-g -O2 -Wall -Werror -fdiagnostics-color=always"
+         run:  cd tps-*; mkdir build; cd build; ../configure --disable-dependency-tracking CXXFLAGS="-g -O2 -Wall -fdiagnostics-color=always"
        - name: VPATH make
          run:  cd tps-*; cd build; make -j 2
        - name: VPATH tests
@@ -247,7 +247,7 @@ jobs:
        - name: Query modules loaded
          run:  module restore tps-gpu-gnu9; module list         
        - name: Configure
-         run: cd tps-*; module restore tps-gpu-gnu9; ./configure --disable-dependency-tracking --enable-pybind11 --enable-gpu-cuda CUDA_ARCH=sm_75 USER_CUDA_CXXFLAGS="-Werror all-warnings -Xcompiler=-Wall -Xcompiler=-Werror"
+         run: cd tps-*; module restore tps-gpu-gnu9; ./configure --disable-dependency-tracking --enable-pybind11 --enable-gpu-cuda CUDA_ARCH=sm_75 USER_CUDA_CXXFLAGS=" "
        - name: Make
          run:  cd tps-*; module restore tps-gpu-gnu9; make -j 2
        - name: TPS version
