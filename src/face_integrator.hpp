@@ -74,7 +74,7 @@ class FaceIntegrator : public NonlinearFormIntegrator {
   int faceNum;
   bool faceMassMatrixComputed;
   bool useLinear;
-  const bool axisymmetric_;
+  bool axisymmetric_;
 
   int totDofs;
   Array<int> vdofs1;

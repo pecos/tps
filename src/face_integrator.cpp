@@ -349,7 +349,7 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
     viscF1.AddMult(nor, fluxN);
     fluxN *= ip.weight;
 
-    if (axisymmetricHere_) {
+    if (axisymmetric_) {
       fluxN *= transip[0];
     }
 
