@@ -30,7 +30,7 @@ import scipy.cluster
 from itertools import cycle
 import cross_section
 import os
-# import traceback
+import traceback
 
 ev_to_K               = collisions.TEMP_K_1EV
 Td_fac                = 1e-21
@@ -48,6 +48,8 @@ kB                    = scipy.constants.Boltzmann
 
 varyT_cs = 1
 append_recomb_cs = 1
+
+cs_datbase = "/work2/10565/ashwathsv/frontera/tps-venv/frontera/tps-venv/tps/tps-inputs/axisymmetric/argon/highP/cs_data"
 
 logfile = "outlog.txt"
 
@@ -130,6 +132,7 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
             comm.Abort(1)
         nSpecies = int(len(narr) / len(Tarr))
     except Exception as e:
+        traceback.print_exc()
         print(e)
         print("rank [%d/%d], failed setting up grid_idx_to_spatial_pts vector and species, temperature vector"%(rank_, size_), flush=True)
         comm.Abort(1)
@@ -148,10 +151,14 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
         ev_max                           = (6 * vth / c_gamma)**2 
         # Replace ev_max based on the mean electron energy in each grid
         for idx in range(n_grids):
+            if len(Tg[grid_idx_to_spatial_idx_map[idx]]) <= 0:
+                print("Rank ", rank_, ", gidx ", idx, ", len(Tg) = ", len(Tg[grid_idx_to_spatial_idx_map[idx]]), ", <= 0, aborting....", flush=True)
+                comm.Abort(1)
             ev_max[idx] = 36 * np.mean( Tg[grid_idx_to_spatial_idx_map[idx]] / ev_to_K) 
             if args.ee_collisions==1:
                 ev_max[idx] = 100 * np.mean( Tg[grid_idx_to_spatial_idx_map[idx]] / ev_to_K) 
     except Exception as e:
+        traceback.print_exc()
         print(e)
         print("rank [%d/%d], failed setting up ev_max for each v-space grid"%(rank_, size_), flush=True)
         comm.Abort(1)
@@ -161,12 +168,25 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
         for idx in range(n_grids):
             cs_fname = collisions_file
             if varyT_cs == 1:
+                Tlfile = cs_datbase + "/Tlump.txt"
+                Tlarr = np.loadtxt(Tlfile, delimiter=",")
+                Temp = Tlarr[np.argmin(np.abs((Te[idx]*ev_to_K) - Tlarr))]
+                cs_input = "/crs_Tlump%06d.lxcat" %(Temp)
+                cs_input = cs_datbase + cs_input
                 cs_fname = "%s/crs_rank_%06d_npes_%06d_%06d.txt"%(crs_folder, rank_, size_, idx) 
                 # synthetic_cs.gen_lxcat_file(cs_fname, Te[idx] * ev_to_K, append_recomb_cs, rank_, idx)
-                synthetic_cs.gen_lxcat_file_coupledsolve(cs_fname, Te[idx] * ev_to_K, ev_max[idx], append_recomb_cs, rank_, idx)
+                # synthetic_cs.gen_lxcat_file_coupledsolve(cs_fname, Te[idx] * ev_to_K, ev_max[idx], append_recomb_cs, rank_, idx)
+                synthetic_cs.read_and_write_lumpedcs(cs_fname, cs_input, ev_max[idx], rank_, idx)
+
             col_cs.append(cs_fname)
+    except Exception as e:
+        traceback.print_exc()
+        print("rank [%d/%d], failed setting up the cross-section files"%(rank_, size_), flush=True)
+        comm.Abort(1)
+
         comm.Barrier()
 
+    try:
         args.collisions = collisions_file # collision cross-section file
         if varyT_cs == 1:
             args.collisions = col_cs[0]
@@ -226,15 +246,24 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
         #     col_cs.append(cs_fname)
         # comm.Barrier()
     except Exception as e:
+        traceback.print_exc()
         print(e)
         print("rank [%d/%d], failed setting up vectors to setup BTE solver object"%(rank_, size_), flush=True)
         comm.Abort(1)
 
-    bte_solver  = bte_0d3v_batched(args, ev_max, Te, nr, lm_modes, n_grids, col_cs)
+    try:
+        bte_solver  = bte_0d3v_batched(args, ev_max, Te, nr, lm_modes, n_grids, col_cs)
 
-    # compute BTE operators
-    for grid_idx in range(n_grids):
-        bte_solver.assemble_operators(grid_idx)
+        # compute BTE operators
+        for grid_idx in range(n_grids):
+            bte_solver.assemble_operators(grid_idx)
+    except Exception as e:
+        traceback.print_exc()
+        print(e)
+        print("rank [%d/%d], failed setting up BTE solver object and operator assembly"%(rank_, size_), flush=True)
+        comm.Abort(1)
+    
+    comm.Barrier()
 
     # Initialize the EEDFs to Maxwellian for each v-space grid
     for grid_idx in range(n_grids):
@@ -314,11 +343,13 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
     # -------------End of solve_init() ------------------------------
 
     # 8D SUB-CLUSTERING OF THE PLASMA PARAMETERS
-    EMag                    = np.sqrt( Er**2 + Ei**2 )
+    ERe = Er
+    EIm = Ei
+    EMag                    = np.sqrt( ERe**2 + EIm**2 )
     e_idx                   = EMag < EMag_threshold
 
-    ExbyN                   = Er/n0/Td_fac
-    EybyN                   = Ei/n0/Td_fac
+    ExbyN                   = ERe/n0/Td_fac
+    EybyN                   = EIm/n0/Td_fac
 
     ExbyN[e_idx]            = (EMag_threshold/np.sqrt(2)) / n0[e_idx] / Td_fac
     EybyN[e_idx]            = (EMag_threshold/np.sqrt(2)) / n0[e_idx] / Td_fac
@@ -694,14 +725,16 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
                         fig          = plt.figure(figsize=(num_plt_cols * 8 + 0.5*(num_plt_cols-1), num_plt_rows * 8 + 0.5*(num_plt_rows-1)), dpi=200, constrained_layout=True)
                         plt_idx      =  1
                         n_pts_step   =  n_pts // 4
+                        # n_pts_step = max(1, n_pts // 4)
 
                         for lm_idx, lm in enumerate(bte_solver._par_lm[grid_idx]):
                             plt.subplot(num_plt_rows, num_plt_cols, plt_idx)
 
-                            for ii in range(0, n_pts, n_pts_step):
-                                fr     = np.abs(ff_r[ii, lm_idx, :])
-                                mf_str = " ".join([r"$%s/n0$=%.2E"%(s, ns_by_n0[ii, s_idx]) for s_idx, s in enumerate(cs_species)])
-                                plt.semilogy(ev, fr, label=r"$T_g$=%.2E [K], $E/n_0$=%.2E [Td] $n_e/n_0$=%.2E "%(Tg[ii], eMag[ii]/n0[ii]/1e-21, ne[ii]/n0[ii]) + " " +mf_str)
+                            if n_pts_step > 0:
+                                for ii in range(0, n_pts, n_pts_step):
+                                    fr     = np.abs(ff_r[ii, lm_idx, :])
+                                    mf_str = " ".join([r"$%s/n0$=%.2E"%(s, ns_by_n0[ii, s_idx]) for s_idx, s in enumerate(cs_species)])
+                                    plt.semilogy(ev, fr, label=r"$T_g$=%.2E [K], $E/n_0$=%.2E [Td] $n_e/n_0$=%.2E "%(Tg[ii], eMag[ii]/n0[ii]/1e-21, ne[ii]/n0[ii]) + " " +mf_str)
 
                             plt.xlabel(r"energy (eV)")
                             plt.ylabel(r"$f_%d$"%(lm[0]))
@@ -714,28 +747,12 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
                         plt.savefig("%s_plot.png"%(fname))
                         plt.close()
             except Exception as e:
-                # traceback.print_exc()
+                traceback.print_exc()
                 print(e)
-                # exc_type, exc_obj, exc_tb = sys.exc_info()
-                # line_number = exc_tb.tb_lineno
-                # print("rank [%d/%d], failed storing csv of QoIs for grid_idx %d, Line %d."%(rank_, size_, grid_idx, line_number), flush=True)
-                print("rank [%d/%d], failed storing csv of QoIs for grid_idx %d."%(rank_, size_, grid_idx), flush=True)
+                exc_type, exc_obj, exc_tb = sys.exc_info()
+                line_number = exc_tb.tb_lineno
+                print("rank [%d/%d], failed storing csv of QoIs for grid_idx %d, Line %d."%(rank_, size_, grid_idx, line_number), flush=True)
                 comm.Abort(1)
-
-    # for i in range(rates.shape[0]):
-    #     rateloc = rates[i,:]
-    #     locmin = np.amin(rateloc)
-    #     locmax = np.amax(rateloc)
-
-    #     glomin = comm.allreduce(locmin, op=MPI.MIN)
-    #     glomax = comm.allreduce(locmax, op=MPI.MAX)
-        
-    #     locnumneg = np.sum(rateloc < -1e5)
-    #     glonumneg = comm.allreduce(locnumneg, op=MPI.SUM)
-
-    #     if rank_ == 0:
-    #         printstr = "[Py] Reaction %d, %.4e to %.4e, numneg = %d" %(i, glomin, glomax, glonumneg)
-    #         print(printstr)
 
     data = rates[1:rates.shape[0]].flatten()
     data[data < 1.0e-21] = 0.0
@@ -784,8 +801,42 @@ def bte_grid_setup(Tarr, n_grids):
             grid_idx_to_spatial_pts_map.append(np.argwhere(membership==b_idx)[:,0])
 
         grid_idx_to_npts            = np.array([len(a) for a in grid_idx_to_spatial_pts_map], dtype=np.int32)
+
+        # Find and reassign empty grids
+        empty_grids = np.where(grid_idx_to_npts == 0)[0]
+        if len(empty_grids) > 0:
+            print(f"Rank {rank_}: Found {len(empty_grids)} empty grids: {empty_grids}", flush=True)
+        
+        for empty_idx in empty_grids:
+            # Find nearest non-empty grid
+            distances_to_clusters = np.abs(Tecw[empty_idx] - Tecw)
+            distances_to_clusters[empty_idx] = np.inf  # Exclude self
+            nearest_grid = np.argmin(distances_to_clusters)
+
+            # Reassign one point from nearest grid to empty grid
+            if grid_idx_to_npts[nearest_grid] > 1:
+                # Move the point closest to empty_idx from nearest_grid
+                pts_in_nearest = grid_idx_to_spatial_pts_map[nearest_grid]
+                distances = np.abs(Tew[pts_in_nearest] - Tecw[empty_idx])
+                point_to_move = pts_in_nearest[np.argmin(distances)]
+
+                # Update membership
+                membership[point_to_move] = empty_idx
+
+                # Rebuild maps
+                grid_idx_to_spatial_pts_map = list()
+                for b_idx in range(n_grids):
+                    grid_idx_to_spatial_pts_map.append(np.argwhere(membership == b_idx)[:, 0])
+                    
+                grid_idx_to_npts = np.array([len(a) for a in grid_idx_to_spatial_pts_map], dtype=np.int32)
+                print(f"Rank {rank_}: Reassigned point {point_to_move} to empty grid {empty_idx}", flush=True)
+
         grid_idx_to_spatial_idx_map = grid_idx_to_spatial_pts_map
 
+        if np.sum(grid_idx_to_npts)    != len(Te):
+            print("Rank ", rank_, ", np.sum(grid_idx_to_npts) = ", np.sum(grid_idx_to_npts), ", != len(Te) = ", len(Te))
+            comm.Abort(1)
+        
         np.sum(grid_idx_to_npts)    == len(Te), "[Error] : TPS spatial points for v-space grid assignment is inconsitant"
 
         # grid_idx_to_spatial_pts_map is passed as a vector of int to C++
@@ -797,6 +848,13 @@ def bte_grid_setup(Tarr, n_grids):
             ghi = glo + grid_idx_to_npts[gidx]
             grid_pts_to_spatial_index_map_vec[glo:ghi] = grid_idx_to_spatial_idx_map[gidx]
             glo = ghi
+            # print("Rank ", rank_, ", grid_idx_to_npts = ", grid_idx_to_npts, ", sum = ", np.sum(grid_idx_to_npts), flush=True)
+        
+        if (np.amin(grid_idx_to_npts) <= 0) or (np.isnan(grid_idx_to_npts).any()):
+            print("Rank ", rank_, ", grid_idx_to_npts has zero length for some grid_idx, grid_idx_to_npts = ", grid_idx_to_npts, ", aborting...", flush=True)
+            comm.Abort(1)
+        
+    comm.Barrier()
 
     return grid_idx_to_npts, grid_pts_to_spatial_index_map_vec, Te
 
