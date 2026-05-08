@@ -32,6 +32,3 @@ test/ref_solns/supg/restart_output_wstab1T.sol.h5 filter=lfs diff=lfs merge=lfs 
 test/ref_solns/supg/restart_output_lte_supg.sol.h5 filter=lfs diff=lfs merge=lfs -text
 test/ref_solns/plasma.lte2d.v48.h5 filter=lfs diff=lfs merge=lfs -text
 test/ref_solns/plasma.lte1d.v48.h5 filter=lfs diff=lfs merge=lfs -text
-test/meshes/axi-pipe-wall-rm2.msh
-test/ref_solns/ref_solns/pipe.zeta-f/REFSOL_restart_output-pipe-zeta-f.sol.h5 filter=lfs diff=lfs merge=lfs -text
-test/ref_solns/ref_solns/pipe.zeta-f/REF0_restart_output-pipe-zeta-f.sol.h5 filter=lfs diff=lfs merge=lfs -text
