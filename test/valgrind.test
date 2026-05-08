@@ -9,7 +9,8 @@ RUNFILE_AVG="inputs/input.cyl-2d.caseA.ini"
 PIPE_RUNFILE="inputs/lomach.pipe.ini"
 EXE="../src/tps"
 LIBTOOL_RUN="../libtool --mode=execute"
-VALGRIND="valgrind --suppressions=valgrind.suppressions --tool=memcheck --leak-check=full --error-exitcode=1 --errors-for-leak-kinds=definite"
+VALGRIND="valgrind --suppressions=valgrind.suppressions --tool=memcheck --leak-check=full --error-exitcode=1"
+#VALGRIND="valgrind --suppressions=valgrind.suppressions --tool=memcheck --leak-check=full --error-exitcode=1 --errors-for-leak-kinds=definite"
 
 setup() {
     OPTS=""
