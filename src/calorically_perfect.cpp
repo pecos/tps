@@ -264,7 +264,7 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
 
   R0PM0_gf_.SetSpace(sfes_);
 
-  rhoDt_gf_.SetSpace(sfes_);
+  rhoDt.SetSpace(sfes_);
 
   if (rank0_) grvy_printf(ginfo, "CaloricallyPerfectThermoChem vectors and gf initialized...\n");
 
@@ -273,7 +273,6 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
   toFlow_interface_.viscosity = &visc_gf_;
   toFlow_interface_.thermal_divergence = &Qt_gf_;
   toTurbModel_interface_.density = &rn_gf_;
-  toTurbModel_interface_.viscosity = &visc_gf_;
   if (rank0_) {
     std::cout << "exports set..." << endl;
   }
@@ -452,9 +451,9 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   // coefficients for operators
   rho_coeff_ = new GridFunctionCoefficient(&rn_gf_);
 
-  rhoDt_gf_ = rn_gf_;
-  rhoDt_gf_ /= dt_;
-  rho_over_dt_coeff_ = new GridFunctionCoefficient(&rhoDt_gf_);
+  rhoDt = rn_gf_;
+  rhoDt /= dt_;
+  rho_over_dt_coeff_ = new GridFunctionCoefficient(&rhoDt);
 
   // thermal_diff_coeff.constant = thermal_diff;
   thermal_diff_coeff_ = new GridFunctionCoefficient(&kappa_gf_);
@@ -483,7 +482,6 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
     Reh_coeff_ = new ProductCoefficient(*reh2_coeff_, *umag_coeff_);
 
     // Csupg
-    // auto csupgLambda = std::bind(csupgFactor, std::placeholders::_1,  Reh_factor_, Reh_offset_);
     std::function<double(double)> csupgLambda = std::bind(csupgFactor, std::placeholders::_1, Reh_factor_, Reh_offset_);
     csupg_coeff_ = new ExtTransformedCoefficient(Reh_coeff_, csupgLambda);
 
@@ -738,8 +736,8 @@ void CaloricallyPerfectThermoChem::step() {
   // NB: adiabatic natural BC is handled, but don't have ability to impose non-zero heat flux yet
 
   // Update Helmholtz operator to account for changing dt, rho, and kappa
-  rhoDt_gf_ = rn_gf_;
-  rhoDt_gf_ *= (time_coeff_.bd0 / dt_);
+  rhoDt = rn_gf_;
+  rhoDt *= (time_coeff_.bd0 / dt_);
 
   Ht_form_->Update();
   Ht_form_->Assemble();

@@ -99,12 +99,10 @@ class ReactingFlow : public ThermoChemModelBase {
   PerfectMixtureInput mixtureInput_;
   GasTransportInput gasInput_;
   ChemistryInput chemistryInput_;
-  ChemistryInput chemistryInputBase_;
 
   PerfectMixture *mixture_ = NULL;
   GasMixtureTransport *transport_ = NULL;
   Chemistry *chemistry_ = NULL;
-  Chemistry *chemistryBase_ = NULL;
 
   std::vector<std::string> speciesNames_;
   std::map<std::string, int> atomMap_;
@@ -121,7 +119,6 @@ class ReactingFlow : public ThermoChemModelBase {
   bool constant_density_ = false;     /**< Enable/disable constant density */
   bool domain_is_open_ = false;       /**< true if domain is open */
   bool axisym_ = false;               /**< true if simulation is axisymmetric */
-  bool species_init_ = false;         /**< true if species are initialized from file */
   bool neumann_temp_ = false;         /**< only applies to inlet */
   bool neumann_species_inlet_ = true; /**< only applies to inlet */
   bool neumann_species_wall_ = true;  /**< only applies to inlet */
@@ -232,7 +229,6 @@ class ReactingFlow : public ThermoChemModelBase {
   // ParGridFunction *buffer_tInlet_ = nullptr;
   GridFunctionCoefficient *temperature_bc_field_ = nullptr;
   GridFunctionCoefficient *species_bc_field_ = nullptr;
-  VectorGridFunctionCoefficient *species_init_field_ = nullptr;
 
   VectorGridFunctionCoefficient *un_next_coeff_ = nullptr;
   GridFunctionCoefficient *rhon_next_coeff_ = nullptr;
@@ -382,11 +378,6 @@ class ReactingFlow : public ThermoChemModelBase {
   double implicit_chemistry_rtol_ = 1e-8;
   double implicit_chemistry_atol_ = 1e-12;
   double implicit_chemistry_smin_ = 1e-12;
-
-  // chemistry ramping
-  bool ramp_chem_ = false;
-  double ramp_start;
-  double ramp_time;
 
   // Parameters and objects used in filter-based stabilization
   bool filter_temperature_ = false;
