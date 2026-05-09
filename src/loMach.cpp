@@ -191,7 +191,7 @@ void LoMachSolver::initialize() {
     flow_ = new ZeroFlow(pmesh_, 1, tpsP_);
   } else if (loMach_opts_.flow_solver == "tomboulides") {
     // Tomboulides flow solver
-    flow_ = new Tomboulides(pmesh_, loMach_opts_.order, loMach_opts_.order, temporal_coeff_, 
+    flow_ = new Tomboulides(pmesh_, loMach_opts_.order, loMach_opts_.order, temporal_coeff_,
                             (meshData_->getGridScale()), tpsP_);
   } else {
     // Unknown choice... die
@@ -720,7 +720,7 @@ void LoMachSolver::parseSolverOptions() {
 
   tpsP_->getInput("loMach/thermo-solver", loMach_opts_.thermo_solver, string("constant-property"));
   assert(loMach_opts_.thermo_solver == "constant-property" || loMach_opts_.thermo_solver == "calorically-perfect" ||
-         loMach_opts_.thermo_solver == "lte-thermo-chem" || loMach_opts_.thermo_solver == "reacting-flow" );
+         loMach_opts_.thermo_solver == "lte-thermo-chem" || loMach_opts_.thermo_solver == "reacting-flow");
 
   tpsP_->getInput("loMach/order", loMach_opts_.order, 1);
   assert(loMach_opts_.order >= 1);
