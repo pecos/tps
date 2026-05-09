@@ -612,7 +612,7 @@ void LteThermoChem::initializeOperators() {
 
     // Csupg
     csupg_coeff_ = new TransformedCoefficient(Reh_coeff_, csupgFactor);
-    
+
     // compute upwind magnitude
     if (axisym_) {
       uw1_coeff_ = new ProductCoefficient(*rad_rho_Cp_coeff_, *csupg_coeff_);

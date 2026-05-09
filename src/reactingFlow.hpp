@@ -112,14 +112,14 @@ class ReactingFlow : public ThermoChemModelBase {
   bool radiative_decay_NECincluded_;
 
   // Flags
-  bool rank0_;                        /**< true if this is rank 0 */
-  bool partial_assembly_ = false;     /**< Enable/disable partial assembly of forms. */
-  bool numerical_integ_ = false;      // true;     /**< Enable/disable numerical integration rules of forms. */
-  bool constant_viscosity_ = false;   /**< Enable/disable constant viscosity */
-  bool constant_density_ = false;     /**< Enable/disable constant density */
-  bool domain_is_open_ = false;       /**< true if domain is open */
-  bool axisym_ = false;               /**< true if simulation is axisymmetric */
-  bool species_init_ = false;         /**< true if species are initialized from file */
+  bool rank0_;                      /**< true if this is rank 0 */
+  bool partial_assembly_ = false;   /**< Enable/disable partial assembly of forms. */
+  bool numerical_integ_ = false;    // true;     /**< Enable/disable numerical integration rules of forms. */
+  bool constant_viscosity_ = false; /**< Enable/disable constant viscosity */
+  bool constant_density_ = false;   /**< Enable/disable constant density */
+  bool domain_is_open_ = false;     /**< true if domain is open */
+  bool axisym_ = false;             /**< true if simulation is axisymmetric */
+  bool species_init_ = false;       /**< true if species are initialized from file */
 
   // Linear-solver-related options
   int pl_solve_ = 0;    /**< Verbosity level passed to mfem solvers */
