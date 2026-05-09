@@ -99,12 +99,10 @@ class ReactingFlow : public ThermoChemModelBase {
   PerfectMixtureInput mixtureInput_;
   GasTransportInput gasInput_;
   ChemistryInput chemistryInput_;
-  ChemistryInput chemistryInputBase_;
 
   PerfectMixture *mixture_ = NULL;
   GasMixtureTransport *transport_ = NULL;
   Chemistry *chemistry_ = NULL;
-  Chemistry *chemistryBase_ = NULL;
 
   std::vector<std::string> speciesNames_;
   std::map<std::string, int> atomMap_;
@@ -122,9 +120,6 @@ class ReactingFlow : public ThermoChemModelBase {
   bool domain_is_open_ = false;       /**< true if domain is open */
   bool axisym_ = false;               /**< true if simulation is axisymmetric */
   bool species_init_ = false;         /**< true if species are initialized from file */
-  bool neumann_temp_ = false;         /**< only applies to inlet */
-  bool neumann_species_inlet_ = true; /**< only applies to inlet */
-  bool neumann_species_wall_ = true;  /**< only applies to inlet */
 
   // Linear-solver-related options
   int pl_solve_ = 0;    /**< Verbosity level passed to mfem solvers */
@@ -166,7 +161,6 @@ class ReactingFlow : public ThermoChemModelBase {
 
   // streamwise-stabilization
   bool sw_stab_;
-  double Reh_factor_, Reh_offset_;
 
   // FEM related fields and objects
 
@@ -280,7 +274,7 @@ class ReactingFlow : public ThermoChemModelBase {
   ProductCoefficient *reh1_coeff_ = nullptr;
   ProductCoefficient *reh2_coeff_ = nullptr;
   ProductCoefficient *Reh_coeff_ = nullptr;
-  ExtTransformedCoefficient *csupg_coeff_ = nullptr;
+  TransformedCoefficient *csupg_coeff_ = nullptr;
   ProductCoefficient *uw1_coeff_ = nullptr;
   ProductCoefficient *uw2_coeff_ = nullptr;
   ProductCoefficient *upwind_coeff_ = nullptr;
@@ -382,11 +376,6 @@ class ReactingFlow : public ThermoChemModelBase {
   double implicit_chemistry_rtol_ = 1e-8;
   double implicit_chemistry_atol_ = 1e-12;
   double implicit_chemistry_smin_ = 1e-12;
-
-  // chemistry ramping
-  bool ramp_chem_ = false;
-  double ramp_start;
-  double ramp_time;
 
   // Parameters and objects used in filter-based stabilization
   bool filter_temperature_ = false;
