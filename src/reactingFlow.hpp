@@ -214,19 +214,9 @@ class ReactingFlow : public ThermoChemModelBase {
   ParGridFunction sigma_gf_;
   ParGridFunction jh_gf_;
 
-  // viz for qt rhs
-  // ParGridFunction rhsqt_bd_;
-  // ParGridFunction rhsqt_fo_;
-  // ParGridFunction rhsqt_jh_;
-  // ParGridFunction rhsqt_hf_;
-  // ParGridFunction rhsqt_sd_;
-  // ParGridFunction rhsqt_total_;
-  // ParGridFunction Xqt_gf_;
-
   // ParGridFunction *buffer_tInlet_ = nullptr;
   GridFunctionCoefficient *temperature_bc_field_ = nullptr;
   GridFunctionCoefficient *species_bc_field_ = nullptr;
-  VectorGridFunctionCoefficient *species_init_field_ = nullptr;
 
   VectorGridFunctionCoefficient *un_next_coeff_ = nullptr;
   GridFunctionCoefficient *rhon_next_coeff_ = nullptr;

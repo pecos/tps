@@ -271,7 +271,6 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
   toFlow_interface_.viscosity = &visc_gf_;
   toFlow_interface_.thermal_divergence = &Qt_gf_;
   toTurbModel_interface_.density = &rn_gf_;
-  toTurbModel_interface_.viscosity = &visc_gf_;
   if (rank0_) {
     std::cout << "exports set..." << endl;
   }
@@ -482,7 +481,11 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
 
     // Csupg
     csupg_coeff_ = new TransformedCoefficient(Reh_coeff_, csupgFactor);
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> main
     // compute upwind magnitude
     uw1_coeff_ = new ProductCoefficient(*rho_coeff_, *csupg_coeff_);
     uw2_coeff_ = new ProductCoefficient(*uw1_coeff_, *gscale_coeff_);
@@ -533,6 +536,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   Ht_form_ = new ParBilinearForm(sfes_);
   auto *hmt_blfi = new MassIntegrator(*rho_over_dt_coeff_);
   auto *hdt_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
+
   if (numerical_integ_) {
     hmt_blfi->SetIntRule(&ir_di);
     hdt_blfi->SetIntRule(&ir_di);

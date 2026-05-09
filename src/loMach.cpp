@@ -52,11 +52,9 @@
 #include "logger.hpp"
 #include "lte_thermo_chem.hpp"
 #include "reactingFlow.hpp"
-#include "static_rans.hpp"
 #include "tomboulides.hpp"
 #include "tps.hpp"
 #include "utils.hpp"
-#include "zetaModel.hpp"
 
 using namespace mfem;
 using namespace mfem::common;
@@ -158,11 +156,6 @@ void LoMachSolver::initialize() {
   } else if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::ALGEBRAIC_RANS) {
     //    turbModel_ = new AlgebraicRans(serial_mesh_, pmesh_, partitioning_, loMach_opts_.order, tpsP_);
     turbModel_ = new AlgebraicRans(pmesh_, partitioning_, loMach_opts_.order, tpsP_, (meshData_->getWallDistance()));
-  } else if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::STATIC_RANS) {
-    //    turbModel_ = new AlgebraicRans(serial_mesh_, pmesh_, partitioning_, loMach_opts_.order, tpsP_);
-    turbModel_ = new StaticRans(pmesh_, partitioning_, loMach_opts_.order, tpsP_);
-  } else if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::ZETA_F) {
-    turbModel_ = new ZetaModel(pmesh_, &loMach_opts_, temporal_coeff_, tpsP_, (meshData_->getGridScale()));
   } else if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::NONE) {
     // default
     turbModel_ = new ZeroTurbModel(pmesh_, loMach_opts_.order);
@@ -246,7 +239,7 @@ void LoMachSolver::initialize() {
   extData_->setup();
   flow_->initializeFromExtData(&extData_->toFlow_interface_);
   thermo_->initializeFromExtData(&extData_->toThermoChem_interface_);
-  turbModel_->initializeFromExtData(&extData_->toTurbModel_interface_);
+
   // Initialize model-owned data
   sponge_->initializeSelf();
   turbModel_->initializeSelf();
@@ -254,7 +247,6 @@ void LoMachSolver::initialize() {
   thermo_->initializeSelf();
 
   // Exchange interface information
-  turbModel_->initializeFromSponge(&sponge_->toTurbModel_interface_);
   turbModel_->initializeFromThermoChem(&thermo_->toTurbModel_interface_);
   turbModel_->initializeFromFlow(&flow_->toTurbModel_interface_);
   flow_->initializeFromTurbModel(&turbModel_->toFlow_interface_);
@@ -265,7 +257,6 @@ void LoMachSolver::initialize() {
   thermo_->initializeFromSponge(&sponge_->toThermoChem_interface_);
 
   // Initialize restart read/write capability
-  turbModel_->initializeIO(ioData);
   flow_->initializeIO(ioData);
   thermo_->initializeIO(ioData);
 
@@ -291,7 +282,6 @@ void LoMachSolver::initialize() {
 
   // Finish initializing operators
   flow_->initializeOperators();
-  flow_->setup();
   turbModel_->setup();
   turbModel_->initializeOperators();
   thermo_->initializeOperators();
@@ -388,7 +378,7 @@ void LoMachSolver::solveBegin() {
     }
 
     std::cout << std::endl;
-    std::cout << "#==========================================================================" << std::endl;
+    std::cout << "#==================================================================" << std::endl;
 
     std::cout << std::setw(10) << iter << " ";
     std::cout << std::setw(10) << std::scientific << temporal_coeff_.time << " ";
@@ -727,8 +717,7 @@ void LoMachSolver::parseSolverOptions() {
 
   tpsP_->getInput("loMach/thermo-solver", loMach_opts_.thermo_solver, string("constant-property"));
   assert(loMach_opts_.thermo_solver == "constant-property" || loMach_opts_.thermo_solver == "calorically-perfect" ||
-         loMach_opts_.thermo_solver == "lte-thermo-chem" || loMach_opts_.thermo_solver == "reacting-flow" ||
-         loMach_opts_.thermo_solver == "static-thermo");
+         loMach_opts_.thermo_solver == "lte-thermo-chem" || loMach_opts_.thermo_solver == "reacting-flow");
 
   tpsP_->getInput("loMach/order", loMach_opts_.order, 1);
   assert(loMach_opts_.order >= 1);

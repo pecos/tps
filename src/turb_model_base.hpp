@@ -37,10 +37,7 @@
 
 #include "tps_mfem_wrap.hpp"
 
-class IODataOrganizer;
 struct flowToTurbModel;
-struct thermoChemToTurbModel;
-struct spongeToTurbModel;
 
 /**
  * Provides wrapper for fields that need to be provided by the
@@ -50,6 +47,8 @@ struct turbModelToFlow {
   const mfem::ParGridFunction *eddy_viscosity = nullptr;
 };
 
+struct thermoChemToTurbModel;
+
 /**
  * Provides wrapper for fields that need to be provided by the
  * turbulence model to the thermo chem model.
@@ -57,14 +56,6 @@ struct turbModelToFlow {
 struct turbModelToThermoChem {
   const mfem::ParGridFunction *eddy_viscosity = nullptr;
 };
-
-struct extDataToTurbModel;
-
-/**
- * Provides wrapper for fields that need to be provided by the
- * turbulence model to the thermo chem model.
- */
-struct turbModelToExtData {};
 
 /**
  * Provides interface for turbulence model implementation
@@ -75,8 +66,6 @@ class TurbModelBase {
  protected:
   const flowToTurbModel *flow_interface_;
   const thermoChemToTurbModel *thermoChem_interface_;
-  const extDataToTurbModel *extData_interface_;
-  const spongeToTurbModel *sponge_interface_;
 
  public:
   /// Destructor
@@ -99,8 +88,6 @@ class TurbModelBase {
    */
   virtual void initializeViz(mfem::ParaViewDataCollection &pvdc) {}
 
-  virtual void initializeIO(IODataOrganizer &io) {}
-
   /**
    * @brief Initialize model operators
    *
@@ -122,17 +109,6 @@ class TurbModelBase {
   virtual void setup() = 0;
 
   /**
-   * @brief Initialize data from visc mult class
-   *
-   * Initialize fields that the turbulence model needs from the
-   * visc mult.
-   */
-  void initializeFromSponge(spongeToTurbModel *sponge) { sponge_interface_ = sponge; }
-
-  /// Get interface provided by flow model
-  const spongeToTurbModel *getSpongeInterface() const { return sponge_interface_; }
-
-  /**
    * @brief Initialize data from the flow class
    *
    * Initialize fields that the turbulence model needs from the
@@ -150,7 +126,7 @@ class TurbModelBase {
    * @brief Initialize data from the thermoChem class
    *
    * Initialize fields that the turbulence model needs from the
-   * thermochem model.
+   * turbulence model.
    */
   void initializeFromThermoChem(thermoChemToTurbModel *thermoChem) { thermoChem_interface_ = thermoChem; }
 
@@ -159,20 +135,6 @@ class TurbModelBase {
 
   /// Interface object, provides fields necessary for the turbModel
   turbModelToThermoChem toThermoChem_interface_;
-
-  /**
-   * @brief Initialize data from the external data class
-   *
-   * Initialize fields that the turbulence model needs from the
-   * external data.
-   */
-  void initializeFromExtData(extDataToTurbModel *extData) { extData_interface_ = extData; }
-
-  /// Get interface provided by external data
-  const extDataToTurbModel *getExtDataInterface() const { return extData_interface_; }
-
-  /// Interface object, provides fields necessary for the turbModel
-  turbModelToExtData toExtData_interface_;
 
   virtual mfem::ParGridFunction *getCurrentEddyViscosity() { return nullptr; }
   virtual mfem::ParGridFunction *getGridScale() { return nullptr; }
