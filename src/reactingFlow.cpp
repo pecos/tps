@@ -3534,7 +3534,7 @@ void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, 
 
   // Evaluate the chemical source terms
   chemistry_->computeForwardRateCoeffs(n_sp.Read(), Th, Te, dofindex, kfwd.HostWrite());
-  
+
   // ramp chemistry from previous run
   if (ramp_chem_ && time_ < ramp_time + ramp_start && time_ > ramp_start) {
     Vector kfwd_base;
