@@ -227,6 +227,7 @@ Tomboulides::~Tomboulides() {
   delete gradU_gf_;
   delete gradV_gf_;
   delete gradW_gf_;
+  delete gradS_gf_;
   delete epsi_gf_;
   delete vfes_;
   delete vfec_;
@@ -247,6 +248,7 @@ void Tomboulides::initializeSelf() {
   gradU_gf_ = new ParGridFunction(vfes_);
   gradV_gf_ = new ParGridFunction(vfes_);
   gradW_gf_ = new ParGridFunction(vfes_);
+  gradS_gf_ = new ParGridFunction(vfes_);
   sfec_ = new H1_FECollection(vorder_);
   sfes_ = new ParFiniteElementSpace(pmesh_, sfec_);
 
@@ -280,6 +282,7 @@ void Tomboulides::initializeSelf() {
   *gradU_gf_ = 0.0;
   *gradV_gf_ = 0.0;
   *gradW_gf_ = 0.0;
+  *gradS_gf_ = 0.0;
 
   *p_gf_ = 0.0;
   *resp_gf_ = 0.0;
@@ -302,6 +305,7 @@ void Tomboulides::initializeSelf() {
   if (axisym_) {
     toTurbModel_interface_.swirl_supported = true;
     toTurbModel_interface_.swirl = utheta_next_gf_;
+    toTurbModel_interface_.gradS = gradS_gf_;
   }
   toTurbModel_interface_.gradU = gradU_gf_;
   toTurbModel_interface_.gradV = gradV_gf_;
@@ -351,6 +355,7 @@ void Tomboulides::initializeSelf() {
   gradU_.SetSize(vfes_truevsize);
   gradV_.SetSize(vfes_truevsize);
   gradW_.SetSize(vfes_truevsize);
+  gradS_.SetSize(vfes_truevsize);
 
   // zero vectors for now
   forcing_vec_ = 0.0;
@@ -468,10 +473,22 @@ void Tomboulides::initializeSelf() {
 
       velocity_field_ = new VectorGridFunctionCoefficient(extData_interface_->Udata);
       addVelDirichletBC(velocity_field_, inlet_attr);
+      swirl_field_ = new GridFunctionCoefficient(extData_interface_->Thdata);
+      if (axisym_) {
+        addSwirlDirichletBC(swirl_field_, inlet_attr);
+      }
+    } else if (type == "fully-developed-pipe-swirl") {
+      if (pmesh_->GetMyRank() == 0) {
+        std::cout << "Tomboulides: Setting uniform inlet velocity on patch = " << patch << std::endl;
+      }
+      Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
+      inlet_attr = 0;
+      inlet_attr[patch - 1] = 1;
 
-      // axisymmetric not testsed with interpolation BCs yet.  For now, just stop.
-      assert(!axisym_);
-
+      addVelDirichletBC(vel_exact_pipe, inlet_attr);
+      if (axisym_) {
+        addSwirlDirichletBC(swirl_pipe, inlet_attr);
+      }
     } else {
       Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
       inlet_attr = 0;
@@ -644,6 +661,8 @@ void Tomboulides::initializeOperators() {
   S_poisson_coeff_ = new VectorSumCoefficient(*twoS_gradmu_coeff_, *gradmu_Qt_coeff_, 1.0, -2. / 3);
   S_mom_coeff_ = new VectorSumCoefficient(*graduT_gradmu_coeff_, *gradmu_Qt_coeff_, 1.0, -1.0);
 
+  u_next_coeff_ = new VectorGridFunctionCoefficient(u_next_gf_);
+
   // Coefficients for axisymmetric
   if (axisym_) {
     rad_rho_coeff_ = new ProductCoefficient(radius_coeff, *rho_coeff_);
@@ -664,7 +683,6 @@ void Tomboulides::initializeOperators() {
     ur_conv_forcing_coeff_ = new VectorArrayCoefficient(2);
     ur_conv_forcing_coeff_->Set(0, utheta2_coeff_);
 
-    u_next_coeff_ = new VectorGridFunctionCoefficient(u_next_gf_);
     rad_rhou_coeff_ = new ScalarVectorProductCoefficient(*rad_rho_coeff_, *u_next_coeff_);
 
     u_next_rad_coeff_ = new GridFunctionCoefficient(u_next_rad_comp_gf_);
@@ -706,6 +724,18 @@ void Tomboulides::initializeOperators() {
     L_iorho_blfi->SetIntRule(&ir_ni_p);
   }
   L_iorho_form_->AddDomainIntegrator(L_iorho_blfi);
+
+  // DiffusionIntegrator *slio_blfi;
+  // if (sw_stab_) {
+  //   // auto *slio_blfi = new DiffusionIntegrator(*supg_coeff_);
+  //   slio_blfi = new DiffusionIntegrator(*supg_coeff_);
+  //   // SUPG diffusion
+  //   // if (numerical_integ_) {
+  //   //   slio_blfi->SetIntRule(&ir_di);
+  //   // }
+  //   L_iorho_form_->AddDomainIntegrator(slio_blfi);
+  // }
+
   L_iorho_form_->Assemble();
   L_iorho_form_->FormSystemMatrix(pres_ess_tdof_, L_iorho_op_);
 
@@ -904,6 +934,7 @@ void Tomboulides::initializeOperators() {
   Hv_form_ = new ParBilinearForm(vfes_);
   VectorMassIntegrator *hmv_blfi;
   VectorDiffusionIntegrator *hdv_blfi;
+
   if (axisym_) {
     hmv_blfi = new VectorMassIntegrator(*rad_rho_over_dt_coeff_);
     hdv_blfi = new VectorDiffusionIntegrator(*rad_mu_coeff_);
@@ -917,10 +948,7 @@ void Tomboulides::initializeOperators() {
   }
   Hv_form_->AddDomainIntegrator(hmv_blfi);
   Hv_form_->AddDomainIntegrator(hdv_blfi);
-<<<<<<< HEAD
 
-=======
->>>>>>> main
   if (axisym_) {
     auto *hfv_blfi = new VectorMassIntegrator(*visc_forcing_coeff_);
     Hv_form_->AddDomainIntegrator(hfv_blfi);
@@ -1460,6 +1488,7 @@ void Tomboulides::step() {
     });
   }
 
+  // printf("%f\n", tmpR1_.Norml2());
   // Add ustar/dt contribution
   pp_div_vec_ += ustar_vec_;
 
@@ -1779,6 +1808,20 @@ void Tomboulides::addSwirlDirichletBC(double ut, mfem::Array<int> &attr) {
   }
 }
 
+void Tomboulides::addSwirlDirichletBC(Coefficient *coeff, Array<int> &attr) {
+  swirl_dbcs_.emplace_back(attr, coeff);
+  for (int i = 0; i < attr.Size(); ++i) {
+    if (attr[i] == 1) {
+      assert(!swirl_ess_attr_[i]);
+      swirl_ess_attr_[i] = 1;
+    }
+  }
+}
+
+void Tomboulides::addSwirlDirichletBC(double (*f)(const Vector &, double), Array<int> &attr) {
+  addSwirlDirichletBC(new FunctionCoefficient(f), attr);
+}
+
 double Tomboulides::maxVelocityMagnitude() {
   double local_max_vel_magnitude = 0.0;
   double global_max_vel_magnitude = 0.0;
@@ -1807,6 +1850,8 @@ double Tomboulides::maxVelocityMagnitude() {
   return global_max_vel_magnitude;
 }
 
+void Tomboulides::setup() { evaluateVelocityGradient(); }
+
 void Tomboulides::evaluateVelocityGradient() {
   setScalarFromVector(u_next_vec_, 0, &tmpR0_);
   G_op_->Mult(tmpR0_, tmpR1_);
@@ -1822,4 +1867,9 @@ void Tomboulides::evaluateVelocityGradient() {
   gradU_gf_->SetFromTrueDofs(gradU_);
   gradV_gf_->SetFromTrueDofs(gradV_);
   gradW_gf_->SetFromTrueDofs(gradW_);
+
+  if (axisym_) {
+    G_op_->Mult(utheta_next_vec_, tmpR1_);
+    Mv_inv_->Mult(tmpR1_, gradS_);
+  }
 }

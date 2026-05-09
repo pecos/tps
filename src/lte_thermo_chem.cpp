@@ -179,10 +179,7 @@ LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, t
   tps->getInput("loMach/ltethermo/linear-solver-verbosity", pl_solve_, 0);
 
   tpsP_->getInput("loMach/ltethermo/streamwise-stabilization", sw_stab_, false);
-<<<<<<< HEAD
 
-=======
->>>>>>> main
   if (sw_stab_) {
     if (rank0_) std::cout << "Using SUPG in LTE thermo chem!" << std::endl;
   }
@@ -368,6 +365,7 @@ void LteThermoChem::initializeSelf() {
   toFlow_interface_.viscosity = &mu_gf_;
   toFlow_interface_.thermal_divergence = &Qt_gf_;
   toTurbModel_interface_.density = &rn_gf_;
+  toTurbModel_interface_.viscosity = &mu_gf_;
 
   plasma_conductivity_gf_ = &sigma_gf_;
   joule_heating_gf_ = &jh_gf_;
@@ -457,10 +455,6 @@ void LteThermoChem::initializeSelf() {
           std::cout << "Calorically Perfect: Setting uniform Dirichlet temperature on patch = " << patch << std::endl;
         }
         AddTempDirichletBC(temperature_value, inlet_attr);
-<<<<<<< HEAD
-=======
-
->>>>>>> main
       } else if (type == "interpolate") {
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
         inlet_attr = 0;
@@ -500,11 +494,7 @@ void LteThermoChem::initializeSelf() {
 
   // Wall BCs
   {
-<<<<<<< HEAD
     // if (rank0_) std::cout << "There are " << pmesh_->bdr_attributes.Max() << " boundary attributes!" << std::endl;
-=======
-    // std::cout << "There are " << pmesh_->bdr_attributes.Max() << " boundary attributes!" << std::endl;
->>>>>>> main
     Array<int> attr_wall(pmesh_->bdr_attributes.Max());
     attr_wall = 0;
 
@@ -622,7 +612,7 @@ void LteThermoChem::initializeOperators() {
 
     // Csupg
     csupg_coeff_ = new TransformedCoefficient(Reh_coeff_, csupgFactor);
-
+    
     // compute upwind magnitude
     if (axisym_) {
       uw1_coeff_ = new ProductCoefficient(*rad_rho_Cp_coeff_, *csupg_coeff_);

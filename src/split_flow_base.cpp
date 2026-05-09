@@ -73,4 +73,5 @@ void ZeroFlow::initializeSelf() {
   toTurbModel_interface_.gradU = zero_;
   toTurbModel_interface_.gradV = zero_;
   toTurbModel_interface_.gradW = zero_;
+  toTurbModel_interface_.gradS = zero_;
 }

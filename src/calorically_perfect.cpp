@@ -481,11 +481,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
 
     // Csupg
     csupg_coeff_ = new TransformedCoefficient(Reh_coeff_, csupgFactor);
-<<<<<<< HEAD
-    
-=======
 
->>>>>>> main
     // compute upwind magnitude
     uw1_coeff_ = new ProductCoefficient(*rho_coeff_, *csupg_coeff_);
     uw2_coeff_ = new ProductCoefficient(*uw1_coeff_, *gscale_coeff_);
