@@ -806,21 +806,6 @@ ReactingFlow::~ReactingFlow() {
   delete supg_coeff_;
   delete supg_cp_coeff_;
 
-  delete umag_coeff_;
-  delete gscale_coeff_;
-  delete visc_coeff_;
-  delete visc_inv_coeff_;
-  delete reh1_coeff_;
-  delete reh2_coeff_;
-  delete Reh_coeff_;
-  delete csupg_coeff_;
-  delete uw1_coeff_;
-  delete uw2_coeff_;
-  delete upwind_coeff_;
-  delete swdiff_coeff_;
-  delete supg_coeff_;
-  delete supg_cp_coeff_;
-
   // allocated in initializeSelf
   delete vfes_;
   delete vfec_;
@@ -1029,22 +1014,6 @@ void ReactingFlow::initializeSelf() {
   Mmix_gf_.SetSpace(sfes_);
   Rmix_gf_.SetSpace(sfes_);
 
-  // qt rhs visualization
-  // rhsqt_bd_.SetSpace(sfes_);
-  // rhsqt_fo_.SetSpace(sfes_);
-  // rhsqt_jh_.SetSpace(sfes_);
-  // rhsqt_hf_.SetSpace(sfes_);
-  // rhsqt_sd_.SetSpace(sfes_);
-  // rhsqt_total_.SetSpace(sfes_);
-  // Xqt_gf_.SetSpace(sfes_);
-  // rhsqt_bd_ = 0.0;
-  // rhsqt_fo_ = 0.0;
-  // rhsqt_jh_ = 0.0;
-  // rhsqt_hf_ = 0.0;
-  // rhsqt_sd_ = 0.0;
-  // rhsqt_total_ = 0.0;
-  // Xqt_gf_ = 0.0;
-
   // exports
   toFlow_interface_.density = &rn_gf_;
   toFlow_interface_.viscosity = &visc_gf_;
@@ -1129,7 +1098,6 @@ void ReactingFlow::initializeSelf() {
       setVectorFromScalar(tmpR0_, sp, &Yn_);
     }
   }
-
   Ynm1_ = Yn_;
   Ynm2_ = Yn_;
   Yn_next_gf_ = Yn_gf_;
@@ -1167,69 +1135,42 @@ void ReactingFlow::initializeSelf() {
 
       if (type == "uniform") {
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
-        if (!neumann_temp_) {
-          inlet_attr = 0;
-          inlet_attr[patch - 1] = 1;
-          double temperature_value;
-          tpsP_->getRequiredInput((basepath + "/temperature").c_str(), temperature_value);
-          if (rank0_) {
-            std::cout << "Rx Flow: Setting uniform Dirichlet temperature on patch = " << patch << std::endl;
-          }
-          AddTempDirichletBC(temperature_value, inlet_attr);
-        } else {
-          if (rank0_) {
-            std::cout << "Rx Flow: Setting zero Neumann temperature on patch = " << patch << std::endl;
-          }
+        inlet_attr = 0;
+        inlet_attr[patch - 1] = 1;
+        double temperature_value;
+        tpsP_->getRequiredInput((basepath + "/temperature").c_str(), temperature_value);
+        if (rank0_) {
+          std::cout << "Rx Flow: Setting uniform Dirichlet temperature on patch = " << patch << std::endl;
         }
+        AddTempDirichletBC(temperature_value, inlet_attr);
 
-        if (neumann_species_inlet_) {
-          if (rank0_) {
-            std::cout << "Rx Flow: Setting zero Neumann species on patch = " << patch << std::endl;
-          }
-        } else {
-          if (rank0_) {
-            std::cout << "Rx Flow: Setting zero Dirichlet species on patch = " << patch << std::endl;
-          }
-          AddSpecDirichletBC(0.0, inlet_attr);
-        }
+        // AddSpecDirichletBC(0.0, inlet_attr);
 
       } else if (type == "interpolate") {
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
+        inlet_attr = 0;
+        inlet_attr[patch - 1] = 1;
         temperature_bc_field_ = new GridFunctionCoefficient(extData_interface_->Tdata);
-        if (!neumann_temp_) {
-          inlet_attr = 0;
-          inlet_attr[patch - 1] = 1;
-          if (rank0_) {
-            std::cout << "Rx Flow: Setting interpolated Dirichlet temperature on patch = " << patch << std::endl;
-          }
-          AddTempDirichletBC(temperature_bc_field_, inlet_attr);
-
-          // Force the IC to agree with the interpolated inlet BC
-          //
-          // NB: It is still possible for Tn_gf_ on a restart to
-          // disagree with this BC.  Specifically, since the restart
-          // field is read after this projection, if it does not satisfy
-          // this BC, there will be a discrepancy (which will be
-          // eliminated after the first step).
-          Tn_gf_.ProjectBdrCoefficient(*temperature_bc_field_, inlet_attr);
-        } else {
-          if (rank0_) {
-            std::cout << "Rx Flow: Setting zero Neumann temperature on patch = " << patch << std::endl;
-          }
+        if (rank0_) {
+          std::cout << "Rx Flow: Setting interpolated Dirichlet temperature on patch = " << patch << std::endl;
         }
+        AddTempDirichletBC(temperature_bc_field_, inlet_attr);
+
+        // Force the IC to agree with the interpolated inlet BC
+        //
+        // NB: It is still possible for Tn_gf_ on a restart to
+        // disagree with this BC.  Specifically, since the restart
+        // field is read after this projection, if it does not satisfy
+        // this BC, there will be a discrepancy (which will be
+        // eliminated after the first step).
+        Tn_gf_.ProjectBdrCoefficient(*temperature_bc_field_, inlet_attr);
 
         species_bc_field_ = new GridFunctionCoefficient(extData_interface_->Ydata);
-        if (neumann_species_inlet_) {
-          if (rank0_) {
-            std::cout << "Rx Flow: Setting zero Neumann species on patch = " << patch << std::endl;
-          }
-        } else {
-          if (rank0_) {
-            std::cout << "Rx Flow: Setting interpolated Dirichlet species on patch = " << patch << std::endl;
-          }
-          AddSpecDirichletBC(species_bc_field_, inlet_attr);
-          Yn_gf_.ProjectBdrCoefficient(*species_bc_field_, inlet_attr);
+        if (rank0_) {
+          std::cout << "Rx Flow: Setting interpolated Dirichlet species on patch = " << patch << std::endl;
         }
+        AddSpecDirichletBC(species_bc_field_, inlet_attr);
+        Yn_gf_.ProjectBdrCoefficient(*species_bc_field_, inlet_attr);
 
       } else {
         if (rank0_) {
@@ -1287,9 +1228,7 @@ void ReactingFlow::initializeSelf() {
         Qt_bc_coeff->constant = 0.0;
         AddQtDirichletBC(Qt_bc_coeff, attr_wall);
 
-        if (!neumann_species_wall_) {
-          AddSpecDirichletBC(0.0, attr_wall);
-        }
+        // AddSpecDirichletBC(0.0, attr_wall);
       }
     }
     if (rank0_) std::cout << "Temp wall bc completed: " << numWalls << endl;
@@ -1386,8 +1325,7 @@ void ReactingFlow::initializeOperators() {
     Reh_coeff_ = new ProductCoefficient(*reh2_coeff_, *umag_coeff_);
 
     // Csupg
-    std::function<double(double)> csupgLambda = std::bind(csupgFactor, std::placeholders::_1, Reh_factor_, Reh_offset_);
-    csupg_coeff_ = new ExtTransformedCoefficient(Reh_coeff_, csupgLambda);
+    csupg_coeff_ = new TransformedCoefficient(Reh_coeff_, csupgFactor);
 
     // compute upwind magnitude
     if (axisym_) {
@@ -1745,15 +1683,6 @@ void ReactingFlow::initializeOperators() {
     lyd_blfi->SetIntRule(&ir_di);
   }
   LY_form_->AddDomainIntegrator(lyd_blfi);
-
-  // auto *slyd_blfi = new DiffusionIntegrator(*supg_coeff_);
-  // if (sw_stab_)
-  //   // SUPG diffusion
-  //   // if (numerical_integ_) {
-  //   //   slyd_blfi->SetIntRule(&ir_di);
-  //   // }
-  //   LY_form_->AddDomainIntegrator(slqd_blfi);
-
   if (partial_assembly_) {
     LY_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   }
@@ -1972,11 +1901,8 @@ void ReactingFlow::step() {
         YT[nActiveSpecies_] = h_Tn[i];
 
         // Solve backward Euler update
-        // printf("Chem %d/%d\n", i, sDofInt_);
-        // Vector loc(3);
-        // pmesh_->GetNode(i, loc);
-        // printf("Coord %f, %f, %f\n", loc[0], loc[1], loc[2]);
         solveChemistryStep(YT, i, dt_);
+
         // Overwrite point state data
         for (int sp = 0; sp < nActiveSpecies_; sp++) {
           h_Yn[sp * sDofInt_ + i] = YT[sp];
@@ -2083,7 +2009,6 @@ void ReactingFlow::step() {
 
   updateMixture();
   updateDiffusivity();
-  // if (rank0_) std::cout << "step success" << std::endl;
 }
 
 // should be Nsub s.t.: Nsub > dt * [Prod_Y{n}/rho{n}/Yn{n}]
@@ -2695,15 +2620,6 @@ void ReactingFlow::initializeViz(ParaViewDataCollection &pvdc) {
   pvdc.RegisterField("weff", &weff_gf_);
   pvdc.RegisterField("emission", &emission_gf_);
 
-  // diagnose Qt issues, rhs contributions
-  // pvdc.RegisterField("rhsqt_bd", &rhsqt_bd_); //boundary terms
-  // pvdc.RegisterField("rhsqt_fo", &rhsqt_fo_); //bilinear form
-  // pvdc.RegisterField("rhsqt_jh", &rhsqt_jh_); //joule heating
-  // pvdc.RegisterField("rhsqt_hf", &rhsqt_hf_); //heat of formation
-  // pvdc.RegisterField("rhsqt_sd", &rhsqt_sd_); ///species-temp diff
-  // pvdc.RegisterField("rhsqt_total", &rhsqt_total_);
-  // pvdc.RegisterField("Xqt", &Xqt_gf_);
-
   vizSpecFields_.clear();
   vizSpecNames_.clear();
   for (int sp = 0; sp < nSpecies_; sp++) {
@@ -3179,81 +3095,43 @@ void ReactingFlow::AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr) {
 
 void ReactingFlow::computeQtTO() {
   tmpR0_ = 0.0;
-  // rhsqt_bd_ = 0.0;
-  // rhsqt_fo_ = 0.0;
-  // rhsqt_jh_ = 0.0;
-  // rhsqt_hf_ = 0.0;
-  // rhsqt_sd_ = 0.0;
-  // rhsqt_total_ = 0.0;
-  // Xqt_gf_ = 0.0;
   LQ_bdry_->Update();
   LQ_bdry_->Assemble();
   LQ_bdry_->ParallelAssemble(tmpR0_);
   tmpR0_.Neg();
-  // LQ_bdry_->ParallelAssemble(rhsqt_bd_);
-  // rhsqt_bd_.Neg();
-  // tmpR0_ += rhsqt_bd_;
-  // printf("%f\n", tmpR0_.Norml2());
 
   Array<int> empty;
   LQ_form_->Update();
   LQ_form_->Assemble();
   LQ_form_->FormSystemMatrix(empty, LQ_);
   LQ_->AddMult(Tn_next_, tmpR0_);  // tmpR0_ += LQ{Tn_next}
-  // LQ_->Mult(Tn_next_, rhsqt_fo_);  // tmpR0_ += LQ{Tn_next}
-  // tmpR0_ += rhsqt_fo_;
-  // printf("%f\n", tmpR0_.Norml2());
 
   // Joule heating (and radiation sink)
   jh_form_->Update();
   jh_form_->Assemble();
   jh_form_->ParallelAssemble(jh_);
   tmpR0_ -= jh_;
-  // rhsqt_jh_.SetFromTrueDofs(jh_);
-  // rhsqt_jh_.Neg();
-  // printf("%f\n", tmpR0_.Norml2());
 
   // heat of formation
   Ms_->AddMult(hw_, tmpR0_, -1.0);
-  // Ms_->Mult(hw_, rhsqt_hf_);
-  // rhsqt_hf_.Neg();
-  // tmpR0_ += rhsqt_hf_;
-  // printf("%f\n", tmpR0_.Norml2());
 
   // species-temp diffusion term, already in int-weak form
   tmpR0_.Add(-1.0, crossDiff_);
-  // rhsqt_sd_.SetFromTrueDofs(crossDiff_);
-  // rhsqt_sd_.Neg();
-  // printf("%f\n", tmpR0_.Norml2());
 
   sfes_->GetRestrictionMatrix()->MultTranspose(tmpR0_, resT_gf_);
-  // rhsqt_total_.SetFromTrueDofs(resT_gf_);
 
   Qt_ = 0.0;
   Qt_gf_.SetFromTrueDofs(Qt_);
 
   Vector Xqt, Bqt;
   Mq_form_->FormLinearSystem(Qt_ess_tdof_, Qt_gf_, resT_gf_, Mq_, Xqt, Bqt, 1);
+
   MqInv_->Mult(Bqt, Xqt);
   Mq_form_->RecoverFEMSolution(Xqt, resT_gf_, Qt_gf_);
-  // Xqt_gf_.SetFromTrueDofs(Xqt);
 
   Qt_gf_ *= Rmix_gf_;
   Qt_gf_ /= CpMix_gf_;
   Qt_gf_ /= thermo_pressure_;
-
-  // NOTE: clipping for diagnosis, goes both directions for now
-  // double clip_val;
-  // if (clip_qt_) {
-  //   tpsP_->getInput("loMach/reactingFlow/clip-qt-value", clip_val, 50000.);
-
-  //   for (int n = 0; n < sfes_->GetNDofs(); n++) {
-  //     // Qt_gf_[n] = std::clamp(Qt_gf_[n], -clip_val, clip_val)
-  //     Qt_gf_[n] = std::min(clip_val, std::max(-clip_val, Qt_gf_[n]));
-  //   }
-
-  // }
-
   Qt_gf_.Neg();
 }
 

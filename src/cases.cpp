@@ -156,7 +156,7 @@ vfptr vel_ic(std::string ic_string_) {
   }
 }
 
-/// Used for pipe flow test case
+/// Used to for pipe flow test case
 void vel_exact_pipe(const Vector &x, double t, Vector &u) {
   u(0) = 0.0;
   u(1) = 2.0 * (1 - x[0] * x[0]);

@@ -85,7 +85,7 @@ class ExternalDataBase {
   /// Interface object, provides fields necessary for the flow
   extDataToFlow toFlow_interface_;
 
-  /// Interface object, provides fields necessary for the thermo chem model
+  /// Interface object, provides fields necessary for the turbModel
   extDataToThermoChem toThermoChem_interface_;
 };
 
