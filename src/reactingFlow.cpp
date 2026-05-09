@@ -707,9 +707,6 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   tpsP_->getInput("loMach/reactingFlow/Reh_factor", Reh_factor_, 0.5);
   tpsP_->getInput("loMach/reactingFlow/Reh_offset", Reh_offset_, 1.0);
 
-  // specified plasma initial condition
-  tpsP_->getInput("plasma_models/initialize_species", species_init_, false);
-
   // zero-gradient BCs
   tpsP_->getInput("loMach/reactingFlow/neumann-temp", neumann_temp_, false);
   tpsP_->getInput("loMach/reactingFlow/neumann-species-inlet", neumann_species_inlet_, true);
