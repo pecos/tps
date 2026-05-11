@@ -123,6 +123,7 @@ class LoMachSolver : public TPS::PlasmaSolver {
   // Various codes and flags
   int exit_status_;     // exit status code;
   bool loadFromAuxSol;  // load restart of different polynomial order
+  bool disable_flow_;
 
   // Model classes
   MeshBase *meshData_ = nullptr;

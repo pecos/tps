@@ -191,7 +191,8 @@ void LoMachSolver::initialize() {
     flow_ = new ZeroFlow(pmesh_, 1, tpsP_);
   } else if (loMach_opts_.flow_solver == "tomboulides") {
     // Tomboulides flow solver
-    flow_ = new Tomboulides(pmesh_, loMach_opts_.order, loMach_opts_.order, temporal_coeff_, tpsP_);
+    flow_ = new Tomboulides(pmesh_, loMach_opts_.order, loMach_opts_.order, temporal_coeff_,
+                            (meshData_->getGridScale()), tpsP_);
   } else {
     // Unknown choice... die
     if (rank0_) {
@@ -378,7 +379,7 @@ void LoMachSolver::solveBegin() {
     }
 
     std::cout << std::endl;
-    std::cout << "#==================================================================" << std::endl;
+    std::cout << "#==========================================================================" << std::endl;
 
     std::cout << std::setw(10) << iter << " ";
     std::cout << std::setw(10) << std::scientific << temporal_coeff_.time << " ";
@@ -408,7 +409,9 @@ void LoMachSolver::solveStep() {
     thermo_->step();
     sw_thermChem_.Stop();
     sw_flow_.Start();
-    flow_->step();
+    if (!disable_flow_) {
+      flow_->step();
+    }
     sw_flow_.Stop();
     sw_turb_.Start();
     turbModel_->step();
@@ -742,6 +745,9 @@ void LoMachSolver::parseSolverOptions() {
   tpsP_->getInput("loMach/maxIters", loMach_opts_.max_steps_, 10);
   tpsP_->getInput("loMach/outputFreq", loMach_opts_.output_frequency_, 50);
   tpsP_->getInput("loMach/timingFreq", loMach_opts_.timing_frequency_, 100);
+
+  // Flag to disable flow step
+  tpsP_->getInput("loMach/disableFlow", disable_flow_, false);
 
   // Turbulence model options
   loMach_opts_.turb_opts_.read(tpsP_, std::string("loMach"));
