@@ -100,7 +100,7 @@ LoMachSolver::~LoMachSolver() {
 }
 
 void LoMachSolver::initialize() {
-  // forcing a trivial check
+  // forcing check
   bool verbose = rank0_;
   if (verbose) grvy_printf(ginfo, "Initializing loMach solver.\n");
 
