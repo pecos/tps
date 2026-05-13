@@ -71,40 +71,6 @@ jobs:
          run:  cd build; make -j 2
        - name: VPATH tests
          run:  cd build; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
-   build-gpu-cpu:
-    runs-on: [self-hosted, linux, x64, gpu, hip]
-    name: Build/GPU-CPU
-    env:
-      MFEM_DIR: /home/oliver/sw/mfem-4.5.2-cpu
-    steps:
-      - name: Cancel previous runs
-        uses: styfle/cancel-workflow-action@0.11.0
-        with:
-          access_token: ${{ github.token }}
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          lfs: true
-      - name: MFEM Tree
-        run: echo "MFEM_DIR=$MFEM_DIR"
-      - name: Query modules loaded
-        run:  module restore tps-gpu-cpu; module list
-      - name: Bootstrap
-        run:  module restore tps-gpu-cpu; ./bootstrap
-      - name: Configure
-        run: module restore tps-gpu-cpu; ./configure CXXFLAGS="-g -O2 -Wall -Wno-nonnull -Werror" --enable-pybind11 --enable-gpu-cpu
-      - name: Make
-        run: module restore tps-gpu-cpu; make -j 2
-      - name: Tests
-        run: module restore tps-gpu-cpu; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
-      - name: Distclean
-        run:  make distclean
-      - name: VPATH configure
-        run:  mkdir build; cd build; module restore tps-gpu-cpu; ../configure CXXFLAGS="-g -O2 -Wall -Wno-nonnull -Werror" --enable-pybind11 --enable-gpu-cpu
-      - name: VPATH make
-        run:  cd build; module restore tps-gpu-cpu; make -j 2
-      - name: VPATH tests
-        run:  cd build; module restore tps-gpu-cpu; make AM_COLOR_TESTS=yes check || (cat test/*.log; exit 1)
    distbuild:
      runs-on: ubuntu-22.04
      needs: [cpuimage]
