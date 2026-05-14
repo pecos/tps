@@ -59,7 +59,7 @@ static double sigmaTorchStartUp(const Vector &pos) {
   const double x = std::sqrt(pos[0] * pos[0] + pos[2] * pos[2]);  // radial location
   const double y = pos[1];                                        // axial location
 
-  const double r0 = 0.005;
+  // const double r0 = 0.005;
   // const double y0 = 0.135;
   // const double ysig = 0.015;
 
