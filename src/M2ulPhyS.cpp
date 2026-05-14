@@ -1955,7 +1955,7 @@ void M2ulPhyS::projectInitialSolution() {
 
       // start a run from a loMach solution <jump>
       // NOTE: this is NOT setup for reacting flow
-      // TODO: move to separate subroutine
+      // TODO(swh): move to separate subroutine
     } else {
       if (rank0_) std::cout << "restarting from low-Mach field..." << std::endl;
 
@@ -2724,7 +2724,7 @@ void M2ulPhyS::clipOutflow() {
     }
 
     double rho = dataU[i + 0 * dof];
-    double vel[nvel];
+    double vel[3];
     for (int d = 0; d < nvel; d++) vel[d] = dataU[i + (d + 1) * dof] / rho;
 
     double ke0 = 0.;
@@ -2739,13 +2739,8 @@ void M2ulPhyS::clipOutflow() {
       double unLcl = uNeck * 4.18879 * (1.0 + leak) * (1.0 - std::pow(rad / neckRad, 2.0));
       dataU[i + (eq + 1) * dof] = rho * min(vel[eq], unLcl);
       dataU[i + (eq + 1) * dof] = max(dataU[i + (eq + 1) * dof], 0.0);
-    } /*else if (yy >= clipPlane) {
-      double dist = yy - clipPlane;
-      double wOut = tanh(dist/clipWidth);
-      int eq = 1;
-      dataU[i + (eq+1)*dof] = rho * ((1.0-wOut)*vel[eq] + wOut*max(vel[eq], 0.0));
-      }*/
-
+    }
+    
     double ke = 0.;
     for (int d = 0; d < nvel; d++) ke += dataU[i + (d + 1) * dof] * dataU[i + (d + 1) * dof] / (rho * rho);
     ke *= 0.5;

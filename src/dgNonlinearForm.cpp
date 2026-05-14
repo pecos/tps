@@ -309,7 +309,6 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
       // problem seems to have something to do with virtual functions
       // and pointer arguments, but I don't understand it.  However,
       // this approach is working.
-      //std::cout << "Eval_LF dgNonlin 1" << endl;
       d_rsolver->Eval_LF(d_uk_el1 + k * num_equation + iface * maxIntPoints * num_equation,
                          d_uk_el2 + k * num_equation + iface * maxIntPoints * num_equation,
                          d_normal + offset + k * dim,
@@ -336,7 +335,6 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
           Rflux[eq] *= radius;
         }
       }
-
 
       // store
       for (int eq = 0; eq < num_equation; eq++) {
