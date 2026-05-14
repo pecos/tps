@@ -114,13 +114,18 @@ class ReactingFlow : public ThermoChemModelBase {
   bool radiative_decay_NECincluded_;
 
   // Flags
-  bool rank0_;                      /**< true if this is rank 0 */
-  bool partial_assembly_ = false;   /**< Enable/disable partial assembly of forms. */
-  bool numerical_integ_ = false;    // true;     /**< Enable/disable numerical integration rules of forms. */
-  bool constant_viscosity_ = false; /**< Enable/disable constant viscosity */
-  bool constant_density_ = false;   /**< Enable/disable constant density */
-  bool domain_is_open_ = false;     /**< true if domain is open */
-  bool axisym_ = false;             /**< true if simulation is axisymmetric */
+
+  bool rank0_;                        /**< true if this is rank 0 */
+  bool partial_assembly_ = false;     /**< Enable/disable partial assembly of forms. */
+  bool numerical_integ_ = false;      // true;     /**< Enable/disable numerical integration rules of forms. */
+  bool constant_viscosity_ = false;   /**< Enable/disable constant viscosity */
+  bool constant_density_ = false;     /**< Enable/disable constant density */
+  bool domain_is_open_ = false;       /**< true if domain is open */
+  bool axisym_ = false;               /**< true if simulation is axisymmetric */
+  bool species_init_ = false;         /**< true if species are initialized from file */
+  bool neumann_temp_ = false;         /**< only applies to inlet */
+  bool neumann_species_inlet_ = true; /**< only applies to inlet */
+  bool neumann_species_wall_ = true;  /**< only applies to inlet */
 
   // Linear-solver-related options
   int pl_solve_ = 0;    /**< Verbosity level passed to mfem solvers */
@@ -162,6 +167,7 @@ class ReactingFlow : public ThermoChemModelBase {
 
   // streamwise-stabilization
   bool sw_stab_;
+  double Reh_factor_, Reh_offset_;
 
   // FEM related fields and objects
 
@@ -215,9 +221,19 @@ class ReactingFlow : public ThermoChemModelBase {
   ParGridFunction sigma_gf_;
   ParGridFunction jh_gf_;
 
+  // viz for qt rhs
+  // ParGridFunction rhsqt_bd_;
+  // ParGridFunction rhsqt_fo_;
+  // ParGridFunction rhsqt_jh_;
+  // ParGridFunction rhsqt_hf_;
+  // ParGridFunction rhsqt_sd_;
+  // ParGridFunction rhsqt_total_;
+  // ParGridFunction Xqt_gf_;
+
   // ParGridFunction *buffer_tInlet_ = nullptr;
   GridFunctionCoefficient *temperature_bc_field_ = nullptr;
   GridFunctionCoefficient *species_bc_field_ = nullptr;
+  VectorGridFunctionCoefficient *species_init_field_ = nullptr;
 
   VectorGridFunctionCoefficient *un_next_coeff_ = nullptr;
   GridFunctionCoefficient *rhon_next_coeff_ = nullptr;
@@ -265,7 +281,7 @@ class ReactingFlow : public ThermoChemModelBase {
   ProductCoefficient *reh1_coeff_ = nullptr;
   ProductCoefficient *reh2_coeff_ = nullptr;
   ProductCoefficient *Reh_coeff_ = nullptr;
-  TransformedCoefficient *csupg_coeff_ = nullptr;
+  ExtTransformedCoefficient *csupg_coeff_ = nullptr;
   ProductCoefficient *uw1_coeff_ = nullptr;
   ProductCoefficient *uw2_coeff_ = nullptr;
   ProductCoefficient *upwind_coeff_ = nullptr;

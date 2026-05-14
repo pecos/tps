@@ -51,4 +51,5 @@ void UnitySponge::initializeSelf() {
 
   toFlow_interface_.visc_multiplier = multiplier_;
   toThermoChem_interface_.diff_multiplier = multiplier_;
+  toTurbModel_interface_.diff_multiplier = multiplier_;
 }
