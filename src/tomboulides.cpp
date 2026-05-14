@@ -68,9 +68,8 @@ void Orthogonalize(Vector &v, const ParFiniteElementSpace *pfes) {
 }
 
 Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalSchemeCoefficients &coeff,
-                         ParGridFunction *gridScale, TPS::Tps *tps)
+                         mfem::ParGridFunction *gridScale, TPS::Tps *tps)
     : gll_rules(0, Quadrature1D::GaussLobatto),
-      //>>>>>>> origin/dev-expStreamwiseStabilization
       tpsP_(tps),
       pmesh_(pmesh),
       vorder_(vorder),
@@ -136,12 +135,16 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
     tps->getInput("loMach/tomboulides/hsolve-maxIters", hsolve_max_iter_, default_max_iter_);
     tps->getInput("loMach/tomboulides/msolve-maxIters", mass_inverse_max_iter_, default_max_iter_);
 
+    // artificial diffusion (SUPG)
+    tpsP_->getInput("loMach/tomboulides/streamwise-stabilization", sw_stab_, false);
+    tpsP_->getInput("loMach/tomboulides/Reh_factor", Reh_factor_, 0.5);
+    tpsP_->getInput("loMach/tomboulides/Reh_offset", Reh_offset_, 1.0);
+
+    // option to disable Qt contributions to momentum equations for bad transients
+    tpsP_->getInput("loMach/tomboulides/disable-qt", disable_qt_, false);
+
     tps->getInput("loMach/tomboulides/iorho_gf", use_iorho_gf_, false);
   }
-
-  tps->getInput("loMach/tomboulides/streamwise-stabilization", sw_stab_, false);
-  tps->getInput("loMach/tomboulides/Reh_offset", re_offset_, 1.0);
-  tps->getInput("loMach/tomboulides/Reh_factor", re_factor_, 0.01);
 
   if ((sw_stab_ == true) && (dim_ != 3)) {
     if (rank0_) std::cout << " ERROR: streamwise stabalization only implemented for 3D simulations. exiting..." << endl;
@@ -188,6 +191,8 @@ Tomboulides::~Tomboulides() {
   delete L_iorho_lor_;
   delete L_iorho_form_;
 
+  delete Mv_stab_form_;
+
   delete swirl_var_viscosity_coeff_;
   delete utheta_vec_coeff_;
   delete rho_ur_ut_coeff_;
@@ -223,6 +228,20 @@ Tomboulides::~Tomboulides() {
   delete iorho_coeff_;
   delete rho_coeff_;
 
+  delete umag_coeff_;
+  delete gscale_coeff_;
+  delete visc_inv_coeff_;
+  delete reh1_coeff_;
+  delete reh2_coeff_;
+  delete Reh_coeff_;
+  delete csupg_coeff_;
+  delete uw1_coeff_;
+  delete uw2_coeff_;
+  delete upwind_coeff_;
+  delete swdiff_coeff_;
+  delete supg_coeff_;
+  delete visc_coeff_;
+
   // objects allocated by initalizeSelf
   if (axisym_) delete gravity_vec_;
   delete iorho_gf_;
@@ -247,6 +266,7 @@ Tomboulides::~Tomboulides() {
   delete Reh_gf_;
   delete tmpR0_gf_;
   delete tmpR1_gf_;
+  delete gradS_gf_;
   delete epsi_gf_;
   delete vfes_;
   delete vfec_;
@@ -272,6 +292,14 @@ void Tomboulides::initializeSelf() {
   gradU_gf_ = new ParGridFunction(vfes_);
   gradV_gf_ = new ParGridFunction(vfes_);
   gradW_gf_ = new ParGridFunction(vfes_);
+
+  gradS_gf_ = new ParGridFunction(vfes_);
+  sfec_ = new H1_FECollection(vorder_);
+  sfes_ = new ParFiniteElementSpace(pmesh_, sfec_);
+
+  pfec_ = new H1_FECollection(porder_);
+  pfes_ = new ParFiniteElementSpace(pmesh_, pfec_);
+
   p_gf_ = new ParGridFunction(pfes_);
   iorho_gf_ = new ParGridFunction(pfes_);
   resp_gf_ = new ParGridFunction(pfes_);
@@ -302,6 +330,7 @@ void Tomboulides::initializeSelf() {
   *gradU_gf_ = 0.0;
   *gradV_gf_ = 0.0;
   *gradW_gf_ = 0.0;
+  *gradS_gf_ = 0.0;
 
   *p_gf_ = 0.0;
   *resp_gf_ = 0.0;
@@ -327,6 +356,7 @@ void Tomboulides::initializeSelf() {
   if (axisym_) {
     toTurbModel_interface_.swirl_supported = true;
     toTurbModel_interface_.swirl = utheta_next_gf_;
+    toTurbModel_interface_.gradS = gradS_gf_;
   }
   toTurbModel_interface_.gradU = gradU_gf_;
   toTurbModel_interface_.gradV = gradV_gf_;
@@ -377,10 +407,13 @@ void Tomboulides::initializeSelf() {
   tmpR0b_.SetSize(pfes_truevsize);
   tmpR0c_.SetSize(pfes_truevsize);
   tmpR1_.SetSize(vfes_truevsize);
+  swDiff_vec_.SetSize(vfes_truevsize);
+  tmpR0b_.SetSize(pfes_truevsize);
 
   gradU_.SetSize(vfes_truevsize);
   gradV_.SetSize(vfes_truevsize);
   gradW_.SetSize(vfes_truevsize);
+  gradS_.SetSize(vfes_truevsize);
 
   // zero vectors for now
   forcing_vec_ = 0.0;
@@ -687,9 +720,22 @@ void Tomboulides::initializeSelf() {
 
       velocity_field_ = new VectorGridFunctionCoefficient(extData_interface_->Udata);
       addVelDirichletBC(velocity_field_, inlet_attr);
+      swirl_field_ = new GridFunctionCoefficient(extData_interface_->Thdata);
+      if (axisym_) {
+        addSwirlDirichletBC(swirl_field_, inlet_attr);
+      }
+    } else if (type == "fully-developed-pipe-swirl") {
+      if (pmesh_->GetMyRank() == 0) {
+        std::cout << "Tomboulides: Setting uniform inlet velocity on patch = " << patch << std::endl;
+      }
+      Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
+      inlet_attr = 0;
+      inlet_attr[patch - 1] = 1;
 
-      // axisymmetric not testsed with interpolation BCs yet.  For now, just stop.
-      assert(!axisym_);
+      addVelDirichletBC(vel_exact_pipe, inlet_attr);
+      if (axisym_) {
+        addSwirlDirichletBC(swirl_pipe, inlet_attr);
+      }
 
     } else {
       Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
@@ -874,6 +920,8 @@ void Tomboulides::initializeOperators() {
   S_mom_coeff_ = new VectorSumCoefficient(*graduT_gradmu_coeff_, *gradmu_Qt_coeff_, 1.0, -1.0);
   // if(rank0_) std::cout << "initializeOperators: check 7..." << endl;
 
+  u_next_coeff_ = new VectorGridFunctionCoefficient(u_next_gf_);
+
   // Coefficients for axisymmetric
   if (axisym_) {
     rad_rho_coeff_ = new ProductCoefficient(radius_coeff, *rho_coeff_);
@@ -894,7 +942,6 @@ void Tomboulides::initializeOperators() {
     ur_conv_forcing_coeff_ = new VectorArrayCoefficient(2);
     ur_conv_forcing_coeff_->Set(0, utheta2_coeff_);
 
-    u_next_coeff_ = new VectorGridFunctionCoefficient(u_next_gf_);
     rad_rhou_coeff_ = new ScalarVectorProductCoefficient(*rad_rho_coeff_, *u_next_coeff_);
 
     u_next_rad_coeff_ = new GridFunctionCoefficient(u_next_rad_comp_gf_);
@@ -907,6 +954,48 @@ void Tomboulides::initializeOperators() {
     utheta_vec_coeff_ = new VectorArrayCoefficient(2);
     utheta_vec_coeff_->Set(0, utheta_coeff_);
     swirl_var_viscosity_coeff_ = new InnerProductCoefficient(*grad_mu_coeff_, *utheta_vec_coeff_);
+  }
+
+  // artifical diffusion coefficients
+  if (sw_stab_) {
+    visc_coeff_ = new GridFunctionCoefficient(thermo_interface_->viscosity);
+    umag_coeff_ = new VectorMagnitudeCoefficient(*u_next_coeff_);
+    gscale_coeff_ = new GridFunctionCoefficient(gridScale_gf_);
+
+    visc_inv_coeff_ = new PowerCoefficient(*visc_coeff_, -1.0);
+    // visc_inv_coeff_ = new PowerCoefficient(*mu_coeff_, -1.0);
+
+    // compute Reh
+    reh1_coeff_ = new ProductCoefficient(*rho_coeff_, *visc_inv_coeff_);
+    reh2_coeff_ = new ProductCoefficient(*reh1_coeff_, *gscale_coeff_);
+    Reh_coeff_ = new ProductCoefficient(*reh2_coeff_, *umag_coeff_);
+
+    // Csupg
+    std::function<double(double)> csupgLambda = std::bind(csupgFactor, std::placeholders::_1, Reh_factor_, Reh_offset_);
+    csupg_coeff_ = new ExtTransformedCoefficient(Reh_coeff_, csupgLambda);
+
+    if (axisym_) {
+      // compute upwind magnitude
+      uw1_coeff_ = new ProductCoefficient(*rad_rho_coeff_, *csupg_coeff_);
+      uw2_coeff_ = new ProductCoefficient(*uw1_coeff_, *gscale_coeff_);
+      upwind_coeff_ = new ProductCoefficient(*uw2_coeff_, *umag_coeff_);
+
+      // streamwise diffusion direction
+      swdiff_coeff_ = new TransformedMatrixVectorCoefficient(u_next_coeff_, &streamwiseTensor);
+
+      supg_coeff_ = new ScalarMatrixProductCoefficient(*upwind_coeff_, *swdiff_coeff_);
+    } else {
+      // compute upwind magnitude
+      // dividing by rho anyway
+      uw1_coeff_ = new ProductCoefficient(*rho_coeff_, *csupg_coeff_);
+      uw2_coeff_ = new ProductCoefficient(*uw1_coeff_, *gscale_coeff_);
+      upwind_coeff_ = new ProductCoefficient(*uw2_coeff_, *umag_coeff_);
+
+      // streamwise diffusion direction
+      swdiff_coeff_ = new TransformedMatrixVectorCoefficient(u_next_coeff_, &streamwiseTensor);
+
+      supg_coeff_ = new ScalarMatrixProductCoefficient(*upwind_coeff_, *swdiff_coeff_);
+    }
   }
 
   // Integration rules (only used if numerical_integ_ is true).  When
@@ -938,6 +1027,18 @@ void Tomboulides::initializeOperators() {
     L_iorho_blfi->SetIntRule(&ir_ni_p);
   }
   L_iorho_form_->AddDomainIntegrator(L_iorho_blfi);
+
+  // DiffusionIntegrator *slio_blfi;
+  // if (sw_stab_) {
+  //   // auto *slio_blfi = new DiffusionIntegrator(*supg_coeff_);
+  //   slio_blfi = new DiffusionIntegrator(*supg_coeff_);
+  //   // SUPG diffusion
+  //   // if (numerical_integ_) {
+  //   //   slio_blfi->SetIntRule(&ir_di);
+  //   // }
+  //   L_iorho_form_->AddDomainIntegrator(slio_blfi);
+  // }
+
   L_iorho_form_->Assemble();
   L_iorho_form_->FormSystemMatrix(pres_ess_tdof_, L_iorho_op_);
   // if(rank0_) std::cout << "initializeOperators: check 10..." << endl;
@@ -1083,6 +1184,19 @@ void Tomboulides::initializeOperators() {
   Mv_rho_form_->FormSystemMatrix(empty, Mv_rho_op_);
   // if(rank0_) std::cout << "initializeOperators: check 17..." << endl;
 
+  // Vector mass matrix for streamwise stability of the velocity gradients
+  if (sw_stab_) {
+    Mv_stab_form_ = new ParBilinearForm(vfes_);
+    VectorMassIntegrator *mvs_blfi;
+    mvs_blfi = new VectorMassIntegrator(*supg_coeff_);
+    if (numerical_integ_) {
+      mvs_blfi->SetIntRule(&ir_ni_v);
+    }
+    Mv_stab_form_->AddDomainIntegrator(mvs_blfi);
+    Mv_stab_form_->Assemble();
+    Mv_stab_form_->FormSystemMatrix(empty, Mv_stab_op_);
+  }
+
   // Inverse (unweighted) mass operator (velocity space)
   if (partial_assembly_) {
     Vector diag_pa(vfes_->GetTrueVSize());
@@ -1164,6 +1278,7 @@ void Tomboulides::initializeOperators() {
   Hv_form_ = new ParBilinearForm(vfes_);
   VectorMassIntegrator *hmv_blfi;
   VectorDiffusionIntegrator *hdv_blfi;
+
   if (axisym_) {
     hmv_blfi = new VectorMassIntegrator(*rad_rho_over_dt_coeff_);
     hdv_blfi = new VectorDiffusionIntegrator(*rad_mu_coeff_);
@@ -1177,6 +1292,17 @@ void Tomboulides::initializeOperators() {
   }
   Hv_form_->AddDomainIntegrator(hmv_blfi);
   Hv_form_->AddDomainIntegrator(hdv_blfi);
+
+  VectorDiffusionIntegrator *shdv_blfi;
+  if (sw_stab_) {
+    // auto *shdv_blfi = new VectorDiffusionIntegrator(*supg_coeff_);
+    shdv_blfi = new VectorDiffusionIntegrator(*supg_coeff_);
+    // if (numerical_integ_) {
+    //   shdv_blfi->SetIntRule(&ir_di);
+    // }
+    Hv_form_->AddDomainIntegrator(shdv_blfi);
+  }
+
   if (axisym_) {
     auto *hfv_blfi = new VectorMassIntegrator(*visc_forcing_coeff_);
     Hv_form_->AddDomainIntegrator(hfv_blfi);
@@ -1280,6 +1406,13 @@ void Tomboulides::initializeOperators() {
     auto *hms_blfi = new MassIntegrator(*rad_rho_over_dt_coeff_);
     auto *hds_blfi = new DiffusionIntegrator(*rad_mu_coeff_);
     auto *hfs_blfi = new MassIntegrator(*mu_over_rad_coeff_);
+
+    DiffusionIntegrator *shds_blfi;
+    if (sw_stab_) {
+      // auto *shds_blfi = new DiffusionIntegrator(*supg_coeff_);
+      shds_blfi = new DiffusionIntegrator(*supg_coeff_);
+      Hs_form_->AddDomainIntegrator(shds_blfi);
+    }
 
     Hs_form_->AddDomainIntegrator(hms_blfi);
     Hs_form_->AddDomainIntegrator(hds_blfi);
@@ -1758,7 +1891,11 @@ void Tomboulides::step() {
     exit(1);
   }
   grad_Qt_vec_ *= (4. / 3);
-  pp_div_vec_ += grad_Qt_vec_;
+
+  // disable Qt 1
+  if (!disable_qt_) {
+    pp_div_vec_ += grad_Qt_vec_;
+  }
 
   // Multiply pp_div_vec_ by nu
   // TODO(trevilo): This is ugly.  Find a better way.
@@ -1786,8 +1923,8 @@ void Tomboulides::step() {
   }
 
   // Add streamwise stability to rhs
-  computeReh();
-  if (sw_stab_) {
+  // computeReh();
+  // if (sw_stab_) {
     /*
     for (int i = 0; i < dim_; i++) {
       setScalarFromVector(u_vec_, i, &tmpR0a_);
@@ -1795,12 +1932,32 @@ void Tomboulides::step() {
       setVectorFromScalar(tmpR0b_, i, &swDiff_vec_);
     }
     */
-    streamwiseDiffusion(gradU_, tmpR0b_);
+    // streamwiseDiffusion(gradU_, tmpR0b_);
+    // setVectorFromScalar(tmpR0b_, 0, &swDiff_vec_);
+    // streamwiseDiffusion(gradV_, tmpR0b_);
+    // setVectorFromScalar(tmpR0b_, 1, &swDiff_vec_);
+    // streamwiseDiffusion(gradW_, tmpR0b_);
+    // setVectorFromScalar(tmpR0b_, 2, &swDiff_vec_);
+
+  if (sw_stab_) {
+    
+    // Update matrix
+    Array<int> empty;
+    Mv_stab_form_->Update();
+    Mv_stab_form_->Assemble();
+    Mv_stab_form_->FormSystemMatrix(empty, Mv_stab_op_);
+
+    Mv_stab_op_->Mult(gradU_, tmpR1_);
+    D_op_->Mult(tmpR1_, tmpR0b_);
     setVectorFromScalar(tmpR0b_, 0, &swDiff_vec_);
-    streamwiseDiffusion(gradV_, tmpR0b_);
+    Mv_stab_op_->Mult(gradV_, tmpR1_);
+    D_op_->Mult(tmpR1_, tmpR0b_);
     setVectorFromScalar(tmpR0b_, 1, &swDiff_vec_);
-    streamwiseDiffusion(gradW_, tmpR0b_);
-    setVectorFromScalar(tmpR0b_, 2, &swDiff_vec_);
+    if (dim_ == 3) {
+      Mv_stab_op_->Mult(gradW_, tmpR1_);
+      D_op_->Mult(tmpR1_, tmpR0b_);
+      setVectorFromScalar(tmpR0b_, 2, &swDiff_vec_);
+    }
     Mv_rho_inv_->Mult(swDiff_vec_, tmpR1_);
     pp_div_vec_ += tmpR1_;
   }
@@ -1820,7 +1977,10 @@ void Tomboulides::step() {
   D_op_->Mult(pp_div_vec_, resp_vec_);
 
   // Add Qt term (rhs += -bd0 * Qt / dt)
-  Ms_op_->AddMult(Qt_vec_, resp_vec_, -coeff_.bd0 / dt);
+  // disable Qt 2
+  if (!disable_qt_) {
+    Ms_op_->AddMult(Qt_vec_, resp_vec_, -coeff_.bd0 / dt);
+  }
 
   // Add axisymmetric "forcing" term to rhs
   if (axisym_) {
@@ -1903,7 +2063,10 @@ void Tomboulides::step() {
 
   // Add grad(mu * Qt) term
   Qt_vec_ *= mu_vec_;  // NB: pointwise multiply
-  G_op_->AddMult(Qt_vec_, resu_vec_, 1.0 / 3.0);
+  // disable Qt 3
+  if (!disable_qt_) {
+    G_op_->AddMult(Qt_vec_, resu_vec_, 1.0 / 3.0);
+  }
 
   // rho * vstar / dt term
   Mv_rho_op_->AddMult(ustar_vec_, resu_vec_);
@@ -2127,6 +2290,20 @@ void Tomboulides::addSwirlDirichletBC(double ut, mfem::Array<int> &attr) {
   }
 }
 
+void Tomboulides::addSwirlDirichletBC(Coefficient *coeff, Array<int> &attr) {
+  swirl_dbcs_.emplace_back(attr, coeff);
+  for (int i = 0; i < attr.Size(); ++i) {
+    if (attr[i] == 1) {
+      assert(!swirl_ess_attr_[i]);
+      swirl_ess_attr_[i] = 1;
+    }
+  }
+}
+
+void Tomboulides::addSwirlDirichletBC(double (*f)(const Vector &, double), Array<int> &attr) {
+  addSwirlDirichletBC(new FunctionCoefficient(f), attr);
+}
+
 double Tomboulides::maxVelocityMagnitude() {
   double local_max_vel_magnitude = 0.0;
   double global_max_vel_magnitude = 0.0;
@@ -2155,6 +2332,8 @@ double Tomboulides::maxVelocityMagnitude() {
   return global_max_vel_magnitude;
 }
 
+void Tomboulides::setup() { evaluateVelocityGradient(); }
+
 void Tomboulides::evaluateVelocityGradient() {
   setScalarFromVector(u_next_vec_, 0, &tmpR0_);
   G_op_->Mult(tmpR0_, tmpR1_);
@@ -2170,6 +2349,11 @@ void Tomboulides::evaluateVelocityGradient() {
   gradU_gf_->SetFromTrueDofs(gradU_);
   gradV_gf_->SetFromTrueDofs(gradV_);
   gradW_gf_->SetFromTrueDofs(gradW_);
+
+  if (axisym_) {
+    G_op_->Mult(utheta_next_vec_, tmpR1_);
+    Mv_inv_->Mult(tmpR1_, gradS_);
+  }
 }
 
 void Tomboulides::computeReh() {
@@ -2217,7 +2401,7 @@ void Tomboulides::streamwiseDiffusion(Vector &gradPhi, Vector &swDiff) {
   gridScale_gf_->GetTrueDofs(tmpR0_);
   Reh_gf_->GetTrueDofs(tmpR0c_);
   // mu_total_gf_->GetTrueDofs(mu_vec_);
-  upwindDiff(dim_, re_factor_, re_offset_, u_vec_, rho_vec_, tmpR0_, tmpR0c_, swDiff);
+  upwindDiff(dim_, Reh_factor_, Reh_offset_, u_vec_, rho_vec_, tmpR0_, tmpR0c_, swDiff);
 
   /*
   const double *rho = rho_vec_.HostRead();

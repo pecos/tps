@@ -63,6 +63,7 @@ struct flowToTurbModel {
 
   bool swirl_supported = false;
   const mfem::ParGridFunction *swirl = nullptr;
+  const mfem::ParGridFunction *gradS = nullptr;
 
   const mfem::ParGridFunction *gradU = nullptr;
   const mfem::ParGridFunction *gradV = nullptr;
@@ -102,6 +103,8 @@ class FlowBase {
   virtual void initializeViz(mfem::ParaViewDataCollection &pvdc) const {}
   virtual void initializeStats(Averaging &average, IODataOrganizer &io, bool continuation) const {}
   virtual void computeDissipation(Averaging &average, const int iter) {}
+
+  virtual void setup() {}
 
   /**
    * @brief Header strings for screen dump
