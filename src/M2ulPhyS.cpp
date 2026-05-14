@@ -2740,7 +2740,7 @@ void M2ulPhyS::clipOutflow() {
       dataU[i + (eq + 1) * dof] = rho * min(vel[eq], unLcl);
       dataU[i + (eq + 1) * dof] = max(dataU[i + (eq + 1) * dof], 0.0);
     }
-    
+
     double ke = 0.;
     for (int d = 0; d < nvel; d++) ke += dataU[i + (d + 1) * dof] * dataU[i + (d + 1) * dof] / (rho * rho);
     ke *= 0.5;
