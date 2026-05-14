@@ -112,6 +112,7 @@ class ReactingFlow : public ThermoChemModelBase {
   bool radiative_decay_NECincluded_;
 
   // Flags
+
   bool rank0_;                        /**< true if this is rank 0 */
   bool partial_assembly_ = false;     /**< Enable/disable partial assembly of forms. */
   bool numerical_integ_ = false;      // true;     /**< Enable/disable numerical integration rules of forms. */
@@ -119,6 +120,7 @@ class ReactingFlow : public ThermoChemModelBase {
   bool constant_density_ = false;     /**< Enable/disable constant density */
   bool domain_is_open_ = false;       /**< true if domain is open */
   bool axisym_ = false;               /**< true if simulation is axisymmetric */
+  bool species_init_ = false;         /**< true if species are initialized from file */
   bool neumann_temp_ = false;         /**< only applies to inlet */
   bool neumann_species_inlet_ = true; /**< only applies to inlet */
   bool neumann_species_wall_ = true;  /**< only applies to inlet */
@@ -229,6 +231,7 @@ class ReactingFlow : public ThermoChemModelBase {
   // ParGridFunction *buffer_tInlet_ = nullptr;
   GridFunctionCoefficient *temperature_bc_field_ = nullptr;
   GridFunctionCoefficient *species_bc_field_ = nullptr;
+  VectorGridFunctionCoefficient *species_init_field_ = nullptr;
 
   VectorGridFunctionCoefficient *un_next_coeff_ = nullptr;
   GridFunctionCoefficient *rhon_next_coeff_ = nullptr;
