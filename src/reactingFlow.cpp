@@ -780,11 +780,11 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
 
   // artificial diffusion (SUPG)
   tpsP_->getInput("loMach/reactingFlow/streamwise-stabilization", sw_stab_, false);
-  tpsP_->getInput("loMach/reactingFlow/Reh_factor", Reh_factor_, 0.5);
-  tpsP_->getInput("loMach/reactingFlow/Reh_offset", Reh_offset_, 1.0);
 
   // specified plasma initial condition
   tpsP_->getInput("plasma_models/initialize_species", species_init_, false);
+  tpsP_->getInput("loMach/reactingFlow/Reh_factor", Reh_factor_, 0.5);
+  tpsP_->getInput("loMach/reactingFlow/Reh_offset", Reh_offset_, 1.0);
 
   // zero-gradient BCs
   tpsP_->getInput("loMach/reactingFlow/neumann-temp", neumann_temp_, false);
@@ -1265,6 +1265,9 @@ void ReactingFlow::initializeSelf() {
           }
         }
 
+        // AddTempDirichletBC(temperature_value, inlet_attr);
+        // AddSpecDirichletBC(0.0, inlet_attr);
+
         if (neumann_species_inlet_) {
           if (rank0_) {
             std::cout << "Rx Flow: Setting zero Neumann species on patch = " << patch << std::endl;
@@ -1343,6 +1346,8 @@ void ReactingFlow::initializeSelf() {
         AddTempDirichletBC(temperature_value, inlet_attr);
 
         // do nothing for species for time being
+        // AddSpecDirichletBC(species_bc_field_, inlet_attr);
+        // Yn_gf_.ProjectBdrCoefficient(*species_bc_field_, inlet_attr);
 
       } else {
         if (rank0_) {

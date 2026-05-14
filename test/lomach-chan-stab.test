@@ -7,9 +7,9 @@ EXE="../src/tps"
 RESTART="ref_solns/stabChan/restart_output.sol.h5"
 
 setup() {
-    SOLN_FILE=restart_output.sol.h5
-    REF_FILE=ref_solns/stabChan/restart_output.sol.h5
-    OUT_FILE=output_solns/restart_output_stabChan.sol.h5    
+    SOLN_FILE="restart_output.sol.h5"
+    REF_FILE="ref_solns/stabChan/restart_output.sol.h5"
+    OUT_FILE="output_solns/restart_output_stabChan.sol.h5"
 }
 
 @test "[$TEST] check for input file $RUNFILE" {

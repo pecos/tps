@@ -114,6 +114,7 @@ class ReactingFlow : public ThermoChemModelBase {
   bool radiative_decay_NECincluded_;
 
   // Flags
+
   bool rank0_;                        /**< true if this is rank 0 */
   bool partial_assembly_ = false;     /**< Enable/disable partial assembly of forms. */
   bool numerical_integ_ = false;      // true;     /**< Enable/disable numerical integration rules of forms. */

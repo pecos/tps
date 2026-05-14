@@ -739,6 +739,7 @@ void Tomboulides::initializeSelf() {
       if (axisym_) {
         addSwirlDirichletBC(swirl_pipe, inlet_attr);
       }
+
     } else {
       Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
       inlet_attr = 0;
@@ -1946,6 +1947,7 @@ void Tomboulides::step() {
     Mv_rho_inv_->Mult(swDiff_vec_, tmpR1_);
     pp_div_vec_ += tmpR1_;
   }
+
   // printf("%f\n", tmpR1_.Norml2());
   // Add ustar/dt contribution
   pp_div_vec_ += ustar_vec_;
