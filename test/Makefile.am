@@ -36,6 +36,7 @@ EXTRA_DIST  = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes lte-
               ref_solns/reactBinDiff/*.h5 \
               ref_solns/reactSingleRx/*.h5 \
               ref_solns/reactTable/*.h5 \
+              ref_solns/stabChan/*.h5 \
               ref_solns/radDecay/*.h5 \
               ref_solns/reactNitrogen/*.h5 \
               ref_solns/supg/*.h5 \
@@ -58,7 +59,6 @@ EXTRA_DIST  = tap-driver.sh test_tps_splitcomm.py soln_differ inputs meshes lte-
               reactFlow-binDiff.test reactFlow-singleRx.test reactFlow-table.test radiativeDecay.test \
 			  reactFlow-nitrogen.test argon_minimal.test argon_minimal.binary.test \
 			  supg-scalars.test lomach-pipe-zf.test
-
 
 TESTS = vpath.sh
 XFAIL_TESTS =

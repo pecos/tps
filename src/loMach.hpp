@@ -90,6 +90,8 @@ struct temporalSchemeCoefficients {
   double dt1;
   double dt2;
   double dt3;
+  double dt4;
+  double dt5;
 
   // "Adams-Bashforth" coefficients (explicit)
   double ab1;
@@ -101,6 +103,9 @@ struct temporalSchemeCoefficients {
   double bd1;
   double bd2;
   double bd3;
+
+  // Akima-spline flag
+  // bool akima;
 };
 
 /**
@@ -165,6 +170,9 @@ class LoMachSolver : public TPS::PlasmaSolver {
   /// Scalar \f$H^1\f$ finite element space.
   ParFiniteElementSpace *sfes_ = nullptr;
 
+  // mfem::FiniteElementCollection *fec_ = nullptr;
+  // mfem::ParFiniteElementSpace *fes_ = nullptr;
+
   /*
   Vector gridScaleSml;
   Vector gridScaleXSml;
@@ -191,6 +199,9 @@ class LoMachSolver : public TPS::PlasmaSolver {
 
   /// The order of the velocity and pressure space.
   int order;
+
+  // number of species, if non-reacting this will be zero
+  int nSpec = 0;
 
   // Timers.
   StopWatch sw_setup_, sw_step_, sw_turb_, sw_thermChem_, sw_flow_, sw_press_;

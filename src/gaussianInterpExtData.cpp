@@ -390,6 +390,7 @@ void GaussianInterpExtData::setInlet() {
   // broadcast data
   // MPI_Bcast(&inlet, nCount * 8, MPI_DOUBLE, 0, tpsP_->getTPSCommWorld());
   MPI_Bcast(&inlet, nCount * (8 + maxSpec), MPI_DOUBLE, 0, tpsP_->getTPSCommWorld());
+
   if (rank0_) {
     std::cout << " communicated inlet data" << endl;
     fflush(stdout);
@@ -482,7 +483,7 @@ void GaussianInterpExtData::setInlet() {
                     (xp[2] - inlet[j].z) * (xp[2] - inlet[j].z));
 
         // gaussian interpolation
-        if (dist <= 1.5 * radius) {
+        if (dist <= 2.0 * radius) {
           wt = exp(-(dist * dist) / (radius * radius));
           wt_tot += wt;
           val_u = val_u + wt * inlet[j].u;

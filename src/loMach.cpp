@@ -134,6 +134,9 @@ void LoMachSolver::initialize() {
 
   partitioning_ = meshData_->getPartition();
 
+  // fec_ = meshData_->getFec();
+  // fes_ = meshData_->getFes();
+
   // Stash mesh dimension (convenience)
   dim_ = serial_mesh_->Dimension();
 
@@ -155,6 +158,8 @@ void LoMachSolver::initialize() {
     turbModel_ = new AlgebraicSubgridModels(pmesh_, &loMach_opts_, tpsP_, (meshData_->getGridScale()), 1);
   } else if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::SIGMA) {
     turbModel_ = new AlgebraicSubgridModels(pmesh_, &loMach_opts_, tpsP_, (meshData_->getGridScale()), 2);
+  } else if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::WALE) {
+    turbModel_ = new AlgebraicSubgridModels(pmesh_, &loMach_opts_, tpsP_, (meshData_->getGridScale()), 3);
   } else if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::ALGEBRAIC_RANS) {
     //    turbModel_ = new AlgebraicRans(serial_mesh_, pmesh_, partitioning_, loMach_opts_.order, tpsP_);
     turbModel_ = new AlgebraicRans(pmesh_, partitioning_, loMach_opts_.order, tpsP_, (meshData_->getWallDistance()));
@@ -248,11 +253,13 @@ void LoMachSolver::initialize() {
   flow_->initializeFromExtData(&extData_->toFlow_interface_);
   thermo_->initializeFromExtData(&extData_->toThermoChem_interface_);
   turbModel_->initializeFromExtData(&extData_->toTurbModel_interface_);
+
   // Initialize model-owned data
   sponge_->initializeSelf();
   turbModel_->initializeSelf();
   flow_->initializeSelf();
   thermo_->initializeSelf();
+  if (rank0_) std::cout << "Initialize self section complete." << endl;
 
   // Exchange interface information
   turbModel_->initializeFromSponge(&sponge_->toTurbModel_interface_);
@@ -264,15 +271,18 @@ void LoMachSolver::initialize() {
   thermo_->initializeFromFlow(&flow_->toThermoChem_interface_);
   flow_->initializeFromSponge(&sponge_->toFlow_interface_);
   thermo_->initializeFromSponge(&sponge_->toThermoChem_interface_);
+  if (rank0_) std::cout << "Exchange section complete." << endl;
 
   // Initialize restart read/write capability
   turbModel_->initializeIO(ioData);
   flow_->initializeIO(ioData);
   thermo_->initializeIO(ioData);
+  if (rank0_) std::cout << "I/O section complete." << endl;
 
   // Initialize statistics
   flow_->initializeStats(*average_, ioData, average_->ContinueMean());
   thermo_->initializeStats(*average_, ioData, average_->ContinueMean());
+  if (rank0_) std::cout << "Statistics section complete." << endl;
 
   const bool restart_serial =
       (loMach_opts_.io_opts_.restart_serial_read_ || loMach_opts_.io_opts_.restart_serial_write_);
@@ -289,13 +299,19 @@ void LoMachSolver::initialize() {
 
   // static sponge
   sponge_->setup();
+  if (rank0_) std::cout << "Sponge section complete." << endl;
 
   // Finish initializing operators
   flow_->initializeOperators();
+  if (rank0_) std::cout << "Operators (flow) section complete." << endl;
   flow_->setup();
+
   turbModel_->setup();
+  if (rank0_) std::cout << "Operators (turbModel) setup complete." << endl;
   turbModel_->initializeOperators();
+  if (rank0_) std::cout << "Operators (turbModel) section complete." << endl;
   thermo_->initializeOperators();
+  if (rank0_) std::cout << "Operators section complete." << endl;
 
   // Initialize visualization
   pvdc_ = new ParaViewDataCollection(loMach_opts_.io_opts_.output_dir_, pmesh_);
@@ -310,8 +326,10 @@ void LoMachSolver::initialize() {
   sponge_->initializeViz(*pvdc_);
   extData_->initializeViz(*pvdc_);
   average_->initializeViz();
+  if (rank0_) std::cout << "Viz section complete." << endl;
 
   sw_setup_.Stop();
+  if (rank0_) std::cout << "All initialization completed!" << endl;
 }
 
 void LoMachSolver::UpdateTimestepHistory(double dt) {
@@ -703,8 +721,8 @@ void LoMachSolver::SetTimeIntegrationCoefficients(int step) {
     temporal_coeff_.bd1 = -(1.0 + rho1);
     temporal_coeff_.bd2 = pow(rho1, 2.0) / (1.0 + rho1);
     temporal_coeff_.bd3 = 0.0;
-    temporal_coeff_.ab1 = 1.0 + rho1;
-    temporal_coeff_.ab2 = -rho1;
+    temporal_coeff_.ab1 = (1.0 + rho1);  // * 1.5/2.0;
+    temporal_coeff_.ab2 = -rho1;         // * 0.5;
     temporal_coeff_.ab3 = 0.0;
   } else if (step >= 2 && bdf_order == 3) {
     temporal_coeff_.bd0 = 1.0 + rho1 / (1.0 + rho1) + (rho2 * rho1) / (1.0 + rho2 * (1 + rho1));
@@ -712,10 +730,15 @@ void LoMachSolver::SetTimeIntegrationCoefficients(int step) {
     temporal_coeff_.bd2 = pow(rho1, 2.0) * (rho2 + 1.0 / (1.0 + rho1));
     temporal_coeff_.bd3 =
         -(pow(rho2, 3.0) * pow(rho1, 2.0) * (1.0 + rho1)) / ((1.0 + rho2) * (1.0 + rho2 + rho2 * rho1));
-    temporal_coeff_.ab1 = ((1.0 + rho1) * (1.0 + rho2 * (1.0 + rho1))) / (1.0 + rho2);
-    temporal_coeff_.ab2 = -rho1 * (1.0 + rho2 * (1.0 + rho1));
-    temporal_coeff_.ab3 = (pow(rho2, 2.0) * rho1 * (1.0 + rho1)) / (1.0 + rho2);
+    temporal_coeff_.ab1 = ((1.0 + rho1) * (1.0 + rho2 * (1.0 + rho1))) / (1.0 + rho2);  // () * (5.0/2.0) / 3.0
+    temporal_coeff_.ab2 = -rho1 * (1.0 + rho2 * (1.0 + rho1));                          // () * 2.0 / 3.0
+    temporal_coeff_.ab3 = (pow(rho2, 2.0) * rho1 * (1.0 + rho1)) / (1.0 + rho2);        // () * 0.5
   }
+
+  // temporal_coeff_.akima = false;
+  // if (step >= 5) {
+  //   temporal_coeff_.akima = true;
+  // }
 }
 
 // query solver-specific runtime controls

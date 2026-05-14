@@ -617,7 +617,7 @@ void M2ulPhyS::initVariables() {
   d_fluxClass = fluxClass;
 
   rsolver = new RiemannSolverTPS(num_equation, mixture, eqSystem, d_fluxClass, config.RoeRiemannSolverTPS(),
-                                 config.isAxisymmetric());
+                                 config.isAxisymmetric(), rank_);
 #endif
 
 #ifdef _GPU_
@@ -681,6 +681,7 @@ void M2ulPhyS::initVariables() {
 
   ioData.initializeSerial(rank0_, config.isRestartSerialized("either"), serial_mesh, locToGlobElem, &partitioning_);
   projectInitialSolution();
+  // if (rank0_) std::cout << "okay 1 "  << std::endl;
 
   // Boundary attributes in present partition
   Array<int> local_attr;
@@ -697,6 +698,7 @@ void M2ulPhyS::initVariables() {
   }
 
   // A->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+  // if (rank0_) std::cout << "okay 2 "  << std::endl;
 
   A = new DGNonLinearForm(rsolver, d_fluxClass, vfes, gradUpfes, gradUp, bcIntegrator, intRules, dim, num_equation,
                           mixture, gpu_precomputed_data_, maxIntPoints, maxDofs);
@@ -707,9 +709,10 @@ void M2ulPhyS::initVariables() {
     //    if( basisType==1 && intRuleType==1 ) useLinearIntegration = true;
 
     faceIntegrator = new FaceIntegrator(intRules, rsolver, d_fluxClass, vfes, useLinearIntegration, dim, num_equation,
-                                        gradUp, gradUpfes, max_char_speed, config.isAxisymmetric(), distance_);
+                                        gradUp, gradUpfes, max_char_speed, config.isAxisymmetric(), distance_, rank_);
   }
   A->AddInteriorFaceIntegrator(faceIntegrator);
+  // if (rank0_) std::cout << "okay 3 "  << std::endl;
 
   Aflux = new MixedBilinearForm(dfes, fes);
   domainIntegrator =
@@ -717,6 +720,7 @@ void M2ulPhyS::initVariables() {
   Aflux->AddDomainIntegrator(domainIntegrator);
   Aflux->Assemble();
   Aflux->Finalize();
+  // if (rank0_) std::cout << "okay 4 "  << std::endl;
 
   switch (config.GetTimeIntegratorType()) {
     case 1:
@@ -741,16 +745,18 @@ void M2ulPhyS::initVariables() {
   gradUp_A = new GradNonLinearForm(gradUpfes, intRules, dim, num_equation);
   gradUp_A->AddInteriorFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation));
   gradUp_A->AddBdrFaceIntegrator(new GradFaceIntegrator(intRules, dim, num_equation, bcIntegrator, config.useBCinGrad));
+  // if (rank0_) std::cout << "okay 5 "  << std::endl;
 
   rhsOperator =
       new RHSoperator(iter, dim, num_equation, order, eqSystem, max_char_speed, intRules, intRuleType, d_fluxClass,
                       mixture, d_mixture, chemistry_, transportPtr, radiation_, vfes, fes, gpu_precomputed_data_,
                       maxIntPoints, maxDofs, A, Aflux, mesh, spaceVaryViscMult, U, Up, gradUp, gradUpfes, gradUp_A,
                       bcIntegrator, config, plasma_conductivity_, joule_heating_, distance_);
-
+  // if (rank0_) std::cout << "okay 5a "  << std::endl;
   CFL = config.GetCFLNumber();
   rhsOperator->SetTime(time);
   timeIntegrator->Init(*rhsOperator);
+  // if (rank0_) std::cout << "okay 6 "  << std::endl;
 
   // Determine the minimum element size.
   {
@@ -1943,7 +1949,124 @@ void M2ulPhyS::projectInitialSolution() {
     if (config.use_mms_ && config.mmsSaveDetails_) projectExactSolution(0.0, masaU_);
 #endif
 
-    restart_files_hdf5("read");
+    // regular restart
+    if (config.restartFromLoMach == false) {
+      restart_files_hdf5("read");
+
+      // start a run from a loMach solution <jump>
+      // NOTE: this is NOT setup for reacting flow
+      // TODO(swh): move to separate subroutine
+    } else {
+      if (rank0_) std::cout << "restarting from low-Mach field..." << std::endl;
+
+      // create continuous FE space used in loMach
+      vfecTmp = new H1_FECollection(order, dim);
+      vfesTmp = new ParFiniteElementSpace(mesh, vfecTmp, dim);
+      sfecTmp = new H1_FECollection(order);
+      sfesTmp = new ParFiniteElementSpace(mesh, sfecTmp);
+
+      // loMach stored fields
+      u_gf = new ParGridFunction(vfesTmp);
+      T_gf = new ParGridFunction(sfesTmp);
+      rho_gf = new ParGridFunction(sfesTmp);
+      P_gf = new ParGridFunction(sfesTmp);
+
+      // register fields to read-in
+      ioData.registerIOFamily("Velocity", "/velocity", u_gf, true, true, vfecTmp);
+      ioData.registerIOVar("/velocity", "x-comp", 0);
+      ioData.registerIOVar("/velocity", "y-comp", 1);
+      ioData.registerIOVar("/velocity", "z-comp", 2);
+      ioData.registerIOFamily("Temperature", "/temperature", T_gf, true, true, sfecTmp);
+      ioData.registerIOVar("/temperature", "temperature", 0);
+      ioData.registerIOFamily("Pressure", "/pressure", P_gf, true, true, sfecTmp);
+      ioData.registerIOVar("/pressure", "pressure", 0);
+
+      if (rank0_) std::cout << "...attempting read" << std::endl;
+
+      // read data, will throw a warning for all compressible-type data not in restart
+      restart_files_hdf5("read");
+
+      if (rank0_) std::cout << "...constructing density" << std::endl;
+
+      // compute density using ideal gas
+      double constantP = config.restartFromLoMachPressure;
+      double constantR = config.restartFromLoMachRgas;
+      TnTmp.SetSize(sfesTmp->GetTrueVSize());
+      rhoTmp.SetSize(sfesTmp->GetTrueVSize());
+      PnTmp.SetSize(sfesTmp->GetTrueVSize());
+      T_gf->GetTrueDofs(TnTmp);
+      P_gf->GetTrueDofs(PnTmp);
+      PnTmp += constantP;
+      // rhoTmp = (constantP / constantR);
+      rhoTmp.Set(1.0 / constantR, PnTmp);
+      rhoTmp /= TnTmp;
+      rho_gf->SetFromTrueDofs(rhoTmp);
+
+      // modify temperature to prevent crazy pressures in small regions where gas is non-ideal
+      //{
+      //  const double *dataRho = rhoTmp.HostRead();
+      //  double *dataTemp = TnTmp.HostWrite();
+      //  for (int i = 0; i < fes->GetNDofs(); i++) {
+      //    double T_here = mixture->ComputeTemperatureFromDensityPressure(dataRho[i], constantP);
+      //  dataTemp[i] = T_here;
+      //  }
+      //  T_gf->SetFromTrueDofs(TnTmp);
+      //}
+
+      // project to DG space.  These guys already point to the correct location in Up
+      vel->ProjectGridFunction(*u_gf);
+      temperature->ProjectGridFunction(*T_gf);
+      dens->ProjectGridFunction(*rho_gf);
+      press->ProjectGridFunction(*P_gf);
+
+      // Exchange before computing conserved state
+      Up->ParFESpace()->ExchangeFaceNbrData();
+      Up->ExchangeFaceNbrData();
+
+      if (rank0_)
+        std::cout << "...computing conserved state " << fes->GetNDofs() << " " << dfes->GetNDofs() << std::endl;
+      // compute conserved state
+      {
+        const double *dataPrim = Up->HostRead();
+        const double *dataP = press->HostRead();
+        double *dataCons = U->HostWrite();
+        int nDof = fes->GetNDofs();
+        for (int i = 0; i < nDof; i++) {
+          double state[gpudata::MAXEQUATIONS];
+          double conservedState[gpudata::MAXEQUATIONS];
+
+          for (int eq = 0; eq <= dim + 1; eq++) state[eq] = dataPrim[i + eq * nDof];
+
+          // conserved state
+          mixture->GetConservativesFromPrimitives(state, conservedState);
+
+          // patch-up field for non-ideal regions
+          for (int eq = 0; eq <= dim + 1; eq++) state[eq] = conservedState[eq];
+          mixture->modifyEnergyForPressure(state, conservedState, dataP[i]);
+
+          // copy to U => cant use sDofInt here
+          for (int eq = 0; eq <= dim + 1; eq++) dataCons[i + eq * nDof] = conservedState[eq];
+        }
+      }
+
+      if (rank0_) std::cout << "...cleaning up" << std::endl;
+      // remove loMach data from write list
+      ioData.unregisterIOFamily("Velocity", "/velocity", u_gf);
+      ioData.unregisterIOFamily("Temperature", "/temperature", T_gf);
+      ioData.unregisterIOFamily("Pressure", "/pressure", P_gf);
+
+      // cleanup (should be fine as long as actual data never accessed via ioData again)
+      // delete u_gf;
+      // delete T_gf;
+      // delete rho_gf;
+      // delete P_gf;
+      // delete sfesTmp;
+      // delete sfecTmp;
+      // delete vfesTmp;
+      // delete vfecTmp;
+
+      if (rank0_) std::cout << "...and done with restart from low-Mach!" << std::endl;
+    }
 
     if (config.io_opts_.enable_restart_from_lte_) {
       initilizeSpeciesFromLTE();
@@ -1960,17 +2083,21 @@ void M2ulPhyS::projectInitialSolution() {
   // Exchange before computing primitives
   U->ParFESpace()->ExchangeFaceNbrData();
   U->ExchangeFaceNbrData();
+  // if (rank0_) std::cout << "...restart nbr exhange done" << std::endl;
 
-  updatePrimitives();
+  if (config.restartFromLoMach == false) updatePrimitives();
+  // updatePrimitives();
+  // if (rank0_) std::cout << "...update primitives done" << std::endl;
 
   // update pressure grid function
   mixture->UpdatePressureGridFunction(press, Up);
+  // if (rank0_) std::cout << "...restart p-grid done" << std::endl;
 
   // update plasma electrical conductivity
   if (tpsP->isFlowEMCoupled()) {
     ParGridFunction *coordsDof = new ParGridFunction(dfes);
     mesh->GetNodes(*coordsDof);
-    mixture->SetConstantPlasmaConductivity(plasma_conductivity_, Up, coordsDof);
+    mixture->SetConstantPlasmaConductivity(plasma_conductivity_, Up, coordsDof, rank0_);
     delete coordsDof;
   }
 
@@ -1980,6 +2107,7 @@ void M2ulPhyS::projectInitialSolution() {
     // overwrite existing paraview data for the current iteration.
     if (!(tpsP->isVisualizationMode())) paraviewColl->Save();
   }
+  // if (rank0_) std::cout << "...load form aux sol done" << std::endl;
 
   // if restarting from LTE, write paraview and restart h5 immediately
   if (config.io_opts_.enable_restart_from_lte_ && !tpsP->isVisualizationMode()) {
@@ -1987,6 +2115,9 @@ void M2ulPhyS::projectInitialSolution() {
     paraviewColl->Save();
     restart_files_hdf5("write");
   }
+
+  if (config.restartFromLoMach == true) paraviewColl->Save();
+  // if (rank0_) std::cout << "...done with restart!" << std::endl;
 }
 
 void M2ulPhyS::solveBegin() {
@@ -2006,6 +2137,9 @@ void M2ulPhyS::solveStep() {
 
   Check_NAN();
   if (mixture->GetWorkingFluid() == WorkingFluid::USER_DEFINED) Check_Undershoot();
+
+  // Hack for torch transients
+  // clipOutflow();
 
   // MPI_Barrier(MPI_COMM_WORLD);
   // if (rank0_) cout << "skata : " << " Check_Undershoot 2" << endl;
@@ -2547,6 +2681,77 @@ void M2ulPhyS::Check_Undershoot() {
 #endif
 }
 
+// Clipping approach for outflow region, hard-coded for y-oriented outflow for now
+// this is essentially a hack for torch transients
+void M2ulPhyS::clipOutflow() {
+  int dof = vfes->GetNDofs();
+
+  ParGridFunction coordsDof(dfes);
+  mesh->GetNodes(coordsDof);
+
+  // make readable and general if we keep this
+  // double wOut = 0.5;
+  // double clipPlane = 0.355;
+  // double clipPlane = 0.15;
+  // double clipWidth = 0.2;
+  double neckStart = 0.324;
+  double neckEnd = 0.355;
+  double neckRad = 0.0155;
+  // double leak = -1.0;
+  // double leak = -0.5;
+  // double leak = 0.05; // from approx control-volume analysis at 2kW
+  // double leak = 0.25;
+  double leak = 3.0;
+  // double neckMid = neckStart + 0.5*(neckEnd-neckStart);
+
+  // based on h = 0.026, d = 0.03m, A = 0.00283 m^2
+  // Ar @ 40SLPM = 1.1727 g/s, rho = 1.6338, 39.95 g/mol
+  // Ni @ 30SLPM = 0.61688 g/s, rho = 1.148, 28.02 g/mol
+  // g/s(/1000) * (m^3/kg) / (m^2)
+  double uNeck = 1.1727 / 1000 / 1.6338 / 0.00283;
+  // double uNeck = 0.6168/1000 / 1.148 / 0.00283;
+
+  // double uNeck;
+  // tpsP->getInput("flow/uNeck", uNeck, 0.0);
+
+  // int nv = nvel;
+  double *dataU = U->HostReadWrite();
+  for (int i = 0; i < dof; i++) {
+    auto hcoords = coordsDof.HostRead();
+    double coords[3];
+    for (int d = 0; d < dim; d++) {
+      coords[d] = hcoords[i + d * dof];
+    }
+
+    double rho = dataU[i + 0 * dof];
+    double vel[3];
+    for (int d = 0; d < nvel; d++) vel[d] = dataU[i + (d + 1) * dof] / rho;
+
+    double ke0 = 0.;
+    for (int d = 0; d < nvel; d++) ke0 += vel[d] * vel[d];
+    ke0 *= 0.5;
+
+    // force outflow of torch but also prevent full blow-out
+    double rad = sqrt(coords[0] * coords[0] + coords[2] * coords[2]);
+    double yy = coords[1];
+    if (yy >= neckStart && yy <= neckEnd && rad <= neckRad) {
+      int eq = 1;
+      double unLcl = uNeck * 4.18879 * (1.0 + leak) * (1.0 - std::pow(rad / neckRad, 2.0));
+      dataU[i + (eq + 1) * dof] = rho * min(vel[eq], unLcl);
+      dataU[i + (eq + 1) * dof] = max(dataU[i + (eq + 1) * dof], 0.0);
+    }
+
+    double ke = 0.;
+    for (int d = 0; d < nvel; d++) ke += dataU[i + (d + 1) * dof] * dataU[i + (d + 1) * dof] / (rho * rho);
+    ke *= 0.5;
+
+    // adjust energy
+    dataU[i + (nvel + 1) * dof] = dataU[i + (nvel + 1) * dof] + (ke - ke0);  // * dataU[i + 0*dof]
+  }
+
+  updatePrimitives();
+}
+
 void M2ulPhyS::initialTimeStep() {
   auto dataU = U->HostReadWrite();
   int dof = vfes->GetNDofs();
@@ -2554,6 +2759,8 @@ void M2ulPhyS::initialTimeStep() {
   for (int n = 0; n < dof; n++) {
     Vector state(num_equation);
     for (int eq = 0; eq < num_equation; eq++) state[eq] = dataU[n + eq * dof];
+
+    // std::cout << "ComputeMCS M2 1" << endl;
     double iC = mixture->ComputeMaxCharSpeed(state);
     if (iC > max_char_speed) max_char_speed = iC;
   }
@@ -2621,10 +2828,13 @@ void M2ulPhyS::parseSolverOptions2() {
   config.gasModel = NUM_GASMODEL;
   config.transportModel = NUM_TRANSPORTMODEL;
   config.chemistryModel_ = NUM_CHEMISTRYMODEL;
-  if (config.workFluid == USER_DEFINED) {
+
+  // NOT SURE HERE
+  if (config.workFluid == USER_DEFINED || config.workFluid == LTE_FLUID) {
     parsePlasmaModels();
   } else {
     // parse options for other plasma presets.
+    if (rank0_) std::cout << "WARNING: setting a constant plasma conductivity to 50" << endl;
     config.const_plasma_conductivity_ = 50.0;
   }
 
@@ -2685,6 +2895,10 @@ void M2ulPhyS::parseFlowOptions() {
   tpsP->getInput("flow/refinement_levels", config.ref_levels, 0);
   tpsP->getInput("flow/computeDistance", config.compute_distance, false);
   tpsP->getInput("flow/readDistance", config.read_distance, false);
+
+  tpsP->getInput("io/restartFromLoMach", config.restartFromLoMach, false);
+  tpsP->getInput("io/restartFromLoMach-pressure", config.restartFromLoMachPressure, 101325.0);
+  tpsP->getInput("io/restartFromLoMach-Rgas", config.restartFromLoMachRgas, 287.0);
 
   std::string type;
   tpsP->getInput("flow/sgsModel", type, std::string("none"));
@@ -2958,7 +3172,7 @@ void M2ulPhyS::parsePlasmaModels() {
   } else if (transportModelStr == "constant") {
     config.transportModel = CONSTANT;
   }
-  printf("config.transportModel = %s\n", transportModelStr.c_str());
+  if (rank0_) printf("config.transportModel = %s\n", transportModelStr.c_str());
   fflush(stdout);
   // } else {
   //   grvy_printf(GRVY_ERROR, "\nUnknown transport_model -> %s", transportModelStr.c_str());
@@ -2967,7 +3181,6 @@ void M2ulPhyS::parsePlasmaModels() {
 
   std::string chemistryModelStr;
   tpsP->getInput("plasma_models/chemistry_model", chemistryModelStr, std::string(""));
-
   tpsP->getInput("plasma_models/const_plasma_conductivity", config.const_plasma_conductivity_, 0.0);
 
   // TODO(kevin): cantera wrapper

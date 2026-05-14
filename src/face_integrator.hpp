@@ -55,24 +55,20 @@ class FaceIntegrator : public NonlinearFormIntegrator {
   RiemannSolverTPS *rsolver;
   Fluxes *fluxClass;
   ParFiniteElementSpace *vfes;
-
   const int dim;
   const int num_equation;
-
   double &max_char_speed;
-
   const ParGridFunction *gradUp;
   const ParFiniteElementSpace *gradUpfes;
-
   const ParGridFunction *distance_;
-
   IntegrationRules *intRules;
+  bool useLinear;
+  bool axisymmetric_;
+  int rank_;
 
   DenseMatrix *faceMassMatrix1, *faceMassMatrix2;
   int faceNum;
   bool faceMassMatrixComputed;
-  bool useLinear;
-  const bool axisymmetric_;
 
   int totDofs;
   Array<int> vdofs1;
@@ -109,7 +105,7 @@ class FaceIntegrator : public NonlinearFormIntegrator {
   FaceIntegrator(IntegrationRules *_intRules, RiemannSolverTPS *rsolver_, Fluxes *_fluxClass,
                  ParFiniteElementSpace *_vfes, bool _useLinear, const int _dim, const int _num_equation,
                  ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes, double &_max_char_speed, bool axisym,
-                 ParGridFunction *distance);
+                 ParGridFunction *distance, int rank);
   ~FaceIntegrator();
 
   virtual void AssembleFaceVector(const FiniteElement &el1, const FiniteElement &el2, FaceElementTransformations &Tr,

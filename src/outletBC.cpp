@@ -606,6 +606,7 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
   // gradient of pressure in normal direction
   double dpdn = mixture->ComputePressureDerivative(normGrad, stateIn, false);
 
+  std::cout << "ComputeSoS outletBC 1" << endl;
   const double speedSound = mixture->ComputeSpeedOfSound(meanUp);
 
   double meanK = 0.;
@@ -724,15 +725,48 @@ void OutletBC::subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, De
   for (int eq = 0; eq < num_equation_; eq++) boundaryU[eq + bdrN * num_equation_] = newU[eq];
   bdrN++;
 
+  // std::cout << " Eval oBC 1" << endl;
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }
 
 // This is more or less right formulation even for two-temperature case.
 void OutletBC::subsonicReflectingPressure(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
   Vector state2(num_equation_);
+  // Vector stateInTmp(num_equation_);
+  // stateInTmp = stateIn;
+
+  // HERE HERE HERE
+  // modify stateInTmp so that there is no in-flow
+
+  // outward facing normal
+  /*
+  Vector unitNorm = normal;
+  {
+    double mod = 0.;
+    for (int d = 0; d < dim_; d++) mod += normal[d] * normal[d];
+    unitNorm *= 1. / sqrt(mod);
+  }
+
+  // vel in face normal direction
+  double normVel = 0.;
+  for (int d = 0; d < dim_; d++) normVel += stateInTmp[1 + d] * unitNorm[d];
+  normVel /= stateInTmp[0];
+
+  // if normVel negative, resist inflow at outlet. for now, also kill tangents
+  //if (normVel < 0.0) {
+  //  //for (int d = 0; d < dim_; d++) stateInTmp[1 + d] = -1.0 * stateInTmp[1 + d];
+  //  for (int d = 0; d < dim_; d++) stateInTmp[1 + d] = 0.0; // more gentle
+  // }
+
+  // CHEATING with known y-norm exit for torch
+  if (stateInTmp[2]<0.0) stateInTmp[2] = 0.0;
+
+  mixture->modifyEnergyForPressure(stateInTmp, state2, inputState[0]);
+  */
 
   mixture->modifyEnergyForPressure(stateIn, state2, inputState[0]);
 
+  // std::cout << " Eval oBC 2" << endl;
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }
 
@@ -770,6 +804,7 @@ void OutletBC::subsonicNonRefMassFlow(Vector &normal, Vector &stateIn, DenseMatr
   // gradient of pressure in normal direction
   double dpdn = mixture->ComputePressureDerivative(normGrad, stateIn, false);
 
+  std::cout << "ComputeSoS outletBC 2" << endl;
   const double speedSound = mixture->ComputeSpeedOfSound(meanUp);
 
   double meanK = 0.;
@@ -888,6 +923,7 @@ void OutletBC::subsonicNonRefMassFlow(Vector &normal, Vector &stateIn, DenseMatr
   for (int eq = 0; eq < num_equation_; eq++) boundaryU[eq + bdrN * num_equation_] = newU[eq];
   bdrN++;
 
+  // std::cout << " Eval oBC 3" << endl;
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }
 
@@ -925,6 +961,7 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal, Vector &stateIn, DenseMa
   // gradient of pressure in normal direction
   double dpdn = mixture->ComputePressureDerivative(normGrad, stateIn, false);
 
+  std::cout << "ComputeSoS outletBC 3" << endl;
   const double speedSound = mixture->ComputeSpeedOfSound(meanUp);
 
   double normVel = 0.;
@@ -1023,6 +1060,7 @@ void OutletBC::subsonicNonRefPWMassFlow(Vector &normal, Vector &stateIn, DenseMa
   for (int eq = 0; eq < num_equation_; eq++) boundaryU[eq + bdrN * num_equation_] = newU[eq];
   bdrN++;
 
+  // std::cout << " Eval oBC 4" << endl;
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }
 
@@ -1238,6 +1276,7 @@ void OutletBC::interpOutlet_gpu(const mfem::Vector &x, const elementIndexingData
       }
 
       // compute flux
+      // std::cout << " Eval_LF outletBC 1" << endl;
       d_rsolver->Eval_LF(u1, u2, nor, Rflux);
 
       if (d_rsolver->isAxisymmetric()) {

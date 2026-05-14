@@ -112,12 +112,14 @@ void M2ulPhyS::read_restart_files_hdf5(hid_t file, bool serialized_read) {
   // -------------------------------------------------------------------
   // Attributes - read relevant solution metadata for this Solver
   // -------------------------------------------------------------------
+  // if (rank0_) std::cout << " meta data read for file " << file << endl;
 
   if (rank0_ || !serialized_read) {
     h5_read_attribute(file, "iteration", iter);
     h5_read_attribute(file, "time", time);
     h5_read_attribute(file, "dt", dt);
     h5_read_attribute(file, "order", read_order);
+    // if (rank0_) std::cout << " ...basic meta data success!" << endl;
     if (average->ComputeMean() && config.GetRestartMean()) {
       int samplesMean, samplesRMS, intervals;
       h5_read_attribute(file, "samplesMean", samplesMean);
@@ -169,6 +171,7 @@ void M2ulPhyS::read_restart_files_hdf5(hid_t file, bool serialized_read) {
   // -------------------------------------------------------------------
   // Data - actual data read handled by IODataOrganizer class
   // -------------------------------------------------------------------
+  if (rank0_) std::cout << " ...attempting actual data read for file" << file << endl;
   ioData.read(file, serialized_read, read_order);
 
   if (loadFromAuxSol) {
@@ -197,6 +200,8 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
 #ifdef HAVE_GRVY
   grvy_timer_begin(__func__);
 #endif
+
+  // if (rank0_) cout << "...in io:restart_files_hdf5" << endl;
 
   string serialName;
   if (inputFileName.length() > 0) {
@@ -237,6 +242,8 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
         assert(file >= 0);
       }
     } else {
+      if (rank0_) cout << "...verifying all files" << endl;
+
       // verify we have all desired files and open on each process
       int gstatus;
       int status = static_cast<int>(file_exists(fileName));
@@ -247,8 +254,10 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
         exit(ERROR);
       }
 
+      if (rank0_) cout << "...calling H5Fopen for " << fileName.c_str() << endl;
       file = H5Fopen(fileName.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
       assert(file >= 0);
+      if (rank0_) cout << "...success! " << fileName.c_str() << endl;
     }
   }
 
@@ -259,6 +268,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
   if (mode == "write") {
     write_restart_files_hdf5(file, config.isRestartSerialized(mode));
   } else {  // read
+    if (rank0_) cout << "...calling read_restart_files_hdf5" << endl;
     read_restart_files_hdf5(file, config.isRestartSerialized(mode));
   }
 
@@ -387,24 +397,41 @@ void partitioning_file_hdf5(std::string mode, MPI_Groups *groupsMPI, int nelemGl
 
 // convenience function to check size of variable in hdf5 file
 hsize_t get_variable_size_hdf5(hid_t file, std::string name) {
+  // these checks dont work
+  // int exists = H5Lexists(file, name.c_str(), H5P_DEFAULT);
+  // int exists = H5Aexists(file, name.c_str());
+  hsize_t numInSoln;
+
+  // if(exists) {
+  // std::cout << "Good: " << name.c_str() << endl;
   hid_t data_soln = H5Dopen2(file, name.c_str(), H5P_DEFAULT);
-  assert(data_soln >= 0);
-  hid_t dataspace = H5Dget_space(data_soln);
-  hsize_t numInSoln = H5Sget_simple_extent_npoints(dataspace);
-  H5Dclose(data_soln);
+  // assert(data_soln >= 0);
+  if (data_soln >= 0) {
+    hid_t dataspace;
+    dataspace = H5Dget_space(data_soln);
+    numInSoln = H5Sget_simple_extent_npoints(dataspace);
+    H5Dclose(data_soln);
+  } else {
+    numInSoln = 0;
+  }
+
   return numInSoln;
 }
 
 // convenience function to read solution data for parallel restarts
-void read_variable_data_hdf5(hid_t file, string varName, size_t index, double *data) {
+void read_variable_data_hdf5(hid_t file, string varName, size_t index, double *data, int rank0) {
   hid_t data_soln;
   herr_t status;
 
   data_soln = H5Dopen2(file, varName.c_str(), H5P_DEFAULT);
-  assert(data_soln >= 0);
-  status = H5Dread(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &data[index]);
-  assert(status >= 0);
-  H5Dclose(data_soln);
+  // assert(data_soln >= 0);
+  if (data_soln >= 0) {
+    status = H5Dread(data_soln, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &data[index]);
+    assert(status >= 0);
+    H5Dclose(data_soln);
+  } else {
+    if (rank0) std::cout << "WARNING: data " << varName.c_str() << " not found in restart file" << endl;
+  }
 }
 
 IOOptions::IOOptions() : output_dir_("output"), restart_dir_("./"), restart_mode_("standard") {}
@@ -482,7 +509,7 @@ void IOFamily::readDistributeSerializedVariable(hid_t file, const IOVar &var, in
     Vector data_serial;
     data_serial.SetSize(numDof);
 
-    read_variable_data_hdf5(file, varName, 0, data_serial.HostWrite());
+    read_variable_data_hdf5(file, varName, 0, data_serial.HostWrite(), rank0_);
 
     // assign solution owned by rank 0
     Array<int> lvdofs, gvdofs;
@@ -760,17 +787,24 @@ void IOFamily::readPartitioned(hid_t file) {
   // Ensure that size of read matches expectations
   std::string varGroupName = group_ + "/" + vars_[0].varName_;
   const hsize_t numInSoln = get_variable_size_hdf5(file, varGroupName);
-  assert((int)numInSoln == local_ndofs_);
+  // assert((int)numInSoln == local_ndofs_);
 
-  // get pointer to raw data
-  double *data = pfunc_->HostWrite();
+  if ((int)numInSoln == local_ndofs_) {
+    // get pointer to raw data
+    double *data = pfunc_->HostWrite();
 
-  // read from file into appropriate spot in data
-  for (auto var : vars_) {
-    if (var.inRestartFile_) {
-      std::string h5Path = group_ + "/" + var.varName_;
-      if (rank0_) grvy_printf(ginfo, "--> Reading h5 path = %s\n", h5Path.c_str());
-      read_variable_data_hdf5(file, h5Path.c_str(), var.index_ * numInSoln, data);
+    // read from file into appropriate spot in data
+    for (auto var : vars_) {
+      if (var.inRestartFile_) {
+        std::string h5Path = group_ + "/" + var.varName_;
+        if (rank0_) grvy_printf(ginfo, "--> Reading h5 path = %s\n", h5Path.c_str());
+        read_variable_data_hdf5(file, h5Path.c_str(), var.index_ * numInSoln, data, rank0_);
+      }
+    }
+
+  } else {
+    for (auto var : vars_) {
+      if (rank0_) grvy_printf(ginfo, "--> Skipping = %s\n", var.varName_.c_str());
     }
   }
 }
@@ -819,7 +853,7 @@ void IOFamily::readChangeOrder(hid_t file, int read_order) {
       if (var.inRestartFile_) {
         std::string h5Path = group_ + "/" + var.varName_;
         if (rank0_) grvy_printf(ginfo, "--> Reading h5 path = %s\n", h5Path.c_str());
-        read_variable_data_hdf5(file, h5Path.c_str(), var.index_ * aux_dof, data);
+        read_variable_data_hdf5(file, h5Path.c_str(), var.index_ * aux_dof, data, rank0_);
       }
     }
 
@@ -859,6 +893,12 @@ void IODataOrganizer::registerIOFamily(std::string description, std::string grou
   }
 
   families_.push_back(family);
+}
+
+// remove family from read/write list
+void IODataOrganizer::unregisterIOFamily(std::string description, std::string group, ParGridFunction *pfunc) {
+  IOFamily family(description, group, pfunc);
+  family.inRestartFile_ = false;
 }
 
 // register individual variables for IO family
@@ -959,11 +999,12 @@ void IODataOrganizer::read(hid_t file, bool serial, int read_order) {
 
   // Loop over defined IO families to load desired input
   for (auto fam : families_) {
+    // std::cout << "...checking if fam is in restart file" << endl;
     if (fam.inRestartFile_) {  // read mode
       const int rank = fam.pfunc_->ParFESpace()->GetMyRank();
       const bool rank0 = (rank == 0);
 
-      if (rank0) cout << "Reading in solution data from restart..." << endl;
+      if (rank0) std::cout << "Reading in solution data from restart..." << endl;
 
       int fam_order;
       bool change_order = false;
@@ -971,6 +1012,7 @@ void IODataOrganizer::read(hid_t file, bool serial, int read_order) {
         assert(!fam.pfunc_->ParFESpace()->IsVariableOrder());
         fam_order = fam.pfunc_->ParFESpace()->FEColl()->GetOrder();
         change_order = (fam_order != read_order);
+        if (rank0 && change_order) std::cout << "Going from " << read_order << " to " << fam_order << endl;
       }
 
       // Read handled by appropriate method from IOFamily
@@ -984,11 +1026,12 @@ void IODataOrganizer::read(hid_t file, bool serial, int read_order) {
         if (serial && nprocs_max > 1) {
           fam.readSerial(file);
         } else {
+          if (rank0) cout << "...attempting readParititioned(file)" << endl;
           fam.readPartitioned(file);
         }
       }
-    }
-  }
+    }  // end of if family name in restart file
+  }  // end of all registered families loop
 }
 
 IODataOrganizer::~IODataOrganizer() {

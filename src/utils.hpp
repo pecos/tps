@@ -187,6 +187,10 @@ void scalarGrad3DV(FiniteElementSpace *fes, FiniteElementSpace *vfes, Vector u, 
 void makeContinuous(ParGridFunction &u);
 
 bool copyFile(const char *SRC, const char *DEST);
+// void streamwiseGrad(int dim, ParGridFunction &phi, ParGridFunction &u, ParGridFunction &swGrad);
+void streamwiseGrad(int dim, ParGridFunction &u, ParGridFunction &swGrad);
+void upwindDiff(int dim, double re_factor, double re_offset, Vector &u_vec, Vector &rho_vec, Vector &del_vec,
+                Vector &Reh_vec, Vector &swDiff);
 
 /// upwind diffusion support: evaluate u * u^T / ||u||^2
 void streamwiseTensor(const Vector &vel, DenseMatrix &swMgbl);
