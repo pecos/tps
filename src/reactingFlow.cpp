@@ -82,11 +82,11 @@ static double sigmaTorchStartUp(const Vector &pos) {
   hwgt = std::exp(-0.5 * ((y - y0) / ysig) * ((y - y0) / ysig));
   if (radius_here >= rCyl) rwgt = 0.0;
   sigma = 2000. * rwgt * hwgt;
-  
-  if (sigma>1.0) {
-    std::cout << "sigma: " << sigma << " radius: "<< radius_here << " y: " << y << endl;
+
+  if (sigma > 1.0) {
+    std::cout << "sigma: " << sigma << " radius: " << radius_here << " y: " << y << endl;
   }
-  
+
   return sigma;
 }
 
@@ -130,7 +130,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
 
   // Duplicating this logical here as w/o it, sigma will be updated with diffusivities
   tpsP_->getInput("cycle-avg-joule-coupled/fixed-conductivity", fixed_conductivity_, false);
-  
+
   workFluid_ = USER_DEFINED;
   gasModel_ = PERFECT_MIXTURE;
   chemistryModel_ = NUM_CHEMISTRYMODEL;
@@ -748,7 +748,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   }
 
   tps->getInput("loMach/torch-cold-start", torch_cold_start_, false);
-  
+
   tpsP_->getInput("loMach/reactingFlow/explicit-destruction", explicit_destruction_, false);
   tpsP_->getInput("loMach/reactingFlow/sub-steps", nSub_, 1);
   tpsP_->getInput("loMach/reactingFlow/dynamic-substep", dynamic_substepping_, false);
@@ -1410,11 +1410,11 @@ void ReactingFlow::initializeOperators() {
   dt_ = time_coeff_.dt;
 
   // TODO(trevilo): Put a flag for this!!!!
-  if(torch_cold_start_) {
-    if (rank0_) std::cout << " Cold start selected.  Specifying sigma field."  << endl;    
+  if (torch_cold_start_) {
+    if (rank0_) std::cout << " Cold start selected.  Specifying sigma field." << endl;
     sigma_gf_.ProjectCoefficient(sigma_start_up);
   }
-  
+
   Array<int> empty;
 
   // GLL integration rule (Numerical Integration)
@@ -3069,7 +3069,6 @@ void ReactingFlow::updateThermoP() {
 }
 
 void ReactingFlow::updateDiffusivity() {
-  
   (flow_interface_->velocity)->GetTrueDofs(tmpR1_);
   const double *dataTemp = Tn_.HostRead();
   const double *dataRho = rn_.HostRead();
@@ -3158,43 +3157,41 @@ void ReactingFlow::updateDiffusivity() {
   kappa_gf_.SetFromTrueDofs(kappa_);
 
   // electrical conductivity
-  if( !torch_cold_start_ && !fixed_conductivity_) {
-
-    //if(rank0_) std::cout << " sigma update portion... " << endl;    
+  if (!torch_cold_start_ && !fixed_conductivity_) {
+    // if(rank0_) std::cout << " sigma update portion... " << endl;
     {
-    double *h_sig = sigma_.HostReadWrite();
-    for (int i = 0; i < sDofInt_; i++) {
-      // int nEq = dim_ + 2 + nActiveSpecies_;
-      double state[gpudata::MAXEQUATIONS];
-      double conservedState[gpudata::MAXEQUATIONS];
+      double *h_sig = sigma_.HostReadWrite();
+      for (int i = 0; i < sDofInt_; i++) {
+        // int nEq = dim_ + 2 + nActiveSpecies_;
+        double state[gpudata::MAXEQUATIONS];
+        double conservedState[gpudata::MAXEQUATIONS];
 
-      // Populate *primitive* state vector = [rho, velocity, temperature, species mole densities]
-      state[0] = dataRho[i];
-      for (int eq = 0; eq < dim_; eq++) {
-        state[eq + 1] = dataU[i + eq * sDofInt_];
+        // Populate *primitive* state vector = [rho, velocity, temperature, species mole densities]
+        state[0] = dataRho[i];
+        for (int eq = 0; eq < dim_; eq++) {
+          state[eq + 1] = dataU[i + eq * sDofInt_];
+        }
+        state[dim_ + 1] = dataTemp[i];
+        for (int sp = 0; sp < nActiveSpecies_; sp++) {
+          state[dim_ + 2 + sp] =
+              dataRho[i] * Yn_[i + sp * sDofInt_] / mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
+        }
+
+        mixture_->GetConservativesFromPrimitives(state, conservedState);
+
+        double sig;
+        transport_->ComputeElectricalConductivity(conservedState, sig);
+        h_sig[i] = sig;
       }
-      state[dim_ + 1] = dataTemp[i];
-      for (int sp = 0; sp < nActiveSpecies_; sp++) {
-        state[dim_ + 2 + sp] = dataRho[i] * Yn_[i + sp * sDofInt_] / mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
-      }
-
-      mixture_->GetConservativesFromPrimitives(state, conservedState);
-
-      double sig;
-      transport_->ComputeElectricalConductivity(conservedState, sig);
-      h_sig[i] = sig;
     }
+
+    sigma_gf_.SetFromTrueDofs(sigma_);
   }
-    
-  sigma_gf_.SetFromTrueDofs(sigma_);
-  }
-  
 }
 
 void ReactingFlow::evaluatePlasmaConductivityGF() {
+  if (rank0_) std::cout << " we are in evaluatePlasmaConductivityGF " << endl;
 
-  if(rank0_) std::cout << " we are in evaluatePlasmaConductivityGF " << endl;
-  
   (flow_interface_->velocity)->GetTrueDofs(tmpR1_);
   const double *dataTemp = Tn_.HostRead();
   const double *dataRho = rn_.HostRead();
@@ -3202,8 +3199,7 @@ void ReactingFlow::evaluatePlasmaConductivityGF() {
 
   double *h_sig = sigma_.HostReadWrite();
 
-  if(!torch_cold_start_) {
-    
+  if (!torch_cold_start_) {
     for (int i = 0; i < sDofInt_; i++) {
       // int nEq = dim_ + 2 + nActiveSpecies_;
       double state[gpudata::MAXEQUATIONS];
@@ -3225,11 +3221,9 @@ void ReactingFlow::evaluatePlasmaConductivityGF() {
       transport_->ComputeElectricalConductivity(conservedState, sig);
       h_sig[i] = sig;
     }
-    
+
     sigma_gf_.SetFromTrueDofs(sigma_);
-  
   }
-  
 }
 
 void ReactingFlow::updateDensity(double tStep, bool update_mass_matrix) {

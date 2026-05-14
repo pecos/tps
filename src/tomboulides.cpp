@@ -1925,22 +1925,21 @@ void Tomboulides::step() {
   // Add streamwise stability to rhs
   // computeReh();
   // if (sw_stab_) {
-    /*
-    for (int i = 0; i < dim_; i++) {
-      setScalarFromVector(u_vec_, i, &tmpR0a_);
-      streamwiseDiffusion(tmpR0a_, tmpR0b_);
-      setVectorFromScalar(tmpR0b_, i, &swDiff_vec_);
-    }
-    */
-    // streamwiseDiffusion(gradU_, tmpR0b_);
-    // setVectorFromScalar(tmpR0b_, 0, &swDiff_vec_);
-    // streamwiseDiffusion(gradV_, tmpR0b_);
-    // setVectorFromScalar(tmpR0b_, 1, &swDiff_vec_);
-    // streamwiseDiffusion(gradW_, tmpR0b_);
-    // setVectorFromScalar(tmpR0b_, 2, &swDiff_vec_);
+  /*
+  for (int i = 0; i < dim_; i++) {
+    setScalarFromVector(u_vec_, i, &tmpR0a_);
+    streamwiseDiffusion(tmpR0a_, tmpR0b_);
+    setVectorFromScalar(tmpR0b_, i, &swDiff_vec_);
+  }
+  */
+  // streamwiseDiffusion(gradU_, tmpR0b_);
+  // setVectorFromScalar(tmpR0b_, 0, &swDiff_vec_);
+  // streamwiseDiffusion(gradV_, tmpR0b_);
+  // setVectorFromScalar(tmpR0b_, 1, &swDiff_vec_);
+  // streamwiseDiffusion(gradW_, tmpR0b_);
+  // setVectorFromScalar(tmpR0b_, 2, &swDiff_vec_);
 
   if (sw_stab_) {
-    
     // Update matrix
     Array<int> empty;
     Mv_stab_form_->Update();

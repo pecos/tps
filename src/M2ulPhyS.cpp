@@ -2139,7 +2139,7 @@ void M2ulPhyS::solveStep() {
   if (mixture->GetWorkingFluid() == WorkingFluid::USER_DEFINED) Check_Undershoot();
 
   // Hack for torch transients
-  clipOutflow();
+  // clipOutflow();
 
   // MPI_Barrier(MPI_COMM_WORLD);
   // if (rank0_) cout << "skata : " << " Check_Undershoot 2" << endl;
@@ -2692,8 +2692,8 @@ void M2ulPhyS::clipOutflow() {
   // make readable and general if we keep this
   // double wOut = 0.5;
   // double clipPlane = 0.355;
-  double clipPlane = 0.15;
-  double clipWidth = 0.2;
+  // double clipPlane = 0.15;
+  // double clipWidth = 0.2;
   double neckStart = 0.324;
   double neckEnd = 0.355;
   double neckRad = 0.0155;
@@ -2714,7 +2714,7 @@ void M2ulPhyS::clipOutflow() {
   // double uNeck;
   // tpsP->getInput("flow/uNeck", uNeck, 0.0);
 
-  int nv = nvel;
+  // int nv = nvel;
   double *dataU = U->HostReadWrite();
   for (int i = 0; i < dof; i++) {
     auto hcoords = coordsDof.HostRead();

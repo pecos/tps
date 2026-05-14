@@ -211,9 +211,9 @@ LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, t
   tpsP_->getInput("loMach/ltethermo/msolve-verbosity", mass_inverse_pl_, pl_solve_);
 
   tps->getInput("loMach/torch-cold-start", torch_cold_start_, false);
-  
+
   tps->getInput("loMach/ltethermo/Reh_offset", re_offset_, 1.0);
-  tps->getInput("loMach/ltethermo/Reh_factor", re_factor_, 0.1);  
+  tps->getInput("loMach/ltethermo/Reh_factor", re_factor_, 0.1);
 
   tpsP_->getInput("loMach/ltethermo/streamwise-stabilization", sw_stab_, false);
   tpsP_->getInput("loMach/ltethermo/Reh_factor", Reh_factor_, 0.5);
@@ -632,7 +632,7 @@ void LteThermoChem::initializeOperators() {
   const double dt_ = time_coeff_.dt;
 
   // TODO(trevilo): Put a flag for this!!!!
-  if(torch_cold_start_) {
+  if (torch_cold_start_) {
     sigma_gf_.ProjectCoefficient(sigma_start_up);
   }
 
