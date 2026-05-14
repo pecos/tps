@@ -185,7 +185,7 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
       if (_mixture->IsAmbipolar()) {  // diffusion current using electric conductivity.
         // const double mho = globalTransport(SrcTrns::ELECTRIC_CONDUCTIVITY);
         // Jd = mho * Efield
-        /// HACK HACK HACK        if (h_pc != NULL) h_pc[n] = globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY];
+        if (h_pc != NULL) h_pc[n] = globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY];
 
       } else {  // diffusion current by definition.
         for (int sp = 0; sp < _numSpecies; sp++) {
@@ -196,7 +196,7 @@ void SourceTerm::updateTerms(mfem::Vector &in) {
       }
     } else {
       // only makes sense to be here for LTE model... assert this?
-      //// HACK HACK HACK      if (h_pc != NULL) h_pc[n] = globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY];
+      if (h_pc != NULL) h_pc[n] = globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY];
     }
 
     // TODO(kevin): may move axisymmetric source terms to here.

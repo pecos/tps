@@ -61,14 +61,14 @@ class FaceIntegrator : public NonlinearFormIntegrator {
   const ParGridFunction *gradUp;
   const ParFiniteElementSpace *gradUpfes;
   const ParGridFunction *distance_;
-  IntegrationRules *intRules;  
+  IntegrationRules *intRules;
   bool useLinear;
   bool axisymmetric_;
   int rank_;
 
   DenseMatrix *faceMassMatrix1, *faceMassMatrix2;
   int faceNum;
-  bool faceMassMatrixComputed;  
+  bool faceMassMatrixComputed;
 
   int totDofs;
   Array<int> vdofs1;
