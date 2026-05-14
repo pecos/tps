@@ -714,7 +714,6 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   tpsP_->getInput("loMach/reactingFlow/neumann-temp", neumann_temp_, false);
   tpsP_->getInput("loMach/reactingFlow/neumann-species-inlet", neumann_species_inlet_, true);
   tpsP_->getInput("loMach/reactingFlow/neumann-species-wall", neumann_species_wall_, true);
-
 }  // NOLINT
 
 ReactingFlow::~ReactingFlow() {
