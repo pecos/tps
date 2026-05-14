@@ -707,6 +707,14 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
 
   // specified plasma initial condition
   tpsP_->getInput("plasma_models/initialize_species", species_init_, false);
+  tpsP_->getInput("loMach/reactingFlow/Reh_factor", Reh_factor_, 0.5);
+  tpsP_->getInput("loMach/reactingFlow/Reh_offset", Reh_offset_, 1.0);
+
+  // zero-gradient BCs
+  tpsP_->getInput("loMach/reactingFlow/neumann-temp", neumann_temp_, false);
+  tpsP_->getInput("loMach/reactingFlow/neumann-species-inlet", neumann_species_inlet_, true);
+  tpsP_->getInput("loMach/reactingFlow/neumann-species-wall", neumann_species_wall_, true);
+
 }  // NOLINT
 
 ReactingFlow::~ReactingFlow() {
@@ -786,6 +794,21 @@ ReactingFlow::~ReactingFlow() {
   delete mixture_;
   delete transport_;
   delete chemistry_;
+
+  delete umag_coeff_;
+  delete gscale_coeff_;
+  delete visc_coeff_;
+  delete visc_inv_coeff_;
+  delete reh1_coeff_;
+  delete reh2_coeff_;
+  delete Reh_coeff_;
+  delete csupg_coeff_;
+  delete uw1_coeff_;
+  delete uw2_coeff_;
+  delete upwind_coeff_;
+  delete swdiff_coeff_;
+  delete supg_coeff_;
+  delete supg_cp_coeff_;
 
   delete umag_coeff_;
   delete gscale_coeff_;
@@ -1149,43 +1172,76 @@ void ReactingFlow::initializeSelf() {
 
       if (type == "uniform") {
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
-        inlet_attr = 0;
-        inlet_attr[patch - 1] = 1;
-        double temperature_value;
-        tpsP_->getRequiredInput((basepath + "/temperature").c_str(), temperature_value);
-        if (rank0_) {
-          std::cout << "Rx Flow: Setting uniform Dirichlet temperature on patch = " << patch << std::endl;
+        if (!neumann_temp_) {
+          inlet_attr = 0;
+          inlet_attr[patch - 1] = 1;
+          double temperature_value;
+          tpsP_->getRequiredInput((basepath + "/temperature").c_str(), temperature_value);
+          if (rank0_) {
+            std::cout << "Rx Flow: Setting uniform Dirichlet temperature on patch = " << patch << std::endl;
+          }
+          AddTempDirichletBC(temperature_value, inlet_attr);
+        } else {
+          if (rank0_) {
+            std::cout << "Rx Flow: Setting zero Neumann temperature on patch = " << patch << std::endl;
+          }
         }
 
-        AddTempDirichletBC(temperature_value, inlet_attr);
-
+        // AddTempDirichletBC(temperature_value, inlet_attr);
         // AddSpecDirichletBC(0.0, inlet_attr);
+
+        if (neumann_species_inlet_) {
+          if (rank0_) {
+            std::cout << "Rx Flow: Setting zero Neumann species on patch = " << patch << std::endl;
+          }
+        } else {
+          if (rank0_) {
+            std::cout << "Rx Flow: Setting zero Dirichlet species on patch = " << patch << std::endl;
+          }
+          AddSpecDirichletBC(0.0, inlet_attr);
+        }
+
       } else if (type == "interpolate") {
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
-        inlet_attr = 0;
-        inlet_attr[patch - 1] = 1;
         temperature_bc_field_ = new GridFunctionCoefficient(extData_interface_->Tdata);
-        if (rank0_) {
-          std::cout << "Rx Flow: Setting interpolated Dirichlet temperature on patch = " << patch << std::endl;
-        }
-        AddTempDirichletBC(temperature_bc_field_, inlet_attr);
+        if (!neumann_temp_) {
+          inlet_attr = 0;
+          inlet_attr[patch - 1] = 1;
+          if (rank0_) {
+            std::cout << "Rx Flow: Setting interpolated Dirichlet temperature on patch = " << patch << std::endl;
+          }
+          AddTempDirichletBC(temperature_bc_field_, inlet_attr);
 
-        // Force the IC to agree with the interpolated inlet BC
-        //
-        // NB: It is still possible for Tn_gf_ on a restart to
-        // disagree with this BC.  Specifically, since the restart
-        // field is read after this projection, if it does not satisfy
-        // this BC, there will be a discrepancy (which will be
-        // eliminated after the first step).
-        Tn_gf_.ProjectBdrCoefficient(*temperature_bc_field_, inlet_attr);
+          // Force the IC to agree with the interpolated inlet BC
+          //
+          // NB: It is still possible for Tn_gf_ on a restart to
+          // disagree with this BC.  Specifically, since the restart
+          // field is read after this projection, if it does not satisfy
+          // this BC, there will be a discrepancy (which will be
+          // eliminated after the first step).
+          Tn_gf_.ProjectBdrCoefficient(*temperature_bc_field_, inlet_attr);
+        } else {
+          if (rank0_) {
+            std::cout << "Rx Flow: Setting zero Neumann temperature on patch = " << patch << std::endl;
+          }
+        }
 
         species_bc_field_ = new GridFunctionCoefficient(extData_interface_->Ydata);
-        if (rank0_) {
-          std::cout << "Rx Flow: Setting interpolated Dirichlet species on patch = " << patch << std::endl;
+        if (neumann_species_inlet_) {
+          if (rank0_) {
+            std::cout << "Rx Flow: Setting zero Neumann species on patch = " << patch << std::endl;
+          }
+        } else {
+          if (rank0_) {
+            std::cout << "Rx Flow: Setting interpolated Dirichlet species on patch = " << patch << std::endl;
+          }
+          AddSpecDirichletBC(species_bc_field_, inlet_attr);
+          Yn_gf_.ProjectBdrCoefficient(*species_bc_field_, inlet_attr);
         }
 
-        AddSpecDirichletBC(species_bc_field_, inlet_attr);
-        Yn_gf_.ProjectBdrCoefficient(*species_bc_field_, inlet_attr);
+        // AddSpecDirichletBC(species_bc_field_, inlet_attr);
+        // Yn_gf_.ProjectBdrCoefficient(*species_bc_field_, inlet_attr);
+
       } else {
         if (rank0_) {
           std::cout << "ERROR: Rx Flow inlet type = " << type << " not supported." << std::endl;
@@ -1242,7 +1298,9 @@ void ReactingFlow::initializeSelf() {
         Qt_bc_coeff->constant = 0.0;
         AddQtDirichletBC(Qt_bc_coeff, attr_wall);
 
-        // AddSpecDirichletBC(0.0, attr_wall);
+        if (!neumann_species_wall_) {
+          AddSpecDirichletBC(0.0, attr_wall);
+        }
       }
     }
     if (rank0_) std::cout << "Temp wall bc completed: " << numWalls << endl;
@@ -1339,7 +1397,8 @@ void ReactingFlow::initializeOperators() {
     Reh_coeff_ = new ProductCoefficient(*reh2_coeff_, *umag_coeff_);
 
     // Csupg
-    csupg_coeff_ = new TransformedCoefficient(Reh_coeff_, csupgFactor);
+    std::function<double(double)> csupgLambda = std::bind(csupgFactor, std::placeholders::_1, Reh_factor_, Reh_offset_);
+    csupg_coeff_ = new ExtTransformedCoefficient(Reh_coeff_, csupgLambda);
 
     // compute upwind magnitude
     if (axisym_) {
