@@ -465,11 +465,8 @@ void LteThermoChem::initializeSelf() {
             std::cout << "Calorically Perfect: Setting zero Neumann temperature on patch = " << patch << std::endl;
           }
         }
-<<<<<<< HEAD
-        AddTempDirichletBC(temperature_value, inlet_attr);
-=======
+        // AddTempDirichletBC(temperature_value, inlet_attr);
 
->>>>>>> main
       } else if (type == "interpolate") {
         temperature_bc_field_ = new GridFunctionCoefficient(extData_interface_->Tdata);
         if (!neumann_temp_) {
@@ -518,11 +515,7 @@ void LteThermoChem::initializeSelf() {
 
   // Wall BCs
   {
-<<<<<<< HEAD
-    // if (rank0_) std::cout << "There are " << pmesh_->bdr_attributes.Max() << " boundary attributes!" << std::endl;
-=======
-    if (rank0_) std::cout << "There are " << pmesh_->bdr_attributes.Max() << " boundary attributes!" << std::endl;
->>>>>>> main
+    if (rank0_) std::cout << "There are " << pmesh_->bdr_attributes.Max() << " boundary attributes" << std::endl;
     Array<int> attr_wall(pmesh_->bdr_attributes.Max());
     attr_wall = 0;
 
