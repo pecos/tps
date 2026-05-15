@@ -39,7 +39,7 @@ TurbulenceModelOptions::TurbulenceModelOptions()
   turb_model_map_["none"] = NONE;
   turb_model_map_["smagorinsky"] = SMAGORINSKY;
   turb_model_map_["sigma"] = SIGMA;
-  turb_model_map_["wale"] = WALE;  
+  turb_model_map_["wale"] = WALE;
   turb_model_map_["algebraic-rans"] = ALGEBRAIC_RANS;
   turb_model_map_["static-rans"] = STATIC_RANS;
   turb_model_map_["zeta-f"] = ZETA_F;
@@ -74,7 +74,7 @@ void TurbulenceModelOptions::read(TPS::Tps *tps, std::string prefix) {
   } else if (turb_model_type_ == SIGMA) {
     default_turb_const = 0.135;
   } else if (turb_model_type_ == WALE) {
-    default_turb_const = 0.5;    
+    default_turb_const = 0.5;
   }
 
   // Get model constant (set to default if not present)

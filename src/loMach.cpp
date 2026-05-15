@@ -156,7 +156,7 @@ void LoMachSolver::initialize() {
   } else if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::SIGMA) {
     turbModel_ = new AlgebraicSubgridModels(pmesh_, &loMach_opts_, tpsP_, (meshData_->getGridScale()), 2);
   } else if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::WALE) {
-    turbModel_ = new AlgebraicSubgridModels(pmesh_, &loMach_opts_, tpsP_, (meshData_->getGridScale()), 3);    
+    turbModel_ = new AlgebraicSubgridModels(pmesh_, &loMach_opts_, tpsP_, (meshData_->getGridScale()), 3);
   } else if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::ALGEBRAIC_RANS) {
     //    turbModel_ = new AlgebraicRans(serial_mesh_, pmesh_, partitioning_, loMach_opts_.order, tpsP_);
     turbModel_ = new AlgebraicRans(pmesh_, partitioning_, loMach_opts_.order, tpsP_, (meshData_->getWallDistance()));
