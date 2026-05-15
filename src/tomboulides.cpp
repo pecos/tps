@@ -491,7 +491,6 @@ void Tomboulides::initializeSelf() {
         addSwirlDirichletBC(swirl, inlet_attr);
       }
 
-
       // Prescribe inlet velocity bc of face in face-coordinate system
       // NOTE: Original intent is to allow multiple inlet faces of different
       // orientation to be included in a single patch number.  There appears
@@ -565,7 +564,8 @@ void Tomboulides::initializeSelf() {
           // std::cout << patch << ") attr: " << attr << endl;
           nCount++;
 
-          int iFace = vfes_->GetMesh()->GetBdrFace(bel);
+          // int iFace = vfes_->GetMesh()->GetBdrFace(bel);
+          int iFace = vfes_->GetMesh()->GetBdrElementFaceIndex(bel);
           // FaceElementTransformations *Tr = vfes_->GetMesh()->GetBdrFaceTransformations(bel);
           // ElementTransformation *Tr = vfes_->GetMesh()->GetBdrElementTransformation(bel);
           ElementTransformation *Tr = vfes_->GetMesh()->GetFaceTransformation(iFace);
@@ -678,8 +678,7 @@ void Tomboulides::initializeSelf() {
                   << " cnt: " << nCount << endl;
       }
       addVelDirichletBC(uGlobal, inlet_attr);
-      
-      
+
     } else if (type == "interpolate") {
       if (pmesh_->GetMyRank() == 0) {
         std::cout << "Tomboulides: Setting interpolated Dirichlet velocity on patch = " << patch << std::endl;
