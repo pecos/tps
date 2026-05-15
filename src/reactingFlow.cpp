@@ -83,9 +83,9 @@ static double sigmaTorchStartUp(const Vector &pos) {
   if (radius_here >= rCyl) rwgt = 0.0;
   sigma = 2000. * rwgt * hwgt;
 
-  if (sigma > 1.0) {
-    std::cout << "sigma: " << sigma << " radius: " << radius_here << " y: " << y << endl;
-  }
+  // if (sigma > 1.0) {
+  //   std::cout << "sigma: " << sigma << " radius: " << radius_here << " y: " << y << endl;
+  // }
 
   return sigma;
 }

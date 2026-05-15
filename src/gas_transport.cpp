@@ -899,14 +899,14 @@ MFEM_HOST_DEVICE GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, 
   if (inputs.gas == GasType::Ar) {
     gasType_ = Ar;
 
-    if (numSpecies > 6) {
-      printf("\nGas:Ar ternary transport only supports ternary mixture of Ar, Ar.+1, Ar_m, Ar_r, Ar_p, and E (%d)!\n",
-             numSpecies);
-      // if (numSpecies > 7) {
-      //   printf(
-      //       "\nGas:Ar ternary transport only supports ternary mixture of Ar, Ar.+1, Ar_m, Ar_r, Ar_p, Ar_h, and E "
-      //       "(%d)!\n",
-      //       numSpecies);
+    // if (numSpecies > 6) {
+    // printf("\nGas:Ar ternary transport only supports ternary mixture of Ar, Ar.+1, Ar_m, Ar_r, Ar_p, and E (%d)!\n",
+    // numSpecies);
+    if (numSpecies > 7) {
+      printf(
+          "\nGas:Ar ternary transport only supports ternary mixture of Ar, Ar.+1, Ar_m, Ar_r, Ar_p, Ar_h, and E "
+          "(%d)!\n",
+          numSpecies);
       assert(false);
     }
 
@@ -949,7 +949,7 @@ MFEM_HOST_DEVICE GasMixtureTransport::GasMixtureTransport(GasMixture *_mixture, 
     // Nitrogen
   } else if (inputs.gas == GasType::Ni) {
     gasType_ = Ni;
-    printf("gas mixture type nitrogen...\n");
+    // printf("gas mixture type nitrogen...\n");
     neutralIndex2_ = inputs.neutralIndex2;
     ionIndex2_ = inputs.ionIndex2;
   } else {
