@@ -491,6 +491,195 @@ void Tomboulides::initializeSelf() {
         addSwirlDirichletBC(swirl, inlet_attr);
       }
 
+
+      // Prescribe inlet velocity bc of face in face-coordinate system
+      // NOTE: Original intent is to allow multiple inlet faces of different
+      // orientation to be included in a single patch number.  There appears
+      // to be an issue with the dof list output from GetFaceDofs(iFace, dofs).
+      // These sections of code are commented (but retained for future reference)
+      // in favor of a simpler approach which requires a different patch tag for
+      // every inlet face. This simple method does not account for curvature
+      // over the contiguous patch.
+    } else if (type == "normal") {
+      if (pmesh_->GetMyRank() == 0) {
+        std::cout << "Tomboulides: Setting face-normal Dirichlet velocity on patch = " << patch << std::endl;
+      }
+
+      // only support 3d mesh for now
+      assert(dim_ == 3);
+
+      Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
+      inlet_attr = 0;
+      inlet_attr[patch - 1] = 1;
+
+      Vector velocity_value(dim_);
+      Vector zero(dim_);
+      zero = 0.0;
+      tpsP_->getVec((basepath + "/velocity").c_str(), velocity_value, dim_, zero);
+
+      // face coord system
+      Vector normal;
+      Vector nTmp;
+      Vector tangent1;
+      Vector tangent2;
+      normal.SetSize(dim_);
+      nTmp.SetSize(dim_);
+      tangent1.SetSize(dim_);
+      tangent2.SetSize(dim_);
+      normal = 0.0;
+      nTmp = 0.0;
+      tangent1 = 0.0;
+      tangent2 = 0.0;
+
+      Vector one(dim_);
+      one = 0.0;
+      one[0] = 1.0;
+
+      tpsP_->getVec((basepath + "/tangent").c_str(), tangent2, dim_, one);
+      double nMag = 0.0;
+      for (int ii = 0; ii < dim_; ii++) nMag += tangent2[ii] * tangent2[ii];
+      tangent2 /= sqrt(nMag);
+
+      // stores actual boundary conditions
+      // uface_gf_ = new ParGridFunction(vfes_);
+      // *uface_gf_ = 0.0;
+
+      // gets passed to dirichlet bc
+      // uface_coeff_ = new VectorGridFunctionCoefficient(uface_gf_);
+
+      // loop over all boundary elements
+      // tmpR1_ = 0.0;
+      // double *data = tmpR1_.HostWrite();
+      // int sDofInt = sfes_->GetTrueVSize();
+      int nCount = 0;
+      Vector uSingleInlet;
+      uSingleInlet.SetSize(dim_);
+      uSingleInlet = 0.0;
+
+      for (int bel = 0; bel < vfes_->GetNBE(); bel++) {
+        // bel face tag
+        int attr = vfes_->GetBdrAttribute(bel);
+
+        // bndry eles with patch tag
+        if (attr == patch) {
+          // std::cout << patch << ") attr: " << attr << endl;
+          nCount++;
+
+          int iFace = vfes_->GetMesh()->GetBdrFace(bel);
+          // FaceElementTransformations *Tr = vfes_->GetMesh()->GetBdrFaceTransformations(bel);
+          // ElementTransformation *Tr = vfes_->GetMesh()->GetBdrElementTransformation(bel);
+          ElementTransformation *Tr = vfes_->GetMesh()->GetFaceTransformation(iFace);
+
+          // changing order from 1
+          const IntegrationRule ir = gll_rules.Get(Tr->GetGeometryType(), 2 * vorder_ - 1);
+
+          // face normal
+          for (int i = 0; i < ir.GetNPoints(); i++) {
+            IntegrationPoint ip = ir.IntPoint(i);
+            // Tr->SetAllIntPoints(&ip);
+            Tr->SetIntPoint(&ip);
+            CalcOrtho(Tr->Jacobian(), nTmp);
+            // std::cout << patch << "/" << bel << ") normal: (" << nTmp[0] << ", " << nTmp[1] << ", " << nTmp[2] << ")"
+            // << endl;
+            for (int ii = 0; ii < dim_; ii++) normal[ii] -= nTmp[ii];  // minus to be inward facing normal
+            // std::cout << patch << "/" << i << ") normal: (" << normal[0] << ", " << normal[1] << ", " << normal[2] <<
+            // ")" << endl;
+          }
+        }  // attr patch check
+      }  // bel loop
+
+      Vector uGlobal;
+      uGlobal.SetSize(dim_);
+      uGlobal = 0.0;
+      if (nCount > 0) {
+        nMag = 0.0;
+        for (int ii = 0; ii < dim_; ii++) nMag += normal[ii] * normal[ii];
+        normal /= sqrt(nMag);
+
+        // ensure normal is orthogonal to specified tangent
+        // std::cout << patch << ") inlet orig normal: (" << normal[0] << ", " << normal[1] << ", " << normal[2] << ")"
+        // << endl;
+        {
+          Vector projt2(dim_);
+          double tmag, tn;
+          tmag = 0.0;
+          tn = 0.0;
+          for (int d = 0; d < dim_; d++) tmag += tangent2[d] * tangent2[d];
+          for (int d = 0; d < dim_; d++) tn += tangent2[d] * normal[d];
+          for (int d = 0; d < dim_; d++) projt2[d] = (tn / tmag) * tangent2[d];
+          for (int d = 0; d < dim_; d++) normal[d] -= projt2[d];
+        }
+        // std::cout << patch << ") inlet fixed normal: (" << normal[0] << ", " << normal[1] << ", " << normal[2] << ")"
+        // << endl;
+
+        // unspecified tangent
+        tangent1[0] = normal[1] * tangent2[2] - normal[2] * tangent2[1];
+        tangent1[1] = normal[2] * tangent2[0] - normal[0] * tangent2[2];
+        tangent1[2] = normal[0] * tangent2[1] - normal[1] * tangent2[0];
+        nMag = 0.0;
+        for (int ii = 0; ii < dim_; ii++) nMag += tangent1[ii] * tangent1[ii];
+        tangent1 /= sqrt(nMag);
+        // std::cout << patch << ") inlet patch tangent: (" << tangent1[0] << ", " << tangent1[1] << ", " << tangent1[2]
+        // << ")" << endl;
+
+        // transform to global
+        DenseMatrix M(dim_, dim_);
+        for (int d = 0; d < dim_; d++) {
+          M(0, d) = normal[d];
+          M(1, d) = tangent1[d];
+          M(2, d) = tangent2[d];
+        }
+        for (int ii = 0; ii < dim_; ii++) {
+          for (int jj = 0; jj < dim_; jj++) {
+            uGlobal[ii] = uGlobal[ii] + M(jj, ii) * velocity_value[jj];
+            // uGlobal[ii] = uGlobal[ii] + M(ii,jj) * velocity_value[jj];
+          }
+        }
+        // std::cout << patch << ") Ugbl: " << uGlobal[0] << ", " << uGlobal[1] << ", " << uGlobal[2] << endl;
+
+        // with simple form of bc, just take mean of all ip
+        // for (int ii = 0; ii < dim_; ii++) uSingleInlet[ii] += uGlobal[ii];
+        // std::cout << patch << ") Usingle: " << uSingleInlet[0] << ", " << uSingleInlet[1] << ", " << uSingleInlet[2]
+        // << endl;
+
+        // dofs of element
+        // Array<int> dofs;
+        // sfes_->GetElementDofs(Tr->Elem1No, dofs);
+        // sfes_->GetBdrElementDofs(bel, dofs);
+        // sfes_->GetFaceDofs(iFace, dofs);
+        // int nDofs = dofs.Size();
+
+        // std::cout << bel << ") dofs: ";
+        // for (int ii = 0; ii < nDofs ; ii++) {
+        //   std::cout << dofs[ii] << " ";
+        // }
+        // std::cout << endl;
+
+        // for (int eq = 0; eq < dim_; eq++) {
+        //   for (int ii = 0; ii < nDofs ; ii++) {
+        //     int idof = dofs[ii];
+        //     data[idof + eq*sDofInt] = uGlobal[eq];
+        //   }
+        // }
+
+        //} // attr patch check
+        //} // bel loop
+
+        // uface_gf_->SetFromTrueDofs(tmpR1_);
+        // addVelDirichletBC(uface_coeff_, inlet_attr);
+
+        // if (nCount > 0) {
+        // for (int ii = 0; ii < dim_; ii++) uSingleInlet[ii] /= (double)nCount;
+        // std::cout <<  patch << ") Inlet BC: " << uSingleInlet[0] << ", " << uSingleInlet[1] << ", " <<
+        // uSingleInlet[2] << " cnt: " << nCount << endl;
+        // }
+        // addVelDirichletBC(uSingleInlet, inlet_attr);
+        std::cout << patch << ") Inlet BC: " << uGlobal[0] << ", " << uGlobal[1] << ", " << uGlobal[2]
+                  << " cnt: " << nCount << endl;
+      }
+      addVelDirichletBC(uGlobal, inlet_attr);
+      
+      
     } else if (type == "interpolate") {
       if (pmesh_->GetMyRank() == 0) {
         std::cout << "Tomboulides: Setting interpolated Dirichlet velocity on patch = " << patch << std::endl;
