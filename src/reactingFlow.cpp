@@ -83,9 +83,9 @@ static double sigmaTorchStartUp(const Vector &pos) {
   if (radius_here >= rCyl) rwgt = 0.0;
   sigma = 2000. * rwgt * hwgt;
 
-  if (sigma > 1.0) {
-    std::cout << "sigma: " << sigma << " radius: " << radius_here << " y: " << y << endl;
-  }
+  // if (sigma > 1.0) {
+  //   std::cout << "sigma: " << sigma << " radius: " << radius_here << " y: " << y << endl;
+  // }
 
   return sigma;
 }
@@ -790,6 +790,14 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   tpsP_->getInput("loMach/reactingFlow/neumann-temp", neumann_temp_, false);
   tpsP_->getInput("loMach/reactingFlow/neumann-species-inlet", neumann_species_inlet_, true);
   tpsP_->getInput("loMach/reactingFlow/neumann-species-wall", neumann_species_wall_, true);
+
+  // spark flow
+  Vector zero(dim_);
+  zero = 0.0;
+  tpsP_->getInput("loMach/reactingFlow/spark", spark_, false);
+  tpsP_->getVec("loMach/reactingFlow/spark-center",spark_center_, dim_, zero);
+  tpsP_->getInput("loMach/reactingFlow/spark-radius",spark_radius_, 0.0);
+  tpsP_->getInput("loMach/reactingFlow/spark-electron-mass-fraction",spark_peak_, 1.0e-18);  
 }  // NOLINT
 
 ReactingFlow::~ReactingFlow() {
@@ -1998,6 +2006,45 @@ void ReactingFlow::step() {
   dt_ = time_coeff_.dt;
   time_ = time_coeff_.time;
 
+  // spark flow if triggered
+  if (spark_) {
+    int eSlot = nSpecies_ - 2;
+    int ionSlot = nSpecies_ - 3;
+
+    ParGridFunction coordsDof(sfes);
+    pmesh_->GetNodes(coordsDof);
+
+    // rough code
+    auto h_Yn = Yn_next_.HostReadWrite();
+    for (int i = 0; i < sDofInt_; i++) {
+      
+      double x = coords(0 * sDofInt_ + i);
+      double y = coords(1 * sDofInt_ + i);
+      double z = coords(2 * sDofInt_ + i);
+      x = x - spark_center_[0];
+      y = y - spark_center_[1];
+      z = z - spark_center_[2];      
+      
+      double dist = spark_center_[0];
+      double pi = 3.14159265359;
+
+
+  double rwgt, hwgt;
+  double sigma;
+  rwgt = std::exp(-0.5 * (radius_here / rsig) * (radius_here / rsig));
+  hwgt = std::exp(-0.5 * ((y - y0) / ysig) * ((y - y0) / ysig));
+  if (radius_here >= rCyl) rwgt = 0.0;
+  sigma = 2000. * rwgt * hwgt;
+
+      
+      int sp = eSlot;	
+       = h_Yn[sp * sDofInt_ + i];
+    }
+    
+    speciesLastStep();      
+    spark_ = false;
+  }  
+  
   // Set current time for velocity Dirichlet boundary conditions.
   for (auto &temp_dbc : temp_dbcs_) {
     temp_dbc.coeff->SetTime(time_ + dt_);
