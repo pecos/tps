@@ -171,6 +171,12 @@ class ReactingFlow : public ThermoChemModelBase {
   bool sw_stab_;
   double Reh_factor_, Reh_offset_;
 
+  // flow spark
+  bool spark_ = false;
+  double spark_radius_;
+  double spark_peak_;
+  Vector spark_center_;
+
   // FEM related fields and objects
 
   // Scalar \f$H^1\f$ finite element collection.

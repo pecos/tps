@@ -792,12 +792,13 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   tpsP_->getInput("loMach/reactingFlow/neumann-species-wall", neumann_species_wall_, true);
 
   // spark flow
+  spark_center_.SetSize(dim_);
   Vector zero(dim_);
   zero = 0.0;
   tpsP_->getInput("loMach/reactingFlow/spark", spark_, false);
-  tpsP_->getVec("loMach/reactingFlow/spark-center",spark_center_, dim_, zero);
-  tpsP_->getInput("loMach/reactingFlow/spark-radius",spark_radius_, 0.0);
-  tpsP_->getInput("loMach/reactingFlow/spark-electron-mass-fraction",spark_peak_, 1.0e-18);  
+  tpsP_->getVec("loMach/reactingFlow/spark-center", spark_center_, dim_, zero);
+  tpsP_->getInput("loMach/reactingFlow/spark-radius", spark_radius_, 0.0);
+  tpsP_->getInput("loMach/reactingFlow/spark-electron-mass-fraction", spark_peak_, 1.0e-18);
 }  // NOLINT
 
 ReactingFlow::~ReactingFlow() {
@@ -2006,45 +2007,53 @@ void ReactingFlow::step() {
   dt_ = time_coeff_.dt;
   time_ = time_coeff_.time;
 
-  // spark flow if triggered
+  // spark flow at specified location if triggered
+  // TODO(swh) move to seperate function
   if (spark_) {
+    // TODO(swh) confirm that this check is alreay enforced elsewhere
+    int nSlot = nSpecies_ - 1;
     int eSlot = nSpecies_ - 2;
     int ionSlot = nSpecies_ - 3;
 
-    ParGridFunction coordsDof(sfes);
-    pmesh_->GetNodes(coordsDof);
+    const double m_n = mixture_->GetGasParams(nSlot, GasParams::SPECIES_MW);
+    const double m_e = mixture_->GetGasParams(eSlot, GasParams::SPECIES_MW);
+    const double m_ion = mixture_->GetGasParams(ionSlot, GasParams::SPECIES_MW);
 
-    // rough code
-    auto h_Yn = Yn_next_.HostReadWrite();
+    ParGridFunction coordsDof(sfes_);
+    pmesh_->GetNodes(coordsDof);
+    auto h_Yn = Yn_.HostReadWrite();
     for (int i = 0; i < sDofInt_; i++) {
-      
-      double x = coords(0 * sDofInt_ + i);
-      double y = coords(1 * sDofInt_ + i);
-      double z = coords(2 * sDofInt_ + i);
+      // spark volume weight
+      double x, y, z, dist;
+      double wgt;
+      x = coordsDof(0 * sDofInt_ + i);
+      y = coordsDof(1 * sDofInt_ + i);
       x = x - spark_center_[0];
       y = y - spark_center_[1];
-      z = z - spark_center_[2];      
-      
-      double dist = spark_center_[0];
-      double pi = 3.14159265359;
+      dist = x * x + y * y;
+      if (dim_ == 3) {
+        z = coordsDof(2 * sDofInt_ + i);
+        z = z - spark_center_[2];
+        dist += z * z;
+      }
+      dist = std::sqrt(dist);
+      wgt = std::exp(-0.5 * (dist / spark_radius_) * (dist / spark_radius_));
 
+      // free electron value (mass-fraction)
+      h_Yn[eSlot * sDofInt_ + i] = wgt * spark_peak_;
 
-  double rwgt, hwgt;
-  double sigma;
-  rwgt = std::exp(-0.5 * (radius_here / rsig) * (radius_here / rsig));
-  hwgt = std::exp(-0.5 * ((y - y0) / ysig) * ((y - y0) / ysig));
-  if (radius_here >= rCyl) rwgt = 0.0;
-  sigma = 2000. * rwgt * hwgt;
+      // correct ion value to stay consistent
+      h_Yn[ionSlot * sDofInt_ + i] -= h_Yn[eSlot * sDofInt_ + i] * m_ion / m_e;
 
-      
-      int sp = eSlot;	
-       = h_Yn[sp * sDofInt_ + i];
+      // correct nuetral
+      h_Yn[nSlot * sDofInt_ + i] -= h_Yn[eSlot * sDofInt_ + i] * m_n / m_e;
     }
-    
-    speciesLastStep();      
+    YnFull_gf_.SetFromTrueDofs(Yn_);
+
+    // only do this once
     spark_ = false;
-  }  
-  
+  }  // end spark loop
+
   // Set current time for velocity Dirichlet boundary conditions.
   for (auto &temp_dbc : temp_dbcs_) {
     temp_dbc.coeff->SetTime(time_ + dt_);
