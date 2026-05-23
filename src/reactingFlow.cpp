@@ -797,7 +797,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   zero = 0.0;
   tpsP_->getInput("loMach/reactingFlow/spark", spark_, false);
   tpsP_->getVec("loMach/reactingFlow/spark-center", spark_center_, dim_, zero);
-  tpsP_->getInput("loMach/reactingFlow/spark-radius", spark_radius_, 0.0);
+  tpsP_->getInput("loMach/reactingFlow/spark-radius", spark_radius_, 1.0);
   tpsP_->getInput("loMach/reactingFlow/spark-electron-mass-fraction", spark_peak_, 1.0e-18);
 }  // NOLINT
 
@@ -2010,6 +2010,8 @@ void ReactingFlow::step() {
   // spark flow at specified location if triggered
   // TODO(swh) move to seperate function
   if (spark_) {
+    if(rank0_) std::cout << "Sparking flow" << endl;
+    
     // TODO(swh) confirm that this check is alreay enforced elsewhere
     int nSlot = nSpecies_ - 1;
     int eSlot = nSpecies_ - 2;
@@ -2019,10 +2021,11 @@ void ReactingFlow::step() {
     const double m_e = mixture_->GetGasParams(eSlot, GasParams::SPECIES_MW);
     const double m_ion = mixture_->GetGasParams(ionSlot, GasParams::SPECIES_MW);
 
-    ParGridFunction coordsDof(sfes_);
+    ParGridFunction coordsDof(vfes_);
     pmesh_->GetNodes(coordsDof);
     auto h_Yn = Yn_.HostReadWrite();
     for (int i = 0; i < sDofInt_; i++) {
+      
       // spark volume weight
       double x, y, z, dist;
       double wgt;
@@ -2038,12 +2041,20 @@ void ReactingFlow::step() {
       }
       dist = std::sqrt(dist);
       wgt = std::exp(-0.5 * (dist / spark_radius_) * (dist / spark_radius_));
-
+      //if (rank0_) std::cout << "SPARK WGT: " << wgt << " | dist: " << dist << " | spark_radius: " << spark_radius_ << endl;
+      //wgt = 1.0;
+      //if(wgt < 0) {
+      //std::cout << "BAD WGT: " << wgt << endl;
+      //}
+      //if(wgt >1) {
+      //std::cout << "BAD WGT: " << wgt << endl;
+      //}
+      
       // free electron value (mass-fraction)
-      h_Yn[eSlot * sDofInt_ + i] = wgt * spark_peak_;
+      h_Yn[eSlot * sDofInt_ + i] += wgt * spark_peak_;
 
       // correct ion value to stay consistent
-      h_Yn[ionSlot * sDofInt_ + i] -= h_Yn[eSlot * sDofInt_ + i] * m_ion / m_e;
+      h_Yn[ionSlot * sDofInt_ + i] += h_Yn[eSlot * sDofInt_ + i] * m_ion / m_e;
 
       // correct nuetral
       h_Yn[nSlot * sDofInt_ + i] -= h_Yn[eSlot * sDofInt_ + i] * m_n / m_e;
