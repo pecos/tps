@@ -41,6 +41,8 @@ TurbulenceModelOptions::TurbulenceModelOptions()
   turb_model_map_["sigma"] = SIGMA;
   turb_model_map_["wale"] = WALE;
   turb_model_map_["algebraic-rans"] = ALGEBRAIC_RANS;
+  turb_model_map_["static-rans"] = STATIC_RANS;
+  turb_model_map_["zeta-f"] = ZETA_F;
 
   turb_model_type_ = turb_model_map_[turb_model_string_];
 }

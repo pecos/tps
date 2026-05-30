@@ -65,6 +65,7 @@ struct thermoChemToFlow {
  */
 struct thermoChemToTurbModel {
   const mfem::ParGridFunction *density = nullptr;
+  const mfem::ParGridFunction *viscosity = nullptr;
 };
 
 /**

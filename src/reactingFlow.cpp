@@ -76,7 +76,7 @@ static double sigmaTorchStartUp(const Vector &pos) {
   const double x = std::sqrt(pos[0] * pos[0] + pos[2] * pos[2]);  // radial location
   const double y = pos[1];                                        // axial location
 
-  const double r0 = 0.005;
+  // const double r0 = 0.005;
   // const double y0 = 0.135;
   // const double ysig = 0.015;
 
@@ -99,11 +99,11 @@ static double sigmaTorchStartUp(const Vector &pos) {
   hwgt = std::exp(-0.5 * ((y - y0) / ysig) * ((y - y0) / ysig));
   if (radius_here >= rCyl) rwgt = 0.0;
   sigma = 2000. * rwgt * hwgt;
-  
-  if (sigma>1.0) {
-    std::cout << "sigma: " << sigma << " radius: "<< radius_here << " y: " << y << endl;
-  }
-  
+
+  // if (sigma > 1.0) {
+  //   std::cout << "sigma: " << sigma << " radius: " << radius_here << " y: " << y << endl;
+  // }
+
   return sigma;
 }
 
@@ -174,7 +174,6 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
 
   // Duplicating this logical here as w/o it, sigma will be updated with diffusivities
   tpsP_->getInput("cycle-avg-joule-coupled/fixed-conductivity", fixed_conductivity_, false);
-  
   workFluid_ = USER_DEFINED;
   gasModel_ = PERFECT_MIXTURE;
   chemistryModel_ = NUM_CHEMISTRYMODEL;
@@ -715,6 +714,39 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
 
   chemistry_ = new Chemistry(mixture_, chemistryInput_);
 
+  // ramping changes between chemistry models
+  tpsP_->getInput("loMach/reactingFlow/ramp-chem", ramp_chem_, false);
+  if (ramp_chem_) {
+    tpsP_->getInput("loMach/reactingFlow/ramp-chem/ramp_start", ramp_start, -1.);
+    tpsP_->getInput("loMach/reactingFlow/ramp-chem/ramp_time", ramp_time, -1.);
+  }
+
+  // retain access to baseline chemistry models if ramping from one to another
+  if (ramp_chem_) {
+    chemistryInputBase_ = chemistryInput_;
+    for (int r = 1; r <= nReactions_; r++) {
+      std::string basepath("reactions_base/reaction" + std::to_string(r));
+
+      std::string equation, model;
+      tpsP_->getRequiredInput((basepath + "/equation").c_str(), equation);
+      tpsP_->getRequiredInput((basepath + "/model").c_str(), model);
+
+      double energy;
+      tpsP_->getRequiredInput((basepath + "/reaction_energy").c_str(), energy);
+
+      // not implemented for non-tabulated
+      if (model == "tabulated") {
+        std::string inputPath(basepath + "/tabulated");
+        readTableWrapper(inputPath, chemistryInputBase_.reactionInputs[r - 1].tableInput);
+
+      } else {
+        grvy_printf(GRVY_ERROR, "\nUnknown reaction_model for chem_ramp settings -> %s", model.c_str());
+        exit(ERROR);
+      }
+    }
+    chemistryBase_ = new Chemistry(mixture_, chemistryInputBase_);
+  }
+
   // Initialize radiation (just NEC for now) model
   std::string type;
   std::string basepath("plasma_models/radiation_model");
@@ -782,7 +814,6 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   }
 
   tps->getInput("loMach/torch-cold-start", torch_cold_start_, false);
-  
   tpsP_->getInput("loMach/reactingFlow/explicit-destruction", explicit_destruction_, false);
   tpsP_->getInput("loMach/reactingFlow/sub-steps", nSub_, 1);
   tpsP_->getInput("loMach/reactingFlow/dynamic-substep", dynamic_substepping_, false);
@@ -814,6 +845,16 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
 
   // artificial diffusion (SUPG)
   tpsP_->getInput("loMach/reactingFlow/streamwise-stabilization", sw_stab_, false);
+
+  // specified plasma initial condition
+  tpsP_->getInput("plasma_models/initialize_species", species_init_, false);
+  tpsP_->getInput("loMach/reactingFlow/Reh_factor", Reh_factor_, 0.5);
+  tpsP_->getInput("loMach/reactingFlow/Reh_offset", Reh_offset_, 1.0);
+
+  // zero-gradient BCs
+  tpsP_->getInput("loMach/reactingFlow/neumann-temp", neumann_temp_, false);
+  tpsP_->getInput("loMach/reactingFlow/neumann-species-inlet", neumann_species_inlet_, true);
+  tpsP_->getInput("loMach/reactingFlow/neumann-species-wall", neumann_species_wall_, true);
 }  // NOLINT
 
 ReactingFlow::~ReactingFlow() {
@@ -923,6 +964,24 @@ ReactingFlow::~ReactingFlow() {
   delete mixture_;
   delete transport_;
   delete chemistry_;
+  if (ramp_chem_) {
+    delete chemistryBase_;
+  }
+
+  delete umag_coeff_;
+  delete gscale_coeff_;
+  delete visc_coeff_;
+  delete visc_inv_coeff_;
+  delete reh1_coeff_;
+  delete reh2_coeff_;
+  delete Reh_coeff_;
+  delete csupg_coeff_;
+  delete uw1_coeff_;
+  delete uw2_coeff_;
+  delete upwind_coeff_;
+  delete swdiff_coeff_;
+  delete supg_coeff_;
+  delete supg_cp_coeff_;
 
   delete umag_coeff_;
   delete gscale_coeff_;
@@ -1247,11 +1306,28 @@ void ReactingFlow::initializeSelf() {
   Mmix_gf_.SetSpace(sfes_);
   Rmix_gf_.SetSpace(sfes_);
 
+  // qt rhs visualization
+  // rhsqt_bd_.SetSpace(sfes_);
+  // rhsqt_fo_.SetSpace(sfes_);
+  // rhsqt_jh_.SetSpace(sfes_);
+  // rhsqt_hf_.SetSpace(sfes_);
+  // rhsqt_sd_.SetSpace(sfes_);
+  // rhsqt_total_.SetSpace(sfes_);
+  // Xqt_gf_.SetSpace(sfes_);
+  // rhsqt_bd_ = 0.0;
+  // rhsqt_fo_ = 0.0;
+  // rhsqt_jh_ = 0.0;
+  // rhsqt_hf_ = 0.0;
+  // rhsqt_sd_ = 0.0;
+  // rhsqt_total_ = 0.0;
+  // Xqt_gf_ = 0.0;
+
   // exports
   toFlow_interface_.density = &rn_gf_;
   toFlow_interface_.viscosity = &visc_gf_;
   toFlow_interface_.thermal_divergence = &Qt_gf_;
   toTurbModel_interface_.density = &rn_gf_;
+  toTurbModel_interface_.viscosity = &visc_gf_;
 
   plasma_conductivity_gf_ = &sigma_gf_;
   joule_heating_gf_ = &jh_gf_;
@@ -1336,6 +1412,7 @@ void ReactingFlow::initializeSelf() {
       setVectorFromScalar(tmpR0_, sp, &Yn_);
     }
   }
+
   Ynm1_ = Yn_;
   Ynm2_ = Yn_;
   Yn_next_gf_ = Yn_gf_;
@@ -1384,6 +1461,79 @@ void ReactingFlow::initializeSelf() {
 
       if (type == "uniform") {
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
+        if (!neumann_temp_) {
+          inlet_attr = 0;
+          inlet_attr[patch - 1] = 1;
+          double temperature_value;
+          tpsP_->getRequiredInput((basepath + "/temperature").c_str(), temperature_value);
+          if (rank0_) {
+            std::cout << "Rx Flow: Setting uniform Dirichlet temperature on patch = " << patch << std::endl;
+          }
+          AddTempDirichletBC(temperature_value, inlet_attr);
+        } else {
+          if (rank0_) {
+            std::cout << "Rx Flow: Setting zero Neumann temperature on patch = " << patch << std::endl;
+          }
+        }
+
+        // AddTempDirichletBC(temperature_value, inlet_attr);
+        // AddSpecDirichletBC(0.0, inlet_attr);
+
+        if (neumann_species_inlet_) {
+          if (rank0_) {
+            std::cout << "Rx Flow: Setting zero Neumann species on patch = " << patch << std::endl;
+          }
+        } else {
+          if (rank0_) {
+            std::cout << "Rx Flow: Setting zero Dirichlet species on patch = " << patch << std::endl;
+          }
+          AddSpecDirichletBC(0.0, inlet_attr);
+        }
+
+      } else if (type == "interpolate") {
+        Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
+        temperature_bc_field_ = new GridFunctionCoefficient(extData_interface_->Tdata);
+
+        if (!neumann_temp_) {
+          inlet_attr = 0;
+          inlet_attr[patch - 1] = 1;
+          if (rank0_) {
+            std::cout << "Rx Flow: Setting interpolated Dirichlet temperature on patch = " << patch << std::endl;
+          }
+          AddTempDirichletBC(temperature_bc_field_, inlet_attr);
+
+          // Force the IC to agree with the interpolated inlet BC
+          //
+          // NB: It is still possible for Tn_gf_ on a restart to
+          // disagree with this BC.  Specifically, since the restart
+          // field is read after this projection, if it does not satisfy
+          // this BC, there will be a discrepancy (which will be
+          // eliminated after the first step).
+          Tn_gf_.ProjectBdrCoefficient(*temperature_bc_field_, inlet_attr);
+        } else {
+          if (rank0_) {
+            std::cout << "Rx Flow: Setting zero Neumann temperature on patch = " << patch << std::endl;
+          }
+        }
+
+        species_bc_field_ = new GridFunctionCoefficient(extData_interface_->Ydata);
+        if (neumann_species_inlet_) {
+          if (rank0_) {
+            std::cout << "Rx Flow: Setting zero Neumann species on patch = " << patch << std::endl;
+          }
+        } else {
+          if (rank0_) {
+            std::cout << "Rx Flow: Setting interpolated Dirichlet species on patch = " << patch << std::endl;
+          }
+          AddSpecDirichletBC(species_bc_field_, inlet_attr);
+          Yn_gf_.ProjectBdrCoefficient(*species_bc_field_, inlet_attr);
+        }
+
+        // AddSpecDirichletBC(species_bc_field_, inlet_attr);
+        // Yn_gf_.ProjectBdrCoefficient(*species_bc_field_, inlet_attr);
+
+      } else if (type == "normal") {
+        Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
         inlet_attr = 0;
         inlet_attr[patch - 1] = 1;
         double temperature_value;
@@ -1393,35 +1543,7 @@ void ReactingFlow::initializeSelf() {
         }
         AddTempDirichletBC(temperature_value, inlet_attr);
 
-        // AddSpecDirichletBC(0.0, inlet_attr);
-
-      } else if (type == "interpolate") {
-        Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
-        inlet_attr = 0;
-        inlet_attr[patch - 1] = 1;
-        temperature_bc_field_ = new GridFunctionCoefficient(extData_interface_->Tdata);
-        // species_bc_field_ = new GridFunctionCoefficient(extData_interface_->Ydata);
-        if (rank0_) {
-          std::cout << "Rx Flow: Setting interpolated Dirichlet temperature on patch = " << patch << std::endl;
-        }
-        AddTempDirichletBC(temperature_bc_field_, inlet_attr);
-        // AddSpeciesDirichletBC(species_value, inlet_attr);
-
-        // Force the IC to agree with the interpolated inlet BC
-        //
-        // NB: It is still possible for Tn_gf_ on a restart to
-        // disagree with this BC.  Specifically, since the restart
-        // field is read after this projection, if it does not satisfy
-        // this BC, there will be a discrepancy (which will be
-        // eliminated after the first step).
-        Tn_gf_.ProjectBdrCoefficient(*temperature_bc_field_, inlet_attr);
-
-        species_bc_field_ = new GridFunctionCoefficient(extData_interface_->Ydata);
-        if (rank0_) {
-          std::cout << "Rx Flow: Setting interpolated Dirichlet species on patch = " << patch << std::endl;
-        }
-        AddSpecDirichletBC(species_bc_field_, inlet_attr);
-        Yn_gf_.ProjectBdrCoefficient(*species_bc_field_, inlet_attr);
+        // do nothing for species for time being
 
       } else if (type == "normal") {
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
@@ -1492,7 +1614,9 @@ void ReactingFlow::initializeSelf() {
         Qt_bc_coeff->constant = 0.0;
         AddQtDirichletBC(Qt_bc_coeff, attr_wall);
 
-        // AddSpecDirichletBC(0.0, attr_wall);
+        if (!neumann_species_wall_) {
+          AddSpecDirichletBC(0.0, attr_wall);
+        }
       }
     }
     if (rank0_) std::cout << "Temp wall bc completed: " << numWalls << endl;
@@ -1510,11 +1634,11 @@ void ReactingFlow::initializeOperators() {
   dt_ = time_coeff_.dt;
 
   // TODO(trevilo): Put a flag for this!!!!
-  if(torch_cold_start_) {
-    if (rank0_) std::cout << " Cold start selected.  Specifying sigma field."  << endl;    
+  if (torch_cold_start_) {
+    if (rank0_) std::cout << " Cold start selected.  Specifying sigma field." << endl;
     sigma_gf_.ProjectCoefficient(sigma_start_up);
   }
-  
+
   Array<int> empty;
 
   // GLL integration rule (Numerical Integration)
@@ -1595,7 +1719,8 @@ void ReactingFlow::initializeOperators() {
     Reh_coeff_ = new ProductCoefficient(*reh2_coeff_, *umag_coeff_);
 
     // Csupg
-    csupg_coeff_ = new TransformedCoefficient(Reh_coeff_, csupgFactor);
+    std::function<double(double)> csupgLambda = std::bind(csupgFactor, std::placeholders::_1, Reh_factor_, Reh_offset_);
+    csupg_coeff_ = new ExtTransformedCoefficient(Reh_coeff_, csupgLambda);
 
     // compute upwind magnitude
     if (axisym_) {
@@ -1953,6 +2078,15 @@ void ReactingFlow::initializeOperators() {
     lyd_blfi->SetIntRule(&ir_di);
   }
   LY_form_->AddDomainIntegrator(lyd_blfi);
+
+  // auto *slyd_blfi = new DiffusionIntegrator(*supg_coeff_);
+  // if (sw_stab_)
+  //   // SUPG diffusion
+  //   // if (numerical_integ_) {
+  //   //   slyd_blfi->SetIntRule(&ir_di);
+  //   // }
+  //   LY_form_->AddDomainIntegrator(slqd_blfi);
+
   if (partial_assembly_) {
     LY_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   }
@@ -2053,6 +2187,25 @@ void ReactingFlow::initializeOperators() {
   BTEkReac_gf_.GetTrueDofs(BTEkReac_);  
   BTErrf_by_rrb_gf_.GetTrueDofs(BTErrf_by_rrb_);  
 #endif
+  // override species initial condition
+  if (species_init_) {
+    if (rank0_) std::cout << "Projecting initial species fields." << endl;
+    species_init_field_ = new VectorGridFunctionCoefficient(extData_interface_->Yfulldata);
+    // for (int sp = 0; sp < nSpecies_; sp++) {
+    //   // Yn_gf_.ProjectCoefficient(species_init_field_);
+    //   // Yn_gf_.GetTrueDofs(tmpR0_);
+    //   // setVectorFromScalar(tmpR0_, sp, &Yn_);
+    //   setVectorFromScalar(tmpR0_, sp, &Yn_);
+    // }
+    // Ynm1_ = Yn_;
+    // Ynm2_ = Yn_;
+    // Yn_next_gf_ = Yn_gf_;
+    // YnFull_gf_.SetFromTrueDofs(Yn_);
+    YnFull_gf_.ProjectCoefficient(*species_init_field_);
+    Yn_ = YnFull_gf_.GetTrueVector();
+    Ynm1_ = Yn_;
+    Ynm2_ = Yn_;
+  }
 
   // and initialize system mass
   updateMixture();
@@ -2743,7 +2896,7 @@ void ReactingFlow::step() {
 
   updateMixture();
   updateDiffusivity();
-
+  // if (rank0_) std::cout << "step success" << std::endl;
 }
 
 // should be Nsub s.t.: Nsub > dt * [Prod_Y{n}/rho{n}/Yn{n}]
@@ -3227,6 +3380,21 @@ void ReactingFlow::speciesProduction() {
 
     // Evaluate the chemical source terms
     chemistry_->computeForwardRateCoeffs(n_sp.Read(), Th, Te, i, kfwd.HostWrite());
+
+    // ramp chemistry from previous run
+    if (ramp_chem_ && time_ < ramp_time + ramp_start && time_ > ramp_start) {
+      Vector kfwd_base;
+      kfwd_base.SetSize(chemistryBase_->getNumReactions());
+      chemistryBase_->computeForwardRateCoeffs(n_sp.Read(), Th, Te, i, kfwd_base.HostWrite());
+      for (int r = 0; r < chemistryBase_->getNumReactions(); r++) {
+        kfwd[r] = kfwd_base[r] + (time_ - ramp_start) * (kfwd[r] - kfwd_base[r]) / ramp_time;
+      }
+      // if (i == 100) {
+      //   // kfwd new = %.6e,
+      //   printf("kfwd old = %.6e, kfwd star = %.6e\n", kfwd_base[0], kfwd[0]);
+      // }
+    }
+
     chemistry_->computeEquilibriumConstants(Th, Te, keq.HostWrite());
     chemistry_->computeProgressRate(n_sp, kfwd, keq, progressRate);
     chemistry_->computeCreationRate(progressRate, creationRate, emissionRate);
@@ -3413,6 +3581,14 @@ void ReactingFlow::initializeViz(ParaViewDataCollection &pvdc) {
   pvdc.RegisterField("EfieldR", &er_gf_);
   pvdc.RegisterField("EfieldI", &ei_gf_);
 #endif
+  // diagnose Qt issues, rhs contributions
+  // pvdc.RegisterField("rhsqt_bd", &rhsqt_bd_); //boundary terms
+  // pvdc.RegisterField("rhsqt_fo", &rhsqt_fo_); //bilinear form
+  // pvdc.RegisterField("rhsqt_jh", &rhsqt_jh_); //joule heating
+  // pvdc.RegisterField("rhsqt_hf", &rhsqt_hf_); //heat of formation
+  // pvdc.RegisterField("rhsqt_sd", &rhsqt_sd_); ///species-temp diff
+  // pvdc.RegisterField("rhsqt_total", &rhsqt_total_);
+  // pvdc.RegisterField("Xqt", &Xqt_gf_);
 
   vizSpecFields_.clear();
   vizSpecNames_.clear();
@@ -3763,43 +3939,41 @@ void ReactingFlow::updateDiffusivity() {
   kappa_gf_.SetFromTrueDofs(kappa_);
 
   // electrical conductivity
-  if( !torch_cold_start_ && !fixed_conductivity_) {
-
-    //if(rank0_) std::cout << " sigma update portion... " << endl;    
+  if (!torch_cold_start_ && !fixed_conductivity_) {
+    // if(rank0_) std::cout << " sigma update portion... " << endl;
     {
-    double *h_sig = sigma_.HostReadWrite();
-    for (int i = 0; i < sDofInt_; i++) {
-      // int nEq = dim_ + 2 + nActiveSpecies_;
-      double state[gpudata::MAXEQUATIONS];
-      double conservedState[gpudata::MAXEQUATIONS];
+      double *h_sig = sigma_.HostReadWrite();
+      for (int i = 0; i < sDofInt_; i++) {
+        // int nEq = dim_ + 2 + nActiveSpecies_;
+        double state[gpudata::MAXEQUATIONS];
+        double conservedState[gpudata::MAXEQUATIONS];
 
-      // Populate *primitive* state vector = [rho, velocity, temperature, species mole densities]
-      state[0] = dataRho[i];
-      for (int eq = 0; eq < dim_; eq++) {
-        state[eq + 1] = dataU[i + eq * sDofInt_];
+        // Populate *primitive* state vector = [rho, velocity, temperature, species mole densities]
+        state[0] = dataRho[i];
+        for (int eq = 0; eq < dim_; eq++) {
+          state[eq + 1] = dataU[i + eq * sDofInt_];
+        }
+        state[dim_ + 1] = dataTemp[i];
+        for (int sp = 0; sp < nActiveSpecies_; sp++) {
+          state[dim_ + 2 + sp] =
+              dataRho[i] * Yn_[i + sp * sDofInt_] / mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
+        }
+
+        mixture_->GetConservativesFromPrimitives(state, conservedState);
+
+        double sig;
+        transport_->ComputeElectricalConductivity(conservedState, sig);
+        h_sig[i] = sig;
       }
-      state[dim_ + 1] = dataTemp[i];
-      for (int sp = 0; sp < nActiveSpecies_; sp++) {
-        state[dim_ + 2 + sp] = dataRho[i] * Yn_[i + sp * sDofInt_] / mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
-      }
-
-      mixture_->GetConservativesFromPrimitives(state, conservedState);
-
-      double sig;
-      transport_->ComputeElectricalConductivity(conservedState, sig);
-      h_sig[i] = sig;
     }
+
+    sigma_gf_.SetFromTrueDofs(sigma_);
   }
-    
-  sigma_gf_.SetFromTrueDofs(sigma_);
-  }
-  
 }
 
 void ReactingFlow::evaluatePlasmaConductivityGF() {
+  if (rank0_) std::cout << " we are in evaluatePlasmaConductivityGF " << endl;
 
-  if(rank0_) std::cout << " we are in evaluatePlasmaConductivityGF " << endl;
-  
   (flow_interface_->velocity)->GetTrueDofs(tmpR1_);
   const double *dataTemp = Tn_.HostRead();
   const double *dataRho = rn_.HostRead();
@@ -3807,8 +3981,7 @@ void ReactingFlow::evaluatePlasmaConductivityGF() {
 
   double *h_sig = sigma_.HostReadWrite();
 
-  if(!torch_cold_start_) {
-    
+  if (!torch_cold_start_) {
     for (int i = 0; i < sDofInt_; i++) {
       // int nEq = dim_ + 2 + nActiveSpecies_;
       double state[gpudata::MAXEQUATIONS];
@@ -3830,11 +4003,9 @@ void ReactingFlow::evaluatePlasmaConductivityGF() {
       transport_->ComputeElectricalConductivity(conservedState, sig);
       h_sig[i] = sig;
     }
-    
+
     sigma_gf_.SetFromTrueDofs(sigma_);
-  
   }
-  
 }
 
 void ReactingFlow::updateDensity(double tStep, bool update_mass_matrix) {
@@ -3988,43 +4159,81 @@ void ReactingFlow::AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr) {
 
 void ReactingFlow::computeQtTO() {
   tmpR0_ = 0.0;
+  // rhsqt_bd_ = 0.0;
+  // rhsqt_fo_ = 0.0;
+  // rhsqt_jh_ = 0.0;
+  // rhsqt_hf_ = 0.0;
+  // rhsqt_sd_ = 0.0;
+  // rhsqt_total_ = 0.0;
+  // Xqt_gf_ = 0.0;
   LQ_bdry_->Update();
   LQ_bdry_->Assemble();
   LQ_bdry_->ParallelAssemble(tmpR0_);
   tmpR0_.Neg();
+  // LQ_bdry_->ParallelAssemble(rhsqt_bd_);
+  // rhsqt_bd_.Neg();
+  // tmpR0_ += rhsqt_bd_;
+  // printf("%f\n", tmpR0_.Norml2());
 
   Array<int> empty;
   LQ_form_->Update();
   LQ_form_->Assemble();
   LQ_form_->FormSystemMatrix(empty, LQ_);
   LQ_->AddMult(Tn_next_, tmpR0_);  // tmpR0_ += LQ{Tn_next}
+  // LQ_->Mult(Tn_next_, rhsqt_fo_);  // tmpR0_ += LQ{Tn_next}
+  // tmpR0_ += rhsqt_fo_;
+  // printf("%f\n", tmpR0_.Norml2());
 
   // Joule heating (and radiation sink)
   jh_form_->Update();
   jh_form_->Assemble();
   jh_form_->ParallelAssemble(jh_);
   tmpR0_ -= jh_;
+  // rhsqt_jh_.SetFromTrueDofs(jh_);
+  // rhsqt_jh_.Neg();
+  // printf("%f\n", tmpR0_.Norml2());
 
   // heat of formation
   Ms_->AddMult(hw_, tmpR0_, -1.0);
+  // Ms_->Mult(hw_, rhsqt_hf_);
+  // rhsqt_hf_.Neg();
+  // tmpR0_ += rhsqt_hf_;
+  // printf("%f\n", tmpR0_.Norml2());
 
   // species-temp diffusion term, already in int-weak form
   tmpR0_.Add(-1.0, crossDiff_);
+  // rhsqt_sd_.SetFromTrueDofs(crossDiff_);
+  // rhsqt_sd_.Neg();
+  // printf("%f\n", tmpR0_.Norml2());
 
   sfes_->GetRestrictionMatrix()->MultTranspose(tmpR0_, resT_gf_);
+  // rhsqt_total_.SetFromTrueDofs(resT_gf_);
 
   Qt_ = 0.0;
   Qt_gf_.SetFromTrueDofs(Qt_);
 
   Vector Xqt, Bqt;
   Mq_form_->FormLinearSystem(Qt_ess_tdof_, Qt_gf_, resT_gf_, Mq_, Xqt, Bqt, 1);
-
   MqInv_->Mult(Bqt, Xqt);
   Mq_form_->RecoverFEMSolution(Xqt, resT_gf_, Qt_gf_);
+  // Xqt_gf_.SetFromTrueDofs(Xqt);
 
   Qt_gf_ *= Rmix_gf_;
   Qt_gf_ /= CpMix_gf_;
   Qt_gf_ /= thermo_pressure_;
+
+  // NOTE: clipping for diagnosis, goes both directions for now
+  // double clip_val;
+  // if (clip_qt_) {
+  //   tpsP_->getInput("loMach/reactingFlow/clip-qt-value", clip_val, 50000.);
+
+  //   for (int n = 0; n < sfes_->GetNDofs(); n++) {
+  //     // Qt_gf_[n] = std::clamp(Qt_gf_[n], -clip_val, clip_val)
+  //     Qt_gf_[n] = std::min(clip_val, std::max(-clip_val, Qt_gf_[n]));
+  //   }
+
+  // }
+
   Qt_gf_.Neg();
 }
 
@@ -4384,6 +4593,17 @@ void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, 
 
   // Evaluate the chemical source terms
   chemistry_->computeForwardRateCoeffs(n_sp.Read(), Th, Te, dofindex, kfwd.HostWrite());
+
+  // ramp chemistry from previous run
+  if (ramp_chem_ && time_ < ramp_time + ramp_start && time_ > ramp_start) {
+    Vector kfwd_base;
+    kfwd_base.SetSize(chemistryBase_->getNumReactions());
+    chemistryBase_->computeForwardRateCoeffs(n_sp.Read(), Th, Te, dofindex, kfwd_base.HostWrite());
+    for (int r = 0; r < chemistryBase_->getNumReactions(); r++) {
+      kfwd[r] = kfwd_base[r] + (time_ - ramp_start) * (kfwd[r] - kfwd_base[r]) / ramp_time;
+    }
+  }
+
   chemistry_->computeEquilibriumConstants(Th, Te, keq.HostWrite());
   chemistry_->computeProgressRate(n_sp, kfwd, keq, progressRate);
   chemistry_->computeCreationRate(progressRate, creationRate, emissionRate);

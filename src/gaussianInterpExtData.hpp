@@ -104,8 +104,22 @@ class GaussianInterpExtData : public ExternalDataBase {
   // int iter;
 
   bool isInterpInlet_;
+  bool isInterpTurbInlet_;
+  bool isInterpTurbField_;
+  bool isInitSpeciesField_;
 
+  double tke_const_;
+
+  bool axisym_;
+  bool species_init_;
+
+  std::string turb_type_;
   std::string fname_;
+  std::string fname_turb_;
+  std::string fname_tke_;
+  std::string fname_spec_;
+  double v_fac_;
+  double tke_bc_fac_;
 
   // Scalar \f$H^1\f$ finite element collection.
   FiniteElementCollection *sfec_ = nullptr;
@@ -124,7 +138,13 @@ class GaussianInterpExtData : public ExternalDataBase {
   ParGridFunction temperature_gf_;
   ParGridFunction velocity_gf_;
   ParGridFunction vel0_gf_;
+  ParGridFunction swirl_gf_;
+  ParGridFunction swirl0_gf_;
+  ParGridFunction nut_gf_;
+  ParGridFunction tke_gf_;
+  ParGridFunction v2_gf_;
   ParGridFunction Yn_gf_;
+  ParGridFunction Yfull_gf_;
 
   // gradual increase of external bc over multiple steps
   int rampSteps_;
@@ -140,6 +160,10 @@ class GaussianInterpExtData : public ExternalDataBase {
   void initializeSelf();
   void initializeViz(ParaViewDataCollection &pvdc) final;
   void setup();
+  void setInlet();
+  void setInletTurbScalars();
+  void setFieldTurbVisc();
+  void setFieldInitSpec();
   void step();
 
   /// Return a pointer to the current temperature ParGridFunction.
@@ -147,5 +171,14 @@ class GaussianInterpExtData : public ExternalDataBase {
 
   /// Return a pointer to the current velocity ParGridFunction.
   ParGridFunction *GetExternalInterpolatedVelocity() { return &velocity_gf_; }
+
+  /// Return a pointer to the current TKE ParGridFunction.
+  ParGridFunction *GetExternalInterpolatedTurbKineticEnergy() { return &tke_gf_; }
+
+  /// Return a pointer to the current v2 ParGridFunction.
+  ParGridFunction *GetExternalInterpolatedTurbV2() { return &v2_gf_; }
+
+  /// Return a pointer to the current eddy viscosity ParGridFunction.
+  ParGridFunction *GetExternalInterpolatedEddyViscosity() { return &nut_gf_; }
 };
 #endif  // GAUSSIANINTERPEXTDATA_HPP_

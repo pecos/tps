@@ -1,0 +1,32 @@
+#!./bats
+# -*- mode: sh -*-
+
+TEST="pipe-zeta-f"
+RUNFILE="inputs/lomach.pipe.zf.ini"
+EXE="../src/tps"
+
+setup() {
+    SOLN_FILE="restart_output-pipe-zeta-f.sol.h5"
+    REF_FILE="ref_solns/pipe.zeta-f/REFSOL_restart_output-pipe-zeta-f.sol.h5"
+    RES_FILE="ref_solns/pipe.zeta-f/REF0_restart_output-pipe-zeta-f.sol.h5"
+    OUT_FILE="output_solns/restart_output-pipe-zeta-f.sol.h5"    
+}
+
+@test "[$TEST] check for input file $RUNFILE" {
+    test -s $RUNFILE
+}
+
+@test "[$TEST] run tps with input -> $RUNFILE" {
+    rm -rf output/*
+    rm -f $SOLN_FILE
+    cp $RES_FILE $SOLN_FILE
+    $EXE --runFile $RUNFILE
+    test -s $SOLN_FILE    
+}
+
+@test "[$TEST] verify tps output with input -> $RUNFILE" {
+    test -s $SOLN_FILE
+    test -s $REF_FILE
+    h5diff -r --delta=1e-10 $SOLN_FILE $REF_FILE /swirl
+    h5diff -r --delta=1e-10 $SOLN_FILE $REF_FILE /muT
+}

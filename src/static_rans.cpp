@@ -30,46 +30,45 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------------el-
 
-#include "thermo_chem_base.hpp"
+#include "static_rans.hpp"
 
-#include "tps.hpp"
+#include "split_flow_base.hpp"
+#include "thermo_chem_base.hpp"
 
 using namespace mfem;
 
-ConstantPropertyThermoChem::ConstantPropertyThermoChem(ParMesh *pmesh, int sorder, double rho, double mu)
-    : pmesh_(pmesh), sorder_(sorder), rho_(rho), mu_(mu) {}
+StaticRans::StaticRans(ParMesh *pmesh, const Array<int> &partitioning, int order, TPS::Tps *tps)
+    : pmesh_(pmesh), order_(order) {
+  // tps->getInput("loMach/static-rans/visc-file", visc_file_);
 
-ConstantPropertyThermoChem::ConstantPropertyThermoChem(ParMesh *pmesh, int sorder, TPS::Tps *tps)
-    : pmesh_(pmesh), sorder_(sorder) {
-  assert(tps != nullptr);
-  tps->getInput("loMach/constprop/rho", rho_, 1.0);
-  tps->getInput("loMach/constprop/mu", mu_, 1.0);
+  // Scalar FEM space
+  sfec_ = new H1_FECollection(order_);
+  sfes_ = new ParFiniteElementSpace(pmesh_, sfec_);
 }
 
-ConstantPropertyThermoChem::~ConstantPropertyThermoChem() {
-  delete thermal_divergence_;
-  delete viscosity_;
-  delete density_;
-  delete fes_;
-  delete fec_;
+StaticRans::~StaticRans() {
+  delete sfes_;
+  delete sfec_;
+  delete mut_;
+  delete nut_field_;
+  delete extData_;
 }
 
-void ConstantPropertyThermoChem::initializeSelf() {
-  fec_ = new H1_FECollection(sorder_);
-  fes_ = new ParFiniteElementSpace(pmesh_, fec_);
+void StaticRans::initializeSelf() {
+  // Eddy viscosity
+  mut_ = new ParGridFunction(sfes_);
+  *mut_ = 0.0;
 
-  density_ = new ParGridFunction(fes_);
-  viscosity_ = new ParGridFunction(fes_);
-  thermal_divergence_ = new ParGridFunction(fes_);
+  toFlow_interface_.eddy_viscosity = mut_;
+  toThermoChem_interface_.eddy_viscosity = mut_;
 
-  *density_ = rho_;
-  *viscosity_ = mu_;
-  *thermal_divergence_ = 0.0;
+  // get interpolated nu_t field
+  nut_field_ = new GridFunctionCoefficient(extData_interface_->NuTdata);
+}
 
-  toFlow_interface_.density = density_;
-  toFlow_interface_.viscosity = viscosity_;
-  toFlow_interface_.thermal_divergence = thermal_divergence_;
+void StaticRans::initializeViz(mfem::ParaViewDataCollection &pvdc) { pvdc.RegisterField("muT", mut_); }
 
-  toTurbModel_interface_.density = density_;
-  toTurbModel_interface_.viscosity = viscosity_;
+void StaticRans::step() {
+  mut_->ProjectCoefficient(*nut_field_);
+  *mut_ *= *thermoChem_interface_->density;
 }
