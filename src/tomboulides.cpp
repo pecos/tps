@@ -309,9 +309,9 @@ void Tomboulides::initializeSelf() {
   // pp_div_rad_comp_gf_ = new ParGridFunction(pfes_, *pp_div_gf_);
   // u_next_rad_comp_gf_ = new ParGridFunction(pfes_, *u_next_gf_);
 
-  Reh_gf_ = new ParGridFunction(pfes_);
-  tmpR0_gf_ = new ParGridFunction(pfes_);
-  tmpR1_gf_ = new ParGridFunction(vfes_);
+  // Reh_gf_ = new ParGridFunction(pfes_);
+  // tmpR0_gf_ = new ParGridFunction(pfes_);
+  // tmpR1_gf_ = new ParGridFunction(vfes_);
 
   if (axisym_) {
     pp_div_rad_comp_gf_ = new ParGridFunction(pfes_);
@@ -335,7 +335,7 @@ void Tomboulides::initializeSelf() {
   *p_gf_ = 0.0;
   *resp_gf_ = 0.0;
   *mu_total_gf_ = 0.0;
-  *Reh_gf_ = 0.0;
+  // *Reh_gf_ = 0.0;
 
   *epsi_gf_ = 0.0;
 
@@ -350,7 +350,7 @@ void Tomboulides::initializeSelf() {
     toThermoChem_interface_.swirl_supported = true;
     toThermoChem_interface_.swirl = utheta_next_gf_;
   }
-  toThermoChem_interface_.Reh = Reh_gf_;
+  // toThermoChem_interface_.Reh = Reh_gf_;
 
   toTurbModel_interface_.velocity = u_next_gf_;
   if (axisym_) {
@@ -361,7 +361,7 @@ void Tomboulides::initializeSelf() {
   toTurbModel_interface_.gradU = gradU_gf_;
   toTurbModel_interface_.gradV = gradV_gf_;
   toTurbModel_interface_.gradW = gradW_gf_;
-  toTurbModel_interface_.Reh = Reh_gf_;
+  // toTurbModel_interface_.Reh = Reh_gf_;
 
   // Allocate Vector storage
   const int vfes_truevsize = vfes_->GetTrueVSize();
@@ -1496,7 +1496,7 @@ void Tomboulides::initializeViz(mfem::ParaViewDataCollection &pvdc) const {
     pvdc.RegisterField("swirl", utheta_gf_);
   }
   // pvdc.RegisterField("inlet", uface_gf_);
-  pvdc.RegisterField("Re_h", Reh_gf_);
+  // pvdc.RegisterField("Re_h", Reh_gf_);
 }
 
 void Tomboulides::initializeStats(Averaging &average, IODataOrganizer &io, bool continuation) const {
@@ -2338,79 +2338,79 @@ void Tomboulides::evaluateVelocityGradient() {
   }
 }
 
-void Tomboulides::computeReh() {
-  (thermo_interface_->density)->GetTrueDofs(rho_vec_);
-  gridScale_gf_->GetTrueDofs(tmpR0_);
-  mu_total_gf_->GetTrueDofs(mu_vec_);
-  // u_curr_gf_->GetTrueDofs(u_vec_);
-  u_next_gf_->GetTrueDofs(uext_vec_);
+// void Tomboulides::computeReh() {
+//   (thermo_interface_->density)->GetTrueDofs(rho_vec_);
+//   gridScale_gf_->GetTrueDofs(tmpR0_);
+//   mu_total_gf_->GetTrueDofs(mu_vec_);
+//   // u_curr_gf_->GetTrueDofs(u_vec_);
+//   u_next_gf_->GetTrueDofs(uext_vec_);
 
-  const double *rho = rho_vec_.HostRead();
-  const double *del = tmpR0_.HostRead();
-  const double *vel = uext_vec_.HostRead();
-  const double *mu = mu_vec_.HostRead();
-  double *data = tmpR0c_.HostReadWrite();
+//   const double *rho = rho_vec_.HostRead();
+//   const double *del = tmpR0_.HostRead();
+//   const double *vel = uext_vec_.HostRead();
+//   const double *mu = mu_vec_.HostRead();
+//   double *data = tmpR0c_.HostReadWrite();
 
-  int Sdof = tmpR0c_.Size();
-  for (int dof = 0; dof < Sdof; dof++) {
-    // vel mag
-    double Umag = 0.0;
-    for (int i = 0; i < dim_; i++) Umag += vel[dof + i * Sdof] * vel[dof + i * Sdof];
-    Umag = std::sqrt(Umag);
+//   int Sdof = tmpR0c_.Size();
+//   for (int dof = 0; dof < Sdof; dof++) {
+//     // vel mag
+//     double Umag = 0.0;
+//     for (int i = 0; i < dim_; i++) Umag += vel[dof + i * Sdof] * vel[dof + i * Sdof];
+//     Umag = std::sqrt(Umag);
 
-    // element Re
-    double Re = Umag * del[dof] * rho[dof] / mu[dof];
-    data[dof] = Re;
-  }
-  Reh_gf_->SetFromTrueDofs(tmpR0c_);
-}
+//     // element Re
+//     double Re = Umag * del[dof] * rho[dof] / mu[dof];
+//     data[dof] = Re;
+//   }
+//   Reh_gf_->SetFromTrueDofs(tmpR0c_);
+// }
 
 // f(Re_h) * Mu_sw * div(streamwiseGrad), i.e. this does not consider grad of f(Re_h) * Mu_sw
 // void Tomboulides::streamwiseDiffusion(Vector &phi, Vector &swDiff) {
-void Tomboulides::streamwiseDiffusion(Vector &gradPhi, Vector &swDiff) {
-  // compute streamwise gradient of input field
-  // tmpR0_gf_->SetFromTrueDofs(phi);
-  // streamwiseGrad(dim_, *tmpR0_gf_, *u_curr_gf_, *tmpR1_gf_);
+// void Tomboulides::streamwiseDiffusion(Vector &gradPhi, Vector &swDiff) {
+//   // compute streamwise gradient of input field
+//   // tmpR0_gf_->SetFromTrueDofs(phi);
+//   // streamwiseGrad(dim_, *tmpR0_gf_, *u_curr_gf_, *tmpR1_gf_);
 
-  tmpR1_gf_->SetFromTrueDofs(gradPhi);
-  streamwiseGrad(dim_, *u_curr_gf_, *tmpR1_gf_);
+//   tmpR1_gf_->SetFromTrueDofs(gradPhi);
+//   streamwiseGrad(dim_, *u_curr_gf_, *tmpR1_gf_);
 
-  // divergence of sw-grad
-  tmpR1_gf_->GetTrueDofs(tmpR1_);
-  D_op_->Mult(tmpR1_, swDiff);
+//   // divergence of sw-grad
+//   tmpR1_gf_->GetTrueDofs(tmpR1_);
+//   D_op_->Mult(tmpR1_, swDiff);
 
-  (thermo_interface_->density)->GetTrueDofs(rho_vec_);
-  gridScale_gf_->GetTrueDofs(tmpR0_);
-  Reh_gf_->GetTrueDofs(tmpR0c_);
-  // mu_total_gf_->GetTrueDofs(mu_vec_);
-  upwindDiff(dim_, re_factor_, re_offset_, u_vec_, rho_vec_, tmpR0_, tmpR0c_, swDiff);
+//   (thermo_interface_->density)->GetTrueDofs(rho_vec_);
+//   gridScale_gf_->GetTrueDofs(tmpR0_);
+//   Reh_gf_->GetTrueDofs(tmpR0c_);
+//   // mu_total_gf_->GetTrueDofs(mu_vec_);
+//   upwindDiff(dim_, re_factor_, re_offset_, u_vec_, rho_vec_, tmpR0_, tmpR0c_, swDiff);
 
-  /*
-  const double *rho = rho_vec_.HostRead();
-  const double *del = tmpR0_.HostRead();
-  const double *vel = u_vec_.HostRead();
-  //const double *mu = mu_vec_.HostRead();
-  const double *Reh = tmpR0c_.HostRead();
-  double *data = swDiff.HostReadWrite();
+//   /*
+//   const double *rho = rho_vec_.HostRead();
+//   const double *del = tmpR0_.HostRead();
+//   const double *vel = u_vec_.HostRead();
+//   //const double *mu = mu_vec_.HostRead();
+//   const double *Reh = tmpR0c_.HostRead();
+//   double *data = swDiff.HostReadWrite();
 
-  int Sdof = rho_vec_.Size();
-  for (int dof = 0; dof < Sdof; dof++) {
-    double Umag = 0.0;
-    for (int i = 0; i < dim_; i++) Umag += vel[i] * vel[i];
-    Umag = std::sqrt(Umag);
+//   int Sdof = rho_vec_.Size();
+//   for (int dof = 0; dof < Sdof; dof++) {
+//     double Umag = 0.0;
+//     for (int i = 0; i < dim_; i++) Umag += vel[i] * vel[i];
+//     Umag = std::sqrt(Umag);
 
-    // element Re
-    //double Re = Umag * del[dof] * rho[dof] / mu[dof];
-    double Re = Reh[dof];
+//     // element Re
+//     //double Re = Umag * del[dof] * rho[dof] / mu[dof];
+//     double Re = Reh[dof];
 
-    // SUPG weight
-    double Csupg = 0.5 * (tanh(re_factor_ * Re - re_offset_) + 1.0);
+//     // SUPG weight
+//     double Csupg = 0.5 * (tanh(re_factor_ * Re - re_offset_) + 1.0);
 
-    // streamwise diffusion coeff
-    double CswDiff = Csupg * Umag * del[dof] * rho[dof];
+//     // streamwise diffusion coeff
+//     double CswDiff = Csupg * Umag * del[dof] * rho[dof];
 
-    // scaled streamwise Laplacian
-    data[dof] *= CswDiff;
-  }
-  */
-}
+//     // scaled streamwise Laplacian
+//     data[dof] *= CswDiff;
+//   }
+//   */
+// }

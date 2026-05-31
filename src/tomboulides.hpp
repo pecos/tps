@@ -480,12 +480,12 @@ class Tomboulides final : public FlowBase {
    * @brief Computes f(Re_h) * |U|*h * div(M_sw*grad(phi)) where M_sw transforms the gradient into the
    * streamwise direction
    */
-  void streamwiseDiffusion(Vector &phi, Vector &swDiff);
+  // void streamwiseDiffusion(Vector &phi, Vector &swDiff);
 
   /**
    * @brief Computes element convective Reynolds number
    */
-  void computeReh();
+  // void computeReh();
 
   /**
    * @brief Compute turbulent dissipation using average u
