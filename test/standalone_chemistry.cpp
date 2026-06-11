@@ -106,7 +106,7 @@ int main(int argc, char *argv[]) {
 
     thermo->solveChemistryStep(YT, 0, dt
 #ifdef HAVE_PYTHON
-      , YT
+      , YT, YT, YT, YT
 #endif
     );
     time += dt;
