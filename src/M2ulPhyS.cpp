@@ -618,7 +618,6 @@ void M2ulPhyS::initVariables() {
 
   rsolver = new RiemannSolverTPS(num_equation, mixture, eqSystem, d_fluxClass, config.RoeRiemannSolverTPS(),
                                  config.isAxisymmetric()); 
-                                //  rank_);
 #endif
 
 #ifdef _GPU_
@@ -682,7 +681,6 @@ void M2ulPhyS::initVariables() {
 
   ioData.initializeSerial(rank0_, config.isRestartSerialized("either"), serial_mesh, locToGlobElem, &partitioning_);
   projectInitialSolution();
-  // if (rank0_) std::cout << "okay 1 "  << std::endl;
 
   // Boundary attributes in present partition
   Array<int> local_attr;
@@ -699,7 +697,6 @@ void M2ulPhyS::initVariables() {
   }
 
   // A->SetAssemblyLevel(AssemblyLevel::PARTIAL);
-  // if (rank0_) std::cout << "okay 2 "  << std::endl;
 
   A = new DGNonLinearForm(rsolver, d_fluxClass, vfes, gradUpfes, gradUp, bcIntegrator, intRules, dim, num_equation,
                           mixture, gpu_precomputed_data_, maxIntPoints, maxDofs);
@@ -710,7 +707,7 @@ void M2ulPhyS::initVariables() {
     //    if( basisType==1 && intRuleType==1 ) useLinearIntegration = true;
 
     faceIntegrator = new FaceIntegrator(intRules, rsolver, d_fluxClass, vfes, useLinearIntegration, dim, num_equation,
-                                        gradUp, gradUpfes, max_char_speed, config.isAxisymmetric(), distance_, rank_);
+                                        gradUp, gradUpfes, max_char_speed, config.isAxisymmetric(), distance_);
   }
   A->AddInteriorFaceIntegrator(faceIntegrator);
   // if (rank0_) std::cout << "okay 3 "  << std::endl;

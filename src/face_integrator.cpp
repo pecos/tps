@@ -36,7 +36,7 @@
 FaceIntegrator::FaceIntegrator(IntegrationRules *_intRules, RiemannSolverTPS *rsolver_, Fluxes *_fluxClass,
                                ParFiniteElementSpace *_vfes, bool _useLinear, const int _dim, const int _num_equation,
                                ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes, double &_max_char_speed,
-                               bool axisym, ParGridFunction *distance, int rank)
+                               bool axisym, ParGridFunction *distance)
     : rsolver(rsolver_),
       fluxClass(_fluxClass),
       vfes(_vfes),
@@ -48,8 +48,7 @@ FaceIntegrator::FaceIntegrator(IntegrationRules *_intRules, RiemannSolverTPS *rs
       distance_(distance),
       intRules(_intRules),
       useLinear(_useLinear),
-      axisymmetric_(axisym),
-      rank_(rank) {
+      axisymmetric_(axisym) {
   assert(!useLinear);
   totDofs = vfes->GetNDofs();
 }

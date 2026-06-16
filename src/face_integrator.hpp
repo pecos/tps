@@ -111,7 +111,7 @@ class FaceIntegrator : public NonlinearFormIntegrator {
   FaceIntegrator(IntegrationRules *_intRules, RiemannSolverTPS *rsolver_, Fluxes *_fluxClass,
                  ParFiniteElementSpace *_vfes, bool _useLinear, const int _dim, const int _num_equation,
                  ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes, double &_max_char_speed, bool axisym,
-                 ParGridFunction *distance, int rank);
+                 ParGridFunction *distance);
   ~FaceIntegrator();
 
   virtual void AssembleFaceVector(const FiniteElement &el1, const FiniteElement &el2, FaceElementTransformations &Tr,
