@@ -197,17 +197,17 @@ class M2ulPhyS : public TPS::PlasmaSolver {
   ParFiniteElementSpace *vfes;
 
   // used to restart from loMach sims
-  FiniteElementCollection *vfecTmp;
-  FiniteElementCollection *sfecTmp;
-  ParFiniteElementSpace *vfesTmp;
-  ParFiniteElementSpace *sfesTmp;
-  ParGridFunction *u_gf;
-  ParGridFunction *T_gf;
-  ParGridFunction *rho_gf;
-  ParGridFunction *P_gf;
-  Vector rhoTmp;
-  Vector TnTmp;
-  Vector PnTmp;
+  // FiniteElementCollection *vfecTmp;
+  // FiniteElementCollection *sfecTmp;
+  // ParFiniteElementSpace *vfesTmp;
+  // ParFiniteElementSpace *sfesTmp;
+  // ParGridFunction *u_gf;
+  // ParGridFunction *T_gf;
+  // ParGridFunction *rho_gf;
+  // ParGridFunction *P_gf;
+  // Vector rhoTmp;
+  // Vector TnTmp;
+  // Vector PnTmp;
 
   // nodes IDs and indirection array
   const int maxIntPoints = gpudata::MAXINTPOINTS;  // corresponding to HEX face with p=5
@@ -459,14 +459,13 @@ class M2ulPhyS : public TPS::PlasmaSolver {
 
   static int Check_NaN_GPU(ParGridFunction *U, int lengthU, Array<int> &loc_print);
   void Check_Undershoot();
-  void clipOutflow();
 
-  //  void setConstantPlasmaConductivityGF() {
-  //    ParGridFunction *coordsDof = new ParGridFunction(dfes);
-  //    mesh->GetNodes(*coordsDof);
-  //    mixture->SetConstantPlasmaConductivity(plasma_conductivity_, Up, coordsDof, rank0_);
-  //    delete coordsDof;
-  //  }
+   void setConstantPlasmaConductivityGF() {
+     ParGridFunction *coordsDof = new ParGridFunction(dfes);
+     mesh->GetNodes(*coordsDof);
+     mixture->SetConstantPlasmaConductivity(plasma_conductivity_, Up, coordsDof);
+     delete coordsDof;
+   }
 
   // tps2Boltzmann interface (implemented in M2ulPhyS2Boltzmann.cpp)
   /// Push solver variables to interface

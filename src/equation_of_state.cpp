@@ -45,7 +45,7 @@ MFEM_HOST_DEVICE GasMixture::GasMixture(WorkingFluid f, int _dim, int nvel, doub
 }
 
 void GasMixture::SetConstantPlasmaConductivity(ParGridFunction *pc, const ParGridFunction *Up,
-                                               const ParGridFunction *coords, bool rank0) {
+                                               const ParGridFunction *coords) {
   // quick return if pc is NULL (nothing to set)
   if (pc == NULL) return;
 
