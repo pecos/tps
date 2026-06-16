@@ -445,13 +445,13 @@ void LoMachSolver::solveStep() {
     thermo_->step();
     sw_thermChem_.Stop();
     sw_flow_.Start();
-  #ifdef HAVE_PYTHON
-    if (loMach_opts_.doFlowStep) {
-  #endif
+  // #ifdef HAVE_PYTHON
+  //   if (loMach_opts_.doFlowStep) {
+  // #endif
     flow_->step();
-  #ifdef HAVE_PYTHON
-    }
-  #endif
+  // #ifdef HAVE_PYTHON
+  //   }
+  // #endif
     sw_flow_.Stop();
     sw_turb_.Start();
     turbModel_->step();

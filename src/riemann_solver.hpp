@@ -65,7 +65,7 @@ class RiemannSolverTPS {
 
  public:
   MFEM_HOST_DEVICE RiemannSolverTPS(int _num_equation, GasMixture *mixture, Equations _eqSystem, Fluxes *_fluxClass,
-                                    bool _useRoe, bool axisym, int rank);
+                                    bool _useRoe, bool axisym);
 
   void Eval(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux, bool LF = false);
   MFEM_HOST_DEVICE void Eval(const double *state1, const double *state2, const double *nor, double *flux,

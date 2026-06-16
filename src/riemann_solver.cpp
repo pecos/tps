@@ -36,15 +36,14 @@ using namespace mfem;
 
 // Implementation of class RiemannSolverTPS
 MFEM_HOST_DEVICE RiemannSolverTPS::RiemannSolverTPS(int _num_equation, GasMixture *_mixture, Equations _eqSystem,
-                                                    Fluxes *_fluxClass, bool _useRoe, bool axisym, int rank)
+                                                    Fluxes *_fluxClass, bool _useRoe, bool axisym)
 
     : num_equation(_num_equation),
       mixture(_mixture),
       eqSystem(_eqSystem),
       fluxClass(_fluxClass),
       useRoe(_useRoe),
-      axisymmetric_(axisym),
-      rank_(rank) {}
+      axisymmetric_(axisym) {}
 
 // Compute the scalar F(u).n
 void RiemannSolverTPS::ComputeFluxDotN(const Vector &state, const Vector &nor, Vector &fluxN) {

@@ -617,7 +617,8 @@ void M2ulPhyS::initVariables() {
   d_fluxClass = fluxClass;
 
   rsolver = new RiemannSolverTPS(num_equation, mixture, eqSystem, d_fluxClass, config.RoeRiemannSolverTPS(),
-                                 config.isAxisymmetric(), rank_);
+                                 config.isAxisymmetric()); 
+                                //  rank_);
 #endif
 
 #ifdef _GPU_

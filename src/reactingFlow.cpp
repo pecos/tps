@@ -144,26 +144,26 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
 #ifdef HAVE_PYTHON
   tpsP_->getInput("cycle-avg-joule-coupled/bte-from-tps", bte_from_tps_, false);
   if (bte_from_tps_) {
-    tpsP_->getRequiredInput("boltzmannSolver/collisionsFile", collisionsFile);
-    tpsP_->getRequiredInput("boltzmannSolver/solver_type", solver_type);
-    tpsP_->getInput("boltzmannSolver/ee_collisions", ee_collisions, 0);
-    tpsP_->getInput("boltzmannSolver/blend-frac-init", bl_frac_init_, 0.01);
-    tpsP_->getInput("boltzmannSolver/blend-frac-increment", bl_frac_increment_, 0.01);
-    tpsP_->getInput("boltzmannSolver/blend-frac-change-freq", bl_frac_change_freq_, 1);
-    bl_frac_ = bl_frac_init_;
-    tpsP_->getInput("boltzmannSolver/solve-bte-every-n", solve_bte_every_n, 1);
-    tpsP_->getInput("boltzmannSolver/regrid-bte-every-n", regrid_bte_every_n, 1);
-    tpsP_->getInput("boltzmannSolver/do-bte-sub-cluster", do_bte_sub_cluster, 1);
-    tpsP_->getInput("boltzmannSolver/num-bte-sub-clusters", num_sub_clusters_bte, 50);
-    tpsP_->getInput("boltzmannSolver/n_grids", n_vspace_grids, 1);
-    grid_idx_to_npts.resize(n_vspace_grids);
-    Te_vec.resize(n_vspace_grids);
-    tpsP_->getInput("boltzmannSolver/Nr", Nr_BTE, 128);
-    tpsP_->getInput("boltzmannSolver/rtol", BTE_rtol, 1e-6);
-    tpsP_->getInput("boltzmannSolver/dt_BTE", dt_BTE, 5e-3);
-    tpsP_->getInput("boltzmannSolver/store_csv", store_csv, 1);
-    tpsP_->getInput("boltzmannSolver/clip_rr", clip_rr, 0);
-    tpsP_->getInput("boltzmannSolver/clip_frac", clip_frac, 10.0);
+    // tpsP_->getRequiredInput("boltzmannSolver/collisionsFile", collisionsFile);
+    // tpsP_->getRequiredInput("boltzmannSolver/solver_type", solver_type);
+    // tpsP_->getInput("boltzmannSolver/ee_collisions", ee_collisions, 0);
+    // tpsP_->getInput("boltzmannSolver/blend-frac-init", bl_frac_init_, 0.01);
+    // tpsP_->getInput("boltzmannSolver/blend-frac-increment", bl_frac_increment_, 0.01);
+    // tpsP_->getInput("boltzmannSolver/blend-frac-change-freq", bl_frac_change_freq_, 1);
+    // bl_frac_ = bl_frac_init_;
+    // tpsP_->getInput("boltzmannSolver/solve-bte-every-n", solve_bte_every_n, 1);
+    // tpsP_->getInput("boltzmannSolver/regrid-bte-every-n", regrid_bte_every_n, 1);
+    // tpsP_->getInput("boltzmannSolver/do-bte-sub-cluster", do_bte_sub_cluster, 1);
+    // tpsP_->getInput("boltzmannSolver/num-bte-sub-clusters", num_sub_clusters_bte, 50);
+    // tpsP_->getInput("boltzmannSolver/n_grids", n_vspace_grids, 1);
+    // grid_idx_to_npts.resize(n_vspace_grids);
+    // Te_vec.resize(n_vspace_grids);
+    // tpsP_->getInput("boltzmannSolver/Nr", Nr_BTE, 128);
+    // tpsP_->getInput("boltzmannSolver/rtol", BTE_rtol, 1e-6);
+    // tpsP_->getInput("boltzmannSolver/dt_BTE", dt_BTE, 5e-3);
+    // tpsP_->getInput("boltzmannSolver/store_csv", store_csv, 1);
+    // tpsP_->getInput("boltzmannSolver/clip_rr", clip_rr, 0);
+    // tpsP_->getInput("boltzmannSolver/clip_frac", clip_frac, 10.0);
   }
 #endif
 
@@ -2772,17 +2772,17 @@ void ReactingFlow::step() {
       int myRank;
       MPI_Comm_rank(tpsP_->getTPSCommWorld(), &myRank);
 
-      kReac_gf_.SetFromTrueDofs(kReac_);
-      reacR_gf_.SetFromTrueDofs(reacR_);
-      productY_gf_.SetFromTrueDofs(prodY_);
-      rrf_by_rrb_gf_.SetFromTrueDofs(rrf_by_rrb_);
+      // kReac_gf_.SetFromTrueDofs(kReac_);
+      // reacR_gf_.SetFromTrueDofs(reacR_);
+      // productY_gf_.SetFromTrueDofs(prodY_);
+      // rrf_by_rrb_gf_.SetFromTrueDofs(rrf_by_rrb_);
 
-      BTEkReac_gf_.SetFromTrueDofs(BTEkReac_);
-      BTEreacR_gf_.SetFromTrueDofs(BTEreacR_);
-      BTErrf_by_rrb_gf_.SetFromTrueDofs(BTErrf_by_rrb_);
+      // BTEkReac_gf_.SetFromTrueDofs(BTEkReac_);
+      // BTEreacR_gf_.SetFromTrueDofs(BTEreacR_);
+      // BTErrf_by_rrb_gf_.SetFromTrueDofs(BTErrf_by_rrb_);
 
-      er_gf_.SetFromTrueDofs(er_);
-      ei_gf_.SetFromTrueDofs(ei_);
+      // er_gf_.SetFromTrueDofs(er_);
+      // ei_gf_.SetFromTrueDofs(ei_);
 
 
 
@@ -4675,13 +4675,13 @@ void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, 
   chemistry_->computeProgressRate(n_sp, kfwd, keq, progressRate);
   chemistry_->computeCreationRate(progressRate, creationRate, emissionRate);
 
-  for (int nr = 0; nr < nReactions_; nr++) {
-    kf[nr] = kfwd[nr];
-    prograte[nr] = progressRate[nr];
-    if (nr % 2 == 0) {
-      rrfrrb[int(nr/2)] = progressRate[nr] / (1e-20 + progressRate[nr+1]);
-    }
-  }
+  // for (int nr = 0; nr < nReactions_; nr++) {
+  //   kf[nr] = kfwd[nr];
+  //   prograte[nr] = progressRate[nr];
+  //   if (nr % 2 == 0) {
+  //     rrfrrb[int(nr/2)] = progressRate[nr] / (1e-20 + progressRate[nr+1]);
+  //   }
+  // }
 
   // for(int sp = 0; sp < nSpecies_; sp++){
   //   prodYsp[sp] = creationRate[sp];

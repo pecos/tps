@@ -104,9 +104,20 @@ int main(int argc, char *argv[]) {
     }
     std::cout << std::endl;
 
+    // Below are some placeholder variables 
+    mfem::Vector kf(nActiveSpecies);
+    mfem::Vector prograte(nActiveSpecies);
+    mfem::Vector rrfrrb(nActiveSpecies);
+    mfem::Vector prodYsp(nActiveSpecies);
+
+    prodYsp = 0.0;
+    kf = 0.0;
+    prograte = 0.0;
+    rrfrrb = 0.0;
+
     thermo->solveChemistryStep(YT, 0, dt
 #ifdef HAVE_PYTHON
-      , YT, YT, YT, YT
+      , kf.GetData(), prograte.GetData(), rrfrrb.GetData(), prodYsp.GetData()
 #endif
     );
     time += dt;
