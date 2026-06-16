@@ -1943,124 +1943,6 @@ void M2ulPhyS::projectInitialSolution() {
     if (config.use_mms_ && config.mmsSaveDetails_) projectExactSolution(0.0, masaU_);
 #endif
 
-    // regular restart
-    // if (config.restartFromLoMach == false) {
-    //   restart_files_hdf5("read");
-
-    //   // start a run from a loMach solution <jump>
-    //   // NOTE: this is NOT setup for reacting flow
-    //   // TODO: move to separate subroutine
-    // } else {
-    //   if (rank0_) std::cout << "restarting from low-Mach field..." << std::endl;
-
-    //   // create continuous FE space used in loMach
-    //   vfecTmp = new H1_FECollection(order, dim);
-    //   vfesTmp = new ParFiniteElementSpace(mesh, vfecTmp, dim);
-    //   sfecTmp = new H1_FECollection(order);
-    //   sfesTmp = new ParFiniteElementSpace(mesh, sfecTmp);
-
-    //   // loMach stored fields
-    //   u_gf = new ParGridFunction(vfesTmp);
-    //   T_gf = new ParGridFunction(sfesTmp);
-    //   rho_gf = new ParGridFunction(sfesTmp);
-    //   P_gf = new ParGridFunction(sfesTmp);
-
-    //   // register fields to read-in
-    //   ioData.registerIOFamily("Velocity", "/velocity", u_gf, true, true, vfecTmp);
-    //   ioData.registerIOVar("/velocity", "x-comp", 0);
-    //   ioData.registerIOVar("/velocity", "y-comp", 1);
-    //   ioData.registerIOVar("/velocity", "z-comp", 2);
-    //   ioData.registerIOFamily("Temperature", "/temperature", T_gf, true, true, sfecTmp);
-    //   ioData.registerIOVar("/temperature", "temperature", 0);
-    //   ioData.registerIOFamily("Pressure", "/pressure", P_gf, true, true, sfecTmp);
-    //   ioData.registerIOVar("/pressure", "pressure", 0);
-
-    //   if (rank0_) std::cout << "...attempting read" << std::endl;
-
-    //   // read data, will throw a warning for all compressible-type data not in restart
-    //   restart_files_hdf5("read");
-
-      // if (rank0_) std::cout << "...constructing density" << std::endl;
-
-      // // compute density using ideal gas
-      // double constantP = config.restartFromLoMachPressure;
-      // double constantR = config.restartFromLoMachRgas;
-      // TnTmp.SetSize(sfesTmp->GetTrueVSize());
-      // rhoTmp.SetSize(sfesTmp->GetTrueVSize());
-      // PnTmp.SetSize(sfesTmp->GetTrueVSize());
-      // T_gf->GetTrueDofs(TnTmp);
-      // P_gf->GetTrueDofs(PnTmp);
-      // PnTmp += constantP;
-      // // rhoTmp = (constantP / constantR);
-      // rhoTmp.Set(1.0 / constantR, PnTmp);
-      // rhoTmp /= TnTmp;
-      // rho_gf->SetFromTrueDofs(rhoTmp);
-
-      // modify temperature to prevent crazy pressures in small regions where gas is non-ideal
-      //{
-      //  const double *dataRho = rhoTmp.HostRead();
-      //  double *dataTemp = TnTmp.HostWrite();
-      //  for (int i = 0; i < fes->GetNDofs(); i++) {
-      //    double T_here = mixture->ComputeTemperatureFromDensityPressure(dataRho[i], constantP);
-      //  dataTemp[i] = T_here;
-      //  }
-      //  T_gf->SetFromTrueDofs(TnTmp);
-      //}
-
-      // project to DG space.  These guys already point to the correct location in Up
-      // vel->ProjectGridFunction(*u_gf);
-      // temperature->ProjectGridFunction(*T_gf);
-      // dens->ProjectGridFunction(*rho_gf);
-      // press->ProjectGridFunction(*P_gf);
-
-      // // Exchange before computing conserved state
-      // Up->ParFESpace()->ExchangeFaceNbrData();
-      // Up->ExchangeFaceNbrData();
-
-      // if (rank0_)
-      //   std::cout << "...computing conserved state " << fes->GetNDofs() << " " << dfes->GetNDofs() << std::endl;
-      // // compute conserved state
-      // {
-      //   const double *dataPrim = Up->HostRead();
-      //   const double *dataP = press->HostRead();
-      //   double *dataCons = U->HostWrite();
-      //   int nDof = fes->GetNDofs();
-      //   for (int i = 0; i < nDof; i++) {
-      //     double state[gpudata::MAXEQUATIONS];
-      //     double conservedState[gpudata::MAXEQUATIONS];
-
-      //     for (int eq = 0; eq <= dim + 1; eq++) state[eq] = dataPrim[i + eq * nDof];
-
-      //     // conserved state
-      //     mixture->GetConservativesFromPrimitives(state, conservedState);
-
-      //     // patch-up field for non-ideal regions
-      //     for (int eq = 0; eq <= dim + 1; eq++) state[eq] = conservedState[eq];
-      //     mixture->modifyEnergyForPressure(state, conservedState, dataP[i]);
-
-      //     // copy to U => cant use sDofInt here
-      //     for (int eq = 0; eq <= dim + 1; eq++) dataCons[i + eq * nDof] = conservedState[eq];
-      //   }
-      // }
-
-      // if (rank0_) std::cout << "...cleaning up" << std::endl;
-      // // remove loMach data from write list
-      // ioData.unregisterIOFamily("Velocity", "/velocity", u_gf);
-      // ioData.unregisterIOFamily("Temperature", "/temperature", T_gf);
-      // ioData.unregisterIOFamily("Pressure", "/pressure", P_gf);
-
-      // // cleanup (should be fine as long as actual data never accessed via ioData again)
-      // // delete u_gf;
-      // // delete T_gf;
-      // // delete rho_gf;
-      // // delete P_gf;
-      // // delete sfesTmp;
-      // // delete sfecTmp;
-      // // delete vfesTmp;
-      // // delete vfecTmp;
-
-      // if (rank0_) std::cout << "...and done with restart from low-Mach!" << std::endl;
-    // }
     restart_files_hdf5("read");
 
     if (config.io_opts_.enable_restart_from_lte_) {
@@ -2665,82 +2547,6 @@ void M2ulPhyS::Check_Undershoot() {
 #endif
 }
 
-// Clipping approach for outflow region, hard-coded for y-oriented outflow for now
-// this is essentially a hack for torch transients
-// void M2ulPhyS::clipOutflow() {
-  // int dof = vfes->GetNDofs();
-
-  // ParGridFunction coordsDof(dfes);
-  // mesh->GetNodes(coordsDof);
-
-  // make readable and general if we keep this
-  // double wOut = 0.5;
-  // double clipPlane = 0.355;
-  // double clipPlane = 0.15;
-  // double clipWidth = 0.2;
-  // double neckStart = 0.324;
-  // double neckEnd = 0.355;
-  // double neckRad = 0.0155;
-  // double leak = -1.0;
-  // double leak = -0.5;
-  // double leak = 0.05; // from approx control-volume analysis at 2kW
-  // double leak = 0.25;
-  // double leak = 3.0;
-  // double neckMid = neckStart + 0.5*(neckEnd-neckStart);
-
-  // based on h = 0.026, d = 0.03m, A = 0.00283 m^2
-  // Ar @ 40SLPM = 1.1727 g/s, rho = 1.6338, 39.95 g/mol
-  // Ni @ 30SLPM = 0.61688 g/s, rho = 1.148, 28.02 g/mol
-  // g/s(/1000) * (m^3/kg) / (m^2)
-  // double uNeck = 1.1727 / 1000 / 1.6338 / 0.00283;
-  // double uNeck = 0.6168/1000 / 1.148 / 0.00283;
-
-  // double uNeck;
-  // tpsP->getInput("flow/uNeck", uNeck, 0.0);
-
-  // int nv = nvel;
-  // double *dataU = U->HostReadWrite();
-  // for (int i = 0; i < dof; i++) {
-  //   auto hcoords = coordsDof.HostRead();
-  //   double coords[3];
-  //   for (int d = 0; d < dim; d++) {
-  //     coords[d] = hcoords[i + d * dof];
-  //   }
-
-  //   double rho = dataU[i + 0 * dof];
-  //   double vel[nvel];
-  //   for (int d = 0; d < nvel; d++) vel[d] = dataU[i + (d + 1) * dof] / rho;
-
-  //   double ke0 = 0.;
-  //   for (int d = 0; d < nvel; d++) ke0 += vel[d] * vel[d];
-  //   ke0 *= 0.5;
-
-  //   // force outflow of torch but also prevent full blow-out
-  //   double rad = sqrt(coords[0] * coords[0] + coords[2] * coords[2]);
-  //   double yy = coords[1];
-  //   if (yy >= neckStart && yy <= neckEnd && rad <= neckRad) {
-  //     int eq = 1;
-  //     double unLcl = uNeck * 4.18879 * (1.0 + leak) * (1.0 - std::pow(rad / neckRad, 2.0));
-  //     dataU[i + (eq + 1) * dof] = rho * min(vel[eq], unLcl);
-  //     dataU[i + (eq + 1) * dof] = max(dataU[i + (eq + 1) * dof], 0.0);
-  //   } /*else if (yy >= clipPlane) {
-  //     double dist = yy - clipPlane;
-  //     double wOut = tanh(dist/clipWidth);
-  //     int eq = 1;
-  //     dataU[i + (eq+1)*dof] = rho * ((1.0-wOut)*vel[eq] + wOut*max(vel[eq], 0.0));
-  //     }*/
-
-  //   double ke = 0.;
-  //   for (int d = 0; d < nvel; d++) ke += dataU[i + (d + 1) * dof] * dataU[i + (d + 1) * dof] / (rho * rho);
-  //   ke *= 0.5;
-
-  //   // adjust energy
-  //   dataU[i + (nvel + 1) * dof] = dataU[i + (nvel + 1) * dof] + (ke - ke0);  // * dataU[i + 0*dof]
-  // }
-
-  // updatePrimitives();
-// }
-
 void M2ulPhyS::initialTimeStep() {
   auto dataU = U->HostReadWrite();
   int dof = vfes->GetNDofs();
@@ -3161,7 +2967,7 @@ void M2ulPhyS::parsePlasmaModels() {
 
   std::string chemistryModelStr;
   tpsP->getInput("plasma_models/chemistry_model", chemistryModelStr, std::string(""));
-  
+
   tpsP->getInput("plasma_models/const_plasma_conductivity", config.const_plasma_conductivity_, 0.0);
 
   // TODO(kevin): cantera wrapper
