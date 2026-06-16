@@ -478,23 +478,24 @@ void CycleAvgJouleCoupling::interpElectricFieldFromEMToFlow() {
   if (flow_fespace->IsDGSpace()) {
     efieldR_->SetFromTrueDofs(interp_vals);
   } else {
-    Array<int> vdofs;
-    Vector elem_dof_vals;
-    int n0 = 0;
-    const int NE = flow_solver_->getMesh()->GetNE();
-    for (int i = 0; i < NE; i++) {
-      flow_fespace->GetElementDofs(i, vdofs);
-      const int nsp = flow_fespace->GetFE(i)->GetNodes().GetNPoints();
-      assert(nsp == vdofs.Size());
-      elem_dof_vals.SetSize(nsp);
-      for (int j = 0; j < nsp; j++) {
-        elem_dof_vals(j) = interp_vals(n0 + j);
-      }
-      efieldR_->SetSubVector(vdofs, elem_dof_vals);
-      n0 += nsp;
-    }
-    efieldR_->SetTrueVector();
-    efieldR_->SetFromTrueVector();
+    // Array<int> vdofs;
+    // Vector elem_dof_vals;
+    // int n0 = 0;
+    // const int NE = flow_solver_->getMesh()->GetNE();
+    // for (int i = 0; i < NE; i++) {
+    //   flow_fespace->GetElementDofs(i, vdofs);
+    //   const int nsp = flow_fespace->GetFE(i)->GetNodes().GetNPoints();
+    //   assert(nsp == vdofs.Size());
+    //   elem_dof_vals.SetSize(nsp);
+    //   for (int j = 0; j < nsp; j++) {
+    //     elem_dof_vals(j) = interp_vals(n0 + j);
+    //   }
+    //   efieldR_->SetSubVector(vdofs, elem_dof_vals);
+    //   n0 += nsp;
+    // }
+    // efieldR_->SetTrueVector();
+    // efieldR_->SetFromTrueVector();
+    assert(false);
   }
   efieldR_->HostRead();
 
@@ -503,23 +504,24 @@ void CycleAvgJouleCoupling::interpElectricFieldFromEMToFlow() {
   if (flow_fespace->IsDGSpace()) {
     efieldI_->SetFromTrueDofs(interp_vals);
   } else {
-    Array<int> vdofs;
-    Vector elem_dof_vals;
-    int n0 = 0;
-    const int NE = flow_solver_->getMesh()->GetNE();
-    for (int i = 0; i < NE; i++) {
-      flow_fespace->GetElementDofs(i, vdofs);
-      const int nsp = flow_fespace->GetFE(i)->GetNodes().GetNPoints();
-      assert(nsp == vdofs.Size());
-      elem_dof_vals.SetSize(nsp);
-      for (int j = 0; j < nsp; j++) {
-        elem_dof_vals(j) = interp_vals(n0 + j);
-      }
-      efieldI_->SetSubVector(vdofs, elem_dof_vals);
-      n0 += nsp;
-    }
-    efieldI_->SetTrueVector();
-    efieldI_->SetFromTrueVector();
+    // Array<int> vdofs;
+    // Vector elem_dof_vals;
+    // int n0 = 0;
+    // const int NE = flow_solver_->getMesh()->GetNE();
+    // for (int i = 0; i < NE; i++) {
+    //   flow_fespace->GetElementDofs(i, vdofs);
+    //   const int nsp = flow_fespace->GetFE(i)->GetNodes().GetNPoints();
+    //   assert(nsp == vdofs.Size());
+    //   elem_dof_vals.SetSize(nsp);
+    //   for (int j = 0; j < nsp; j++) {
+    //     elem_dof_vals(j) = interp_vals(n0 + j);
+    //   }
+    //   efieldI_->SetSubVector(vdofs, elem_dof_vals);
+    //   n0 += nsp;
+    // }
+    // efieldI_->SetTrueVector();
+    // efieldI_->SetFromTrueVector();
+    assert(false);
   }
   efieldI_->HostRead();
 #else
