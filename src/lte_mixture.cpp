@@ -216,12 +216,6 @@ MFEM_HOST_DEVICE bool LteMixture::ComputeTemperatureInternal(const double *state
     // printf("Iter %d: res = %.6e, T = %.6e\n", niter, res, T); fflush(stdout);
   }
 
-  // clip
-  // if (!converged) {
-  //   converged = true;
-  //   T = 298.0;
-  // }
-
   if (!converged) {
     return false;
   }
