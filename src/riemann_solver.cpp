@@ -37,7 +37,6 @@ using namespace mfem;
 // Implementation of class RiemannSolverTPS
 MFEM_HOST_DEVICE RiemannSolverTPS::RiemannSolverTPS(int _num_equation, GasMixture *_mixture, Equations _eqSystem,
                                                     Fluxes *_fluxClass, bool _useRoe, bool axisym)
-
     : num_equation(_num_equation),
       mixture(_mixture),
       eqSystem(_eqSystem),
@@ -91,7 +90,6 @@ MFEM_HOST_DEVICE void RiemannSolverTPS::Eval_LF(const double *state1, const doub
                                                 double *flux) const {
   const int dim = mixture->GetDimension();
 
-  // std::cout << "ComputeMCS eval_lf 1" << endl;
   const double maxE1 = mixture->ComputeMaxCharSpeed(state1);
   const double maxE2 = mixture->ComputeMaxCharSpeed(state2);
 

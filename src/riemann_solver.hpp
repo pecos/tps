@@ -59,8 +59,6 @@ class RiemannSolverTPS {
   bool useRoe;
   const bool axisymmetric_;
 
-  int rank_;
-
   void Eval_Roe(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux);
 
  public:
@@ -70,10 +68,9 @@ class RiemannSolverTPS {
   void Eval(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux, bool LF = false);
   MFEM_HOST_DEVICE void Eval(const double *state1, const double *state2, const double *nor, double *flux,
                              bool LF = false);
-
-  void EvalCheck(const double s10, const double s11, const double s12, const double s13, const double s14,
-                 const double s20, const double s21, const double s22, const double s23, const double s24,
-                 const Vector &nor, Vector &flux, bool LF = false);
+  // void EvalCheck(const double s10, const double s11, const double s12, const double s13, const double s14,
+  //                const double s20, const double s21, const double s22, const double s23, const double s24,
+  //                const Vector &nor, Vector &flux, bool LF = false);
 
   void ComputeFluxDotN(const Vector &state, const Vector &nor, Vector &fluxN);
 
