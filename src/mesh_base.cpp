@@ -276,7 +276,7 @@ void MeshBase::initializeMesh() {
   // meshes.  We do it here b/c waiting until later (e.g., right
   // before interpolation set up) leads to a seg fault when running in
   // parallel, which is not yet understood.
-  if (pmesh_->GetNodes() == NULL) pmesh_->SetCurvature(1);
+  // if (pmesh_->GetNodes() == NULL) pmesh_->SetCurvature(1);
 }
 
 void MeshBase::initializeViz(ParaViewDataCollection &pvdc) {
