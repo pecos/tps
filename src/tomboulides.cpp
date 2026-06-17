@@ -33,6 +33,7 @@
 #include "tomboulides.hpp"
 
 #include <mfem/general/forall.hpp>
+
 #include "algebraicSubgridModels.hpp"
 #include "cases.hpp"
 #include "externalData_base.hpp"
@@ -79,7 +80,6 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
 
   rank0_ = (pmesh_->GetMyRank() == 0);
   axisym_ = false;
-  // writePressure_ = false;
   nvel_ = dim_;
   gridScale_gf_ = gridScale;
 
@@ -107,9 +107,6 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
       swirl_ess_attr_.SetSize(pmesh_->bdr_attributes.Max());
       swirl_ess_attr_ = 0;
     }
-
-    // Store pressure field in h5, primarily for restarting DG-compressible from low-mach
-    // tps->getInput("loMach/write-pressure", writePressure_, false);
 
     // Use "numerical integration" (i.e., under-integrate so that mass matrix is diagonal)
     // NOTE: this should default to false as it is generally not safe, but much of the
@@ -268,8 +265,6 @@ void Tomboulides::initializeSelf() {
   // Initialize minimal state and interface
   vfec_ = new H1_FECollection(vorder_, dim_);
   vfes_ = new ParFiniteElementSpace(pmesh_, vfec_, dim_);
-  // pfec_ = new H1_FECollection(porder_);
-  // pfes_ = new ParFiniteElementSpace(pmesh_, pfec_);
 
   u_curr_gf_ = new ParGridFunction(vfes_);
   u_next_gf_ = new ParGridFunction(vfes_);
@@ -381,11 +376,6 @@ void Tomboulides::initializeSelf() {
     utheta_next_vec_.SetSize(pfes_truevsize);
   }
 
-  // swDiff_vec_.SetSize(vfes_truevsize);
-  // tmpR0_.SetSize(pfes_truevsize);
-  // tmpR0a_.SetSize(pfes_truevsize);
-  // tmpR0b_.SetSize(pfes_truevsize);
-  // tmpR0c_.SetSize(pfes_truevsize);
   tmpR0_.SetSize(sfes_truevsize);
   tmpR1_.SetSize(vfes_truevsize);
   swDiff_vec_.SetSize(vfes_truevsize);
@@ -1010,7 +1000,6 @@ void Tomboulides::initializeOperators() {
   L_iorho_form_->FormSystemMatrix(pres_ess_tdof_, L_iorho_op_);
 
   // Variable coefficient Laplacian inverse (gets destoryed and rebuilt every step)
-  // Note: This is not pyramid-safe!
   L_iorho_lor_ = new ParLORDiscretization(*L_iorho_form_, pres_ess_tdof_);
   L_iorho_inv_pc_ = new HypreBoomerAMG(L_iorho_lor_->GetAssembledMatrix());
   L_iorho_inv_pc_->SetPrintLevel(pressure_solve_pl_);
@@ -1405,10 +1394,6 @@ void Tomboulides::initializeIO(IODataOrganizer &io) const {
   io.registerIOVar("/velocity", "x-comp", 0);
   if (dim_ >= 2) io.registerIOVar("/velocity", "y-comp", 1);
   if (dim_ == 3) io.registerIOVar("/velocity", "z-comp", 2);
-  // if (writePressure_) {
-  //   io.registerIOFamily("Pressure", "/pressure", p_gf_, false, false, sfec_);
-  //   io.registerIOVar("/pressure", "pressure", 0);
-  // }
 
   if (axisym_) {
     io.registerIOFamily("Velocity azimuthal", "/swirl", utheta_gf_, true, true, pfec_);
@@ -1929,8 +1914,6 @@ void Tomboulides::step() {
   // rho * vstar / dt term
   Mv_rho_op_->AddMult(ustar_vec_, resu_vec_);
 
-  // Add streamwise diffusion
-  // if (sw_stab_) resu_vec_ += swDiff_vec_;
   for (auto &vel_dbc : vel_dbcs_) {
     u_next_gf_->ProjectBdrCoefficient(*vel_dbc.coeff, vel_dbc.attr);
   }

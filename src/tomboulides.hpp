@@ -78,7 +78,6 @@ class Tomboulides final : public FlowBase {
   // true if this is root rank
   bool rank0_;
   bool axisym_;
-  // bool writePressure_;
 
   // Options
   bool numerical_integ_ = false;
@@ -165,12 +164,8 @@ class Tomboulides final : public FlowBase {
   double hsolve_rtol_;
   double hsolve_atol_;
 
-  // double re_offset_;
-  // double re_factor_;
-
   // To use "numerical integration", quadrature rule must persist
   mfem::IntegrationRules gll_rules;
-  // mfem::IntegrationRules *intRules;
 
   // Options-related structures
   TPS::Tps *tpsP_ = nullptr;
@@ -240,7 +235,6 @@ class Tomboulides final : public FlowBase {
   mfem::VectorGridFunctionCoefficient *velocity_field_ = nullptr;
   mfem::GridFunctionCoefficient *swirl_field_ = nullptr;
   mfem::ParGridFunction *epsi_gf_ = nullptr;
-  // mfem::ParGridFunction *uface_gf_ = nullptr;
 
   /// Pressure FEM objects and fields
   mfem::FiniteElementCollection *pfec_ = nullptr;
@@ -396,11 +390,7 @@ class Tomboulides final : public FlowBase {
   mfem::Vector resp_vec_;
   mfem::Vector p_vec_;
   mfem::Vector resu_vec_;
-  // mfem::Vector swDiff_vec_;
   mfem::Vector tmpR0_;
-  // mfem::Vector tmpR0a_;
-  // mfem::Vector tmpR0b_;
-  // mfem::Vector tmpR0c_;
   mfem::Vector tmpR1_;
   mfem::Vector gradU_;
   mfem::Vector gradV_;
