@@ -91,8 +91,6 @@ struct temporalSchemeCoefficients {
   double dt1;
   double dt2;
   double dt3;
-  // double dt4;
-  // double dt5;
 
   // "Adams-Bashforth" coefficients (explicit)
   double ab1;
@@ -194,9 +192,6 @@ class LoMachSolver : public TPS::PlasmaSolver {
 
   /// The order of the velocity and pressure space.
   int order;
-
-  // number of species, if non-reacting this will be zero
-  // int nSpec = 0;
 
   // Timers.
   StopWatch sw_setup_, sw_step_, sw_turb_, sw_thermChem_, sw_flow_, sw_press_;

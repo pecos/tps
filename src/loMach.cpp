@@ -757,9 +757,6 @@ void LoMachSolver::parseSolverOptions() {
   tpsP_->getInput("loMach/thermalDiv", loMach_opts_.thermalDiv, true);
   tpsP_->getInput("loMach/realDiv", loMach_opts_.realDiv, false);
   tpsP_->getInput("loMach/solveTemp", loMach_opts_.solveTemp, true);
-// #ifdef HAVE_PYTHON
-//   tpsP_->getInput("loMach/do-flow-step", loMach_opts_.doFlowStep, true);
-// #endif
 
   // dump options to screen for user inspection
   if (rank0_) {

@@ -140,10 +140,6 @@ class LoMachOptions {
   bool solveTemp;
   int nSpec;
 
-// #ifdef HAVE_PYTHON
-//   bool doFlowStep;
-// #endif
-
   LoMachOptions() {
     order = 1;
     scale_mesh = 1.0;
