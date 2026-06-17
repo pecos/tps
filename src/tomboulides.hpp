@@ -78,7 +78,7 @@ class Tomboulides final : public FlowBase {
   // true if this is root rank
   bool rank0_;
   bool axisym_;
-  bool writePressure_;
+  // bool writePressure_;
 
   // Options
   bool numerical_integ_ = false;
@@ -165,12 +165,12 @@ class Tomboulides final : public FlowBase {
   double hsolve_rtol_;
   double hsolve_atol_;
 
-  double re_offset_;
-  double re_factor_;
+  // double re_offset_;
+  // double re_factor_;
 
   // To use "numerical integration", quadrature rule must persist
   mfem::IntegrationRules gll_rules;
-  mfem::IntegrationRules *intRules;
+  // mfem::IntegrationRules *intRules;
 
   // Options-related structures
   TPS::Tps *tpsP_ = nullptr;
@@ -240,7 +240,7 @@ class Tomboulides final : public FlowBase {
   mfem::VectorGridFunctionCoefficient *velocity_field_ = nullptr;
   mfem::GridFunctionCoefficient *swirl_field_ = nullptr;
   mfem::ParGridFunction *epsi_gf_ = nullptr;
-  mfem::ParGridFunction *uface_gf_ = nullptr;
+  // mfem::ParGridFunction *uface_gf_ = nullptr;
 
   /// Pressure FEM objects and fields
   mfem::FiniteElementCollection *pfec_ = nullptr;
@@ -250,12 +250,12 @@ class Tomboulides final : public FlowBase {
   mfem::ParGridFunction *resp_gf_ = nullptr;
   mfem::ParGridFunction *pp_div_rad_comp_gf_ = nullptr;
 
+  mfem::ParGridFunction *gridScale_gf_ = nullptr;
+
   /// Swirl
   mfem::ParGridFunction *utheta_gf_ = nullptr;
   mfem::ParGridFunction *utheta_next_gf_ = nullptr;
   mfem::ParGridFunction *u_next_rad_comp_gf_ = nullptr;
-
-  mfem::ParGridFunction *gridScale_gf_ = nullptr;
 
   /// "total" viscosity, including fluid, turbulence, sponge
   mfem::ParGridFunction *mu_total_gf_ = nullptr;
@@ -396,11 +396,11 @@ class Tomboulides final : public FlowBase {
   mfem::Vector resp_vec_;
   mfem::Vector p_vec_;
   mfem::Vector resu_vec_;
-  mfem::Vector swDiff_vec_;
+  // mfem::Vector swDiff_vec_;
   mfem::Vector tmpR0_;
-  mfem::Vector tmpR0a_;
-  mfem::Vector tmpR0b_;
-  mfem::Vector tmpR0c_;
+  // mfem::Vector tmpR0a_;
+  // mfem::Vector tmpR0b_;
+  // mfem::Vector tmpR0c_;
   mfem::Vector tmpR1_;
   mfem::Vector gradU_;
   mfem::Vector gradV_;
@@ -418,6 +418,9 @@ class Tomboulides final : public FlowBase {
   mfem::Vector utheta_m1_vec_;
   mfem::Vector utheta_m2_vec_;
   mfem::Vector utheta_next_vec_;
+
+  mfem::Vector tmpR0b_;
+  mfem::Vector swDiff_vec_;
 
   // miscellaneous
   double volume_;
@@ -475,17 +478,6 @@ class Tomboulides final : public FlowBase {
    * @brief Initialize statistics outputs
    */
   void initializeStats(Averaging &average, IODataOrganizer &io, bool continuation) const final;
-
-  /**
-   * @brief Computes f(Re_h) * |U|*h * div(M_sw*grad(phi)) where M_sw transforms the gradient into the
-   * streamwise direction
-   */
-  // void streamwiseDiffusion(Vector &phi, Vector &swDiff);
-
-  /**
-   * @brief Computes element convective Reynolds number
-   */
-  // void computeReh();
 
   /**
    * @brief Compute turbulent dissipation using average u

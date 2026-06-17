@@ -54,8 +54,6 @@ struct flowToThermoChem {
 
   bool swirl_supported = false;
   const mfem::ParGridFunction *swirl = nullptr;
-
-  const mfem::ParGridFunction *Reh = nullptr;
 };
 
 struct flowToTurbModel {
@@ -68,8 +66,6 @@ struct flowToTurbModel {
   const mfem::ParGridFunction *gradU = nullptr;
   const mfem::ParGridFunction *gradV = nullptr;
   const mfem::ParGridFunction *gradW = nullptr;
-
-  const mfem::ParGridFunction *Reh = nullptr;
 };
 
 class FlowBase {
