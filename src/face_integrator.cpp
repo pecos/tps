@@ -284,11 +284,10 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
 
     // set face and element int. points
     Tr.SetAllIntPoints(&ip);
-
-    // x-y-z coordinates of int pts
-    double x[3];
-    Vector transip(x, 3);
-    Tr.Transform(ip, transip);
+    // // x-y-z coordinates of int pts
+    // double x[3];
+    // Vector transip(x, 3);
+    // Tr.Transform(ip, transip);
 
     // Calculate basis functions on both elements at the face
     el1.CalcShape(Tr.GetElement1IntPoint(), shape1);
@@ -306,7 +305,7 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
       funval2[eq] = max(funval2[eq], 0.0);
     }
 
-    // Interpolate the distance function
+    // // Interpolate the distance function
     double d1 = 0;
     double d2 = 0;
     if (distance_ != NULL) {
@@ -329,9 +328,9 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
     CalcOrtho(Tr.Jacobian(), nor);
     rsolver->Eval(funval1, funval2, nor, fluxN);
 
-    // double x[3];
-    // Vector transip(x, 3);
-    // Tr.Transform(ip, transip);
+    double x[3];
+    Vector transip(x, 3);
+    Tr.Transform(ip, transip);
 
     // compute viscous fluxes
     viscF1 = viscF2 = 0.;

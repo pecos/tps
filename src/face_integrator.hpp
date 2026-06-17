@@ -68,8 +68,6 @@ class FaceIntegrator : public NonlinearFormIntegrator {
 
   IntegrationRules *intRules;
 
-  int rank_;
-
   DenseMatrix *faceMassMatrix1, *faceMassMatrix2;
   int faceNum;
   bool faceMassMatrixComputed;
