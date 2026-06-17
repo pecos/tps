@@ -347,6 +347,7 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
           std::cout << "Calorically Perfect: Setting uniform Dirichlet temperature on patch = " << patch << std::endl;
         }
         AddTempDirichletBC(temperature_value, inlet_attr);
+
       } else if (type == "interpolate") {
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
         inlet_attr = 0;
