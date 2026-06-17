@@ -318,10 +318,6 @@ class RunConfiguration {
   bool compute_distance;
   bool read_distance;
 
-  // restart flag indicating starting from a Low-Mach solution
-  // bool restartFromLoMach;
-  // double restartFromLoMachPressure;
-  // double restartFromLoMachRgas;
   RunConfiguration();
   ~RunConfiguration();
 
