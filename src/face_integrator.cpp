@@ -282,12 +282,7 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
   for (int i = 0; i < ir->GetNPoints(); i++) {
     const IntegrationPoint &ip = ir->IntPoint(i);
 
-    // set face and element int. points
-    Tr.SetAllIntPoints(&ip);
-    // // x-y-z coordinates of int pts
-    // double x[3];
-    // Vector transip(x, 3);
-    // Tr.Transform(ip, transip);
+    Tr.SetAllIntPoints(&ip);  // set face and element int. points
 
     // Calculate basis functions on both elements at the face
     el1.CalcShape(Tr.GetElement1IntPoint(), shape1);

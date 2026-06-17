@@ -575,7 +575,6 @@ SpongeZone::SpongeZone(const int &_dim, const int &_num_equation, const int &_or
         double planeDistance = distF + distInit;
         hSigma[n] = distInit / planeDistance / planeDistance;
       }
-
     } else if (szData.szType == SpongeZoneType::ANNULUS) {
       double distInit = 0.;
       for (int d = 0; d < dim; d++) distInit -= szData.normal[d] * (Xn[d] - szData.pointInit[d]);
