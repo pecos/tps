@@ -46,10 +46,10 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolverTPS *
       inletType_(_bcType),
       maxIntPoints_(_maxIntPoints),
       maxDofs_(_maxDofs) {
-    if ((mixture->GetWorkingFluid() != DRY_AIR) && (inletType_ != SUB_DENS_VEL)) {
-      grvy_printf(GRVY_ERROR, "Plasma only supports subsonic reflecting density velocity inlet!\n");
-      exit(-1);
-    }
+  if ((mixture->GetWorkingFluid() != DRY_AIR) && (inletType_ != SUB_DENS_VEL)) {
+    grvy_printf(GRVY_ERROR, "Plasma only supports subsonic reflecting density velocity inlet!\n");
+    exit(-1);
+  }
   inputState.UseDevice(true);
   inputState.SetSize(_inputData.Size());
   auto hinputState = inputState.HostWrite();
@@ -810,14 +810,6 @@ void InletBC::subsonicReflectingDensityVelocityFace(Vector &normal, Vector tange
   state2[1] = state2[0] * Un;
   state2[2] = state2[0] * Ut;
   if (nvel_ == 3) state2[3] = state2[0] * 0.0;
-  // Vector ruGlobal;
-  // ruGlobal.SetSize(dim_);
-  // ruGlobal = 0.0;
-
-  // Vector ruFace;
-  // ruFace.SetSize(dim_);
-  // ruFace = 0.0;
-  // for (int d = 0; d < dim_; d++) ruFace[d] = state2[d + 1];
 
   if (eqSystem == NS_PASSIVE) {
     state2[num_equation_ - 1] = 0.;
@@ -843,12 +835,6 @@ void InletBC::subsonicReflectingDensityVelocityFace(Vector &normal, Vector tange
     for (int d = 0; d < dim_; d++) momN[d] = state2[1 + d];
     invM.Mult(momN, momX);
     for (int d = 0; d < dim_; d++) state2[1 + d] = momX[d];
-    // for (int ii = 0; ii < dim_; ii++) {
-    //   for (int jj = 0; jj < dim_; jj++) {
-    //     ruGlobal[ii] = ruGlobal[ii] + M(jj, ii) * ruFace[jj];
-    //   }
-    // }
-    // for (int d = 0; d < dim_; d++) state2[d + 1] = ruGlobal[d];
   }
 
   if (eqSystem == NS_PASSIVE) {
@@ -968,10 +954,10 @@ void InletBC::interpInlet_gpu(const mfem::Vector &x, const elementIndexingData &
 
   const InletType type = inletType_;
 
-   if ((fluid != DRY_AIR) && (type != SUB_DENS_VEL)) {
-     mfem_error("Plasma only supports subsonic reflecting density velocity inlet!\n");
-     exit(-1);
-   }
+  if ((fluid != DRY_AIR) && (type != SUB_DENS_VEL)) {
+    mfem_error("Plasma only supports subsonic reflecting density velocity inlet!\n");
+    exit(-1);
+  }
 
   const int dim = dim_;
   const int nvel = nvel_;

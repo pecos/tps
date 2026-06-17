@@ -987,8 +987,8 @@ void IODataOrganizer::read(hid_t file, bool serial, int read_order) {
           fam.readPartitioned(file);
         }
       }
-    } 
-  } 
+    }
+  }
 }
 
 IODataOrganizer::~IODataOrganizer() {
