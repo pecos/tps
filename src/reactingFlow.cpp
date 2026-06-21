@@ -2407,7 +2407,7 @@ void ReactingFlow::temperatureStep() {
   {
     double* djh = jh_.HostReadWrite();
     for (int i = 0; i < sDofInt_; i++) {
-      double x, y, z, dist;
+      double x, z, dist;
       double wgt;
       x = coordsDof(0 * sDofInt_ + i);
       // y = coordsDof(1 * sDofInt_ + i);
@@ -3557,7 +3557,7 @@ void ReactingFlow::computeQtTO() {
   {
     double* djh = jh_.HostReadWrite();
     for (int i = 0; i < sDofInt_; i++) {
-      double x, y, z, dist;
+      double x, z, dist;
       double wgt;
       x = coordsDof(0 * sDofInt_ + i);
       // y = coordsDof(1 * sDofInt_ + i);
