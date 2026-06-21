@@ -141,6 +141,9 @@ class CaloricallyPerfectThermoChem : public ThermoChemModelBase {
   bool sw_stab_;
   double Reh_factor_, Reh_offset_;
 
+  // not currently implemented but we need to yell if someone tries this
+  bool axisym_;
+  
   // FEM related fields and objects
 
   // Scalar \f$H^1\f$ finite element collection.

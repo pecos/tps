@@ -65,6 +65,15 @@ CaloricallyPerfectThermoChem::CaloricallyPerfectThermoChem(mfem::ParMesh *pmesh,
   order_ = loMach_opts->order;
   gridScale_gf_ = gridScale;
 
+  tps->getInput("loMach/axisymmetric", axisym_, false);
+  if (axisym_) {
+    if (rank0_) {
+      std::cout << "ERROR: axisymmetric is not currently implemented in calorically_perfect.  Either implement or use LTE or reacting..." << std::endl;
+    }
+    assert(false);
+    exit(1);    
+  }
+  
   std::string visc_model;
   tpsP_->getInput("loMach/calperfect/viscosity-model", visc_model, std::string("sutherland"));
   if (visc_model == "sutherland") {
@@ -135,10 +144,10 @@ CaloricallyPerfectThermoChem::CaloricallyPerfectThermoChem(mfem::ParMesh *pmesh,
   tpsP_->getInput("loMach/calperfect/msolve-max-iter", mass_inverse_max_iter_, max_iter_);
   tpsP_->getInput("loMach/calperfect/msolve-verbosity", mass_inverse_pl_, pl_solve_);
 
-  // artificial diffusion (SUPG)
+  // artificial diffusion (SUPG) use full for all but momentum
   tpsP_->getInput("loMach/calperfect/streamwise-stabilization", sw_stab_, false);
-  tpsP_->getInput("loMach/calperfect/Reh_factor", Reh_factor_, 0.5);
-  tpsP_->getInput("loMach/calperfect/Reh_offset", Reh_offset_, 1.0);
+  tpsP_->getInput("loMach/calperfect/Reh_factor", Reh_factor_, 1.0);
+  tpsP_->getInput("loMach/calperfect/Reh_offset", Reh_offset_, 0.0);
 }
 
 CaloricallyPerfectThermoChem::~CaloricallyPerfectThermoChem() {
@@ -348,6 +357,17 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
         }
         AddTempDirichletBC(temperature_value, inlet_attr);
 
+      } else if (type == "normal") {
+        Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
+        inlet_attr = 0;
+        inlet_attr[patch - 1] = 1;
+        double temperature_value;
+        tpsP_->getRequiredInput((basepath + "/temperature").c_str(), temperature_value);
+        if (rank0_) {
+          std::cout << "Calorically Perfect: Setting uniform Dirichlet temperature on patch = " << patch << std::endl;
+        }
+        AddTempDirichletBC(temperature_value, inlet_attr);
+	
       } else if (type == "interpolate") {
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
         inlet_attr = 0;
@@ -626,20 +646,25 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   MqInv_->SetMaxIter(mass_inverse_max_iter_);
 
   LQ_form_ = new ParBilinearForm(sfes_);
-  auto *lqd_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
+  //auto *lqd_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
+  //if (axisym_) {
+  //  auto *lqd_blfi = new DiffusionIntegrator(*rad_thermal_diff_total_coeff_);
+  //} else {
+    auto *lqd_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
+  //}  
   if (numerical_integ_) {
     lqd_blfi->SetIntRule(&ir_di);
   }
   LQ_form_->AddDomainIntegrator(lqd_blfi);
 
-  // SUPG diffusion
-  if (sw_stab_) {
-    auto *slqd_blfi = new DiffusionIntegrator(*supg_coeff_);
-    if (numerical_integ_) {
-      slqd_blfi->SetIntRule(&ir_di);
-    }
-    LQ_form_->AddDomainIntegrator(slqd_blfi);
-  }
+  // NO, this is not consistent and will degrade stability  
+  // if (sw_stab_) {
+  //   auto *slqd_blfi = new DiffusionIntegrator(*supg_coeff_);
+  //   if (numerical_integ_) {
+  //    slqd_blfi->SetIntRule(&ir_di);
+  //  }
+  //  LQ_form_->AddDomainIntegrator(slqd_blfi);
+  // }
 
   if (partial_assembly_) {
     LQ_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
@@ -1074,6 +1099,7 @@ void CaloricallyPerfectThermoChem::computeQtTO() {
   Qt_gf_.GetTrueDofs(Qt_);
   Qt_ *= -Rgas_ / thermo_pressure_;
   Qt_gf_.SetFromTrueDofs(Qt_);
+  
 }
 
 void CaloricallyPerfectThermoChem::screenHeader(std::vector<std::string> &header) const {

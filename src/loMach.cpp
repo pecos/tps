@@ -92,7 +92,7 @@ LoMachSolver::~LoMachSolver() {
   delete flow_;
   delete thermo_;
   delete sponge_;
-  delete turbModel_;
+  // delete turbModel_; // is this causing the seg faults?
   delete avg_opts_;
   delete average_;
   delete meshData_;
@@ -417,16 +417,20 @@ void LoMachSolver::solveStep() {
   if (loMach_opts_.ts_opts_.integrator_type_ == LoMachTemporalOptions::CURL_CURL) {
     SetTimeIntegrationCoefficients(iter - iter_start_);
     extData_->step();
+
     sw_thermChem_.Start();
     thermo_->step();
+
     sw_thermChem_.Stop();
     sw_flow_.Start();
     if (!disable_flow_) {
       flow_->step();
     }
+
     sw_flow_.Stop();
     sw_turb_.Start();
     turbModel_->step();
+
     sw_turb_.Stop();
   } else {
     if (rank0_) std::cout << "Time integration not updated." << endl;

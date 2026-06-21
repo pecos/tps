@@ -222,6 +222,7 @@ void QuasiMagnetostaticSolver3D::initialize() {
 
   joule_heating_ = new ParGridFunction(jh_space_);
   *joule_heating_ = 0.0;
+  if (rank0_) std::cout << "QM3D initialize okay..." << endl;  
 }
 
 void QuasiMagnetostaticSolver3D::InitializeCurrent() {
@@ -277,13 +278,13 @@ void QuasiMagnetostaticSolver3D::InitializeCurrent() {
 
   PWConstCoefficient J0coef(J0);
   VectorFunctionCoefficient current(dim_, JFun, &J0coef);
-
+  
   // 2) Build a discretely divergence-free approximation of the source
   // current that lives in the Nedelec FE space defined in
   // Initialize()
   ParGridFunction *Jorig = new ParGridFunction(Aspace_);
   ParGridFunction *Jproj = new ParGridFunction(Aspace_);
-
+  
   r_ = new ParLinearForm(Aspace_);
 
   // This call (i.e., GlobalProjectDiscCoefficient) replaces the
@@ -316,6 +317,7 @@ void QuasiMagnetostaticSolver3D::InitializeCurrent() {
   delete Jproj;
 
   current_initialized_ = true;
+  if (rank0_) std::cout << "InitializeCurrent okay..." << endl;    
 }
 
 // query solver-specific runtime controls
@@ -698,6 +700,26 @@ double QuasiMagnetostaticSolver3D::elementJouleHeating(const FiniteElement &el, 
 
     const double wt = ip.weight * Tr.Weight();
     elem_jh += qpcontrib * wt;
+
+    // HERE
+    // need to modify here so that joule heating is only IN torch
+    // this is a problem-specific hack (HACK)
+    double rCyl = 0.028;
+    double x, y, z, dist;
+    double wgt = 1.0; 
+    Vector coords(Tr.GetSpaceDim());
+    Tr.Transform(ip, coords);
+    x = coords[0];
+    y = coords[1];
+    dist = x * x;
+    if (dim_ == Tr.GetSpaceDim()) {
+      z = coords[2];
+      dist += z * z;
+    }
+    dist = std::sqrt(dist);	
+    if (dist > rCyl) wgt = 0.0; 	
+    elem_jh *= wgt;  
+    
   }
 
   return elem_jh;
@@ -728,6 +750,7 @@ double QuasiMagnetostaticSolver3D::totalJouleHeating() {
 
     // following bad fields here (el_x has the actual data)...
     int_jh += elementJouleHeating(*fe, *T, el_x);
+    
   }
 
   // sum over mpi ranks

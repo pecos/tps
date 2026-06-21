@@ -56,12 +56,13 @@ static double sigmaTorchStartUp(const Vector &pos) {
   const double x = std::sqrt(pos[0] * pos[0] + pos[2] * pos[2]);  // radial location
   const double y = pos[1];                                        // axial location
 
-  const double r0 = 0.005;
+  //const double r0 = 0.005;
+  const double r0 = 0.0067;
   const double y0 = 0.135;
   const double ysig = 0.015;
 
   const double sigma =
-      2000. * std::exp(-0.5 * (x / r0) * (x / r0)) * std::exp(-0.5 * ((y - y0) / ysig) * ((y - y0) / ysig));
+      4000. * std::exp(-0.5 * (x / r0) * (x / r0)) * std::exp(-0.5 * ((y - y0) / ysig) * ((y - y0) / ysig));
 
   return sigma;
 }
@@ -178,9 +179,10 @@ LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, t
   tps->getInput("loMach/ltethermo/linear-solver-max-iter", max_iter_, 1000);
   tps->getInput("loMach/ltethermo/linear-solver-verbosity", pl_solve_, 0);
 
+  // use full stabilization for all but momentum
   tpsP_->getInput("loMach/ltethermo/streamwise-stabilization", sw_stab_, false);
-  tpsP_->getInput("loMach/ltethermo/Reh_factor", Reh_factor_, 0.5);
-  tpsP_->getInput("loMach/ltethermo/Reh_offset", Reh_offset_, 1.0);
+  tpsP_->getInput("loMach/ltethermo/Reh_factor", Reh_factor_, 1.0);
+  tpsP_->getInput("loMach/ltethermo/Reh_offset", Reh_offset_, 0.0);
   tpsP_->getInput("loMach/ltethermo/neumann-temp", neumann_temp_, false);
 
   if (sw_stab_) {
@@ -467,6 +469,17 @@ void LteThermoChem::initializeSelf() {
         }
         // AddTempDirichletBC(temperature_value, inlet_attr);
 
+      } else if (type == "normal") {
+        Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
+        inlet_attr = 0;
+        inlet_attr[patch - 1] = 1;
+        double temperature_value;
+        tpsP_->getRequiredInput((basepath + "/temperature").c_str(), temperature_value);
+        if (rank0_) {
+          std::cout << "Calorically Perfect: Setting uniform Dirichlet temperature on patch = " << patch << std::endl;
+        }
+        AddTempDirichletBC(temperature_value, inlet_attr);
+	
       } else if (type == "interpolate") {
         temperature_bc_field_ = new GridFunctionCoefficient(extData_interface_->Tdata);
         if (!neumann_temp_) {
@@ -902,15 +915,17 @@ void LteThermoChem::initializeOperators() {
   }
   LQ_form_->AddDomainIntegrator(lqd_blfi);
 
-  if (sw_stab_) {
-    auto *slqd_blfi = new DiffusionIntegrator(*supg_coeff_);
-    if (numerical_integ_) {
-      slqd_blfi->SetIntRule(&ir_di);
-    }
-    LQ_form_->AddDomainIntegrator(slqd_blfi);
-  }
+  // NO, this is not consistent and will degrade stability 
+  //if (sw_stab_) {
+  //  auto *slqd_blfi = new DiffusionIntegrator(*supg_coeff_);
+  //  if (numerical_integ_) {
+  //    slqd_blfi->SetIntRule(&ir_di);
+  //  }
+  //  LQ_form_->AddDomainIntegrator(slqd_blfi);
+  // }
+  
   if (partial_assembly_) {
-    LQ_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
+     LQ_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   }
   LQ_form_->Assemble();
   LQ_form_->FormSystemMatrix(empty, LQ_);
@@ -961,6 +976,7 @@ void LteThermoChem::initializeOperators() {
     Tn_gf_.GetTrueDofs(Tn_);
     Tn_next_gf_.SetFromTrueDofs(Tn_);
     Tn_next_gf_.GetTrueDofs(Tn_next_);
+    
   } else if (filter_restart_) {
     if (rank0_) std::cout << "************ Filtering temperature restart ******************" << std::endl;
     // Build the right-hand-side

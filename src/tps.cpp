@@ -248,22 +248,28 @@ void Tps::chooseSolver() {
   if (input_solver_type_ == "flow") {
     isFlowOnlyMode_ = true;
     solver_ = new M2ulPhyS(iFile_, this);
+    if (isRank0_) std::cout << "Using compressible DG solver" << endl;             
   } else if (input_solver_type_ == "em") {
     isEMOnlyMode_ = true;
     ElectromagneticOptions em_opt;
     solver_ = new QuasiMagnetostaticSolver3D(em_opt, this);
+    if (isRank0_) std::cout << "Using quasi-magnetostatic solver" << endl;         
   } else if (input_solver_type_ == "loMach") {
     solver_ = new LoMachSolver(this);
+    if (isRank0_) std::cout << "Using low-Mach solver" << endl;     
   } else if (input_solver_type_ == "em-axi") {
     isEMOnlyMode_ = true;
     ElectromagneticOptions em_opt;
     solver_ = new QuasiMagnetostaticSolverAxiSym(em_opt, this);
+    if (isRank0_) std::cout << "Using axisymmetric quasi-magnetostatic solver" << endl;     
   } else if (input_solver_type_ == "independent-coupled") {
     isFlowEMCoupledMode_ = true;
     solver_ = new IndependentCoupling(iFile_, this);
+    if (isRank0_) std::cout << "Using independent-coupled solver" << endl;     
   } else if (input_solver_type_ == "cycle-avg-joule-coupled") {
     isFlowEMCoupledMode_ = true;
     solver_ = new CycleAvgJouleCoupling(iFile_, this);
+    if (isRank0_) std::cout << "Using cycle-averaged joule-coupled solver" << endl; 
   } else if (input_solver_type_ == "coupled") {
     isFlowEMCoupledMode_ = true;
     grvy_printf(GRVY_ERROR, "\nSlow your roll.  Solid high-five for whoever implements this coupled solver mode!\n");

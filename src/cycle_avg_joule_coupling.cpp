@@ -502,7 +502,7 @@ void CycleAvgJouleCoupling::solveStep() {
       const double upd_jh = qmsa_solver_->totalJouleHeating();
       if (rank0_) {
         grvy_printf(GRVY_INFO, "current_iter = %d\n", current_iter_);
-        grvy_printf(GRVY_INFO, "Joule heating scaling ratio = %d\n", ratio);
+        grvy_printf(GRVY_INFO, "Joule heating scaling ratio = %.6e\n", ratio);
         grvy_printf(GRVY_INFO, "The total input Joule heating after scaling = %.6e\n", upd_jh);
       }
     }

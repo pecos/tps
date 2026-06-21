@@ -131,7 +131,7 @@ Tomboulides::Tomboulides(mfem::ParMesh *pmesh, int vorder, int porder, temporalS
     tps->getInput("loMach/tomboulides/hsolve-maxIters", hsolve_max_iter_, default_max_iter_);
     tps->getInput("loMach/tomboulides/msolve-maxIters", mass_inverse_max_iter_, default_max_iter_);
 
-    // artificial diffusion (SUPG)
+    // artificial diffusion (SUPG) full-streamwise stab is fine for RANS, but not for LES
     tpsP_->getInput("loMach/tomboulides/streamwise-stabilization", sw_stab_, false);
     tpsP_->getInput("loMach/tomboulides/Reh_factor", Reh_factor_, 0.5);
     tpsP_->getInput("loMach/tomboulides/Reh_offset", Reh_offset_, 1.0);

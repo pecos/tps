@@ -71,8 +71,9 @@ static double sigmaTorchStartUp(const Vector &pos) {
   // additions for 3d, this should just use "SetConstantPlasmaConductivity" in equation_of_state.cpp
   const double z = pos[2];
   const double rCyl = 0.029;
-  const double rsig = 0.005;  // 5mm
-  const double ysig = 0.01;
+  //const double rsig = 0.005;  // 5mm
+  const double rsig = 0.0075;
+  const double ysig = 0.1;
   const double y0 = 0.15;  // step location
 
   double radius_here = std::sqrt(x * x + z * z);
@@ -81,7 +82,7 @@ static double sigmaTorchStartUp(const Vector &pos) {
   rwgt = std::exp(-0.5 * (radius_here / rsig) * (radius_here / rsig));
   hwgt = std::exp(-0.5 * ((y - y0) / ysig) * ((y - y0) / ysig));
   if (radius_here >= rCyl) rwgt = 0.0;
-  sigma = 2000. * rwgt * hwgt;
+  sigma = 4000. * rwgt * hwgt;
 
   // if (sigma > 1.0) {
   //   std::cout << "sigma: " << sigma << " radius: " << radius_here << " y: " << y << endl;
@@ -90,7 +91,30 @@ static double sigmaTorchStartUp(const Vector &pos) {
   return sigma;
 }
 
+static double sigmaTorchStartUp2D(const Vector &pos) {
+  const double x = std::sqrt(pos[0] * pos[0]);  // radial location
+  const double y = pos[1];                                        // axial location
+
+  // additions for 3d, this should just use "SetConstantPlasmaConductivity" in equation_of_state.cpp
+  const double rCyl = 0.029;
+  const double rsig = 0.005;  // 5mm
+  const double ysig = 0.01;
+  const double y0 = 0.15;  // step location
+
+  double radius_here = std::sqrt(x * x);
+  double rwgt, hwgt;
+  double sigma;
+  rwgt = std::exp(-0.5 * (radius_here / rsig) * (radius_here / rsig));
+  hwgt = std::exp(-0.5 * ((y - y0) / ysig) * ((y - y0) / ysig));
+  if (radius_here >= rCyl) rwgt = 0.0;
+  sigma = 2000. * rwgt * hwgt;
+
+  return sigma;
+}
+
+
 static FunctionCoefficient sigma_start_up(sigmaTorchStartUp);
+static FunctionCoefficient sigma_start_up_2d(sigmaTorchStartUp2D);
 
 ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &time_coeff,
                            ParGridFunction *gridScale, TPS::Tps *tps)
@@ -781,10 +805,10 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   // artificial diffusion (SUPG)
   tpsP_->getInput("loMach/reactingFlow/streamwise-stabilization", sw_stab_, false);
 
-  // specified plasma initial condition
+  // specified plasma initial condition (use full sw-stab for all but momentum)
   tpsP_->getInput("plasma_models/initialize_species", species_init_, false);
-  tpsP_->getInput("loMach/reactingFlow/Reh_factor", Reh_factor_, 0.5);
-  tpsP_->getInput("loMach/reactingFlow/Reh_offset", Reh_offset_, 1.0);
+  tpsP_->getInput("loMach/reactingFlow/Reh_factor", Reh_factor_, 1.0);
+  tpsP_->getInput("loMach/reactingFlow/Reh_offset", Reh_offset_, 0.0);
 
   // zero-gradient BCs
   tpsP_->getInput("loMach/reactingFlow/neumann-temp", neumann_temp_, false);
@@ -1421,7 +1445,12 @@ void ReactingFlow::initializeOperators() {
   // TODO(trevilo): Put a flag for this!!!!
   if (torch_cold_start_) {
     if (rank0_) std::cout << " Cold start selected.  Specifying sigma field." << endl;
-    sigma_gf_.ProjectCoefficient(sigma_start_up);
+    if (dim_ == 3) {
+      sigma_gf_.ProjectCoefficient(sigma_start_up);
+    } else {
+      sigma_gf_.ProjectCoefficient(sigma_start_up_2d);      
+    }
+	
   }
 
   Array<int> empty;
@@ -1829,14 +1858,17 @@ void ReactingFlow::initializeOperators() {
   }
   LQ_form_->AddDomainIntegrator(lqd_blfi);
 
-  DiffusionIntegrator *slqd_blfi;
-  if (sw_stab_) {
-    slqd_blfi = new DiffusionIntegrator(*supg_coeff_);
-    if (numerical_integ_) {
-      slqd_blfi->SetIntRule(&ir_di);
-    }
-    LQ_form_->AddDomainIntegrator(slqd_blfi);
-  }
+
+  // NO, this is not consistent and will degrade stability  
+  // DiffusionIntegrator *slqd_blfi;
+  // if (sw_stab_) {
+  //   slqd_blfi = new DiffusionIntegrator(*supg_coeff_);
+  //   if (numerical_integ_) {
+  //     slqd_blfi->SetIntRule(&ir_di);
+  //   }
+  //   LQ_form_->AddDomainIntegrator(slqd_blfi);
+  // }
+  
   if (partial_assembly_) {
     LQ_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   }
@@ -2373,6 +2405,37 @@ void ReactingFlow::temperatureStep() {
   jh_form_->Update();
   jh_form_->Assemble();
   jh_form_->ParallelAssemble(jh_);
+
+
+
+    // this bit is to prevent joule heating bleed -> make more elegant and then move to separate routine
+    ParGridFunction coordsDof(vfes_);
+    pmesh_->GetNodes(coordsDof);
+    double rCyl = 0.029;    
+    {
+      double *djh = jh_.HostReadWrite();
+      for (int i = 0; i < sDofInt_; i++) {
+
+        double x, y, z, dist;
+        double wgt;
+        x = coordsDof(0 * sDofInt_ + i);
+        // y = coordsDof(1 * sDofInt_ + i);
+        dist = x * x;
+        if (dim_ == 3) {
+          z = coordsDof(2 * sDofInt_ + i);
+          z = z - spark_center_[2];
+          dist += z * z;
+        }
+        dist = std::sqrt(dist);
+        wgt = 1.0;	
+	if (dist > rCyl) wgt = 0.0; 	
+	djh[i] *= wgt;
+	
+      }
+    }
+
+
+  
   resT_ += jh_;
 
   // species-temp diffusion term, already in int-weak form
@@ -3225,10 +3288,16 @@ void ReactingFlow::updateDiffusivity() {
 
   // electrical conductivity
   if (!torch_cold_start_ && !fixed_conductivity_) {
-    // if(rank0_) std::cout << " sigma update portion... " << endl;
+
+    // this bit is to prevent joule heating bleed 
+    //ParGridFunction coordsDof(vfes_);
+    //pmesh_->GetNodes(coordsDof);
+    //double rCyl = 0.029;
+    
     {
       double *h_sig = sigma_.HostReadWrite();
       for (int i = 0; i < sDofInt_; i++) {
+	
         // int nEq = dim_ + 2 + nActiveSpecies_;
         double state[gpudata::MAXEQUATIONS];
         double conservedState[gpudata::MAXEQUATIONS];
@@ -3248,7 +3317,23 @@ void ReactingFlow::updateDiffusivity() {
 
         double sig;
         transport_->ComputeElectricalConductivity(conservedState, sig);
-        h_sig[i] = sig;
+	h_sig[i] = sig;	
+	
+	// this is hack to prevent heating in outflow tank
+        //double x, y, z, dist;
+        //double wgt;
+        //x = coordsDof(0 * sDofInt_ + i);
+        //y = coordsDof(1 * sDofInt_ + i);
+        //dist = x * x;
+        //if (dim_ == 3) {
+        //  z = coordsDof(2 * sDofInt_ + i);
+        //  dist += z * z;
+        //}
+        //dist = std::sqrt(dist);
+        //wgt = 1.0;	
+	//if (dist > rCyl) wgt = 0.0; 	
+	//h_sig[i] = wgt * sig;
+	
       }
     }
 
@@ -3257,7 +3342,8 @@ void ReactingFlow::updateDiffusivity() {
 }
 
 void ReactingFlow::evaluatePlasmaConductivityGF() {
-  if (rank0_) std::cout << " we are in evaluatePlasmaConductivityGF " << endl;
+  
+  if (rank0_) std::cout << " ...we are in evaluatePlasmaConductivityGF " << endl;
 
   (flow_interface_->velocity)->GetTrueDofs(tmpR1_);
   const double *dataTemp = Tn_.HostRead();
@@ -3442,6 +3528,12 @@ void ReactingFlow::AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr) {
   AddQtDirichletBC(new FunctionCoefficient(f), attr);
 }
 
+// Rather than filtering Qt, a better way is to filter the temperature
+// that is fed to the Qt operators.  In particular, temperature
+// should live in C1 (at least).  This can be done with polynomial
+// space filtering or numericallly with and (I-alpha*nabla)T type
+// filter.  In the latter, alpha should depend on discontinuity in
+// grad(T) at element boundaries (which is annoying to compute).
 void ReactingFlow::computeQtTO() {
   tmpR0_ = 0.0;
   // rhsqt_bd_ = 0.0;
@@ -3473,6 +3565,35 @@ void ReactingFlow::computeQtTO() {
   jh_form_->Update();
   jh_form_->Assemble();
   jh_form_->ParallelAssemble(jh_);
+
+
+    // this bit is to prevent joule heating bleed -> make more elegant and then move to separate routine
+    ParGridFunction coordsDof(vfes_);
+    pmesh_->GetNodes(coordsDof);
+    double rCyl = 0.029;    
+    {
+      double *djh = jh_.HostReadWrite();
+      for (int i = 0; i < sDofInt_; i++) {
+
+        double x, y, z, dist;
+        double wgt;
+        x = coordsDof(0 * sDofInt_ + i);
+        // y = coordsDof(1 * sDofInt_ + i);
+        dist = x * x;
+        if (dim_ == 3) {
+          z = coordsDof(2 * sDofInt_ + i);
+          z = z - spark_center_[2];
+          dist += z * z;
+        }
+        dist = std::sqrt(dist);
+        wgt = 1.0;	
+	if (dist > rCyl) wgt = 0.0; 	
+	djh[i] *= wgt;
+	
+      }
+    }
+
+  
   tmpR0_ -= jh_;
   // rhsqt_jh_.SetFromTrueDofs(jh_);
   // rhsqt_jh_.Neg();
