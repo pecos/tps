@@ -249,7 +249,8 @@ class ReactingFlow : public ThermoChemModelBase {
   // additions for species
   ParGridFunction Ynm1_gf_, Ynm2_gf_;
   ParGridFunction Yn_gf_, Yn_next_gf_, Yext_gf_, resY_gf_;
-  ParGridFunction prodY_gf_, productY_gf_;
+  ParGridFunction prodY_gf_; 
+  // ParGridFunction productY_gf_;
   ParGridFunction YnFull_gf_;
   ParGridFunction CpY_gf_;
   ParGridFunction CpMix_gf_;

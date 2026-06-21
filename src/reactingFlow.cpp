@@ -144,26 +144,26 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
 #ifdef HAVE_PYTHON
   tpsP_->getInput("cycle-avg-joule-coupled/bte-from-tps", bte_from_tps_, false);
   if (bte_from_tps_) {
-    // tpsP_->getRequiredInput("boltzmannSolver/collisionsFile", collisionsFile);
-    // tpsP_->getRequiredInput("boltzmannSolver/solver_type", solver_type);
-    // tpsP_->getInput("boltzmannSolver/ee_collisions", ee_collisions, 0);
-    // tpsP_->getInput("boltzmannSolver/blend-frac-init", bl_frac_init_, 0.01);
-    // tpsP_->getInput("boltzmannSolver/blend-frac-increment", bl_frac_increment_, 0.01);
-    // tpsP_->getInput("boltzmannSolver/blend-frac-change-freq", bl_frac_change_freq_, 1);
-    // bl_frac_ = bl_frac_init_;
-    // tpsP_->getInput("boltzmannSolver/solve-bte-every-n", solve_bte_every_n, 1);
-    // tpsP_->getInput("boltzmannSolver/regrid-bte-every-n", regrid_bte_every_n, 1);
-    // tpsP_->getInput("boltzmannSolver/do-bte-sub-cluster", do_bte_sub_cluster, 1);
-    // tpsP_->getInput("boltzmannSolver/num-bte-sub-clusters", num_sub_clusters_bte, 50);
-    // tpsP_->getInput("boltzmannSolver/n_grids", n_vspace_grids, 1);
-    // grid_idx_to_npts.resize(n_vspace_grids);
-    // Te_vec.resize(n_vspace_grids);
-    // tpsP_->getInput("boltzmannSolver/Nr", Nr_BTE, 128);
-    // tpsP_->getInput("boltzmannSolver/rtol", BTE_rtol, 1e-6);
-    // tpsP_->getInput("boltzmannSolver/dt_BTE", dt_BTE, 5e-3);
-    // tpsP_->getInput("boltzmannSolver/store_csv", store_csv, 1);
-    // tpsP_->getInput("boltzmannSolver/clip_rr", clip_rr, 0);
-    // tpsP_->getInput("boltzmannSolver/clip_frac", clip_frac, 10.0);
+    tpsP_->getRequiredInput("boltzmannSolver/collisionsFile", collisionsFile);
+    tpsP_->getRequiredInput("boltzmannSolver/solver_type", solver_type);
+    tpsP_->getInput("boltzmannSolver/ee_collisions", ee_collisions, 0);
+    tpsP_->getInput("boltzmannSolver/blend-frac-init", bl_frac_init_, 0.01);
+    tpsP_->getInput("boltzmannSolver/blend-frac-increment", bl_frac_increment_, 0.01);
+    tpsP_->getInput("boltzmannSolver/blend-frac-change-freq", bl_frac_change_freq_, 1);
+    bl_frac_ = bl_frac_init_;
+    tpsP_->getInput("boltzmannSolver/solve-bte-every-n", solve_bte_every_n, 1);
+    tpsP_->getInput("boltzmannSolver/regrid-bte-every-n", regrid_bte_every_n, 1);
+    tpsP_->getInput("boltzmannSolver/do-bte-sub-cluster", do_bte_sub_cluster, 1);
+    tpsP_->getInput("boltzmannSolver/num-bte-sub-clusters", num_sub_clusters_bte, 50);
+    tpsP_->getInput("boltzmannSolver/n_grids", n_vspace_grids, 1);
+    grid_idx_to_npts.resize(n_vspace_grids);
+    Te_vec.resize(n_vspace_grids);
+    tpsP_->getInput("boltzmannSolver/Nr", Nr_BTE, 128);
+    tpsP_->getInput("boltzmannSolver/rtol", BTE_rtol, 1e-6);
+    tpsP_->getInput("boltzmannSolver/dt_BTE", dt_BTE, 5e-3);
+    tpsP_->getInput("boltzmannSolver/store_csv", store_csv, 1);
+    tpsP_->getInput("boltzmannSolver/clip_rr", clip_rr, 0);
+    tpsP_->getInput("boltzmannSolver/clip_frac", clip_frac, 10.0);
   }
 #endif
 
@@ -876,9 +876,9 @@ ReactingFlow::~ReactingFlow() {
     delete vizReacFields_[i];
   }
 
-  for (unsigned int i = 0; i < vizProdFields_.size(); i++) {
-    delete vizProdFields_[i];
-  }
+  // for (unsigned int i = 0; i < vizProdFields_.size(); i++) {
+  //   delete vizProdFields_[i];
+  // }
 
   for (unsigned int i = 0; i < vizkReacFields_.size(); i++) {
     delete vizkReacFields_[i];
@@ -1153,8 +1153,8 @@ void ReactingFlow::initializeSelf() {
   YnFull_gf_ = 0.0;
 
   // prodY for plotting
-  productY_gf_.SetSpace(yfes_);
-  productY_gf_ = 0.0;
+  // productY_gf_.SetSpace(yfes_);
+  // productY_gf_ = 0.0;
 
   // reaction progress rates for plotting
   reacR_gf_.SetSpace(rfes_);
@@ -1428,7 +1428,7 @@ void ReactingFlow::initializeSelf() {
   YnFull_gf_.SetFromTrueDofs(Yn_);
 
 #ifdef HAVE_PYTHON
-  productY_gf_.SetFromTrueDofs(prodY_);
+  // productY_gf_.SetFromTrueDofs(prodY_);
   reacR_gf_.SetFromTrueDofs(reacR_);
   kReac_gf_.SetFromTrueDofs(kReac_);
   rrf_by_rrb_gf_.SetFromTrueDofs(rrf_by_rrb_);
@@ -2170,7 +2170,7 @@ void ReactingFlow::initializeOperators() {
     YnFull_gf_.SetFromTrueDofs(Yn_);
 
 #ifdef HAVE_PYTHON
-    productY_gf_.SetFromTrueDofs(prodY_);
+    // productY_gf_.SetFromTrueDofs(prodY_);
     reacR_gf_.SetFromTrueDofs(reacR_);
     kReac_gf_.SetFromTrueDofs(kReac_);
     rrf_by_rrb_gf_.SetFromTrueDofs(rrf_by_rrb_);
@@ -2187,7 +2187,7 @@ void ReactingFlow::initializeOperators() {
   YnFull_gf_.GetTrueDofs(Yn_);
 
 #ifdef HAVE_PYTHON
-  productY_gf_.GetTrueDofs(prodY_);  
+  // productY_gf_.GetTrueDofs(prodY_);  
   reacR_gf_.GetTrueDofs(reacR_);  
   kReac_gf_.GetTrueDofs(kReac_);  
   rrf_by_rrb_gf_.GetTrueDofs(rrf_by_rrb_);  
@@ -2938,7 +2938,7 @@ void ReactingFlow::step() {
 #ifdef HAVE_PYTHON
     kReac_gf_.SetFromTrueDofs(kReac_);
     reacR_gf_.SetFromTrueDofs(reacR_);
-    productY_gf_.SetFromTrueDofs(prodY_);
+    // productY_gf_.SetFromTrueDofs(prodY_);
     rrf_by_rrb_gf_.SetFromTrueDofs(rrf_by_rrb_);
 
     BTEkReac_gf_.SetFromTrueDofs(BTEkReac_);
@@ -3480,7 +3480,7 @@ void ReactingFlow::speciesProduction() {
 
   // prodY_gf stores the species production rates for each species
   // reacR_gf stores the reaction progress rates for each reaction
-  productY_gf_.SetFromTrueDofs(prodY_);
+  // productY_gf_.SetFromTrueDofs(prodY_);
   reacR_gf_.SetFromTrueDofs(reacR_);
   // if Yn + P_Y*(dt*N) > 1 (or < 0) can we clip the value?
   // N = 4 or something (maybe nSub?)
@@ -3666,13 +3666,13 @@ void ReactingFlow::initializeViz(ParaViewDataCollection &pvdc) {
   }
 
   // WRITING THE REACTION PRODUCT TERMS TO THE PARAVIEW FILE
-  vizProdFields_.clear();
-  vizProdNames_.clear();
-  for (int sp = 0; sp < nSpecies_; sp++) {
-    vizProdFields_.push_back(new ParGridFunction(sfes_, productY_gf_, (sp * sDof_)));
-    vizProdNames_.push_back(std::string("prodYn_" + speciesNames_[sp]));
-    pvdc.RegisterField(vizProdNames_[sp], vizProdFields_[sp]);
-  }
+  // vizProdFields_.clear();
+  // vizProdNames_.clear();
+  // for (int sp = 0; sp < nSpecies_; sp++) {
+  //   vizProdFields_.push_back(new ParGridFunction(sfes_, productY_gf_, (sp * sDof_)));
+  //   vizProdNames_.push_back(std::string("prodYn_" + speciesNames_[sp]));
+  //   pvdc.RegisterField(vizProdNames_[sp], vizProdFields_[sp]);
+  // }
 
   // WRITING THE REACTION PROGRESS RATES TO THE PARAVIEW FILE
   vizReacFields_.clear();
