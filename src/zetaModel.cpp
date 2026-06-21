@@ -1430,7 +1430,7 @@ void ZetaModel::updateTLS() {
   const double* dRho = rho_.HostRead();
   double* dTLS = tls_.HostReadWrite();
 
-  double wgt = 1.0;
+  // double wgt = 1.0;
   // double Clength;
   // Clength = 1.0 / (std::sqrt(6.0) * Cmu_);
   for (int i = 0; i < SdofInt_; i++) {
