@@ -705,12 +705,12 @@ double QuasiMagnetostaticSolver3D::elementJouleHeating(const FiniteElement& el, 
     // need to modify here so that joule heating is only IN torch
     // this is a problem-specific hack (HACK)
     double rCyl = 0.028;
-    double x, y, z, dist;
+    double x, z, dist;
     double wgt = 1.0;
     Vector coords(Tr.GetSpaceDim());
     Tr.Transform(ip, coords);
     x = coords[0];
-    y = coords[1];
+    // unused, but if we need it later... y = coords[1];
     dist = x * x;
     if (dim_ == Tr.GetSpaceDim()) {
       z = coords[2];
