@@ -94,10 +94,10 @@ class ReactingFlow : public ThermoChemModelBase {
   #endif
 
   // Number of reactions and dofs
-  int rDof_, rDofInt_;
+  // int rDof_, rDofInt_;
 
   #ifdef HAVE_PYTHON
-  int rrf_by_rrbDof_, rrf_by_rrbDofInt_;
+  // int rrf_by_rrbDof_, rrf_by_rrbDofInt_;
   #endif
 
   WorkingFluid workFluid_;
@@ -219,23 +219,23 @@ class ReactingFlow : public ThermoChemModelBase {
   ParFiniteElementSpace *vfes_ = nullptr;
 
   // Reactions \f$H^1\f$ finite element collection.
-  FiniteElementCollection *rfec_ = nullptr;
+  // FiniteElementCollection *rfec_ = nullptr;
 
   // Reactions \f$H^1\f$ finite element space.
-  ParFiniteElementSpace *rfes_ = nullptr;
+  // ParFiniteElementSpace *rfes_ = nullptr;
 
 #ifdef HAVE_PYTHON
   // Reaction rate ratio (forward to backward) \f$H^1\f$ finite element collection (stores ratio of rates used to advance TPS, can be from tabulated, BTE, or blended).
-  FiniteElementCollection *rrf_by_rrbfec_ = nullptr;
+  // FiniteElementCollection *rrf_by_rrbfec_ = nullptr;
 
-  // Reaction rate ratio \f$H^1\f$ finite element space.
-  ParFiniteElementSpace *rrf_by_rrbfes_ = nullptr;
+  // // Reaction rate ratio \f$H^1\f$ finite element space.
+  // ParFiniteElementSpace *rrf_by_rrbfes_ = nullptr;
 
-  // BTE Reaction rate ratio (forward to backward) \f$H^1\f$ finite element collection (stores the rate ratio computed from BTE).
-  FiniteElementCollection *BTErrf_by_rrbfec_ = nullptr;
+  // // BTE Reaction rate ratio (forward to backward) \f$H^1\f$ finite element collection (stores the rate ratio computed from BTE).
+  // FiniteElementCollection *BTErrf_by_rrbfec_ = nullptr;
 
-  // Reaction rate ratio \f$H^1\f$ finite element space.
-  ParFiniteElementSpace *BTErrf_by_rrbfes_ = nullptr;
+  // // Reaction rate ratio \f$H^1\f$ finite element space.
+  // ParFiniteElementSpace *BTErrf_by_rrbfes_ = nullptr;
 #endif
   ParGridFunction *gridScale_gf_ = nullptr;
 
@@ -260,10 +260,10 @@ class ReactingFlow : public ThermoChemModelBase {
 
 
   // additions for reaction progress rates
-  ParGridFunction reacR_gf_;
+  // ParGridFunction reacR_gf_;
 
 #ifdef HAVE_PYTHON
-ParGridFunction BTEreacR_gf_;
+// ParGridFunction BTEreacR_gf_;
 #endif
 
   ParGridFunction visc_gf_;
@@ -284,13 +284,13 @@ ParGridFunction BTEreacR_gf_;
   ParGridFunction er_gf_;
   ParGridFunction ei_gf_;
 
-  ParGridFunction rrf_by_rrb_gf_;
+  // ParGridFunction rrf_by_rrb_gf_;
 
-  ParGridFunction BTErrf_by_rrb_gf_;
+  // ParGridFunction BTErrf_by_rrb_gf_;
 
-  // additions for rate coefficients
-  ParGridFunction kReac_gf_;
-  ParGridFunction BTEkReac_gf_;
+  // // additions for rate coefficients
+  // ParGridFunction kReac_gf_;
+  // ParGridFunction BTEkReac_gf_;
 #endif
   // viz for qt rhs
   // ParGridFunction rhsqt_bd_;
@@ -419,9 +419,9 @@ ParGridFunction BTEreacR_gf_;
   Vector bterates_;
   Vector bte_rr_mapping_;
   // additions for reaction rate coefficients
-  Vector kReac_, BTEkReac_;
+  // Vector kReac_, BTEkReac_;
   // Ratio of forward to reverse reaction rates
-  Vector rrf_by_rrb_, BTErrf_by_rrb_;
+  // Vector rrf_by_rrb_, BTErrf_by_rrb_;
 #endif
 
   // additions for species
@@ -443,10 +443,10 @@ ParGridFunction BTEreacR_gf_;
   Vector CpMix_;
 
   // additions for reaction progress rates
-  Vector reacR_;
+  // Vector reacR_;
 
 #ifdef HAVE_PYTHON
-  Vector BTEreacR_;
+  // Vector BTEreacR_;
 #endif
 
   Vector Qt_;
@@ -497,32 +497,32 @@ ParGridFunction BTEreacR_gf_;
   std::vector<ParGridFunction *> vizSpecFields_;
   std::vector<std::string> vizSpecNames_;
 
-  std::vector<ParGridFunction *> vizProdFields_;
-  std::vector<std::string> vizProdNames_;
+  // std::vector<ParGridFunction *> vizProdFields_;
+  // std::vector<std::string> vizProdNames_;
 
   // PARGRID FUNCTION AND STRING FOR REACTION PROGRESS RATES
-  std::vector<ParGridFunction *> vizReacFields_;
-  std::vector<std::string> vizReacNames_;
+  // std::vector<ParGridFunction *> vizReacFields_;
+  // std::vector<std::string> vizReacNames_;
 
 #ifdef HAVE_PYTHON
   // PARGRID FUNCTION AND STRING FOR REACTION PROGRESS RATES
-  std::vector<ParGridFunction *> vizBTEReacFields_;
-  std::vector<std::string> vizBTEReacNames_;
+  // std::vector<ParGridFunction *> vizBTEReacFields_;
+  // std::vector<std::string> vizBTEReacNames_;
 
-  // PARGRID FUNCTION AND STRING FOR REACTION PROGRESS RATES
-  std::vector<ParGridFunction *> vizkReacFields_;
-  std::vector<std::string> vizkReacNames_;
+  // // PARGRID FUNCTION AND STRING FOR REACTION PROGRESS RATES
+  // std::vector<ParGridFunction *> vizkReacFields_;
+  // std::vector<std::string> vizkReacNames_;
 
-  // PARGRID FUNCTION AND STRING FOR REACTION PROGRESS RATES
-  std::vector<ParGridFunction *> vizBTEkReacFields_;
-  std::vector<std::string> vizBTEkReacNames_;
+  // // PARGRID FUNCTION AND STRING FOR REACTION PROGRESS RATES
+  // std::vector<ParGridFunction *> vizBTEkReacFields_;
+  // std::vector<std::string> vizBTEkReacNames_;
 
-  // PARGRID FUNCTION AND STRING FOR REACTION PROGRESS RATES
-  std::vector<ParGridFunction *> vizrrfbyrrbFields_;
-  std::vector<std::string> vizrrfbyrrbNames_;
+  // // PARGRID FUNCTION AND STRING FOR REACTION PROGRESS RATES
+  // std::vector<ParGridFunction *> vizrrfbyrrbFields_;
+  // std::vector<std::string> vizrrfbyrrbNames_;
 
-  std::vector<ParGridFunction *> vizBTErrfbyrrbFields_;
-  std::vector<std::string> vizBTErrfbyrrbNames_;
+  // std::vector<ParGridFunction *> vizBTErrfbyrrbFields_;
+  // std::vector<std::string> vizBTErrfbyrrbNames_;
 
   // k_blend = bl_frac * k_BTE + (1 - bl_frac)*k_LTE
   // bl_frac is the blending coefficient which is initialized as bl_frac_init
