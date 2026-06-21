@@ -46,15 +46,15 @@ using namespace mfem;
 using namespace mfem::common;
 
 /// forward declarations
-double species_stepLeft(const Vector &coords, double t);
-double species_stepRight(const Vector &coords, double t);
-double species_uniform(const Vector &coords, double t);
-double binaryTest(const Vector &coords, double t);
+double species_stepLeft(const Vector& coords, double t);
+double species_stepRight(const Vector& coords, double t);
+double species_uniform(const Vector& coords, double t);
+double binaryTest(const Vector& coords, double t);
 
-static double radius(const Vector &pos) { return pos[0]; }
+static double radius(const Vector& pos) { return pos[0]; }
 static FunctionCoefficient radius_coeff(radius);
 
-static double sigmaTorchStartUp(const Vector &pos) {
+static double sigmaTorchStartUp(const Vector& pos) {
   // const double x = pos[0];  // radial location
   const double x = std::sqrt(pos[0] * pos[0] + pos[2] * pos[2]);  // radial location
   const double y = pos[1];                                        // axial location
@@ -71,7 +71,7 @@ static double sigmaTorchStartUp(const Vector &pos) {
   // additions for 3d, this should just use "SetConstantPlasmaConductivity" in equation_of_state.cpp
   const double z = pos[2];
   const double rCyl = 0.029;
-  //const double rsig = 0.005;  // 5mm
+  // const double rsig = 0.005;  // 5mm
   const double rsig = 0.0075;
   const double ysig = 0.1;
   const double y0 = 0.15;  // step location
@@ -91,9 +91,9 @@ static double sigmaTorchStartUp(const Vector &pos) {
   return sigma;
 }
 
-static double sigmaTorchStartUp2D(const Vector &pos) {
+static double sigmaTorchStartUp2D(const Vector& pos) {
   const double x = std::sqrt(pos[0] * pos[0]);  // radial location
-  const double y = pos[1];                                        // axial location
+  const double y = pos[1];                      // axial location
 
   // additions for 3d, this should just use "SetConstantPlasmaConductivity" in equation_of_state.cpp
   const double rCyl = 0.029;
@@ -112,12 +112,11 @@ static double sigmaTorchStartUp2D(const Vector &pos) {
   return sigma;
 }
 
-
 static FunctionCoefficient sigma_start_up(sigmaTorchStartUp);
 static FunctionCoefficient sigma_start_up_2d(sigmaTorchStartUp2D);
 
-ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &time_coeff,
-                           ParGridFunction *gridScale, TPS::Tps *tps)
+ReactingFlow::ReactingFlow(mfem::ParMesh* pmesh, LoMachOptions* loMach_opts, temporalSchemeCoefficients& time_coeff,
+                           ParGridFunction* gridScale, TPS::Tps* tps)
     : tpsP_(tps), pmesh_(pmesh), dim_(pmesh->Dimension()), time_coeff_(time_coeff) {
   rank0_ = (pmesh_->GetMyRank() == 0);
   order_ = loMach_opts->order;
@@ -1414,12 +1413,12 @@ void ReactingFlow::initializeSelf() {
         double Twall;
         tpsP_->getRequiredInput((basepath + "/temperature").c_str(), Twall);
 
-        ConstantCoefficient *Twall_coeff = new ConstantCoefficient();
+        ConstantCoefficient* Twall_coeff = new ConstantCoefficient();
         Twall_coeff->constant = Twall;
 
         AddTempDirichletBC(Twall_coeff, attr_wall);
 
-        ConstantCoefficient *Qt_bc_coeff = new ConstantCoefficient();
+        ConstantCoefficient* Qt_bc_coeff = new ConstantCoefficient();
         Qt_bc_coeff->constant = 0.0;
         AddQtDirichletBC(Qt_bc_coeff, attr_wall);
 
@@ -1448,9 +1447,8 @@ void ReactingFlow::initializeOperators() {
     if (dim_ == 3) {
       sigma_gf_.ProjectCoefficient(sigma_start_up);
     } else {
-      sigma_gf_.ProjectCoefficient(sigma_start_up_2d);      
+      sigma_gf_.ProjectCoefficient(sigma_start_up_2d);
     }
-	
   }
 
   Array<int> empty;
@@ -1459,9 +1457,9 @@ void ReactingFlow::initializeOperators() {
   // unsteady: p+p [+p] = 2p [3p]
   // convection: p+p+(p-1) [+p] = 3p-1 [4p-1]
   // diffusion: (p-1)+(p-1) [+p] = 2p-2 [3p-2]
-  const IntegrationRule &ir_i = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 2 * order_ + 1);
-  const IntegrationRule &ir_nli = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 4 * order_);
-  const IntegrationRule &ir_di = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 3 * order_ - 1);
+  const IntegrationRule& ir_i = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 2 * order_ + 1);
+  const IntegrationRule& ir_nli = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 4 * order_);
+  const IntegrationRule& ir_di = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 3 * order_ - 1);
 
   // coefficients for operators
   cpMix_coeff_ = new GridFunctionCoefficient(&CpMix_gf_);
@@ -1553,7 +1551,7 @@ void ReactingFlow::initializeOperators() {
   }
 
   At_form_ = new ParBilinearForm(sfes_);
-  ConvectionIntegrator *at_blfi;
+  ConvectionIntegrator* at_blfi;
   if (axisym_) {
     at_blfi = new ConvectionIntegrator(*rad_rho_Cp_u_coeff_);
   } else {
@@ -1570,7 +1568,7 @@ void ReactingFlow::initializeOperators() {
   At_form_->FormSystemMatrix(empty, At_);
 
   Ay_form_ = new ParBilinearForm(sfes_);
-  ConvectionIntegrator *ay_blfi;
+  ConvectionIntegrator* ay_blfi;
   if (axisym_) {
     ay_blfi = new ConvectionIntegrator(*rad_rho_u_coeff_);
   } else {
@@ -1588,7 +1586,7 @@ void ReactingFlow::initializeOperators() {
 
   // mass matrix
   Ms_form_ = new ParBilinearForm(sfes_);
-  MassIntegrator *ms_blfi;
+  MassIntegrator* ms_blfi;
   if (axisym_) {
     ms_blfi = new MassIntegrator(radius_coeff);
   } else {
@@ -1606,7 +1604,7 @@ void ReactingFlow::initializeOperators() {
 
   // mass matrix with rho
   MsRho_form_ = new ParBilinearForm(sfes_);
-  MassIntegrator *msrho_blfi;
+  MassIntegrator* msrho_blfi;
   if (axisym_) {
     msrho_blfi = new MassIntegrator(*rad_rho_coeff_);
   } else {
@@ -1624,7 +1622,7 @@ void ReactingFlow::initializeOperators() {
 
   // mass matrix with rho and Cp
   MsRhoCp_form_ = new ParBilinearForm(sfes_);
-  MassIntegrator *msrhocp_blfi;
+  MassIntegrator* msrhocp_blfi;
   if (axisym_) {
     msrhocp_blfi = new MassIntegrator(*rad_rho_Cp_coeff_);
   } else {
@@ -1642,13 +1640,13 @@ void ReactingFlow::initializeOperators() {
 
   // temperature Helmholtz
   Ht_form_ = new ParBilinearForm(sfes_);
-  MassIntegrator *hmt_blfi;
+  MassIntegrator* hmt_blfi;
   if (axisym_) {
     hmt_blfi = new MassIntegrator(*rad_rho_Cp_over_dt_coeff_);
   } else {
     hmt_blfi = new MassIntegrator(*rhoCp_over_dt_coeff_);
   }
-  DiffusionIntegrator *hdt_blfi;
+  DiffusionIntegrator* hdt_blfi;
   if (axisym_) {
     hdt_blfi = new DiffusionIntegrator(*rad_thermal_diff_total_coeff_);
   } else {
@@ -1676,13 +1674,13 @@ void ReactingFlow::initializeOperators() {
 
   // species Helmholtz
   Hy_form_ = new ParBilinearForm(sfes_);
-  MassIntegrator *hmy_blfi;
+  MassIntegrator* hmy_blfi;
   if (axisym_) {
     hmy_blfi = new MassIntegrator(*rad_rho_over_dt_coeff_);
   } else {
     hmy_blfi = new MassIntegrator(*rho_over_dt_coeff_);
   }
-  DiffusionIntegrator *hdy_blfi;
+  DiffusionIntegrator* hdy_blfi;
   if (axisym_) {
     hdy_blfi = new DiffusionIntegrator(*rad_species_diff_total_coeff_);
   } else {
@@ -1714,7 +1712,7 @@ void ReactingFlow::initializeOperators() {
     MsInvPC_ = new OperatorJacobiSmoother(diag_pa, empty);
   } else {
     MsInvPC_ = new HypreSmoother(*Ms_.As<HypreParMatrix>());
-    dynamic_cast<HypreSmoother *>(MsInvPC_)->SetType(HypreSmoother::Jacobi, 1);
+    dynamic_cast<HypreSmoother*>(MsInvPC_)->SetType(HypreSmoother::Jacobi, 1);
   }
   MsInv_ = new CGSolver(sfes_->GetComm());
   MsInv_->iterative_mode = false;
@@ -1730,7 +1728,7 @@ void ReactingFlow::initializeOperators() {
     HtInvPC_ = new OperatorJacobiSmoother(diag_pa, temp_ess_tdof_);
   } else {
     HtInvPC_ = new HypreSmoother(*Ht_.As<HypreParMatrix>());
-    dynamic_cast<HypreSmoother *>(HtInvPC_)->SetType(HypreSmoother::Jacobi, 1);
+    dynamic_cast<HypreSmoother*>(HtInvPC_)->SetType(HypreSmoother::Jacobi, 1);
   }
 
   HtInv_ = new CGSolver(sfes_->GetComm());
@@ -1747,7 +1745,7 @@ void ReactingFlow::initializeOperators() {
     HyInvPC_ = new OperatorJacobiSmoother(diag_pa, spec_ess_tdof_);
   } else {
     HyInvPC_ = new HypreSmoother(*Hy_.As<HypreParMatrix>());
-    dynamic_cast<HypreSmoother *>(HyInvPC_)->SetType(HypreSmoother::Jacobi, 1);
+    dynamic_cast<HypreSmoother*>(HyInvPC_)->SetType(HypreSmoother::Jacobi, 1);
   }
 
   HyInv_ = new CGSolver(sfes_->GetComm());
@@ -1760,7 +1758,7 @@ void ReactingFlow::initializeOperators() {
 
   // Vector space mass matrix (used in gradient calcs)
   Mv_form_ = new ParBilinearForm(vfes_);
-  VectorMassIntegrator *mv_blfi;
+  VectorMassIntegrator* mv_blfi;
   if (axisym_) {
     mv_blfi = new VectorMassIntegrator(radius_coeff);
   } else {
@@ -1783,7 +1781,7 @@ void ReactingFlow::initializeOperators() {
     Mv_inv_pc_ = new OperatorJacobiSmoother(diag_pa, empty);
   } else {
     Mv_inv_pc_ = new HypreSmoother(*Mv_op_.As<HypreParMatrix>());
-    dynamic_cast<HypreSmoother *>(Mv_inv_pc_)->SetType(HypreSmoother::Jacobi, 1);
+    dynamic_cast<HypreSmoother*>(Mv_inv_pc_)->SetType(HypreSmoother::Jacobi, 1);
   }
   Mv_inv_ = new CGSolver(vfes_->GetComm());
   Mv_inv_->iterative_mode = false;
@@ -1796,8 +1794,8 @@ void ReactingFlow::initializeOperators() {
 
   // Energy sink/source terms: Joule heating and radiation sink
   jh_form_ = new ParLinearForm(sfes_);
-  DomainLFIntegrator *jh_dlfi;
-  DomainLFIntegrator *rad_dlfi;
+  DomainLFIntegrator* jh_dlfi;
+  DomainLFIntegrator* rad_dlfi;
   if (axisym_) {
     jh_dlfi = new DomainLFIntegrator(*rad_jh_coeff_);
     rad_dlfi = new DomainLFIntegrator(*rad_radiation_sink_coeff_);
@@ -1814,7 +1812,7 @@ void ReactingFlow::initializeOperators() {
 
   // Qt .....................................
   Mq_form_ = new ParBilinearForm(sfes_);
-  MassIntegrator *mq_blfi;
+  MassIntegrator* mq_blfi;
   if (axisym_) {
     mq_blfi = new MassIntegrator(radius_coeff);
   } else {
@@ -1836,7 +1834,7 @@ void ReactingFlow::initializeOperators() {
     MqInvPC_ = new OperatorJacobiSmoother(diag_pa, empty);
   } else {
     MqInvPC_ = new HypreSmoother(*Mq_.As<HypreParMatrix>());
-    dynamic_cast<HypreSmoother *>(MqInvPC_)->SetType(HypreSmoother::Jacobi, 1);
+    dynamic_cast<HypreSmoother*>(MqInvPC_)->SetType(HypreSmoother::Jacobi, 1);
   }
   MqInv_ = new CGSolver(sfes_->GetComm());
   MqInv_->iterative_mode = false;
@@ -1847,7 +1845,7 @@ void ReactingFlow::initializeOperators() {
   MqInv_->SetMaxIter(max_iter_);
 
   LQ_form_ = new ParBilinearForm(sfes_);
-  DiffusionIntegrator *lqd_blfi;
+  DiffusionIntegrator* lqd_blfi;
   if (axisym_) {
     lqd_blfi = new DiffusionIntegrator(*rad_thermal_diff_total_coeff_);
   } else {
@@ -1858,8 +1856,7 @@ void ReactingFlow::initializeOperators() {
   }
   LQ_form_->AddDomainIntegrator(lqd_blfi);
 
-
-  // NO, this is not consistent and will degrade stability  
+  // NO, this is not consistent and will degrade stability
   // DiffusionIntegrator *slqd_blfi;
   // if (sw_stab_) {
   //   slqd_blfi = new DiffusionIntegrator(*supg_coeff_);
@@ -1868,7 +1865,7 @@ void ReactingFlow::initializeOperators() {
   //   }
   //   LQ_form_->AddDomainIntegrator(slqd_blfi);
   // }
-  
+
   if (partial_assembly_) {
     LQ_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   }
@@ -1876,7 +1873,7 @@ void ReactingFlow::initializeOperators() {
   LQ_form_->FormSystemMatrix(empty, LQ_);
 
   LQ_bdry_ = new ParLinearForm(sfes_);
-  BoundaryNormalLFIntegrator *lq_bdry_lfi;
+  BoundaryNormalLFIntegrator* lq_bdry_lfi;
   if (axisym_) {
     lq_bdry_lfi = new BoundaryNormalLFIntegrator(*rad_kap_gradT_coeff_, 2, -1);
   } else {
@@ -1890,7 +1887,7 @@ void ReactingFlow::initializeOperators() {
   // for explicit species-diff source term in energy (inv not needed)
   // TODO(trevilo): This operator is not used.  Can we eliminate it?
   LY_form_ = new ParBilinearForm(sfes_);
-  auto *lyd_blfi = new DiffusionIntegrator(*species_diff_Cp_coeff_);
+  auto* lyd_blfi = new DiffusionIntegrator(*species_diff_Cp_coeff_);
   if (numerical_integ_) {
     lyd_blfi->SetIntRule(&ir_di);
   }
@@ -1912,7 +1909,7 @@ void ReactingFlow::initializeOperators() {
 
   // gradient of scalar
   G_form_ = new ParMixedBilinearForm(sfes_, vfes_);
-  GradientIntegrator *g_mblfi;
+  GradientIntegrator* g_mblfi;
   if (axisym_) {
     g_mblfi = new GradientIntegrator(radius_coeff);
   } else {
@@ -1952,8 +1949,8 @@ void ReactingFlow::initializeOperators() {
   if (restart_from_lte) {
     Vector n_sp(nSpecies_);
     Vector rho_sp(nSpecies_);
-    const double *h_T = Tn_.HostRead();
-    double *h_Yn = Yn_.HostWrite();
+    const double* h_T = Tn_.HostRead();
+    double* h_Yn = Yn_.HostWrite();
     for (int i = 0; i < sDofInt_; i++) {
       const double Ti = h_T[i];
 
@@ -2042,8 +2039,8 @@ void ReactingFlow::step() {
   // spark flow at specified location if triggered
   // TODO(swh) move to seperate function
   if (spark_) {
-    if(rank0_) std::cout << "Sparking flow" << endl;
-    
+    if (rank0_) std::cout << "Sparking flow" << endl;
+
     // TODO(swh) confirm that this check is alreay enforced elsewhere
     int nSlot = nSpecies_ - 1;
     int eSlot = nSpecies_ - 2;
@@ -2057,7 +2054,6 @@ void ReactingFlow::step() {
     pmesh_->GetNodes(coordsDof);
     auto h_Yn = Yn_.HostReadWrite();
     for (int i = 0; i < sDofInt_; i++) {
-      
       // spark volume weight
       double x, y, z, dist;
       double wgt;
@@ -2073,15 +2069,13 @@ void ReactingFlow::step() {
       }
       dist = std::sqrt(dist);
       wgt = std::exp(-0.5 * (dist / spark_radius_) * (dist / spark_radius_));
-      //if (rank0_) std::cout << "SPARK WGT: " << wgt << " | dist: " << dist << " | spark_radius: " << spark_radius_ << endl;
-      //wgt = 1.0;
-      //if(wgt < 0) {
-      //std::cout << "BAD WGT: " << wgt << endl;
-      //}
-      //if(wgt >1) {
-      //std::cout << "BAD WGT: " << wgt << endl;
-      //}
-      
+      // if (rank0_) std::cout << "SPARK WGT: " << wgt << " | dist: " << dist << " | spark_radius: " << spark_radius_ <<
+      // endl; wgt = 1.0; if(wgt < 0) { std::cout << "BAD WGT: " << wgt << endl;
+      // }
+      // if(wgt >1) {
+      // std::cout << "BAD WGT: " << wgt << endl;
+      // }
+
       // free electron value (mass-fraction)
       h_Yn[eSlot * sDofInt_ + i] += wgt * spark_peak_;
 
@@ -2098,7 +2092,7 @@ void ReactingFlow::step() {
   }  // end spark loop
 
   // Set current time for velocity Dirichlet boundary conditions.
-  for (auto &temp_dbc : temp_dbcs_) {
+  for (auto& temp_dbc : temp_dbcs_) {
     temp_dbc.coeff->SetTime(time_ + dt_);
   }
 
@@ -2191,7 +2185,7 @@ void ReactingFlow::step() {
     if (implicit_chemistry_) {
       auto h_Yn = Yn_next_.HostReadWrite();
       auto h_Tn = Tn_next_.HostReadWrite();
-      double *YT = new double[nActiveSpecies_ + 1];
+      double* YT = new double[nActiveSpecies_ + 1];
       for (int i = 0; i < sDofInt_; i++) {
         // Extract point state
         for (int sp = 0; sp < nActiveSpecies_; sp++) {
@@ -2326,8 +2320,8 @@ void ReactingFlow::evalSubstepNumber() {
   speciesProduction();
 
   {
-    const double *dataProd = prodY_.HostRead();
-    const double *dataYn = Yn_.HostRead();
+    const double* dataProd = prodY_.HostRead();
+    const double* dataYn = Yn_.HostRead();
     for (int i = 0; i < sDofInt_; i++) {
       for (int sp = 0; sp < nSpecies_; sp++) {
         // basic based on max production
@@ -2365,9 +2359,9 @@ void ReactingFlow::temperatureStep() {
 
   // Update radiation sink
   if (radiation_ != nullptr) {
-    const double *d_T = Tn_next_.Read();
-    double *d_rad = radiation_sink_.Write();
-    Radiation *rmodel = radiation_;
+    const double* d_T = Tn_next_.Read();
+    double* d_rad = radiation_sink_.Write();
+    Radiation* rmodel = radiation_;
     MFEM_FORALL(i, Tn_next_.Size(), { d_rad[i] = rmodel->computeEnergySink(d_T[i]); });
   }
   radiation_sink_gf_.SetFromTrueDofs(radiation_sink_);
@@ -2406,36 +2400,30 @@ void ReactingFlow::temperatureStep() {
   jh_form_->Assemble();
   jh_form_->ParallelAssemble(jh_);
 
-
-
-    // this bit is to prevent joule heating bleed -> make more elegant and then move to separate routine
-    ParGridFunction coordsDof(vfes_);
-    pmesh_->GetNodes(coordsDof);
-    double rCyl = 0.029;    
-    {
-      double *djh = jh_.HostReadWrite();
-      for (int i = 0; i < sDofInt_; i++) {
-
-        double x, y, z, dist;
-        double wgt;
-        x = coordsDof(0 * sDofInt_ + i);
-        // y = coordsDof(1 * sDofInt_ + i);
-        dist = x * x;
-        if (dim_ == 3) {
-          z = coordsDof(2 * sDofInt_ + i);
-          z = z - spark_center_[2];
-          dist += z * z;
-        }
-        dist = std::sqrt(dist);
-        wgt = 1.0;	
-	if (dist > rCyl) wgt = 0.0; 	
-	djh[i] *= wgt;
-	
+  // this bit is to prevent joule heating bleed -> make more elegant and then move to separate routine
+  ParGridFunction coordsDof(vfes_);
+  pmesh_->GetNodes(coordsDof);
+  double rCyl = 0.029;
+  {
+    double* djh = jh_.HostReadWrite();
+    for (int i = 0; i < sDofInt_; i++) {
+      double x, y, z, dist;
+      double wgt;
+      x = coordsDof(0 * sDofInt_ + i);
+      // y = coordsDof(1 * sDofInt_ + i);
+      dist = x * x;
+      if (dim_ == 3) {
+        z = coordsDof(2 * sDofInt_ + i);
+        z = z - spark_center_[2];
+        dist += z * z;
       }
+      dist = std::sqrt(dist);
+      wgt = 1.0;
+      if (dist > rCyl) wgt = 0.0;
+      djh[i] *= wgt;
     }
+  }
 
-
-  
   resT_ += jh_;
 
   // species-temp diffusion term, already in int-weak form
@@ -2463,14 +2451,14 @@ void ReactingFlow::temperatureStep() {
   }
 
   // Prepare for the solve
-  for (auto &temp_dbc : temp_dbcs_) {
+  for (auto& temp_dbc : temp_dbcs_) {
     Tn_next_gf_.ProjectBdrCoefficient(*temp_dbc.coeff, temp_dbc.attr);
   }
   sfes_->GetRestrictionMatrix()->MultTranspose(resT_, resT_gf_);
 
   Vector Xt2, Bt2;
   if (partial_assembly_) {
-    auto *HC = Ht_.As<ConstrainedOperator>();
+    auto* HC = Ht_.As<ConstrainedOperator>();
     EliminateRHS(*Ht_form_, *HC, temp_ess_tdof_, Tn_next_gf_, resT_gf_, Xt2, Bt2, 1);
   } else {
     Ht_form_->FormLinearSystem(temp_ess_tdof_, Tn_next_gf_, resT_gf_, Ht_, Xt2, Bt2, 1);
@@ -2560,9 +2548,9 @@ void ReactingFlow::temperatureSubstep(int iSub) {
   // tmpR0_.Add(1.0, TnStar_);
   // tmpR0_.Add(1.0, Tn_);
 
-  double *data = tmpR0_.HostReadWrite();
-  double *dTstar = TnStar_.HostReadWrite();
-  double *dTn = Tn_.HostReadWrite();
+  double* data = tmpR0_.HostReadWrite();
+  double* dTstar = TnStar_.HostReadWrite();
+  double* dTn = Tn_.HostReadWrite();
 
   if (explicit_destruction_) {
     for (int i = 0; i < sDofInt_; i++) {
@@ -2596,8 +2584,8 @@ void ReactingFlow::temperatureSubstep(int iSub) {
 
 void ReactingFlow::speciesLastStep() {
   tmpR0_ = 0.0;
-  double *dataYn = Yn_next_.HostReadWrite();
-  double *dataYsum = tmpR0_.HostReadWrite();
+  double* dataYn = Yn_next_.HostReadWrite();
+  double* dataYsum = tmpR0_.HostReadWrite();
   for (int n = 0; n < nSpecies_ - 1; n++) {
     for (int i = 0; i < sDofInt_; i++) {
       dataYsum[i] += dataYn[i + n * sDofInt_];
@@ -2610,8 +2598,8 @@ void ReactingFlow::speciesLastStep() {
 
 void ReactingFlow::speciesLastSubstep() {
   tmpR0_ = 0.0;
-  double *dataYn = Yn_.HostReadWrite();
-  double *dataYsum = tmpR0_.HostReadWrite();
+  double* dataYn = Yn_.HostReadWrite();
+  double* dataYsum = tmpR0_.HostReadWrite();
   for (int n = 0; n < nSpecies_ - 1; n++) {
     for (int i = 0; i < sDofInt_; i++) {
       dataYsum[i] += dataYn[i + n * sDofInt_];
@@ -2681,14 +2669,14 @@ void ReactingFlow::speciesStep(int iSpec) {
   setScalarFromVector(Yn_, iSpec, &tmpR0a_);
   Yn_next_gf_.SetFromTrueDofs(tmpR0a_);
 
-  for (auto &spec_dbc : spec_dbcs_) {
+  for (auto& spec_dbc : spec_dbcs_) {
     Yn_next_gf_.ProjectBdrCoefficient(*spec_dbc.coeff, spec_dbc.attr);
   }
   sfes_->GetRestrictionMatrix()->MultTranspose(resY_, resY_gf_);
 
   Vector Xt2, Bt2;
   if (partial_assembly_) {
-    auto *HC = Hy_.As<ConstrainedOperator>();
+    auto* HC = Hy_.As<ConstrainedOperator>();
     EliminateRHS(*Hy_form_, *HC, spec_ess_tdof_, Yn_next_gf_, resY_gf_, Xt2, Bt2, 1);
   } else {
     Hy_form_->FormLinearSystem(spec_ess_tdof_, Yn_next_gf_, resY_gf_, Hy_, Xt2, Bt2, 1);
@@ -2741,10 +2729,10 @@ void ReactingFlow::speciesSubstep(int iSpec, int iSub) {
   // setScalarFromVector(Yn_, iSpec, &tmpR0a_);
   // tmpR0_.Add(1.0, tmpR0a_);
 
-  const double *dYstar = YnStar_.HostRead();
-  const double *dYn = Yn_.HostRead();
+  const double* dYstar = YnStar_.HostRead();
+  const double* dYn = Yn_.HostRead();
   // const double *dRho = rn_.HostRead();
-  double *data = tmpR0_.HostReadWrite();
+  double* data = tmpR0_.HostReadWrite();
 
   if (explicit_destruction_) {
     for (int i = 0; i < sDofInt_; i++) {
@@ -2773,7 +2761,7 @@ void ReactingFlow::speciesSubstep(int iSpec, int iSub) {
 
   // clip any small negative values
   {
-    double *data = tmpR0_.HostReadWrite();
+    double* data = tmpR0_.HostReadWrite();
     for (int i = 0; i < sDofInt_; i++) {
       data[i] = max(data[i], 0.0);
     }
@@ -2785,11 +2773,11 @@ void ReactingFlow::speciesSubstep(int iSpec, int iSub) {
 /**/
 
 void ReactingFlow::speciesProduction() {
-  const double *dataT = Tn_.HostRead();
-  const double *dataRho = rn_.HostRead();
-  const double *dataY = Yn_.HostRead();
-  double *dataProd = prodY_.HostWrite();
-  double *dataEmit = prodE_.HostWrite();
+  const double* dataT = Tn_.HostRead();
+  const double* dataRho = rn_.HostRead();
+  const double* dataY = Yn_.HostRead();
+  double* dataProd = prodY_.HostWrite();
+  double* dataEmit = prodE_.HostWrite();
 
   // const int nEq = dim_ + 2 + nActiveSpecies_;
   Vector state(gpudata::MAXEQUATIONS);
@@ -2861,12 +2849,12 @@ void ReactingFlow::speciesProduction() {
 void ReactingFlow::heatOfFormation() {
   hw_ = 0.0;
   tmpR0_ = 0.0;
-  double *h_hw = hw_.HostReadWrite();
-  double *h_em = tmpR0_.HostReadWrite();
+  double* h_hw = hw_.HostReadWrite();
+  double* h_em = tmpR0_.HostReadWrite();
 
-  const double *dataT = Tn_.HostRead();
-  const double *h_prodY = prodY_.HostRead();
-  const double *h_prodE = prodE_.HostRead();
+  const double* dataT = Tn_.HostRead();
+  const double* h_prodY = prodY_.HostRead();
+  const double* h_prodE = prodE_.HostRead();
 
   double hspecies;
 
@@ -2976,7 +2964,7 @@ void ReactingFlow::computeExplicitSpecConvectionOP(int iSpec, bool extrap) {
   setVectorFromScalar(tmpR0a_, iSpec, &NYn_);
 }
 
-void ReactingFlow::initializeIO(IODataOrganizer &io) {
+void ReactingFlow::initializeIO(IODataOrganizer& io) {
   io.registerIOFamily("Temperature", "/temperature", &Tn_gf_, true, true, sfec_);
   io.registerIOVar("/temperature", "temperature", 0);
 
@@ -2998,7 +2986,7 @@ void ReactingFlow::initializeIO(IODataOrganizer &io) {
   }
 }
 
-void ReactingFlow::initializeViz(ParaViewDataCollection &pvdc) {
+void ReactingFlow::initializeViz(ParaViewDataCollection& pvdc) {
   pvdc.RegisterField("temperature", &Tn_gf_);
   pvdc.RegisterField("density", &rn_gf_);
   pvdc.RegisterField("sigma", &sigma_gf_);
@@ -3082,9 +3070,9 @@ void ReactingFlow::substepState() {
 
 void ReactingFlow::updateMixture() {
   {
-    double *dataY = Yn_gf_.HostReadWrite();
-    double *dataR = Rmix_gf_.HostReadWrite();
-    double *dataM = Mmix_gf_.HostReadWrite();
+    double* dataY = Yn_gf_.HostReadWrite();
+    double* dataR = Rmix_gf_.HostReadWrite();
+    double* dataM = Mmix_gf_.HostReadWrite();
     Mmix_gf_ = 0.0;
 
     for (int sp = 0; sp < nSpecies_; sp++) {
@@ -3108,9 +3096,9 @@ void ReactingFlow::updateMixture() {
     setScalarFromVector(Yn_, sp, &tmpR0a_);
     setScalarFromVector(Xn_, sp, &tmpR0b_);
     Mmix_gf_.GetTrueDofs(tmpR0c_);
-    double *d_Y = tmpR0a_.HostReadWrite();
-    double *d_X = tmpR0b_.HostReadWrite();
-    double *d_M = tmpR0c_.HostReadWrite();
+    double* d_Y = tmpR0a_.HostReadWrite();
+    double* d_X = tmpR0b_.HostReadWrite();
+    double* d_M = tmpR0c_.HostReadWrite();
     for (int i = 0; i < sDofInt_; i++) {
       d_X[i] = d_Y[i] * d_M[i] / gasParams_(sp, GasParams::SPECIES_MW);
     }
@@ -3119,10 +3107,10 @@ void ReactingFlow::updateMixture() {
 
   // mixture Cp
   {
-    double *d_CMix = tmpR0c_.HostReadWrite();
-    double *d_Yn = Yn_.HostReadWrite();
-    double *d_Rho = rn_.HostReadWrite();
-    double *d_Cp = CpY_.HostReadWrite();
+    double* d_CMix = tmpR0c_.HostReadWrite();
+    double* d_Yn = Yn_.HostReadWrite();
+    double* d_Rho = rn_.HostReadWrite();
+    double* d_Cp = CpY_.HostReadWrite();
 
     // int nEq = dim_ + 2 + nActiveSpecies_;
     Vector state(gpudata::MAXEQUATIONS);
@@ -3200,14 +3188,14 @@ void ReactingFlow::updateThermoP() {
 
 void ReactingFlow::updateDiffusivity() {
   (flow_interface_->velocity)->GetTrueDofs(tmpR1_);
-  const double *dataTemp = Tn_.HostRead();
-  const double *dataRho = rn_.HostRead();
-  const double *dataU = tmpR1_.HostRead();
+  const double* dataTemp = Tn_.HostRead();
+  const double* dataRho = rn_.HostRead();
+  const double* dataU = tmpR1_.HostRead();
   double diffY_min = 1.0e-8;  // make readable
 
   // species diffusivities
   {
-    double *dataDiff = diffY_.HostReadWrite();
+    double* dataDiff = diffY_.HostReadWrite();
     for (int i = 0; i < sDofInt_; i++) {
       double Efield[gpudata::MAXDIM];
       for (int v = 0; v < dim_; v++) Efield[v] = 0.0;
@@ -3237,7 +3225,7 @@ void ReactingFlow::updateDiffusivity() {
 
   // viscosity
   {
-    double *dataVisc = visc_.HostReadWrite();
+    double* dataVisc = visc_.HostReadWrite();
     for (int i = 0; i < sDofInt_; i++) {
       double state[gpudata::MAXEQUATIONS];
       double conservedState[gpudata::MAXEQUATIONS];
@@ -3262,7 +3250,7 @@ void ReactingFlow::updateDiffusivity() {
 
   // thermal conductivity (kappa = alpha*rho*Cp = (nu/Pr)*(rho*Cp))
   {
-    double *dataKappa = kappa_.HostReadWrite();
+    double* dataKappa = kappa_.HostReadWrite();
     for (int i = 0; i < sDofInt_; i++) {
       // int nEq = dim_ + 2 + nActiveSpecies_;
       double state[gpudata::MAXEQUATIONS];
@@ -3288,16 +3276,14 @@ void ReactingFlow::updateDiffusivity() {
 
   // electrical conductivity
   if (!torch_cold_start_ && !fixed_conductivity_) {
+    // this bit is to prevent joule heating bleed
+    // ParGridFunction coordsDof(vfes_);
+    // pmesh_->GetNodes(coordsDof);
+    // double rCyl = 0.029;
 
-    // this bit is to prevent joule heating bleed 
-    //ParGridFunction coordsDof(vfes_);
-    //pmesh_->GetNodes(coordsDof);
-    //double rCyl = 0.029;
-    
     {
-      double *h_sig = sigma_.HostReadWrite();
+      double* h_sig = sigma_.HostReadWrite();
       for (int i = 0; i < sDofInt_; i++) {
-	
         // int nEq = dim_ + 2 + nActiveSpecies_;
         double state[gpudata::MAXEQUATIONS];
         double conservedState[gpudata::MAXEQUATIONS];
@@ -3317,23 +3303,22 @@ void ReactingFlow::updateDiffusivity() {
 
         double sig;
         transport_->ComputeElectricalConductivity(conservedState, sig);
-	h_sig[i] = sig;	
-	
-	// this is hack to prevent heating in outflow tank
-        //double x, y, z, dist;
-        //double wgt;
-        //x = coordsDof(0 * sDofInt_ + i);
-        //y = coordsDof(1 * sDofInt_ + i);
-        //dist = x * x;
-        //if (dim_ == 3) {
+        h_sig[i] = sig;
+
+        // this is hack to prevent heating in outflow tank
+        // double x, y, z, dist;
+        // double wgt;
+        // x = coordsDof(0 * sDofInt_ + i);
+        // y = coordsDof(1 * sDofInt_ + i);
+        // dist = x * x;
+        // if (dim_ == 3) {
         //  z = coordsDof(2 * sDofInt_ + i);
         //  dist += z * z;
         //}
-        //dist = std::sqrt(dist);
-        //wgt = 1.0;	
-	//if (dist > rCyl) wgt = 0.0; 	
-	//h_sig[i] = wgt * sig;
-	
+        // dist = std::sqrt(dist);
+        // wgt = 1.0;
+        // if (dist > rCyl) wgt = 0.0;
+        // h_sig[i] = wgt * sig;
       }
     }
 
@@ -3342,15 +3327,14 @@ void ReactingFlow::updateDiffusivity() {
 }
 
 void ReactingFlow::evaluatePlasmaConductivityGF() {
-  
   if (rank0_) std::cout << " ...we are in evaluatePlasmaConductivityGF " << endl;
 
   (flow_interface_->velocity)->GetTrueDofs(tmpR1_);
-  const double *dataTemp = Tn_.HostRead();
-  const double *dataRho = rn_.HostRead();
-  const double *dataU = tmpR1_.HostRead();
+  const double* dataTemp = Tn_.HostRead();
+  const double* dataRho = rn_.HostRead();
+  const double* dataU = tmpR1_.HostRead();
 
-  double *h_sig = sigma_.HostReadWrite();
+  double* h_sig = sigma_.HostReadWrite();
 
   if (!torch_cold_start_) {
     for (int i = 0; i < sDofInt_; i++) {
@@ -3441,7 +3425,7 @@ void ReactingFlow::computeSystemMass() {
 }
 
 /// Add a Dirichlet boundary condition to the temperature field
-void ReactingFlow::AddTempDirichletBC(const double &temp, Array<int> &attr) {
+void ReactingFlow::AddTempDirichletBC(const double& temp, Array<int>& attr) {
   temp_dbcs_.emplace_back(attr, new ConstantCoefficient(temp));
   for (int i = 0; i < attr.Size(); ++i) {
     if (attr[i] == 1) {
@@ -3463,7 +3447,7 @@ void ReactingFlow::AddSpecDirichletBC(const double &Y, Array<int> &attr) {
 }
 */
 
-void ReactingFlow::AddTempDirichletBC(Coefficient *coeff, Array<int> &attr) {
+void ReactingFlow::AddTempDirichletBC(Coefficient* coeff, Array<int>& attr) {
   temp_dbcs_.emplace_back(attr, coeff);
   for (int i = 0; i < attr.Size(); ++i) {
     if (attr[i] == 1) {
@@ -3473,12 +3457,12 @@ void ReactingFlow::AddTempDirichletBC(Coefficient *coeff, Array<int> &attr) {
   }
 }
 
-void ReactingFlow::AddTempDirichletBC(ScalarFuncT *f, Array<int> &attr) {
+void ReactingFlow::AddTempDirichletBC(ScalarFuncT* f, Array<int>& attr) {
   AddTempDirichletBC(new FunctionCoefficient(f), attr);
 }
 
 /// Add a Dirichlet boundary condition to the species field
-void ReactingFlow::AddSpecDirichletBC(const double &spec, Array<int> &attr) {
+void ReactingFlow::AddSpecDirichletBC(const double& spec, Array<int>& attr) {
   spec_dbcs_.emplace_back(attr, new ConstantCoefficient(spec));
   for (int i = 0; i < attr.Size(); ++i) {
     if (attr[i] == 1) {
@@ -3488,7 +3472,7 @@ void ReactingFlow::AddSpecDirichletBC(const double &spec, Array<int> &attr) {
   }
 }
 
-void ReactingFlow::AddSpecDirichletBC(Coefficient *coeff, Array<int> &attr) {
+void ReactingFlow::AddSpecDirichletBC(Coefficient* coeff, Array<int>& attr) {
   spec_dbcs_.emplace_back(attr, coeff);
   for (int i = 0; i < attr.Size(); ++i) {
     if (attr[i] == 1) {
@@ -3498,12 +3482,12 @@ void ReactingFlow::AddSpecDirichletBC(Coefficient *coeff, Array<int> &attr) {
   }
 }
 
-void ReactingFlow::AddSpecDirichletBC(ScalarFuncT *f, Array<int> &attr) {
+void ReactingFlow::AddSpecDirichletBC(ScalarFuncT* f, Array<int>& attr) {
   AddSpecDirichletBC(new FunctionCoefficient(f), attr);
 }
 
 // thermal divergence term
-void ReactingFlow::AddQtDirichletBC(Coefficient *coeff, Array<int> &attr) {
+void ReactingFlow::AddQtDirichletBC(Coefficient* coeff, Array<int>& attr) {
   Qt_dbcs_.emplace_back(attr, coeff);
 
   if (rank0_ && pmesh_->GetMyRank() == 0) {
@@ -3524,7 +3508,7 @@ void ReactingFlow::AddQtDirichletBC(Coefficient *coeff, Array<int> &attr) {
   }
 }
 
-void ReactingFlow::AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr) {
+void ReactingFlow::AddQtDirichletBC(ScalarFuncT* f, Array<int>& attr) {
   AddQtDirichletBC(new FunctionCoefficient(f), attr);
 }
 
@@ -3566,34 +3550,30 @@ void ReactingFlow::computeQtTO() {
   jh_form_->Assemble();
   jh_form_->ParallelAssemble(jh_);
 
-
-    // this bit is to prevent joule heating bleed -> make more elegant and then move to separate routine
-    ParGridFunction coordsDof(vfes_);
-    pmesh_->GetNodes(coordsDof);
-    double rCyl = 0.029;    
-    {
-      double *djh = jh_.HostReadWrite();
-      for (int i = 0; i < sDofInt_; i++) {
-
-        double x, y, z, dist;
-        double wgt;
-        x = coordsDof(0 * sDofInt_ + i);
-        // y = coordsDof(1 * sDofInt_ + i);
-        dist = x * x;
-        if (dim_ == 3) {
-          z = coordsDof(2 * sDofInt_ + i);
-          z = z - spark_center_[2];
-          dist += z * z;
-        }
-        dist = std::sqrt(dist);
-        wgt = 1.0;	
-	if (dist > rCyl) wgt = 0.0; 	
-	djh[i] *= wgt;
-	
+  // this bit is to prevent joule heating bleed -> make more elegant and then move to separate routine
+  ParGridFunction coordsDof(vfes_);
+  pmesh_->GetNodes(coordsDof);
+  double rCyl = 0.029;
+  {
+    double* djh = jh_.HostReadWrite();
+    for (int i = 0; i < sDofInt_; i++) {
+      double x, y, z, dist;
+      double wgt;
+      x = coordsDof(0 * sDofInt_ + i);
+      // y = coordsDof(1 * sDofInt_ + i);
+      dist = x * x;
+      if (dim_ == 3) {
+        z = coordsDof(2 * sDofInt_ + i);
+        z = z - spark_center_[2];
+        dist += z * z;
       }
+      dist = std::sqrt(dist);
+      wgt = 1.0;
+      if (dist > rCyl) wgt = 0.0;
+      djh[i] *= wgt;
     }
+  }
 
-  
   tmpR0_ -= jh_;
   // rhsqt_jh_.SetFromTrueDofs(jh_);
   // rhsqt_jh_.Neg();
@@ -3645,7 +3625,7 @@ void ReactingFlow::computeQtTO() {
 
 /// identifySpeciesType and identifyCollisionType copies from M2ulPhyS
 //  note: this is rather convoluted and messy, is it even used?
-void ReactingFlow::identifySpeciesType(Array<GasSpcs> &speciesType) {
+void ReactingFlow::identifySpeciesType(Array<GasSpcs>& speciesType) {
   speciesType.SetSize(nSpecies_);
 
   switch (gasType_) {
@@ -3787,7 +3767,7 @@ void ReactingFlow::identifySpeciesType(Array<GasSpcs> &speciesType) {
   return;
 }
 
-void ReactingFlow::readTableWrapper(std::string inputPath, TableInput &result) {
+void ReactingFlow::readTableWrapper(std::string inputPath, TableInput& result) {
   std::string filename;
   tpsP_->getInput((inputPath + "/x_log").c_str(), result.xLogScale, false);
   tpsP_->getInput((inputPath + "/f_log").c_str(), result.fLogScale, false);
@@ -3796,7 +3776,7 @@ void ReactingFlow::readTableWrapper(std::string inputPath, TableInput &result) {
   readTable(tpsP_->getTPSCommWorld(), filename, result.xLogScale, result.fLogScale, result.order, tableHost_, result);
 }
 
-void ReactingFlow::identifyCollisionType(const Array<GasSpcs> &speciesType, GasColl *collisionIndex) {
+void ReactingFlow::identifyCollisionType(const Array<GasSpcs>& speciesType, GasColl* collisionIndex) {
   for (int spI = 0; spI < nSpecies_; spI++) {
     for (int spJ = spI; spJ < nSpecies_; spJ++) {
       // If not initialized, will raise an error.
@@ -3890,7 +3870,7 @@ void ReactingFlow::identifyCollisionType(const Array<GasSpcs> &speciesType, GasC
   return;
 }
 
-void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, double *omega) {
+void ReactingFlow::evaluateReactingSource(const double* YT, const int dofindex, double* omega) {
   // This function evaluates the reacting flow source terms at a given
   // state (i.e., at a point in the grid) which is necessary for a
   // nonlinear solve for an implicit time step at each point.  The
@@ -4047,14 +4027,14 @@ void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, 
   omega[nActiveSpecies_] = hw / rho / Cpmix;
 }
 
-void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const double dt) {
+void ReactingFlow::solveChemistryStep(double* YT, const int dofindex, const double dt) {
   const int nState = nActiveSpecies_ + 1;         // Number of variables in YT
   const double eps = implicit_chemistry_fd_eps_;  // Perturbation for finite difference Jacobian
 
-  double *YT1 = new double[nState];
-  double *YT0 = new double[nState];
-  double *rhs1 = new double[nState];
-  double *rhs = new double[nState];
+  double* YT1 = new double[nState];
+  double* YT0 = new double[nState];
+  double* rhs1 = new double[nState];
+  double* rhs = new double[nState];
 
   mfem::DenseMatrix Jac(nState);
 
@@ -4174,7 +4154,7 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
   delete[] rhs;
 }
 
-double binaryTest(const Vector &coords, double t) {
+double binaryTest(const Vector& coords, double t) {
   double x = coords(0);
   double y = coords(1);
   // double z = coords(2);
@@ -4193,7 +4173,7 @@ double binaryTest(const Vector &coords, double t) {
   return yn;
 }
 
-double species_stepLeft(const Vector &coords, double t) {
+double species_stepLeft(const Vector& coords, double t) {
   double x = coords(0);
   // douable y = coords(1);
   // double z = coords(2);
@@ -4205,7 +4185,7 @@ double species_stepLeft(const Vector &coords, double t) {
   return yn;
 }
 
-double species_stepRight(const Vector &coords, double t) {
+double species_stepRight(const Vector& coords, double t) {
   double x = coords(0);
   // double y = coords(1);
   // double z = coords(2);
@@ -4218,7 +4198,7 @@ double species_stepRight(const Vector &coords, double t) {
   return yn;
 }
 
-double species_uniform(const Vector &coords, double t) {
+double species_uniform(const Vector& coords, double t) {
   // double x = coords(0);
   // double y = coords(1);
   // double z = coords(2);

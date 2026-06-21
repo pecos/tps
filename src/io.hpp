@@ -72,7 +72,7 @@ class IOOptions {
   bool restart_serial_read_ = false;
   bool restart_serial_write_ = false;
 
-  void read(TPS::Tps *tps, std::string prefix = std::string(""));
+  void read(TPS::Tps* tps, std::string prefix = std::string(""));
   void setRestartFlags();
 };
 
@@ -135,7 +135,7 @@ class IOFamily {
   std::string group_;
 
   /** mfem::ParGridFunction owning the data to be written or read into */
-  mfem::ParGridFunction *pfunc_ = nullptr;
+  mfem::ParGridFunction* pfunc_ = nullptr;
 
   /** Variables that make up the family */
   std::vector<IOVar> vars_;
@@ -147,28 +147,28 @@ class IOFamily {
   bool inRestartFile_;
 
   /** mfem::FiniteElementSpace for serial mesh (used if serial read and/or write requested) */
-  mfem::FiniteElementSpace *serial_fes_ = nullptr;
+  mfem::FiniteElementSpace* serial_fes_ = nullptr;
 
   /** mfem::GridFunction on serial mesh (used if serial read and/or write requested) */
-  mfem::GridFunction *serial_sol_ = nullptr;
+  mfem::GridFunction* serial_sol_ = nullptr;
 
   /** Map from local to global element numbering (used for serial read/write) */
-  int *local_to_global_elem_ = nullptr;
+  int* local_to_global_elem_ = nullptr;
 
   /** Partition array; partitioning[i] = mpi rank that owns the ith element (global numbering) */
-  mfem::Array<int> *partitioning_ = nullptr;
+  mfem::Array<int>* partitioning_ = nullptr;
 
   /** mfem::FiniteElementCollection used by pfunc_ (used for variable order read) */
-  mfem::FiniteElementCollection *fec_ = nullptr;
+  mfem::FiniteElementCollection* fec_ = nullptr;
 
   /** mfem::FiniteElementCollection with read order (used for variable order read) */
-  mfem::FiniteElementCollection *aux_fec_ = nullptr;
+  mfem::FiniteElementCollection* aux_fec_ = nullptr;
 
   /** mfem::FiniteElementCollection with read order elements (used for variable order read) */
-  mfem::ParFiniteElementSpace *aux_pfes_ = nullptr;
+  mfem::ParFiniteElementSpace* aux_pfes_ = nullptr;
 
   /** mfem::ParGridFunction with read order elements (used for variable order read) */
-  mfem::ParGridFunction *aux_pfunc_ = nullptr;
+  mfem::ParGridFunction* aux_pfunc_ = nullptr;
 
   /**
    * @brief Prepare for serial write by collecting data onto rank 0
@@ -185,7 +185,7 @@ class IOFamily {
    * @param file Open HDF5 file handle (e.g., as returned by H5Fcreate or H5Fopen)
    * @param var IOVar for the variable being read
    */
-  void readDistributeSerializedVariable(hid_t file, const IOVar &var, int numDof, double *data);
+  void readDistributeSerializedVariable(hid_t file, const IOVar& var, int numDof, double* data);
 
  public:
   /**
@@ -195,7 +195,7 @@ class IOFamily {
    * @param grp Group name
    * @param pf Pointer to mfem::ParGridFunction that owns the data
    */
-  IOFamily(std::string desc, std::string grp, mfem::ParGridFunction *pf);
+  IOFamily(std::string desc, std::string grp, mfem::ParGridFunction* pf);
 
   /** @brief "Partitioned" write (each mpi rank writes its local part of the ParGridFunction to a separate file) */
   void writePartitioned(hid_t file);
@@ -258,8 +258,8 @@ class IODataOrganizer {
    * @param inRestartFile If false, skip family on read (optional, defaults to true)
    * @param fec FiniteElementCollection for grid function (optional, only used for different order read)
    */
-  void registerIOFamily(std::string description, std::string group, mfem::ParGridFunction *pfunc,
-                        bool auxRestart = true, bool inRestartFile = true, mfem::FiniteElementCollection *fec = NULL);
+  void registerIOFamily(std::string description, std::string group, mfem::ParGridFunction* pfunc,
+                        bool auxRestart = true, bool inRestartFile = true, mfem::FiniteElementCollection* fec = NULL);
   /** Destructor */
   ~IODataOrganizer();
 
@@ -282,7 +282,7 @@ class IODataOrganizer {
    * @param locToGlob Map from local element index to global element index
    * @param part Map from global element index to mpi rank owning that element
    */
-  void initializeSerial(bool root, bool serial, mfem::Mesh *serial_mesh, int *locToGlob, mfem::Array<int> *part);
+  void initializeSerial(bool root, bool serial, mfem::Mesh* serial_mesh, int* locToGlob, mfem::Array<int>* part);
 
   /**
    * @brief Write data from all families
@@ -339,7 +339,7 @@ hsize_t get_variable_size_hdf5(hid_t file, std::string name);
  * @param index Starting location within data buffer
  * @param data Data buffer
  */
-void read_variable_data_hdf5(hid_t file, std::string varName, size_t index, double *data);
+void read_variable_data_hdf5(hid_t file, std::string varName, size_t index, double* data);
 
 /**
  * @brief Write data to an hdf5 file
@@ -349,7 +349,7 @@ void read_variable_data_hdf5(hid_t file, std::string varName, size_t index, doub
  * @param dataspace HDF5 dataspace (e.g., as returned by H5Screate_simple)
  * @param data Buffer with data to write
  */
-void write_variable_data_hdf5(hid_t group, std::string varName, hid_t dataspace, const double *data);
+void write_variable_data_hdf5(hid_t group, std::string varName, hid_t dataspace, const double* data);
 
 /**
  * @brief Read/write partitioning information
@@ -362,6 +362,6 @@ void write_variable_data_hdf5(hid_t group, std::string varName, hid_t dataspace,
  * @todo Refactor this function to make it more generic and fit better
  * into the IODataOrganizer paradigm.
  */
-void partitioning_file_hdf5(std::string mode, MPI_Groups *groupsMPI, int nelemGlobal, mfem::Array<int> &partitioning,
+void partitioning_file_hdf5(std::string mode, MPI_Groups* groupsMPI, int nelemGlobal, mfem::Array<int>& partitioning,
                             std::string fileName = "./");
 #endif  // IO_HPP_

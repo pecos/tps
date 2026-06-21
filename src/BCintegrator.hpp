@@ -51,74 +51,74 @@ class BCintegrator : public NonlinearFormIntegrator {
   friend class M2ulPhyS;
 
  protected:
-  MPI_Groups *groupsMPI;
+  MPI_Groups* groupsMPI;
 
-  RunConfiguration &config;
+  RunConfiguration& config;
 
-  RiemannSolverTPS *rsolver;
-  GasMixture *mixture;
-  Fluxes *fluxClass;
+  RiemannSolverTPS* rsolver;
+  GasMixture* mixture;
+  Fluxes* fluxClass;
 
-  double &max_char_speed;
-  IntegrationRules *intRules;
+  double& max_char_speed;
+  IntegrationRules* intRules;
 
-  ParMesh *mesh;
+  ParMesh* mesh;
 
   // pointer to finite element space
-  ParFiniteElementSpace *vfes;
+  ParFiniteElementSpace* vfes;
 
   // pointer to primitive varibales
-  ParGridFunction *Up;
+  ParGridFunction* Up;
 
-  ParGridFunction *gradUp;
+  ParGridFunction* gradUp;
 
-  ParGridFunction *distance_;
+  ParGridFunction* distance_;
 
-  const boundaryFaceIntegrationData &boundary_face_data_;
+  const boundaryFaceIntegrationData& boundary_face_data_;
 
   const int dim;
   const int num_equation;
 
-  const int &maxIntPoints;
-  const int &maxDofs;
+  const int& maxIntPoints;
+  const int& maxDofs;
 
-  std::unordered_map<int, BoundaryCondition *> inletBCmap;
-  std::unordered_map<int, BoundaryCondition *> outletBCmap;
-  std::unordered_map<int, BoundaryCondition *> wallBCmap;
+  std::unordered_map<int, BoundaryCondition*> inletBCmap;
+  std::unordered_map<int, BoundaryCondition*> outletBCmap;
+  std::unordered_map<int, BoundaryCondition*> wallBCmap;
 
   bool mpiRoot;
   double time;
-  double *pTime;
+  double* pTime;
 
   // void calcMeanState();
-  void computeBdrFlux(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip,
-                      double delta, double time, double distance, Vector &bdrFlux);
+  void computeBdrFlux(const int attr, Vector& normal, Vector& stateIn, DenseMatrix& gradState, Vector transip,
+                      double delta, double time, double distance, Vector& bdrFlux);
 
  public:
-  BCintegrator(bool _mpiRoot, MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElementSpace *_vfes,
-               IntegrationRules *_intRules, RiemannSolverTPS *rsolver_, double &_dt, double *_time, GasMixture *mixture,
-               GasMixture *d_mixture, Fluxes *_fluxClass, ParGridFunction *_Up, ParGridFunction *_gradUp,
-               const boundaryFaceIntegrationData &boundary_face_data, const int _dim, const int _num_equation,
-               double &_max_char_speed, RunConfiguration &_runFile, Array<int> &local_bdr_attr,
-               const int &_maxIntPoints, const int &_maxDofs, ParGridFunction *distance_);
+  BCintegrator(bool _mpiRoot, MPI_Groups* _groupsMPI, ParMesh* _mesh, ParFiniteElementSpace* _vfes,
+               IntegrationRules* _intRules, RiemannSolverTPS* rsolver_, double& _dt, double* _time, GasMixture* mixture,
+               GasMixture* d_mixture, Fluxes* _fluxClass, ParGridFunction* _Up, ParGridFunction* _gradUp,
+               const boundaryFaceIntegrationData& boundary_face_data, const int _dim, const int _num_equation,
+               double& _max_char_speed, RunConfiguration& _runFile, Array<int>& local_bdr_attr,
+               const int& _maxIntPoints, const int& _maxDofs, ParGridFunction* distance_);
   ~BCintegrator();
 
-  virtual void AssembleFaceVector(const FiniteElement &el1, const FiniteElement &el2, FaceElementTransformations &Tr,
-                                  const Vector &elfun, Vector &elvect);
+  virtual void AssembleFaceVector(const FiniteElement& el1, const FiniteElement& el2, FaceElementTransformations& Tr,
+                                  const Vector& elfun, Vector& elvect);
   void initBCs();
 
-  void updateBCMean(ParGridFunction *Up);
-  void integrateBCs(Vector &y, const Vector &x, const elementIndexingData &elem_index_data);
+  void updateBCMean(ParGridFunction* Up);
+  void integrateBCs(Vector& y, const Vector& x, const elementIndexingData& elem_index_data);
 
   // GPU functions
-  static void retrieveGradientsData_gpu(ParGridFunction *gradUp, DenseTensor &elGradUp, Array<int> &vdofs,
-                                        const int &num_equation, const int &dim, const int &totalDofs,
-                                        const int &elDofs);
+  static void retrieveGradientsData_gpu(ParGridFunction* gradUp, DenseTensor& elGradUp, Array<int>& vdofs,
+                                        const int& num_equation, const int& dim, const int& totalDofs,
+                                        const int& elDofs);
 
   boundaryCategory getAttributeCategory(int attr) const {
-    std::unordered_map<int, BoundaryCondition *>::const_iterator ibc = inletBCmap.find(attr);
-    std::unordered_map<int, BoundaryCondition *>::const_iterator obc = outletBCmap.find(attr);
-    std::unordered_map<int, BoundaryCondition *>::const_iterator wbc = wallBCmap.find(attr);
+    std::unordered_map<int, BoundaryCondition*>::const_iterator ibc = inletBCmap.find(attr);
+    std::unordered_map<int, BoundaryCondition*>::const_iterator obc = outletBCmap.find(attr);
+    std::unordered_map<int, BoundaryCondition*>::const_iterator wbc = wallBCmap.find(attr);
     if (ibc != inletBCmap.end()) {
       return INLET;
     }

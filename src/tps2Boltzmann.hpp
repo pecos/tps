@@ -89,24 +89,24 @@ class Tps2Boltzmann {
   //! Total number of fields
   const std::size_t NIndexes;
 
-  Tps2Boltzmann(Tps *tps);
-  void init(TPS::PlasmaSolver *flowSolver);
+  Tps2Boltzmann(Tps* tps);
+  void init(TPS::PlasmaSolver* flowSolver);
   bool IsInitialized() const { return all_fes_ != nullptr; }
 
-  const mfem::ParFiniteElementSpace &Fes(Index index) const { return *(list_fes_[index]); }
-  mfem::ParFiniteElementSpace &Fes(Index index) { return *(list_fes_[index]); }
+  const mfem::ParFiniteElementSpace& Fes(Index index) const { return *(list_fes_[index]); }
+  mfem::ParFiniteElementSpace& Fes(Index index) { return *(list_fes_[index]); }
 
-  const mfem::ParFiniteElementSpace &NativeFes(Index index) const { return *(list_native_fes_[index]); }
-  mfem::ParFiniteElementSpace &NativeFes(Index index) { return *(list_native_fes_[index]); }
+  const mfem::ParFiniteElementSpace& NativeFes(Index index) const { return *(list_native_fes_[index]); }
+  mfem::ParFiniteElementSpace& NativeFes(Index index) { return *(list_native_fes_[index]); }
 
-  const mfem::ParGridFunction &SpatialCoordinates() const { return *spatial_coordinates_; }
-  mfem::ParGridFunction &SpatialCoordinates() { return *spatial_coordinates_; }
+  const mfem::ParGridFunction& SpatialCoordinates() const { return *spatial_coordinates_; }
+  mfem::ParGridFunction& SpatialCoordinates() { return *spatial_coordinates_; }
 
-  const mfem::ParGridFunction &Field(Index index) const { return *(fields_[index]); }
-  mfem::ParGridFunction &Field(Index index) { return *(fields_[index]); }
+  const mfem::ParGridFunction& Field(Index index) const { return *(fields_[index]); }
+  mfem::ParGridFunction& Field(Index index) { return *(fields_[index]); }
 
-  void interpolateFromNativeFES(const ParGridFunction &input, Index index);
-  void interpolateToNativeFES(ParGridFunction &output, Index index);
+  void interpolateFromNativeFES(const ParGridFunction& input, Index index);
+  void interpolateToNativeFES(ParGridFunction& output, Index index);
 
   //! Get the angular Frequency \omega of the electrical field:
   //! E(t) = Er*cos(\omega t) + Ei*sin(\omega t)
@@ -128,7 +128,7 @@ class Tps2Boltzmann {
 
  private:
   int _countBTEReactions();
-  Tps *tps_;
+  Tps* tps_;
 
   int nspecies_;
   int nEfieldComps_;
@@ -139,39 +139,39 @@ class Tps2Boltzmann {
   mfem::Array<int> offsets;
   mfem::Array<int> ncomps;
 
-  mfem::FiniteElementCollection *fec_;
+  mfem::FiniteElementCollection* fec_;
 
   //! Function spaces in the Boltzmann interface
-  mfem::ParFiniteElementSpace *all_fes_;
-  mfem::ParFiniteElementSpace *species_densities_fes_;
-  mfem::ParFiniteElementSpace *efield_fes_;
-  mfem::ParFiniteElementSpace *scalar_fes_;
-  mfem::ParFiniteElementSpace *reaction_rates_fes_;
-  mfem::ParFiniteElementSpace **list_fes_;
+  mfem::ParFiniteElementSpace* all_fes_;
+  mfem::ParFiniteElementSpace* species_densities_fes_;
+  mfem::ParFiniteElementSpace* efield_fes_;
+  mfem::ParFiniteElementSpace* scalar_fes_;
+  mfem::ParFiniteElementSpace* reaction_rates_fes_;
+  mfem::ParFiniteElementSpace** list_fes_;
 
-  mfem::ParFiniteElementSpace *spatial_coord_fes_;
+  mfem::ParFiniteElementSpace* spatial_coord_fes_;
 
   //! Function spaces using the native TPS fec
-  mfem::ParFiniteElementSpace *species_densities_native_fes_;
-  mfem::ParFiniteElementSpace *efield_native_fes_;
-  mfem::ParFiniteElementSpace *scalar_native_fes_;
-  mfem::ParFiniteElementSpace *reaction_rates_native_fes_;
-  mfem::ParFiniteElementSpace **list_native_fes_;
+  mfem::ParFiniteElementSpace* species_densities_native_fes_;
+  mfem::ParFiniteElementSpace* efield_native_fes_;
+  mfem::ParFiniteElementSpace* scalar_native_fes_;
+  mfem::ParFiniteElementSpace* reaction_rates_native_fes_;
+  mfem::ParFiniteElementSpace** list_native_fes_;
 
   //! Linear interpolator between native TPS fec to Interface fec
-  mfem::ParDiscreteLinearOperator *scalar_interpolator_;
-  mfem::ParDiscreteLinearOperator *scalar_interpolator_to_nativeFES_;
+  mfem::ParDiscreteLinearOperator* scalar_interpolator_;
+  mfem::ParDiscreteLinearOperator* scalar_interpolator_to_nativeFES_;
 
   //! array of fields see *Index for how to address this
-  mfem::ParGridFunction **fields_;
-  mfem::ParGridFunction *spatial_coordinates_;
+  mfem::ParGridFunction** fields_;
+  mfem::ParGridFunction* spatial_coordinates_;
 
   double EfieldAngularFreq_;
   double timestep_;
   double currentTime_;
 
   bool save_to_paraview_dc;
-  mfem::ParaViewDataCollection *paraview_dc;
+  mfem::ParaViewDataCollection* paraview_dc;
   std::vector<std::string> reaction_eqs_;
 };
 }  // namespace TPS

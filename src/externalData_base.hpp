@@ -42,8 +42,8 @@
  * ext data to the flow.
  */
 struct extDataToFlow {
-  const mfem::ParGridFunction *Udata = nullptr;
-  const mfem::ParGridFunction *Thdata = nullptr;
+  const mfem::ParGridFunction* Udata = nullptr;
+  const mfem::ParGridFunction* Thdata = nullptr;
 };
 
 /**
@@ -51,9 +51,9 @@ struct extDataToFlow {
  * ext data to the thermo chem model.
  */
 struct extDataToThermoChem {
-  const mfem::ParGridFunction *Tdata = nullptr;
-  const mfem::ParGridFunction *Ydata = nullptr;
-  const mfem::ParGridFunction *Yfulldata = nullptr;
+  const mfem::ParGridFunction* Tdata = nullptr;
+  const mfem::ParGridFunction* Ydata = nullptr;
+  const mfem::ParGridFunction* Yfulldata = nullptr;
 };
 
 /**
@@ -61,9 +61,9 @@ struct extDataToThermoChem {
  * ext data to the turb model
  */
 struct extDataToTurbModel {
-  const mfem::ParGridFunction *NuTdata = nullptr;
-  const mfem::ParGridFunction *TKEdata = nullptr;
-  const mfem::ParGridFunction *V2data = nullptr;
+  const mfem::ParGridFunction* NuTdata = nullptr;
+  const mfem::ParGridFunction* TKEdata = nullptr;
+  const mfem::ParGridFunction* V2data = nullptr;
 };
 
 /**
@@ -84,7 +84,7 @@ class ExternalDataBase {
   /**
    * @brief Hook to let derived classes register visualization fields with ParaViewDataCollection
    */
-  virtual void initializeViz(mfem::ParaViewDataCollection &pvdc) {}
+  virtual void initializeViz(mfem::ParaViewDataCollection& pvdc) {}
 
   /**
    * @brief Take a single time step

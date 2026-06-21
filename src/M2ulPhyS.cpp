@@ -39,7 +39,7 @@
 #include "utils.hpp"
 #include "wallBC.hpp"
 
-M2ulPhyS::M2ulPhyS(TPS::Tps *tps)
+M2ulPhyS::M2ulPhyS(TPS::Tps* tps)
     : groupsMPI(new MPI_Groups(tps->getTPSCommWorld())),
       nprocs_(groupsMPI->getTPSWorldSize()),
       rank_(groupsMPI->getTPSWorldRank()),
@@ -48,7 +48,7 @@ M2ulPhyS::M2ulPhyS(TPS::Tps *tps)
   parseSolverOptions2();
 }
 
-M2ulPhyS::M2ulPhyS(string &inputFileName, TPS::Tps *tps)
+M2ulPhyS::M2ulPhyS(string& inputFileName, TPS::Tps* tps)
     : groupsMPI(new MPI_Groups(tps->getTPSCommWorld())),
       nprocs_(groupsMPI->getTPSWorldSize()),
       rank_(groupsMPI->getTPSWorldRank()),
@@ -96,10 +96,10 @@ void M2ulPhyS::initMixtureAndTransportModels() {
       mixture = new DryAir(config, dim, nvel);
 
 #if defined(_CUDA_) || defined(_HIP_)
-      tpsGpuMalloc((void **)(&d_mixture), sizeof(DryAir));
+      tpsGpuMalloc((void**)(&d_mixture), sizeof(DryAir));
       gpu::instantiateDeviceDryAir<<<1, 1>>>(config.dryAirInput, dim, nvel, d_mixture);
 
-      tpsGpuMalloc((void **)&transportPtr, sizeof(DryAirTransport));
+      tpsGpuMalloc((void**)&transportPtr, sizeof(DryAirTransport));
       gpu::instantiateDeviceDryAirTransport<<<1, 1>>>(d_mixture, config.GetViscMult(), config.GetBulkViscMult(),
                                                       config.sutherland_.C1, config.sutherland_.S0,
                                                       config.sutherland_.Pr, transportPtr);
@@ -112,7 +112,7 @@ void M2ulPhyS::initMixtureAndTransportModels() {
         case GasModel::PERFECT_MIXTURE:
           mixture = new PerfectMixture(config, dim, nvel);
 #if defined(_CUDA_) || defined(_HIP_)
-          tpsGpuMalloc((void **)(&d_mixture), sizeof(PerfectMixture));
+          tpsGpuMalloc((void**)(&d_mixture), sizeof(PerfectMixture));
           gpu::instantiateDevicePerfectMixture<<<1, 1>>>(config.perfectMixtureInput, dim, nvel, d_mixture);
 #endif
           break;
@@ -124,7 +124,7 @@ void M2ulPhyS::initMixtureAndTransportModels() {
       switch (config.GetTranportModel()) {
         case ARGON_MINIMAL:
 #if defined(_CUDA_) || defined(_HIP_)
-          tpsGpuMalloc((void **)&transportPtr, sizeof(GasMinimalTransport));
+          tpsGpuMalloc((void**)&transportPtr, sizeof(GasMinimalTransport));
           gpu::instantiateDeviceGasMinimalTransport<<<1, 1>>>(d_mixture, config.gasTransportInput, transportPtr);
 #else
           transportPtr = new GasMinimalTransport(mixture, config);
@@ -132,7 +132,7 @@ void M2ulPhyS::initMixtureAndTransportModels() {
           break;
         case ARGON_MIXTURE:
 #if defined(_CUDA_) || defined(_HIP_)
-          tpsGpuMalloc((void **)&transportPtr, sizeof(GasMixtureTransport));
+          tpsGpuMalloc((void**)&transportPtr, sizeof(GasMixtureTransport));
           gpu::instantiateDeviceGasMixtureTransport<<<1, 1>>>(d_mixture, config.gasTransportInput, transportPtr);
 #else
           transportPtr = new GasMixtureTransport(mixture, config);
@@ -140,7 +140,7 @@ void M2ulPhyS::initMixtureAndTransportModels() {
           break;
         case CONSTANT:
 #if defined(_CUDA_) || defined(_HIP_)
-          tpsGpuMalloc((void **)&transportPtr, sizeof(ConstantTransport));
+          tpsGpuMalloc((void**)&transportPtr, sizeof(ConstantTransport));
           gpu::instantiateDeviceConstantTransport<<<1, 1>>>(d_mixture, config.constantTransport, transportPtr);
 #else
           transportPtr = new ConstantTransport(mixture, config);
@@ -153,7 +153,7 @@ void M2ulPhyS::initMixtureAndTransportModels() {
       switch (config.GetChemistryModel()) {
         default:
 #if defined(_CUDA_) || defined(_HIP_)
-          tpsGpuMalloc((void **)&chemistry_, sizeof(Chemistry));
+          tpsGpuMalloc((void**)&chemistry_, sizeof(Chemistry));
           gpu::instantiateDeviceChemistry<<<1, 1>>>(d_mixture, config.chemistryInput, chemistry_);
 #else
           chemistry_ = new Chemistry(mixture, config.chemistryInput);
@@ -216,7 +216,7 @@ void M2ulPhyS::initMixtureAndTransportModels() {
         T_table_input.fdata = thermo_tables[0].xdata;
 
         // LteMixture object valid on device
-        tpsGpuMalloc((void **)(&d_mixture), sizeof(LteMixture));
+        tpsGpuMalloc((void**)(&d_mixture), sizeof(LteMixture));
         gpu::instantiateDeviceLteMixture<<<1, 1>>>(config.lteMixtureInput.f, dim, nvel,
                                                    config.const_plasma_conductivity_, thermo_tables[0],
                                                    thermo_tables[1], thermo_tables[2], T_table_input, d_mixture);
@@ -247,7 +247,7 @@ void M2ulPhyS::initMixtureAndTransportModels() {
           trans_tables[icol].fdata = trans_data.Read() + (icol + 1) * nrow;
         }
 
-        tpsGpuMalloc((void **)&transportPtr, sizeof(LteTransport));
+        tpsGpuMalloc((void**)&transportPtr, sizeof(LteTransport));
         gpu::instantiateDeviceLteTransport<<<1, 1>>>(d_mixture, trans_tables[0], trans_tables[1], trans_tables[2],
                                                      transportPtr);
 #else
@@ -267,13 +267,13 @@ void M2ulPhyS::initMixtureAndTransportModels() {
     // dynamic_cast on a device-side pointer doesn't work, so instead
     // pass the TransportProperties pointer and cast it within
     // instantiateDeviceMixingLengthTransport
-    TransportProperties *temporary_transport = transportPtr;
-    tpsGpuMalloc((void **)&transportPtr, sizeof(MixingLengthTransport));
+    TransportProperties* temporary_transport = transportPtr;
+    tpsGpuMalloc((void**)&transportPtr, sizeof(MixingLengthTransport));
     gpu::instantiateDeviceMixingLengthTransport<<<1, 1>>>(d_mixture, config.mix_length_trans_input_,
                                                           temporary_transport, transportPtr);
 #else
     // Build mixing length transport using whatever molecular transport we've already instantiated
-    MolecularTransport *temporary_transport = dynamic_cast<MolecularTransport *>(transportPtr);
+    MolecularTransport* temporary_transport = dynamic_cast<MolecularTransport*>(transportPtr);
     transportPtr = new MixingLengthTransport(mixture, config, temporary_transport);
 #endif
   }
@@ -370,9 +370,9 @@ void M2ulPhyS::initVariables() {
 
   // If requested, evaluate the distance function (i.e., the distance to the nearest no-slip wall)
   distance_ = NULL;
-  GridFunction *serial_distance = NULL;
-  FiniteElementSpace *serial_fes = NULL;
-  DG_FECollection *tmp_fec = NULL;
+  GridFunction* serial_distance = NULL;
+  FiniteElementSpace* serial_fes = NULL;
+  DG_FECollection* tmp_fec = NULL;
   if (config.compute_distance) {
     order = config.GetSolutionOrder();
     dim = serial_mesh->Dimension();
@@ -401,7 +401,7 @@ void M2ulPhyS::initVariables() {
       serial_mesh->SetCurvature(1);
     }
 
-    FiniteElementSpace *tmp_dfes = new FiniteElementSpace(serial_mesh, tmp_fec, dim, Ordering::byNODES);
+    FiniteElementSpace* tmp_dfes = new FiniteElementSpace(serial_mesh, tmp_fec, dim, Ordering::byNODES);
     GridFunction coordinates(tmp_dfes);
     serial_mesh->GetNodes(coordinates);
 
@@ -511,7 +511,7 @@ void M2ulPhyS::initVariables() {
   switch (config.radiationInput.model) {
     case NET_EMISSION:
 #if defined(_CUDA_) || defined(_HIP_)
-      tpsGpuMalloc((void **)(&radiation_), sizeof(NetEmission));
+      tpsGpuMalloc((void**)(&radiation_), sizeof(NetEmission));
       gpu::instantiateDeviceNetEmission<<<1, 1>>>(config.radiationInput, radiation_);
 #else
       radiation_ = new NetEmission(config.radiationInput);
@@ -596,12 +596,12 @@ void M2ulPhyS::initVariables() {
     vsd.width = config.GetLinearVaryingData().width;
   }
 
-  tpsGpuMalloc((void **)&d_fluxClass, sizeof(Fluxes));
+  tpsGpuMalloc((void**)&d_fluxClass, sizeof(Fluxes));
   gpu::instantiateDeviceFluxes<<<1, 1>>>(d_mixture, eqSystem, transportPtr, num_equation, dim, config.isAxisymmetric(),
                                          config.GetSgsModelType(), config.GetSgsFloor(), config.GetSgsConstant(), vsd,
                                          d_fluxClass);
 
-  tpsGpuMalloc((void **)&rsolver, sizeof(RiemannSolverTPS));
+  tpsGpuMalloc((void**)&rsolver, sizeof(RiemannSolverTPS));
   gpu::instantiateDeviceRiemann<<<1, 1>>>(num_equation, d_mixture, eqSystem, d_fluxClass, config.RoeRiemannSolverTPS(),
                                           config.isAxisymmetric(), rsolver);
 
@@ -686,7 +686,7 @@ void M2ulPhyS::initVariables() {
   Array<int> local_attr;
   getAttributesInPartition(local_attr);
 
-  double *pTime;
+  double* pTime;
   pTime = &time;
 
   bcIntegrator = NULL;
@@ -817,7 +817,7 @@ void M2ulPhyS::initIndirectionArrays() {
   //-----------------------------------------------------------------
   // Element data
   //-----------------------------------------------------------------
-  elementIndexingData &elem_data = gpu_precomputed_data_.element_indexing_data;
+  elementIndexingData& elem_data = gpu_precomputed_data_.element_indexing_data;
 
   elem_data.dof_offset.SetSize(vfes->GetNE());
   elem_data.dof_offset = -1;  // invalid
@@ -873,7 +873,7 @@ void M2ulPhyS::initIndirectionArrays() {
   //-----------------------------------------------------------------
   // Interior faces
   //-----------------------------------------------------------------
-  interiorFaceIntegrationData &face_data = gpu_precomputed_data_.interior_face_data;
+  interiorFaceIntegrationData& face_data = gpu_precomputed_data_.interior_face_data;
 
   face_data.element_to_faces.SetSize(7 * vfes->GetNE());
   face_data.element_to_faces = 0;
@@ -935,7 +935,7 @@ void M2ulPhyS::initIndirectionArrays() {
   Vector xyz(dim);
 
   for (int face = 0; face < mesh->GetNumFaces(); face++) {
-    FaceElementTransformations *tr;
+    FaceElementTransformations* tr;
     tr = mesh->GetInteriorFaceTransformations(face);
     if (tr != NULL) {
       Array<int> vdofs;
@@ -957,8 +957,8 @@ void M2ulPhyS::initIndirectionArrays() {
         h_element_to_faces[7 * tr->Elem2No] = nf;
       }
 
-      const FiniteElement *fe1 = fes->GetFE(tr->Elem1No);
-      const FiniteElement *fe2 = fes->GetFE(tr->Elem2No);
+      const FiniteElement* fe1 = fes->GetFE(tr->Elem1No);
+      const FiniteElement* fe2 = fes->GetFE(tr->Elem2No);
 
       const int dof1 = fe1->GetDof();
       const int dof2 = fe2->GetDof();
@@ -972,7 +972,7 @@ void M2ulPhyS::initIndirectionArrays() {
       if (fe1->Space() == FunctionSpace::Pk) {
         intorder++;
       }
-      const IntegrationRule *ir = &intRules->Get(tr->GetGeometryType(), intorder);
+      const IntegrationRule* ir = &intRules->Get(tr->GetGeometryType(), intorder);
 
       h_face_el1[face] = tr->Elem1No;
       h_face_el2[face] = tr->Elem2No;
@@ -989,7 +989,7 @@ void M2ulPhyS::initIndirectionArrays() {
         // below is from the variant of Mesh::GetElementSize that takes an
         // ElementTransformation as input, rather than an element index.
         // We should simply call that function, but it is not public.
-        ElementTransformation *T = tr->Elem2;
+        ElementTransformation* T = tr->Elem2;
         DenseMatrix J(dim, dim);
 
         Geometry::Type geom = T->GetGeometryType();
@@ -1010,7 +1010,7 @@ void M2ulPhyS::initIndirectionArrays() {
 
       Vector dist1, dist2;
       if (distance_ != NULL) {
-        const ParFiniteElementSpace *dist_fes = distance_->ParFESpace();
+        const ParFiniteElementSpace* dist_fes = distance_->ParFESpace();
 
         Array<int> dist_dofs1;
         // dist_fes->GetElementVDofs(tr->Elem1->ElementNo, dist_dofs1);
@@ -1032,7 +1032,7 @@ void M2ulPhyS::initIndirectionArrays() {
       }
 
       for (int k = 0; k < ir->GetNPoints(); k++) {
-        const IntegrationPoint &ip = ir->IntPoint(k);
+        const IntegrationPoint& ip = ir->IntPoint(k);
         tr->SetAllIntPoints(&ip);
         // shape functions
         fe1->CalcShape(tr->GetElement1IntPoint(), shape1i);
@@ -1076,7 +1076,7 @@ void M2ulPhyS::initIndirectionArrays() {
   //-----------------------------------------------------------------
   // Boundary faces
   //-----------------------------------------------------------------
-  boundaryFaceIntegrationData &bdry_face_data = gpu_precomputed_data_.boundary_face_data;
+  boundaryFaceIntegrationData& bdry_face_data = gpu_precomputed_data_.boundary_face_data;
 
   // This is supposed to be number of boundary faces, and for
   // non-periodic cases it is.  But, for periodic meshes, it includes
@@ -1137,8 +1137,8 @@ void M2ulPhyS::initIndirectionArrays() {
     bdry_face_data.dist = 0.;
     auto h_bdry_dist = bdry_face_data.dist.HostWrite();
 
-    const FiniteElement *fe;
-    FaceElementTransformations *tr;
+    const FiniteElement* fe;
+    FaceElementTransformations* tr;
     // Mesh *mesh = fes->GetMesh();
 
     std::vector<int> uniqueElems;
@@ -1167,7 +1167,7 @@ void M2ulPhyS::initIndirectionArrays() {
         if (fe->Space() == FunctionSpace::Pk) {
           intorder++;
         }
-        const IntegrationRule *ir = &intRules->Get(tr->GetGeometryType(), intorder);
+        const IntegrationRule* ir = &intRules->Get(tr->GetGeometryType(), intorder);
 
         h_face_el[f] = tr->Elem1No;
         h_face_num_quad[f] = ir->GetNPoints();
@@ -1181,7 +1181,7 @@ void M2ulPhyS::initIndirectionArrays() {
 
         Vector dist;
         if (distance_ != NULL) {
-          const ParFiniteElementSpace *dist_fes = distance_->ParFESpace();
+          const ParFiniteElementSpace* dist_fes = distance_->ParFESpace();
 
           Array<int> dist_dofs1;
           // dist_fes->GetElementVDofs(tr->Elem1->ElementNo, dist_dofs1);
@@ -1191,7 +1191,7 @@ void M2ulPhyS::initIndirectionArrays() {
         }
 
         for (int q = 0; q < ir->GetNPoints(); q++) {
-          const IntegrationPoint &ip = ir->IntPoint(q);
+          const IntegrationPoint& ip = ir->IntPoint(q);
           tr->SetAllIntPoints(&ip);
           Vector nor;
           nor.UseDevice(false);
@@ -1262,7 +1262,7 @@ void M2ulPhyS::initIndirectionArrays() {
   // Shared faces (i.e., interior faces at boundary of decomposition,
   // such that element1 and element2 live on different mpi ranks)
   //-----------------------------------------------------------------
-  sharedFaceIntegrationData &shared_face_data = gpu_precomputed_data_.shared_face_data;
+  sharedFaceIntegrationData& shared_face_data = gpu_precomputed_data_.shared_face_data;
 
   mesh->ExchangeFaceNbrNodes();
   mesh->ExchangeFaceNbrData();
@@ -1342,13 +1342,13 @@ void M2ulPhyS::initIndirectionArrays() {
     unicElems.clear();
 
     Array<int> vdofs2, vdofsGrad;
-    FaceElementTransformations *tr;
+    FaceElementTransformations* tr;
     for (int i = 0; i < Nshared; i++) {
       tr = mesh->GetSharedFaceTransformations(i, true);
       int Elem2NbrNo = tr->Elem2No - mesh->GetNE();
 
-      const FiniteElement *fe1 = vfes->GetFE(tr->Elem1No);
-      const FiniteElement *fe2 = vfes->GetFaceNbrFE(Elem2NbrNo);
+      const FiniteElement* fe1 = vfes->GetFE(tr->Elem1No);
+      const FiniteElement* fe2 = vfes->GetFaceNbrFE(Elem2NbrNo);
       const int dof1 = fe1->GetDof();
       const int dof2 = fe2->GetDof();
 
@@ -1361,7 +1361,7 @@ void M2ulPhyS::initIndirectionArrays() {
       // takes an ElementTransformation as input, rather than an
       // element index.  We should simply call that function, but it
       // is not public.
-      ElementTransformation *T = tr->Elem2;
+      ElementTransformation* T = tr->Elem2;
       DenseMatrix J(dim, dim);
 
       Geometry::Type geom = T->GetGeometryType();
@@ -1395,7 +1395,7 @@ void M2ulPhyS::initIndirectionArrays() {
         intorder++;
       }
       // IntegrationRules IntRules2(0, Quadrature1D::GaussLobatto);
-      const IntegrationRule *ir = &intRules->Get(tr->GetGeometryType(), intorder);
+      const IntegrationRule* ir = &intRules->Get(tr->GetGeometryType(), intorder);
 
       h_face_el1[i] = tr->Elem1No;
       h_face_num_quad[i] = ir->GetNPoints();
@@ -1409,7 +1409,7 @@ void M2ulPhyS::initIndirectionArrays() {
 
       Vector dist1, dist2;
       if (distance_ != NULL) {
-        const ParFiniteElementSpace *dist_fes = distance_->ParFESpace();
+        const ParFiniteElementSpace* dist_fes = distance_->ParFESpace();
 
         Array<int> dist_dofs1;
         dist_fes->GetElementVDofs(tr->Elem1->ElementNo, dist_dofs1);
@@ -1431,7 +1431,7 @@ void M2ulPhyS::initIndirectionArrays() {
       nor.SetSize(dim);
 
       for (int q = 0; q < ir->GetNPoints(); q++) {
-        const IntegrationPoint &ip = ir->IntPoint(q);
+        const IntegrationPoint& ip = ir->IntPoint(q);
         tr->SetAllIntPoints(&ip);
 
         fe1->CalcShape(tr->GetElement1IntPoint(), shape1);
@@ -1486,7 +1486,7 @@ void M2ulPhyS::initIndirectionArrays() {
 }
 
 void M2ulPhyS::initIndirectionBC() {
-  boundaryFaceIntegrationData &bdry_face_data = gpu_precomputed_data_.boundary_face_data;
+  boundaryFaceIntegrationData& bdry_face_data = gpu_precomputed_data_.boundary_face_data;
 
   // This is supposed to be number of boundary faces, and for
   // non-periodic cases it is.  See #199 for more info.
@@ -1506,8 +1506,8 @@ void M2ulPhyS::initIndirectionBC() {
     bdry_face_data.wall_bc_temperature.UseDevice(true);
     auto h_wall_bc_temperature = bdry_face_data.wall_bc_temperature.HostWrite();
 
-    FaceElementTransformations *tr;
-    Mesh *mesh = fes->GetMesh();
+    FaceElementTransformations* tr;
+    Mesh* mesh = fes->GetMesh();
 
     for (int f = 0; f < NumBCelems; f++) {
       tr = mesh->GetBdrFaceTransformations(f);
@@ -1515,9 +1515,9 @@ void M2ulPhyS::initIndirectionBC() {
         int attr = tr->Attribute;
         h_bc_category[f] = bcIntegrator->getAttributeCategory(attr);
         if (config.useBCinGrad && h_bc_category[f] == WALL) {
-          std::unordered_map<int, BoundaryCondition *>::const_iterator wbci = bcIntegrator->wallBCmap.find(attr);
+          std::unordered_map<int, BoundaryCondition*>::const_iterator wbci = bcIntegrator->wallBCmap.find(attr);
           if (wbci != bcIntegrator->wallBCmap.end()) {
-            WallBC *wbc = dynamic_cast<WallBC *>(wbci->second);
+            WallBC* wbc = dynamic_cast<WallBC*>(wbci->second);
             WallType wt = wbc->getType();
             if (wt == VISC_ISOTH) {
               fflush(stdout);
@@ -1624,7 +1624,7 @@ M2ulPhyS::~M2ulPhyS() {
 #endif
 }
 
-void M2ulPhyS::getAttributesInPartition(Array<int> &local_attr) {
+void M2ulPhyS::getAttributesInPartition(Array<int>& local_attr) {
   local_attr.DeleteAll();
   for (int bel = 0; bel < vfes->GetNBE(); bel++) {
     int attr = vfes->GetBdrAttribute(bel);
@@ -1859,7 +1859,7 @@ void M2ulPhyS::initSolutionAndVisualizationVectors() {
   mesh->GetNodes(coordsDof);
   if (config.linViscData.isEnabled) {
     spaceVaryViscMult = new ParGridFunction(fes);
-    double *viscMult = spaceVaryViscMult->HostWrite();
+    double* viscMult = spaceVaryViscMult->HostWrite();
     double wgt = 0.;
     for (int n = 0; n < fes->GetNDofs(); n++) {
       auto hcoords = coordsDof.HostRead();  // get coords
@@ -1968,7 +1968,7 @@ void M2ulPhyS::projectInitialSolution() {
 
   // update plasma electrical conductivity
   if (tpsP->isFlowEMCoupled()) {
-    ParGridFunction *coordsDof = new ParGridFunction(dfes);
+    ParGridFunction* coordsDof = new ParGridFunction(dfes);
     mesh->GetNodes(*coordsDof);
     mixture->SetConstantPlasmaConductivity(plasma_conductivity_, Up, coordsDof);
     delete coordsDof;
@@ -2054,7 +2054,7 @@ void M2ulPhyS::solveStep() {
 #ifdef HAVE_GSLIB
       // Get the source field for the interpolation
       // TODO(shaering): improve option to select u, <u>, or <u'u'> for multiple at once
-      ParGridFunction *u_gf;
+      ParGridFunction* u_gf;
       if (config.planeDump.conserved == true) {
         u_gf = GetSolutionGF();
       } else if (config.planeDump.primitive == true) {
@@ -2184,13 +2184,13 @@ void M2ulPhyS::solve() {
 }
 
 // Initial conditions for debug/test case
-void M2ulPhyS::InitialConditionEulerVortex(const Vector &x, Vector &y) {
+void M2ulPhyS::InitialConditionEulerVortex(const Vector& x, Vector& y) {
   MFEM_ASSERT(x.Size() == 2, "");
   int equations = 4;
   if (x.Size() == 3) equations = 5;
 
   int problem = 1;
-  DryAir *eqState = new DryAir();
+  DryAir* eqState = new DryAir();
   const double gamma = eqState->GetSpecificHeatRatio();
   const double Rg = eqState->GetGasConstant();
 
@@ -2269,8 +2269,8 @@ void M2ulPhyS::InitialConditionEulerVortex(const Vector &x, Vector &y) {
 }
 
 // Initial conditions for debug/test case
-void M2ulPhyS::testInitialCondition(const Vector &x, Vector &y) {
-  DryAir *eqState = new DryAir();
+void M2ulPhyS::testInitialCondition(const Vector& x, Vector& y) {
+  DryAir* eqState = new DryAir();
 
   // Nice units
   const double vel_inf = 1.;
@@ -2293,12 +2293,12 @@ void M2ulPhyS::testInitialCondition(const Vector &x, Vector &y) {
 // // NOTE: Use only for DRY_AIR.
 // void M2ulPhyS::dryAirUniformInitialConditions() {
 void M2ulPhyS::uniformInitialConditions() {
-  double *data = U->HostWrite();
-  double *dataUp = Up->HostWrite();
-  double *dataGradUp = gradUp->HostWrite();
+  double* data = U->HostWrite();
+  double* dataUp = Up->HostWrite();
+  double* dataGradUp = gradUp->HostWrite();
 
   int dof = vfes->GetNDofs();
-  double *inputRhoRhoVp = config.GetConstantInitialCondition();
+  double* inputRhoRhoVp = config.GetConstantInitialCondition();
 
   // build initial state
   Vector initState(num_equation);
@@ -2371,7 +2371,7 @@ void M2ulPhyS::uniformInitialConditions() {
 }
 
 void M2ulPhyS::initGradUp() {
-  double *dataGradUp = gradUp->HostWrite();
+  double* dataGradUp = gradUp->HostWrite();
   int dof = vfes->GetNDofs();
 
   for (int i = 0; i < dof; i++) {
@@ -2386,8 +2386,8 @@ void M2ulPhyS::initGradUp() {
 // NOTE(Mal): This is a method to be used when we restart from LTE simulation.
 // It initilzes species mass densities based on LTE assumptions.
 void M2ulPhyS::initilizeSpeciesFromLTE() {
-  double *dataU = U->GetData();
-  double *dataUp = Up->GetData();
+  double* dataU = U->GetData();
+  double* dataUp = Up->GetData();
   // double *dataGradUp = gradUp->HostWrite();
 
   int dof = vfes->GetNDofs();
@@ -2404,10 +2404,10 @@ void M2ulPhyS::initilizeSpeciesFromLTE() {
   tpsP->getRequiredInput("flow/lte/e_rev_table", e_rev_file);
   config.lteMixtureInput.e_rev_file_name = e_rev_file;
 
-  TableInterpolator2D *energy_table;
-  TableInterpolator2D *R_table;
-  TableInterpolator2D *c_table;
-  TableInterpolator2D *T_table;
+  TableInterpolator2D* energy_table;
+  TableInterpolator2D* R_table;
+  TableInterpolator2D* c_table;
+  TableInterpolator2D* T_table;
 
 #if defined(HAVE_GSL) && !defined(_CUDA_) && !defined(_HIP_)
 
@@ -2472,7 +2472,7 @@ void M2ulPhyS::Check_NAN() {
     cout << "Found a NaN!" << endl;
   }
 #else
-  const double *dataU = U->HostRead();
+  const double* dataU = U->HostRead();
 
   // bool thereIsNan = false;
 
@@ -2506,8 +2506,8 @@ void M2ulPhyS::Check_NAN() {
   }
 }
 
-int M2ulPhyS::Check_NaN_GPU(ParGridFunction *U, int lengthU, Array<int> &loc_print) {
-  const double *dataU = U->Read();
+int M2ulPhyS::Check_NaN_GPU(ParGridFunction* U, int lengthU, Array<int>& loc_print) {
+  const double* dataU = U->Read();
   auto d_temp = loc_print.ReadWrite();
 
   MFEM_FORALL(n, lengthU, {
@@ -2528,7 +2528,7 @@ void M2ulPhyS::Check_Undershoot() {
 #ifdef _GPU_
   int nv = nvel;
   int nsp = numActiveSpecies;
-  double *dataU = U->ReadWrite();
+  double* dataU = U->ReadWrite();
 
   MFEM_FORALL(i, dof, {
     for (int sp = 0; sp < nsp; sp++) {
@@ -2537,7 +2537,7 @@ void M2ulPhyS::Check_Undershoot() {
     }
   });
 #else
-  double *dataU = U->HostReadWrite();
+  double* dataU = U->HostReadWrite();
   for (int i = 0; i < dof; i++) {
     for (int sp = 0; sp < numActiveSpecies; sp++) {
       int eq = nvel + 2 + sp;
@@ -3793,7 +3793,7 @@ void M2ulPhyS::parseRadiationInputs() {
   }
 }
 
-void M2ulPhyS::readTableWrapper(std::string inputPath, TableInput &result) {
+void M2ulPhyS::readTableWrapper(std::string inputPath, TableInput& result) {
   MPI_Comm TPSCommWorld = this->groupsMPI->getTPSCommWorld();
   std::string filename;
   tpsP->getInput((inputPath + "/x_log").c_str(), result.xLogScale, false);
@@ -3851,7 +3851,7 @@ void M2ulPhyS::packUpGasMixtureInput() {
   }
 }
 
-void M2ulPhyS::identifySpeciesType(Array<GasSpcs> &speciesType) {
+void M2ulPhyS::identifySpeciesType(Array<GasSpcs>& speciesType) {
   speciesType.SetSize(config.numSpecies);
 
   for (int sp = 0; sp < config.numSpecies; sp++) {
@@ -3922,7 +3922,7 @@ void M2ulPhyS::identifySpeciesType(Array<GasSpcs> &speciesType) {
   return;
 }
 
-void M2ulPhyS::identifyCollisionType(const Array<GasSpcs> &speciesType, GasColl *collisionIndex) {
+void M2ulPhyS::identifyCollisionType(const Array<GasSpcs>& speciesType, GasColl* collisionIndex) {
   // collisionIndex_.resize(numSpecies);
   for (int spI = 0; spI < config.numSpecies; spI++) {
     // collisionIndex_[spI].resize(numSpecies - spI);
@@ -4051,8 +4051,8 @@ void M2ulPhyS::checkSolverOptions() const {
 }
 
 void M2ulPhyS::updatePrimitives() {
-  const double *data = U->HostRead();
-  double *dataUp = Up->HostWrite();
+  const double* data = U->HostRead();
+  double* dataUp = Up->HostWrite();
   int dof = vfes->GetNDofs();
 
   // Change this double * state = new double[num_equation] and same for Upi?
@@ -4162,9 +4162,9 @@ void M2ulPhyS::updateVisualizationVariables() {
   // TODO(kevin): The routine here currently only supports cpu path, though it is written in a gpu-compatible way.
   // Will require some minor #ifdef additions to implement gpu path.
 
-  double *dataU = U->GetData();
-  double *dataUp = Up->GetData();
-  double *dataGradUp = gradUp->GetData();
+  double* dataU = U->GetData();
+  double* dataUp = Up->GetData();
+  double* dataGradUp = gradUp->GetData();
   const int ndofs = vfes->GetNDofs();
   const int _dim = dim;
   const int _nvel = nvel;
@@ -4172,14 +4172,14 @@ void M2ulPhyS::updateVisualizationVariables() {
   const int _numSpecies = numSpecies;
   const int _numReactions = config.numReactions;
 
-  GasMixture *in_mix = mixture;
-  TransportProperties *in_transport = transportPtr;
-  Chemistry *in_chem = chemistry_;
+  GasMixture* in_mix = mixture;
+  TransportProperties* in_transport = transportPtr;
+  Chemistry* in_chem = chemistry_;
   const bool isDryAir = (config.workFluid == DRY_AIR);
 
   const int nVisual = visualizationVariables_.size();
   const AuxiliaryVisualizationIndexes visualIdxs = visualizationIndexes_;
-  double *dataVis[gpudata::MAXVISUAL];
+  double* dataVis[gpudata::MAXVISUAL];
   for (int vis = 0; vis < nVisual; vis++) dataVis[vis] = visualizationVariables_[vis]->GetData();
 
   for (int n = 0; n < ndofs; n++) {
@@ -4217,7 +4217,7 @@ void M2ulPhyS::updateVisualizationVariables() {
 
       double radius = -1;
       if (config.isAxisymmetric()) {
-        ParGridFunction *xyz = new ParGridFunction(dfes);
+        ParGridFunction* xyz = new ParGridFunction(dfes);
         mesh->GetNodes(*xyz);
         radius = (*xyz)[n + 0 * ndofs];
       }
@@ -4264,18 +4264,18 @@ void M2ulPhyS::updateVisualizationVariables() {
 
 void M2ulPhyS::evaluatePlasmaConductivityGF() {
   assert(plasma_conductivity_ != NULL);
-  double *d_pc = plasma_conductivity_->Write();
+  double* d_pc = plasma_conductivity_->Write();
 
-  const double *d_Up = Up->Read();
-  const double *d_U = U->Read();
-  const double *d_gradUp = gradUp->Read();
+  const double* d_Up = Up->Read();
+  const double* d_U = U->Read();
+  const double* d_gradUp = gradUp->Read();
 
-  const double *d_distance = NULL;
+  const double* d_distance = NULL;
   if (distance_ != NULL) {
     d_distance = distance_->Read();
   }
 
-  TransportProperties *d_transport = transportPtr;
+  TransportProperties* d_transport = transportPtr;
 
   const int nnodes = vfes->GetNDofs();
   const int _dim = dim;

@@ -37,13 +37,13 @@
 #include "outletBC.hpp"
 #include "wallBC.hpp"
 
-BCintegrator::BCintegrator(bool _mpiRoot, MPI_Groups *_groupsMPI, ParMesh *_mesh, ParFiniteElementSpace *_vfes,
-                           IntegrationRules *_intRules, RiemannSolverTPS *rsolver_, double &_dt, double *_time,
-                           GasMixture *_mixture, GasMixture *d_mixture, Fluxes *_fluxClass, ParGridFunction *_Up,
-                           ParGridFunction *_gradUp, const boundaryFaceIntegrationData &boundary_face_data,
-                           const int _dim, const int _num_equation, double &_max_char_speed, RunConfiguration &_runFile,
-                           Array<int> &local_attr, const int &_maxIntPoints, const int &_maxDofs,
-                           ParGridFunction *distance)
+BCintegrator::BCintegrator(bool _mpiRoot, MPI_Groups* _groupsMPI, ParMesh* _mesh, ParFiniteElementSpace* _vfes,
+                           IntegrationRules* _intRules, RiemannSolverTPS* rsolver_, double& _dt, double* _time,
+                           GasMixture* _mixture, GasMixture* d_mixture, Fluxes* _fluxClass, ParGridFunction* _Up,
+                           ParGridFunction* _gradUp, const boundaryFaceIntegrationData& boundary_face_data,
+                           const int _dim, const int _num_equation, double& _max_char_speed, RunConfiguration& _runFile,
+                           Array<int>& local_attr, const int& _maxIntPoints, const int& _maxDofs,
+                           ParGridFunction* distance)
     : groupsMPI(_groupsMPI),
       config(_runFile),
       rsolver(rsolver_),
@@ -129,8 +129,8 @@ BCintegrator::BCintegrator(bool _mpiRoot, MPI_Groups *_groupsMPI, ParMesh *_mesh
 
   // Inlets
   if (NumBCelems > 0 && inletBCmap.size() > 0) {
-    Mesh *mesh_bc = vfes->GetMesh();
-    FaceElementTransformations *tr;
+    Mesh* mesh_bc = vfes->GetMesh();
+    FaceElementTransformations* tr;
 
     for (int i = 0; i < local_attr.Size(); i++) {
       int attr = local_attr[i];
@@ -145,15 +145,15 @@ BCintegrator::BCintegrator(bool _mpiRoot, MPI_Groups *_groupsMPI, ParMesh *_mesh
         }
       }
 
-      std::unordered_map<int, BoundaryCondition *>::const_iterator ibc = inletBCmap.find(attr);
+      std::unordered_map<int, BoundaryCondition*>::const_iterator ibc = inletBCmap.find(attr);
       if (ibc != inletBCmap.end()) ibc->second->setElementList(list);
     }
   }
 
   // Outlets
   if (NumBCelems > 0 && outletBCmap.size() > 0) {
-    Mesh *mesh_bc = vfes->GetMesh();
-    FaceElementTransformations *tr;
+    Mesh* mesh_bc = vfes->GetMesh();
+    FaceElementTransformations* tr;
 
     for (int i = 0; i < local_attr.Size(); i++) {
       int attr = local_attr[i];
@@ -168,15 +168,15 @@ BCintegrator::BCintegrator(bool _mpiRoot, MPI_Groups *_groupsMPI, ParMesh *_mesh
         }
       }
 
-      std::unordered_map<int, BoundaryCondition *>::const_iterator obc = outletBCmap.find(attr);
+      std::unordered_map<int, BoundaryCondition*>::const_iterator obc = outletBCmap.find(attr);
       if (obc != outletBCmap.end()) obc->second->setElementList(list);
     }
   }
 
   // Walls
   if (NumBCelems > 0 && wallBCmap.size() > 0) {
-    Mesh *mesh_bc = vfes->GetMesh();
-    FaceElementTransformations *tr;
+    Mesh* mesh_bc = vfes->GetMesh();
+    FaceElementTransformations* tr;
 
     for (int i = 0; i < local_attr.Size(); i++) {
       int attr = local_attr[i];
@@ -191,7 +191,7 @@ BCintegrator::BCintegrator(bool _mpiRoot, MPI_Groups *_groupsMPI, ParMesh *_mesh
         }
       }
 
-      std::unordered_map<int, BoundaryCondition *>::const_iterator wbc = wallBCmap.find(attr);
+      std::unordered_map<int, BoundaryCondition*>::const_iterator wbc = wallBCmap.find(attr);
       if (wbc != wallBCmap.end()) wbc->second->setElementList(list);
     }
   }
@@ -225,11 +225,11 @@ void BCintegrator::initBCs() {
   }
 }
 
-void BCintegrator::computeBdrFlux(const int attr, Vector &normal, Vector &stateIn, DenseMatrix &gradState,
-                                  Vector transip, double delta, double time, double distance, Vector &bdrFlux) {
-  std::unordered_map<int, BoundaryCondition *>::const_iterator ibc = inletBCmap.find(attr);
-  std::unordered_map<int, BoundaryCondition *>::const_iterator obc = outletBCmap.find(attr);
-  std::unordered_map<int, BoundaryCondition *>::const_iterator wbc = wallBCmap.find(attr);
+void BCintegrator::computeBdrFlux(const int attr, Vector& normal, Vector& stateIn, DenseMatrix& gradState,
+                                  Vector transip, double delta, double time, double distance, Vector& bdrFlux) {
+  std::unordered_map<int, BoundaryCondition*>::const_iterator ibc = inletBCmap.find(attr);
+  std::unordered_map<int, BoundaryCondition*>::const_iterator obc = outletBCmap.find(attr);
+  std::unordered_map<int, BoundaryCondition*>::const_iterator wbc = wallBCmap.find(attr);
 
   if (ibc != inletBCmap.end())
     ibc->second->computeBdrFlux(normal, stateIn, gradState, transip, delta, time, distance, bdrFlux);
@@ -241,7 +241,7 @@ void BCintegrator::computeBdrFlux(const int attr, Vector &normal, Vector &stateI
   //   BCmap[attr]->computeBdrFlux(normal, stateIn, gradState, radius, bdrFlux);
 }
 
-void BCintegrator::updateBCMean(ParGridFunction *Up) {
+void BCintegrator::updateBCMean(ParGridFunction* Up) {
   for (auto bc = inletBCmap.begin(); bc != inletBCmap.end(); bc++) {
     bc->second->updateMean(intRules, Up);
   }
@@ -255,7 +255,7 @@ void BCintegrator::updateBCMean(ParGridFunction *Up) {
   }
 }
 
-void BCintegrator::integrateBCs(Vector &y, const Vector &x, const elementIndexingData &elem_index_data) {
+void BCintegrator::integrateBCs(Vector& y, const Vector& x, const elementIndexingData& elem_index_data) {
   for (auto bc = inletBCmap.begin(); bc != inletBCmap.end(); bc++) {
     bc->second->integrationBC(y,  // output
                               x, elem_index_data, Up, gradUp, boundary_face_data_, maxIntPoints, maxDofs);
@@ -272,12 +272,12 @@ void BCintegrator::integrateBCs(Vector &y, const Vector &x, const elementIndexin
   }
 }
 
-void BCintegrator::retrieveGradientsData_gpu(ParGridFunction *gradUp, DenseTensor &elGradUp, Array<int> &vdofs,
-                                             const int &num_equation, const int &dim, const int &totalDofs,
-                                             const int &elDofs) {
+void BCintegrator::retrieveGradientsData_gpu(ParGridFunction* gradUp, DenseTensor& elGradUp, Array<int>& vdofs,
+                                             const int& num_equation, const int& dim, const int& totalDofs,
+                                             const int& elDofs) {
 #ifdef _GPU_
-  const double *d_GradUp = gradUp->Read();
-  double *d_elGradUp = elGradUp.ReadWrite();
+  const double* d_GradUp = gradUp->Read();
+  double* d_elGradUp = elGradUp.ReadWrite();
   auto d_vdofs = vdofs.Read();
 
   MFEM_FORALL(i, elDofs, {
@@ -292,15 +292,15 @@ void BCintegrator::retrieveGradientsData_gpu(ParGridFunction *gradUp, DenseTenso
 #endif
 }
 
-void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElement &el2,
-                                      FaceElementTransformations &Tr, const Vector &elfun, Vector &elvect) {
+void BCintegrator::AssembleFaceVector(const FiniteElement& el1, const FiniteElement& el2,
+                                      FaceElementTransformations& Tr, const Vector& elfun, Vector& elvect) {
   Vector shape1;
   Vector funval1(num_equation);
   Vector nor(dim);
   Vector fluxN(num_equation);
 
 #ifndef _GPU_
-  const double *dataGradUp = gradUp->HostRead();
+  const double* dataGradUp = gradUp->HostRead();
 #endif
 
   const int dof1 = el1.GetDof();
@@ -323,7 +323,7 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
 
   // element size
   double delta;
-  Mesh *mesh = vfes->GetMesh();
+  Mesh* mesh = vfes->GetMesh();
   delta = mesh->GetElementSize(Tr.Elem1No, 1) / el1.GetOrder();
 
 #ifdef _GPU_
@@ -361,12 +361,12 @@ void BCintegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElem
     intorder++;
   }
 
-  const IntegrationRule *ir = &intRules->Get(Tr.GetGeometryType(), intorder);
+  const IntegrationRule* ir = &intRules->Get(Tr.GetGeometryType(), intorder);
   const int numActiveSpecies = mixture->GetNumActiveSpecies();
   const int nvel = mixture->GetNumVels();
 
   for (int i = 0; i < ir->GetNPoints(); i++) {
-    const IntegrationPoint &ip = ir->IntPoint(i);
+    const IntegrationPoint& ip = ir->IntPoint(i);
 
     Tr.SetAllIntPoints(&ip);  // set face and element int. points
 

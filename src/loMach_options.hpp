@@ -46,7 +46,7 @@ class Tps;
 class TurbulenceModelOptions {
  public:
   TurbulenceModelOptions();
-  void read(TPS::Tps *tps, std::string prefix = std::string(""));
+  void read(TPS::Tps* tps, std::string prefix = std::string(""));
 
   enum TurbulenceModelType { NONE, SMAGORINSKY, SIGMA, WALE, ALGEBRAIC_RANS, STATIC_RANS, ZETA_F };
 
@@ -61,7 +61,7 @@ class TurbulenceModelOptions {
 class LoMachTemporalOptions {
  public:
   LoMachTemporalOptions();
-  void read(TPS::Tps *tps, std::string prefix = std::string(""));
+  void read(TPS::Tps* tps, std::string prefix = std::string(""));
 
   enum IntegratorType { CURL_CURL, STAGGERED_TIME, DELTA_P };
 
@@ -151,7 +151,7 @@ class LoMachOptions {
     nSpec = 0;
   }
 
-  void print(std::ostream &out) {
+  void print(std::ostream& out) {
     out << std::endl;
     out << "LoMach options:" << std::endl;
     out << "  mesh_file   = " << mesh_file << std::endl;

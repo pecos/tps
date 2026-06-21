@@ -49,8 +49,8 @@
 using namespace mfem;
 using namespace mfem::common;
 
-GaussianInterpExtData::GaussianInterpExtData(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts,
-                                             temporalSchemeCoefficients &coeff, TPS::Tps *tps)
+GaussianInterpExtData::GaussianInterpExtData(mfem::ParMesh* pmesh, LoMachOptions* loMach_opts,
+                                             temporalSchemeCoefficients& coeff, TPS::Tps* tps)
     : tpsP_(tps), loMach_opts_(loMach_opts), pmesh_(pmesh), coeff_(coeff) {
   nprocs_ = pmesh_->GetNRanks();
   rank_ = pmesh_->GetMyRank();
@@ -218,7 +218,7 @@ void GaussianInterpExtData::initializeSelf() {
   }
 }
 
-void GaussianInterpExtData::initializeViz(ParaViewDataCollection &pvdc) {
+void GaussianInterpExtData::initializeViz(ParaViewDataCollection& pvdc) {
   if (isInterpInlet_) {
     pvdc.RegisterField("externalTemp", &temperature_gf_);
     pvdc.RegisterField("externalU", &velocity_gf_);
@@ -279,13 +279,13 @@ void GaussianInterpExtData::setInlet() {
     }
   }
 
-  double *Tdata = temperature_gf_.HostReadWrite();
-  double *Udata = velocity_gf_.HostReadWrite();
-  double *U0 = vel0_gf_.HostReadWrite();
-  double *Thdata = swirl_gf_.HostReadWrite();
-  double *Th0 = swirl0_gf_.HostReadWrite();
-  double *Ydata = Yn_gf_.HostReadWrite();
-  double *hcoords = coordsDof.HostReadWrite();
+  double* Tdata = temperature_gf_.HostReadWrite();
+  double* Udata = velocity_gf_.HostReadWrite();
+  double* U0 = vel0_gf_.HostReadWrite();
+  double* Thdata = swirl_gf_.HostReadWrite();
+  double* Th0 = swirl0_gf_.HostReadWrite();
+  double* Ydata = Yn_gf_.HostReadWrite();
+  double* hcoords = coordsDof.HostReadWrite();
 
   struct inlet_profile {
     // double x, y, z, rho, temp, u, v, w;
@@ -295,14 +295,14 @@ void GaussianInterpExtData::setInlet() {
   string fnameBase;
   std::string basepath("./inputs/");
   fnameBase = (basepath + fname_);
-  const char *fnameRead = fnameBase.c_str();
+  const char* fnameRead = fnameBase.c_str();
   int nCount = 0;
 
   // find size
   if (rank0_) {
     std::cout << " Attempting to open inlet file for counting... " << fnameRead << " ";
 
-    FILE *inlet_file;
+    FILE* inlet_file;
     if ((inlet_file = fopen(fnameRead, "r"))) {
       std::cout << " ...and open" << endl;
       fflush(stdout);
@@ -561,8 +561,8 @@ void GaussianInterpExtData::setFieldInitSpec() {
   pmesh_->GetNodes(coordsDof);
   // now repeat for the spec field data
   // TODO(garobed1): no support for 3D
-  double *Yfulldata = Yfull_gf_.HostReadWrite();
-  double *hcoords = coordsDof.HostReadWrite();
+  double* Yfulldata = Yfull_gf_.HostReadWrite();
+  double* hcoords = coordsDof.HostReadWrite();
 
   const int maxSpec = 10;
 
@@ -573,14 +573,14 @@ void GaussianInterpExtData::setFieldInitSpec() {
   string fnamespecBase;
   std::string basepathspec("./inputs/");
   fnamespecBase = (basepathspec + fname_spec_);
-  const char *fnamespecRead = fnamespecBase.c_str();
+  const char* fnamespecRead = fnamespecBase.c_str();
   int nCountSpec = 0;
 
   // find size
   if (rank0_) {
     std::cout << " Attempting to open species file for counting... " << fnamespecRead << " ";
 
-    FILE *field_file;
+    FILE* field_file;
     if ((field_file = fopen(fnamespecRead, "r"))) {
       std::cout << " ...and open" << endl;
       fflush(stdout);
@@ -752,8 +752,8 @@ void GaussianInterpExtData::setFieldTurbVisc() {
   pmesh_->GetNodes(coordsDof);
   // now repeat for the turb field data
   // TODO(garobed1): no support for 3D
-  double *NuTdata = nut_gf_.HostReadWrite();
-  double *hcoords = coordsDof.HostReadWrite();
+  double* NuTdata = nut_gf_.HostReadWrite();
+  double* hcoords = coordsDof.HostReadWrite();
 
   struct turb_profile {
     double x, y, z, nut;
@@ -762,14 +762,14 @@ void GaussianInterpExtData::setFieldTurbVisc() {
   string fnameturbBase;
   std::string basepathturb("./inputs/");
   fnameturbBase = (basepathturb + fname_turb_);
-  const char *fnameturbRead = fnameturbBase.c_str();
+  const char* fnameturbRead = fnameturbBase.c_str();
   int nCountTurb = 0;
 
   // find size
   if (rank0_) {
     std::cout << " Attempting to open turb file for counting... " << fnameturbRead << " ";
 
-    FILE *inlet_file;
+    FILE* inlet_file;
     if ((inlet_file = fopen(fnameturbRead, "r"))) {
       std::cout << " ...and open" << endl;
       fflush(stdout);
@@ -913,9 +913,9 @@ void GaussianInterpExtData::setInletTurbScalars() {
   ParGridFunction coordsDof(vfes_);
   pmesh_->GetNodes(coordsDof);
 
-  double *TKEdata = tke_gf_.HostReadWrite();
-  double *V2data = v2_gf_.HostReadWrite();
-  double *hcoords = coordsDof.HostReadWrite();
+  double* TKEdata = tke_gf_.HostReadWrite();
+  double* V2data = v2_gf_.HostReadWrite();
+  double* hcoords = coordsDof.HostReadWrite();
 
   struct tke_profile {
     double x, y, z, tke, v2;
@@ -924,14 +924,14 @@ void GaussianInterpExtData::setInletTurbScalars() {
   string fnametkeBase;
   std::string basepathtke("./inputs/");
   fnametkeBase = (basepathtke + fname_tke_);
-  const char *fnametkeRead = fnametkeBase.c_str();
+  const char* fnametkeRead = fnametkeBase.c_str();
   int nCountTKE = 0;
 
   // find size
   if (rank0_) {
     std::cout << " Attempting to open zeta-f file for counting... " << fnametkeRead << " ";
 
-    FILE *inlet_file;
+    FILE* inlet_file;
     if ((inlet_file = fopen(fnametkeRead, "r"))) {
       std::cout << " ...and open" << endl;
       fflush(stdout);
@@ -1105,10 +1105,10 @@ void GaussianInterpExtData::step() {
     return;
   }
 
-  double *Udata = velocity_gf_.HostReadWrite();
-  double *U0 = vel0_gf_.HostReadWrite();
-  double *Thdata = swirl_gf_.HostReadWrite();
-  double *Th0 = swirl0_gf_.HostReadWrite();
+  double* Udata = velocity_gf_.HostReadWrite();
+  double* U0 = vel0_gf_.HostReadWrite();
+  double* Thdata = swirl_gf_.HostReadWrite();
+  double* Th0 = swirl0_gf_.HostReadWrite();
 
   // only addressing velocity for now and assume ic is zero
   for (int eq = 0; eq < dim_; eq++) {

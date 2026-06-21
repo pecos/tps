@@ -66,7 +66,7 @@ class Chemistry {
       productStoich_[gpudata::MAXSPECIES * gpudata::MAXREACTIONS];
 
   // std::vector<Reaction *> reactions_;
-  Reaction *reactions_[gpudata::MAXREACTIONS];
+  Reaction* reactions_[gpudata::MAXREACTIONS];
   double reactionEnergies_[gpudata::MAXREACTIONS];
 
   // std::map<int, int> *mixtureToInputMap_;
@@ -85,55 +85,55 @@ class Chemistry {
   // // Kevin: should we use a vector of function pointers?
 
   // Kevin: currently, I doubt we need mixture class here. but left it just in case.
-  GasMixture *mixture_ = NULL;
+  GasMixture* mixture_ = NULL;
 
   double min_temperature_;
 
   ReactionModel reactionModels_[gpudata::MAXREACTIONS];
 
  public:
-  Chemistry(GasMixture *mixture, RunConfiguration &config);
-  MFEM_HOST_DEVICE Chemistry(GasMixture *mixture, const ChemistryInput &inputs);
+  Chemistry(GasMixture* mixture, RunConfiguration& config);
+  MFEM_HOST_DEVICE Chemistry(GasMixture* mixture, const ChemistryInput& inputs);
 
   MFEM_HOST_DEVICE ~Chemistry();
 
   // Set the grid function rates for GRIDFUNCTION_RXN reaction types
-  void setGridFunctionRates(mfem::GridFunction &f);
-  MFEM_HOST_DEVICE void setRates(const double *data, int size);
+  void setGridFunctionRates(mfem::GridFunction& f);
+  MFEM_HOST_DEVICE void setRates(const double* data, int size);
 
   // return Vector of reaction rate coefficients, with the size of numReaction_.
   // WARNING(marc) I have removed "virtual" qualifier here assuming these functions will not
   // change for child classes. Correct if wrong
 
-  void computeForwardRateCoeffs(const Vector &ns, const double &T_h, const double &T_e, Vector &kfwd);
-  MFEM_HOST_DEVICE void computeForwardRateCoeffs(const double *ns, const double &T_h, const double &T_e,
-                                                 const int &dofindex, double *kfwd);
+  void computeForwardRateCoeffs(const Vector& ns, const double& T_h, const double& T_e, Vector& kfwd);
+  MFEM_HOST_DEVICE void computeForwardRateCoeffs(const double* ns, const double& T_h, const double& T_e,
+                                                 const int& dofindex, double* kfwd);
 
   // void computeEquilibriumConstants(const double &T_h, const double &T_e, Vector &kC);
-  MFEM_HOST_DEVICE void computeEquilibriumConstants(const double &T_h, const double &T_e, double *kC);
+  MFEM_HOST_DEVICE void computeEquilibriumConstants(const double& T_h, const double& T_e, double* kC);
 
   // return rate coefficients of (reactionIndex)-th reaction. (start from 0)
   // reactionIndex is taken from reactionMapping.right.
   // virtual Vector computeRateCoeffOf(const int reactionIndex, const double T_h, const double T_e) {};
 
-  const double *getReactantStoichiometry(const int reactionIndex) {
+  const double* getReactantStoichiometry(const int reactionIndex) {
     return &reactantStoich_[reactionIndex * numSpecies_];
   }
-  const double *getProductStoichiometry(const int reactionIndex) {
+  const double* getProductStoichiometry(const int reactionIndex) {
     return &productStoich_[reactionIndex * numSpecies_];
   }
 
   // compute progress rate by mass-action law.
-  void computeProgressRate(const Vector &ns, const Vector &kfwd, const Vector &keq, Vector &progressRate);
-  MFEM_HOST_DEVICE void computeProgressRate(const double *ns, const double *kfwd, const double *keq,
-                                            double *progressRate);
-  void computeCreationRate(const Vector &progressRate, Vector &creationRate, Vector &emmisionRate);
-  MFEM_HOST_DEVICE void computeCreationRate(const double *progressRate, double *creationRate, double *emmisionRate);
+  void computeProgressRate(const Vector& ns, const Vector& kfwd, const Vector& keq, Vector& progressRate);
+  MFEM_HOST_DEVICE void computeProgressRate(const double* ns, const double* kfwd, const double* keq,
+                                            double* progressRate);
+  void computeCreationRate(const Vector& progressRate, Vector& creationRate, Vector& emmisionRate);
+  MFEM_HOST_DEVICE void computeCreationRate(const double* progressRate, double* creationRate, double* emmisionRate);
 
-  MFEM_HOST_DEVICE double getReactionEnergy(const int &reactionIndex) { return reactionEnergies_[reactionIndex]; }
+  MFEM_HOST_DEVICE double getReactionEnergy(const int& reactionIndex) { return reactionEnergies_[reactionIndex]; }
   int getNumReactions() { return numReactions_; }
 
-  MFEM_HOST_DEVICE bool isElectronInvolvedAt(const int &reactionIndex) {
+  MFEM_HOST_DEVICE bool isElectronInvolvedAt(const int& reactionIndex) {
     return (electronIndex_ < 0) ? false : (reactantStoich_[electronIndex_ + reactionIndex * numSpecies_] != 0);
   }
 

@@ -45,9 +45,9 @@ using namespace mfem;
 
 class InletBC : public BoundaryCondition {
  private:
-  MPI_Groups *groupsMPI;
+  MPI_Groups* groupsMPI;
 
-  GasMixture *d_mixture_;  // used only in the device
+  GasMixture* d_mixture_;  // used only in the device
 
   const InletType inletType_;
 
@@ -68,8 +68,8 @@ class InletBC : public BoundaryCondition {
   Array<int> bdrElemsQ;  // element dofs and face num. of integration points
   Array<int> bdrDofs;    // indexes of the D
   Vector bdrShape;       // shape functions evaluated at the integration points
-  const int &maxIntPoints_;
-  const int &maxDofs_;
+  const int& maxIntPoints_;
+  const int& maxDofs_;
 
   // local vector for mean calculation
   Vector localMeanUp;
@@ -82,50 +82,50 @@ class InletBC : public BoundaryCondition {
   Vector inverseNorm2cartesian;
 
   void initBdrElemsShape();
-  void initBoundaryU(ParGridFunction *Up);
+  void initBoundaryU(ParGridFunction* Up);
 
-  void subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn, Vector &bdrFlux);
+  void subsonicReflectingDensityVelocity(Vector& normal, Vector& stateIn, Vector& bdrFlux);
 
-  void subsonicReflectingDensityVelocityFace(Vector &normal, Vector tangentW, Vector &stateIn, Vector transip,
-                                             double time, Vector &bdrFlux);
+  void subsonicReflectingDensityVelocityFace(Vector& normal, Vector tangentW, Vector& stateIn, Vector transip,
+                                             double time, Vector& bdrFlux);
 
-  void subsonicNonReflectingDensityVelocity(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
+  void subsonicNonReflectingDensityVelocity(Vector& normal, Vector& stateIn, DenseMatrix& gradState, Vector& bdrFlux);
 
-  virtual void updateMean(IntegrationRules *intRules, ParGridFunction *Up);
+  virtual void updateMean(IntegrationRules* intRules, ParGridFunction* Up);
 
  public:
-  InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolverTPS *rsolver_, GasMixture *_mixture,
-          GasMixture *d_mixture, ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
+  InletBC(MPI_Groups* _groupsMPI, Equations _eqSystem, RiemannSolverTPS* rsolver_, GasMixture* _mixture,
+          GasMixture* d_mixture, ParFiniteElementSpace* _vfes, IntegrationRules* _intRules, double& _dt, const int _dim,
           const int _num_equation, int _patchNumber, double _refLength, InletType _bcType,
-          const Array<double> &_inputData, const int &_maxIntPoints, const int &maxDofs, bool axisym);
+          const Array<double>& _inputData, const int& _maxIntPoints, const int& maxDofs, bool axisym);
   ~InletBC();
 
-  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip, double delta,
-                      double time, double distance, Vector &bdrFlux);
+  void computeBdrFlux(Vector& normal, Vector& stateIn, DenseMatrix& gradState, Vector transip, double delta,
+                      double time, double distance, Vector& bdrFlux);
 
   virtual void initBCs();
 
-  virtual void integrationBC(Vector &y,  // output
-                             const Vector &x, const elementIndexingData &elem_index_data, ParGridFunction *Up,
-                             ParGridFunction *gradUp, const boundaryFaceIntegrationData &boundary_face_data,
-                             const int &maxIntPoints, const int &maxDofs);
+  virtual void integrationBC(Vector& y,  // output
+                             const Vector& x, const elementIndexingData& elem_index_data, ParGridFunction* Up,
+                             ParGridFunction* gradUp, const boundaryFaceIntegrationData& boundary_face_data,
+                             const int& maxIntPoints, const int& maxDofs);
 
-  static void updateMean_gpu(ParGridFunction *Up, Vector &localMeanUp, const int _num_equation, const int numBdrElems,
-                             const int totalDofs, Vector &bdrUp, Array<int> &bdrElemsQ, Array<int> &bdrDofs,
-                             Vector &bdrShape, const int &maxIntPoints, const int &maxDofs);
+  static void updateMean_gpu(ParGridFunction* Up, Vector& localMeanUp, const int _num_equation, const int numBdrElems,
+                             const int totalDofs, Vector& bdrUp, Array<int>& bdrElemsQ, Array<int>& bdrDofs,
+                             Vector& bdrShape, const int& maxIntPoints, const int& maxDofs);
 
   // functions for BC integration on GPU
 
-  void integrateInlets_gpu(Vector &y,  // output
-                           const Vector &x, const elementIndexingData &elem_index_data,
-                           const boundaryFaceIntegrationData &boundary_face_data, Array<int> &listElems,
-                           Array<int> &offsetsBoundaryU);
-  void interpInlet_gpu(const Vector &x, const elementIndexingData &elem_index_data,
-                       const boundaryFaceIntegrationData &boundary_face_data, Array<int> &listElems,
-                       Array<int> &offsetsBoundaryU);
+  void integrateInlets_gpu(Vector& y,  // output
+                           const Vector& x, const elementIndexingData& elem_index_data,
+                           const boundaryFaceIntegrationData& boundary_face_data, Array<int>& listElems,
+                           Array<int>& offsetsBoundaryU);
+  void interpInlet_gpu(const Vector& x, const elementIndexingData& elem_index_data,
+                       const boundaryFaceIntegrationData& boundary_face_data, Array<int>& listElems,
+                       Array<int>& offsetsBoundaryU);
 
 #ifdef _GPU_
-  MFEM_HOST_DEVICE void pluginInputState(const double *inputState, double *u2, const int nvel,
+  MFEM_HOST_DEVICE void pluginInputState(const double* inputState, double* u2, const int nvel,
                                          const int numActiveSpecies) {
     u2[0] = inputState[0];
     for (int v = 0; v < nvel; v++) u2[1 + v] = inputState[0] * inputState[1 + v];
@@ -135,10 +135,10 @@ class InletBC : public BoundaryCondition {
     return;
   }
 
-  static MFEM_HOST_DEVICE void computeSubDenseVel(const double *u1, double *u2, const double *nor,
-                                                  const double *inputState, const double &gamma, const double &Rg,
-                                                  const int &dim, const int &num_equation, const WorkingFluid &fluid,
-                                                  const Equations &eqSystem, const int &thrd, const int &maxThread) {
+  static MFEM_HOST_DEVICE void computeSubDenseVel(const double* u1, double* u2, const double* nor,
+                                                  const double* inputState, const double& gamma, const double& Rg,
+                                                  const int& dim, const int& num_equation, const WorkingFluid& fluid,
+                                                  const Equations& eqSystem, const int& thrd, const int& maxThread) {
     // assumes there at least as many threads as number of equations
     MFEM_SHARED double KE[3];
     MFEM_SHARED double p;
@@ -165,10 +165,10 @@ class InletBC : public BoundaryCondition {
     }
   }
 
-  static MFEM_HOST_DEVICE void computeSubDenseVel_gpu_serial(const double *u1, double *u2, const double *nor,
-                                                             const double *inputState, const double &gamma,
-                                                             const double &Rg, const int &dim, const int &num_equation,
-                                                             const WorkingFluid &fluid) {
+  static MFEM_HOST_DEVICE void computeSubDenseVel_gpu_serial(const double* u1, double* u2, const double* nor,
+                                                             const double* inputState, const double& gamma,
+                                                             const double& Rg, const int& dim, const int& num_equation,
+                                                             const WorkingFluid& fluid) {
     // assumes there at least as many threads as number of equations
     double KE[3];
     double p;

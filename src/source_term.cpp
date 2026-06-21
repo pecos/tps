@@ -33,12 +33,12 @@
 
 #include <vector>
 
-SourceTerm::SourceTerm(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
-                       IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U,
-                       ParGridFunction *_Up, ParGridFunction *_gradUp,
-                       const precomputedIntegrationData &gpu_precomputed_data, RunConfiguration &_config,
-                       GasMixture *mixture, GasMixture *d_mixture, TransportProperties *transport, Chemistry *chemistry,
-                       Radiation *radiation, ParGridFunction *pc, ParGridFunction *distance)
+SourceTerm::SourceTerm(const int& _dim, const int& _num_equation, const int& _order, const int& _intRuleType,
+                       IntegrationRules* _intRules, ParFiniteElementSpace* _vfes, ParGridFunction* U,
+                       ParGridFunction* _Up, ParGridFunction* _gradUp,
+                       const precomputedIntegrationData& gpu_precomputed_data, RunConfiguration& _config,
+                       GasMixture* mixture, GasMixture* d_mixture, TransportProperties* transport, Chemistry* chemistry,
+                       Radiation* radiation, ParGridFunction* pc, ParGridFunction* distance)
     : ForcingTerms(_dim, _num_equation, _order, _intRuleType, _intRules, _vfes, U, _Up, _gradUp, gpu_precomputed_data,
                    _config.isAxisymmetric()),
       mixture_(mixture),
@@ -59,40 +59,40 @@ SourceTerm::SourceTerm(const int &_dim, const int &_num_equation, const int &_or
 
 SourceTerm::~SourceTerm() {}
 
-void SourceTerm::updateTerms(mfem::Vector &in) {
-  double *h_pc = NULL;
+void SourceTerm::updateTerms(mfem::Vector& in) {
+  double* h_pc = NULL;
 #ifdef _GPU_
-  const double *h_Up = Up_->Read();
-  const double *h_U = U_->Read();
-  const double *h_gradUp = gradUp_->Read();
-  double *h_in = in.ReadWrite();
+  const double* h_Up = Up_->Read();
+  const double* h_U = U_->Read();
+  const double* h_gradUp = gradUp_->Read();
+  double* h_in = in.ReadWrite();
 
-  GasMixture *_mixture = d_mixture_;
+  GasMixture* _mixture = d_mixture_;
 
   if (plasma_conductivity_ != NULL) {
     h_pc = plasma_conductivity_->Write();
   }
 #else
-  const double *h_Up = Up_->HostRead();
-  const double *h_U = U_->HostRead();
-  const double *h_gradUp = gradUp_->HostRead();
-  double *h_in = in.HostReadWrite();
+  const double* h_Up = Up_->HostRead();
+  const double* h_U = U_->HostRead();
+  const double* h_gradUp = gradUp_->HostRead();
+  double* h_in = in.HostReadWrite();
 
-  GasMixture *_mixture = mixture_;
+  GasMixture* _mixture = mixture_;
 
   if (plasma_conductivity_ != NULL) {
     h_pc = plasma_conductivity_->HostWrite();
   }
 
 #endif
-  const double *d_distance = NULL;
+  const double* d_distance = NULL;
   if (distance_ != NULL) {
     d_distance = distance_->Read();
   }
 
-  TransportProperties *_transport = transport_;
-  Chemistry *_chemistry = chemistry_;
-  Radiation *_radiation = radiation_;
+  TransportProperties* _transport = transport_;
+  Chemistry* _chemistry = chemistry_;
+  Radiation* _radiation = radiation_;
   const bool _enableRadiation = enableRadiation_;
 
   const int nnodes = vfes->GetNDofs();

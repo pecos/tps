@@ -48,27 +48,27 @@ using namespace std;
 // so that we can use GPU
 class DGNonLinearForm : public ParNonlinearForm {
  private:
-  RiemannSolverTPS *rsolver_;
-  Fluxes *fluxes;
-  ParFiniteElementSpace *vfes;
-  ParFiniteElementSpace *gradFes;
+  RiemannSolverTPS* rsolver_;
+  Fluxes* fluxes;
+  ParFiniteElementSpace* vfes;
+  ParFiniteElementSpace* gradFes;
 
-  ParGridFunction *gradUp_;
+  ParGridFunction* gradUp_;
 
-  BCintegrator *bcIntegrator;
+  BCintegrator* bcIntegrator;
 
-  IntegrationRules *intRules;
+  IntegrationRules* intRules;
   const int dim_;
   const int num_equation_;
-  GasMixture *mixture;
+  GasMixture* mixture;
 
-  const precomputedIntegrationData &gpu_precomputed_data_;
+  const precomputedIntegrationData& gpu_precomputed_data_;
 
-  mutable dataTransferArrays *transferU;
-  mutable dataTransferArrays *transferGradUp;
+  mutable dataTransferArrays* transferU;
+  mutable dataTransferArrays* transferGradUp;
 
-  const int &maxIntPoints_;
-  const int &maxDofs_;
+  const int& maxIntPoints_;
+  const int& maxDofs_;
 
   Vector uk_el1, grad_upk_el1;
   Vector uk_el2, grad_upk_el2;
@@ -77,26 +77,26 @@ class DGNonLinearForm : public ParNonlinearForm {
   Vector shared_flux;
 
  public:
-  DGNonLinearForm(RiemannSolverTPS *rsolver, Fluxes *_flux, ParFiniteElementSpace *f, ParFiniteElementSpace *gradFes,
-                  ParGridFunction *_gradUp, BCintegrator *_bcIntegrator, IntegrationRules *intRules, const int dim,
-                  const int num_equation, GasMixture *mixture, const precomputedIntegrationData &gpu_precomputed_data,
-                  const int &maxIntPoints, const int &maxDofs);
+  DGNonLinearForm(RiemannSolverTPS* rsolver, Fluxes* _flux, ParFiniteElementSpace* f, ParFiniteElementSpace* gradFes,
+                  ParGridFunction* _gradUp, BCintegrator* _bcIntegrator, IntegrationRules* intRules, const int dim,
+                  const int num_equation, GasMixture* mixture, const precomputedIntegrationData& gpu_precomputed_data,
+                  const int& maxIntPoints, const int& maxDofs);
 
-  void setParallelData(dataTransferArrays *_transferU, dataTransferArrays *_transferGradUp);
+  void setParallelData(dataTransferArrays* _transferU, dataTransferArrays* _transferGradUp);
 
-  void faceIntegration_gpu(Vector &y, int elType, int elemOffset, int elDof);
+  void faceIntegration_gpu(Vector& y, int elType, int elemOffset, int elDof);
 
-  void sharedFaceIntegration_gpu(Vector &y);
+  void sharedFaceIntegration_gpu(Vector& y);
 
-  void interpFaceData_gpu(const Vector &x, int elType, int elemOffset, int elDof);
+  void interpFaceData_gpu(const Vector& x, int elType, int elemOffset, int elDof);
 
-  void sharedFaceInterpolation_gpu(const Vector &x);
+  void sharedFaceInterpolation_gpu(const Vector& x);
   void evalFaceFlux_gpu();
 
 #ifdef _GPU_
-  void Mult_domain(const Vector &x, Vector &y);
-  void Mult_bdr(const Vector &x, Vector &y);
-  static void setToZero_gpu(Vector &x, const int size);
+  void Mult_domain(const Vector& x, Vector& y);
+  void Mult_bdr(const Vector& x, Vector& y);
+  static void setToZero_gpu(Vector& x, const int size);
 #endif
 };
 

@@ -33,10 +33,10 @@
 #include "face_integrator.hpp"
 
 // Implementation of class FaceIntegrator
-FaceIntegrator::FaceIntegrator(IntegrationRules *_intRules, RiemannSolverTPS *rsolver_, Fluxes *_fluxClass,
-                               ParFiniteElementSpace *_vfes, bool _useLinear, const int _dim, const int _num_equation,
-                               ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes, double &_max_char_speed,
-                               bool axisym, ParGridFunction *distance)
+FaceIntegrator::FaceIntegrator(IntegrationRules* _intRules, RiemannSolverTPS* rsolver_, Fluxes* _fluxClass,
+                               ParFiniteElementSpace* _vfes, bool _useLinear, const int _dim, const int _num_equation,
+                               ParGridFunction* _gradUp, ParFiniteElementSpace* _gradUpfes, double& _max_char_speed,
+                               bool axisym, ParGridFunction* distance)
     : rsolver(rsolver_),
       fluxClass(_fluxClass),
       vfes(_vfes),
@@ -60,9 +60,9 @@ FaceIntegrator::~FaceIntegrator() {
   }
 }
 
-void FaceIntegrator::getElementsGrads_cpu(FaceElementTransformations &Tr, const FiniteElement &el1,
-                                          const FiniteElement &el2, DenseTensor &gradUp1, DenseTensor &gradUp2) {
-  double *dataGradUp = gradUp->GetData();
+void FaceIntegrator::getElementsGrads_cpu(FaceElementTransformations& Tr, const FiniteElement& el1,
+                                          const FiniteElement& el2, DenseTensor& gradUp1, DenseTensor& gradUp2) {
+  double* dataGradUp = gradUp->GetData();
 
   vfes->GetElementVDofs(Tr.Elem1->ElementNo, vdofs1);
   int eldDof = el1.GetDof();
@@ -101,13 +101,13 @@ void FaceIntegrator::getElementsGrads_cpu(FaceElementTransformations &Tr, const 
   }
 }
 
-void FaceIntegrator::getElementsGrads_gpu(const ParGridFunction *gradUp, ParFiniteElementSpace *vfes,
-                                          const ParFiniteElementSpace *gradUpfes, FaceElementTransformations &Tr,
-                                          const FiniteElement &el1, const FiniteElement &el2, DenseTensor &gradUp1,
-                                          DenseTensor &gradUp2, const int &num_equation, const int &totalDofs,
-                                          const int &dim) {
-  const double *d_gradUp = gradUp->Read();
-  double *d_gradUp1 = gradUp1.ReadWrite();
+void FaceIntegrator::getElementsGrads_gpu(const ParGridFunction* gradUp, ParFiniteElementSpace* vfes,
+                                          const ParFiniteElementSpace* gradUpfes, FaceElementTransformations& Tr,
+                                          const FiniteElement& el1, const FiniteElement& el2, DenseTensor& gradUp1,
+                                          DenseTensor& gradUp2, const int& num_equation, const int& totalDofs,
+                                          const int& dim) {
+  const double* d_gradUp = gradUp->Read();
+  double* d_gradUp1 = gradUp1.ReadWrite();
 
   Array<int> vdofs1;
   vfes->GetElementVDofs(Tr.Elem1->ElementNo, vdofs1);
@@ -144,7 +144,7 @@ void FaceIntegrator::getElementsGrads_gpu(const ParGridFunction *gradUp, ParFini
 
   } else {
     vfes->GetElementVDofs(no2, vdofs2);
-    double *d_gradUp2 = gradUp2.Write();
+    double* d_gradUp2 = gradUp2.Write();
     auto d_vdofs2 = vdofs2.Read();
 
     MFEM_FORALL(n, eldDof, {
@@ -159,11 +159,11 @@ void FaceIntegrator::getElementsGrads_gpu(const ParGridFunction *gradUp, ParFini
   }
 }
 
-void FaceIntegrator::getDistanceDofs(FaceElementTransformations &Tr, const FiniteElement &el1, const FiniteElement &el2,
-                                     Vector &dist1, Vector &dist2) {
+void FaceIntegrator::getDistanceDofs(FaceElementTransformations& Tr, const FiniteElement& el1, const FiniteElement& el2,
+                                     Vector& dist1, Vector& dist2) {
   assert(distance_ != NULL);
 
-  const ParFiniteElementSpace *pfes = distance_->ParFESpace();
+  const ParFiniteElementSpace* pfes = distance_->ParFESpace();
 
   Array<int> dofs1;
   pfes->GetElementVDofs(Tr.Elem1->ElementNo, dofs1);
@@ -186,13 +186,13 @@ void FaceIntegrator::getDistanceDofs(FaceElementTransformations &Tr, const Finit
   }
 }
 
-void FaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElement &el2,
-                                        FaceElementTransformations &Tr, const Vector &elfun, Vector &elvect) {
+void FaceIntegrator::AssembleFaceVector(const FiniteElement& el1, const FiniteElement& el2,
+                                        FaceElementTransformations& Tr, const Vector& elfun, Vector& elvect) {
   NonLinearFaceIntegration(el1, el2, Tr, elfun, elvect);
 }
 
-void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const FiniteElement &el2,
-                                              FaceElementTransformations &Tr, const Vector &elfun, Vector &elvect) {
+void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement& el1, const FiniteElement& el2,
+                                              FaceElementTransformations& Tr, const Vector& elfun, Vector& elvect) {
   // Compute the term <F.n(u),[w]> on the interior faces.
 
   funval1.SetSize(num_equation);
@@ -240,7 +240,7 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
     intorder++;
   }
   // IntegrationRules IntRules2(0, Quadrature1D::GaussLobatto);
-  const IntegrationRule *ir = &intRules->Get(Tr.GetGeometryType(), intorder);
+  const IntegrationRule* ir = &intRules->Get(Tr.GetGeometryType(), intorder);
 
   gradUp1i.SetSize(num_equation, dim);
   gradUp2i.SetSize(num_equation, dim);
@@ -249,7 +249,7 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
   viscF2.SetSize(num_equation, dim);
 
   // element size
-  Mesh *mesh = vfes->GetMesh();
+  Mesh* mesh = vfes->GetMesh();
   const double delta1 = mesh->GetElementSize(Tr.Elem1No, 1) / el1.GetOrder();
 
   double delta2 = delta1;
@@ -262,7 +262,7 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
     // below is from the variant of Mesh::GetElementSize that takes an
     // ElementTransformation as input, rather than an element index.
     // We should simply call that function, but it is not public.
-    ElementTransformation *T = Tr.Elem2;
+    ElementTransformation* T = Tr.Elem2;
     DenseMatrix J(dim, dim);
 
     Geometry::Type geom = T->GetGeometryType();
@@ -280,7 +280,7 @@ void FaceIntegrator::NonLinearFaceIntegration(const FiniteElement &el1, const Fi
   const int nvel = fluxClass->GetNumVels();
 
   for (int i = 0; i < ir->GetNPoints(); i++) {
-    const IntegrationPoint &ip = ir->IntPoint(i);
+    const IntegrationPoint& ip = ir->IntPoint(i);
 
     Tr.SetAllIntPoints(&ip);  // set face and element int. points
 

@@ -34,7 +34,7 @@
 
 using namespace mfem;
 
-UnitySponge::UnitySponge(ParMesh *pmesh, int sorder) : pmesh_(pmesh), sorder_(sorder) {}
+UnitySponge::UnitySponge(ParMesh* pmesh, int sorder) : pmesh_(pmesh), sorder_(sorder) {}
 
 UnitySponge::~UnitySponge() {
   delete multiplier_;

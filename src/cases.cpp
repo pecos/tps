@@ -54,28 +54,28 @@
 using namespace mfem;
 
 /// generic user-specified vel ic
-void velIC_user(const Vector &x, double t, Vector &u) {
+void velIC_user(const Vector& x, double t, Vector& u) {
   u(0) = 0.0;
   u(1) = 0.0;
   u(2) = 0.0;
 }
 
 /// generic user-specified vel bc
-void velBC_user(const Vector &x, double t, Vector &u) {
+void velBC_user(const Vector& x, double t, Vector& u) {
   u(0) = 0.0;
   u(1) = 0.0;
   u(2) = 0.0;
 }
 
 /// generic user-specified temp ic
-double tempIC_user(const Vector &coords, double t) {
+double tempIC_user(const Vector& coords, double t) {
   double temp;
   temp = -1.0;
   return temp;
 }
 
 /// Used to set the velocity IC (and to check error)
-void vel_exact_tgv2d(const Vector &x, double t, Vector &u) {
+void vel_exact_tgv2d(const Vector& x, double t, Vector& u) {
   const double nu = 1.0;
   const double F = std::exp(-2 * nu * t);
 
@@ -85,7 +85,7 @@ void vel_exact_tgv2d(const Vector &x, double t, Vector &u) {
 }
 
 /// Used to set the velocity IC with TG field and uniform
-void vel_tgv2d_uniform(const Vector &x, double t, Vector &u) {
+void vel_tgv2d_uniform(const Vector& x, double t, Vector& u) {
   const double u0 = 1.0;
   const double F = 0.1;
   const double PI = 3.14159265359;
@@ -100,7 +100,7 @@ void vel_tgv2d_uniform(const Vector &x, double t, Vector &u) {
 }
 
 /// Used to set the channel IC
-void vel_channel(const Vector &x, double t, Vector &u) {
+void vel_channel(const Vector& x, double t, Vector& u) {
   double PI = 3.14159265359;
   double Lx = 25.0;
   double Ly = 2.0;
@@ -157,13 +157,13 @@ vfptr vel_ic(std::string ic_string_) {
 }
 
 /// Used for pipe flow test case
-void vel_exact_pipe(const Vector &x, double t, Vector &u) {
+void vel_exact_pipe(const Vector& x, double t, Vector& u) {
   u(0) = 0.0;
   u(1) = 2.0 * (1 - x[0] * x[0]);
 }
 
 /// Used for pipe with swirl
-double swirl_pipe(const Vector &x, double t) {
+double swirl_pipe(const Vector& x, double t) {
   double rt = 0.9;
   double R = 1.0;
   double u_th_max = 1.0;
@@ -176,7 +176,7 @@ double swirl_pipe(const Vector &x, double t) {
 }
 
 /// rough tke bc for pipe flow test case
-double tke_pipe(const Vector &x, double t) {
+double tke_pipe(const Vector& x, double t) {
   // return 0.05 * std::exp(-50. * (x[0] - 0.75) * (x[0] - 0.75));
   return 0.005 * std::exp(-50. * (x[0] - 0.75) * (x[0] - 0.75));
 }
@@ -195,7 +195,7 @@ vfptr vel_bc(std::string type) {
 }
 
 /// Rayleigh-Taylor ic
-double temp_rt3d(const Vector &x, double t) {
+double temp_rt3d(const Vector& x, double t) {
   double CC = 0.05;
   double twoPi = 6.28318530718;
   double yWidth = 0.1;
@@ -218,7 +218,7 @@ double temp_rt3d(const Vector &x, double t) {
 }
 
 /// Hot/Cold wall channel
-double temp_channel(const Vector &coords, double t) {
+double temp_channel(const Vector& coords, double t) {
   double Thi = 400.0;
   double Tlo = 200.0;
   double y = coords(1);
@@ -228,7 +228,7 @@ double temp_channel(const Vector &coords, double t) {
 }
 
 /// Bouyancy-driven cavity
-double temp_lequereBox(const Vector &coords, double t) {
+double temp_lequereBox(const Vector& coords, double t) {
   double Thi = 480.0;
   double Tlo = 120.0;
   double Tmean;

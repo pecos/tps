@@ -50,35 +50,35 @@ namespace TPS {
 
 class CPUDataRead {
  public:
-  CPUDataRead(const mfem::Vector &v) : data_(v.HostRead()), size_(v.Size()), stride_(1) {}
-  double *data() const { return const_cast<double *>(data_); }
+  CPUDataRead(const mfem::Vector& v) : data_(v.HostRead()), size_(v.Size()), stride_(1) {}
+  double* data() const { return const_cast<double*>(data_); }
   size_t size() const { return size_; }
   size_t stride() const { return stride_; }
 
  private:
-  const double *data_;
+  const double* data_;
   size_t size_;
   size_t stride_;
 };
 
 class CPUData {
  public:
-  CPUData(mfem::Vector &v, bool rw) : data_(rw ? v.HostReadWrite() : v.HostWrite()), size_(v.Size()), stride_(1) {}
-  double *data() { return data_; }
+  CPUData(mfem::Vector& v, bool rw) : data_(rw ? v.HostReadWrite() : v.HostWrite()), size_(v.Size()), stride_(1) {}
+  double* data() { return data_; }
   size_t size() const { return size_; }
   size_t stride() const { return stride_; }
 
  private:
-  double *data_;
+  double* data_;
   size_t size_;
   size_t stride_;
 };
 
-void idenity_fun(const Vector &x, Vector &out) {
+void idenity_fun(const Vector& x, Vector& out) {
   for (int i(0); i < x.Size(); ++i) out[i] = x[i];
 }
 
-Tps2Boltzmann::Tps2Boltzmann(Tps *tps)
+Tps2Boltzmann::Tps2Boltzmann(Tps* tps)
     : NIndexes(7), tps_(tps), all_fes_(nullptr), save_to_paraview_dc(false), paraview_dc(nullptr) {
   // Assert we have a couple solver;
   assert(tps->isFlowEMCoupled());
@@ -116,9 +116,9 @@ int Tps2Boltzmann::_countBTEReactions() {
   return bte_reactions;
 }
 
-void Tps2Boltzmann::init(TPS::PlasmaSolver *flowSolver) {
+void Tps2Boltzmann::init(TPS::PlasmaSolver* flowSolver) {
   std::cout << "Tps2Boltzmann::init is called" << std::endl;
-  mfem::ParMesh *pmesh(flowSolver->getMesh());
+  mfem::ParMesh* pmesh(flowSolver->getMesh());
   fec_ = new mfem::L2_FECollection(order_, pmesh->Dimension(), basis_type_);
   switch (pmesh->Dimension()) {
     case 2:
@@ -139,7 +139,7 @@ void Tps2Boltzmann::init(TPS::PlasmaSolver *flowSolver) {
   scalar_fes_ = new mfem::ParFiniteElementSpace(pmesh, fec_);
   reaction_rates_fes_ = new mfem::ParFiniteElementSpace(pmesh, fec_, nreactions_, mfem::Ordering::byNODES);
 
-  list_fes_ = new mfem::ParFiniteElementSpace *[NIndexes + 1];
+  list_fes_ = new mfem::ParFiniteElementSpace*[NIndexes + 1];
   list_fes_[Index::ElectricField] = efield_fes_;
   ncomps[Index::ElectricField] = nEfieldComps_;
   list_fes_[Index::SpeciesDensities] = species_densities_fes_;
@@ -157,8 +157,8 @@ void Tps2Boltzmann::init(TPS::PlasmaSolver *flowSolver) {
   list_fes_[Index::All] = all_fes_;
   ncomps[Index::All] = nfields_;
 
-  mfem::ParGridFunction *all = new mfem::ParGridFunction(all_fes_);
-  fields_ = new mfem::ParGridFunction *[NIndexes + 1];
+  mfem::ParGridFunction* all = new mfem::ParGridFunction(all_fes_);
+  fields_ = new mfem::ParGridFunction*[NIndexes + 1];
   offsets[0] = 0;
   for (std::size_t index(0); index < NIndexes; ++index) {
     fields_[index] = new mfem::ParGridFunction(list_fes_[index], *all, offsets[index]);
@@ -167,14 +167,14 @@ void Tps2Boltzmann::init(TPS::PlasmaSolver *flowSolver) {
   fields_[Index::All] = all;
 
   // Native spaces
-  const mfem::FiniteElementCollection *fec_native(flowSolver->getFEC());
+  const mfem::FiniteElementCollection* fec_native(flowSolver->getFEC());
   species_densities_native_fes_ =
       new mfem::ParFiniteElementSpace(pmesh, fec_native, nspecies_, mfem::Ordering::byNODES);
   efield_native_fes_ = new mfem::ParFiniteElementSpace(pmesh, fec_native, nEfieldComps_, mfem::Ordering::byNODES);
   scalar_native_fes_ = new mfem::ParFiniteElementSpace(pmesh, fec_native);
   reaction_rates_native_fes_ = new mfem::ParFiniteElementSpace(pmesh, fec_native, nreactions_, mfem::Ordering::byNODES);
 
-  list_native_fes_ = new mfem::ParFiniteElementSpace *[NIndexes + 1];
+  list_native_fes_ = new mfem::ParFiniteElementSpace*[NIndexes + 1];
   list_native_fes_[Index::ElectricField] = efield_native_fes_;
   list_native_fes_[Index::SpeciesDensities] = species_densities_native_fes_;
   list_native_fes_[Index::HeavyTemperature] = scalar_native_fes_;
@@ -199,7 +199,7 @@ void Tps2Boltzmann::init(TPS::PlasmaSolver *flowSolver) {
   spatial_coord_fes_ = new mfem::ParFiniteElementSpace(pmesh, fec_, pmesh->Dimension(), mfem::Ordering::byNODES);
   spatial_coordinates_ = new mfem::ParGridFunction(spatial_coord_fes_);
   mfem::VectorFunctionCoefficient coord_fun(pmesh->Dimension(),
-                                            std::function<void(const Vector &, Vector &)>(idenity_fun));
+                                            std::function<void(const Vector&, Vector&)>(idenity_fun));
   spatial_coordinates_->ProjectCoefficient(coord_fun);
 
   if (save_to_paraview_dc) {
@@ -214,14 +214,14 @@ void Tps2Boltzmann::init(TPS::PlasmaSolver *flowSolver) {
   }
 }
 
-void Tps2Boltzmann::interpolateFromNativeFES(const ParGridFunction &input, Tps2Boltzmann::Index index) {
+void Tps2Boltzmann::interpolateFromNativeFES(const ParGridFunction& input, Tps2Boltzmann::Index index) {
   if (ncomps[index] == 1) {
     scalar_interpolator_->Mult(input, *(fields_[index]));
   } else {
     const int loc_size_native = list_native_fes_[index]->GetNDofs();
     const int loc_size = list_fes_[index]->GetNDofs();
     for (int icomp(0); icomp < ncomps[index]; ++icomp) {
-      const mfem::Vector view_input(const_cast<mfem::ParGridFunction &>(input), icomp * loc_size_native,
+      const mfem::Vector view_input(const_cast<mfem::ParGridFunction&>(input), icomp * loc_size_native,
                                     loc_size_native);
       mfem::Vector view_field(*(fields_[index]), icomp * loc_size, loc_size);
       scalar_interpolator_->Mult(view_input, view_field);
@@ -229,7 +229,7 @@ void Tps2Boltzmann::interpolateFromNativeFES(const ParGridFunction &input, Tps2B
   }
 }
 
-void Tps2Boltzmann::interpolateToNativeFES(ParGridFunction &output, Index index) {
+void Tps2Boltzmann::interpolateToNativeFES(ParGridFunction& output, Index index) {
   if (ncomps[index] == 1) {
     scalar_interpolator_to_nativeFES_->Mult(*(fields_[index]), output);
   } else {
@@ -291,10 +291,10 @@ Tps2Boltzmann::~Tps2Boltzmann() {
 namespace py = pybind11;
 
 namespace tps_wrappers {
-void tps2bolzmann(py::module &m) {
+void tps2bolzmann(py::module& m) {
   // Can by read in numpy as np.array(data_instance, copy = False)
   py::class_<TPS::CPUDataRead>(m, "CPUDataRead", py::buffer_protocol())
-      .def_buffer([](TPS::CPUDataRead &d) -> py::buffer_info {
+      .def_buffer([](TPS::CPUDataRead& d) -> py::buffer_info {
         return py::buffer_info(d.data(),                                /*pointer to buffer*/
                                sizeof(double),                          /*size of one element*/
                                py::format_descriptor<double>::format(), /*python struct-style format descriptor*/
@@ -304,7 +304,7 @@ void tps2bolzmann(py::module &m) {
                                true /*read only*/);
       });
 
-  py::class_<TPS::CPUData>(m, "CPUData", py::buffer_protocol()).def_buffer([](TPS::CPUData &d) -> py::buffer_info {
+  py::class_<TPS::CPUData>(m, "CPUData", py::buffer_protocol()).def_buffer([](TPS::CPUData& d) -> py::buffer_info {
     return py::buffer_info(d.data(),                                /*pointer to buffer*/
                            sizeof(double),                          /*size of one element*/
                            py::format_descriptor<double>::format(), /*python struct-style format descriptor*/
@@ -324,21 +324,21 @@ void tps2bolzmann(py::module &m) {
       .value("ReactionRates", TPS::Tps2Boltzmann::Index::ReactionRates);
 
   py::class_<TPS::Tps2Boltzmann>(m, "Tps2Boltzmann")
-      .def(py::init<TPS::Tps *>())
+      .def(py::init<TPS::Tps*>())
       .def("HostReadSpatialCoordinates",
-           [](const TPS::Tps2Boltzmann &interface) {
+           [](const TPS::Tps2Boltzmann& interface) {
              return std::unique_ptr<TPS::CPUDataRead>(new TPS::CPUDataRead(interface.SpatialCoordinates()));
            })
       .def("HostRead",
-           [](const TPS::Tps2Boltzmann &interface, TPS::Tps2Boltzmann::Index index) {
+           [](const TPS::Tps2Boltzmann& interface, TPS::Tps2Boltzmann::Index index) {
              return std::unique_ptr<TPS::CPUDataRead>(new TPS::CPUDataRead(interface.Field(index)));
            })
       .def("HostWrite",
-           [](TPS::Tps2Boltzmann &interface, TPS::Tps2Boltzmann::Index index) {
+           [](TPS::Tps2Boltzmann& interface, TPS::Tps2Boltzmann::Index index) {
              return std::unique_ptr<TPS::CPUData>(new TPS::CPUData(interface.Field(index), false));
            })
       .def("HostReadWrite",
-           [](TPS::Tps2Boltzmann &interface, TPS::Tps2Boltzmann::Index index) {
+           [](TPS::Tps2Boltzmann& interface, TPS::Tps2Boltzmann::Index index) {
              return std::unique_ptr<TPS::CPUData>(new TPS::CPUData(interface.Field(index), true));
            })
       .def("EfieldAngularFreq", &TPS::Tps2Boltzmann::EfieldAngularFreq)

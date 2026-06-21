@@ -99,40 +99,40 @@ class GasMinimalTransport : public MolecularTransport {
   double mobilMult_;
 
  public:
-  GasMinimalTransport(GasMixture *_mixture, RunConfiguration &_runfile);
-  MFEM_HOST_DEVICE GasMinimalTransport(GasMixture *_mixture, const GasTransportInput &inputs);
-  MFEM_HOST_DEVICE GasMinimalTransport(GasMixture *_mixture);
+  GasMinimalTransport(GasMixture* _mixture, RunConfiguration& _runfile);
+  MFEM_HOST_DEVICE GasMinimalTransport(GasMixture* _mixture, const GasTransportInput& inputs);
+  MFEM_HOST_DEVICE GasMinimalTransport(GasMixture* _mixture);
 
   MFEM_HOST_DEVICE virtual ~GasMinimalTransport() {}
 
-  MFEM_HOST_DEVICE double getMuw(const int &spI, const int &spJ) { return muw_[spI + spJ * numSpecies]; }
+  MFEM_HOST_DEVICE double getMuw(const int& spI, const int& spJ) { return muw_[spI + spJ * numSpecies]; }
 
   int getIonIndex() { return ionIndex_; }
 
-  virtual collisionInputs computeCollisionInputs(const Vector &primitive, const Vector &n_sp);
-  MFEM_HOST_DEVICE collisionInputs computeCollisionInputs(const double *primitive, const double *n_sp);
+  virtual collisionInputs computeCollisionInputs(const Vector& primitive, const Vector& n_sp);
+  MFEM_HOST_DEVICE collisionInputs computeCollisionInputs(const double* primitive, const double* n_sp);
 
-  MFEM_HOST_DEVICE void ComputeFluxMolecularTransport(const double *state, const double *gradUp, const double *Efield,
-                                                      double *transportBuffer, double *diffusionVelocity) override;
+  MFEM_HOST_DEVICE void ComputeFluxMolecularTransport(const double* state, const double* gradUp, const double* Efield,
+                                                      double* transportBuffer, double* diffusionVelocity) override;
 
-  MFEM_HOST_DEVICE void ComputeSourceMolecularTransport(const double *state, const double *Up, const double *gradUp,
-                                                        const double *Efield, double *globalTransport,
-                                                        double *speciesTransport, double *diffusionVelocity,
-                                                        double *n_sp) override;
+  MFEM_HOST_DEVICE void ComputeSourceMolecularTransport(const double* state, const double* Up, const double* gradUp,
+                                                        const double* Efield, double* globalTransport,
+                                                        double* speciesTransport, double* diffusionVelocity,
+                                                        double* n_sp) override;
 
   // NOTE(kevin): only for AxisymmetricSource
   using MolecularTransport::GetViscosities;
-  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) override;
+  MFEM_HOST_DEVICE void GetViscosities(const double* conserved, const double* primitive, double* visc) override;
 
   // virtual double computeThirdOrderElectronThermalConductivity(const Vector &X_sp, const double debyeLength,
   //                                                             const double Te, const double nondimTe);
-  MFEM_HOST_DEVICE double computeThirdOrderElectronThermalConductivity(const double *X_sp, const double debyeLength,
+  MFEM_HOST_DEVICE double computeThirdOrderElectronThermalConductivity(const double* X_sp, const double debyeLength,
                                                                        const double Te, const double nondimTe);
 
-  virtual void computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield, Vector &diffusivity,
+  virtual void computeMixtureAverageDiffusivity(const Vector& state, const Vector& Efield, Vector& diffusivity,
                                                 bool unused);
-  MFEM_HOST_DEVICE virtual void computeMixtureAverageDiffusivity(const double *state, const double *Efield,
-                                                                 double *diffusivity, bool unused);
+  MFEM_HOST_DEVICE virtual void computeMixtureAverageDiffusivity(const double* state, const double* Efield,
+                                                                 double* diffusivity, bool unused);
 
   // here HERE
   // virtual void computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield, Vector &diffusivity, bool
@@ -145,21 +145,21 @@ class GasMinimalTransport : public MolecularTransport {
   // override;
 
   // These are used to compute third-order electron thermal conductivity based on standard Chapman--Enskog method.
-  MFEM_HOST_DEVICE double L11ee(const double *Q2) { return Q2[0]; }
-  MFEM_HOST_DEVICE double L11ea(const double *Q1) { return 6.25 * Q1[0] - 15. * Q1[1] + 12. * Q1[2]; }
-  MFEM_HOST_DEVICE double L12ee(const double *Q2) { return 1.75 * Q2[0] - 2.0 * Q2[1]; }
-  MFEM_HOST_DEVICE double L12ea(const double *Q1) {
+  MFEM_HOST_DEVICE double L11ee(const double* Q2) { return Q2[0]; }
+  MFEM_HOST_DEVICE double L11ea(const double* Q1) { return 6.25 * Q1[0] - 15. * Q1[1] + 12. * Q1[2]; }
+  MFEM_HOST_DEVICE double L12ee(const double* Q2) { return 1.75 * Q2[0] - 2.0 * Q2[1]; }
+  MFEM_HOST_DEVICE double L12ea(const double* Q1) {
     return 10.9375 * Q1[0] - 39.375 * Q1[1] + 57. * Q1[2] - 30. * Q1[3];
   }
-  MFEM_HOST_DEVICE double L22ee(const double *Q2) { return 4.8125 * Q2[0] - 7.0 * Q2[1] + 5. * Q2[2]; }
-  MFEM_HOST_DEVICE double L22ea(const double *Q1) {
+  MFEM_HOST_DEVICE double L22ee(const double* Q2) { return 4.8125 * Q2[0] - 7.0 * Q2[1] + 5. * Q2[2]; }
+  MFEM_HOST_DEVICE double L22ea(const double* Q1) {
     return 19.140625 * Q1[0] - 91.875 * Q1[1] + 199.5 * Q1[2] - 210. * Q1[3] + 90. * Q1[4];
   }
 
-  MFEM_HOST_DEVICE void computeEffectiveMass(const double *mw, double *muw);
+  MFEM_HOST_DEVICE void computeEffectiveMass(const double* mw, double* muw);
 
   // For artificial multipliers
-  MFEM_HOST_DEVICE void setArtificialMultipliers(const GasTransportInput &inputs);
+  MFEM_HOST_DEVICE void setArtificialMultipliers(const GasTransportInput& inputs);
 };
 
 //////////////////////////////////////////////////////
@@ -191,39 +191,39 @@ class GasMixtureTransport : public GasMinimalTransport {
   // void identifyCollisionType();
 
  public:
-  GasMixtureTransport(GasMixture *_mixture, RunConfiguration &_runfile);
-  MFEM_HOST_DEVICE GasMixtureTransport(GasMixture *_mixture, const GasTransportInput &inputs);
+  GasMixtureTransport(GasMixture* _mixture, RunConfiguration& _runfile);
+  MFEM_HOST_DEVICE GasMixtureTransport(GasMixture* _mixture, const GasTransportInput& inputs);
 
   MFEM_HOST_DEVICE virtual ~GasMixtureTransport() {}
 
   MFEM_HOST_DEVICE double collisionIntegral(const int _spI, const int _spJ, const int l, const int r,
                                             const collisionInputs collInputs);
 
-  MFEM_HOST_DEVICE void ComputeFluxMolecularTransport(const double *state, const double *gradUp, const double *Efield,
-                                                      double *transportBuffer, double *diffusionVelocity) final;
+  MFEM_HOST_DEVICE void ComputeFluxMolecularTransport(const double* state, const double* gradUp, const double* Efield,
+                                                      double* transportBuffer, double* diffusionVelocity) final;
 
-  MFEM_HOST_DEVICE void ComputeSourceMolecularTransport(const double *state, const double *Up, const double *gradUp,
-                                                        const double *Efield, double *globalTransport,
-                                                        double *speciesTransport, double *diffusionVelocity,
-                                                        double *n_sp) final;
+  MFEM_HOST_DEVICE void ComputeSourceMolecularTransport(const double* state, const double* Up, const double* gradUp,
+                                                        const double* Efield, double* globalTransport,
+                                                        double* speciesTransport, double* diffusionVelocity,
+                                                        double* n_sp) final;
 
   // NOTE(kevin): only for AxisymmetricSource
   using GasMinimalTransport::GetViscosities;
-  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) final;
+  MFEM_HOST_DEVICE void GetViscosities(const double* conserved, const double* primitive, double* visc) final;
 
-  MFEM_HOST_DEVICE double computeThirdOrderElectronThermalConductivity(const double *X_sp,
-                                                                       const collisionInputs &collInputs);
+  MFEM_HOST_DEVICE double computeThirdOrderElectronThermalConductivity(const double* X_sp,
+                                                                       const collisionInputs& collInputs);
 
   // here HERE
-  virtual void computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield, Vector &diffusivity,
+  virtual void computeMixtureAverageDiffusivity(const Vector& state, const Vector& Efield, Vector& diffusivity,
                                                 bool unused);
 
-  MFEM_HOST_DEVICE virtual void computeMixtureAverageDiffusivity(const double *state, const double *Efield,
-                                                                 double *diffusivity, bool unused);
+  MFEM_HOST_DEVICE virtual void computeMixtureAverageDiffusivity(const double* state, const double* Efield,
+                                                                 double* diffusivity, bool unused);
 
-  MFEM_HOST_DEVICE void GetThermalConductivities(const double *conserved, const double *primitive, double *kappa);
+  MFEM_HOST_DEVICE void GetThermalConductivities(const double* conserved, const double* primitive, double* kappa);
 
-  MFEM_HOST_DEVICE void ComputeElectricalConductivity(const double *state, double &sigma);
+  MFEM_HOST_DEVICE void ComputeElectricalConductivity(const double* state, double& sigma);
 
   // virtual void computeMixtureAverageDiffusivity(const Vector &state, const Vector &Efield, Vector &diffusivity, bool
   // unused); // final; //override; using GasMinimalTransport::computeMixtureAverageDiffusivity; MFEM_HOST_DEVICE void

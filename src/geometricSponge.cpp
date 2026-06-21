@@ -49,7 +49,7 @@
 using namespace mfem;
 using namespace mfem::common;
 
-GeometricSponge::GeometricSponge(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, TPS::Tps *tps)
+GeometricSponge::GeometricSponge(mfem::ParMesh* pmesh, LoMachOptions* loMach_opts, TPS::Tps* tps)
     : tpsP_(tps), loMach_opts_(loMach_opts), pmesh_(pmesh) {
   rank_ = pmesh_->GetMyRank();
   rank0_ = (pmesh_->GetMyRank() == 0);
@@ -138,14 +138,14 @@ void GeometricSponge::initializeSelf() {
   toTurbModel_interface_.diff_multiplier = &mult_gf_;
 }
 
-void GeometricSponge::initializeViz(ParaViewDataCollection &pvdc) { pvdc.RegisterField("sponge", &mult_gf_); }
+void GeometricSponge::initializeViz(ParaViewDataCollection& pvdc) { pvdc.RegisterField("sponge", &mult_gf_); }
 
 void GeometricSponge::setup() {
   ParGridFunction coordsDof(vfes_);
   pmesh_->GetNodes(coordsDof);
 
-  double *data = mult_gf_.HostReadWrite();
-  const double *hcoords = coordsDof.HostRead();
+  double* data = mult_gf_.HostReadWrite();
+  const double* hcoords = coordsDof.HostRead();
 
   for (int i = 0; i < Sdof_; i++) {
     double coords[3];
@@ -162,7 +162,7 @@ void GeometricSponge::setup() {
   }
 }
 
-void GeometricSponge::spongeUniform(double &wgt) {
+void GeometricSponge::spongeUniform(double& wgt) {
   double factor, wgt_lcl;
   factor = uniform.mult;
   factor = max(factor, 1.0);
@@ -170,7 +170,7 @@ void GeometricSponge::spongeUniform(double &wgt) {
   wgt = max(wgt, wgt_lcl);
 }
 
-void GeometricSponge::spongePlane(double *x, double &wgt) {
+void GeometricSponge::spongePlane(double* x, double& wgt) {
   double normal[3];
   double point[3];
   double s[3];
@@ -201,7 +201,7 @@ void GeometricSponge::spongePlane(double *x, double &wgt) {
 }
 
 // TODO(swh): add suppport for arbitrary orientation of cylinder axis
-void GeometricSponge::spongeCylinder(double *xGlobal, double &wgt) {
+void GeometricSponge::spongeCylinder(double* xGlobal, double& wgt) {
   // C++ standard frowns on use of non-compile time arrays, e.g.
   // point[dim_], hence the requirement for hard-codes here and
   // elsewhere in this class
@@ -264,7 +264,7 @@ void GeometricSponge::spongeCylinder(double *xGlobal, double &wgt) {
 }
 
 // TODO(swh): NOT GENERAL, only for annulus aligned with y
-void GeometricSponge::spongeAnnulus(double *xGlobal, double &wgt) {
+void GeometricSponge::spongeAnnulus(double* xGlobal, double& wgt) {
   double wgtAnn;
   double s[3];
   double x[3];

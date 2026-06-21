@@ -58,74 +58,74 @@ using namespace mfem;
 // DG weak form.
 class RHSoperator : public TimeDependentOperator {
  private:
-  const RunConfiguration &config_;
-  Gradients *gradients;
+  const RunConfiguration& config_;
+  Gradients* gradients;
 
-  int &iter;
+  int& iter;
 
   const int dim_;
   const int nvel;
 
-  const Equations &eqSystem;
+  const Equations& eqSystem;
 
-  double &max_char_speed;
-  const int &num_equation_;
+  double& max_char_speed;
+  const int& num_equation_;
 
-  IntegrationRules *intRules;
+  IntegrationRules* intRules;
   const int intRuleType;
 
-  Fluxes *fluxClass;
+  Fluxes* fluxClass;
   GasMixture *mixture, *d_mixture_;
-  TransportProperties *transport_;
+  TransportProperties* transport_;
 
-  ParFiniteElementSpace *vfes;
-  ParFiniteElementSpace *fes;
+  ParFiniteElementSpace* vfes;
+  ParFiniteElementSpace* fes;
 
-  const precomputedIntegrationData &gpu_precomputed_data_;
+  const precomputedIntegrationData& gpu_precomputed_data_;
 
-  const int *h_num_elems_of_type;
+  const int* h_num_elems_of_type;
 
-  const int &maxIntPoints;
-  const int &maxDofs;
+  const int& maxIntPoints;
+  const int& maxDofs;
 
-  DGNonLinearForm *A;
+  DGNonLinearForm* A;
 
-  MixedBilinearForm *Aflux;
+  MixedBilinearForm* Aflux;
 
-  ParMesh *mesh;
+  ParMesh* mesh;
 
-  ParFiniteElementSpace *dfes;
-  ParGridFunction *coordsDof;
-  ParGridFunction *elSize;
+  ParFiniteElementSpace* dfes;
+  ParGridFunction* coordsDof;
+  ParGridFunction* elSize;
 
-  ParGridFunction *spaceVaryViscMult;
-  linearlyVaryingVisc &linViscData;
+  ParGridFunction* spaceVaryViscMult;
+  linearlyVaryingVisc& linViscData;
 
-  Array<DenseMatrix *> Me_inv;
-  Array<DenseMatrix *> Me_inv_rad;
+  Array<DenseMatrix*> Me_inv;
+  Array<DenseMatrix*> Me_inv_rad;
 
   Vector invMArray;
   Vector invMArray_rad;
   Array<int> posDofInvM;
 
   // reference to conserved varibales
-  ParGridFunction *U_;
+  ParGridFunction* U_;
 
   // reference to primitive varibales
-  ParGridFunction *Up;
-  ParGridFunction *plasma_conductivity_;
-  ParGridFunction *joule_heating_;
+  ParGridFunction* Up;
+  ParGridFunction* plasma_conductivity_;
+  ParGridFunction* joule_heating_;
 
   // gradients of primitives and associated forms&FE space
-  ParGridFunction *gradUp;
-  ParFiniteElementSpace *gradUpfes;
+  ParGridFunction* gradUp;
+  ParFiniteElementSpace* gradUpfes;
   // ParNonlinearForm *gradUp_A;
-  GradNonLinearForm *gradUp_A;
+  GradNonLinearForm* gradUp_A;
 
-  BCintegrator *bcIntegrator;
-  ParGridFunction *distance_;
+  BCintegrator* bcIntegrator;
+  ParGridFunction* distance_;
 
-  Array<ForcingTerms *> forcing;
+  Array<ForcingTerms*> forcing;
   int masaForcingIndex_ = -1;
 
   mutable DenseTensor flux;
@@ -138,49 +138,49 @@ class RHSoperator : public TimeDependentOperator {
   void allocateTransferData();
 
   // void GetFlux(const DenseMatrix &state, DenseTensor &flux) const;
-  void GetFlux(const Vector &state, DenseTensor &flux) const;
+  void GetFlux(const Vector& state, DenseTensor& flux) const;
 
   mutable Vector local_timeDerivatives;
-  void computeMeanTimeDerivatives(Vector &y) const;
+  void computeMeanTimeDerivatives(Vector& y) const;
 
  public:
-  RHSoperator(int &_iter, const int _dim, const int &_num_equation, const int &_order, const Equations &_eqSystem,
-              double &_max_char_speed, IntegrationRules *_intRules, int _intRuleType, Fluxes *_fluxClass,
-              GasMixture *_mixture, GasMixture *d_mixture, Chemistry *_chemistry, TransportProperties *_transport,
-              Radiation *_radiation, ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_fes,
-              const precomputedIntegrationData &gpu_precomputed_data, const int &_maxIntPoints, const int &_maxDofs,
-              DGNonLinearForm *_A, MixedBilinearForm *_Aflux, ParMesh *_mesh, ParGridFunction *_spaceVaryViscMult,
-              ParGridFunction *U, ParGridFunction *_Up, ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes,
-              GradNonLinearForm *_gradUp_A, BCintegrator *_bcIntegrator, RunConfiguration &_config, ParGridFunction *pc,
-              ParGridFunction *jh, ParGridFunction *distance);
+  RHSoperator(int& _iter, const int _dim, const int& _num_equation, const int& _order, const Equations& _eqSystem,
+              double& _max_char_speed, IntegrationRules* _intRules, int _intRuleType, Fluxes* _fluxClass,
+              GasMixture* _mixture, GasMixture* d_mixture, Chemistry* _chemistry, TransportProperties* _transport,
+              Radiation* _radiation, ParFiniteElementSpace* _vfes, ParFiniteElementSpace* _fes,
+              const precomputedIntegrationData& gpu_precomputed_data, const int& _maxIntPoints, const int& _maxDofs,
+              DGNonLinearForm* _A, MixedBilinearForm* _Aflux, ParMesh* _mesh, ParGridFunction* _spaceVaryViscMult,
+              ParGridFunction* U, ParGridFunction* _Up, ParGridFunction* _gradUp, ParFiniteElementSpace* _gradUpfes,
+              GradNonLinearForm* _gradUp_A, BCintegrator* _bcIntegrator, RunConfiguration& _config, ParGridFunction* pc,
+              ParGridFunction* jh, ParGridFunction* distance);
 
-  virtual void Mult(const Vector &x, Vector &y) const;
-  void updatePrimitives(const Vector &x) const;
-  void updateGradients(const Vector &x, const bool &primitiveUpdated) const;
+  virtual void Mult(const Vector& x, Vector& y) const;
+  void updatePrimitives(const Vector& x) const;
+  void updateGradients(const Vector& x, const bool& primitiveUpdated) const;
 
   virtual ~RHSoperator();
 
-  Gradients *getGradients() { return gradients; }
-  DenseTensor *getFlux() { return &flux; }
+  Gradients* getGradients() { return gradients; }
+  DenseTensor* getFlux() { return &flux; }
 
-  const double *getLocalTimeDerivatives() { return local_timeDerivatives.HostRead(); }
-  ForcingTerms *getForcingTerm(const int index) { return forcing[index]; }
+  const double* getLocalTimeDerivatives() { return local_timeDerivatives.HostRead(); }
+  ForcingTerms* getForcingTerm(const int index) { return forcing[index]; }
   int getMasaForcingIndex() { return masaForcingIndex_; }
 
-  static void initNBlockDataTransfer(const Vector &x, ParFiniteElementSpace *pfes, dataTransferArrays &dataTransfer);
-  static void waitAllDataTransfer(ParFiniteElementSpace *pfes, dataTransferArrays &dataTransfer);
+  static void initNBlockDataTransfer(const Vector& x, ParFiniteElementSpace* pfes, dataTransferArrays& dataTransfer);
+  static void waitAllDataTransfer(ParFiniteElementSpace* pfes, dataTransferArrays& dataTransfer);
 
   // GPU functions
-  void GetFlux_gpu(const Vector &state, DenseTensor &flux) const;
-  static void copyZk2Z_gpu(Vector &z, Vector &zk, const int eq, const int dof);
-  static void copyDataForFluxIntegration_gpu(const Vector &z, DenseTensor &flux, Vector &fk, Vector &zk, const int eq,
+  void GetFlux_gpu(const Vector& state, DenseTensor& flux) const;
+  static void copyZk2Z_gpu(Vector& z, Vector& zk, const int eq, const int dof);
+  static void copyDataForFluxIntegration_gpu(const Vector& z, DenseTensor& flux, Vector& fk, Vector& zk, const int eq,
                                              const int dof, const int dim);
-  static void multiPlyInvers_gpu(Vector &y, Vector &z, const precomputedIntegrationData &gpu_precomputed_data,
-                                 const Vector &invMArray, const Array<int> &posDofInvM, const int num_equation,
+  static void multiPlyInvers_gpu(Vector& y, Vector& z, const precomputedIntegrationData& gpu_precomputed_data,
+                                 const Vector& invMArray, const Array<int>& posDofInvM, const int num_equation,
                                  const int totNumDof, const int NE, const int elemOffset, const int dof);
 
-  static void meanTimeDerivatives_gpu(Vector &y, Vector &local_timeDerivatives, Vector &tmp_vec, const int &NDof,
-                                      const int &num_equation, const int &dim);
+  static void meanTimeDerivatives_gpu(Vector& y, Vector& local_timeDerivatives, Vector& tmp_vec, const int& NDof,
+                                      const int& num_equation, const int& dim);
 };
 
 #endif  // RHS_OPERATOR_HPP_

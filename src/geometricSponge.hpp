@@ -94,13 +94,13 @@ class LoMachOptions;
 class GeometricSponge : public SpongeBase {
  private:
   // pointer to parent Tps class
-  TPS::Tps *tpsP_ = nullptr;
+  TPS::Tps* tpsP_ = nullptr;
 
   // Run options
-  LoMachOptions *loMach_opts_;
+  LoMachOptions* loMach_opts_;
 
   // MPI helpers
-  MPI_Groups *groupsMPI_ = nullptr;
+  MPI_Groups* groupsMPI_ = nullptr;
   int nprocs_;  // total number of MPI procs
   int rank_;    // local MPI rank
   bool rank0_;  // flag to indicate rank 0
@@ -111,7 +111,7 @@ class GeometricSponge : public SpongeBase {
   /// Enable/disable verbose output.
   bool verbose = true;
 
-  ParMesh *pmesh_;
+  ParMesh* pmesh_;
 
   // The order of the scalar spaces
   int order_;
@@ -129,33 +129,33 @@ class GeometricSponge : public SpongeBase {
   geomAnnulus annulus;
 
   // Scalar \f$H^1\f$ finite element collection.
-  FiniteElementCollection *sfec_ = nullptr;
+  FiniteElementCollection* sfec_ = nullptr;
 
   // Scalar \f$H^1\f$ finite element space.
-  ParFiniteElementSpace *sfes_ = nullptr;
+  ParFiniteElementSpace* sfes_ = nullptr;
 
   // Vector \f$H^1\f$ finite element collection & space
-  FiniteElementCollection *vfec_ = nullptr;
-  ParFiniteElementSpace *vfes_ = nullptr;
+  FiniteElementCollection* vfec_ = nullptr;
+  ParFiniteElementSpace* vfes_ = nullptr;
 
   ParGridFunction mult_gf_;
   // Vector mult_;
 
  public:
-  GeometricSponge(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, TPS::Tps *tps);
+  GeometricSponge(mfem::ParMesh* pmesh, LoMachOptions* loMach_opts, TPS::Tps* tps);
   virtual ~GeometricSponge();
 
   void initializeSelf();
-  void initializeViz(ParaViewDataCollection &pvdc) final;
+  void initializeViz(ParaViewDataCollection& pvdc) final;
   void setup();
   void step();
 
-  void spongeUniform(double &wgt);
-  void spongePlane(double *x, double &wgt);
-  void spongeCylinder(double *x, double &wgt);
-  void spongeAnnulus(double *x, double &wgt);
+  void spongeUniform(double& wgt);
+  void spongePlane(double* x, double& wgt);
+  void spongeCylinder(double* x, double& wgt);
+  void spongeAnnulus(double* x, double& wgt);
 
   /// Return a pointer to the current temperature ParGridFunction.
-  ParGridFunction *GetCurrentMultiplier() { return &mult_gf_; }
+  ParGridFunction* GetCurrentMultiplier() { return &mult_gf_; }
 };
 #endif  // GEOMETRICSPONGE_HPP_

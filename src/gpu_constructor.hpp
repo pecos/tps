@@ -92,75 +92,75 @@ namespace gpu {
 
 #if defined(_CUDA_) || defined(_HIP_)
 //! Instantiate DryAir object on the device with placement new
-__global__ void instantiateDeviceDryAir(const DryAirInput inputs, int _dim, int nvel, void *mix);
+__global__ void instantiateDeviceDryAir(const DryAirInput inputs, int _dim, int nvel, void* mix);
 
 //! Instantiate PerfectMixture object on the device with placement new
-__global__ void instantiateDevicePerfectMixture(const PerfectMixtureInput inputs, int _dim, int nvel, void *mix);
+__global__ void instantiateDevicePerfectMixture(const PerfectMixtureInput inputs, int _dim, int nvel, void* mix);
 
 //! Instantiate LteMixture object on the device with placement new
 __global__ void instantiateDeviceLteMixture(WorkingFluid f, int _dim, int nvel, double pc,
                                             TableInput energy_table_input, TableInput R_table_input,
-                                            TableInput c_table_input, TableInput T_table_input, void *mix);
+                                            TableInput c_table_input, TableInput T_table_input, void* mix);
 
 //! Instantiate DryAirTransport object on the device with placement new
-__global__ void instantiateDeviceDryAirTransport(GasMixture *mixture, const double viscosity_multiplier,
+__global__ void instantiateDeviceDryAirTransport(GasMixture* mixture, const double viscosity_multiplier,
                                                  const double bulk_viscosity, const double C1, const double S0,
-                                                 const double Pr, void *transport);
+                                                 const double Pr, void* transport);
 
 //! Instantiate ConstantTransport object on the device with placement new
-__global__ void instantiateDeviceConstantTransport(GasMixture *mixture, const constantTransportData inputs,
-                                                   void *trans);
+__global__ void instantiateDeviceConstantTransport(GasMixture* mixture, const constantTransportData inputs,
+                                                   void* trans);
 
 //! Instantiate GasMinimalTransport object on the device with placement new
-__global__ void instantiateDeviceGasMinimalTransport(GasMixture *mixture, const GasTransportInput inputs, void *trans);
+__global__ void instantiateDeviceGasMinimalTransport(GasMixture* mixture, const GasTransportInput inputs, void* trans);
 
 //! Instantiate GasMixtureTransport object on the device with placement new
-__global__ void instantiateDeviceGasMixtureTransport(GasMixture *mixture, const GasTransportInput inputs, void *trans);
+__global__ void instantiateDeviceGasMixtureTransport(GasMixture* mixture, const GasTransportInput inputs, void* trans);
 
 //! Instantiate ConstantTransport object on the device with placement new
-__global__ void instantiateDeviceLteTransport(GasMixture *mixture, TableInput mu_table_input,
-                                              TableInput kappa_table_input, TableInput sigma_table_input, void *trans);
+__global__ void instantiateDeviceLteTransport(GasMixture* mixture, TableInput mu_table_input,
+                                              TableInput kappa_table_input, TableInput sigma_table_input, void* trans);
 
 //! Instantiate MixingLengthTransport object on the device with placement new
-__global__ void instantiateDeviceMixingLengthTransport(GasMixture *mixture, const mixingLengthTransportData inputs,
-                                                       TransportProperties *mol_trans, void *trans);
+__global__ void instantiateDeviceMixingLengthTransport(GasMixture* mixture, const mixingLengthTransportData inputs,
+                                                       TransportProperties* mol_trans, void* trans);
 
 //! Instantiate Fluxes object on the device with placement new
-__global__ void instantiateDeviceFluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
+__global__ void instantiateDeviceFluxes(GasMixture* _mixture, Equations _eqSystem, TransportProperties* _transport,
                                         const int _num_equation, const int _dim, bool axisym, int sgs_model,
-                                        double sgs_floor, double sgs_const, viscositySpongeData vsd, void *f);
+                                        double sgs_floor, double sgs_const, viscositySpongeData vsd, void* f);
 
 //! Instantiate RiemannSolverTPS object on the device with placement new
-__global__ void instantiateDeviceRiemann(int _num_equation, GasMixture *_mixture, Equations _eqSystem,
-                                         Fluxes *_fluxClass, bool _useRoe, bool axisym, void *r);
+__global__ void instantiateDeviceRiemann(int _num_equation, GasMixture* _mixture, Equations _eqSystem,
+                                         Fluxes* _fluxClass, bool _useRoe, bool axisym, void* r);
 
 //! Instantiate Chemistry object on the device with placement new
-__global__ void instantiateDeviceChemistry(GasMixture *mixture, const ChemistryInput inputs, void *chem);
+__global__ void instantiateDeviceChemistry(GasMixture* mixture, const ChemistryInput inputs, void* chem);
 
 //! Instantiate NetEmission object on the device with placement new
-__global__ void instantiateDeviceNetEmission(const RadiationInput inputs, void *radiation);
+__global__ void instantiateDeviceNetEmission(const RadiationInput inputs, void* radiation);
 
 //! Explicit call to GasMixture destructor on the device
-__global__ void freeDeviceMixture(GasMixture *mix);
+__global__ void freeDeviceMixture(GasMixture* mix);
 
 //! Explicit call to TransportProperties destructor on the device
-__global__ void freeDeviceTransport(TransportProperties *transport);
+__global__ void freeDeviceTransport(TransportProperties* transport);
 
 //! Explicit call to Fluxes destructor on the device
-__global__ void freeDeviceFluxes(Fluxes *f);
+__global__ void freeDeviceFluxes(Fluxes* f);
 
 //! Explicit call to RiemannSolverTPS destructor on the device
-__global__ void freeDeviceRiemann(RiemannSolverTPS *r);
+__global__ void freeDeviceRiemann(RiemannSolverTPS* r);
 
 //! Explicit call to Chemistry destructor on the device
-__global__ void freeDeviceChemistry(Chemistry *chem);
+__global__ void freeDeviceChemistry(Chemistry* chem);
 
 //! Explicit call to Radiation destructor on the device
-__global__ void freeDeviceRadiation(Radiation *radiation);
+__global__ void freeDeviceRadiation(Radiation* radiation);
 
 //! Set the data to a GridFunctionReaction
-__global__ void deviceSetGridFunctionReactionData(const double *data, int size, GridFunctionReaction *reaction);
-__global__ void deviceSetChemistryReactionData(const double *data, int size, Chemistry *chem);
+__global__ void deviceSetGridFunctionReactionData(const double* data, int size, GridFunctionReaction* reaction);
+__global__ void deviceSetChemistryReactionData(const double* data, int size, Chemistry* chem);
 
 #endif  // cuda or hip
 }  // namespace gpu

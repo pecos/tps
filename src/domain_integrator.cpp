@@ -33,7 +33,7 @@
 #include "domain_integrator.hpp"
 
 // Implementation of class DomainIntegrator
-DomainIntegrator::DomainIntegrator(Fluxes *_fluxClass, IntegrationRules *_intRules, int _intRuleType, const int _dim,
+DomainIntegrator::DomainIntegrator(Fluxes* _fluxClass, IntegrationRules* _intRules, int _intRuleType, const int _dim,
                                    const int _num_equation, bool axisym)
     : fluxClass(_fluxClass),
       dim(_dim),
@@ -42,8 +42,8 @@ DomainIntegrator::DomainIntegrator(Fluxes *_fluxClass, IntegrationRules *_intRul
       intRuleType(_intRuleType),
       axisymmetric_(axisym) {}
 
-void DomainIntegrator::AssembleElementMatrix2(const FiniteElement &trial_fe, const FiniteElement &test_fe,
-                                              ElementTransformation &Tr, DenseMatrix &elmat) {
+void DomainIntegrator::AssembleElementMatrix2(const FiniteElement& trial_fe, const FiniteElement& test_fe,
+                                              ElementTransformation& Tr, DenseMatrix& elmat) {
   // Assemble the form (vec(v), grad(w))
   Vector shape;
   shape.UseDevice(false);
@@ -67,9 +67,9 @@ void DomainIntegrator::AssembleElementMatrix2(const FiniteElement &trial_fe, con
 
   const int maxorder = max(trial_fe.GetOrder(), test_fe.GetOrder());
   int intorder = 2 * maxorder;
-  const IntegrationRule *ir = &intRules->Get(trial_fe.GetGeomType(), intorder);
+  const IntegrationRule* ir = &intRules->Get(trial_fe.GetGeomType(), intorder);
   for (int i = 0; i < ir->GetNPoints(); i++) {
-    const IntegrationPoint &ip = ir->IntPoint(i);
+    const IntegrationPoint& ip = ir->IntPoint(i);
 
     // Calculate the shape functions
     trial_fe.CalcShape(ip, shape);

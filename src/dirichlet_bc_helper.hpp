@@ -39,10 +39,10 @@
 template <class Tcoeff>
 class DirichletBC_T {
  public:
-  DirichletBC_T(mfem::Array<int> attr, Tcoeff *coeff) : attr(attr), coeff(coeff) {}
+  DirichletBC_T(mfem::Array<int> attr, Tcoeff* coeff) : attr(attr), coeff(coeff) {}
 
   // Move constructor (required for emplace_back)
-  DirichletBC_T(DirichletBC_T &&obj) {
+  DirichletBC_T(DirichletBC_T&& obj) {
     // Deep copy the attribute array
     this->attr = obj.attr;
 
@@ -54,6 +54,6 @@ class DirichletBC_T {
   ~DirichletBC_T() { delete coeff; }
 
   mfem::Array<int> attr;
-  Tcoeff *coeff;
+  Tcoeff* coeff;
 };
 #endif  // DIRICHLET_BC_HELPER_HPP_

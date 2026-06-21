@@ -36,7 +36,7 @@
 
 #include "tps.hpp"
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   mfem::Mpi::Init(argc, argv);
   int status;
   {

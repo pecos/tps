@@ -33,7 +33,7 @@
 #include "lte_transport_properties.hpp"
 
 #ifndef _GPU_
-LteTransport::LteTransport(GasMixture *_mixture, RunConfiguration &_runfile) : MolecularTransport(_mixture) {
+LteTransport::LteTransport(GasMixture* _mixture, RunConfiguration& _runfile) : MolecularTransport(_mixture) {
 #ifdef HAVE_GSL
   mu_table_ = new GslTableInterpolator2D(_runfile.lteMixtureInput.trans_file_name, 0, /* temperature column */
                                          1,                                           /* density column */
@@ -57,7 +57,7 @@ LteTransport::LteTransport(GasMixture *_mixture, RunConfiguration &_runfile) : M
 #endif  // HAVE_GSL
 }
 
-LteTransport::LteTransport(GasMixture *_mixture, TableInput mu_table_input, TableInput kappa_table_input,
+LteTransport::LteTransport(GasMixture* _mixture, TableInput mu_table_input, TableInput kappa_table_input,
                            TableInput sigma_table_input)
     : MolecularTransport(_mixture) {
   mu_table_ = new LinearTable(mu_table_input);
@@ -65,7 +65,7 @@ LteTransport::LteTransport(GasMixture *_mixture, TableInput mu_table_input, Tabl
   sigma_table_ = new LinearTable(sigma_table_input);
 }
 #else
-MFEM_HOST_DEVICE LteTransport::LteTransport(GasMixture *_mixture, TableInput mu_table_input,
+MFEM_HOST_DEVICE LteTransport::LteTransport(GasMixture* _mixture, TableInput mu_table_input,
                                             TableInput kappa_table_input, TableInput sigma_table_input)
     : MolecularTransport(_mixture),
       mu_table_(LinearTable(mu_table_input)),
@@ -81,9 +81,9 @@ MFEM_HOST_DEVICE LteTransport::~LteTransport() {
 #endif
 }
 
-MFEM_HOST_DEVICE void LteTransport::ComputeFluxMolecularTransport(const double *state, const double *gradUp,
-                                                                  const double *Efield, double *transportBuffer,
-                                                                  double *diffusionVelocity) {
+MFEM_HOST_DEVICE void LteTransport::ComputeFluxMolecularTransport(const double* state, const double* gradUp,
+                                                                  const double* Efield, double* transportBuffer,
+                                                                  double* diffusionVelocity) {
   const double rho = state[0];
   const double T = mixture->ComputeTemperature(state);
 
@@ -104,10 +104,10 @@ MFEM_HOST_DEVICE void LteTransport::ComputeFluxMolecularTransport(const double *
   }
 }
 
-MFEM_HOST_DEVICE void LteTransport::ComputeSourceMolecularTransport(const double *state, const double *Up,
-                                                                    const double *gradUp, const double *Efield,
-                                                                    double *globalTransport, double *speciesTransport,
-                                                                    double *diffusionVelocity, double *n_sp) {
+MFEM_HOST_DEVICE void LteTransport::ComputeSourceMolecularTransport(const double* state, const double* Up,
+                                                                    const double* gradUp, const double* Efield,
+                                                                    double* globalTransport, double* speciesTransport,
+                                                                    double* diffusionVelocity, double* n_sp) {
   const double rho = Up[0];
   const double T = Up[1 + nvel_];
 #ifdef _GPU_
@@ -122,7 +122,7 @@ MFEM_HOST_DEVICE void LteTransport::ComputeSourceMolecularTransport(const double
   globalTransport[SrcTrns::ELECTRIC_CONDUCTIVITY] = sigma;
 }
 
-MFEM_HOST_DEVICE void LteTransport::GetViscosities(const double *conserved, const double *primitive, double *visc) {
+MFEM_HOST_DEVICE void LteTransport::GetViscosities(const double* conserved, const double* primitive, double* visc) {
   const double rho = primitive[0];
   const double T = primitive[1 + nvel_];
 

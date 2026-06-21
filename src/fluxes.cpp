@@ -31,7 +31,7 @@
 // -----------------------------------------------------------------------------------el-
 #include "fluxes.hpp"
 
-Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport, const int _num_equation,
+Fluxes::Fluxes(GasMixture* _mixture, Equations _eqSystem, TransportProperties* _transport, const int _num_equation,
                const int _dim, bool axisym)
     : mixture(_mixture),
       eqSystem(_eqSystem),
@@ -54,8 +54,8 @@ Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_
   numActiveSpecies = mixture->GetNumActiveSpecies();
 }
 
-Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport, const int _num_equation,
-               const int _dim, bool axisym, RunConfiguration *config)
+Fluxes::Fluxes(GasMixture* _mixture, Equations _eqSystem, TransportProperties* _transport, const int _num_equation,
+               const int _dim, bool axisym, RunConfiguration* config)
     : mixture(_mixture),
       eqSystem(_eqSystem),
       config_(config),
@@ -94,7 +94,7 @@ Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_
   numActiveSpecies = mixture->GetNumActiveSpecies();
 }
 
-MFEM_HOST_DEVICE Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
+MFEM_HOST_DEVICE Fluxes::Fluxes(GasMixture* _mixture, Equations _eqSystem, TransportProperties* _transport,
                                 const int _num_equation, const int _dim, bool axisym, int sgs_type, double sgs_floor,
                                 double sgs_const, viscositySpongeData vsd)
     : mixture(_mixture),
@@ -128,11 +128,11 @@ MFEM_HOST_DEVICE Fluxes::Fluxes(GasMixture *_mixture, Equations _eqSystem, Trans
   numActiveSpecies = mixture->GetNumActiveSpecies();
 }
 
-void Fluxes::ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux) {
+void Fluxes::ComputeConvectiveFluxes(const Vector& state, DenseMatrix& flux) {
   ComputeConvectiveFluxes(state.GetData(), flux.GetData());
 }
 
-MFEM_HOST_DEVICE void Fluxes::ComputeConvectiveFluxes(const double *state, double *flux) const {
+MFEM_HOST_DEVICE void Fluxes::ComputeConvectiveFluxes(const double* state, double* flux) const {
   double Pe = 0.0;
   const double pres = mixture->ComputePressure(state, &Pe);
   const int numActiveSpecies = mixture->GetNumActiveSpecies();
@@ -170,13 +170,13 @@ MFEM_HOST_DEVICE void Fluxes::ComputeConvectiveFluxes(const double *state, doubl
 }
 
 // TODO(kevin): check/complete axisymmetric setting for multi-component flow.
-void Fluxes::ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, Vector transip, double delta,
-                                  double distance, DenseMatrix &flux) {
+void Fluxes::ComputeViscousFluxes(const Vector& state, const DenseMatrix& gradUp, Vector transip, double delta,
+                                  double distance, DenseMatrix& flux) {
   ComputeViscousFluxes(state.GetData(), gradUp.GetData(), transip.GetData(), delta, distance, flux.GetData());
 }
 
-MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const double *gradUp, double *transip,
-                                                   double delta, double distance, double *flux) {
+MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double* state, const double* gradUp, double* transip,
+                                                   double delta, double distance, double* flux) {
   for (int d = 0; d < dim; d++) {
     for (int eq = 0; eq < num_equation; eq++) {
       flux[eq + d * num_equation] = 0.;
@@ -334,16 +334,16 @@ MFEM_HOST_DEVICE void Fluxes::ComputeViscousFluxes(const double *state, const do
   }
 }
 
-void Fluxes::ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, Vector transip, double delta,
-                                     double distance, const BoundaryViscousFluxData &bcFlux, Vector &normalFlux) {
+void Fluxes::ComputeBdrViscousFluxes(const Vector& state, const DenseMatrix& gradUp, Vector transip, double delta,
+                                     double distance, const BoundaryViscousFluxData& bcFlux, Vector& normalFlux) {
   normalFlux.SetSize(num_equation);
   ComputeBdrViscousFluxes(state.GetData(), gradUp.GetData(), transip.GetData(), delta, distance, bcFlux,
                           normalFlux.GetData());
 }
 
-MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const double *gradUp, double *transip,
+MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double* state, const double* gradUp, double* transip,
                                                       double delta, double distance,
-                                                      const BoundaryViscousFluxData &bcFlux, double *normalFlux) {
+                                                      const BoundaryViscousFluxData& bcFlux, double* normalFlux) {
   // normalFlux.SetSize(num_equation);
   for (int eq = 0; eq < num_equation; eq++) normalFlux[eq] = 0.;
   if (eqSystem == EULER) {
@@ -506,11 +506,11 @@ MFEM_HOST_DEVICE void Fluxes::ComputeBdrViscousFluxes(const double *state, const
 /**
 Basic Smagorinksy subgrid model with user-specified cutoff grid length
 */
-void Fluxes::sgsSmag(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu) {
+void Fluxes::sgsSmag(const Vector& state, const DenseMatrix& gradUp, double delta, double& mu) {
   sgsSmag(state.GetData(), gradUp.GetData(), delta, mu);
 }
 
-MFEM_HOST_DEVICE void Fluxes::sgsSmag(const double *state, const double *gradUp, double delta, double &mu) {
+MFEM_HOST_DEVICE void Fluxes::sgsSmag(const double* state, const double* gradUp, double delta, double& mu) {
   double Sij[6];
   double Smag = 0.;
   double Cd = sgs_model_const_;  // user-set, defaults to 0.12
@@ -540,11 +540,11 @@ MFEM_HOST_DEVICE void Fluxes::sgsSmag(const double *state, const double *gradUp,
 Sigma subgrid model following Nicoud et.al., "Using singular values to build a
 subgrid-scale model for large eddy simulations", PoF 2011.
 */
-void Fluxes::sgsSigma(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu) {
+void Fluxes::sgsSigma(const Vector& state, const DenseMatrix& gradUp, double delta, double& mu) {
   sgsSigma(state.GetData(), gradUp.GetData(), delta, mu);
 }
 
-MFEM_HOST_DEVICE void Fluxes::sgsSigma(const double *state, const double *gradUp, double delta, double &mu) {
+MFEM_HOST_DEVICE void Fluxes::sgsSigma(const double* state, const double* gradUp, double delta, double& mu) {
   double Cd = sgs_model_const_;  // user-set, defaults to 0.135
   double sml = 1.0e-12;
   double l_floor, d_model, d4;
@@ -666,7 +666,7 @@ MFEM_HOST_DEVICE void Fluxes::sgsSigma(const double *state, const double *gradUp
 Simple planar viscous sponge layer with smooth tanh-transtion using user-specified width and
 total amplification.  Note: duplicate in M2
 */
-MFEM_HOST_DEVICE void Fluxes::viscSpongePlanar(double *x, double &wgt) {
+MFEM_HOST_DEVICE void Fluxes::viscSpongePlanar(double* x, double& wgt) {
   double s[3];
   double factor, width, dist;
 

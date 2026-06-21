@@ -31,21 +31,21 @@
 // -----------------------------------------------------------------------------------el-
 #include "rhs_operator.hpp"
 
-double getRadius(const Vector &pos) { return pos[0]; }
+double getRadius(const Vector& pos) { return pos[0]; }
 FunctionCoefficient radiusFcn(getRadius);
 
 // Implementation of class RHSoperator
-RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, const int &_order,
-                         const Equations &_eqSystem, double &_max_char_speed, IntegrationRules *_intRules,
-                         int _intRuleType, Fluxes *_fluxClass, GasMixture *_mixture, GasMixture *d_mixture,
-                         Chemistry *_chemistry, TransportProperties *_transport, Radiation *_radiation,
-                         ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_fes,
-                         const precomputedIntegrationData &gpu_precomputed_data, const int &_maxIntPoints,
-                         const int &_maxDofs, DGNonLinearForm *_A, MixedBilinearForm *_Aflux, ParMesh *_mesh,
-                         ParGridFunction *_spaceVaryViscMult, ParGridFunction *U, ParGridFunction *_Up,
-                         ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes, GradNonLinearForm *_gradUp_A,
-                         BCintegrator *_bcIntegrator, RunConfiguration &_config, ParGridFunction *pc,
-                         ParGridFunction *jh, ParGridFunction *distance)
+RHSoperator::RHSoperator(int& _iter, const int _dim, const int& _num_equation, const int& _order,
+                         const Equations& _eqSystem, double& _max_char_speed, IntegrationRules* _intRules,
+                         int _intRuleType, Fluxes* _fluxClass, GasMixture* _mixture, GasMixture* d_mixture,
+                         Chemistry* _chemistry, TransportProperties* _transport, Radiation* _radiation,
+                         ParFiniteElementSpace* _vfes, ParFiniteElementSpace* _fes,
+                         const precomputedIntegrationData& gpu_precomputed_data, const int& _maxIntPoints,
+                         const int& _maxDofs, DGNonLinearForm* _A, MixedBilinearForm* _Aflux, ParMesh* _mesh,
+                         ParGridFunction* _spaceVaryViscMult, ParGridFunction* U, ParGridFunction* _Up,
+                         ParGridFunction* _gradUp, ParFiniteElementSpace* _gradUpfes, GradNonLinearForm* _gradUp_A,
+                         BCintegrator* _bcIntegrator, RunConfiguration& _config, ParGridFunction* pc,
+                         ParGridFunction* jh, ParGridFunction* distance)
     : TimeDependentOperator(_A->Height()),
       config_(_config),
       iter(_iter),
@@ -89,7 +89,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
   fk.SetSize(dim_ * vfes->GetNDofs());
   zk.SetSize(vfes->GetNDofs());
 
-  const elementIndexingData &elem_data = gpu_precomputed_data_.element_indexing_data;
+  const elementIndexingData& elem_data = gpu_precomputed_data_.element_indexing_data;
   h_num_elems_of_type = elem_data.num_elems_of_type.HostRead();
 
   Me_inv.SetSize(vfes->GetNE());
@@ -136,7 +136,7 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
 #endif
 
   // not just for axisymmetric
-  const FiniteElementCollection *fec = vfes->FEColl();
+  const FiniteElementCollection* fec = vfes->FEColl();
   dfes = new ParFiniteElementSpace(mesh, fec, dim_, Ordering::byNODES);
   coordsDof = new ParGridFunction(dfes);
   mesh->GetNodes(*coordsDof);
@@ -260,11 +260,11 @@ RHSoperator::RHSoperator(int &_iter, const int _dim, const int &_num_equation, c
     DenseMatrix Dx(dof), Kx(dof);
     Dx = 0.;
     Kx = 0.;
-    ElementTransformation *Tr = vfes->GetElementTransformation(elem);
+    ElementTransformation* Tr = vfes->GetElementTransformation(elem);
     int integrationOrder = 2 * vfes->GetFE(elem)->GetOrder();
     const IntegrationRule intRule = intRules->Get(vfes->GetFE(elem)->GetGeomType(), integrationOrder);
     for (int k = 0; k < intRule.GetNPoints(); k++) {
-      const IntegrationPoint &ip = intRule.IntPoint(k);
+      const IntegrationPoint& ip = intRule.IntPoint(k);
       double wk = ip.weight;
       Tr->SetIntPoint(&ip);
 
@@ -340,7 +340,7 @@ RHSoperator::~RHSoperator() {
   if (transferGradUp.statuses != NULL) delete[] transferGradUp.statuses;
 }
 
-void RHSoperator::Mult(const Vector &x, Vector &y) const {
+void RHSoperator::Mult(const Vector& x, Vector& y) const {
   max_char_speed = 0.;
 
   // Update primite varibales
@@ -409,7 +409,7 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
 
   // 3. Multiply element-wise by the inverse mass matrices.
 #ifdef _GPU_
-  const elementIndexingData &elem_data = gpu_precomputed_data_.element_indexing_data;
+  const elementIndexingData& elem_data = gpu_precomputed_data_.element_indexing_data;
   auto h_elem_dof_num = elem_data.dof_number.HostRead();
   for (int eltype = 0; eltype < elem_data.num_elems_of_type.Size(); eltype++) {
     int elemOffset = 0;
@@ -463,22 +463,22 @@ void RHSoperator::Mult(const Vector &x, Vector &y) const {
   computeMeanTimeDerivatives(y);
 }
 
-void RHSoperator::copyZk2Z_gpu(Vector &z, Vector &zk, const int eq, const int dof) {
+void RHSoperator::copyZk2Z_gpu(Vector& z, Vector& zk, const int eq, const int dof) {
 #ifdef _GPU_
-  const double *d_zk = zk.Read();
-  double *d_z = z.ReadWrite();
+  const double* d_zk = zk.Read();
+  double* d_z = z.ReadWrite();
 
   MFEM_FORALL(n, dof, { d_z[n + eq * dof] = d_zk[n]; });
 #endif
 }
 
-void RHSoperator::copyDataForFluxIntegration_gpu(const Vector &z, DenseTensor &flux, Vector &fk, Vector &zk,
+void RHSoperator::copyDataForFluxIntegration_gpu(const Vector& z, DenseTensor& flux, Vector& fk, Vector& zk,
                                                  const int eq, const int dof, const int dim) {
 #ifdef _GPU_
-  const double *d_flux = flux.Read();
-  const double *d_z = z.Read();
-  double *d_fk = fk.Write();
-  double *d_zk = zk.Write();
+  const double* d_flux = flux.Read();
+  const double* d_z = z.Read();
+  double* d_fk = fk.Write();
+  double* d_zk = zk.Write();
 
   MFEM_FORALL(n, dof, {
     d_zk[n] = d_z[n + eq * dof];
@@ -490,7 +490,7 @@ void RHSoperator::copyDataForFluxIntegration_gpu(const Vector &z, DenseTensor &f
 }
 
 // Compute the flux at solution nodes.
-void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
+void RHSoperator::GetFlux(const Vector& x, DenseTensor& flux) const {
 #ifdef _GPU_
 
   GetFlux_gpu(x, flux);
@@ -499,7 +499,7 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
   DenseMatrix xmat(x.GetData(), vfes->GetNDofs(), num_equation_);
   DenseMatrix f(num_equation_, dim_);
 
-  double *dataGradUp = gradUp->GetData();
+  double* dataGradUp = gradUp->GetData();
 
   const int dof = flux.SizeI();
   const int dim = flux.SizeJ();
@@ -558,7 +558,7 @@ void RHSoperator::GetFlux(const Vector &x, DenseTensor &flux) const {
   MPI_Allreduce(&partition_max_char, &max_char_speed, 1, MPI_DOUBLE, MPI_MAX, mesh->GetComm());
 }
 
-void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
+void RHSoperator::GetFlux_gpu(const Vector& x, DenseTensor& flux) const {
   auto dataIn = x.Read();
   auto d_flux = flux.Write();
 
@@ -566,16 +566,16 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
   const int dim = dim_;
   const int num_equation = num_equation_;
 
-  const double *d_coord = coordsDof->Read();
-  const double *d_gradUp = gradUp->Read();
+  const double* d_coord = coordsDof->Read();
+  const double* d_gradUp = gradUp->Read();
 
-  Fluxes *d_fluxClass = fluxClass;
+  Fluxes* d_fluxClass = fluxClass;
 
   // This element size is divided by element polynomial order when
   // elSize is set, in the RHSoperator ctor
   auto d_elSize = elSize->Read();
 
-  const double *d_distance = NULL;
+  const double* d_distance = NULL;
   if (distance_ != NULL) {
     d_distance = distance_->Read();
   }
@@ -620,7 +620,7 @@ void RHSoperator::GetFlux_gpu(const Vector &x, DenseTensor &flux) const {
   });
 }
 
-void RHSoperator::updatePrimitives(const Vector &x_in) const {
+void RHSoperator::updatePrimitives(const Vector& x_in) const {
 #ifdef _GPU_
   auto dataUp = Up->Write();  // make sure data is available in GPU
   auto dataIn = x_in.Read();  // make sure data is available in GPU
@@ -628,7 +628,7 @@ void RHSoperator::updatePrimitives(const Vector &x_in) const {
   const int ndofs = vfes->GetNDofs();
   const int num_equation = num_equation_;
 
-  GasMixture *d_mix = d_mixture_;
+  GasMixture* d_mix = d_mixture_;
 
   MFEM_FORALL(n, ndofs, {
     double state[gpudata::MAXEQUATIONS],
@@ -639,7 +639,7 @@ void RHSoperator::updatePrimitives(const Vector &x_in) const {
     for (int eq = 0; eq < num_equation; eq++) dataUp[n + eq * ndofs] = prim[eq];
   });
 #else
-  double *dataUp = Up->GetData();
+  double* dataUp = Up->GetData();
   for (int i = 0; i < vfes->GetNDofs(); i++) {
     Vector iState(num_equation_);
     Vector primitiveState(num_equation_);
@@ -650,7 +650,7 @@ void RHSoperator::updatePrimitives(const Vector &x_in) const {
 #endif  // _GPU_
 }
 
-void RHSoperator::updateGradients(const Vector &x, const bool &primitiveUpdated) const {
+void RHSoperator::updateGradients(const Vector& x, const bool& primitiveUpdated) const {
   // Update primite varibales
   if (!primitiveUpdated) updatePrimitives(x);
 
@@ -672,18 +672,18 @@ void RHSoperator::updateGradients(const Vector &x, const bool &primitiveUpdated)
 #endif
 }
 
-void RHSoperator::multiPlyInvers_gpu(Vector &y, Vector &z, const precomputedIntegrationData &gpu_precomputed_data,
-                                     const Vector &invMArray, const Array<int> &posDofInvM, const int num_equation,
+void RHSoperator::multiPlyInvers_gpu(Vector& y, Vector& z, const precomputedIntegrationData& gpu_precomputed_data,
+                                     const Vector& invMArray, const Array<int>& posDofInvM, const int num_equation,
                                      const int totNumDof, const int NE, const int elemOffset, const int dof) {
 #ifdef _GPU_
-  double *d_y = y.ReadWrite();
-  const double *d_z = z.Read();
+  double* d_y = y.ReadWrite();
+  const double* d_z = z.Read();
 
-  const elementIndexingData &elem_data = gpu_precomputed_data.element_indexing_data;
+  const elementIndexingData& elem_data = gpu_precomputed_data.element_indexing_data;
   auto d_elem_dofs_list = elem_data.dofs_list.Read();
   auto d_elem_dof_off = elem_data.dof_offset.Read();
   auto d_posDofInvM = posDofInvM.Read();
-  const double *d_invM = invMArray.Read();
+  const double* d_invM = invMArray.Read();
 
   MFEM_FORALL_2D(el, NE, dof, 1, 1, {
     MFEM_SHARED double data[gpudata::MAXDOFS * gpudata::MAXEQUATIONS];  // MFEM_SHARED double data[216 * 20];
@@ -714,12 +714,12 @@ void RHSoperator::multiPlyInvers_gpu(Vector &y, Vector &z, const precomputedInte
 }
 
 void RHSoperator::allocateTransferData() {
-  ParFiniteElementSpace *pfes = Up->ParFESpace();
-  ParMesh *mesh = pfes->GetParMesh();
+  ParFiniteElementSpace* pfes = Up->ParFESpace();
+  ParMesh* mesh = pfes->GetParMesh();
   mesh->ExchangeFaceNbrNodes();
   mesh->ExchangeFaceNbrData();
   vfes->ExchangeFaceNbrData();
-  ParFiniteElementSpace *gradFes = gradUp->ParFESpace();
+  ParFiniteElementSpace* gradFes = gradUp->ParFESpace();
   gradFes->ExchangeFaceNbrData();
 
   const int Nshared = mesh->GetNSharedFaces();
@@ -751,9 +751,9 @@ void RHSoperator::allocateTransferData() {
     transferGradUp.send_data = 0.;
     transferGradUp.num_face_nbrs = mesh->GetNFaceNeighbors();
 
-    MPI_Request *requestsU = new MPI_Request[2 * mesh->GetNFaceNeighbors()];
-    MPI_Request *requestsUp = new MPI_Request[2 * mesh->GetNFaceNeighbors()];
-    MPI_Request *requGradUp = new MPI_Request[2 * mesh->GetNFaceNeighbors()];
+    MPI_Request* requestsU = new MPI_Request[2 * mesh->GetNFaceNeighbors()];
+    MPI_Request* requestsUp = new MPI_Request[2 * mesh->GetNFaceNeighbors()];
+    MPI_Request* requGradUp = new MPI_Request[2 * mesh->GetNFaceNeighbors()];
     transferU.requests = requestsU;
     transferUp.requests = requestsUp;
     transferGradUp.requests = requGradUp;
@@ -772,20 +772,20 @@ void RHSoperator::allocateTransferData() {
   }
 }
 
-void RHSoperator::initNBlockDataTransfer(const Vector &x, ParFiniteElementSpace *pfes,
-                                         dataTransferArrays &dataTransfer) {
+void RHSoperator::initNBlockDataTransfer(const Vector& x, ParFiniteElementSpace* pfes,
+                                         dataTransferArrays& dataTransfer) {
   if (pfes->GetFaceNbrVSize() <= 0) {
     return;
   }
 
-  ParMesh *pmesh = pfes->GetParMesh();
+  ParMesh* pmesh = pfes->GetParMesh();
 
   //    face_nbr_data.SetSize(pfes->GetFaceNbrVSize());
   //    send_data.SetSize(pfes->send_face_nbr_ldof.Size_of_connections());
 
-  int *send_offset = pfes->send_face_nbr_ldof.GetI();
-  const int *d_send_ldof = mfem::Read(pfes->send_face_nbr_ldof.GetJMemory(), dataTransfer.send_data.Size());
-  int *recv_offset = pfes->face_nbr_ldof.GetI();
+  int* send_offset = pfes->send_face_nbr_ldof.GetI();
+  const int* d_send_ldof = mfem::Read(pfes->send_face_nbr_ldof.GetJMemory(), dataTransfer.send_data.Size());
+  int* recv_offset = pfes->face_nbr_ldof.GetI();
   MPI_Comm MyComm = pfes->GetComm();
 
   //    int num_face_nbrs = pmesh->GetNFaceNeighbors();
@@ -821,7 +821,7 @@ void RHSoperator::initNBlockDataTransfer(const Vector &x, ParFiniteElementSpace 
   }
 }
 
-void RHSoperator::waitAllDataTransfer(ParFiniteElementSpace *pfes, dataTransferArrays &dataTransfer) {
+void RHSoperator::waitAllDataTransfer(ParFiniteElementSpace* pfes, dataTransferArrays& dataTransfer) {
   if (pfes->GetFaceNbrVSize() <= 0) {
     return;
   }
@@ -830,7 +830,7 @@ void RHSoperator::waitAllDataTransfer(ParFiniteElementSpace *pfes, dataTransferA
   MPI_Waitall(dataTransfer.num_face_nbrs, dataTransfer.requests + dataTransfer.num_face_nbrs, dataTransfer.statuses);
 }
 
-void RHSoperator::computeMeanTimeDerivatives(Vector &y) const {
+void RHSoperator::computeMeanTimeDerivatives(Vector& y) const {
   if (iter % 100 == 0) {
 #ifdef _GPU_
     int Ndof = y.Size() / num_equation_;
@@ -848,8 +848,8 @@ void RHSoperator::computeMeanTimeDerivatives(Vector &y) const {
   }
 }
 
-void RHSoperator::meanTimeDerivatives_gpu(Vector &y, Vector &local_timeDerivatives, Vector &tmp_vec, const int &NDof,
-                                          const int &num_equation, const int &dim) {
+void RHSoperator::meanTimeDerivatives_gpu(Vector& y, Vector& local_timeDerivatives, Vector& tmp_vec, const int& NDof,
+                                          const int& num_equation, const int& dim) {
 #ifdef _GPU_
 
   auto d_y = y.Read();

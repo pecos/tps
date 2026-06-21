@@ -46,12 +46,12 @@ using namespace mfem;
 
 class BoundaryCondition {
  protected:
-  RiemannSolverTPS *rsolver;
-  GasMixture *mixture;
+  RiemannSolverTPS* rsolver;
+  GasMixture* mixture;
   Equations eqSystem;
-  ParFiniteElementSpace *vfes;
-  IntegrationRules *intRules;
-  double &dt;
+  ParFiniteElementSpace* vfes;
+  IntegrationRules* intRules;
+  double& dt;
   const int dim_;
   const int nvel_;
   const int num_equation_;
@@ -68,13 +68,13 @@ class BoundaryCondition {
   Vector face_flux_;
 
  public:
-  BoundaryCondition(RiemannSolverTPS *_rsolver, GasMixture *_mixture, Equations _eqSystem, ParFiniteElementSpace *_vfes,
-                    IntegrationRules *_intRules, double &dt, const int _dim, const int _num_equation,
+  BoundaryCondition(RiemannSolverTPS* _rsolver, GasMixture* _mixture, Equations _eqSystem, ParFiniteElementSpace* _vfes,
+                    IntegrationRules* _intRules, double& dt, const int _dim, const int _num_equation,
                     const int _patchNumber, const double _refLength, bool axisym);
   virtual ~BoundaryCondition();
 
-  virtual void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip, double delta,
-                              double time, double distance, Vector &bdrFlux) = 0;
+  virtual void computeBdrFlux(Vector& normal, Vector& stateIn, DenseMatrix& gradState, Vector transip, double delta,
+                              double time, double distance, Vector& bdrFlux) = 0;
 
   /** \brief Set the boundary state used in the gradient evaluation
    *
@@ -84,13 +84,13 @@ class BoundaryCondition {
    *  term is zero.  If that is not what you want, you must override
    *  this method in a derived class.
    */
-  virtual void computeBdrPrimitiveStateForGradient(const Vector &stateIn, Vector &stateBC) const;
+  virtual void computeBdrPrimitiveStateForGradient(const Vector& stateIn, Vector& stateBC) const;
 
   // holding function for any miscellaneous items needed to initialize BCs
   // prior to use (and require MPI)
   virtual void initBCs() = 0;
 
-  virtual void updateMean(IntegrationRules *intRules, ParGridFunction *Up) = 0;
+  virtual void updateMean(IntegrationRules* intRules, ParGridFunction* Up) = 0;
 
   // aggregate boundary area
   double aggregateArea(int bndry_attr, MPI_Comm bc_comm);
@@ -98,15 +98,15 @@ class BoundaryCondition {
   int aggregateBndryFaces(int bndry_attr, MPI_Comm bc_comm);
 
   // integration of BC on GPU
-  void setElementList(Array<int> &listElems);
+  void setElementList(Array<int>& listElems);
 
-  virtual void integrationBC(Vector &y,        // output
-                             const Vector &x,  // conservative vars (input)
-                             const elementIndexingData &elem_index_data, ParGridFunction *Up, ParGridFunction *gradUp,
-                             const boundaryFaceIntegrationData &boundary_face_data, const int &maxIntPoints,
-                             const int &maxDofs) = 0;
+  virtual void integrationBC(Vector& y,        // output
+                             const Vector& x,  // conservative vars (input)
+                             const elementIndexingData& elem_index_data, ParGridFunction* Up, ParGridFunction* gradUp,
+                             const boundaryFaceIntegrationData& boundary_face_data, const int& maxIntPoints,
+                             const int& maxDofs) = 0;
 
-  static void copyValues(const Vector &orig, Vector &target, const double &mult);
+  static void copyValues(const Vector& orig, Vector& target, const double& mult);
 };
 
 #endif  // BOUNDARYCONDITION_HPP_

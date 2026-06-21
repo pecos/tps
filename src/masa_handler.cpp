@@ -87,8 +87,8 @@ void M2ulPhyS::initMasaHandler() {
   initMMSCoefficients();
 }
 
-void M2ulPhyS::projectExactSolution(const double _time, ParGridFunction *prjU) {
-  void (*exactSolnFunction)(const Vector &, double, Vector &);
+void M2ulPhyS::projectExactSolution(const double _time, ParGridFunction* prjU) {
+  void (*exactSolnFunction)(const Vector&, double, Vector&);
 
   if (config.workFluid == DRY_AIR || config.workFluid == LTE_FLUID) {
     if (dim == 2) {
@@ -124,7 +124,7 @@ void M2ulPhyS::initMMSCoefficients() {
     // set up origin vector to compute L2 norm via ComputeLpError.
     zeroUBlock_ = new BlockVector(*offsets);
     zeroU_ = new ParGridFunction(vfes, zeroUBlock_->HostReadWrite());
-    double *dataZeros = zeroU_->HostReadWrite();
+    double* dataZeros = zeroU_->HostReadWrite();
     int NDof = vfes->GetNDofs();
     for (int i = 0; i < NDof; i++) {
       for (int eq = 0; eq < num_equation; eq++) {
@@ -150,7 +150,7 @@ void M2ulPhyS::checkSolutionError(const double _time, const bool final) {
       cout << "time step: " << iter << ", physical time " << _time << "s"
            << ", Dens. error: " << errorDen << " Vel. " << errorVel << " press. " << errorPre << endl;
   } else {
-    Coefficient *nullPtr = NULL;
+    Coefficient* nullPtr = NULL;
 
     stateMMS_->SetTime(_time);
     Vector componentErrors(num_equation), componentRelErrors(num_equation);
@@ -196,13 +196,13 @@ void M2ulPhyS::checkSolutionError(const double _time, const bool final) {
 
 namespace mms {
 
-void exactSolnFunction(const Vector &x, double tin, Vector &y) {
+void exactSolnFunction(const Vector& x, double tin, Vector& y) {
   std::vector<double> y1(y.Size());
   MASA::masa_eval_exact_state<double>(x[0], x[1], y1);
   for (int eq = 0; eq < y.Size(); eq++) y[eq] = y1[eq];
 }
 
-void evaluateForcing(const Vector &x, double time, Array<double> &y) {
+void evaluateForcing(const Vector& x, double time, Array<double>& y) {
   std::vector<double> y1(y.Size());
   MASA::masa_eval_source_state<double>(x[0], x[1], y1);
   for (int eq = 0; eq < y.Size(); eq++) y[eq] = y1[eq];
@@ -212,14 +212,14 @@ void evaluateForcing(const Vector &x, double time, Array<double> &y) {
 
 namespace dryair2d {
 
-void evaluateForcing(const Vector &x, double time, Array<double> &y) {
+void evaluateForcing(const Vector& x, double time, Array<double>& y) {
   y[0] = MASA::masa_eval_source_rho<double>(x[0], x[1]);    // rho
   y[1] = MASA::masa_eval_source_rho_u<double>(x[0], x[1]);  // rho*u
   y[2] = MASA::masa_eval_source_rho_v<double>(x[0], x[1]);  // rho*v
   y[3] = MASA::masa_eval_source_rho_e<double>(x[0], x[1]);  // rhp*e
 }
 
-void exactSolnFunction(const Vector &x, double tin, Vector &y) {
+void exactSolnFunction(const Vector& x, double tin, Vector& y) {
   // TODO(kevin): make one for NS2DCompressible.
   MFEM_ASSERT(x.Size() == 2, "");
 
@@ -237,7 +237,7 @@ void exactSolnFunction(const Vector &x, double tin, Vector &y) {
   y[3] += k;
 }
 
-void initEuler2D(const int dim, RunConfiguration &config) {
+void initEuler2D(const int dim, RunConfiguration& config) {
   assert(dim == 2);
   assert(config.workFluid == DRY_AIR);
   assert(config.GetEquationSystem() == EULER);
@@ -262,7 +262,7 @@ void initEuler2D(const int dim, RunConfiguration &config) {
   MASA::masa_set_param<double>("a_py", 2.);
 }
 
-void initCNS2DSutherlands(const int dim, RunConfiguration &config) {
+void initCNS2DSutherlands(const int dim, RunConfiguration& config) {
   assert(dim == 2);
   assert(config.workFluid == DRY_AIR);
   assert(config.mms_name_ == "ad_cns_2d_sutherlands");
@@ -303,7 +303,7 @@ void initCNS2DSutherlands(const int dim, RunConfiguration &config) {
 
 namespace dryair3d {
 
-void evaluateForcing(const Vector &x, double time, Array<double> &y) {
+void evaluateForcing(const Vector& x, double time, Array<double>& y) {
   y[0] = MASA::masa_eval_source_rho<double>(x[0], x[1], x[2], time);  // rho
   y[1] = MASA::masa_eval_source_u<double>(x[0], x[1], x[2], time);    // rho*u
   y[2] = MASA::masa_eval_source_v<double>(x[0], x[1], x[2], time);    // rho*v
@@ -311,7 +311,7 @@ void evaluateForcing(const Vector &x, double time, Array<double> &y) {
   y[4] = MASA::masa_eval_source_e<double>(x[0], x[1], x[2], time);    // rhp*e
 }
 
-void exactSolnFunction(const Vector &x, double tin, Vector &y) {
+void exactSolnFunction(const Vector& x, double tin, Vector& y) {
   // TODO(kevin): make one for NS2DCompressible.
   MFEM_ASSERT(x.Size() == 3, "");
 
@@ -330,24 +330,24 @@ void exactSolnFunction(const Vector &x, double tin, Vector &y) {
   y[4] += k;
 }
 
-void exactDenFunction(const Vector &x, double tin, Vector &y) {
+void exactDenFunction(const Vector& x, double tin, Vector& y) {
   MFEM_ASSERT(x.Size() == 3, "");
   y(0) = MASA::masa_eval_exact_rho<double>(x[0], x[1], x[2], tin);  // rho
 }
 
-void exactVelFunction(const Vector &x, double tin, Vector &y) {
+void exactVelFunction(const Vector& x, double tin, Vector& y) {
   MFEM_ASSERT(x.Size() == 3, "");
   y(0) = MASA::masa_eval_exact_u<double>(x[0], x[1], x[2], tin);
   y(1) = MASA::masa_eval_exact_v<double>(x[0], x[1], x[2], tin);
   y(2) = MASA::masa_eval_exact_w<double>(x[0], x[1], x[2], tin);
 }
 
-void exactPreFunction(const Vector &x, double tin, Vector &y) {
+void exactPreFunction(const Vector& x, double tin, Vector& y) {
   MFEM_ASSERT(x.Size() == 3, "");
   y(0) = MASA::masa_eval_exact_p<double>(x[0], x[1], x[2], tin);
 }
 
-void initEuler3DTransient(const int dim, RunConfiguration &config) {
+void initEuler3DTransient(const int dim, RunConfiguration& config) {
   assert(dim == 3);
   assert(config.workFluid == DRY_AIR || config.workFluid == LTE_FLUID);
   assert(config.GetEquationSystem() == EULER);
@@ -417,7 +417,7 @@ void initEuler3DTransient(const int dim, RunConfiguration &config) {
   MASA::masa_set_param<double>("a_pt", 400.);
 }
 
-void initNS3DTransient(const int dim, RunConfiguration &config) {
+void initNS3DTransient(const int dim, RunConfiguration& config) {
   assert(dim == 3);
   assert(config.workFluid == DRY_AIR);
   assert(config.GetEquationSystem() == NS);
@@ -498,7 +498,7 @@ void initNS3DTransient(const int dim, RunConfiguration &config) {
 
 namespace ternary2d {
 
-void initTernary2DBase(GasMixture *mixture, RunConfiguration &config, const double Lx, const double Ly) {
+void initTernary2DBase(GasMixture* mixture, RunConfiguration& config, const double Lx, const double Ly) {
   assert(config.numSpecies == 3);
   assert(config.transportModel == CONSTANT);
   assert(config.gasModel == PERFECT_MIXTURE);
@@ -618,7 +618,7 @@ void initTernary2DBase(GasMixture *mixture, RunConfiguration &config, const doub
   MASA::masa_set_param<double>("rE", rE);
 }
 
-void initTernary2DPeriodic(GasMixture *mixture, RunConfiguration &config, const double Lx, const double Ly) {
+void initTernary2DPeriodic(GasMixture* mixture, RunConfiguration& config, const double Lx, const double Ly) {
   assert(config.mms_name_ == "ternary_2d_periodic");
   assert(!config.ambipolar);
   assert(!config.twoTemperature);
@@ -635,7 +635,7 @@ void initTernary2DPeriodic(GasMixture *mixture, RunConfiguration &config, const 
   MASA::masa_set_param<double>("offset_y1", 0.29);
 }
 
-void initTernary2DPeriodicAmbipolar(GasMixture *mixture, RunConfiguration &config, const double Lx, const double Ly) {
+void initTernary2DPeriodicAmbipolar(GasMixture* mixture, RunConfiguration& config, const double Lx, const double Ly) {
   assert(config.mms_name_ == "ternary_2d_periodic_ambipolar");
   assert(config.ambipolar);
   assert(!config.twoTemperature);
@@ -644,7 +644,7 @@ void initTernary2DPeriodicAmbipolar(GasMixture *mixture, RunConfiguration &confi
   ternary2d::initTernary2DBase(mixture, config, Lx, Ly);
 }
 
-void initTernary2D2TPeriodicAmbipolar(GasMixture *mixture, RunConfiguration &config, const double Lx, const double Ly) {
+void initTernary2D2TPeriodicAmbipolar(GasMixture* mixture, RunConfiguration& config, const double Lx, const double Ly) {
   assert(config.mms_name_ == "ternary_2d_2t_periodic_ambipolar");
   assert(config.ambipolar);
   assert(config.twoTemperature);
@@ -669,7 +669,7 @@ void initTernary2D2TPeriodicAmbipolar(GasMixture *mixture, RunConfiguration &con
   MASA::masa_set_param<double>("nu_A", config.constantTransport.mtFreq[numSpecies - 1]);
 }
 
-void initTernary2D2TAmbipolarWall(GasMixture *mixture, RunConfiguration &config, const double Lx, const double Ly) {
+void initTernary2D2TAmbipolarWall(GasMixture* mixture, RunConfiguration& config, const double Lx, const double Ly) {
   assert(config.mms_name_ == "ternary_2d_2t_ambipolar_wall");
   assert(config.ambipolar);
   assert(config.twoTemperature);
@@ -717,7 +717,7 @@ void initTernary2D2TAmbipolarWall(GasMixture *mixture, RunConfiguration &config,
   MASA::masa_set_param<double>("dX0y", 0.045);
 }
 
-void initTernary2D2TAmbipolarInoutlet(GasMixture *mixture, RunConfiguration &config, const double Lx, const double Ly) {
+void initTernary2D2TAmbipolarInoutlet(GasMixture* mixture, RunConfiguration& config, const double Lx, const double Ly) {
   assert(config.mms_name_ == "ternary_2d_2t_ambipolar_inoutlet");
   assert(config.ambipolar);
   assert(config.twoTemperature);
@@ -787,7 +787,7 @@ void initTernary2D2TAmbipolarInoutlet(GasMixture *mixture, RunConfiguration &con
   MASA::masa_set_param<double>("offset_py", 0.87);
 }
 
-void initTernary2DSheath(GasMixture *mixture, RunConfiguration &config, const double Lx, const double Ly) {
+void initTernary2DSheath(GasMixture* mixture, RunConfiguration& config, const double Lx, const double Ly) {
   assert(config.mms_name_ == "ternary_2d_sheath");
   assert(config.ambipolar);
   assert(config.twoTemperature);

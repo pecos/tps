@@ -47,7 +47,7 @@ AveragingOptions::AveragingOptions() {
   zero_variances_ = false;
 }
 
-void AveragingOptions::read(TPS::Tps *tps, std::string prefix) {
+void AveragingOptions::read(TPS::Tps* tps, std::string prefix) {
   std::string basename;
   if (!prefix.empty()) {
     basename = prefix + "/averaging";
@@ -61,7 +61,7 @@ void AveragingOptions::read(TPS::Tps *tps, std::string prefix) {
   tps->getInput((basename + "/saveMeanHist").c_str(), save_mean_history_, false);
 }
 
-Averaging::Averaging(AveragingOptions &opts, std::string output_name) {
+Averaging::Averaging(AveragingOptions& opts, std::string output_name) {
   rank0_ = false;
   compute_mean_ = false;
 
@@ -89,31 +89,31 @@ Averaging::~Averaging() {
   }
 }
 
-void Averaging::registerField(std::string name, const ParGridFunction *field_to_average, bool compute_vari,
+void Averaging::registerField(std::string name, const ParGridFunction* field_to_average, bool compute_vari,
                               int vari_start_index, int vari_components) {
   // quick return if not computing stats...
   if (!compute_mean_) return;
 
   // otherwise, set up ParGridFunction to hold mean...
-  ParMesh *mesh = field_to_average->ParFESpace()->GetParMesh();
+  ParMesh* mesh = field_to_average->ParFESpace()->GetParMesh();
   rank0_ = (mesh->GetMyRank() == 0);
 
-  ParGridFunction *mean = new ParGridFunction(field_to_average->ParFESpace());
+  ParGridFunction* mean = new ParGridFunction(field_to_average->ParFESpace());
   *mean = 0.0;
 
   // and maybe the vari
-  ParGridFunction *vari = nullptr;
+  ParGridFunction* vari = nullptr;
   if (compute_vari) {
     // make sure incoming field has enough components to satisfy vari request
     assert((vari_start_index + vari_components) <= field_to_average->ParFESpace()->GetVDim());
 
     const int num_variance = vari_components * (vari_components + 1) / 2;
 
-    const FiniteElementCollection *fec = field_to_average->ParFESpace()->FEColl();
+    const FiniteElementCollection* fec = field_to_average->ParFESpace()->FEColl();
     const int order = fec->GetOrder();
 
-    FiniteElementCollection *vari_fec = fec->Clone(order);
-    ParFiniteElementSpace *vari_fes = new ParFiniteElementSpace(mesh, vari_fec, num_variance, Ordering::byNODES);
+    FiniteElementCollection* vari_fec = fec->Clone(order);
+    ParFiniteElementSpace* vari_fes = new ParFiniteElementSpace(mesh, vari_fec, num_variance, Ordering::byNODES);
     vari = new ParGridFunction(vari_fes);
     vari->MakeOwner(vari_fec);
 
@@ -132,13 +132,13 @@ void Averaging::initializeViz() {
 
   // Loop through the families and add them to the paraview output
   for (size_t i = 0; i < avg_families_.size(); i++) {
-    ParGridFunction *mean = avg_families_[i].mean_fcn_;
-    ParGridFunction *vari = avg_families_[i].vari_fcn_;
+    ParGridFunction* mean = avg_families_[i].mean_fcn_;
+    ParGridFunction* vari = avg_families_[i].vari_fcn_;
 
-    const FiniteElementCollection *fec = mean->ParFESpace()->FEColl();
+    const FiniteElementCollection* fec = mean->ParFESpace()->FEColl();
     const int order = fec->GetOrder();
 
-    ParMesh *mesh = mean->ParFESpace()->GetParMesh();
+    ParMesh* mesh = mean->ParFESpace()->GetParMesh();
 
     // If not yet allocated paraview, do it
     if (pvdc_ == nullptr) {
@@ -164,19 +164,19 @@ void Averaging::initializeViz() {
   }
 }
 
-void Averaging::initializeVizForM2ulPhyS(ParFiniteElementSpace *fes, ParFiniteElementSpace *dfes, int nvel) {
+void Averaging::initializeVizForM2ulPhyS(ParFiniteElementSpace* fes, ParFiniteElementSpace* dfes, int nvel) {
   // quick return if not computing stats...
   if (!compute_mean_) return;
 
   assert(avg_families_.size() == 1);
 
-  ParGridFunction *meanUp = avg_families_[0].mean_fcn_;
-  ParGridFunction *vari = avg_families_[0].vari_fcn_;
+  ParGridFunction* meanUp = avg_families_[0].mean_fcn_;
+  ParGridFunction* vari = avg_families_[0].vari_fcn_;
 
-  const FiniteElementCollection *fec = meanUp->ParFESpace()->FEColl();
+  const FiniteElementCollection* fec = meanUp->ParFESpace()->FEColl();
   const int order = fec->GetOrder();
 
-  ParMesh *mesh = meanUp->ParFESpace()->GetParMesh();
+  ParMesh* mesh = meanUp->ParFESpace()->GetParMesh();
 
   // "helper" spaces to index into meanUp
   meanRho = new ParGridFunction(fes, meanUp->GetData());
@@ -195,7 +195,7 @@ void Averaging::initializeVizForM2ulPhyS(ParFiniteElementSpace *fes, ParFiniteEl
   pvdc_->RegisterField("rms", vari);
 }
 
-void Averaging::addSample(const int &iter, GasMixture *mixture) {
+void Averaging::addSample(const int& iter, GasMixture* mixture) {
   // quick return if not computing stats...
   if (!compute_mean_) return;
 
@@ -233,7 +233,7 @@ void Averaging::addSample(const int &iter, GasMixture *mixture) {
   }
 }
 
-void Averaging::writeViz(const int &iter, const double &time, bool save_mean_hist) {
+void Averaging::writeViz(const int& iter, const double& time, bool save_mean_hist) {
   // quick return if not computing stats...
   if (!compute_mean_) return;
 
@@ -256,15 +256,15 @@ void Averaging::addSampleInternal() {
   // Loop through families that have been registered and compute means and variances
   for (size_t ifam = 0; ifam < avg_families_.size(); ifam++) {
     // Extract fields for use on device (when available)
-    AveragingFamily &fam = avg_families_[ifam];
+    AveragingFamily& fam = avg_families_[ifam];
 
-    const ParGridFunction *inst = fam.instantaneous_fcn_;
-    ParGridFunction *mean = fam.mean_fcn_;
-    ParGridFunction *vari = fam.vari_fcn_;
+    const ParGridFunction* inst = fam.instantaneous_fcn_;
+    ParGridFunction* mean = fam.mean_fcn_;
+    ParGridFunction* vari = fam.vari_fcn_;
 
-    const double *d_inst = inst->Read();
-    double *d_mean = mean->ReadWrite();
-    double *d_vari = nullptr;
+    const double* d_inst = inst->Read();
+    double* d_mean = mean->ReadWrite();
+    double* d_vari = nullptr;
     if (vari != nullptr) {
       d_vari = vari->ReadWrite();
     }
@@ -328,7 +328,7 @@ void Averaging::addSampleInternal() {
   }
 }
 
-void Averaging::addSampleInternal(GasMixture *mixture) {
+void Averaging::addSampleInternal(GasMixture* mixture) {
   // Assert that there is something to average.  In principle we don't
   // need this, b/c the loop below is a no-op if there are no
   // families.  However, if you got to this point, you're expecting to
@@ -339,15 +339,15 @@ void Averaging::addSampleInternal(GasMixture *mixture) {
   // Loop through families that have been registered and compute means and variances
   for (size_t ifam = 0; ifam < avg_families_.size(); ifam++) {
     // Extract fields for use on device (when available)
-    AveragingFamily &fam = avg_families_[ifam];
+    AveragingFamily& fam = avg_families_[ifam];
 
-    const ParGridFunction *inst = fam.instantaneous_fcn_;
-    ParGridFunction *mean = fam.mean_fcn_;
-    ParGridFunction *vari = fam.vari_fcn_;
+    const ParGridFunction* inst = fam.instantaneous_fcn_;
+    ParGridFunction* mean = fam.mean_fcn_;
+    ParGridFunction* vari = fam.vari_fcn_;
 
-    const double *d_inst = inst->Read();
-    double *d_mean = mean->ReadWrite();
-    double *d_vari = nullptr;
+    const double* d_inst = inst->Read();
+    double* d_mean = mean->ReadWrite();
+    double* d_vari = nullptr;
     if (vari != nullptr) {
       d_vari = vari->ReadWrite();
     }
@@ -359,7 +359,7 @@ void Averaging::addSampleInternal(GasMixture *mixture) {
     // quantity is pressure.  But, in general, it may be null, in
     // which case, whatever data are in the state are averaged
     // directly.
-    GasMixture *d_mixture = mixture;
+    GasMixture* d_mixture = mixture;
 
     // Extract size information for use on device
     const int dof = mean->ParFESpace()->GetNDofs();                 // dofs per scalar field

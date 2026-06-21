@@ -49,8 +49,8 @@ class WallBC : public BoundaryCondition {
 
   const bool useBCinGrad_;
 
-  GasMixture *d_mixture_;  // only used in the device.
-  Fluxes *fluxClass;
+  GasMixture* d_mixture_;  // only used in the device.
+  Fluxes* fluxClass;
 
   // TODO(kevin): eventually replace this with wallPrim.
   double wallTemp_;
@@ -59,54 +59,54 @@ class WallBC : public BoundaryCondition {
   BoundaryViscousFluxData bcFlux_;
   BoundaryPrimitiveData bcState_;
 
-  const boundaryFaceIntegrationData &boundary_face_data_;
-  const int &maxIntPoints_;
+  const boundaryFaceIntegrationData& boundary_face_data_;
+  const int& maxIntPoints_;
 
   Array<int> wallElems;
   void buildWallElemsArray();
 
-  void computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip, double delta,
-                          double distance, Vector &bdrFlux);
-  void computeSlipWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip, double delta,
-                           Vector &bdrFlux);
-  void computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip, double delta,
-                                Vector &bdrFlux);
-  void computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip, double delta,
-                                 Vector &bdrFlux);
-  void computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip, double delta,
-                              Vector &bdrFlux);
+  void computeINVwallFlux(Vector& normal, Vector& stateIn, DenseMatrix& gradState, Vector transip, double delta,
+                          double distance, Vector& bdrFlux);
+  void computeSlipWallFlux(Vector& normal, Vector& stateIn, DenseMatrix& gradState, Vector transip, double delta,
+                           Vector& bdrFlux);
+  void computeAdiabaticWallFlux(Vector& normal, Vector& stateIn, DenseMatrix& gradState, Vector transip, double delta,
+                                Vector& bdrFlux);
+  void computeIsothermalWallFlux(Vector& normal, Vector& stateIn, DenseMatrix& gradState, Vector transip, double delta,
+                                 Vector& bdrFlux);
+  void computeGeneralWallFlux(Vector& normal, Vector& stateIn, DenseMatrix& gradState, Vector transip, double delta,
+                              Vector& bdrFlux);
 
  public:
-  WallBC(RiemannSolverTPS *rsolver_, GasMixture *_mixture, GasMixture *d_mixture, Equations _eqSystem,
-         Fluxes *_fluxClass, ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt, const int _dim,
+  WallBC(RiemannSolverTPS* rsolver_, GasMixture* _mixture, GasMixture* d_mixture, Equations _eqSystem,
+         Fluxes* _fluxClass, ParFiniteElementSpace* _vfes, IntegrationRules* _intRules, double& _dt, const int _dim,
          const int _num_equation, int _patchNumber, WallType _bcType, const WallData _inputData,
-         const boundaryFaceIntegrationData &boundary_face_data, const int &maxIntPoints, bool axisym,
+         const boundaryFaceIntegrationData& boundary_face_data, const int& maxIntPoints, bool axisym,
          bool useBCinGrad = false);
   ~WallBC();
 
   WallType getType() { return wallType_; }
 
-  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip, double delta,
-                      double time, double distance, Vector &bdrFlux) override;
-  void computeBdrPrimitiveStateForGradient(const Vector &primIn, Vector &primBC) const override;
+  void computeBdrFlux(Vector& normal, Vector& stateIn, DenseMatrix& gradState, Vector transip, double delta,
+                      double time, double distance, Vector& bdrFlux) override;
+  void computeBdrPrimitiveStateForGradient(const Vector& primIn, Vector& primBC) const override;
 
   void initBCs() override;
 
-  void updateMean(IntegrationRules *intRules, ParGridFunction *Up) override {}
+  void updateMean(IntegrationRules* intRules, ParGridFunction* Up) override {}
 
   // functions for BC integration on GPU
-  void integrationBC(Vector &y,  // output
-                     const Vector &x, const elementIndexingData &elem_index_data, ParGridFunction *Up,
-                     ParGridFunction *gradUp, const boundaryFaceIntegrationData &boundary_face_data,
-                     const int &maxIntPoints, const int &maxDofs) override;
+  void integrationBC(Vector& y,  // output
+                     const Vector& x, const elementIndexingData& elem_index_data, ParGridFunction* Up,
+                     ParGridFunction* gradUp, const boundaryFaceIntegrationData& boundary_face_data,
+                     const int& maxIntPoints, const int& maxDofs) override;
 
-  void integrateWalls_gpu(Vector &y,  // output
-                          const Vector &x, const elementIndexingData &elem_index_data,
-                          const boundaryFaceIntegrationData &boundary_face_data, const int &maxDofs);
+  void integrateWalls_gpu(Vector& y,  // output
+                          const Vector& x, const elementIndexingData& elem_index_data,
+                          const boundaryFaceIntegrationData& boundary_face_data, const int& maxDofs);
 
-  void interpWalls_gpu(const Vector &x, const elementIndexingData &elem_index_data, ParGridFunction *Up,
-                       ParGridFunction *gradUp, const boundaryFaceIntegrationData &boundary_face_data,
-                       const int &maxDofs);
+  void interpWalls_gpu(const Vector& x, const elementIndexingData& elem_index_data, ParGridFunction* Up,
+                       ParGridFunction* gradUp, const boundaryFaceIntegrationData& boundary_face_data,
+                       const int& maxDofs);
 
   double getWallTemp() const {
     assert(wallType_ == VISC_ISOTH);
@@ -114,8 +114,8 @@ class WallBC : public BoundaryCondition {
   }
 
 #ifdef _GPU_
-  static MFEM_HOST_DEVICE void computeInvWallState(const double *u1, double *u2, const double *nor, const int &dim,
-                                                   const int &num_equation, const int &thrd, const int &maxThreads) {
+  static MFEM_HOST_DEVICE void computeInvWallState(const double* u1, double* u2, const double* nor, const int& dim,
+                                                   const int& num_equation, const int& thrd, const int& maxThreads) {
     MFEM_SHARED double momNormal, norm;
     MFEM_SHARED double unitNor[3];
 
@@ -143,8 +143,8 @@ class WallBC : public BoundaryCondition {
     }
   }
 
-  static MFEM_HOST_DEVICE void computeInvWallState_gpu_serial(const double *u1, double *u2, const double *nor,
-                                                              const int &dim, const int &num_equation) {
+  static MFEM_HOST_DEVICE void computeInvWallState_gpu_serial(const double* u1, double* u2, const double* nor,
+                                                              const int& dim, const int& num_equation) {
     double momNormal, norm;
     double unitNor[3];
 
@@ -164,11 +164,11 @@ class WallBC : public BoundaryCondition {
     }
   }
 
-  static MFEM_HOST_DEVICE void computeIsothermalState(const double *u1, double *u2, const double *nor,
-                                                      const double &wallTemp, const double &gamma, const double &Rg,
-                                                      const int &dim, const int &num_equation,
-                                                      const WorkingFluid &fluid, const int &thrd,
-                                                      const int &maxThreads) {
+  static MFEM_HOST_DEVICE void computeIsothermalState(const double* u1, double* u2, const double* nor,
+                                                      const double& wallTemp, const double& gamma, const double& Rg,
+                                                      const int& dim, const int& num_equation,
+                                                      const WorkingFluid& fluid, const int& thrd,
+                                                      const int& maxThreads) {
     if (thrd < num_equation) u2[thrd] = u1[thrd];
     MFEM_SYNC_THREAD;
 
@@ -177,10 +177,10 @@ class WallBC : public BoundaryCondition {
     }
   }
 
-  static MFEM_HOST_DEVICE void computeIsothermalState_gpu_serial(const double *u1, double *u2, const double *nor,
-                                                                 const double &wallTemp, const double &gamma,
-                                                                 const double &Rg, const int &dim,
-                                                                 const int &num_equation, const WorkingFluid &fluid) {
+  static MFEM_HOST_DEVICE void computeIsothermalState_gpu_serial(const double* u1, double* u2, const double* nor,
+                                                                 const double& wallTemp, const double& gamma,
+                                                                 const double& Rg, const int& dim,
+                                                                 const int& num_equation, const WorkingFluid& fluid) {
     for (int eq = 0; eq < num_equation; eq++) {
       u2[eq] = u1[eq];
     }

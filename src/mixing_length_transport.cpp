@@ -37,12 +37,12 @@
 using namespace std;
 using namespace mfem;
 
-MixingLengthTransport::MixingLengthTransport(GasMixture *mix, RunConfiguration &runfile,
-                                             MolecularTransport *molecular_transport)
+MixingLengthTransport::MixingLengthTransport(GasMixture* mix, RunConfiguration& runfile,
+                                             MolecularTransport* molecular_transport)
     : MixingLengthTransport(mix, runfile.mix_length_trans_input_, molecular_transport) {}
 
-MFEM_HOST_DEVICE MixingLengthTransport::MixingLengthTransport(GasMixture *mix, const mixingLengthTransportData &inputs,
-                                                              MolecularTransport *molecular_transport)
+MFEM_HOST_DEVICE MixingLengthTransport::MixingLengthTransport(GasMixture* mix, const mixingLengthTransportData& inputs,
+                                                              MolecularTransport* molecular_transport)
     : TransportProperties(mix),
       max_mixing_length_(inputs.max_mixing_length_),
       Prt_(inputs.Prt_),
@@ -50,19 +50,19 @@ MFEM_HOST_DEVICE MixingLengthTransport::MixingLengthTransport(GasMixture *mix, c
       bulk_mult_(inputs.bulk_multiplier_),
       molecular_transport_(molecular_transport) {}
 
-void MixingLengthTransport::ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp,
-                                                           const Vector &Efield, double radius, double distance,
-                                                           Vector &transportBuffer, DenseMatrix &diffusionVelocity) {
+void MixingLengthTransport::ComputeFluxTransportProperties(const Vector& state, const DenseMatrix& gradUp,
+                                                           const Vector& Efield, double radius, double distance,
+                                                           Vector& transportBuffer, DenseMatrix& diffusionVelocity) {
   transportBuffer.SetSize(FluxTrns::NUM_FLUX_TRANS);
   diffusionVelocity.SetSize(numSpecies, nvel_);
   ComputeFluxTransportProperties(&state[0], gradUp.Read(), &Efield[0], radius, distance, &transportBuffer[0],
                                  diffusionVelocity.Write());
 }
 
-MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(const double *state, const double *gradUp,
-                                                                            const double *Efield, double radius,
-                                                                            double distance, double *transportBuffer,
-                                                                            double *diffusionVelocity) {
+MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(const double* state, const double* gradUp,
+                                                                            const double* Efield, double radius,
+                                                                            double distance, double* transportBuffer,
+                                                                            double* diffusionVelocity) {
   molecular_transport_->ComputeFluxMolecularTransport(state, gradUp, Efield, transportBuffer, diffusionVelocity);
 
   const double kappa = transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY];
@@ -134,11 +134,11 @@ MFEM_HOST_DEVICE void MixingLengthTransport::ComputeFluxTransportProperties(cons
   // TODO(trevilo): Deal with species diffusivities
 }
 
-void MixingLengthTransport::ComputeSourceTransportProperties(const Vector &state, const Vector &Up,
-                                                             const DenseMatrix &gradUp, const Vector &Efield,
-                                                             double distance, Vector &globalTransport,
-                                                             DenseMatrix &speciesTransport,
-                                                             DenseMatrix &diffusionVelocity, Vector &n_sp) {
+void MixingLengthTransport::ComputeSourceTransportProperties(const Vector& state, const Vector& Up,
+                                                             const DenseMatrix& gradUp, const Vector& Efield,
+                                                             double distance, Vector& globalTransport,
+                                                             DenseMatrix& speciesTransport,
+                                                             DenseMatrix& diffusionVelocity, Vector& n_sp) {
   globalTransport.SetSize(SrcTrns::NUM_SRC_TRANS);
   speciesTransport.SetSize(numSpecies, SpeciesTrns::NUM_SPECIES_COEFFS);
   n_sp.SetSize(numSpecies);
@@ -157,8 +157,8 @@ void MixingLengthTransport::ComputeSourceTransportProperties(const Vector &state
 }
 
 MFEM_HOST_DEVICE void MixingLengthTransport::ComputeSourceTransportProperties(
-    const double *state, const double *Up, const double *gradUp, const double *Efield, double distance,
-    double *globalTransport, double *speciesTransport, double *diffusionVelocity, double *n_sp) {
+    const double* state, const double* Up, const double* gradUp, const double* Efield, double distance,
+    double* globalTransport, double* speciesTransport, double* diffusionVelocity, double* n_sp) {
   molecular_transport_->ComputeSourceMolecularTransport(state, Up, gradUp, Efield, globalTransport, speciesTransport,
                                                         diffusionVelocity, n_sp);
 }

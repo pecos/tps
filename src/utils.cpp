@@ -69,7 +69,7 @@ bool slurm_job_almost_done_mpi(MPI_Comm comm, int threshold);
 bool slurm_job_almost_done_mpi(MPI_Comm comm, int threshold) {
   int rank;
   MPI_Comm_rank(comm, &rank);
-  char *SLURM_JOB_ID = getenv("SLURM_JOB_ID");
+  char* SLURM_JOB_ID = getenv("SLURM_JOB_ID");
   if (SLURM_JOB_ID == NULL) {
     printf("[ERROR]: SLURM_JOB_ID env variable not set. Unable to query how much time remaining\n");
     return false;
@@ -157,7 +157,7 @@ bool M2ulPhyS::Check_ExitEarly(int iter) {
 }
 
 // check if file exists
-bool file_exists(const std::string &name) { return (access(name.c_str(), F_OK) != -1); }
+bool file_exists(const std::string& name) { return (access(name.c_str(), F_OK) != -1); }
 
 // Look for existence of output.pvd files in vis output directory and
 // keep a sequentially numbered copy. Useful when doing restart,
@@ -188,7 +188,7 @@ void M2ulPhyS::Cache_Paraview_Timesteps() {
 }
 
 // Run system command and capture output
-std::string systemCmd(const char *cmd) {
+std::string systemCmd(const char* cmd) {
   std::array<char, 128> buffer;
   std::string result;
   std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd, "r"), pclose);
@@ -201,12 +201,12 @@ std::string systemCmd(const char *cmd) {
   return result;
 }
 
-void LocalProjectDiscCoefficient(GridFunction &gf, VectorCoefficient &coeff, Array<int> &dof_attr) {
+void LocalProjectDiscCoefficient(GridFunction& gf, VectorCoefficient& coeff, Array<int>& dof_attr) {
   Array<int> vdofs;
   Vector vals;
 
   gf.HostWrite();
-  FiniteElementSpace *fes = gf.FESpace();
+  FiniteElementSpace* fes = gf.FESpace();
 
   // maximal element attribute for each dof
   dof_attr.SetSize(fes->GetVSize());
@@ -246,7 +246,7 @@ void LocalProjectDiscCoefficient(GridFunction &gf, VectorCoefficient &coeff, Arr
   }
 }
 
-void GlobalProjectDiscCoefficient(ParGridFunction &gf, VectorCoefficient &coeff) {
+void GlobalProjectDiscCoefficient(ParGridFunction& gf, VectorCoefficient& coeff) {
   // local maximal element attribute for each dof
   Array<int> ldof_attr;
 
@@ -257,9 +257,9 @@ void GlobalProjectDiscCoefficient(ParGridFunction &gf, VectorCoefficient &coeff)
   Array<int> gdof_attr;
   ldof_attr.Copy(gdof_attr);
 
-  ParFiniteElementSpace *pfes = gf.ParFESpace();
+  ParFiniteElementSpace* pfes = gf.ParFESpace();
 
-  GroupCommunicator &gcomm = pfes->GroupComm();
+  GroupCommunicator& gcomm = pfes->GroupComm();
   gcomm.Reduce<int>(gdof_attr, GroupCommunicator::Max);
   gcomm.Bcast(gdof_attr);
 
@@ -275,11 +275,11 @@ void GlobalProjectDiscCoefficient(ParGridFunction &gf, VectorCoefficient &coeff)
   }
 
   // parallel averaging plus interpolation to determine final values
-  HypreParVector *tv = pfes->NewTrueDofVector();
+  HypreParVector* tv = pfes->NewTrueDofVector();
   gcomm.Reduce<int>(gdof_attr, GroupCommunicator::Sum);
   gcomm.Bcast(gdof_attr);
 
-  FiniteElementSpace *fes = gf.FESpace();
+  FiniteElementSpace* fes = gf.FESpace();
   for (int i = 0; i < fes->GetVSize(); i++) {
     gf(i) /= gdof_attr[i];
   }
@@ -288,8 +288,8 @@ void GlobalProjectDiscCoefficient(ParGridFunction &gf, VectorCoefficient &coeff)
   delete tv;
 }
 
-bool h5ReadTable(const std::string &fileName, const std::string &datasetName, mfem::DenseMatrix &output,
-                 mfem::Array<int> &shape) {
+bool h5ReadTable(const std::string& fileName, const std::string& datasetName, mfem::DenseMatrix& output,
+                 mfem::Array<int>& shape) {
   bool success = false;
   hid_t file = -1;
   if (file_exists(fileName)) {
@@ -330,8 +330,8 @@ bool h5ReadTable(const std::string &fileName, const std::string &datasetName, mf
   return success;
 }
 
-bool h5ReadBcastMultiColumnTable(const std::string &fileName, const std::string &datasetName, MPI_Comm TPSCommWorld,
-                                 mfem::DenseMatrix &output, std::vector<TableInput> &tables) {
+bool h5ReadBcastMultiColumnTable(const std::string& fileName, const std::string& datasetName, MPI_Comm TPSCommWorld,
+                                 mfem::DenseMatrix& output, std::vector<TableInput>& tables) {
   int myrank;
   MPI_Comm_rank(TPSCommWorld, &myrank);
   const bool rank0 = (myrank == 0);
@@ -357,7 +357,7 @@ bool h5ReadBcastMultiColumnTable(const std::string &fileName, const std::string 
   assert(ncol == (int)tables.size() + 1);
 
   if (!rank0) output.SetSize(nrow, ncol);
-  double *h_table = output.HostReadWrite();
+  double* h_table = output.HostReadWrite();
   MPI_Bcast(h_table, nrow * ncol, MPI_DOUBLE, 0, TPSCommWorld);
 
   for (size_t icol = 0; icol < tables.size(); icol++) {
@@ -368,8 +368,8 @@ bool h5ReadBcastMultiColumnTable(const std::string &fileName, const std::string 
   return success;
 }
 
-void evaluateDistanceSerial(mfem::Mesh &mesh, const mfem::Array<int> &wall_patches, const mfem::GridFunction &coords,
-                            mfem::GridFunction &distance) {
+void evaluateDistanceSerial(mfem::Mesh& mesh, const mfem::Array<int>& wall_patches, const mfem::GridFunction& coords,
+                            mfem::GridFunction& distance) {
   distance = -1.0;  // Initialize with invalid data
 
   // Tolerance for solve
@@ -422,7 +422,7 @@ void evaluateDistanceSerial(mfem::Mesh &mesh, const mfem::Array<int> &wall_patch
         // the wall distance is updated.
 
         // Get information about the current face
-        FaceElementTransformations *Tr = mesh.GetBdrFaceTransformations(bel);
+        FaceElementTransformations* Tr = mesh.GetBdrFaceTransformations(bel);
         const Geometry::Type gt = Tr->GetGeometryType();
         const int rdim = Tr->GetDimension();  // dim of reference space (should be dim-1)
         assert(rdim == dim - 1);
@@ -513,71 +513,71 @@ void evaluateDistanceSerial(mfem::Mesh &mesh, const mfem::Array<int> &wall_patch
   }  // end loop over points in GridFunction for distance
 }
 
-void multConstScalar(double A, Vector B, Vector *C) {
+void multConstScalar(double A, Vector B, Vector* C) {
   {
-    double *dataB = B.HostReadWrite();
-    double *dataC = C->HostReadWrite();
+    double* dataB = B.HostReadWrite();
+    double* dataC = C->HostReadWrite();
     MFEM_FORALL(i, B.Size(), { dataC[i] = A * dataB[i]; });
   }
 }
 
-void multConstScalarInv(double A, Vector B, Vector *C) {
+void multConstScalarInv(double A, Vector B, Vector* C) {
   {
-    double *dataB = B.HostReadWrite();
-    double *dataC = C->HostReadWrite();
+    double* dataB = B.HostReadWrite();
+    double* dataC = C->HostReadWrite();
     MFEM_FORALL(i, B.Size(), { dataC[i] = A / dataB[i]; });
   }
 }
 
-void multConstVector(double A, Vector B, Vector *C) {
+void multConstVector(double A, Vector B, Vector* C) {
   {
-    double *dataB = B.HostReadWrite();
-    double *dataC = C->HostReadWrite();
+    double* dataB = B.HostReadWrite();
+    double* dataC = C->HostReadWrite();
     MFEM_FORALL(i, B.Size(), { dataC[i] = A * dataB[i]; });
   }
 }
 
-void multConstScalarIP(double A, Vector *C) {
+void multConstScalarIP(double A, Vector* C) {
   {
-    double *dataC = C->HostReadWrite();
+    double* dataC = C->HostReadWrite();
     MFEM_FORALL(i, C->Size(), { dataC[i] = A * dataC[i]; });
   }
 }
 
-void multConstScalarInvIP(double A, Vector *C) {
+void multConstScalarInvIP(double A, Vector* C) {
   {
-    double *dataC = C->HostReadWrite();
+    double* dataC = C->HostReadWrite();
     MFEM_FORALL(i, C->Size(), { dataC[i] = A / dataC[i]; });
   }
 }
 
 // not necessary
-void multConstVectorIP(double A, Vector *C) {
+void multConstVectorIP(double A, Vector* C) {
   {
-    double *dataC = C->HostReadWrite();
+    double* dataC = C->HostReadWrite();
     MFEM_FORALL(i, C->Size(), { dataC[i] = A * dataC[i]; });
   }
 }
 
-void multScalarScalar(Vector A, Vector B, Vector *C) {
-  double *dataA = A.HostReadWrite();
-  double *dataB = B.HostReadWrite();
-  double *dataC = C->HostReadWrite();
+void multScalarScalar(Vector A, Vector B, Vector* C) {
+  double* dataA = A.HostReadWrite();
+  double* dataB = B.HostReadWrite();
+  double* dataC = C->HostReadWrite();
   MFEM_FORALL(i, A.Size(), { dataC[i] = dataA[i] * dataB[i]; });
 }
 
-void multScalarScalarInv(Vector A, Vector B, Vector *C) {
-  double *dataA = A.HostReadWrite();
-  double *dataB = B.HostReadWrite();
-  double *dataC = C->HostReadWrite();
+void multScalarScalarInv(Vector A, Vector B, Vector* C) {
+  double* dataA = A.HostReadWrite();
+  double* dataB = B.HostReadWrite();
+  double* dataC = C->HostReadWrite();
   MFEM_FORALL(i, A.Size(), { dataC[i] = dataA[i] / dataB[i]; });
 }
 
-void multScalarVector(Vector A, Vector B, Vector *C, int dim) {
+void multScalarVector(Vector A, Vector B, Vector* C, int dim) {
   int Ndof = A.Size();
-  double *dataA = A.HostReadWrite();
-  double *dataB = B.HostReadWrite();
-  double *dataC = C->HostReadWrite();
+  double* dataA = A.HostReadWrite();
+  double* dataB = B.HostReadWrite();
+  double* dataC = C->HostReadWrite();
   for (int eq = 0; eq < dim; eq++) {
     for (int i = 0; i < Ndof; i++) {
       dataC[i + eq * Ndof] = dataA[i] * dataB[i + eq * Ndof];
@@ -585,11 +585,11 @@ void multScalarVector(Vector A, Vector B, Vector *C, int dim) {
   }
 }
 
-void multScalarInvVector(Vector A, Vector B, Vector *C, int dim) {
+void multScalarInvVector(Vector A, Vector B, Vector* C, int dim) {
   int Ndof = A.Size();
-  double *dataA = A.HostReadWrite();
-  double *dataB = B.HostReadWrite();
-  double *dataC = C->HostReadWrite();
+  double* dataA = A.HostReadWrite();
+  double* dataB = B.HostReadWrite();
+  double* dataC = C->HostReadWrite();
   for (int eq = 0; eq < dim; eq++) {
     for (int i = 0; i < Ndof; i++) {
       dataC[i + eq * Ndof] = (1.0 / dataA[i]) * dataB[i + eq * Ndof];
@@ -597,10 +597,10 @@ void multScalarInvVector(Vector A, Vector B, Vector *C, int dim) {
   }
 }
 
-void multScalarInvVectorIP(Vector A, Vector *C, int dim) {
+void multScalarInvVectorIP(Vector A, Vector* C, int dim) {
   int Ndof = A.Size();
-  double *dataA = A.HostReadWrite();
-  double *dataC = C->HostReadWrite();
+  double* dataA = A.HostReadWrite();
+  double* dataC = C->HostReadWrite();
   for (int eq = 0; eq < dim; eq++) {
     for (int i = 0; i < Ndof; i++) {
       dataC[i + eq * Ndof] = (1.0 / dataA[i]) * dataC[i + eq * Ndof];
@@ -608,12 +608,12 @@ void multScalarInvVectorIP(Vector A, Vector *C, int dim) {
   }
 }
 
-void multVectorVector(Vector A, Vector B, Vector *C1, Vector *C2, Vector *C3, int dim) {
+void multVectorVector(Vector A, Vector B, Vector* C1, Vector* C2, Vector* C3, int dim) {
   {
     int Ndof = A.Size() / dim;
-    double *dataA = A.HostReadWrite();
-    double *dataB = B.HostReadWrite();
-    double *dataC = C1->HostReadWrite();
+    double* dataA = A.HostReadWrite();
+    double* dataB = B.HostReadWrite();
+    double* dataC = C1->HostReadWrite();
     for (int eq = 0; eq < dim; eq++) {
       for (int i = 0; i < Ndof; i++) {
         dataC[i + eq * Ndof] = dataA[i + 0 * Ndof] * dataB[i + eq * Ndof];
@@ -623,9 +623,9 @@ void multVectorVector(Vector A, Vector B, Vector *C1, Vector *C2, Vector *C3, in
 
   {
     int Ndof = A.Size() / dim;
-    double *dataA = A.HostReadWrite();
-    double *dataB = B.HostReadWrite();
-    double *dataC = C2->HostReadWrite();
+    double* dataA = A.HostReadWrite();
+    double* dataB = B.HostReadWrite();
+    double* dataC = C2->HostReadWrite();
     for (int eq = 0; eq < dim; eq++) {
       for (int i = 0; i < Ndof; i++) {
         dataC[i + eq * Ndof] = dataA[i + 1 * Ndof] * dataB[i + eq * Ndof];
@@ -635,9 +635,9 @@ void multVectorVector(Vector A, Vector B, Vector *C1, Vector *C2, Vector *C3, in
 
   {
     int Ndof = A.Size() / dim;
-    double *dataA = A.HostReadWrite();
-    double *dataB = B.HostReadWrite();
-    double *dataC = C3->HostReadWrite();
+    double* dataA = A.HostReadWrite();
+    double* dataB = B.HostReadWrite();
+    double* dataC = C3->HostReadWrite();
     for (int eq = 0; eq < dim; eq++) {
       for (int i = 0; i < Ndof; i++) {
         dataC[i + eq * Ndof] = dataA[i + 2 * Ndof] * dataB[i + eq * Ndof];
@@ -646,11 +646,11 @@ void multVectorVector(Vector A, Vector B, Vector *C1, Vector *C2, Vector *C3, in
   }
 }
 
-void dotVector(Vector A, Vector B, Vector *C, int dim) {
+void dotVector(Vector A, Vector B, Vector* C, int dim) {
   int Ndof = A.Size() / dim;
-  double *dataA = A.HostReadWrite();
-  double *dataB = B.HostReadWrite();
-  double *data = C->HostReadWrite();
+  double* dataA = A.HostReadWrite();
+  double* dataB = B.HostReadWrite();
+  double* data = C->HostReadWrite();
   for (int i = 0; i < Ndof; i++) {
     data[i] = 0.0;
   }
@@ -661,22 +661,22 @@ void dotVector(Vector A, Vector B, Vector *C, int dim) {
   }
 }
 
-void multScalarScalarIP(Vector A, Vector *C) {
-  double *dataA = A.HostReadWrite();
-  double *dataB = C->HostReadWrite();
+void multScalarScalarIP(Vector A, Vector* C) {
+  double* dataA = A.HostReadWrite();
+  double* dataB = C->HostReadWrite();
   MFEM_FORALL(i, A.Size(), { dataB[i] = dataA[i] * dataB[i]; });
 }
 
-void multScalarInvScalarIP(Vector A, Vector *C) {
-  double *dataA = A.HostReadWrite();
-  double *dataB = C->HostReadWrite();
+void multScalarInvScalarIP(Vector A, Vector* C) {
+  double* dataA = A.HostReadWrite();
+  double* dataB = C->HostReadWrite();
   MFEM_FORALL(i, A.Size(), { dataB[i] = 1.0 / dataA[i] * dataB[i]; });
 }
 
-void multScalarVectorIP(Vector A, Vector *C, int dim) {
+void multScalarVectorIP(Vector A, Vector* C, int dim) {
   int Ndof = A.Size();
-  double *dataA = A.HostReadWrite();
-  double *dataB = C->HostReadWrite();
+  double* dataA = A.HostReadWrite();
+  double* dataB = C->HostReadWrite();
   for (int eq = 0; eq < dim; eq++) {
     for (int i = 0; i < Ndof; i++) {
       dataB[i + eq * Ndof] = dataA[i] * dataB[i + eq * Ndof];
@@ -684,22 +684,22 @@ void multScalarVectorIP(Vector A, Vector *C, int dim) {
   }
 }
 
-void setScalarFromVector(Vector A, int ind, Vector *C) {
+void setScalarFromVector(Vector A, int ind, Vector* C) {
   int Ndof = C->Size();
-  const double *dataA = A.Read();
-  double *data = C->Write();
+  const double* dataA = A.Read();
+  double* data = C->Write();
   MFEM_FORALL(i, Ndof, { data[i] = dataA[i + ind * Ndof]; });
 }
 
-void setVectorFromScalar(Vector A, int ind, Vector *C) {
+void setVectorFromScalar(Vector A, int ind, Vector* C) {
   int Ndof = A.Size();
-  const double *dataA = A.Read();
-  double *data = C->Write();
+  const double* dataA = A.Read();
+  double* data = C->Write();
   MFEM_FORALL(i, Ndof, { data[i + ind * Ndof] = dataA[i]; });
 }
 
-void ComputeCurl3D(const ParGridFunction &u, ParGridFunction &cu) {
-  const FiniteElementSpace *fes = u.FESpace();
+void ComputeCurl3D(const ParGridFunction& u, ParGridFunction& cu) {
+  const FiniteElementSpace* fes = u.FESpace();
 
   // AccumulateAndCountZones.
   Array<int> zones_per_vdof;
@@ -728,15 +728,15 @@ void ComputeCurl3D(const ParGridFunction &u, ParGridFunction &cu) {
     fes->GetElementVDofs(e, vdofs);
     u.GetSubVector(vdofs, loc_data);
     vals.SetSize(vdofs.Size());
-    ElementTransformation *tr = fes->GetElementTransformation(e);
-    const FiniteElement *el = fes->GetFE(e);
+    ElementTransformation* tr = fes->GetElementTransformation(e);
+    const FiniteElement* el = fes->GetFE(e);
     elndofs = el->GetDof();
     int dim = el->GetDim();
     dshape.SetSize(elndofs, dim);
 
     for (int dof = 0; dof < elndofs; ++dof) {
       // Project.
-      const IntegrationPoint &ip = el->GetNodes().IntPoint(dof);
+      const IntegrationPoint& ip = el->GetNodes().IntPoint(dof);
       tr->SetIntPoint(&ip);
 
       // Eval and GetVectorGradientHat.
@@ -745,7 +745,7 @@ void ComputeCurl3D(const ParGridFunction &u, ParGridFunction &cu) {
       DenseMatrix loc_data_mat(loc_data.GetData(), elndofs, vdim);
       MultAtB(loc_data_mat, dshape, grad_hat);
 
-      const DenseMatrix &Jinv = tr->InverseJacobian();
+      const DenseMatrix& Jinv = tr->InverseJacobian();
       grad.SetSize(grad_hat.Height(), Jinv.Width());
       Mult(grad_hat, Jinv, grad);
 
@@ -770,7 +770,7 @@ void ComputeCurl3D(const ParGridFunction &u, ParGridFunction &cu) {
   // Communication
 
   // Count the zones globally.
-  GroupCommunicator &gcomm = u.ParFESpace()->GroupComm();
+  GroupCommunicator& gcomm = u.ParFESpace()->GroupComm();
   gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
   gcomm.Bcast(zones_per_vdof);
 
@@ -787,15 +787,15 @@ void ComputeCurl3D(const ParGridFunction &u, ParGridFunction &cu) {
   }
 }
 
-void vectorGrad3D(ParGridFunction &uSub, ParGridFunction &u, ParGridFunction &gu, ParGridFunction &gv,
-                  ParGridFunction &gw) {
+void vectorGrad3D(ParGridFunction& uSub, ParGridFunction& u, ParGridFunction& gu, ParGridFunction& gv,
+                  ParGridFunction& gw) {
   // FiniteElementSpace *sfes = uSub.FESpace();
   int dim = 3;
   int nSize = uSub.Size();
 
   {
-    double *dataSub = uSub.HostReadWrite();
-    double *data = u.HostReadWrite();
+    double* dataSub = uSub.HostReadWrite();
+    double* data = u.HostReadWrite();
     for (int i = 0; i < nSize; i++) {
       dataSub[i] = data[i + 0 * nSize];
     }
@@ -803,8 +803,8 @@ void vectorGrad3D(ParGridFunction &uSub, ParGridFunction &u, ParGridFunction &gu
   scalarGrad3D(uSub, gu);
 
   {
-    double *dataSub = uSub.HostReadWrite();
-    double *data = u.HostReadWrite();
+    double* dataSub = uSub.HostReadWrite();
+    double* data = u.HostReadWrite();
     for (int i = 0; i < nSize; i++) {
       dataSub[i] = data[i + 1 * nSize];
     }
@@ -812,8 +812,8 @@ void vectorGrad3D(ParGridFunction &uSub, ParGridFunction &u, ParGridFunction &gu
   scalarGrad3D(uSub, gv);
 
   if (dim == 3) {
-    double *dataSub = uSub.HostReadWrite();
-    double *data = u.HostReadWrite();
+    double* dataSub = uSub.HostReadWrite();
+    double* data = u.HostReadWrite();
     for (int i = 0; i < nSize; i++) {
       dataSub[i] = data[i + 2 * nSize];
     }
@@ -821,9 +821,9 @@ void vectorGrad3D(ParGridFunction &uSub, ParGridFunction &u, ParGridFunction &gu
   }
 }
 
-void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu) {
-  FiniteElementSpace *fes = u.FESpace();
-  GroupCommunicator &gcomm = u.ParFESpace()->GroupComm();
+void scalarGrad3D(ParGridFunction& u, ParGridFunction& gu) {
+  FiniteElementSpace* fes = u.FESpace();
+  GroupCommunicator& gcomm = u.ParFESpace()->GroupComm();
   int dim = 3;                // spatial dimension
   int vdim = fes->GetVDim();  // vector dimension (or u)
 
@@ -851,8 +851,8 @@ void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu) {
     vals1.SetSize(vdofs.Size());
     vals2.SetSize(vdofs.Size());
     vals3.SetSize(vdofs.Size());
-    ElementTransformation *tr = fes->GetElementTransformation(e);
-    const FiniteElement *el = fes->GetFE(e);
+    ElementTransformation* tr = fes->GetElementTransformation(e);
+    const FiniteElement* el = fes->GetFE(e);
     elndofs = el->GetDof();
     int dim = el->GetDim();
     dshape.SetSize(elndofs, dim);
@@ -860,7 +860,7 @@ void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu) {
     // element dof
     for (int dof = 0; dof < elndofs; ++dof) {
       // Project.
-      const IntegrationPoint &ip = el->GetNodes().IntPoint(dof);
+      const IntegrationPoint& ip = el->GetNodes().IntPoint(dof);
       tr->SetIntPoint(&ip);
 
       // Eval and GetVectorGradientHat.
@@ -870,7 +870,7 @@ void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu) {
       DenseMatrix loc_data_mat(loc_data.GetData(), elndofs, vdim);
       MultAtB(loc_data_mat, dshape, grad_hat);
 
-      const DenseMatrix &Jinv = tr->InverseJacobian();
+      const DenseMatrix& Jinv = tr->InverseJacobian();
       grad.SetSize(grad_hat.Height(), Jinv.Width());
       Mult(grad_hat, Jinv, grad);
 
@@ -906,7 +906,7 @@ void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu) {
   gcomm.Bcast(zones_per_vdof);
 
   // Accumulate for all vdofs.
-  GroupCommunicator &gcomm_g = gu.ParFESpace()->GroupComm();
+  GroupCommunicator& gcomm_g = gu.ParFESpace()->GroupComm();
   gcomm_g.Reduce<double>(gu.GetData(), GroupCommunicator::Sum);
   gcomm_g.Bcast<double>(gu.GetData());
 
@@ -919,8 +919,8 @@ void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu) {
   }
 }
 
-void ComputeCurl2D(const ParGridFunction &u, ParGridFunction &cu, bool assume_scalar) {
-  const FiniteElementSpace *fes = u.FESpace();
+void ComputeCurl2D(const ParGridFunction& u, ParGridFunction& cu, bool assume_scalar) {
+  const FiniteElementSpace* fes = u.FESpace();
 
   // AccumulateAndCountZones.
   Array<int> zones_per_vdof;
@@ -949,15 +949,15 @@ void ComputeCurl2D(const ParGridFunction &u, ParGridFunction &cu, bool assume_sc
     fes->GetElementVDofs(e, vdofs);
     u.GetSubVector(vdofs, loc_data);
     vals.SetSize(vdofs.Size());
-    ElementTransformation *tr = fes->GetElementTransformation(e);
-    const FiniteElement *el = fes->GetFE(e);
+    ElementTransformation* tr = fes->GetElementTransformation(e);
+    const FiniteElement* el = fes->GetFE(e);
     elndofs = el->GetDof();
     int dim = el->GetDim();
     dshape.SetSize(elndofs, dim);
 
     for (int dof = 0; dof < elndofs; ++dof) {
       // Project.
-      const IntegrationPoint &ip = el->GetNodes().IntPoint(dof);
+      const IntegrationPoint& ip = el->GetNodes().IntPoint(dof);
       tr->SetIntPoint(&ip);
 
       // Eval and GetVectorGradientHat.
@@ -966,7 +966,7 @@ void ComputeCurl2D(const ParGridFunction &u, ParGridFunction &cu, bool assume_sc
       DenseMatrix loc_data_mat(loc_data.GetData(), elndofs, vdim);
       MultAtB(loc_data_mat, dshape, grad_hat);
 
-      const DenseMatrix &Jinv = tr->InverseJacobian();
+      const DenseMatrix& Jinv = tr->InverseJacobian();
       grad.SetSize(grad_hat.Height(), Jinv.Width());
       Mult(grad_hat, Jinv, grad);
 
@@ -996,7 +996,7 @@ void ComputeCurl2D(const ParGridFunction &u, ParGridFunction &cu, bool assume_sc
   // Communication.
 
   // Count the zones globally.
-  GroupCommunicator &gcomm = u.ParFESpace()->GroupComm();
+  GroupCommunicator& gcomm = u.ParFESpace()->GroupComm();
   gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
   gcomm.Bcast(zones_per_vdof);
 
@@ -1013,9 +1013,9 @@ void ComputeCurl2D(const ParGridFunction &u, ParGridFunction &cu, bool assume_sc
   }
 }
 
-void ComputeCurlAxi(const ParGridFunction &u, ParGridFunction &cu, bool assume_scalar) {
-  const FiniteElementSpace *fes = u.FESpace();
-  const FiniteElementSpace *cfes = cu.FESpace();
+void ComputeCurlAxi(const ParGridFunction& u, ParGridFunction& cu, bool assume_scalar) {
+  const FiniteElementSpace* fes = u.FESpace();
+  const FiniteElementSpace* cfes = cu.FESpace();
 
   // AccumulateAndCountZones.
   Array<int> zones_per_vdof;
@@ -1048,15 +1048,15 @@ void ComputeCurlAxi(const ParGridFunction &u, ParGridFunction &cu, bool assume_s
     u.GetSubVector(vdofs, loc_data);
     vals.SetSize(cvdofs.Size());
 
-    ElementTransformation *tr = fes->GetElementTransformation(e);
-    const FiniteElement *el = fes->GetFE(e);
+    ElementTransformation* tr = fes->GetElementTransformation(e);
+    const FiniteElement* el = fes->GetFE(e);
     elndofs = el->GetDof();
     int dim = el->GetDim();
     dshape.SetSize(elndofs, dim);
 
     for (int dof = 0; dof < elndofs; ++dof) {
       // Project.
-      const IntegrationPoint &ip = el->GetNodes().IntPoint(dof);
+      const IntegrationPoint& ip = el->GetNodes().IntPoint(dof);
       tr->SetIntPoint(&ip);
 
       tr->Transform(ip, spatial_location);
@@ -1068,7 +1068,7 @@ void ComputeCurlAxi(const ParGridFunction &u, ParGridFunction &cu, bool assume_s
       DenseMatrix loc_data_mat(loc_data.GetData(), elndofs, vdim);
       MultAtB(loc_data_mat, dshape, grad_hat);
 
-      const DenseMatrix &Jinv = tr->InverseJacobian();
+      const DenseMatrix& Jinv = tr->InverseJacobian();
       grad.SetSize(grad_hat.Height(), Jinv.Width());
       Mult(grad_hat, Jinv, grad);
 
@@ -1104,7 +1104,7 @@ void ComputeCurlAxi(const ParGridFunction &u, ParGridFunction &cu, bool assume_s
   // Communication.
 
   // Count the zones globally.
-  GroupCommunicator &gcomm = u.ParFESpace()->GroupComm();
+  GroupCommunicator& gcomm = u.ParFESpace()->GroupComm();
   gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
   gcomm.Bcast(zones_per_vdof);
 
@@ -1121,7 +1121,7 @@ void ComputeCurlAxi(const ParGridFunction &u, ParGridFunction &cu, bool assume_s
   }
 }
 
-void scalarGrad3DV(FiniteElementSpace *fes, FiniteElementSpace *vfes, Vector u, Vector *gu) {
+void scalarGrad3DV(FiniteElementSpace* fes, FiniteElementSpace* vfes, Vector u, Vector* gu) {
   ParGridFunction R0_gf;
   R0_gf.SetSpace(fes);
 
@@ -1133,7 +1133,7 @@ void scalarGrad3DV(FiniteElementSpace *fes, FiniteElementSpace *vfes, Vector u, 
   R1_gf.GetTrueDofs(*gu);
 }
 
-void streamwiseTensor(const Vector &vel, DenseMatrix &swMgbl) {
+void streamwiseTensor(const Vector& vel, DenseMatrix& swMgbl) {
   int dim = vel.Size();
 
   swMgbl.SetSize(dim, dim);
@@ -1157,11 +1157,11 @@ void streamwiseTensor(const Vector &vel, DenseMatrix &swMgbl) {
 
 double csupgFactor(double Reh, double Reh_factor, double Reh_offset) { return Reh_factor * (tanh(Reh) + Reh_offset); }
 
-void EliminateRHS(Operator &A, ConstrainedOperator &constrainedA, const Array<int> &ess_tdof_list, Vector &x, Vector &b,
-                  Vector &X, Vector &B, int copy_interior) {
-  const Operator *Po = A.GetOutputProlongation();
-  const Operator *Pi = A.GetProlongation();
-  const Operator *Ri = A.GetRestriction();
+void EliminateRHS(Operator& A, ConstrainedOperator& constrainedA, const Array<int>& ess_tdof_list, Vector& x, Vector& b,
+                  Vector& X, Vector& B, int copy_interior) {
+  const Operator* Po = A.GetOutputProlongation();
+  const Operator* Pi = A.GetProlongation();
+  const Operator* Ri = A.GetRestriction();
   A.InitTVectors(Po, Ri, Pi, x, b, X, B);
   if (!copy_interior) {
     X.SetSubVectorComplement(ess_tdof_list, 0.0);
@@ -1169,7 +1169,7 @@ void EliminateRHS(Operator &A, ConstrainedOperator &constrainedA, const Array<in
   constrainedA.EliminateRHS(X, B);
 }
 
-void Orthogonalize(Vector &v, MPI_Comm comm) {
+void Orthogonalize(Vector& v, MPI_Comm comm) {
   double loc_sum = v.Sum();
   double global_sum = 0.0;
   int loc_size = v.Size();
@@ -1181,15 +1181,15 @@ void Orthogonalize(Vector &v, MPI_Comm comm) {
   v -= global_sum / static_cast<double>(global_size);
 }
 
-bool copyFile(const char *SRC, const char *DEST) {
+bool copyFile(const char* SRC, const char* DEST) {
   std::ifstream src(SRC, std::ios::binary);
   std::ofstream dest(DEST, std::ios::binary);
   dest << src.rdbuf();
   return src && dest;
 }
 
-void makeContinuous(ParGridFunction &u) {
-  FiniteElementSpace *fes = u.FESpace();
+void makeContinuous(ParGridFunction& u) {
+  FiniteElementSpace* fes = u.FESpace();
 
   ParGridFunction au;
   au.SetSpace(fes);
@@ -1208,7 +1208,7 @@ void makeContinuous(ParGridFunction &u) {
     fes->GetElementVDofs(e, vdofs);
     u.GetSubVector(vdofs, loc_data);
     vals.SetSize(vdofs.Size());
-    const FiniteElement *el = fes->GetFE(e);
+    const FiniteElement* el = fes->GetFE(e);
     elndofs = el->GetDof();
     for (int dof = 0; dof < elndofs; ++dof) {
       vals(dof) = loc_data(dof);
@@ -1225,7 +1225,7 @@ void makeContinuous(ParGridFunction &u) {
   // Communication
 
   // Count the zones globally.
-  GroupCommunicator &gcomm = u.ParFESpace()->GroupComm();
+  GroupCommunicator& gcomm = u.ParFESpace()->GroupComm();
   gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
   gcomm.Bcast(zones_per_vdof);
 
@@ -1246,7 +1246,7 @@ void makeContinuous(ParGridFunction &u) {
 }
 
 void readTable(MPI_Comm TPSCommWorld, std::string filename, bool xLogScale, bool fLogScale, int order,
-               std::list<mfem::DenseMatrix> &tableHost, TableInput &result) {
+               std::list<mfem::DenseMatrix>& tableHost, TableInput& result) {
   int myrank;
   MPI_Comm_rank(TPSCommWorld, &myrank);
   const bool rank0 = (myrank == 0);
@@ -1269,7 +1269,7 @@ void readTable(MPI_Comm TPSCommWorld, std::string filename, bool xLogScale, bool
   success = (suc_int != 0);
   if (!success) exit(ERROR);
 
-  int *d_dims = dims.GetData();
+  int* d_dims = dims.GetData();
   MPI_Bcast(&Ndata, 1, MPI_INT, 0, TPSCommWorld);
   MPI_Bcast(d_dims, 2, MPI_INT, 0, TPSCommWorld);
   assert(dims[0] > 0);
@@ -1277,7 +1277,7 @@ void readTable(MPI_Comm TPSCommWorld, std::string filename, bool xLogScale, bool
 
   // all not 0 ranks have not had matrix size set as in h5ReadTable
   if (!rank0) tableHost.back().SetSize(dims[0], dims[1]);
-  double *d_table = tableHost.back().HostReadWrite();
+  double* d_table = tableHost.back().HostReadWrite();
   MPI_Bcast(d_table, dims[0] * dims[1], MPI_DOUBLE, 0, TPSCommWorld);
 
   result.Ndata = Ndata;
@@ -1288,19 +1288,19 @@ void readTable(MPI_Comm TPSCommWorld, std::string filename, bool xLogScale, bool
 }
 
 namespace mfem {
-GradientVectorGridFunctionCoefficient::GradientVectorGridFunctionCoefficient(const GridFunction *gf)
+GradientVectorGridFunctionCoefficient::GradientVectorGridFunctionCoefficient(const GridFunction* gf)
     : MatrixCoefficient((gf) ? gf->VectorDim() : 0) {
   GridFunc = gf;
 }
 
-void GradientVectorGridFunctionCoefficient::SetGridFunction(const GridFunction *gf) {
+void GradientVectorGridFunctionCoefficient::SetGridFunction(const GridFunction* gf) {
   GridFunc = gf;
   const int dim = (gf) ? gf->VectorDim() : 0;
   height = width = dim;
 }
 
-void GradientVectorGridFunctionCoefficient::Eval(DenseMatrix &G, ElementTransformation &T, const IntegrationPoint &ip) {
-  Mesh *gf_mesh = GridFunc->FESpace()->GetMesh();
+void GradientVectorGridFunctionCoefficient::Eval(DenseMatrix& G, ElementTransformation& T, const IntegrationPoint& ip) {
+  Mesh* gf_mesh = GridFunc->FESpace()->GetMesh();
   if (T.mesh->GetNE() == gf_mesh->GetNE()) {
     GridFunc->GetVectorGradient(T, G);
   } else {
@@ -1312,23 +1312,23 @@ void GradientVectorGridFunctionCoefficient::Eval(DenseMatrix &G, ElementTransfor
 
 #if MFEM_VERSION >= 40700
     // mfem 4.7 and later
-    const Mesh &fine_mesh = *T.mesh;
+    const Mesh& fine_mesh = *T.mesh;
 #else
     // older versions
-    Mesh &fine_mesh = *T.mesh;
+    Mesh& fine_mesh = *T.mesh;
 #endif
 
     // Get the element transformation of the coarse element containing the
     // fine element.
     int fine_element = T.ElementNo;
-    const CoarseFineTransformations &cf = fine_mesh.GetRefinementTransforms();
+    const CoarseFineTransformations& cf = fine_mesh.GetRefinementTransforms();
     int coarse_element = cf.embeddings[fine_element].parent;
-    ElementTransformation *coarse_T = gf_mesh->GetElementTransformation(coarse_element);
+    ElementTransformation* coarse_T = gf_mesh->GetElementTransformation(coarse_element);
     // Transform the integration point from fine element coordinates to coarse
     // element coordinates.
     Geometry::Type geom = T.GetGeometryType();
     IntegrationPointTransformation fine_to_coarse;
-    IsoparametricTransformation &emb_tr = fine_to_coarse.Transf;
+    IsoparametricTransformation& emb_tr = fine_to_coarse.Transf;
     emb_tr.SetIdentityTransformation(geom);
     emb_tr.SetPointMat(cf.point_matrices[geom](cf.embeddings[fine_element].matrix));
     fine_to_coarse.Transform(ip, coarse_ip);
@@ -1338,7 +1338,7 @@ void GradientVectorGridFunctionCoefficient::Eval(DenseMatrix &G, ElementTransfor
   }
 }
 
-VectorMagnitudeCoefficient::VectorMagnitudeCoefficient(VectorCoefficient &A) : a(&A), va(A.GetVDim()) {}
+VectorMagnitudeCoefficient::VectorMagnitudeCoefficient(VectorCoefficient& A) : a(&A), va(A.GetVDim()) {}
 
 void VectorMagnitudeCoefficient::SetTime(double t) {
   if (a) {
@@ -1347,7 +1347,7 @@ void VectorMagnitudeCoefficient::SetTime(double t) {
   this->Coefficient::SetTime(t);
 }
 
-double VectorMagnitudeCoefficient::Eval(ElementTransformation &T, const IntegrationPoint &ip) {
+double VectorMagnitudeCoefficient::Eval(ElementTransformation& T, const IntegrationPoint& ip) {
   a->Eval(va, T, ip);
   return std::max(std::sqrt(va * va), 1.0e-18);
 }
@@ -1357,7 +1357,7 @@ void TransformedMatrixVectorCoefficient::SetTime(double t) {
   this->MatrixCoefficient::SetTime(t);
 }
 
-void TransformedMatrixVectorCoefficient::Eval(DenseMatrix &G, ElementTransformation &T, const IntegrationPoint &ip) {
+void TransformedMatrixVectorCoefficient::Eval(DenseMatrix& G, ElementTransformation& T, const IntegrationPoint& ip) {
   Vector buf;
   buf.SetSize(Q1->GetVDim());
   Q1->Eval(buf, T, ip);
@@ -1374,7 +1374,7 @@ void ExtTransformedCoefficient::SetTime(double t) {
   this->Coefficient::SetTime(t);
 }
 
-double ExtTransformedCoefficient::Eval(ElementTransformation &T, const IntegrationPoint &ip) {
+double ExtTransformedCoefficient::Eval(ElementTransformation& T, const IntegrationPoint& ip) {
   if (Q2) {
     return Transform2(Q1->Eval(T, ip, GetTime()), Q2->Eval(T, ip, GetTime()));
   } else {

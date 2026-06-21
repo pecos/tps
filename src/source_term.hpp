@@ -74,24 +74,24 @@ class SourceTerm : public ForcingTerms {
   bool twoTemperature_;
   bool enableRadiation_;
 
-  GasMixture *mixture_ = NULL;
-  GasMixture *d_mixture_ = NULL;
-  TransportProperties *transport_ = NULL;
-  Chemistry *chemistry_ = NULL;
-  Radiation *radiation_ = NULL;
-  ParGridFunction *plasma_conductivity_;
-  ParGridFunction *distance_;
+  GasMixture* mixture_ = NULL;
+  GasMixture* d_mixture_ = NULL;
+  TransportProperties* transport_ = NULL;
+  Chemistry* chemistry_ = NULL;
+  Radiation* radiation_ = NULL;
+  ParGridFunction* plasma_conductivity_;
+  ParGridFunction* distance_;
 
  public:
-  SourceTerm(const int &_dim, const int &_num_equation, const int &_order, const int &_intRuleType,
-             IntegrationRules *_intRules, ParFiniteElementSpace *_vfes, ParGridFunction *U, ParGridFunction *_Up,
-             ParGridFunction *_gradUp, const precomputedIntegrationData &gpuArrays, RunConfiguration &_config,
-             GasMixture *mixture, GasMixture *d_mixture, TransportProperties *transport, Chemistry *chemistry,
-             Radiation *radiation, ParGridFunction *pc, ParGridFunction *distance);
+  SourceTerm(const int& _dim, const int& _num_equation, const int& _order, const int& _intRuleType,
+             IntegrationRules* _intRules, ParFiniteElementSpace* _vfes, ParGridFunction* U, ParGridFunction* _Up,
+             ParGridFunction* _gradUp, const precomputedIntegrationData& gpuArrays, RunConfiguration& _config,
+             GasMixture* mixture, GasMixture* d_mixture, TransportProperties* transport, Chemistry* chemistry,
+             Radiation* radiation, ParGridFunction* pc, ParGridFunction* distance);
   ~SourceTerm();
 
   // Terms do not need updating
-  virtual void updateTerms(Vector &in);
+  virtual void updateTerms(Vector& in);
 };
 
 #endif  // SOURCE_TERM_HPP_

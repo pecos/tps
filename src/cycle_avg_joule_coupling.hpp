@@ -49,17 +49,17 @@ class Tps;
 class CycleAvgJouleCoupling : public TPS::Solver {
  private:
   ElectromagneticOptions em_opt_;
-  QuasiMagnetostaticSolverBase *qmsa_solver_;
-  TPS::PlasmaSolver *flow_solver_;
+  QuasiMagnetostaticSolverBase* qmsa_solver_;
+  TPS::PlasmaSolver* flow_solver_;
 
   // Only needed for Boltzmann interface
   int efield_ncomp_;
-  const mfem::FiniteElementCollection *efieldFEC_;
-  mfem::ParFiniteElementSpace *efieldFES_;
-  mfem::ParFiniteElementSpace *efieldFES1_;
-  mfem::ParGridFunction *efield_;
-  mfem::ParGridFunction *efieldR_;
-  mfem::ParGridFunction *efieldI_;
+  const mfem::FiniteElementCollection* efieldFEC_;
+  mfem::ParFiniteElementSpace* efieldFES_;
+  mfem::ParFiniteElementSpace* efieldFES1_;
+  mfem::ParGridFunction* efield_;
+  mfem::ParGridFunction* efieldR_;
+  mfem::ParGridFunction* efieldI_;
 
   //! Maximum number of iterations
   int max_iters_;
@@ -73,8 +73,8 @@ class CycleAvgJouleCoupling : public TPS::Solver {
   bool fixed_conductivity_;
 
 #ifdef HAVE_GSLIB
-  FindPointsGSLIB *interp_flow_to_em_;
-  FindPointsGSLIB *interp_em_to_flow_;
+  FindPointsGSLIB* interp_flow_to_em_;
+  FindPointsGSLIB* interp_em_to_flow_;
 #endif
 
   int n_em_interp_nodes_;
@@ -101,14 +101,14 @@ class CycleAvgJouleCoupling : public TPS::Solver {
    * input-power = target power of em field [double, default = -1.]
    * initial-input-power = the starting power of em field [double, default = -1.]
    */
-  CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tps);
+  CycleAvgJouleCoupling(string& inputFileName, TPS::Tps* tps);
   [[deprecated("Use CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tps instead")]] CycleAvgJouleCoupling(
-      string &inputFileName, TPS::Tps *tps, int max_out, bool axisym, double input_power = -1.,
+      string& inputFileName, TPS::Tps* tps, int max_out, bool axisym, double input_power = -1.,
       double initial_input_power = -1.);
   ~CycleAvgJouleCoupling();
 
   void initializeInterpolationData();
-  void interpolationPoints(mfem::Vector &vxyz, int n_interp_nodes, const mfem::ParFiniteElementSpace *fes);
+  void interpolationPoints(mfem::Vector& vxyz, int n_interp_nodes, const mfem::ParFiniteElementSpace* fes);
   void interpConductivityFromFlowToEM();
   void interpJouleHeatingFromEMToFlow();
   void interpElectricFieldFromEMToFlow();
@@ -122,13 +122,13 @@ class CycleAvgJouleCoupling : public TPS::Solver {
   void solveEnd() override;
 
   /// Push solver variables to interface
-  void initInterface(TPS::Tps2Boltzmann &interface) override;
+  void initInterface(TPS::Tps2Boltzmann& interface) override;
   /// Push solver variables to interface
-  void push(TPS::Tps2Boltzmann &interface) override;
+  void push(TPS::Tps2Boltzmann& interface) override;
   /// Fetch solver variables from interface
-  void fetch(TPS::Tps2Boltzmann &interface) override;
+  void fetch(TPS::Tps2Boltzmann& interface) override;
 
-  TPS::PlasmaSolver *getFlowSolver() { return flow_solver_; }
-  QuasiMagnetostaticSolverBase *getEMSolver() { return qmsa_solver_; }
+  TPS::PlasmaSolver* getFlowSolver() { return flow_solver_; }
+  QuasiMagnetostaticSolverBase* getEMSolver() { return qmsa_solver_; }
 };
 #endif  // CYCLE_AVG_JOULE_COUPLING_HPP_

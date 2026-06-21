@@ -125,12 +125,12 @@ void Tps::printHeader() {
 }
 
 /// Register and parse supported command line arguments and runtime inputs
-void Tps::parseCommandLineArgs(int argc, char *argv[]) {
+void Tps::parseCommandLineArgs(int argc, char* argv[]) {
   mfem::OptionsParser args(argc, argv);
   bool showVersion = false;
   bool debugMode = false;
   bool visualMode = false;
-  const char *astring = iFile_.c_str();
+  const char* astring = iFile_.c_str();
 
   if (isRank0_) {
     grvy_printf(GRVY_DEBUG, "# of command-line arguments = %i\n", argc);
@@ -187,8 +187,8 @@ void Tps::parseCommandLineArgs(int argc, char *argv[]) {
  * It is intended for use with Python interface.
  */
 void Tps::parseArgs(std::vector<std::string> argv) {
-  std::vector<char *> argv_char;
-  for (auto &s : argv) argv_char.push_back(&s.front());
+  std::vector<char*> argv_char;
+  for (auto& s : argv) argv_char.push_back(&s.front());
   parseCommandLineArgs(argv_char.size(), argv_char.data());
 }
 
@@ -248,28 +248,28 @@ void Tps::chooseSolver() {
   if (input_solver_type_ == "flow") {
     isFlowOnlyMode_ = true;
     solver_ = new M2ulPhyS(iFile_, this);
-    if (isRank0_) std::cout << "Using compressible DG solver" << endl;             
+    if (isRank0_) std::cout << "Using compressible DG solver" << endl;
   } else if (input_solver_type_ == "em") {
     isEMOnlyMode_ = true;
     ElectromagneticOptions em_opt;
     solver_ = new QuasiMagnetostaticSolver3D(em_opt, this);
-    if (isRank0_) std::cout << "Using quasi-magnetostatic solver" << endl;         
+    if (isRank0_) std::cout << "Using quasi-magnetostatic solver" << endl;
   } else if (input_solver_type_ == "loMach") {
     solver_ = new LoMachSolver(this);
-    if (isRank0_) std::cout << "Using low-Mach solver" << endl;     
+    if (isRank0_) std::cout << "Using low-Mach solver" << endl;
   } else if (input_solver_type_ == "em-axi") {
     isEMOnlyMode_ = true;
     ElectromagneticOptions em_opt;
     solver_ = new QuasiMagnetostaticSolverAxiSym(em_opt, this);
-    if (isRank0_) std::cout << "Using axisymmetric quasi-magnetostatic solver" << endl;     
+    if (isRank0_) std::cout << "Using axisymmetric quasi-magnetostatic solver" << endl;
   } else if (input_solver_type_ == "independent-coupled") {
     isFlowEMCoupledMode_ = true;
     solver_ = new IndependentCoupling(iFile_, this);
-    if (isRank0_) std::cout << "Using independent-coupled solver" << endl;     
+    if (isRank0_) std::cout << "Using independent-coupled solver" << endl;
   } else if (input_solver_type_ == "cycle-avg-joule-coupled") {
     isFlowEMCoupledMode_ = true;
     solver_ = new CycleAvgJouleCoupling(iFile_, this);
-    if (isRank0_) std::cout << "Using cycle-averaged joule-coupled solver" << endl; 
+    if (isRank0_) std::cout << "Using cycle-averaged joule-coupled solver" << endl;
   } else if (input_solver_type_ == "coupled") {
     isFlowEMCoupledMode_ = true;
     grvy_printf(GRVY_ERROR, "\nSlow your roll.  Solid high-five for whoever implements this coupled solver mode!\n");
@@ -353,7 +353,7 @@ void Tps::parseInput() {
  *  keyword not present.  Supported types are T={int,double,bool,std::string}
  */
 template <typename T>
-void Tps::getInput(const char *name, T &var, T varDefault) {
+void Tps::getInput(const char* name, T& var, T varDefault) {
   if (!iparse_.Read_Var(name, &var, varDefault)) {
     std::cout << "ERROR: Unable to read input variable -> " << name << std::endl;
     exit(ERROR);
@@ -364,7 +364,7 @@ void Tps::getInput(const char *name, T &var, T varDefault) {
 /** Read an input vector for keyword [name] and store in var - use vdef if
  *  keyword not present.  Only mfem::Vector supported.
  */
-void Tps::getVec(const char *name, Vector &vec, size_t numElems, const Vector &vdef) {
+void Tps::getVec(const char* name, Vector& vec, size_t numElems, const Vector& vdef) {
   if ((size_t)vdef.Size() < numElems) exit(ERROR);
   if ((size_t)vec.Size() < numElems) vec.SetSize(numElems);
 
@@ -376,8 +376,8 @@ void Tps::getVec(const char *name, Vector &vec, size_t numElems, const Vector &v
   if (!iparse_.Read_Var_Vec(name, vec.HostWrite(), numElems)) {
     grvy_log_setlevel(grvy_log_level);
     if (isRank0_) grvy_printf(GRVY_INFO, "Setting input vector %s to default.\n", name);
-    double *hv = vec.HostWrite();
-    const double *hd = vdef.HostRead();
+    double* hv = vec.HostWrite();
+    const double* hd = vdef.HostRead();
     for (size_t i = 0; i < numElems; i++) {
       hv[i] = hd[i];
     }
@@ -390,7 +390,7 @@ void Tps::getVec(const char *name, Vector &vec, size_t numElems, const Vector &v
  *  are T={int,double,bool,std::string}
  */
 template <typename T>
-void Tps::getRequiredInput(const char *name, T &var) {
+void Tps::getRequiredInput(const char* name, T& var) {
   if (!iparse_.Read_Var(name, &var)) {
     std::cout << "ERROR: Unable to read required input variable -> " << name << std::endl;
     exit(ERROR);
@@ -403,7 +403,7 @@ void Tps::getRequiredInput(const char *name, T &var) {
  *  @param[out] var vector variable to set (resized if necessary)
  *  @param[in] numElems length of vector
  */
-void Tps::getRequiredVec(const char *name, std::vector<double> &vec, size_t numElems) {
+void Tps::getRequiredVec(const char* name, std::vector<double>& vec, size_t numElems) {
   if (vec.size() < numElems) vec.reserve(numElems);
   if (!iparse_.Read_Var_Vec(name, vec.data(), numElems)) {
     std::cout << "ERROR: Unable to read input vector -> " << name << std::endl;
@@ -412,7 +412,7 @@ void Tps::getRequiredVec(const char *name, std::vector<double> &vec, size_t numE
 }
 
 /// @copydoc Tps::getRequiredVec(const char *,std::vector<double> &,size_t)
-void Tps::getRequiredVec(const char *name, Vector &vec, size_t numElems) {
+void Tps::getRequiredVec(const char* name, Vector& vec, size_t numElems) {
   if ((size_t)vec.Size() < numElems) vec.SetSize(numElems);
   if (!iparse_.Read_Var_Vec(name, vec.HostWrite(), numElems)) {
     std::cout << "ERROR: Unable to read input vector -> " << name << std::endl;
@@ -421,7 +421,7 @@ void Tps::getRequiredVec(const char *name, Vector &vec, size_t numElems) {
 }
 
 /// @copydoc Tps::getRequiredVec(const char *,Vector &,size_t)
-void Tps::getRequiredVec(const char *name, mfem::Array<double> &vec, size_t numElems) {
+void Tps::getRequiredVec(const char* name, mfem::Array<double>& vec, size_t numElems) {
   if ((size_t)vec.Size() < numElems) vec.SetSize(numElems);
   if (!iparse_.Read_Var_Vec(name, vec.HostWrite(), numElems)) {
     std::cout << "ERROR: Unable to read input vector -> " << name << std::endl;
@@ -435,7 +435,7 @@ void Tps::getRequiredVec(const char *name, mfem::Array<double> &vec, size_t numE
  * @param[inout] var vector variable to set
  * @param[in] ithElem index of element to set
  */
-void Tps::getRequiredVecElem(const char *name, double &value, int ithElem) {
+void Tps::getRequiredVecElem(const char* name, double& value, int ithElem) {
 #if 1
   if (!iparse_.Read_Var_iVec(name, &value, ithElem)) {
     grvy_printf(GRVY_ERROR, "Unable to read %ith element from input vector -> %s\n", ithElem, name);
@@ -444,7 +444,7 @@ void Tps::getRequiredVecElem(const char *name, double &value, int ithElem) {
 #endif
 }
 
-void Tps::getRequiredPairs(const char *name, std::vector<pair<std::string, std::string>> &var) {
+void Tps::getRequiredPairs(const char* name, std::vector<pair<std::string, std::string>>& var) {
   std::string inputString;
   if (!iparse_.Read_Var(name, &inputString)) {
     std::cout << "ERROR: Unable to read required input variable -> " << name << std::endl;
@@ -476,28 +476,28 @@ void Tps::getRequiredPairs(const char *name, std::vector<pair<std::string, std::
   return;
 }
 
-std::string ltrim(const std::string &s) {
+std::string ltrim(const std::string& s) {
   size_t start = s.find_first_not_of(" \n\r\t\f\v");
   return (start == std::string::npos) ? "" : s.substr(start);
 }
 
-std::string rtrim(const std::string &s) {
+std::string rtrim(const std::string& s) {
   size_t end = s.find_last_not_of(" \n\r\t\f\v");
   return (end == std::string::npos) ? "" : s.substr(0, end + 1);
 }
 
-std::string trim(const std::string &s) { return rtrim(ltrim(s)); }
+std::string trim(const std::string& s) { return rtrim(ltrim(s)); }
 
 // supported templates for getInput()
-template void Tps::getInput<int>(const char *name, int &var, int varDefault);
-template void Tps::getInput<double>(const char *name, double &var, double varDefault);
-template void Tps::getInput<std::string>(const char *name, std::string &var, std::string varDefault);
-template void Tps::getInput<bool>(const char *name, bool &var, bool varDefault);
+template void Tps::getInput<int>(const char* name, int& var, int varDefault);
+template void Tps::getInput<double>(const char* name, double& var, double varDefault);
+template void Tps::getInput<std::string>(const char* name, std::string& var, std::string varDefault);
+template void Tps::getInput<bool>(const char* name, bool& var, bool varDefault);
 
 // supported templates for getRequiredInput()
-template void Tps::getRequiredInput<int>(const char *name, int &var);
-template void Tps::getRequiredInput<double>(const char *name, double &var);
-template void Tps::getRequiredInput<std::string>(const char *name, std::string &var);
+template void Tps::getRequiredInput<int>(const char* name, int& var);
+template void Tps::getRequiredInput<double>(const char* name, double& var);
+template void Tps::getRequiredInput<std::string>(const char* name, std::string& var);
 
 }  // end namespace TPS
 
@@ -511,7 +511,7 @@ namespace py = pybind11;
 
 namespace tps_wrappers {
 
-void tps(py::module &m) {
+void tps(py::module& m) {
 #ifdef HAVE_MPI4PY
   // initialize mpi4py's C-API
   if (import_mpi4py() < 0) {
@@ -537,10 +537,10 @@ void tps(py::module &m) {
       .def("parseCommandLineArgs", &TPS::Tps::parseArgs)
       .def("parseInput", &TPS::Tps::parseInput)
       .def("getRequiredInput",
-           static_cast<double (TPS::Tps::*)(const std::string &)>(&TPS::Tps::getRequiredInput<double>))
-      .def("getRequiredInput", static_cast<int (TPS::Tps::*)(const std::string &)>(&TPS::Tps::getRequiredInput<int>))
-      .def("getInput", static_cast<double (TPS::Tps::*)(const std::string &, double)>(&TPS::Tps::getInput<double>))
-      .def("getInput", static_cast<int (TPS::Tps::*)(const std::string &, int)>(&TPS::Tps::getInput<int>))
+           static_cast<double (TPS::Tps::*)(const std::string&)>(&TPS::Tps::getRequiredInput<double>))
+      .def("getRequiredInput", static_cast<int (TPS::Tps::*)(const std::string&)>(&TPS::Tps::getRequiredInput<int>))
+      .def("getInput", static_cast<double (TPS::Tps::*)(const std::string&, double)>(&TPS::Tps::getInput<double>))
+      .def("getInput", static_cast<int (TPS::Tps::*)(const std::string&, int)>(&TPS::Tps::getInput<int>))
       .def("solve", &TPS::Tps::solve)
       .def("solveBegin", &TPS::Tps::solveBegin)
       .def("solveStep", &TPS::Tps::solveStep)

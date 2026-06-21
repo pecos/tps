@@ -47,7 +47,7 @@ struct spongeToTurbModel;
  * turbulence model to the flow.
  */
 struct turbModelToFlow {
-  const mfem::ParGridFunction *eddy_viscosity = nullptr;
+  const mfem::ParGridFunction* eddy_viscosity = nullptr;
 };
 
 /**
@@ -55,7 +55,7 @@ struct turbModelToFlow {
  * turbulence model to the thermo chem model.
  */
 struct turbModelToThermoChem {
-  const mfem::ParGridFunction *eddy_viscosity = nullptr;
+  const mfem::ParGridFunction* eddy_viscosity = nullptr;
 };
 
 struct extDataToTurbModel;
@@ -73,10 +73,10 @@ struct turbModelToExtData {};
  */
 class TurbModelBase {
  protected:
-  const flowToTurbModel *flow_interface_;
-  const thermoChemToTurbModel *thermoChem_interface_;
-  const extDataToTurbModel *extData_interface_;
-  const spongeToTurbModel *sponge_interface_;
+  const flowToTurbModel* flow_interface_;
+  const thermoChemToTurbModel* thermoChem_interface_;
+  const extDataToTurbModel* extData_interface_;
+  const spongeToTurbModel* sponge_interface_;
 
  public:
   /// Destructor
@@ -97,9 +97,9 @@ class TurbModelBase {
   /**
    * @brief Hook to let derived classes register visualization fields with ParaViewDataCollection
    */
-  virtual void initializeViz(mfem::ParaViewDataCollection &pvdc) {}
+  virtual void initializeViz(mfem::ParaViewDataCollection& pvdc) {}
 
-  virtual void initializeIO(IODataOrganizer &io) {}
+  virtual void initializeIO(IODataOrganizer& io) {}
 
   /**
    * @brief Initialize model operators
@@ -127,10 +127,10 @@ class TurbModelBase {
    * Initialize fields that the turbulence model needs from the
    * visc mult.
    */
-  void initializeFromSponge(spongeToTurbModel *sponge) { sponge_interface_ = sponge; }
+  void initializeFromSponge(spongeToTurbModel* sponge) { sponge_interface_ = sponge; }
 
   /// Get interface provided by flow model
-  const spongeToTurbModel *getSpongeInterface() const { return sponge_interface_; }
+  const spongeToTurbModel* getSpongeInterface() const { return sponge_interface_; }
 
   /**
    * @brief Initialize data from the flow class
@@ -138,10 +138,10 @@ class TurbModelBase {
    * Initialize fields that the turbulence model needs from the
    * flow.
    */
-  void initializeFromFlow(flowToTurbModel *flow) { flow_interface_ = flow; }
+  void initializeFromFlow(flowToTurbModel* flow) { flow_interface_ = flow; }
 
   /// Get interface provided by flow model
-  const flowToTurbModel *getFlowInterface() const { return flow_interface_; }
+  const flowToTurbModel* getFlowInterface() const { return flow_interface_; }
 
   /// Interface object, provides fields necessary for the flow
   turbModelToFlow toFlow_interface_;
@@ -152,10 +152,10 @@ class TurbModelBase {
    * Initialize fields that the turbulence model needs from the
    * thermochem model.
    */
-  void initializeFromThermoChem(thermoChemToTurbModel *thermoChem) { thermoChem_interface_ = thermoChem; }
+  void initializeFromThermoChem(thermoChemToTurbModel* thermoChem) { thermoChem_interface_ = thermoChem; }
 
   /// Get interface provided by thermoChem model
-  const thermoChemToTurbModel *getThermoChemInterface() const { return thermoChem_interface_; }
+  const thermoChemToTurbModel* getThermoChemInterface() const { return thermoChem_interface_; }
 
   /// Interface object, provides fields necessary for the turbModel
   turbModelToThermoChem toThermoChem_interface_;
@@ -166,16 +166,16 @@ class TurbModelBase {
    * Initialize fields that the turbulence model needs from the
    * external data.
    */
-  void initializeFromExtData(extDataToTurbModel *extData) { extData_interface_ = extData; }
+  void initializeFromExtData(extDataToTurbModel* extData) { extData_interface_ = extData; }
 
   /// Get interface provided by external data
-  const extDataToTurbModel *getExtDataInterface() const { return extData_interface_; }
+  const extDataToTurbModel* getExtDataInterface() const { return extData_interface_; }
 
   /// Interface object, provides fields necessary for the turbModel
   turbModelToExtData toExtData_interface_;
 
-  virtual mfem::ParGridFunction *getCurrentEddyViscosity() { return nullptr; }
-  virtual mfem::ParGridFunction *getGridScale() { return nullptr; }
+  virtual mfem::ParGridFunction* getCurrentEddyViscosity() { return nullptr; }
+  virtual mfem::ParGridFunction* getGridScale() { return nullptr; }
 };
 
 /**
@@ -184,13 +184,13 @@ class TurbModelBase {
  */
 class ZeroTurbModel final : public TurbModelBase {
  protected:
-  mfem::ParMesh *pmesh_;
+  mfem::ParMesh* pmesh_;
   const int sorder_;
 
-  mfem::FiniteElementCollection *fec_ = nullptr;
-  mfem::ParFiniteElementSpace *fes_ = nullptr;
+  mfem::FiniteElementCollection* fec_ = nullptr;
+  mfem::ParFiniteElementSpace* fes_ = nullptr;
 
-  mfem::ParGridFunction *eddy_viscosity_ = nullptr;
+  mfem::ParGridFunction* eddy_viscosity_ = nullptr;
 
  public:
   /**
@@ -202,7 +202,7 @@ class ZeroTurbModel final : public TurbModelBase {
    * @param sorder The polynomial order for scalar fields
    * @param nuT The (zero) value to use for the eddy viscosity
    */
-  ZeroTurbModel(mfem::ParMesh *pmesh, int sorder);
+  ZeroTurbModel(mfem::ParMesh* pmesh, int sorder);
 
   /// Free the interface fields and support objects
   ~ZeroTurbModel() final;

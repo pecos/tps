@@ -62,7 +62,7 @@ class AveragingOptions {
   bool enable_mean_continuation_; /**< Enable / disable continuation of statistics calculations from restart file */
   bool zero_variances_;           /**< Enable / disable zeroing out the variances at the beginning of a run */
 
-  void read(TPS::Tps *tps, std::string prefix = std::string(""));
+  void read(TPS::Tps* tps, std::string prefix = std::string(""));
 };
 
 /**
@@ -97,13 +97,13 @@ class AveragingFamily {
   int vari_components_;
 
   /** Pointer to function containing the instantaneous field being averaged (not owned) */
-  const ParGridFunction *instantaneous_fcn_;
+  const ParGridFunction* instantaneous_fcn_;
 
   /** Pointer to mean field (owned) */
-  ParGridFunction *mean_fcn_;
+  ParGridFunction* mean_fcn_;
 
   /** Pointer to variance field (owned) */
-  ParGridFunction *vari_fcn_;
+  ParGridFunction* vari_fcn_;
 
   /**
    * @brief Constructor
@@ -112,7 +112,7 @@ class AveragingFamily {
    * constructing the AveragingFamily, but AveragingFamily then takes
    * ownership.
    */
-  AveragingFamily(std::string name, const ParGridFunction *instant, ParGridFunction *mean, ParGridFunction *vari,
+  AveragingFamily(std::string name, const ParGridFunction* instant, ParGridFunction* mean, ParGridFunction* vari,
                   int vari_start_index = 0, int vari_components = 1) {
     name_ = name;
     vari_start_index_ = vari_start_index;
@@ -123,7 +123,7 @@ class AveragingFamily {
   }
 
   /// Move constructor (required for emplace_back)
-  AveragingFamily(AveragingFamily &&fam) {
+  AveragingFamily(AveragingFamily&& fam) {
     this->name_ = fam.name_;
     this->vari_start_index_ = fam.vari_start_index_;
     this->vari_components_ = fam.vari_components_;
@@ -184,16 +184,16 @@ class Averaging {
   bool zero_variances_;
 
   /// mfem paraview data collection, used to write viz files
-  ParaViewDataCollection *pvdc_ = nullptr;
+  ParaViewDataCollection* pvdc_ = nullptr;
 
   /// time averaged p, rho, vel (pointers to meanUp) for visualization (M2ulPhyS only!)
-  ParGridFunction *meanP = nullptr;
-  ParGridFunction *meanRho = nullptr;
-  ParGridFunction *meanV = nullptr;
+  ParGridFunction* meanP = nullptr;
+  ParGridFunction* meanRho = nullptr;
+  ParGridFunction* meanV = nullptr;
 
  public:
   /// Constructor
-  Averaging(AveragingOptions &opts, std::string output_name);
+  Averaging(AveragingOptions& opts, std::string output_name);
 
   /// Destructor
   ~Averaging();
@@ -207,7 +207,7 @@ class Averaging {
    * @param vari_start_index Variable index at which to start variances (see AveragingFamily)
    * @param vari_components Number of variables in variances (see AveragingFamily)
    */
-  void registerField(std::string name, const ParGridFunction *field_to_average, bool compute_vari = true,
+  void registerField(std::string name, const ParGridFunction* field_to_average, bool compute_vari = true,
                      int vari_start_index = 0, int vari_components = 1);
 
   /**
@@ -222,12 +222,12 @@ class Averaging {
    * returns.  If so, farms work out to appropriate addSampleInternal
    * variant.
    */
-  void addSample(const int &iter, GasMixture *mixture = nullptr);
+  void addSample(const int& iter, GasMixture* mixture = nullptr);
 
   /**
    * @brief Write paraview visualization files with statistics
    */
-  void writeViz(const int &iter, const double &time, bool save_mean_hist);
+  void writeViz(const int& iter, const double& time, bool save_mean_hist);
 
   /**
    * @brief Internal implementation of sample addition
@@ -245,7 +245,7 @@ class Averaging {
    * requirement on device lambdas.  Instead of this method, you
    * should call addSample (with mixture = a valid GasMixture object).
    */
-  void addSampleInternal(GasMixture *mixture);
+  void addSampleInternal(GasMixture* mixture);
 
   /**
    * @brief Initialize visualiztion for statistics (M2ulPhyS version)
@@ -254,7 +254,7 @@ class Averaging {
    * with how stats viz files were originally labeled.  It should only
    * be used inside M2ulPhyS.
    */
-  void initializeVizForM2ulPhyS(ParFiniteElementSpace *fes, ParFiniteElementSpace *dfes, int nvel);
+  void initializeVizForM2ulPhyS(ParFiniteElementSpace* fes, ParFiniteElementSpace* dfes, int nvel);
 
   int getFamilyIndex(std::string name) const {
     for (size_t i = 0; i < avg_families_.size(); i++) {
@@ -268,7 +268,7 @@ class Averaging {
    *
    * @param name Name of the family
    */
-  ParGridFunction *GetMeanField(std::string name) {
+  ParGridFunction* GetMeanField(std::string name) {
     const int i = getFamilyIndex(name);
     assert(i >= 0);
     return avg_families_[i].mean_fcn_;
@@ -279,7 +279,7 @@ class Averaging {
    *
    * @param name Name of the family
    */
-  ParGridFunction *GetVariField(std::string name) {
+  ParGridFunction* GetVariField(std::string name) {
     const int i = getFamilyIndex(name);
     assert(i >= 0);
     return avg_families_[i].vari_fcn_;
@@ -294,9 +294,9 @@ class Averaging {
   bool ContinueMean() { return enable_mean_continuation_; }
   bool RestartRMS() { return zero_variances_; }
 
-  void SetSamplesMean(int &samples) { ns_mean_ = samples; }
-  void SetSamplesRMS(int &samples) { ns_vari_ = samples; }
-  void SetSamplesInterval(int &interval) { sample_interval_ = interval; }
+  void SetSamplesMean(int& samples) { ns_mean_ = samples; }
+  void SetSamplesRMS(int& samples) { ns_vari_ = samples; }
+  void SetSamplesInterval(int& interval) { sample_interval_ = interval; }
 };
 
 #endif  // AVERAGING_HPP_

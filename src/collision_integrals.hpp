@@ -56,25 +56,25 @@ namespace charged {
   laser-plasma interactions. Journal of Computational Physics, 406, 109190. https://doi.org/10.1016/j.jcp.2019.109190
 */
 
-MFEM_HOST_DEVICE double att11(const double &Tp);
-MFEM_HOST_DEVICE double att12(const double &Tp);
-MFEM_HOST_DEVICE double att13(const double &Tp);
-MFEM_HOST_DEVICE double att14(const double &Tp);
-MFEM_HOST_DEVICE double att15(const double &Tp);
+MFEM_HOST_DEVICE double att11(const double& Tp);
+MFEM_HOST_DEVICE double att12(const double& Tp);
+MFEM_HOST_DEVICE double att13(const double& Tp);
+MFEM_HOST_DEVICE double att14(const double& Tp);
+MFEM_HOST_DEVICE double att15(const double& Tp);
 
-MFEM_HOST_DEVICE double att22(const double &Tp);
-MFEM_HOST_DEVICE double att23(const double &Tp);
-MFEM_HOST_DEVICE double att24(const double &Tp);
+MFEM_HOST_DEVICE double att22(const double& Tp);
+MFEM_HOST_DEVICE double att23(const double& Tp);
+MFEM_HOST_DEVICE double att24(const double& Tp);
 
-MFEM_HOST_DEVICE double rep11(const double &Tp);
-MFEM_HOST_DEVICE double rep12(const double &Tp);
-MFEM_HOST_DEVICE double rep13(const double &Tp);
-MFEM_HOST_DEVICE double rep14(const double &Tp);
-MFEM_HOST_DEVICE double rep15(const double &Tp);
+MFEM_HOST_DEVICE double rep11(const double& Tp);
+MFEM_HOST_DEVICE double rep12(const double& Tp);
+MFEM_HOST_DEVICE double rep13(const double& Tp);
+MFEM_HOST_DEVICE double rep14(const double& Tp);
+MFEM_HOST_DEVICE double rep15(const double& Tp);
 
-MFEM_HOST_DEVICE double rep22(const double &Tp);
-MFEM_HOST_DEVICE double rep23(const double &Tp);
-MFEM_HOST_DEVICE double rep24(const double &Tp);
+MFEM_HOST_DEVICE double rep22(const double& Tp);
+MFEM_HOST_DEVICE double rep23(const double& Tp);
+MFEM_HOST_DEVICE double rep24(const double& Tp);
 
 }  // namespace charged
 
@@ -83,23 +83,23 @@ MFEM_HOST_DEVICE double rep24(const double &Tp);
 // Takes T in Kelvin, returns in unit of m^2.
 namespace argon {
 
-MFEM_HOST_DEVICE double ArAr11(const double &T);
+MFEM_HOST_DEVICE double ArAr11(const double& T);
 
-MFEM_HOST_DEVICE double ArAr22(const double &T);
+MFEM_HOST_DEVICE double ArAr22(const double& T);
 
 // argon neutral (Ar) - argon positive ion (Ar1P)
-MFEM_HOST_DEVICE double ArAr1P11(const double &T);
+MFEM_HOST_DEVICE double ArAr1P11(const double& T);
 
 /*
   e-Ar (l,r) are fitted over numerical quadrature of definitions.
   Q_{e,Ar}^(1), elastic momentum transfer cross section, is determined by a 7-parameter shifted MERT model,
   fitted over BSR LXCat dataset.
 */
-MFEM_HOST_DEVICE double eAr11(const double &T);
-MFEM_HOST_DEVICE double eAr12(const double &T);
-MFEM_HOST_DEVICE double eAr13(const double &T);
-MFEM_HOST_DEVICE double eAr14(const double &T);
-MFEM_HOST_DEVICE double eAr15(const double &T);
+MFEM_HOST_DEVICE double eAr11(const double& T);
+MFEM_HOST_DEVICE double eAr12(const double& T);
+MFEM_HOST_DEVICE double eAr13(const double& T);
+MFEM_HOST_DEVICE double eAr14(const double& T);
+MFEM_HOST_DEVICE double eAr15(const double& T);
 
 }  // namespace argon
 
@@ -109,37 +109,37 @@ MFEM_HOST_DEVICE double eAr15(const double &T);
 namespace nitrogen {
 
 // atmoic nitrogen neutral (Ar) - atomic nitrogen positive ion (Ni1P)
-MFEM_HOST_DEVICE double NiNi1P11(const double &T);
-MFEM_HOST_DEVICE double NiNi11(const double &T);
-MFEM_HOST_DEVICE double NiNi22(const double &T);
+MFEM_HOST_DEVICE double NiNi1P11(const double& T);
+MFEM_HOST_DEVICE double NiNi11(const double& T);
+MFEM_HOST_DEVICE double NiNi22(const double& T);
 
 // molecular nitrogen neutral (N2) - molecular nitrogen positive ion (N21P)
-MFEM_HOST_DEVICE double N2N21P11(const double &T);
-MFEM_HOST_DEVICE double N2N211(const double &T);
-MFEM_HOST_DEVICE double N2N222(const double &T);
+MFEM_HOST_DEVICE double N2N21P11(const double& T);
+MFEM_HOST_DEVICE double N2N211(const double& T);
+MFEM_HOST_DEVICE double N2N222(const double& T);
 
 // mixed
-MFEM_HOST_DEVICE double N2Ni11(const double &T);
-MFEM_HOST_DEVICE double N2Ni22(const double &T);
-MFEM_HOST_DEVICE double N2Ni1P11(const double &T);
-MFEM_HOST_DEVICE double NiN21P11(const double &T);
+MFEM_HOST_DEVICE double N2Ni11(const double& T);
+MFEM_HOST_DEVICE double N2Ni22(const double& T);
+MFEM_HOST_DEVICE double N2Ni1P11(const double& T);
+MFEM_HOST_DEVICE double NiN21P11(const double& T);
 
 /*
   e-Ar (l,r) are fitted over numerical quadrature of definitions.
   Q_{e,Ar}^(1), elastic momentum transfer cross section, is determined by a 7-parameter shifted MERT model,
   fitted over BSR LXCat dataset.
 */
-MFEM_HOST_DEVICE double eNi11(const double &T);
-MFEM_HOST_DEVICE double eNi12(const double &T);
-MFEM_HOST_DEVICE double eNi13(const double &T);
-MFEM_HOST_DEVICE double eNi14(const double &T);
-MFEM_HOST_DEVICE double eNi15(const double &T);
+MFEM_HOST_DEVICE double eNi11(const double& T);
+MFEM_HOST_DEVICE double eNi12(const double& T);
+MFEM_HOST_DEVICE double eNi13(const double& T);
+MFEM_HOST_DEVICE double eNi14(const double& T);
+MFEM_HOST_DEVICE double eNi15(const double& T);
 
-MFEM_HOST_DEVICE double eN211(const double &T);
-MFEM_HOST_DEVICE double eN212(const double &T);
-MFEM_HOST_DEVICE double eN213(const double &T);
-MFEM_HOST_DEVICE double eN214(const double &T);
-MFEM_HOST_DEVICE double eN215(const double &T);
+MFEM_HOST_DEVICE double eN211(const double& T);
+MFEM_HOST_DEVICE double eN212(const double& T);
+MFEM_HOST_DEVICE double eN213(const double& T);
+MFEM_HOST_DEVICE double eN214(const double& T);
+MFEM_HOST_DEVICE double eN215(const double& T);
 
 }  // namespace nitrogen
 

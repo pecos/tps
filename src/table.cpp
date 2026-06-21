@@ -36,8 +36,8 @@
 
 using namespace std;
 
-MFEM_HOST_DEVICE TableInterpolator::TableInterpolator(const int &Ndata, const double *xdata, const double *fdata,
-                                                      const bool &xLogScale, const bool &fLogScale)
+MFEM_HOST_DEVICE TableInterpolator::TableInterpolator(const int& Ndata, const double* xdata, const double* fdata,
+                                                      const bool& xLogScale, const bool& fLogScale)
     : Ndata_(Ndata), xLogScale_(xLogScale), fLogScale_(fLogScale) {
   assert((xdata != NULL) && (fdata != NULL));
   for (int k = 0; k < Ndata_; k++) {
@@ -49,7 +49,7 @@ MFEM_HOST_DEVICE TableInterpolator::TableInterpolator(const int &Ndata, const do
 // Find the data interval where the input value lies within.
 // The algorithm is a copy version of std::upper_bound, which is similar to binary search.
 // This has O(log_2(Ndata)) complexity.
-MFEM_HOST_DEVICE int TableInterpolator::findInterval(const double &xEval) {
+MFEM_HOST_DEVICE int TableInterpolator::findInterval(const double& xEval) {
   int count = Ndata_;
   int first = 0;
   int it, step;
@@ -76,7 +76,7 @@ MFEM_HOST_DEVICE int TableInterpolator::findInterval(const double &xEval) {
 //////// Linear interpolation
 //////////////////////////////////////////////////////
 
-MFEM_HOST_DEVICE LinearTable::LinearTable(const TableInput &input)
+MFEM_HOST_DEVICE LinearTable::LinearTable(const TableInput& input)
     : TableInterpolator(input.Ndata, input.xdata, input.fdata, input.xLogScale, input.fLogScale) {
   assert(input.order == 1);
   for (int k = 0; k < Ndata_ - 1; k++) {
@@ -87,7 +87,7 @@ MFEM_HOST_DEVICE LinearTable::LinearTable(const TableInput &input)
   }
 }
 
-MFEM_HOST_DEVICE double LinearTable::eval(const double &xEval) {
+MFEM_HOST_DEVICE double LinearTable::eval(const double& xEval) {
   int index = findInterval(xEval);
   double xt = (xLogScale_) ? log(xEval) : xEval;
   double ft = a_[index] + b_[index] * xt;
@@ -96,7 +96,7 @@ MFEM_HOST_DEVICE double LinearTable::eval(const double &xEval) {
   return ft;
 }
 
-MFEM_HOST_DEVICE double LinearTable::eval_x(const double &xEval) {
+MFEM_HOST_DEVICE double LinearTable::eval_x(const double& xEval) {
   const int index = findInterval(xEval);
   const double xt = (xLogScale_) ? log(xEval) : xEval;
   const double xt_xt = (xLogScale_) ? 1. / xEval : 1.0;
@@ -174,7 +174,7 @@ GslTableInterpolator2D::GslTableInterpolator2D(std::string plato_file, int xcol,
   assert(fcol >= 0 && fcol < ncol);
 
   // open plato file
-  FILE *table_input_file;
+  FILE* table_input_file;
   table_input_file = fopen(plato_file.c_str(), "r");
   if (!table_input_file) {
     std::cout << "Unable to open " << plato_file << std::endl;
@@ -191,7 +191,7 @@ GslTableInterpolator2D::GslTableInterpolator2D(std::string plato_file, int xcol,
 
   // read data
   // char stmp;
-  double *ftmp = new double[ncol];
+  double* ftmp = new double[ncol];
   for (unsigned int jj = 0; jj < ny_; ++jj) {
     for (unsigned int ii = 0; ii < nx_; ++ii) {
       ierr = 0;
@@ -226,8 +226,8 @@ GslTableInterpolator2D::GslTableInterpolator2D(std::string plato_file, int xcol,
  * Initializes data using input pointers.  Allocates and initializes
  * all required GSL objects.
  */
-GslTableInterpolator2D::GslTableInterpolator2D(unsigned int nx, unsigned int ny, const double *xdata,
-                                               const double *ydata, const double *fdata)
+GslTableInterpolator2D::GslTableInterpolator2D(unsigned int nx, unsigned int ny, const double* xdata,
+                                               const double* ydata, const double* fdata)
     : TableInterpolator2D(nx, ny), itype_(gsl_interp2d_bilinear) {
   for (unsigned int i = 0; i < nx_; ++i) {
     xdata_[i] = xdata[i];

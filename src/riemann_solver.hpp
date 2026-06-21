@@ -52,29 +52,29 @@ class RiemannSolverTPS {
  private:
   const int num_equation;
 
-  GasMixture *mixture;
+  GasMixture* mixture;
   Equations eqSystem;
-  Fluxes *fluxClass;
+  Fluxes* fluxClass;
 
   bool useRoe;
   const bool axisymmetric_;
 
-  void Eval_Roe(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux);
+  void Eval_Roe(const Vector& state1, const Vector& state2, const Vector& nor, Vector& flux);
 
  public:
-  MFEM_HOST_DEVICE RiemannSolverTPS(int _num_equation, GasMixture *mixture, Equations _eqSystem, Fluxes *_fluxClass,
+  MFEM_HOST_DEVICE RiemannSolverTPS(int _num_equation, GasMixture* mixture, Equations _eqSystem, Fluxes* _fluxClass,
                                     bool _useRoe, bool axisym);
 
-  void Eval(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux, bool LF = false);
-  MFEM_HOST_DEVICE void Eval(const double *state1, const double *state2, const double *nor, double *flux,
+  void Eval(const Vector& state1, const Vector& state2, const Vector& nor, Vector& flux, bool LF = false);
+  MFEM_HOST_DEVICE void Eval(const double* state1, const double* state2, const double* nor, double* flux,
                              bool LF = false);
 
-  void ComputeFluxDotN(const Vector &state, const Vector &nor, Vector &fluxN);
+  void ComputeFluxDotN(const Vector& state, const Vector& nor, Vector& fluxN);
 
-  MFEM_HOST_DEVICE void ComputeFluxDotN(const double *state, const double *nor, double *fluxN) const;
+  MFEM_HOST_DEVICE void ComputeFluxDotN(const double* state, const double* nor, double* fluxN) const;
 
-  void Eval_LF(const Vector &state1, const Vector &state2, const Vector &nor, Vector &flux);
-  MFEM_HOST_DEVICE void Eval_LF(const double *state1, const double *state2, const double *nor, double *flux) const;
+  void Eval_LF(const Vector& state1, const Vector& state2, const Vector& nor, Vector& flux);
+  MFEM_HOST_DEVICE void Eval_LF(const double* state1, const double* state2, const double* nor, double* flux) const;
 
   MFEM_HOST_DEVICE bool isAxisymmetric() const { return axisymmetric_; }
 };

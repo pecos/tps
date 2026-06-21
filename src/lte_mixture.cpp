@@ -36,7 +36,7 @@
 #include "lte_mixture.hpp"
 
 #ifndef _GPU_
-LteMixture::LteMixture(RunConfiguration &_runfile, int _dim, int nvel)
+LteMixture::LteMixture(RunConfiguration& _runfile, int _dim, int nvel)
     : GasMixture(_runfile.lteMixtureInput.f, _dim, nvel, _runfile.const_plasma_conductivity_) {
   numSpecies = 1;
   ambipolar = false;
@@ -116,11 +116,11 @@ MFEM_HOST_DEVICE LteMixture::~LteMixture() {
 }
 
 /// Compute pressure from conserved state
-double LteMixture::ComputePressure(const Vector &state, double *electronPressure) {
+double LteMixture::ComputePressure(const Vector& state, double* electronPressure) {
   return ComputePressure(state.GetData(), electronPressure);
 }
 
-MFEM_HOST_DEVICE double LteMixture::ComputePressure(const double *state, double *electronPressure) {
+MFEM_HOST_DEVICE double LteMixture::ComputePressure(const double* state, double* electronPressure) {
   const double rho = state[0];
   // const double T = ComputeTemperature(state);
   double T;
@@ -135,11 +135,11 @@ MFEM_HOST_DEVICE double LteMixture::ComputePressure(const double *state, double 
 }
 
 /// Compute pressure from primitive state
-double LteMixture::ComputePressureFromPrimitives(const Vector &Up) {
+double LteMixture::ComputePressureFromPrimitives(const Vector& Up) {
   return ComputePressureFromPrimitives(Up.GetData());
 }
 
-MFEM_HOST_DEVICE double LteMixture::ComputePressureFromPrimitives(const double *Up) {
+MFEM_HOST_DEVICE double LteMixture::ComputePressureFromPrimitives(const double* Up) {
   const double rho = Up[0];
   const double T = Up[1 + nvel_];
 #ifdef _GPU_
@@ -158,7 +158,7 @@ MFEM_HOST_DEVICE double LteMixture::ComputePressureFromPrimitives(const double *
  * internal energy given by the thermodynamic equilibrium look-up
  * table.
  */
-MFEM_HOST_DEVICE bool LteMixture::ComputeTemperatureInternal(const double *state, double &T) {
+MFEM_HOST_DEVICE bool LteMixture::ComputeTemperatureInternal(const double* state, double& T) {
   const double rho = state[0];
 
   double den_vel2 = 0;
@@ -222,9 +222,9 @@ MFEM_HOST_DEVICE bool LteMixture::ComputeTemperatureInternal(const double *state
   return true;
 }
 
-double LteMixture::ComputeTemperature(const Vector &state) { return ComputeTemperature(state.GetData()); }
+double LteMixture::ComputeTemperature(const Vector& state) { return ComputeTemperature(state.GetData()); }
 
-MFEM_HOST_DEVICE double LteMixture::ComputeTemperature(const double *state) {
+MFEM_HOST_DEVICE double LteMixture::ComputeTemperature(const double* state) {
   double T;
   const bool success = ComputeTemperatureInternal(state, T);
   assert(success);
@@ -304,19 +304,19 @@ MFEM_HOST_DEVICE double LteMixture::ComputeTemperatureFromDensityPressure(const 
 }
 
 // TODO(trevilo): move this into the base class
-void LteMixture::computeSpeciesEnthalpies(const Vector &state, Vector &speciesEnthalpies) {
+void LteMixture::computeSpeciesEnthalpies(const Vector& state, Vector& speciesEnthalpies) {
   speciesEnthalpies.SetSize(numSpecies);
   speciesEnthalpies = 0.0;
   return;
 }
 
 /// Compute primitive variables (rho, u, T) from conserved (rho, rho*u, rho*E)
-void LteMixture::GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit) {
+void LteMixture::GetPrimitivesFromConservatives(const Vector& conserv, Vector& primit) {
   primit.SetSize(conserv.Size());
   GetPrimitivesFromConservatives(conserv.GetData(), primit.GetData());
 }
 
-MFEM_HOST_DEVICE void LteMixture::GetPrimitivesFromConservatives(const double *conserv, double *primit) {
+MFEM_HOST_DEVICE void LteMixture::GetPrimitivesFromConservatives(const double* conserv, double* primit) {
   const double T = ComputeTemperature(conserv);
 
   for (int i = 0; i < num_equation; i++) {
@@ -329,12 +329,12 @@ MFEM_HOST_DEVICE void LteMixture::GetPrimitivesFromConservatives(const double *c
 }
 
 /// Compute conserved variables (rho, rho*u, rho*E) from primitive (rho, u, T)
-void LteMixture::GetConservativesFromPrimitives(const Vector &primit, Vector &conserv) {
+void LteMixture::GetConservativesFromPrimitives(const Vector& primit, Vector& conserv) {
   conserv.SetSize(primit.Size());
   GetConservativesFromPrimitives(primit.GetData(), conserv.GetData());
 }
 
-MFEM_HOST_DEVICE void LteMixture::GetConservativesFromPrimitives(const double *primit, double *conserv) {
+MFEM_HOST_DEVICE void LteMixture::GetConservativesFromPrimitives(const double* primit, double* conserv) {
   for (int i = 0; i < num_equation; i++) {
     conserv[i] = primit[i];
   }
@@ -358,12 +358,12 @@ MFEM_HOST_DEVICE void LteMixture::GetConservativesFromPrimitives(const double *p
 }
 
 /// Compute the speed of sound (from look-up table)
-double LteMixture::ComputeSpeedOfSound(const Vector &Uin, bool primitive) {
+double LteMixture::ComputeSpeedOfSound(const Vector& Uin, bool primitive) {
   return ComputeSpeedOfSound(Uin.GetData(), primitive);
 }
 
 /// Compute the speed of sound (from look-up table)
-MFEM_HOST_DEVICE double LteMixture::ComputeSpeedOfSound(const double *Uin, bool primitive) {
+MFEM_HOST_DEVICE double LteMixture::ComputeSpeedOfSound(const double* Uin, bool primitive) {
   const double rho = Uin[0];
   double T;
   if (primitive) {
@@ -381,10 +381,10 @@ MFEM_HOST_DEVICE double LteMixture::ComputeSpeedOfSound(const double *Uin, bool 
 }
 
 /// Compute the maximum characteristic speed (u+a)
-double LteMixture::ComputeMaxCharSpeed(const Vector &state) { return ComputeMaxCharSpeed(state.GetData()); }
+double LteMixture::ComputeMaxCharSpeed(const Vector& state) { return ComputeMaxCharSpeed(state.GetData()); }
 
 /// Compute the maximum characteristic speed (u+a)
-MFEM_HOST_DEVICE double LteMixture::ComputeMaxCharSpeed(const double *state) {
+MFEM_HOST_DEVICE double LteMixture::ComputeMaxCharSpeed(const double* state) {
   const double den = state[0];
 
   double den_vel2 = 0;
@@ -400,13 +400,13 @@ MFEM_HOST_DEVICE double LteMixture::ComputeMaxCharSpeed(const double *state) {
 }
 
 // only used in non-reflecting BCs... don't implement for now
-double LteMixture::ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin, bool primitive) {
+double LteMixture::ComputePressureDerivative(const Vector& dUp_dx, const Vector& Uin, bool primitive) {
   assert(false);
   return 0.0;
 }
 
 /// Check if the density, temperature, and pressure are positive
-bool LteMixture::StateIsPhysical(const Vector &state) {
+bool LteMixture::StateIsPhysical(const Vector& state) {
   const double rho = state[0];
   const double T = ComputeTemperature(state);
 #ifdef _GPU_
@@ -422,13 +422,13 @@ bool LteMixture::StateIsPhysical(const Vector &state) {
 }
 
 // BC related functions
-void LteMixture::computeStagnantStateWithTemp(const Vector &stateIn, const double Temp, Vector &stateOut) {
+void LteMixture::computeStagnantStateWithTemp(const Vector& stateIn, const double Temp, Vector& stateOut) {
   stateOut.SetSize(num_equation);
   computeStagnantStateWithTemp(stateIn.GetData(), Temp, stateOut.GetData());
 }
 
-MFEM_HOST_DEVICE void LteMixture::computeStagnantStateWithTemp(const double *stateIn, const double Temp,
-                                                               double *stateOut) {
+MFEM_HOST_DEVICE void LteMixture::computeStagnantStateWithTemp(const double* stateIn, const double Temp,
+                                                               double* stateOut) {
   for (int i = 0; i < num_equation; i++) {
     stateOut[i] = stateIn[i];
   }
@@ -445,12 +445,12 @@ MFEM_HOST_DEVICE void LteMixture::computeStagnantStateWithTemp(const double *sta
   stateOut[1 + nvel_] = rho * energy;
 }
 
-void LteMixture::modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p,
+void LteMixture::modifyEnergyForPressure(const Vector& stateIn, Vector& stateOut, const double& p,
                                          bool modifyElectronEnergy) {
   modifyEnergyForPressure(stateIn.GetData(), stateOut.GetData(), p, modifyElectronEnergy);
 }
 
-MFEM_HOST_DEVICE void LteMixture::modifyEnergyForPressure(const double *stateIn, double *stateOut, const double &p,
+MFEM_HOST_DEVICE void LteMixture::modifyEnergyForPressure(const double* stateIn, double* stateOut, const double& p,
                                                           bool modifyElectronEnergy) {
   for (int eq = 0; eq < num_equation; eq++) stateOut[eq] = stateIn[eq];
 

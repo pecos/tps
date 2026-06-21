@@ -31,8 +31,8 @@
 // -----------------------------------------------------------------------------------el-
 #include "BoundaryCondition.hpp"
 
-BoundaryCondition::BoundaryCondition(RiemannSolverTPS *_rsolver, GasMixture *_mixture, Equations _eqSystem,
-                                     ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt,
+BoundaryCondition::BoundaryCondition(RiemannSolverTPS* _rsolver, GasMixture* _mixture, Equations _eqSystem,
+                                     ParFiniteElementSpace* _vfes, IntegrationRules* _intRules, double& _dt,
                                      const int _dim, const int _num_equation, const int _patchNumber,
                                      const double _refLength, bool axisym)
     : rsolver(_rsolver),
@@ -52,7 +52,7 @@ BoundaryCondition::BoundaryCondition(RiemannSolverTPS *_rsolver, GasMixture *_mi
 
 BoundaryCondition::~BoundaryCondition() {}
 
-void BoundaryCondition::computeBdrPrimitiveStateForGradient(const Vector &stateIn, Vector &stateBC) const {
+void BoundaryCondition::computeBdrPrimitiveStateForGradient(const Vector& stateIn, Vector& stateBC) const {
   stateBC = stateIn;
 }
 
@@ -63,8 +63,8 @@ double BoundaryCondition::aggregateArea(int bndry_patchnum, MPI_Comm bc_comm) {
   for (int bel = 0; bel < vfes->GetNBE(); bel++) {
     int attr = vfes->GetBdrAttribute(bel);
     if (attr == bndry_patchnum) {
-      FaceElementTransformations *Tr = vfes->GetMesh()->GetBdrFaceTransformations(bel);
-      const IntegrationRule &ir = IntRules.Get(Tr->GetGeometryType(), Tr->OrderJ());
+      FaceElementTransformations* Tr = vfes->GetMesh()->GetBdrFaceTransformations(bel);
+      const IntegrationRule& ir = IntRules.Get(Tr->GetGeometryType(), Tr->OrderJ());
 
       for (int p = 0; p < ir.GetNPoints(); p++) {
         const IntegrationPoint ip = ir.IntPoint(p);
@@ -91,15 +91,15 @@ int BoundaryCondition::aggregateBndryFaces(int bndry_patchnum, MPI_Comm bc_comm)
   return (nfacesTotal);
 }
 
-void BoundaryCondition::setElementList(Array<int> &_listElems) {
+void BoundaryCondition::setElementList(Array<int>& _listElems) {
   listElems.SetSize(_listElems.Size());
   for (int i = 0; i < listElems.Size(); i++) listElems[i] = _listElems[i];
   listElems.ReadWrite();
 }
 
-void BoundaryCondition::copyValues(const Vector &orig, Vector &target, const double &mult) {
-  const double *dOrig = orig.Read();
-  double *dTarget = target.Write();
+void BoundaryCondition::copyValues(const Vector& orig, Vector& target, const double& mult) {
+  const double* dOrig = orig.Read();
+  double* dTarget = target.Write();
 
   MFEM_FORALL(i, target.Size(), { dTarget[i] = dOrig[i] * mult; });
 }

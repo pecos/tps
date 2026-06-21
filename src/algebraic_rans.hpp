@@ -46,7 +46,7 @@
  */
 class AlgebraicRans : public TurbModelBase {
  protected:
-  mfem::ParMesh *pmesh_ = nullptr;
+  mfem::ParMesh* pmesh_ = nullptr;
   int order_;
   int dim_;
   bool axisym_;
@@ -54,32 +54,32 @@ class AlgebraicRans : public TurbModelBase {
   double max_mixing_length_;
   double kappa_von_karman_;
 
-  mfem::FiniteElementCollection *sfec_ = nullptr;
-  mfem::ParFiniteElementSpace *sfes_ = nullptr;
+  mfem::FiniteElementCollection* sfec_ = nullptr;
+  mfem::ParFiniteElementSpace* sfes_ = nullptr;
 
-  mfem::FiniteElementCollection *vfec_ = nullptr;
-  mfem::ParFiniteElementSpace *vfes_ = nullptr;
+  mfem::FiniteElementCollection* vfec_ = nullptr;
+  mfem::ParFiniteElementSpace* vfes_ = nullptr;
 
-  mfem::ParGridFunction *vorticity_gf_ = nullptr;
-  mfem::ParGridFunction *swirl_vorticity_gf_ = nullptr;
+  mfem::ParGridFunction* vorticity_gf_ = nullptr;
+  mfem::ParGridFunction* swirl_vorticity_gf_ = nullptr;
 
-  mfem::ParGridFunction *mut_ = nullptr;
-  mfem::ParGridFunction *distance_ = nullptr;
-  mfem::ParGridFunction *ell_mix_gf_ = nullptr;
+  mfem::ParGridFunction* mut_ = nullptr;
+  mfem::ParGridFunction* distance_ = nullptr;
+  mfem::ParGridFunction* ell_mix_gf_ = nullptr;
 
   // Only used by filter
   bool filter_mut_ = false;
   int filter_p_ = 1;
-  mfem::FiniteElementCollection *sfec_filter_ = nullptr;
-  mfem::ParFiniteElementSpace *sfes_filter_ = nullptr;
-  mfem::ParGridFunction *low_order_mut_ = nullptr;
+  mfem::FiniteElementCollection* sfec_filter_ = nullptr;
+  mfem::ParFiniteElementSpace* sfes_filter_ = nullptr;
+  mfem::ParGridFunction* low_order_mut_ = nullptr;
 
  public:
   /// Constructor
   //  AlgebraicRans(mfem::Mesh *smesh, mfem::ParMesh *pmesh, const mfem::Array<int> &partitioning, int order, TPS::Tps
   //  *tps);
-  AlgebraicRans(mfem::ParMesh *pmesh, const mfem::Array<int> &partitioning, int order, TPS::Tps *tps,
-                mfem::ParGridFunction *distance);
+  AlgebraicRans(mfem::ParMesh* pmesh, const mfem::Array<int>& partitioning, int order, TPS::Tps* tps,
+                mfem::ParGridFunction* distance);
 
   /// Destructor
   virtual ~AlgebraicRans();
@@ -94,7 +94,7 @@ class AlgebraicRans : public TurbModelBase {
   /**
    * @brief Add eddy viscosity and distance function to the visualization output
    */
-  void initializeViz(mfem::ParaViewDataCollection &pvdc) override;
+  void initializeViz(mfem::ParaViewDataCollection& pvdc) override;
 
   /**
    * @brief Initialize the eddy viscosity.
@@ -113,7 +113,7 @@ class AlgebraicRans : public TurbModelBase {
    */
   void setup() override {}
 
-  mfem::ParGridFunction *getCurrentEddyViscosity() override { return mut_; }
+  mfem::ParGridFunction* getCurrentEddyViscosity() override { return mut_; }
 };
 
 #endif  // ALGEBRAIC_RANS_HPP_

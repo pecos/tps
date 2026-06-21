@@ -54,8 +54,8 @@ class Tps;
 #include "tps_mfem_wrap.hpp"
 #include "turb_model_base.hpp"
 
-using VecFuncT = void(const Vector &x, double t, Vector &u);
-using ScalarFuncT = double(const Vector &x, double t);
+using VecFuncT = void(const Vector& x, double t, Vector& u);
+using ScalarFuncT = double(const Vector& x, double t);
 
 class LoMachSolver;
 class LoMachOptions;
@@ -66,9 +66,9 @@ class AlgebraicSubgridModels : public TurbModelBase {
   friend class LoMachSolver;
 
  private:
-  TPS::Tps *tpsP_;
+  TPS::Tps* tpsP_;
   // LoMachSolver *loMach_;
-  LoMachOptions *loMach_opts_ = nullptr;
+  LoMachOptions* loMach_opts_ = nullptr;
 
   // MPI_Groups *groupsMPI;
   // int nprocs_;  // total number of MPI procs
@@ -81,7 +81,7 @@ class AlgebraicSubgridModels : public TurbModelBase {
   /// Enable/disable verbose output.
   bool verbose = true;
 
-  ParMesh *pmesh_ = nullptr;
+  ParMesh* pmesh_ = nullptr;
 
   // The order of the scalar spaces
   int order_;
@@ -100,32 +100,32 @@ class AlgebraicSubgridModels : public TurbModelBase {
   // const temporalSchemeCoefficients &timeCoeff_;
 
   // Scalar \f$H^1\f$ finite element collection.
-  FiniteElementCollection *sfec_ = nullptr;
+  FiniteElementCollection* sfec_ = nullptr;
 
   // Scalar \f$H^1\f$ finite element space.
-  ParFiniteElementSpace *sfes_ = nullptr;
+  ParFiniteElementSpace* sfes_ = nullptr;
 
   /// Velocity \f$H^1\f$ finite element collection.
-  FiniteElementCollection *vfec_ = nullptr;
+  FiniteElementCollection* vfec_ = nullptr;
 
   /// Velocity \f$(H^1)^d\f$ finite element space.
-  ParFiniteElementSpace *vfes_ = nullptr;
+  ParFiniteElementSpace* vfes_ = nullptr;
 
   /// spaces for filtered eddy viscosity
-  FiniteElementCollection *sfec_filter_ = nullptr;
-  ParFiniteElementSpace *sfes_filter_ = nullptr;
+  FiniteElementCollection* sfec_filter_ = nullptr;
+  ParFiniteElementSpace* sfes_filter_ = nullptr;
 
-  ParGridFunction *gradU_gf_ = nullptr;
-  ParGridFunction *gradV_gf_ = nullptr;
-  ParGridFunction *gradW_gf_ = nullptr;
+  ParGridFunction* gradU_gf_ = nullptr;
+  ParGridFunction* gradV_gf_ = nullptr;
+  ParGridFunction* gradW_gf_ = nullptr;
   Vector gradU_;
   Vector gradV_;
   Vector gradW_;
 
-  ParGridFunction *rn_gf_ = nullptr;
+  ParGridFunction* rn_gf_ = nullptr;
   Vector rn_;
 
-  ParGridFunction *delta_gf_ = nullptr;
+  ParGridFunction* delta_gf_ = nullptr;
   Vector delta_;
 
   ParGridFunction subgridVisc_gf_;
@@ -138,7 +138,7 @@ class AlgebraicSubgridModels : public TurbModelBase {
   ParGridFunction muT_filtered_gf_;
 
   // grid information
-  ParGridFunction *gridScale_ = nullptr;
+  ParGridFunction* gridScale_ = nullptr;
 
   double sgs_model_const_;
   int sgs_model_nFilter_;
@@ -147,7 +147,7 @@ class AlgebraicSubgridModels : public TurbModelBase {
   int activeSteps_;
 
  public:
-  AlgebraicSubgridModels(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, TPS::Tps *tps, ParGridFunction *gridScale,
+  AlgebraicSubgridModels(mfem::ParMesh* pmesh, LoMachOptions* loMach_opts, TPS::Tps* tps, ParGridFunction* gridScale,
                          int sModel);
   virtual ~AlgebraicSubgridModels();
 
@@ -156,14 +156,14 @@ class AlgebraicSubgridModels : public TurbModelBase {
   void initializeOperators() final;
   void step() final;
   void setup() final;
-  void initializeViz(ParaViewDataCollection &pvdc) final;
+  void initializeViz(ParaViewDataCollection& pvdc) final;
 
   /// Return a pointer to the current temperature ParGridFunction.
-  ParGridFunction *getCurrentEddyViscosity() { return &subgridVisc_gf_; }
+  ParGridFunction* getCurrentEddyViscosity() { return &subgridVisc_gf_; }
 
   // subgrid scale models => move to turb model class
-  void sgsSmag(const DenseMatrix &gradUp, double delta, double &nu_sgs);
-  void sgsSigma(const DenseMatrix &gradUp, double delta, double &nu_sgs);
-  void sgsWALE(const DenseMatrix &gradUp, double delta, double &nu_sgs);
+  void sgsSmag(const DenseMatrix& gradUp, double delta, double& nu_sgs);
+  void sgsSigma(const DenseMatrix& gradUp, double delta, double& nu_sgs);
+  void sgsWALE(const DenseMatrix& gradUp, double delta, double& nu_sgs);
 };
 #endif  // ALGEBRAICSUBGRIDMODELS_HPP_

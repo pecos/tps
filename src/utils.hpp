@@ -55,8 +55,8 @@
 enum ExitCodes { NORMAL = 0, ERROR = 1, JOB_RESTART = 10, EARLY_EXIT = 11 };
 
 // Misc. utilities
-bool file_exists(const std::string &name);
-std::string systemCmd(const char *cmd);
+bool file_exists(const std::string& name);
+std::string systemCmd(const char* cmd);
 
 // HDF5 convenience utilities
 inline hid_t h5_getType(int) { return (H5T_NATIVE_INT); }
@@ -77,7 +77,7 @@ void h5_save_attribute(hid_t dest, std::string attribute, T value) {
 }
 
 template <typename T>
-void h5_read_attribute(hid_t source, std::string attribute, T &value) {
+void h5_read_attribute(hid_t source, std::string attribute, T& value) {
   herr_t status;
   hid_t attr;
   hid_t attrType = h5_getType(value);
@@ -91,8 +91,8 @@ void h5_read_attribute(hid_t source, std::string attribute, T &value) {
 
 // A simple HDF5 routine to read two-dimensional array into DenseMatrix.
 // Return result as boolean.
-bool h5ReadTable(const std::string &fileName, const std::string &datasetName, mfem::DenseMatrix &output,
-                 mfem::Array<int> &shape);
+bool h5ReadTable(const std::string& fileName, const std::string& datasetName, mfem::DenseMatrix& output,
+                 mfem::Array<int>& shape);
 
 /** Read multi-column table
  *
@@ -101,11 +101,11 @@ bool h5ReadTable(const std::string &fileName, const std::string &datasetName, mf
  * are broadcast to all ranks.  The length of the input std::vector of
  * TableInput must match the number of columsn read.
  */
-bool h5ReadBcastMultiColumnTable(const std::string &fileName, const std::string &datasetName, MPI_Comm TPSCommWorld,
-                                 mfem::DenseMatrix &output, std::vector<TableInput> &tables);
+bool h5ReadBcastMultiColumnTable(const std::string& fileName, const std::string& datasetName, MPI_Comm TPSCommWorld,
+                                 mfem::DenseMatrix& output, std::vector<TableInput>& tables);
 
 void readTable(MPI_Comm TPSCommWorld, std::string filename, bool xLogScale, bool fLogScale, int order,
-               std::list<mfem::DenseMatrix> &tableHost, TableInput &result);
+               std::list<mfem::DenseMatrix>& tableHost, TableInput& result);
 
 // MFEM extensions
 
@@ -120,7 +120,7 @@ void readTable(MPI_Comm TPSCommWorld, std::string filename, bool xLogScale, bool
  * mfem::GridFunction::ProjectDiscCoefficient but has fixes s.t. it
  * will work with Nedelec elements.
  */
-void LocalProjectDiscCoefficient(mfem::GridFunction &gf, mfem::VectorCoefficient &coeff, mfem::Array<int> &dof_attr);
+void LocalProjectDiscCoefficient(mfem::GridFunction& gf, mfem::VectorCoefficient& coeff, mfem::Array<int>& dof_attr);
 
 /** Project discontinous function onto FE space
  *
@@ -132,7 +132,7 @@ void LocalProjectDiscCoefficient(mfem::GridFunction &gf, mfem::VectorCoefficient
  * mfem::ParGridFunction::ProjectDiscCoefficient but calls
  * LocalProjectDiscCoefficient.
  */
-void GlobalProjectDiscCoefficient(mfem::ParGridFunction &gf, mfem::VectorCoefficient &coeff);
+void GlobalProjectDiscCoefficient(mfem::ParGridFunction& gf, mfem::VectorCoefficient& coeff);
 
 /** @brief Evaluate the distance function
  *
@@ -149,62 +149,62 @@ void GlobalProjectDiscCoefficient(mfem::ParGridFunction &gf, mfem::VectorCoeffic
  *  This function is not guarenteed to work for nonlinear elements.
  *  See comments in source about why.
  */
-void evaluateDistanceSerial(mfem::Mesh &mesh, const mfem::Array<int> &wall_patches, const mfem::GridFunction &coords,
-                            mfem::GridFunction &distance);
+void evaluateDistanceSerial(mfem::Mesh& mesh, const mfem::Array<int>& wall_patches, const mfem::GridFunction& coords,
+                            mfem::GridFunction& distance);
 
-void multConstScalar(double A, Vector B, Vector *C);
-void multConstScalarInv(double A, Vector B, Vector *C);
-void multConstVector(double A, Vector B, Vector *C);
-void multConstScalarIP(double A, Vector *C);
-void multConstScalarInvIP(double A, Vector *C);
-void multConstVectorIP(double A, Vector *C);
-void multScalarScalar(Vector A, Vector B, Vector *C);
-void multScalarScalarInv(Vector A, Vector B, Vector *C);
-void multScalarVector(Vector A, Vector B, Vector *C, int dim = 3);
-void multScalarInvVector(Vector A, Vector B, Vector *C, int dim = 3);
-void multScalarInvVectorIP(Vector A, Vector *C, int dim = 3);
-void multVectorVector(Vector A, Vector B, Vector *C1, Vector *C2, Vector *C3, int dim = 3);
-void dotVector(Vector A, Vector B, Vector *C, int dim = 3);
-void multScalarScalarIP(Vector A, Vector *C);
-void multScalarInvScalarIP(Vector A, Vector *C);
-void multScalarVectorIP(Vector A, Vector *C, int dim = 3);
-void setScalarFromVector(Vector A, int ind, Vector *C);
-void setVectorFromScalar(Vector A, int ind, Vector *C);
+void multConstScalar(double A, Vector B, Vector* C);
+void multConstScalarInv(double A, Vector B, Vector* C);
+void multConstVector(double A, Vector B, Vector* C);
+void multConstScalarIP(double A, Vector* C);
+void multConstScalarInvIP(double A, Vector* C);
+void multConstVectorIP(double A, Vector* C);
+void multScalarScalar(Vector A, Vector B, Vector* C);
+void multScalarScalarInv(Vector A, Vector B, Vector* C);
+void multScalarVector(Vector A, Vector B, Vector* C, int dim = 3);
+void multScalarInvVector(Vector A, Vector B, Vector* C, int dim = 3);
+void multScalarInvVectorIP(Vector A, Vector* C, int dim = 3);
+void multVectorVector(Vector A, Vector B, Vector* C1, Vector* C2, Vector* C3, int dim = 3);
+void dotVector(Vector A, Vector B, Vector* C, int dim = 3);
+void multScalarScalarIP(Vector A, Vector* C);
+void multScalarInvScalarIP(Vector A, Vector* C);
+void multScalarVectorIP(Vector A, Vector* C, int dim = 3);
+void setScalarFromVector(Vector A, int ind, Vector* C);
+void setVectorFromScalar(Vector A, int ind, Vector* C);
 
 /// Compute \f$\nabla \times \nabla \times u\f$ for \f$u \in (H^1)^2\f$.
-void ComputeCurl2D(const ParGridFunction &u, ParGridFunction &cu, bool assume_scalar = false);
+void ComputeCurl2D(const ParGridFunction& u, ParGridFunction& cu, bool assume_scalar = false);
 
-void ComputeCurlAxi(const ParGridFunction &u, ParGridFunction &cu, bool assume_scalar = false);
+void ComputeCurlAxi(const ParGridFunction& u, ParGridFunction& cu, bool assume_scalar = false);
 
 /// Compute \f$\nabla \times \nabla \times u\f$ for \f$u \in (H^1)^3\f$.
-void ComputeCurl3D(const ParGridFunction &u, ParGridFunction &cu);
+void ComputeCurl3D(const ParGridFunction& u, ParGridFunction& cu);
 
-void vectorGrad3D(ParGridFunction &uSub, ParGridFunction &u, ParGridFunction &gu, ParGridFunction &gv,
-                  ParGridFunction &gw);
-void scalarGrad3D(ParGridFunction &u, ParGridFunction &gu);
+void vectorGrad3D(ParGridFunction& uSub, ParGridFunction& u, ParGridFunction& gu, ParGridFunction& gv,
+                  ParGridFunction& gw);
+void scalarGrad3D(ParGridFunction& u, ParGridFunction& gu);
 // void vectorGrad3DV(FiniteElementSpace *fes, Vector u, Vector *gu, Vector *gv, Vector *gw);
-void scalarGrad3DV(FiniteElementSpace *fes, FiniteElementSpace *vfes, Vector u, Vector *gu);
-void makeContinuous(ParGridFunction &u);
+void scalarGrad3DV(FiniteElementSpace* fes, FiniteElementSpace* vfes, Vector u, Vector* gu);
+void makeContinuous(ParGridFunction& u);
 
-bool copyFile(const char *SRC, const char *DEST);
+bool copyFile(const char* SRC, const char* DEST);
 
 /// upwind diffusion support: evaluate u * u^T / ||u||^2
-void streamwiseTensor(const Vector &vel, DenseMatrix &swMgbl);
+void streamwiseTensor(const Vector& vel, DenseMatrix& swMgbl);
 
 /// upwind diffusion support: evaluate supg constant
 double csupgFactor(double Reh, double Reh_factor, double Reh_offset);
 
 /// Eliminate essential BCs in an Operator and apply to RHS.
 /// rename this to something sensible "ApplyEssentialBC" or something
-void EliminateRHS(Operator &A, ConstrainedOperator &constrainedA, const Array<int> &ess_tdof_list, Vector &x, Vector &b,
-                  Vector &X, Vector &B, int copy_interior = 0);
+void EliminateRHS(Operator& A, ConstrainedOperator& constrainedA, const Array<int>& ess_tdof_list, Vector& x, Vector& b,
+                  Vector& X, Vector& B, int copy_interior = 0);
 
 /// Remove mean from a Vector.
 /**
  * Modify the Vector @a v by subtracting its mean using
  * \f$v = v - \frac{\sum_i^N v_i}{N} \f$
  */
-void Orthogonalize(Vector &v, MPI_Comm comm);
+void Orthogonalize(Vector& v, MPI_Comm comm);
 
 // Adding to the mfem namespace
 namespace mfem {
@@ -212,21 +212,21 @@ namespace mfem {
 /// Matrix coefficient defined as the Gradient of a Vector GridFunction
 class GradientVectorGridFunctionCoefficient : public MatrixCoefficient {
  protected:
-  const GridFunction *GridFunc;
+  const GridFunction* GridFunc;
 
  public:
   /** @brief Construct the coefficient with a scalar grid function @a gf. The
       grid function is not owned by the coefficient. */
-  GradientVectorGridFunctionCoefficient(const GridFunction *gf);
+  GradientVectorGridFunctionCoefficient(const GridFunction* gf);
 
   /// Set the scalar grid function.
-  void SetGridFunction(const GridFunction *gf);
+  void SetGridFunction(const GridFunction* gf);
 
   /// Get the scalar grid function.
-  const GridFunction *GetGridFunction() const { return GridFunc; }
+  const GridFunction* GetGridFunction() const { return GridFunc; }
 
   /// Evaluate the gradient vector coefficient at @a ip.
-  virtual void Eval(DenseMatrix &G, ElementTransformation &T, const IntegrationPoint &ip);
+  virtual void Eval(DenseMatrix& G, ElementTransformation& T, const IntegrationPoint& ip);
 
   virtual ~GradientVectorGridFunctionCoefficient() {}
 };
@@ -234,41 +234,41 @@ class GradientVectorGridFunctionCoefficient : public MatrixCoefficient {
 /// Scalar coefficient defined as the magnitude of a vector coefficient
 class VectorMagnitudeCoefficient : public Coefficient {
  private:
-  VectorCoefficient *a;
+  VectorCoefficient* a;
 
   mutable Vector va;
 
  public:
   /// Construct with the vector coefficient.  Result is \sqrt{(\f$ A \cdot a \f$}.
-  VectorMagnitudeCoefficient(VectorCoefficient &A);
+  VectorMagnitudeCoefficient(VectorCoefficient& A);
 
   /// Set the time for internally stored coefficients
   void SetTime(double t);
 
   /// Reset the vector
-  void SetACoef(VectorCoefficient &A) { a = &A; }
+  void SetACoef(VectorCoefficient& A) { a = &A; }
   /// Return the vector coefficient
-  VectorCoefficient *GetACoef() const { return a; }
+  VectorCoefficient* GetACoef() const { return a; }
 
   /// Evaluate the coefficient at @a ip.
-  virtual double Eval(ElementTransformation &T, const IntegrationPoint &ip);
+  virtual double Eval(ElementTransformation& T, const IntegrationPoint& ip);
 };
 
 /// Matrix coefficient computed from a function F(v(x)) of a dim-sized vector coefficient, v(x)
 class TransformedMatrixVectorCoefficient : public MatrixCoefficient {
  protected:
-  VectorCoefficient *Q1;
-  std::function<void(const Vector &, DenseMatrix &)> Function;
+  VectorCoefficient* Q1;
+  std::function<void(const Vector&, DenseMatrix&)> Function;
 
  public:
-  TransformedMatrixVectorCoefficient(VectorCoefficient *vc, std::function<void(const Vector &, DenseMatrix &)> F)
+  TransformedMatrixVectorCoefficient(VectorCoefficient* vc, std::function<void(const Vector&, DenseMatrix&)> F)
       : MatrixCoefficient(vc->GetVDim()), Q1(vc), Function(std::move(F)) {}
 
   /// Set the time for internally stored coefficients
   void SetTime(double t);
 
   // using MatrixCoefficient::Eval;
-  virtual void Eval(DenseMatrix &G, ElementTransformation &T, const IntegrationPoint &ip);
+  virtual void Eval(DenseMatrix& G, ElementTransformation& T, const IntegrationPoint& ip);
 
   virtual ~TransformedMatrixVectorCoefficient() {}
 };
@@ -277,22 +277,22 @@ class TransformedMatrixVectorCoefficient : public MatrixCoefficient {
 /// easier to implement wrapped functions with fixed arguments
 class ExtTransformedCoefficient : public Coefficient {
  protected:
-  Coefficient *Q1;
-  Coefficient *Q2;
+  Coefficient* Q1;
+  Coefficient* Q2;
   std::function<double(double)> Transform1;
   std::function<double(double, double)> Transform2;
 
  public:
   /// Define a time-independent coefficient from a std function
   /** \param F time-independent std::function */
-  ExtTransformedCoefficient(Coefficient *q, std::function<double(double)> F) : Q1(q), Transform1(std::move(F)) {
+  ExtTransformedCoefficient(Coefficient* q, std::function<double(double)> F) : Q1(q), Transform1(std::move(F)) {
     Q2 = 0;
     Transform2 = 0;
   }
 
   /// Define a time-dependent coefficient from a std function
   /** \param TDF time-dependent function */
-  ExtTransformedCoefficient(Coefficient *q1, Coefficient *q2, std::function<double(double, double)> F)
+  ExtTransformedCoefficient(Coefficient* q1, Coefficient* q2, std::function<double(double, double)> F)
       : Q1(q1), Q2(q2), Transform2(std::move(F)) {
     Transform1 = 0;
   }
@@ -301,7 +301,7 @@ class ExtTransformedCoefficient : public Coefficient {
   void SetTime(double t);
 
   /// Evaluate the coefficient at @a ip.
-  virtual double Eval(ElementTransformation &T, const IntegrationPoint &ip);
+  virtual double Eval(ElementTransformation& T, const IntegrationPoint& ip);
 
   virtual ~ExtTransformedCoefficient() {}
 };

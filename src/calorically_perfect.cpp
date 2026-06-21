@@ -57,9 +57,9 @@ MFEM_HOST_DEVICE double Sutherland(const double T, const double mu_star, const d
   return mu_star * T_rat_32 * S_rat;
 }
 
-CaloricallyPerfectThermoChem::CaloricallyPerfectThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts,
-                                                           temporalSchemeCoefficients &time_coeff,
-                                                           ParGridFunction *gridScale, TPS::Tps *tps)
+CaloricallyPerfectThermoChem::CaloricallyPerfectThermoChem(mfem::ParMesh* pmesh, LoMachOptions* loMach_opts,
+                                                           temporalSchemeCoefficients& time_coeff,
+                                                           ParGridFunction* gridScale, TPS::Tps* tps)
     : tpsP_(tps), pmesh_(pmesh), time_coeff_(time_coeff) {
   rank0_ = (pmesh_->GetMyRank() == 0);
   order_ = loMach_opts->order;
@@ -68,12 +68,14 @@ CaloricallyPerfectThermoChem::CaloricallyPerfectThermoChem(mfem::ParMesh *pmesh,
   tps->getInput("loMach/axisymmetric", axisym_, false);
   if (axisym_) {
     if (rank0_) {
-      std::cout << "ERROR: axisymmetric is not currently implemented in calorically_perfect.  Either implement or use LTE or reacting..." << std::endl;
+      std::cout << "ERROR: axisymmetric is not currently implemented in calorically_perfect.  Either implement or use "
+                   "LTE or reacting..."
+                << std::endl;
     }
     assert(false);
-    exit(1);    
+    exit(1);
   }
-  
+
   std::string visc_model;
   tpsP_->getInput("loMach/calperfect/viscosity-model", visc_model, std::string("sutherland"));
   if (visc_model == "sutherland") {
@@ -367,7 +369,7 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
           std::cout << "Calorically Perfect: Setting uniform Dirichlet temperature on patch = " << patch << std::endl;
         }
         AddTempDirichletBC(temperature_value, inlet_attr);
-	
+
       } else if (type == "interpolate") {
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
         inlet_attr = 0;
@@ -435,11 +437,11 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
         double Twall;
         tpsP_->getRequiredInput((basepath + "/temperature").c_str(), Twall);
 
-        ConstantCoefficient *Twall_coeff = new ConstantCoefficient();
+        ConstantCoefficient* Twall_coeff = new ConstantCoefficient();
         Twall_coeff->constant = Twall;
         AddTempDirichletBC(Twall_coeff, attr_wall);
 
-        ConstantCoefficient *Qt_bc_coeff = new ConstantCoefficient();
+        ConstantCoefficient* Qt_bc_coeff = new ConstantCoefficient();
         Qt_bc_coeff->constant = 0.0;
         AddQtDirichletBC(Qt_bc_coeff, attr_wall);
       }
@@ -464,9 +466,9 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   // unsteady: p+p [+p] = 2p [3p]
   // convection: p+p+(p-1) [+p] = 3p-1 [4p-1]
   // diffusion: (p-1)+(p-1) [+p] = 2p-2 [3p-2]
-  const IntegrationRule &ir_i = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 2 * order_ + 1);
-  const IntegrationRule &ir_nli = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 4 * order_);
-  const IntegrationRule &ir_di = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 3 * order_ - 1);
+  const IntegrationRule& ir_i = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 2 * order_ + 1);
+  const IntegrationRule& ir_nli = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 4 * order_);
+  const IntegrationRule& ir_di = gll_rules_.Get(sfes_->GetFE(0)->GetGeomType(), 3 * order_ - 1);
   if (rank0_) std::cout << "Integration rules set" << endl;
 
   // coefficients for operators
@@ -518,7 +520,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   }
 
   At_form_ = new ParBilinearForm(sfes_);
-  auto *at_blfi = new ConvectionIntegrator(*rhou_coeff_);
+  auto* at_blfi = new ConvectionIntegrator(*rhou_coeff_);
   if (numerical_integ_) {
     at_blfi->SetIntRule(&ir_nli);
   }
@@ -529,7 +531,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
 
   // mass matrix
   Ms_form_ = new ParBilinearForm(sfes_);
-  auto *ms_blfi = new MassIntegrator;
+  auto* ms_blfi = new MassIntegrator;
   if (numerical_integ_) {
     ms_blfi->SetIntRule(&ir_i);
   }
@@ -542,7 +544,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
 
   // mass matrix with rho
   MsRho_form_ = new ParBilinearForm(sfes_);
-  auto *msrho_blfi = new MassIntegrator(*rho_coeff_);
+  auto* msrho_blfi = new MassIntegrator(*rho_coeff_);
   if (numerical_integ_) {
     msrho_blfi->SetIntRule(&ir_i);
     // msrho_blfi->SetIntRule(&ir_di);
@@ -554,15 +556,15 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
 
   // Helmholtz
   Ht_form_ = new ParBilinearForm(sfes_);
-  auto *hmt_blfi = new MassIntegrator(*rho_over_dt_coeff_);
-  auto *hdt_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
+  auto* hmt_blfi = new MassIntegrator(*rho_over_dt_coeff_);
+  auto* hdt_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
   if (numerical_integ_) {
     hmt_blfi->SetIntRule(&ir_di);
     hdt_blfi->SetIntRule(&ir_di);
   }
   // SUPG diffusion
   if (sw_stab_) {
-    auto *sdt_blfi = new DiffusionIntegrator(*supg_coeff_);
+    auto* sdt_blfi = new DiffusionIntegrator(*supg_coeff_);
     if (numerical_integ_) {
       sdt_blfi->SetIntRule(&ir_di);
     }
@@ -580,10 +582,10 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
     MsInvPC_ = new OperatorJacobiSmoother(diag_pa, empty);
   } else {
     MsInvPC_ = new HypreSmoother(*Ms_.As<HypreParMatrix>());
-    dynamic_cast<HypreSmoother *>(MsInvPC_)->SetType(HypreSmoother::Jacobi, smoother_passes_);
-    dynamic_cast<HypreSmoother *>(MsInvPC_)->SetSOROptions(smoother_relax_weight_, smoother_relax_omega_);
-    dynamic_cast<HypreSmoother *>(MsInvPC_)->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_,
-                                                            smoother_eig_est_);
+    dynamic_cast<HypreSmoother*>(MsInvPC_)->SetType(HypreSmoother::Jacobi, smoother_passes_);
+    dynamic_cast<HypreSmoother*>(MsInvPC_)->SetSOROptions(smoother_relax_weight_, smoother_relax_omega_);
+    dynamic_cast<HypreSmoother*>(MsInvPC_)->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_,
+                                                           smoother_eig_est_);
   }
   MsInv_ = new CGSolver(sfes_->GetComm());
   MsInv_->iterative_mode = false;
@@ -595,10 +597,10 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   MsInv_->SetMaxIter(mass_inverse_max_iter_);
 
   HtInvPC_ = new HypreSmoother(*Ht_.As<HypreParMatrix>());
-  dynamic_cast<HypreSmoother *>(HtInvPC_)->SetType(HypreSmoother::Jacobi, smoother_passes_);
-  dynamic_cast<HypreSmoother *>(HtInvPC_)->SetSOROptions(hsmoother_relax_weight_, hsmoother_relax_omega_);
-  dynamic_cast<HypreSmoother *>(HtInvPC_)->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_,
-                                                          smoother_eig_est_);
+  dynamic_cast<HypreSmoother*>(HtInvPC_)->SetType(HypreSmoother::Jacobi, smoother_passes_);
+  dynamic_cast<HypreSmoother*>(HtInvPC_)->SetSOROptions(hsmoother_relax_weight_, hsmoother_relax_omega_);
+  dynamic_cast<HypreSmoother*>(HtInvPC_)->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_,
+                                                         smoother_eig_est_);
 
   HtInv_ = new CGSolver(sfes_->GetComm());
   HtInv_->iterative_mode = true;
@@ -612,7 +614,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
 
   // Qt .....................................
   Mq_form_ = new ParBilinearForm(sfes_);
-  auto *mq_blfi = new MassIntegrator;
+  auto* mq_blfi = new MassIntegrator;
   if (numerical_integ_) {
     mq_blfi->SetIntRule(&ir_i);
   }
@@ -631,10 +633,10 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
     MqInvPC_ = new OperatorJacobiSmoother(diag_pa, empty);
   } else {
     MqInvPC_ = new HypreSmoother(*Mq_.As<HypreParMatrix>());
-    dynamic_cast<HypreSmoother *>(MqInvPC_)->SetType(HypreSmoother::Jacobi, smoother_passes_);
-    dynamic_cast<HypreSmoother *>(MqInvPC_)->SetSOROptions(smoother_relax_weight_, smoother_relax_omega_);
-    dynamic_cast<HypreSmoother *>(MqInvPC_)->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_,
-                                                            smoother_eig_est_);
+    dynamic_cast<HypreSmoother*>(MqInvPC_)->SetType(HypreSmoother::Jacobi, smoother_passes_);
+    dynamic_cast<HypreSmoother*>(MqInvPC_)->SetSOROptions(smoother_relax_weight_, smoother_relax_omega_);
+    dynamic_cast<HypreSmoother*>(MqInvPC_)->SetPolyOptions(smoother_poly_order_, smoother_poly_fraction_,
+                                                           smoother_eig_est_);
   }
   MqInv_ = new CGSolver(sfes_->GetComm());
   MqInv_->iterative_mode = false;
@@ -646,18 +648,18 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   MqInv_->SetMaxIter(mass_inverse_max_iter_);
 
   LQ_form_ = new ParBilinearForm(sfes_);
-  //auto *lqd_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
-  //if (axisym_) {
-  //  auto *lqd_blfi = new DiffusionIntegrator(*rad_thermal_diff_total_coeff_);
-  //} else {
-    auto *lqd_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
-  //}  
+  // auto *lqd_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
+  // if (axisym_) {
+  //   auto *lqd_blfi = new DiffusionIntegrator(*rad_thermal_diff_total_coeff_);
+  // } else {
+  auto* lqd_blfi = new DiffusionIntegrator(*thermal_diff_total_coeff_);
+  //}
   if (numerical_integ_) {
     lqd_blfi->SetIntRule(&ir_di);
   }
   LQ_form_->AddDomainIntegrator(lqd_blfi);
 
-  // NO, this is not consistent and will degrade stability  
+  // NO, this is not consistent and will degrade stability
   // if (sw_stab_) {
   //   auto *slqd_blfi = new DiffusionIntegrator(*supg_coeff_);
   //   if (numerical_integ_) {
@@ -673,7 +675,7 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   LQ_form_->FormSystemMatrix(empty, LQ_);
 
   LQ_bdry_ = new ParLinearForm(sfes_);
-  auto *lq_bdry_lfi = new BoundaryNormalLFIntegrator(*kap_gradT_coeff_, 2, -1);
+  auto* lq_bdry_lfi = new BoundaryNormalLFIntegrator(*kap_gradT_coeff_, 2, -1);
   if (numerical_integ_) {
     lq_bdry_lfi->SetIntRule(&ir_di);
   }
@@ -729,7 +731,7 @@ void CaloricallyPerfectThermoChem::step() {
   time_ = time_coeff_.time;
 
   // Set current time for velocity Dirichlet boundary conditions.
-  for (auto &temp_dbc : temp_dbcs_) {
+  for (auto& temp_dbc : temp_dbcs_) {
     temp_dbc.coeff->SetTime(time_ + dt_);
   }
 
@@ -771,7 +773,7 @@ void CaloricallyPerfectThermoChem::step() {
   HtInv_->SetOperator(*Ht_);
 
   // Prepare for the solve
-  for (auto &temp_dbc : temp_dbcs_) {
+  for (auto& temp_dbc : temp_dbcs_) {
     Tn_next_gf_.ProjectBdrCoefficient(*temp_dbc.coeff, temp_dbc.attr);
   }
   sfes_->GetRestrictionMatrix()->MultTranspose(resT_, resT_gf_);
@@ -827,19 +829,19 @@ void CaloricallyPerfectThermoChem::computeExplicitTempConvectionOP(bool extrap) 
   }
 }
 
-void CaloricallyPerfectThermoChem::initializeIO(IODataOrganizer &io) {
+void CaloricallyPerfectThermoChem::initializeIO(IODataOrganizer& io) {
   io.registerIOFamily("Temperature", "/temperature", &Tn_gf_, true, true, sfec_);
   io.registerIOVar("/temperature", "temperature", 0);
 }
 
-void CaloricallyPerfectThermoChem::initializeViz(ParaViewDataCollection &pvdc) {
+void CaloricallyPerfectThermoChem::initializeViz(ParaViewDataCollection& pvdc) {
   pvdc.RegisterField("temperature", &Tn_gf_);
   pvdc.RegisterField("density", &rn_gf_);
   pvdc.RegisterField("kappa", &kappa_gf_);
   pvdc.RegisterField("Qt", &Qt_gf_);
 }
 
-void CaloricallyPerfectThermoChem::initializeStats(Averaging &average, IODataOrganizer &io, bool continuation) {
+void CaloricallyPerfectThermoChem::initializeStats(Averaging& average, IODataOrganizer& io, bool continuation) {
   if (average.ComputeMean()) {
     // fields for averaging
     average.registerField(std::string("temperature"), &Tn_gf_, false, 0, 1);
@@ -906,8 +908,8 @@ void CaloricallyPerfectThermoChem::updateThermoP() {
 void CaloricallyPerfectThermoChem::updateDiffusivity() {
   // viscosity
   if (!constant_viscosity_) {
-    double *d_visc = visc_.Write();
-    const double *d_T = Tn_.Read();
+    double* d_visc = visc_.Write();
+    const double* d_T = Tn_.Read();
     const double mu_star = mu0_;
     const double T_star = sutherland_T0_;
     const double S_star = sutherland_S0_;
@@ -1003,7 +1005,7 @@ void CaloricallyPerfectThermoChem::computeSystemMass() {
 }
 
 /// Add a Dirichlet boundary condition to the temperature field
-void CaloricallyPerfectThermoChem::AddTempDirichletBC(const double &temp, Array<int> &attr) {
+void CaloricallyPerfectThermoChem::AddTempDirichletBC(const double& temp, Array<int>& attr) {
   temp_dbcs_.emplace_back(attr, new ConstantCoefficient(temp));
   for (int i = 0; i < attr.Size(); ++i) {
     if (attr[i] == 1) {
@@ -1013,7 +1015,7 @@ void CaloricallyPerfectThermoChem::AddTempDirichletBC(const double &temp, Array<
   }
 }
 
-void CaloricallyPerfectThermoChem::AddTempDirichletBC(Coefficient *coeff, Array<int> &attr) {
+void CaloricallyPerfectThermoChem::AddTempDirichletBC(Coefficient* coeff, Array<int>& attr) {
   temp_dbcs_.emplace_back(attr, coeff);
   for (int i = 0; i < attr.Size(); ++i) {
     if (attr[i] == 1) {
@@ -1043,11 +1045,11 @@ void CaloricallyPerfectThermoChem::AddTempDirichletBC(Coefficient *coeff, Array<
   */
 }
 
-void CaloricallyPerfectThermoChem::AddTempDirichletBC(ScalarFuncT *f, Array<int> &attr) {
+void CaloricallyPerfectThermoChem::AddTempDirichletBC(ScalarFuncT* f, Array<int>& attr) {
   AddTempDirichletBC(new FunctionCoefficient(f), attr);
 }
 
-void CaloricallyPerfectThermoChem::AddQtDirichletBC(Coefficient *coeff, Array<int> &attr) {
+void CaloricallyPerfectThermoChem::AddQtDirichletBC(Coefficient* coeff, Array<int>& attr) {
   Qt_dbcs_.emplace_back(attr, coeff);
 
   if (rank0_ && pmesh_->GetMyRank() == 0) {
@@ -1068,7 +1070,7 @@ void CaloricallyPerfectThermoChem::AddQtDirichletBC(Coefficient *coeff, Array<in
   }
 }
 
-void CaloricallyPerfectThermoChem::AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr) {
+void CaloricallyPerfectThermoChem::AddQtDirichletBC(ScalarFuncT* f, Array<int>& attr) {
   AddQtDirichletBC(new FunctionCoefficient(f), attr);
 }
 
@@ -1099,17 +1101,16 @@ void CaloricallyPerfectThermoChem::computeQtTO() {
   Qt_gf_.GetTrueDofs(Qt_);
   Qt_ *= -Rgas_ / thermo_pressure_;
   Qt_gf_.SetFromTrueDofs(Qt_);
-  
 }
 
-void CaloricallyPerfectThermoChem::screenHeader(std::vector<std::string> &header) const {
+void CaloricallyPerfectThermoChem::screenHeader(std::vector<std::string>& header) const {
   if (!domain_is_open_) {
     header.resize(1);
     header[0] = "P/P0";
   }
 }
 
-void CaloricallyPerfectThermoChem::screenValues(std::vector<double> &values) {
+void CaloricallyPerfectThermoChem::screenValues(std::vector<double>& values) {
   if (!domain_is_open_) {
     values.resize(1);
     values[0] = thermo_pressure_ / ambient_pressure_;

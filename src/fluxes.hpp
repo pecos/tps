@@ -64,10 +64,10 @@ struct viscositySpongeData {
 // Need to discuss further.
 class Fluxes {
  private:
-  GasMixture *mixture;
+  GasMixture* mixture;
   Equations eqSystem;
-  RunConfiguration *config_;
-  TransportProperties *transport;
+  RunConfiguration* config_;
+  TransportProperties* transport;
 
   int nvel;
   const int dim;
@@ -83,39 +83,39 @@ class Fluxes {
   viscositySpongeData vsd_;
 
  public:
-  Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport, const int _num_equation,
+  Fluxes(GasMixture* _mixture, Equations _eqSystem, TransportProperties* _transport, const int _num_equation,
          const int _dim, bool axisym);
-  Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport, const int _num_equation,
-         const int _dim, bool axisym, RunConfiguration *config);
-  MFEM_HOST_DEVICE Fluxes(GasMixture *_mixture, Equations _eqSystem, TransportProperties *_transport,
+  Fluxes(GasMixture* _mixture, Equations _eqSystem, TransportProperties* _transport, const int _num_equation,
+         const int _dim, bool axisym, RunConfiguration* config);
+  MFEM_HOST_DEVICE Fluxes(GasMixture* _mixture, Equations _eqSystem, TransportProperties* _transport,
                           const int _num_equation, const int _dim, bool axisym, int sgs_type, double sgs_floor,
                           double sgs_const, viscositySpongeData vsd);
 
   Equations GetEquationSystem() { return eqSystem; }
 
-  void ComputeConvectiveFluxes(const Vector &state, DenseMatrix &flux);
-  MFEM_HOST_DEVICE void ComputeConvectiveFluxes(const double *state, double *flux) const;
+  void ComputeConvectiveFluxes(const Vector& state, DenseMatrix& flux);
+  MFEM_HOST_DEVICE void ComputeConvectiveFluxes(const double* state, double* flux) const;
 
-  void ComputeViscousFluxes(const Vector &state, const DenseMatrix &gradUp, Vector transip, double delta,
-                            double distance, DenseMatrix &flux);
+  void ComputeViscousFluxes(const Vector& state, const DenseMatrix& gradUp, Vector transip, double delta,
+                            double distance, DenseMatrix& flux);
 
-  MFEM_HOST_DEVICE void ComputeViscousFluxes(const double *state, const double *gradUp, double *transip, double delta,
-                                             double distance, double *flux);
+  MFEM_HOST_DEVICE void ComputeViscousFluxes(const double* state, const double* gradUp, double* transip, double delta,
+                                             double distance, double* flux);
 
-  void sgsSmag(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu_sgs);
-  MFEM_HOST_DEVICE void sgsSmag(const double *state, const double *gradUp, double delta, double &mu_sgs);
-  void sgsSigma(const Vector &state, const DenseMatrix &gradUp, double delta, double &mu_sgs);
-  MFEM_HOST_DEVICE void sgsSigma(const double *state, const double *gradUp, double delta, double &mu_sgs);
+  void sgsSmag(const Vector& state, const DenseMatrix& gradUp, double delta, double& mu_sgs);
+  MFEM_HOST_DEVICE void sgsSmag(const double* state, const double* gradUp, double delta, double& mu_sgs);
+  void sgsSigma(const Vector& state, const DenseMatrix& gradUp, double delta, double& mu_sgs);
+  MFEM_HOST_DEVICE void sgsSigma(const double* state, const double* gradUp, double delta, double& mu_sgs);
 
-  MFEM_HOST_DEVICE void viscSpongePlanar(double *x, double &wgt);
+  MFEM_HOST_DEVICE void viscSpongePlanar(double* x, double& wgt);
 
   // Compute viscous flux with prescribed boundary flux.
-  void ComputeBdrViscousFluxes(const Vector &state, const DenseMatrix &gradUp, Vector transip, double delta,
-                               double distance, const BoundaryViscousFluxData &bcFlux, Vector &normalFlux);
+  void ComputeBdrViscousFluxes(const Vector& state, const DenseMatrix& gradUp, Vector transip, double delta,
+                               double distance, const BoundaryViscousFluxData& bcFlux, Vector& normalFlux);
 
-  MFEM_HOST_DEVICE void ComputeBdrViscousFluxes(const double *state, const double *gradUp, double *transip,
-                                                double delta, double distance, const BoundaryViscousFluxData &bcFlux,
-                                                double *normalFlux);
+  MFEM_HOST_DEVICE void ComputeBdrViscousFluxes(const double* state, const double* gradUp, double* transip,
+                                                double delta, double distance, const BoundaryViscousFluxData& bcFlux,
+                                                double* normalFlux);
 
   MFEM_HOST_DEVICE bool isAxisymmetric() const { return axisymmetric_; }
 

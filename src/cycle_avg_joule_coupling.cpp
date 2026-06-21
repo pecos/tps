@@ -36,7 +36,7 @@
 #include "loMach.hpp"
 #include "quasimagnetostatic.hpp"
 
-CycleAvgJouleCoupling::CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tps)
+CycleAvgJouleCoupling::CycleAvgJouleCoupling(string& inputFileName, TPS::Tps* tps)
     : em_opt_(),
       qmsa_solver_(nullptr),
       flow_solver_(nullptr),
@@ -90,7 +90,7 @@ CycleAvgJouleCoupling::CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tp
 #endif
 }
 
-CycleAvgJouleCoupling::CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tps, int max_out, bool axisym,
+CycleAvgJouleCoupling::CycleAvgJouleCoupling(string& inputFileName, TPS::Tps* tps, int max_out, bool axisym,
                                              double input_power, double initial_input_power)
     : em_opt_(),
       qmsa_solver_(nullptr),
@@ -145,8 +145,8 @@ void CycleAvgJouleCoupling::initializeInterpolationData() {
   if (verbose) grvy_printf(ginfo, "Initializing interpolation data.\n");
 
 #ifdef HAVE_GSLIB
-  ParMesh *flow_mesh = flow_solver_->getMesh();
-  ParMesh *em_mesh = qmsa_solver_->getMesh();
+  ParMesh* flow_mesh = flow_solver_->getMesh();
+  ParMesh* em_mesh = qmsa_solver_->getMesh();
   assert(flow_mesh != NULL);
   assert(em_mesh != NULL);
 
@@ -163,14 +163,14 @@ void CycleAvgJouleCoupling::initializeInterpolationData() {
   interp_em_to_flow_->SetDefaultInterpolationValue(0);
 
   // Determine numbers of points to interpolate to
-  const ParFiniteElementSpace *em_fespace = qmsa_solver_->getFESpace();
+  const ParFiniteElementSpace* em_fespace = qmsa_solver_->getFESpace();
   n_em_interp_nodes_ = 0;
   for (int i = 0; i < em_mesh->GetNE(); i++) {
     n_em_interp_nodes_ += em_fespace->GetFE(i)->GetNodes().GetNPoints();
   }
 
   // Determine numbers of points to interpolate to
-  const ParFiniteElementSpace *flow_fespace = flow_solver_->getFESpace();
+  const ParFiniteElementSpace* flow_fespace = flow_solver_->getFESpace();
   n_flow_interp_nodes_ = 0;
   for (int i = 0; i < flow_mesh->GetNE(); i++) {
     n_flow_interp_nodes_ += flow_fespace->GetFE(i)->GetNodes().GetNPoints();
@@ -187,8 +187,8 @@ void CycleAvgJouleCoupling::interpConductivityFromFlowToEM() {
   if (verbose) grvy_printf(ginfo, "Interpolating conductivity to EM mesh.\n");
 
 #ifdef HAVE_GSLIB
-  const ParMesh *em_mesh = qmsa_solver_->getMesh();
-  const ParFiniteElementSpace *em_fespace = qmsa_solver_->getFESpace();
+  const ParMesh* em_mesh = qmsa_solver_->getMesh();
+  const ParFiniteElementSpace* em_fespace = qmsa_solver_->getFESpace();
 
   const int NE = em_mesh->GetNE();
   const int dim = em_mesh->Dimension();
@@ -200,9 +200,9 @@ void CycleAvgJouleCoupling::interpConductivityFromFlowToEM() {
 
   int n0 = 0;  // running total of starting index
   for (int i = 0; i < NE; i++) {
-    const FiniteElement *fe = em_fespace->GetFE(i);
+    const FiniteElement* fe = em_fespace->GetFE(i);
     const IntegrationRule ir = fe->GetNodes();
-    ElementTransformation *et = em_fespace->GetElementTransformation(i);
+    ElementTransformation* et = em_fespace->GetElementTransformation(i);
 
     const int nsp = ir.GetNPoints();
 
@@ -226,11 +226,11 @@ void CycleAvgJouleCoupling::interpConductivityFromFlowToEM() {
 
   // Interpolate
   Vector conductivity_em(n_em_interp_nodes_);
-  const ParGridFunction *conductivity_flow_gf = flow_solver_->getPlasmaConductivityGF();
+  const ParGridFunction* conductivity_flow_gf = flow_solver_->getPlasmaConductivityGF();
   interp_flow_to_em_->Interpolate(vxyz, *conductivity_flow_gf, conductivity_em);
 
   // Set grid function
-  ParGridFunction *conductivity_em_gf = qmsa_solver_->getPlasmaConductivityGF();
+  ParGridFunction* conductivity_em_gf = qmsa_solver_->getPlasmaConductivityGF();
 
   Array<int> vdofs;
   Vector elem_dof_vals;
@@ -255,16 +255,16 @@ void CycleAvgJouleCoupling::interpConductivityFromFlowToEM() {
 #endif
 }
 
-void CycleAvgJouleCoupling::interpolationPoints(Vector &vxyz, int n_interp_nodes, const ParFiniteElementSpace *fes) {
-  const ParMesh *mesh = fes->GetParMesh();
+void CycleAvgJouleCoupling::interpolationPoints(Vector& vxyz, int n_interp_nodes, const ParFiniteElementSpace* fes) {
+  const ParMesh* mesh = fes->GetParMesh();
   const int NE = mesh->GetNE();
   const int dim = mesh->Dimension();
   vxyz.SetSize(n_interp_nodes * dim);
   int n0 = 0;
   for (int i = 0; i < NE; i++) {
-    const FiniteElement *fe = fes->GetFE(i);
+    const FiniteElement* fe = fes->GetFE(i);
     const IntegrationRule ir = fe->GetNodes();
-    ElementTransformation *et = fes->GetElementTransformation(i);
+    ElementTransformation* et = fes->GetElementTransformation(i);
 
     const int nsp = ir.GetNPoints();
 
@@ -292,7 +292,7 @@ void CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow() {
   if (verbose) grvy_printf(ginfo, "Interpolating Joule heating to flow mesh.\n");
 
 #ifdef HAVE_GSLIB
-  const ParFiniteElementSpace *flow_fespace = flow_solver_->getFESpace();
+  const ParFiniteElementSpace* flow_fespace = flow_solver_->getFESpace();
 
   // Generate list of points where the grid function will be evaluated.
   Vector vxyz;
@@ -301,12 +301,12 @@ void CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow() {
   // Evaluate source grid function.
   Vector interp_vals(n_flow_interp_nodes_);
 
-  const ParGridFunction *joule_heating_gf = qmsa_solver_->getJouleHeatingGF();
+  const ParGridFunction* joule_heating_gf = qmsa_solver_->getJouleHeatingGF();
   assert(joule_heating_gf != NULL);
 
   interp_em_to_flow_->Interpolate(vxyz, *joule_heating_gf, interp_vals);
 
-  ParGridFunction *joule_heating_flow = flow_solver_->getJouleHeatingGF();
+  ParGridFunction* joule_heating_flow = flow_solver_->getJouleHeatingGF();
   if (flow_fespace->IsDGSpace()) {
     joule_heating_flow->SetFromTrueDofs(interp_vals);
   } else {
@@ -346,10 +346,10 @@ void CycleAvgJouleCoupling::interpElectricFieldFromEMToFlow() {
   // Evaluate source grid function.
   Vector interp_vals(n_flow_interp_nodes_ * efield_ncomp_);
 
-  const ParGridFunction *efield_real_gf = qmsa_solver_->getElectricFieldreal();
+  const ParGridFunction* efield_real_gf = qmsa_solver_->getElectricFieldreal();
   interp_em_to_flow_->Interpolate(vxyz, *efield_real_gf, interp_vals);
 
-  const ParFiniteElementSpace *flow_fespace = flow_solver_->getFESpace();
+  const ParFiniteElementSpace* flow_fespace = flow_solver_->getFESpace();
   if (flow_fespace->IsDGSpace()) {
     efieldR_->SetFromTrueDofs(interp_vals);
   } else {
@@ -357,7 +357,7 @@ void CycleAvgJouleCoupling::interpElectricFieldFromEMToFlow() {
   }
   efieldR_->HostRead();
 
-  const ParGridFunction *efield_imag_gf = qmsa_solver_->getElectricFieldimag();
+  const ParGridFunction* efield_imag_gf = qmsa_solver_->getElectricFieldimag();
   interp_em_to_flow_->Interpolate(vxyz, *efield_imag_gf, interp_vals);
   if (flow_fespace->IsDGSpace()) {
     efieldI_->SetFromTrueDofs(interp_vals);
@@ -523,7 +523,7 @@ void CycleAvgJouleCoupling::solveEnd() {
 }
 
 /// Push solver variables to interface
-void CycleAvgJouleCoupling::initInterface(TPS::Tps2Boltzmann &interface) {
+void CycleAvgJouleCoupling::initInterface(TPS::Tps2Boltzmann& interface) {
   assert(!interface.IsInitialized());
   interface.init(flow_solver_);
   qmsa_solver_->setStoreE(true);
@@ -546,10 +546,10 @@ void CycleAvgJouleCoupling::initInterface(TPS::Tps2Boltzmann &interface) {
 }
 
 /// Push solver variables to interface
-void CycleAvgJouleCoupling::push(TPS::Tps2Boltzmann &interface) {
+void CycleAvgJouleCoupling::push(TPS::Tps2Boltzmann& interface) {
   flow_solver_->push(interface);
   interface.interpolateFromNativeFES(*efield_, TPS::Tps2Boltzmann::Index::ElectricField);
 }
 
 /// Fetch solver variables from interface
-void CycleAvgJouleCoupling::fetch(TPS::Tps2Boltzmann &interface) { flow_solver_->fetch(interface); }
+void CycleAvgJouleCoupling::fetch(TPS::Tps2Boltzmann& interface) { flow_solver_->fetch(interface); }

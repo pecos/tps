@@ -50,43 +50,43 @@ class MixingLengthTransport : public TransportProperties {
   const double bulk_mult_;          // bulk viscosity multiplier
 
   // for molecular transport (owned)
-  MolecularTransport *molecular_transport_;
+  MolecularTransport* molecular_transport_;
 
  public:
-  MixingLengthTransport(GasMixture *mix, RunConfiguration &runfile, MolecularTransport *molecular_transport);
-  MFEM_HOST_DEVICE MixingLengthTransport(GasMixture *mix, const mixingLengthTransportData &inputs,
-                                         MolecularTransport *molecular_transport);
+  MixingLengthTransport(GasMixture* mix, RunConfiguration& runfile, MolecularTransport* molecular_transport);
+  MFEM_HOST_DEVICE MixingLengthTransport(GasMixture* mix, const mixingLengthTransportData& inputs,
+                                         MolecularTransport* molecular_transport);
 
   MFEM_HOST_DEVICE virtual ~MixingLengthTransport() { delete molecular_transport_; }
 
-  void ComputeFluxTransportProperties(const Vector &state, const DenseMatrix &gradUp, const Vector &Efield,
-                                      double radius, double distance, Vector &transportBuffer,
-                                      DenseMatrix &diffusionVelocity) final;
-  MFEM_HOST_DEVICE void ComputeFluxTransportProperties(const double *state, const double *gradUp, const double *Efield,
-                                                       double radius, double distance, double *transportBuffer,
-                                                       double *diffusionVelocity) final;
-  void ComputeSourceTransportProperties(const Vector &state, const Vector &Up, const DenseMatrix &gradUp,
-                                        const Vector &Efield, double distance, Vector &globalTransport,
-                                        DenseMatrix &speciesTransport, DenseMatrix &diffusionVelocity,
-                                        Vector &n_sp) final;
-  MFEM_HOST_DEVICE void ComputeSourceTransportProperties(const double *state, const double *Up, const double *gradUp,
-                                                         const double *Efield, double distance, double *globalTransport,
-                                                         double *speciesTransport, double *diffusionVelocity,
-                                                         double *n_sp) final;
+  void ComputeFluxTransportProperties(const Vector& state, const DenseMatrix& gradUp, const Vector& Efield,
+                                      double radius, double distance, Vector& transportBuffer,
+                                      DenseMatrix& diffusionVelocity) final;
+  MFEM_HOST_DEVICE void ComputeFluxTransportProperties(const double* state, const double* gradUp, const double* Efield,
+                                                       double radius, double distance, double* transportBuffer,
+                                                       double* diffusionVelocity) final;
+  void ComputeSourceTransportProperties(const Vector& state, const Vector& Up, const DenseMatrix& gradUp,
+                                        const Vector& Efield, double distance, Vector& globalTransport,
+                                        DenseMatrix& speciesTransport, DenseMatrix& diffusionVelocity,
+                                        Vector& n_sp) final;
+  MFEM_HOST_DEVICE void ComputeSourceTransportProperties(const double* state, const double* Up, const double* gradUp,
+                                                         const double* Efield, double distance, double* globalTransport,
+                                                         double* speciesTransport, double* diffusionVelocity,
+                                                         double* n_sp) final;
 
-  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, double *visc) final;
-  MFEM_HOST_DEVICE void GetViscosities(const double *conserved, const double *primitive, const double *gradUp,
-                                       double radius, double distance, double *visc) final;
+  MFEM_HOST_DEVICE void GetViscosities(const double* conserved, const double* primitive, double* visc) final;
+  MFEM_HOST_DEVICE void GetViscosities(const double* conserved, const double* primitive, const double* gradUp,
+                                       double radius, double distance, double* visc) final;
 };
 
-MFEM_HOST_DEVICE inline void MixingLengthTransport::GetViscosities(const double *conserved, const double *primitive,
-                                                                   double *visc) {
+MFEM_HOST_DEVICE inline void MixingLengthTransport::GetViscosities(const double* conserved, const double* primitive,
+                                                                   double* visc) {
   assert(false);
 }
 
-MFEM_HOST_DEVICE inline void MixingLengthTransport::GetViscosities(const double *conserved, const double *primitive,
-                                                                   const double *gradUp, double radius, double distance,
-                                                                   double *visc) {
+MFEM_HOST_DEVICE inline void MixingLengthTransport::GetViscosities(const double* conserved, const double* primitive,
+                                                                   const double* gradUp, double radius, double distance,
+                                                                   double* visc) {
   molecular_transport_->GetViscosities(conserved, primitive, visc);
 
   const double rho = conserved[0];

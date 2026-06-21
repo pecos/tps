@@ -96,7 +96,7 @@ class Tps {
   std::string meshFile_;
 
   // pointer to solver implementation chosen at runtime
-  TPS::Solver *solver_ = NULL;
+  TPS::Solver* solver_ = NULL;
 
   // post-process visualization mode
   bool isVisualizationMode_;
@@ -115,39 +115,39 @@ class Tps {
 
   /// Input parsing support (variants with default value supplied)
   template <typename T>
-  void getInput(const char *name, T &var, T varDefault);
+  void getInput(const char* name, T& var, T varDefault);
 
   /// Read optional mfem::Vector input (set to vdef if absent in input file)
-  void getVec(const char *name, Vector &vec, size_t numElems, const Vector &vdef);
+  void getVec(const char* name, Vector& vec, size_t numElems, const Vector& vdef);
 
   /// Parsing support for required (scalar) inputs
   template <typename T>
-  void getRequiredInput(const char *name, T &var);
+  void getRequiredInput(const char* name, T& var);
 
   template <typename T>
-  T getRequiredInput(const std::string &name) {
+  T getRequiredInput(const std::string& name) {
     T var;
     this->getRequiredInput(name.c_str(), var);
     return var;
   }
 
   template <typename T>
-  T getInput(const std::string &name, T varDefault) {
+  T getInput(const std::string& name, T varDefault) {
     T var;
     this->getInput(name.c_str(), var, varDefault);
     return var;
   }
 
   /// Parsing support for required (vector) inputs
-  void getRequiredVec(const char *name, std::vector<double> &var, size_t numElems);
-  void getRequiredVec(const char *name, Vector &var, size_t numElems);
-  void getRequiredVec(const char *name, Array<double> &var, size_t numElems);
+  void getRequiredVec(const char* name, std::vector<double>& var, size_t numElems);
+  void getRequiredVec(const char* name, Vector& var, size_t numElems);
+  void getRequiredVec(const char* name, Array<double>& var, size_t numElems);
 
   /// Parsing support for required (single element of vector) inputs
-  void getRequiredVecElem(const char *name, double &var, int ithElem);
+  void getRequiredVecElem(const char* name, double& var, int ithElem);
 
   /// Read string-string pairs for keyword [name] and store in var.
-  void getRequiredPairs(const char *name, std::vector<pair<std::string, std::string>> &var);
+  void getRequiredPairs(const char* name, std::vector<pair<std::string, std::string>>& var);
 
   /// Get solver status
   int getStatus() { return solver_->getStatus(); }
@@ -189,16 +189,16 @@ class Tps {
   }
 
   /// Initialize the interface
-  void initInterface(Tps2Boltzmann &interface) { solver_->initInterface(interface); }
+  void initInterface(Tps2Boltzmann& interface) { solver_->initInterface(interface); }
 
   /// Push solver variables to interface
-  void push(Tps2Boltzmann &interface) { solver_->push(interface); }
+  void push(Tps2Boltzmann& interface) { solver_->push(interface); }
 
   /// Fetch solver variables from interface
-  void fetch(Tps2Boltzmann &interface) { solver_->fetch(interface); }
+  void fetch(Tps2Boltzmann& interface) { solver_->fetch(interface); }
 
   void printHeader();
-  void parseCommandLineArgs(int argc, char *argv[]);  // variant used in C++ interface
+  void parseCommandLineArgs(int argc, char* argv[]);  // variant used in C++ interface
   void parseArgs(std::vector<std::string> argv);      // variant used in python interface
 
   void parseInput();
@@ -209,15 +209,15 @@ class Tps {
 
   MPI_Comm getTPSCommWorld() { return TPSCommWorld_; }
 
-  std::string &getInputFilename() { return iFile_; }
+  std::string& getInputFilename() { return iFile_; }
   bool isFlowEMCoupled() const { return isFlowEMCoupledMode_; }
   bool isVisualizationMode() const { return isVisualizationMode_; }
-  const std::string &getSolverType() { return input_solver_type_; }
+  const std::string& getSolverType() { return input_solver_type_; }
 };
 
-std::string ltrim(const std::string &s);
-std::string rtrim(const std::string &s);
-std::string trim(const std::string &s);
+std::string ltrim(const std::string& s);
+std::string rtrim(const std::string& s);
+std::string trim(const std::string& s);
 
 }  // end namespace TPS
 

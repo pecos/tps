@@ -36,10 +36,10 @@
 
 using namespace mfem;
 
-ConstantPropertyThermoChem::ConstantPropertyThermoChem(ParMesh *pmesh, int sorder, double rho, double mu)
+ConstantPropertyThermoChem::ConstantPropertyThermoChem(ParMesh* pmesh, int sorder, double rho, double mu)
     : pmesh_(pmesh), sorder_(sorder), rho_(rho), mu_(mu) {}
 
-ConstantPropertyThermoChem::ConstantPropertyThermoChem(ParMesh *pmesh, int sorder, TPS::Tps *tps)
+ConstantPropertyThermoChem::ConstantPropertyThermoChem(ParMesh* pmesh, int sorder, TPS::Tps* tps)
     : pmesh_(pmesh), sorder_(sorder) {
   assert(tps != nullptr);
   tps->getInput("loMach/constprop/rho", rho_, 1.0);

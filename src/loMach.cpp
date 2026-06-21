@@ -61,7 +61,7 @@
 using namespace mfem;
 using namespace mfem::common;
 
-LoMachSolver::LoMachSolver(TPS::Tps *tps)
+LoMachSolver::LoMachSolver(TPS::Tps* tps)
     : tpsP_(tps),
       groupsMPI(new MPI_Groups(tps->getTPSCommWorld())),
       nprocs_(groupsMPI->getTPSWorldSize()),
@@ -568,7 +568,7 @@ void LoMachSolver::updateTimestep() {
   auto dataU = flow_->getCurrentVelocity()->HostRead();
 
   // comes in divided by order
-  const double *dataD = (meshData_->getGridScale())->HostRead();
+  const double* dataD = (meshData_->getGridScale())->HostRead();
   int Sdof = meshData_->getDofSize();
 
   for (int n = 0; n < Sdof; n++) {
@@ -585,7 +585,7 @@ void LoMachSolver::updateTimestep() {
   double dtInst_conv = CFL_ / std::max(max_speed, 1.0e-12);
 
   double dtInst = dtInst_conv;
-  double &dt = temporal_coeff_.dt;
+  double& dt = temporal_coeff_.dt;
   if (dtInst > dt) {
     dt = dt * (1.0 + dtFactor);
     dt = std::min(dt, dtInst);
@@ -613,7 +613,7 @@ double LoMachSolver::computeCFL() {
 
   // comes in divided by order
   auto dataU = flow_->getCurrentVelocity()->HostRead();
-  const double *dataD = (meshData_->getGridScale())->HostRead();
+  const double* dataD = (meshData_->getGridScale())->HostRead();
   int Sdof = meshData_->getDofSize();
 
   MPI_Barrier(groupsMPI->getTPSCommWorld());
@@ -638,7 +638,7 @@ void LoMachSolver::setTimestep() {
   double convT_lcl = 1.0e-12;
   double min_convT = 1.0;
   double Umag;
-  const double *dataD = (meshData_->getGridScale())->HostRead();
+  const double* dataD = (meshData_->getGridScale())->HostRead();
   int Sdof = meshData_->getDofSize();
 
   // dt_fixed is initialized to -1, so if it is positive,

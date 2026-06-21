@@ -37,28 +37,28 @@
 #include "tps2Boltzmann.hpp"
 
 // CPU version (just for starting up)
-void M2ulPhyS::push(TPS::Tps2Boltzmann &interface) {
+void M2ulPhyS::push(TPS::Tps2Boltzmann& interface) {
   assert(interface.IsInitialized());
 
   int nscalardofs = vfes->GetNDofs();
 
-  const double *solver_data = U->HostRead();
+  const double* solver_data = U->HostRead();
 
-  mfem::ParGridFunction *species =
+  mfem::ParGridFunction* species =
       new mfem::ParGridFunction(&interface.NativeFes(TPS::Tps2Boltzmann::Index::SpeciesDensities));
-  mfem::ParGridFunction *heavyTemperature =
+  mfem::ParGridFunction* heavyTemperature =
       new mfem::ParGridFunction(&interface.NativeFes(TPS::Tps2Boltzmann::Index::HeavyTemperature));
-  mfem::ParGridFunction *electronTemperature =
+  mfem::ParGridFunction* electronTemperature =
       new mfem::ParGridFunction(&interface.NativeFes(TPS::Tps2Boltzmann::Index::ElectronTemperature));
 
-  double *species_data = species->HostWrite();
-  double *heavyTemperature_data = heavyTemperature->HostWrite();
-  double *electronTemperature_data = electronTemperature->HostWrite();
+  double* species_data = species->HostWrite();
+  double* heavyTemperature_data = heavyTemperature->HostWrite();
+  double* electronTemperature_data = electronTemperature->HostWrite();
 
   double state_local[gpudata::MAXEQUATIONS];
   double species_local[gpudata::MAXSPECIES];
 
-  PerfectMixture *pmixture = dynamic_cast<PerfectMixture *>(mixture);
+  PerfectMixture* pmixture = dynamic_cast<PerfectMixture*>(mixture);
   assert(pmixture);
 
   for (int i = 0; i < nscalardofs; i++) {
@@ -86,12 +86,12 @@ void M2ulPhyS::push(TPS::Tps2Boltzmann &interface) {
   delete electronTemperature;
 }
 
-void M2ulPhyS::fetch(TPS::Tps2Boltzmann &interface) {
-  mfem::ParFiniteElementSpace *reaction_rates_fes(&(interface.NativeFes(TPS::Tps2Boltzmann::Index::ReactionRates)));
+void M2ulPhyS::fetch(TPS::Tps2Boltzmann& interface) {
+  mfem::ParFiniteElementSpace* reaction_rates_fes(&(interface.NativeFes(TPS::Tps2Boltzmann::Index::ReactionRates)));
   externalReactionRates.reset(new mfem::ParGridFunction(reaction_rates_fes));
   interface.interpolateToNativeFES(*externalReactionRates, TPS::Tps2Boltzmann::Index::ReactionRates);
 #if defined(_CUDA_) || defined(_HIP_)
-  const double *data(externalReactionRates->Read());
+  const double* data(externalReactionRates->Read());
   int size(externalReactionRates->FESpace()->GetNDofs());
   assert(externalReactionRates->FESpace()->GetOrdering() == mfem::Ordering::byNODES);
   gpu::deviceSetChemistryReactionData<<<1, 1>>>(data, size, chemistry_);

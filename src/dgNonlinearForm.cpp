@@ -35,11 +35,11 @@
 
 #include "riemann_solver.hpp"
 
-DGNonLinearForm::DGNonLinearForm(RiemannSolverTPS *rsolver, Fluxes *_flux, ParFiniteElementSpace *_vfes,
-                                 ParFiniteElementSpace *_gradFes, ParGridFunction *_gradUp, BCintegrator *_bcIntegrator,
-                                 IntegrationRules *_intRules, const int _dim, const int _num_equation,
-                                 GasMixture *_mixture, const precomputedIntegrationData &gpu_precomputed_data,
-                                 const int &_maxIntPoints, const int &_maxDofs)
+DGNonLinearForm::DGNonLinearForm(RiemannSolverTPS* rsolver, Fluxes* _flux, ParFiniteElementSpace* _vfes,
+                                 ParFiniteElementSpace* _gradFes, ParGridFunction* _gradUp, BCintegrator* _bcIntegrator,
+                                 IntegrationRules* _intRules, const int _dim, const int _num_equation,
+                                 GasMixture* _mixture, const precomputedIntegrationData& gpu_precomputed_data,
+                                 const int& _maxIntPoints, const int& _maxDofs)
     : ParNonlinearForm(_vfes),
       rsolver_(rsolver),
       fluxes(_flux),
@@ -74,7 +74,7 @@ DGNonLinearForm::DGNonLinearForm(RiemannSolverTPS *rsolver, Fluxes *_flux, ParFi
   face_flux_ = 0.;
 }
 
-void DGNonLinearForm::setParallelData(dataTransferArrays *_transferU, dataTransferArrays *_transferGradUp) {
+void DGNonLinearForm::setParallelData(dataTransferArrays* _transferU, dataTransferArrays* _transferGradUp) {
   transferU = _transferU;
   transferGradUp = _transferGradUp;
 
@@ -87,8 +87,8 @@ void DGNonLinearForm::setParallelData(dataTransferArrays *_transferU, dataTransf
 }
 
 #ifdef _GPU_
-void DGNonLinearForm::Mult_domain(const Vector &x, Vector &y) {
-  const elementIndexingData &elem_data = gpu_precomputed_data_.element_indexing_data;
+void DGNonLinearForm::Mult_domain(const Vector& x, Vector& y) {
+  const elementIndexingData& elem_data = gpu_precomputed_data_.element_indexing_data;
 
   auto h_num_elems_of_type = elem_data.num_elems_of_type.HostRead();
   auto h_elem_dof_num = elem_data.dof_number.HostRead();
@@ -119,8 +119,8 @@ void DGNonLinearForm::Mult_domain(const Vector &x, Vector &y) {
   if (bfnfi.Size()) bcIntegrator->integrateBCs(y, x, elem_data);
 }
 
-void DGNonLinearForm::Mult_bdr(const Vector &x, Vector &y) {
-  ParMesh *pmesh = vfes->GetParMesh();
+void DGNonLinearForm::Mult_bdr(const Vector& x, Vector& y) {
+  ParMesh* pmesh = vfes->GetParMesh();
   const int Nshared = pmesh->GetNSharedFaces();
   if (Nshared > 0) {
     sharedFaceInterpolation_gpu(x);
@@ -128,23 +128,23 @@ void DGNonLinearForm::Mult_bdr(const Vector &x, Vector &y) {
   }
 }
 
-void DGNonLinearForm::setToZero_gpu(Vector &x, const int size) {
-  double *d_x = x.Write();
+void DGNonLinearForm::setToZero_gpu(Vector& x, const int size) {
+  double* d_x = x.Write();
 
   MFEM_FORALL(i, size, { d_x[i] = 0.; });
 }
 
-void DGNonLinearForm::faceIntegration_gpu(Vector &y, int elType, int elemOffset, int elDof) {
-  double *d_y = y.ReadWrite();
-  const double *d_f = face_flux_.Read();
+void DGNonLinearForm::faceIntegration_gpu(Vector& y, int elType, int elemOffset, int elDof) {
+  double* d_y = y.ReadWrite();
+  const double* d_f = face_flux_.Read();
 
-  const elementIndexingData &elem_data = gpu_precomputed_data_.element_indexing_data;
+  const elementIndexingData& elem_data = gpu_precomputed_data_.element_indexing_data;
   auto h_num_elems_of_type = elem_data.num_elems_of_type.HostRead();
 
   auto d_elem_dofs_list = elem_data.dofs_list.Read();
   auto d_elem_dof_off = elem_data.dof_offset.Read();
 
-  const interiorFaceIntegrationData &face_data = gpu_precomputed_data_.interior_face_data;
+  const interiorFaceIntegrationData& face_data = gpu_precomputed_data_.interior_face_data;
   auto d_element_to_faces = face_data.element_to_faces.Read();
   auto d_shape1 = face_data.el1_shape.Read();
   auto d_weight = face_data.quad_weight.Read();
@@ -231,13 +231,13 @@ void DGNonLinearForm::faceIntegration_gpu(Vector &y, int elType, int elemOffset,
 }
 
 void DGNonLinearForm::evalFaceFlux_gpu() {
-  double *d_f = face_flux_.Write();
-  const double *d_uk_el1 = uk_el1.Read();
-  const double *d_uk_el2 = uk_el2.Read();
-  const double *d_grad_uk_el1 = grad_upk_el1.Read();
-  const double *d_grad_uk_el2 = grad_upk_el2.Read();
+  double* d_f = face_flux_.Write();
+  const double* d_uk_el1 = uk_el1.Read();
+  const double* d_uk_el2 = uk_el2.Read();
+  const double* d_grad_uk_el1 = grad_upk_el1.Read();
+  const double* d_grad_uk_el2 = grad_upk_el2.Read();
 
-  const interiorFaceIntegrationData &face_data = gpu_precomputed_data_.interior_face_data;
+  const interiorFaceIntegrationData& face_data = gpu_precomputed_data_.interior_face_data;
 
   auto d_normal = face_data.normal.Read();
   auto d_face_nqp = face_data.num_quad.Read();
@@ -247,15 +247,15 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
   auto d_dist1 = face_data.dist1.Read();
   auto d_dist2 = face_data.dist2.Read();
 
-  Mesh *mesh = fes->GetMesh();
+  Mesh* mesh = fes->GetMesh();
   const int Nf = mesh->GetNumFaces();
 
   const int dim = dim_;
   const int num_equation = num_equation_;
   const int maxIntPoints = maxIntPoints_;
 
-  const RiemannSolverTPS *d_rsolver = rsolver_;
-  Fluxes *d_flux = fluxes;
+  const RiemannSolverTPS* d_rsolver = rsolver_;
+  Fluxes* d_flux = fluxes;
 
   // clang-format off
   MFEM_FORALL(iface, Nf,
@@ -346,26 +346,26 @@ void DGNonLinearForm::evalFaceFlux_gpu() {
   // clang-format on
 }
 
-void DGNonLinearForm::interpFaceData_gpu(const Vector &x, int elType, int elemOffset, int elDof) {
-  const elementIndexingData &elem_data = gpu_precomputed_data_.element_indexing_data;
-  const interiorFaceIntegrationData &face_data = gpu_precomputed_data_.interior_face_data;
+void DGNonLinearForm::interpFaceData_gpu(const Vector& x, int elType, int elemOffset, int elDof) {
+  const elementIndexingData& elem_data = gpu_precomputed_data_.element_indexing_data;
+  const interiorFaceIntegrationData& face_data = gpu_precomputed_data_.interior_face_data;
 
   auto h_num_elems_of_type = elem_data.num_elems_of_type.HostRead();
 
   auto d_x = x.Read();
-  double *d_uk_el1 = uk_el1.Write();
-  double *d_uk_el2 = uk_el2.Write();
-  double *d_grad_uk_el1 = grad_upk_el1.Write();
-  double *d_grad_uk_el2 = grad_upk_el2.Write();
+  double* d_uk_el1 = uk_el1.Write();
+  double* d_uk_el2 = uk_el2.Write();
+  double* d_grad_uk_el1 = grad_upk_el1.Write();
+  double* d_grad_uk_el2 = grad_upk_el2.Write();
 
-  const ParGridFunction *gradUp = gradUp_;
+  const ParGridFunction* gradUp = gradUp_;
 
-  const double *d_gradUp = gradUp->Read();
+  const double* d_gradUp = gradUp->Read();
   auto d_element_to_faces = face_data.element_to_faces.Read();
   auto d_elem_dofs_list = elem_data.dofs_list.Read();
   auto d_elem_dof_off = elem_data.dof_offset.Read();
   auto d_shape1 = face_data.el1_shape.Read();
-  const double *d_shape2 = face_data.el2_shape.Read();
+  const double* d_shape2 = face_data.el2_shape.Read();
   auto d_face_el1 = face_data.el1.Read();
   auto d_face_nqp = face_data.num_quad.Read();
 
@@ -376,7 +376,7 @@ void DGNonLinearForm::interpFaceData_gpu(const Vector &x, int elType, int elemOf
   const int maxIntPoints = maxIntPoints_;
   const int maxDofs = maxDofs_;
 
-  Fluxes *d_fluxes = fluxes;
+  Fluxes* d_fluxes = fluxes;
 
   // clang-format off
   MFEM_FORALL_2D(el, NumElemsType, maxIntPoints, 1, 1,
@@ -571,27 +571,27 @@ void DGNonLinearForm::sharedFaceIntegration_gpu(Vector &y) {
 }
 // clang-format on
 
-void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
-  const double *d_x = x.Read();
-  const double *d_gradUp = gradUp_->Read();
-  const double *d_faceGradUp = transferGradUp->face_nbr_data.Read();
-  const double *d_faceData = transferU->face_nbr_data.Read();
+void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector& x) {
+  const double* d_x = x.Read();
+  const double* d_gradUp = gradUp_->Read();
+  const double* d_faceGradUp = transferGradUp->face_nbr_data.Read();
+  const double* d_faceData = transferU->face_nbr_data.Read();
 
-  const elementIndexingData &elem_data = gpu_precomputed_data_.element_indexing_data;
+  const elementIndexingData& elem_data = gpu_precomputed_data_.element_indexing_data;
   auto d_elem_dofs_list = elem_data.dofs_list.Read();
   auto d_elem_dof_off = elem_data.dof_offset.Read();
   auto d_elem_dof_num = elem_data.dof_number.Read();
 
-  const sharedFaceIntegrationData &shared_face_data = gpu_precomputed_data_.shared_face_data;
-  const double *d_normal = shared_face_data.normal.Read();
-  const double *d_xyz = shared_face_data.xyz.Read();
-  const double *d_shape1 = shared_face_data.el1_shape.Read();
-  const double *d_shape2 = shared_face_data.el2_shape.Read();
-  const int *d_face_num_quad = shared_face_data.num_quad.Read();
-  const int *d_face_num_dof2 = shared_face_data.num_dof2.Read();
-  const int *d_elem2_dofs = shared_face_data.elem2_dofs.Read();
-  const int *d_elem2_grad_dofs = shared_face_data.elem2_grad_dofs.Read();
-  const int *d_shared_elements_to_shared_faces = shared_face_data.shared_elements_to_shared_faces.Read();
+  const sharedFaceIntegrationData& shared_face_data = gpu_precomputed_data_.shared_face_data;
+  const double* d_normal = shared_face_data.normal.Read();
+  const double* d_xyz = shared_face_data.xyz.Read();
+  const double* d_shape1 = shared_face_data.el1_shape.Read();
+  const double* d_shape2 = shared_face_data.el2_shape.Read();
+  const int* d_face_num_quad = shared_face_data.num_quad.Read();
+  const int* d_face_num_dof2 = shared_face_data.num_dof2.Read();
+  const int* d_elem2_dofs = shared_face_data.elem2_dofs.Read();
+  const int* d_elem2_grad_dofs = shared_face_data.elem2_grad_dofs.Read();
+  const int* d_shared_elements_to_shared_faces = shared_face_data.shared_elements_to_shared_faces.Read();
 
   auto d_delta_el1 = shared_face_data.delta_el1.Read();
   auto d_delta_el2 = shared_face_data.delta_el2.Read();
@@ -605,10 +605,10 @@ void DGNonLinearForm::sharedFaceInterpolation_gpu(const Vector &x) {
   const int maxIntPoints = maxIntPoints_;
   const int maxDofs = maxDofs_;
 
-  double *d_shared_flux = shared_flux.Write();
+  double* d_shared_flux = shared_flux.Write();
 
-  const RiemannSolverTPS *d_rsolver = rsolver_;
-  Fluxes *d_flux = fluxes;
+  const RiemannSolverTPS* d_rsolver = rsolver_;
+  Fluxes* d_flux = fluxes;
 
   MFEM_FORALL_2D(el, maxNumElems, maxIntPoints, 1, 1, {
     double l1[gpudata::MAXDOFS], l2[gpudata::MAXDOFS];            // double l1[216], l2[216];
