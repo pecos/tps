@@ -1202,19 +1202,32 @@ void ZetaModel::updateMuT() {
 
     for (int i = 0; i < SdofInt_; i++) muT[i] *= std::min(dv2[i], twoThirds * dk[i]);
     // to prevent kinks
+    // double wgt = 1.0;
     // for (int i = 0; i < SdofInt_; i++) {
-    // wgt = std::tanh(tanh_half_ * dv2[i]/(twoThirds*dk[i]));
-    // wgt = wgt * wgt;
-    // muT[i] *= ((1.0-wgt)*dv2[i] + wgt*twoThirds*dk[i]);
-    //}
+    //   if (std::abs(twoThirds*dk[i]) > 1e-16) {
+    //     wgt = std::tanh(tanh_half_ * dv2[i]/(twoThirds*dk[i]));
+    //   } else {
+    //     wgt = 1.0;
+    //     // std::cout << "clipped" << endl;
+    //   }
+    //   wgt = wgt * wgt;
+    //   muT[i] *= ((1.0-wgt)*dv2[i] + wgt*twoThirds*dk[i]);
+    //   // std::cout << wgt << endl;
+    //   // std::cout << dv2[i]/(twoThirds*dk[i]) << endl;
+    // }
 
     for (int i = 0; i < SdofInt_; i++) muT[i] *= std::min(dTTS[i], dTTS_strain[i]);
     // to prevent kinks
     // for (int i = 0; i < SdofInt_; i++) {
-    //  wgt = std::tanh(tanh_half_ * dTTS[i]/dTTS_strain[i]);
-    //  wgt = wgt * wgt;
-    //  muT[i] *= ((1.0-wgt)*dTTS[i] + wgt*dTTS_strain[i]);
-    //}
+    //   if (std::abs(dTTS_strain[i]) > 1e-16) {
+    //     wgt = std::tanh(tanh_half_ * dTTS[i]/dTTS_strain[i]);
+    //   } else {
+    //     wgt = 1.0;
+    //   }
+    //   wgt = wgt * wgt;
+    //   muT[i] *= ((1.0-wgt)*dTTS[i] + wgt*dTTS_strain[i]);
+    //   // std::cout << wgt << endl;
+    // }
 
     for (int i = 0; i < SdofInt_; i++) muT[i] = std::max(muT[i], mut_min_);
   }
@@ -1336,7 +1349,11 @@ void ZetaModel::updateTTS() {
 
     // to prevent kinks
     double wgt = 1.0;
+    // if (std::abs(T3) > 1e-16) {
     wgt = std::tanh(tanh_half_ * T1 / T3);
+    // } else {
+    //   wgt = 1.0;
+    // }
     dTTS[i] = wgt * T1 + (1.0 - wgt) * T3;
 
     // including stag-limit T in nuT only
@@ -1385,13 +1402,22 @@ void ZetaModel::updateTLS() {
 
     // to prevent kinks
     // wgt = std::tanh(tanh_half_ * dTLS[i]/L3);
+    // if (std::abs(L3) > 1e-16) {
     wgt = std::tanh(tanh_half_ * L1 / L3);
+    // } else {
+    //   wgt = 1.0;
+    // }
+    
     dTLS[i] = Cl_ * (wgt * L1 + (1.0 - wgt) * L3);
 
     dTLS[i] = std::max(dTLS[i], tls_min_);
 
     // dTLS[i] = std::min(dTLS[i], tls_max_);
+    // if (std::abs(tls_max_) > 1e-16) {
     wgt = std::tanh(tanh_half_ * dTLS[i] / tls_max_);
+    // } else {
+    //   wgt = 1.0;
+    // }
     dTLS[i] = (1.0 - wgt) * dTLS[i] + wgt * tls_max_;
   }
   tls_gf_.SetFromTrueDofs(tls_);
