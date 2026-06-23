@@ -57,7 +57,7 @@
 // forward-declaration for Tps support class
 namespace TPS {
 class Tps;
-// class Tps2Boltzmann;
+class Tps2Boltzmann;
 }
 
 #include <tps_config.h>
