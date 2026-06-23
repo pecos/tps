@@ -57,7 +57,7 @@
 // forward-declaration for Tps support class
 namespace TPS {
 class Tps;
-class Tps2Boltzmann;
+// class Tps2Boltzmann;
 }
 
 #include <tps_config.h>
@@ -262,8 +262,8 @@ class LoMachSolver : public TPS::PlasmaSolver {
   mfem::ParGridFunction *getJouleHeatingGF() override { return thermo_->getJouleHeatingGF(); }
 
 #ifdef HAVE_PYTHON
-  mfem::ParGridFunction *getEfieldRealGF() override { return thermo_->getEfieldRealGF(); }
-  mfem::ParGridFunction *getEfieldImagGF() override { return thermo_->getEfieldImagGF(); }
+  // mfem::ParGridFunction *getEfieldRealGF() override { return thermo_->getEfieldRealGF(); }
+  // mfem::ParGridFunction *getEfieldImagGF() override { return thermo_->getEfieldImagGF(); }
 #endif
 
   void push(TPS::Tps2Boltzmann &interface) override { thermo_->push(interface); }
