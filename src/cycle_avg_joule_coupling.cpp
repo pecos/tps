@@ -101,10 +101,10 @@ CycleAvgJouleCoupling::CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tp
   } else if (plasma_solver == "lomach") {
     flow_solver_ = new LoMachSolver(tps);
 #ifdef HAVE_PYTHON
-    tps->getInput("cycle-avg-joule-coupled/bte-from-tps", bte_from_tps_, false);
-    tps->getRequiredInput("boltzmannSolver/bte-path", bte_path);
-    tps->getRequiredInput("boltzmannSolver/tps-src-path", tps_src_path);
-    tps->getRequiredInput("boltzmannSolver/torch-chem-path", torch_chem_path);
+    // tps->getInput("cycle-avg-joule-coupled/bte-from-tps", bte_from_tps_, false);
+    // tps->getRequiredInput("boltzmannSolver/bte-path", bte_path);
+    // tps->getRequiredInput("boltzmannSolver/tps-src-path", tps_src_path);
+    // tps->getRequiredInput("boltzmannSolver/torch-chem-path", torch_chem_path);
 #endif
 
   } else {
@@ -363,99 +363,99 @@ void CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow() {
 }
 
 #ifdef HAVE_PYTHON
-void CycleAvgJouleCoupling::interpElectricFieldFromEMToFlowforBTE() {
-  const bool verbose = rank0_;
-  if (verbose) grvy_printf(ginfo, "Interpolating Electric field to flow mesh for calling BTE from TPS.\n");
+// void CycleAvgJouleCoupling::interpElectricFieldFromEMToFlowforBTE() {
+//   const bool verbose = rank0_;
+//   if (verbose) grvy_printf(ginfo, "Interpolating Electric field to flow mesh for calling BTE from TPS.\n");
 
-  // FIRST, GET THE NUMBER OF ELECTRIC FIELD COMPONENTS
-  ParMesh *pmesh(flow_solver_->getMesh());
-  int nEfieldComps_ = 0;
-  switch (pmesh->Dimension()) {
-    case 2:
-      nEfieldComps_ = 2;
-      break;
-    case 3:
-      nEfieldComps_ = 6;
-      break;
-    default:
-      std::abort();
-  }
-  efield_ncomp_ = nEfieldComps_ / 2;
+//   // FIRST, GET THE NUMBER OF ELECTRIC FIELD COMPONENTS
+//   ParMesh *pmesh(flow_solver_->getMesh());
+//   int nEfieldComps_ = 0;
+//   switch (pmesh->Dimension()) {
+//     case 2:
+//       nEfieldComps_ = 2;
+//       break;
+//     case 3:
+//       nEfieldComps_ = 6;
+//       break;
+//     default:
+//       std::abort();
+//   }
+//   efield_ncomp_ = nEfieldComps_ / 2;
 
-#ifdef HAVE_GSLIB
-  const ParFiniteElementSpace *flow_fespace = flow_solver_->getFESpace();
+// #ifdef HAVE_GSLIB
+//   const ParFiniteElementSpace *flow_fespace = flow_solver_->getFESpace();
 
-  // // Generate list of points where the grid function will be evaluated.
-  Vector vxyz;
-  interpolationPoints(vxyz, n_flow_interp_nodes_, flow_fespace);
+//   // // Generate list of points where the grid function will be evaluated.
+//   Vector vxyz;
+//   interpolationPoints(vxyz, n_flow_interp_nodes_, flow_fespace);
 
-  // // Evaluate source grid function.
-  Vector interp_vals(n_flow_interp_nodes_ * efield_ncomp_);
+//   // // Evaluate source grid function.
+//   Vector interp_vals(n_flow_interp_nodes_ * efield_ncomp_);
 
-  const ParGridFunction *efield_real_gf = qmsa_solver_->getElectricFieldreal();
-  assert(efield_real_gf != NULL);
+//   const ParGridFunction *efield_real_gf = qmsa_solver_->getElectricFieldreal();
+//   assert(efield_real_gf != NULL);
 
-  interp_em_to_flow_->Interpolate(vxyz, *efield_real_gf, interp_vals);
+//   interp_em_to_flow_->Interpolate(vxyz, *efield_real_gf, interp_vals);
 
-  ParGridFunction *efield_real_flow = flow_solver_->getEfieldRealGF();
-  assert(efield_real_flow != nullptr);
-  if (flow_fespace->IsDGSpace()) {
-    efield_real_flow->SetFromTrueDofs(interp_vals);
-  } else {
-    Array<int> vdofs;
-    Vector elem_dof_vals;
-    int n0 = 0;
-    const int NE = flow_solver_->getMesh()->GetNE();
-    for (int i = 0; i < NE; i++) {
-      flow_fespace->GetElementDofs(i, vdofs);
-      const int nsp = flow_fespace->GetFE(i)->GetNodes().GetNPoints();
-      assert(nsp == vdofs.Size());
-      elem_dof_vals.SetSize(nsp);
-      for (int j = 0; j < nsp; j++) {
-        elem_dof_vals(j) = interp_vals(n0 + j);
-      }
-      efield_real_flow->SetSubVector(vdofs, elem_dof_vals);
-      n0 += nsp;
-    }
-    efield_real_flow->SetTrueVector();
-    efield_real_flow->SetFromTrueVector();
-  }
-  efield_real_flow->HostRead();
+//   ParGridFunction *efield_real_flow = flow_solver_->getEfieldRealGF();
+//   assert(efield_real_flow != nullptr);
+//   if (flow_fespace->IsDGSpace()) {
+//     efield_real_flow->SetFromTrueDofs(interp_vals);
+//   } else {
+//     Array<int> vdofs;
+//     Vector elem_dof_vals;
+//     int n0 = 0;
+//     const int NE = flow_solver_->getMesh()->GetNE();
+//     for (int i = 0; i < NE; i++) {
+//       flow_fespace->GetElementDofs(i, vdofs);
+//       const int nsp = flow_fespace->GetFE(i)->GetNodes().GetNPoints();
+//       assert(nsp == vdofs.Size());
+//       elem_dof_vals.SetSize(nsp);
+//       for (int j = 0; j < nsp; j++) {
+//         elem_dof_vals(j) = interp_vals(n0 + j);
+//       }
+//       efield_real_flow->SetSubVector(vdofs, elem_dof_vals);
+//       n0 += nsp;
+//     }
+//     efield_real_flow->SetTrueVector();
+//     efield_real_flow->SetFromTrueVector();
+//   }
+//   efield_real_flow->HostRead();
 
-  const ParGridFunction *efield_imag_gf = qmsa_solver_->getElectricFieldimag();
-  assert(efield_imag_gf != NULL);
+//   const ParGridFunction *efield_imag_gf = qmsa_solver_->getElectricFieldimag();
+//   assert(efield_imag_gf != NULL);
 
-  interp_em_to_flow_->Interpolate(vxyz, *efield_imag_gf, interp_vals);
+//   interp_em_to_flow_->Interpolate(vxyz, *efield_imag_gf, interp_vals);
 
-  ParGridFunction *efield_imag_flow = flow_solver_->getEfieldImagGF();
-  assert(efield_imag_flow != nullptr);
-  if (flow_fespace->IsDGSpace()) {
-    efield_imag_flow->SetFromTrueDofs(interp_vals);
-  } else {
-    Array<int> vdofs;
-    Vector elem_dof_vals;
-    int n0 = 0;
-    const int NE = flow_solver_->getMesh()->GetNE();
-    for (int i = 0; i < NE; i++) {
-      flow_fespace->GetElementDofs(i, vdofs);
-      const int nsp = flow_fespace->GetFE(i)->GetNodes().GetNPoints();
-      assert(nsp == vdofs.Size());
-      elem_dof_vals.SetSize(nsp);
-      for (int j = 0; j < nsp; j++) {
-        elem_dof_vals(j) = interp_vals(n0 + j);
-      }
-      efield_imag_flow->SetSubVector(vdofs, elem_dof_vals);
-      n0 += nsp;
-    }
-    efield_imag_flow->SetTrueVector();
-    efield_imag_flow->SetFromTrueVector();
-  }
-  efield_imag_flow->HostRead();
+//   ParGridFunction *efield_imag_flow = flow_solver_->getEfieldImagGF();
+//   assert(efield_imag_flow != nullptr);
+//   if (flow_fespace->IsDGSpace()) {
+//     efield_imag_flow->SetFromTrueDofs(interp_vals);
+//   } else {
+//     Array<int> vdofs;
+//     Vector elem_dof_vals;
+//     int n0 = 0;
+//     const int NE = flow_solver_->getMesh()->GetNE();
+//     for (int i = 0; i < NE; i++) {
+//       flow_fespace->GetElementDofs(i, vdofs);
+//       const int nsp = flow_fespace->GetFE(i)->GetNodes().GetNPoints();
+//       assert(nsp == vdofs.Size());
+//       elem_dof_vals.SetSize(nsp);
+//       for (int j = 0; j < nsp; j++) {
+//         elem_dof_vals(j) = interp_vals(n0 + j);
+//       }
+//       efield_imag_flow->SetSubVector(vdofs, elem_dof_vals);
+//       n0 += nsp;
+//     }
+//     efield_imag_flow->SetTrueVector();
+//     efield_imag_flow->SetFromTrueVector();
+//   }
+//   efield_imag_flow->HostRead();
 
-#else
-  mfem_error("Cannot interpolate without GSLIB support.");
-#endif
-}
+// #else
+//   mfem_error("Cannot interpolate without GSLIB support.");
+// #endif
+// }
 #endif
 
 void CycleAvgJouleCoupling::interpElectricFieldFromEMToFlow() {
@@ -478,23 +478,6 @@ void CycleAvgJouleCoupling::interpElectricFieldFromEMToFlow() {
   if (flow_fespace->IsDGSpace()) {
     efieldR_->SetFromTrueDofs(interp_vals);
   } else {
-    // Array<int> vdofs;
-    // Vector elem_dof_vals;
-    // int n0 = 0;
-    // const int NE = flow_solver_->getMesh()->GetNE();
-    // for (int i = 0; i < NE; i++) {
-    //   flow_fespace->GetElementDofs(i, vdofs);
-    //   const int nsp = flow_fespace->GetFE(i)->GetNodes().GetNPoints();
-    //   assert(nsp == vdofs.Size());
-    //   elem_dof_vals.SetSize(nsp);
-    //   for (int j = 0; j < nsp; j++) {
-    //     elem_dof_vals(j) = interp_vals(n0 + j);
-    //   }
-    //   efieldR_->SetSubVector(vdofs, elem_dof_vals);
-    //   n0 += nsp;
-    // }
-    // efieldR_->SetTrueVector();
-    // efieldR_->SetFromTrueVector();
     assert(false);
   }
   efieldR_->HostRead();
@@ -504,23 +487,6 @@ void CycleAvgJouleCoupling::interpElectricFieldFromEMToFlow() {
   if (flow_fespace->IsDGSpace()) {
     efieldI_->SetFromTrueDofs(interp_vals);
   } else {
-    // Array<int> vdofs;
-    // Vector elem_dof_vals;
-    // int n0 = 0;
-    // const int NE = flow_solver_->getMesh()->GetNE();
-    // for (int i = 0; i < NE; i++) {
-    //   flow_fespace->GetElementDofs(i, vdofs);
-    //   const int nsp = flow_fespace->GetFE(i)->GetNodes().GetNPoints();
-    //   assert(nsp == vdofs.Size());
-    //   elem_dof_vals.SetSize(nsp);
-    //   for (int j = 0; j < nsp; j++) {
-    //     elem_dof_vals(j) = interp_vals(n0 + j);
-    //   }
-    //   efieldI_->SetSubVector(vdofs, elem_dof_vals);
-    //   n0 += nsp;
-    // }
-    // efieldI_->SetTrueVector();
-    // efieldI_->SetFromTrueVector();
     assert(false);
   }
   efieldI_->HostRead();
@@ -545,34 +511,34 @@ void CycleAvgJouleCoupling::solve() {
 #ifdef HAVE_PYTHON
   // INITIALIZE THE PYTHON INTERPRETER BEFORE solveBegin() is called
   if(bte_from_tps_) {
-    py::initialize_interpreter();
+    // py::initialize_interpreter();
 
-    // Import the paths to TPS and BTE
-    try {
-      py::module sys  = py::module::import("sys");
+    // // Import the paths to TPS and BTE
+    // try {
+    //   py::module sys  = py::module::import("sys");
 
-      // Access sys.path (a Python list)
-      py::list sys_path = sys.attr("path");
+    //   // Access sys.path (a Python list)
+    //   py::list sys_path = sys.attr("path");
 
-      // Add the TPS src path to sys.path
-      sys_path.insert(0, tps_src_path); // Insert at the beginning of sys.path
-      sys_path.insert(0, bte_path); // Path to BTE scripts
-      sys_path.insert(0, torch_chem_path); // Path to torch chemistry scripts (needed for temperature dependent collision cross-sections)
+    //   // Add the TPS src path to sys.path
+    //   sys_path.insert(0, tps_src_path); // Insert at the beginning of sys.path
+    //   sys_path.insert(0, bte_path); // Path to BTE scripts
+    //   sys_path.insert(0, torch_chem_path); // Path to torch chemistry scripts (needed for temperature dependent collision cross-sections)
 
-      // Verify that the paths were added
-      if(rank0_) {
-        std::cout << "Updated sys.path:" << std::endl;
-        for (auto item : sys_path) {
-          std::cout << "  " << std::string(py::str(item)) << std::endl;
-        }
-      } 
-    } catch (const py::error_already_set& e) {
-        // Catch and print Python errors
-        std::cerr << "CycleAvgJouleCoupling::solve(), Python error: " << e.what() << std::endl;
-    } catch (const std::exception& e) {
-        // Catch other C++ exceptions
-        std::cerr << "CycleAvgJouleCoupling::solve(), C++ error: " << e.what() << std::endl;
-    }
+    //   // Verify that the paths were added
+    //   if(rank0_) {
+    //     std::cout << "Updated sys.path:" << std::endl;
+    //     for (auto item : sys_path) {
+    //       std::cout << "  " << std::string(py::str(item)) << std::endl;
+    //     }
+    //   } 
+    // } catch (const py::error_already_set& e) {
+    //     // Catch and print Python errors
+    //     std::cerr << "CycleAvgJouleCoupling::solve(), Python error: " << e.what() << std::endl;
+    // } catch (const std::exception& e) {
+    //     // Catch other C++ exceptions
+    //     std::cerr << "CycleAvgJouleCoupling::solve(), C++ error: " << e.what() << std::endl;
+    // }
 
   }
 #endif
@@ -600,7 +566,7 @@ void CycleAvgJouleCoupling::solve() {
 #ifdef HAVE_PYTHON
   // FINALIZE PYTHON INTERPRETER
   if (bte_from_tps_) {
-    py::finalize_interpreter();
+    // py::finalize_interpreter();
   }
 #endif
 }
@@ -611,9 +577,9 @@ void CycleAvgJouleCoupling::solveBegin() {
   // Tell the EM solver to store the electric fields.
   // Electric fields are stored now irrespective of the initialization of
   // TPS-BTE interface
-    bool storeE = qmsa_solver_->getStoreE();
-    qmsa_solver_->setStoreE(true);
-    storeE = qmsa_solver_->getStoreE();
+    // bool storeE = qmsa_solver_->getStoreE();
+    // qmsa_solver_->setStoreE(true);
+    // storeE = qmsa_solver_->getStoreE();
   // }
 #endif
   flow_solver_->solveBegin();
@@ -725,7 +691,7 @@ void CycleAvgJouleCoupling::solveStep() {
     // Electrid field is interpolated from EM to Flow for calling BTE from TPS
     // Interface is not used for this
     // if (bte_from_tps_) {
-      interpElectricFieldFromEMToFlowforBTE();
+      // interpElectricFieldFromEMToFlowforBTE();
     // }
 #endif
     // Electric field is interpolated from EM to Flow for the Interface
