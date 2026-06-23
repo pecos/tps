@@ -510,7 +510,7 @@ void CycleAvgJouleCoupling::solve() {
 
 #ifdef HAVE_PYTHON
   // INITIALIZE THE PYTHON INTERPRETER BEFORE solveBegin() is called
-  if(bte_from_tps_) {
+  // if(bte_from_tps_) {
     // py::initialize_interpreter();
 
     // // Import the paths to TPS and BTE
@@ -540,7 +540,7 @@ void CycleAvgJouleCoupling::solve() {
     //     std::cerr << "CycleAvgJouleCoupling::solve(), C++ error: " << e.what() << std::endl;
     // }
 
-  }
+  // }
 #endif
 
   this->solveBegin();
@@ -565,9 +565,9 @@ void CycleAvgJouleCoupling::solve() {
   this->solveEnd();
 #ifdef HAVE_PYTHON
   // FINALIZE PYTHON INTERPRETER
-  if (bte_from_tps_) {
+  // if (bte_from_tps_) {
     // py::finalize_interpreter();
-  }
+  // }
 #endif
 }
 
@@ -701,9 +701,9 @@ void CycleAvgJouleCoupling::solveStep() {
   // Run a step of the flow solver
   flow_solver_->solveStep();
 
-  if (rank0_) {
-    std::cout << "current_iter_ = " << current_iter_ << "\n";
-  }
+  // if (rank0_) {
+  //   std::cout << "current_iter_ = " << current_iter_ << "\n";
+  // }
   // Increment the current iterate
   ++current_iter_;
 }
