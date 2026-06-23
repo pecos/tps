@@ -295,9 +295,6 @@ class M2ulPhyS : public TPS::PlasmaSolver {
   // for use if we want to write a serial file
   Mesh *serial_mesh;
 
-  // I/O organizer
-  IODataOrganizer ioData;
-
   std::list<mfem::DenseMatrix> tableHost_;
 
 #ifdef HAVE_MASA
@@ -470,6 +467,8 @@ class M2ulPhyS : public TPS::PlasmaSolver {
   int getMaximumIterations() const { return MaxIters; }
   int getCurrentIterations() const { return iter; }
   void setMaximumIterations(int value) { MaxIters = value; }
+
+  double getCurrentTime() const { return time; }
 };
 
 #endif  // M2ULPHYS_HPP_
