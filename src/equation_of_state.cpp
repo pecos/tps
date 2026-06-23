@@ -31,6 +31,7 @@
 // -----------------------------------------------------------------------------------el-
 
 #include "equation_of_state.hpp"
+#include "mfem.hpp"
 
 // EquationOfState::EquationOfState() {}
 
@@ -637,8 +638,10 @@ MFEM_HOST_DEVICE double PerfectMixture::computeBackgroundMassDensity(const doubl
 
   // assert(rhoB >= 0.0);
   if (rhoB < 0.) {
-    // grvy_printf(GRVY_ERROR, "\nNegative background density -> %f\n", rhoB);
-    printf("\nERROR: Negative background density -> %f\n", rhoB);
+    grvy_printf(GRVY_ERROR, "\nNegative background density -> %f\n", rhoB);
+    // printf("\nERROR: Negative background density -> %f\n", rhoB);
+    MFEM_ABORT("Fatal Error: Negative background density in PerfectMixture::computeBackgroundMassDensity!");
+    exit(-1);
 #ifdef _GPU_
     assert(rhoB >= 0.0);
 #else

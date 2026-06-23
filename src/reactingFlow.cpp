@@ -1014,12 +1014,12 @@ ReactingFlow::~ReactingFlow() {
   delete sfec_;
   delete yfes_;
   delete yfec_;
-  // delete rfes_;
-  // delete rfec_;
+  delete rfes_;
+  delete rfec_;
 
 #ifdef HAVE_PYTHON
-  // delete rrf_by_rrbfes_;
-  // delete rrf_by_rrbfec_;
+  delete rrf_by_rrbfes_;
+  delete rrf_by_rrbfec_;
 #endif
 }
 
@@ -1045,13 +1045,13 @@ void ReactingFlow::initializeSelf() {
   vfes_ = new ParFiniteElementSpace(pmesh_, vfec_, dim_);
 
   // PREPARING FINITE ELEMENT SPACE FOR REACTION PROGRESS RATES
-  // rfec_ = new H1_FECollection(order_, dim_);
-  // rfes_ = new ParFiniteElementSpace(pmesh_, yfec_, nReactions_);
+  rfec_ = new H1_FECollection(order_, dim_);
+  rfes_ = new ParFiniteElementSpace(pmesh_, yfec_, nReactions_);
 
 #ifdef HAVE_PYTHON
   // PREPARING FINITE ELEMENT SPACE FOR REACTION RATE RATIO (forward rate / backward rate)
-  // rrf_by_rrbfec_ = new H1_FECollection(order_, dim_);
-  // rrf_by_rrbfes_ = new ParFiniteElementSpace(pmesh_, yfec_, int(nReactions_/2));
+  rrf_by_rrbfec_ = new H1_FECollection(order_, dim_);
+  rrf_by_rrbfes_ = new ParFiniteElementSpace(pmesh_, yfec_, int(nReactions_/2));
 #endif
 
   // Check if fully periodic mesh
@@ -1072,13 +1072,13 @@ void ReactingFlow::initializeSelf() {
   yDofInt_ = yfes_->GetTrueVSize();
 
   // SETTING Dof PARAMETERS FOR REACTION PROGRESS RATES
-  // rDof_ = rfes_->GetVSize();
-  // rDofInt_ = rfes_->GetTrueVSize();
+  rDof_ = rfes_->GetVSize();
+  rDofInt_ = rfes_->GetTrueVSize();
 
 #ifdef HAVE_PYTHON
   // SETTING Dof PARAMETERS FOR RATIO OF FORWARD TO BACKWARD REACTION RATES
-  // rrf_by_rrbDof_ = rrf_by_rrbfes_->GetVSize();
-  // rrf_by_rrbDofInt_ = rrf_by_rrbfes_->GetTrueVSize();
+  rrf_by_rrbDof_ = rrf_by_rrbfes_->GetVSize();
+  rrf_by_rrbDofInt_ = rrf_by_rrbfes_->GetTrueVSize();
 #endif
 
   weff_gf_.SetSpace(vfes_);
@@ -1153,32 +1153,32 @@ void ReactingFlow::initializeSelf() {
   YnFull_gf_ = 0.0;
 
   // prodY for plotting
-  // productY_gf_.SetSpace(yfes_);
-  // productY_gf_ = 0.0;
+  productY_gf_.SetSpace(yfes_);
+  productY_gf_ = 0.0;
 
   // reaction progress rates for plotting
-  // reacR_gf_.SetSpace(rfes_);
-  // reacR_gf_ = 0.0;
+  reacR_gf_.SetSpace(rfes_);
+  reacR_gf_ = 0.0;
 
 #ifdef HAVE_PYTHON
   // reaction rate coefficients for plotting
-  // kReac_gf_.SetSpace(rfes_);
-  // kReac_gf_ = 0.0;
+  kReac_gf_.SetSpace(rfes_);
+  kReac_gf_ = 0.0;
 
   // // reaction rate coefficients for plotting
-  // rrf_by_rrb_gf_.SetSpace(rrf_by_rrbfes_);
-  // rrf_by_rrb_gf_ = 0.0;
+  rrf_by_rrb_gf_.SetSpace(rrf_by_rrbfes_);
+  rrf_by_rrb_gf_ = 0.0;
 
-  // BTEkReac_gf_.SetSpace(rfes_);
-  // BTEkReac_gf_ = 0.0;
+  BTEkReac_gf_.SetSpace(rfes_);
+  BTEkReac_gf_ = 0.0;
 
   // // reaction progress rates for plotting
-  // BTEreacR_gf_.SetSpace(rfes_);
-  // BTEreacR_gf_ = 0.0;
+  BTEreacR_gf_.SetSpace(rfes_);
+  BTEreacR_gf_ = 0.0;
 
   // // reaction rate coefficients for plotting
-  // BTErrf_by_rrb_gf_.SetSpace(rrf_by_rrbfes_);
-  // BTErrf_by_rrb_gf_ = 0.0;
+  BTErrf_by_rrb_gf_.SetSpace(rrf_by_rrbfes_);
+  BTErrf_by_rrb_gf_ = 0.0;
 #endif
 
   // rest can just be sfes
@@ -1219,18 +1219,18 @@ void ReactingFlow::initializeSelf() {
   prodY_gf_ = 0.0;
 
   // reaction progress rates to be passed to reacR_gf
-  // reacR_.SetSize(rDofInt_);
-  // reacR_ = 0.0;
+  reacR_.SetSize(rDofInt_);
+  reacR_ = 0.0;
 
 #ifdef HAVE_PYTHON
-  // BTEreacR_.SetSize(rDofInt_);
-  // BTEreacR_ = 0.0; 
+  BTEreacR_.SetSize(rDofInt_);
+  BTEreacR_ = 0.0; 
 
-  // rrf_by_rrb_.SetSize(int(rDofInt_/2));
-  // rrf_by_rrb_ = 0.0;
+  rrf_by_rrb_.SetSize(int(rDofInt_/2));
+  rrf_by_rrb_ = 0.0;
 
-  // BTErrf_by_rrb_.SetSize(int(rDofInt_/2));
-  // BTErrf_by_rrb_ = 0.0;
+  BTErrf_by_rrb_.SetSize(int(rDofInt_/2));
+  BTErrf_by_rrb_ = 0.0;
 #endif
 
   prodE_.SetSize(yDofInt_);
@@ -1271,11 +1271,11 @@ void ReactingFlow::initializeSelf() {
   bterates_ = 0.0;
 
   // reaction rate coefficients to be passed to kReac_gf_
-  // kReac_.SetSize(rDofInt_);
-  // kReac_ = 0.0;
+  kReac_.SetSize(rDofInt_);
+  kReac_ = 0.0;
 
-  // BTEkReac_.SetSize(rDofInt_);
-  // BTEkReac_ = 0.0;
+  BTEkReac_.SetSize(rDofInt_);
+  BTEkReac_ = 0.0;
 
   grid_idx_to_spatial_idx_map.resize(sDofInt_);
 #endif
@@ -1428,14 +1428,14 @@ void ReactingFlow::initializeSelf() {
   YnFull_gf_.SetFromTrueDofs(Yn_);
 
 #ifdef HAVE_PYTHON
-  // productY_gf_.SetFromTrueDofs(prodY_);
-  // // reacR_gf_.SetFromTrueDofs(reacR_);
-  // kReac_gf_.SetFromTrueDofs(kReac_);
-  // rrf_by_rrb_gf_.SetFromTrueDofs(rrf_by_rrb_);
+  productY_gf_.SetFromTrueDofs(prodY_);
+  reacR_gf_.SetFromTrueDofs(reacR_);
+  kReac_gf_.SetFromTrueDofs(kReac_);
+  rrf_by_rrb_gf_.SetFromTrueDofs(rrf_by_rrb_);
 
-  // BTEreacR_gf_.SetFromTrueDofs(BTEreacR_);
-  // BTEkReac_gf_.SetFromTrueDofs(BTEkReac_);
-  // BTErrf_by_rrb_gf_.SetFromTrueDofs(BTErrf_by_rrb_);
+  BTEreacR_gf_.SetFromTrueDofs(BTEreacR_);
+  BTEkReac_gf_.SetFromTrueDofs(BTEkReac_);
+  BTErrf_by_rrb_gf_.SetFromTrueDofs(BTErrf_by_rrb_);
 #endif
 
   ConstantCoefficient t_ic_coef;
@@ -1554,22 +1554,7 @@ void ReactingFlow::initializeSelf() {
 
         // do nothing for species for time being
 
-      } 
-      // else if (type == "normal") {
-      //   Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
-      //   inlet_attr = 0;
-      //   inlet_attr[patch - 1] = 1;
-      //   double temperature_value;
-      //   tpsP_->getRequiredInput((basepath + "/temperature").c_str(), temperature_value);
-      //   if (rank0_) {
-      //     std::cout << "Rx Flow: Setting uniform Dirichlet temperature on patch = " << patch << std::endl;
-      //   }
-      //   AddTempDirichletBC(temperature_value, inlet_attr);
-
-      //   // do nothing for species for time being
-
-      // } 
-      else {
+      } else {
         if (rank0_) {
           std::cout << "ERROR: Rx Flow inlet type = " << type << " not supported." << std::endl;
         }
@@ -2427,8 +2412,8 @@ void ReactingFlow::step() {
       int iter_number_ = this->GetCurrentIter();
       std::cout << "[C++] Iter = " << iter_number_ << "sDofInt = " << sDofInt_ 
       << ", update_bte_rates = " << update_bte_rates << ", regrid_bte = " << regrid_bte << ", " << regrid_bte_every_n <<
-      ", clip_rr = " << clip_rr << ", clip_frac = " << clip_frac 
-      << ", nBTEReactions, nReactions = " << nBTEReactions_ << ", " << nReactions_ << ", bte_from_tps = " << bte_from_tps_ << "\n";
+      ", bl_frac_ = " << bl_frac_ << ", bl_frac_change_freq_ = " << bl_frac_change_freq_ <<
+      ", nBTEReactions, nReactions = " << nBTEReactions_ << ", " << nReactions_ << ", bte_from_tps = " << bte_from_tps_ << "\n";
     }
 
     if (bte_from_tps_ && regrid_bte == 0) {
@@ -2617,15 +2602,15 @@ void ReactingFlow::step() {
 
       auto btearr = bterates_.HostRead();
       
-      // auto datakfwd = kReac_.HostWrite();
-      // auto dataReac = reacR_.HostWrite();
-      // auto datarrfbyrrb = rrf_by_rrb_.HostWrite();
+      auto datakfwd = kReac_.HostWrite();
+      auto dataReac = reacR_.HostWrite();
+      auto datarrfbyrrb = rrf_by_rrb_.HostWrite();
 
-      // auto dataProd = prodY_.HostWrite();
+      auto dataProd = prodY_.HostWrite();
 
-      // auto dataBTEkfwd = BTEkReac_.HostWrite();
-      // auto dataBTEReac = BTEreacR_.HostWrite();
-      // auto dataBTErrfbyrrb = BTErrf_by_rrb_.HostWrite();
+      auto dataBTEkfwd = BTEkReac_.HostWrite();
+      auto dataBTEReac = BTEreacR_.HostWrite();
+      auto dataBTErrfbyrrb = BTErrf_by_rrb_.HostWrite();
 
       // Define Vectors to be passed to solveChemistryStep
       mfem::Vector bterates(nBTEReactions_);
@@ -2655,28 +2640,6 @@ void ReactingFlow::step() {
             bterates[rr] = btearr[i + rr*sDofInt_];
           }
 
-          // // Create some vectors for storing point values of rate coefficients, rates and forward to backward rate ratio
-          // double *kfBTE = new double[nReactions_];
-          // double *prograteBTE = new double[nReactions_];
-          // double *rrfrrbBTE = new double[int(nReactions_/2)];
-          // double *kf = new double[nReactions_];
-          // double *prograte = new double[nReactions_];
-          // double *rrfrrb = new double[int(nReactions_/2)];
-
-          // double *prodYsp = new double[nSpecies_];
-          
-          // for (int nr = 0; nr < nReactions_; nr++) {
-          //   kfBTE[nr] = 0.0;
-          //   prograteBTE[nr] = 0.0;
-          //   if(nr % 2 == 0) {
-          //     rrfrrbBTE[int(nr/2)] = 0.0;
-          //   }    
-          // }
-
-          // for (int sp = 0; sp < nSpecies_; sp++) {
-          //   prodYsp[sp] = 0.0;
-          // }
-
           kfBTE = 0.0; 
           prograteBTE = 0.0;
           rrfrrbBTE = 0.0;
@@ -2692,50 +2655,22 @@ void ReactingFlow::step() {
             kfBTE.GetData(), prograteBTE.GetData(), rrfrrbBTE.GetData(), prodYsp.GetData()
           );
 
-          // for (int nr = 0; nr < nReactions_; nr++) {
-            // datakfwd[i + nr*sDofInt_] = std::max(0.0,kf[nr]);
-            // dataBTEkfwd[i + nr*sDofInt_] = std::max(0.0,kfBTE[nr]);
-            // dataReac[i + nr * sDofInt_] = prograte[nr];
-            // dataBTEReac[i + nr * sDofInt_] = prograteBTE[nr];
-          //   if (nr % 2 == 0) {
-          //     datarrfbyrrb[i + int(nr/2) * sDofInt_] = std::max(0.0, prograte[nr] / (1e-28 + prograte[nr + 1]));
-          //     dataBTErrfbyrrb[i + int(nr/2) * sDofInt_] = std::max(0.0, prograteBTE[nr] / (1e-28 + prograteBTE[nr + 1]));
-          //   }
-          // }
+          for (int nr = 0; nr < nReactions_; nr++) {
+            datakfwd[i + nr*sDofInt_] = std::max(0.0,kf[nr]);
+            dataBTEkfwd[i + nr*sDofInt_] = std::max(0.0,kfBTE[nr]);
+            dataReac[i + nr * sDofInt_] = prograte[nr];
+            dataBTEReac[i + nr * sDofInt_] = prograteBTE[nr];
+            if (nr % 2 == 0) {
+              datarrfbyrrb[i + int(nr/2) * sDofInt_] = std::max(0.0, prograte[nr] / (1e-28 + prograte[nr + 1]));
+              dataBTErrfbyrrb[i + int(nr/2) * sDofInt_] = std::max(0.0, prograteBTE[nr] / (1e-28 + prograteBTE[nr + 1]));
+            }
+          }
 
-          // for (int sp = 0; sp < nSpecies_; sp++) {
-          //   dataProd[i + sp*sDofInt_] = prodYsp[sp];
-          // }
-
-          // --------------------------BELOW IS FOR TESTING--------------------------
-          // double *kf = new double[nReactions_];
-          // double *prograte = new double[nReactions_];
-          // double *rrfrrb = new double[int(nReactions_/2)];
-          // double *prodYsp = new double[nSpecies_];
-          // Solve backward Euler update (with tabulated rates)
-          // solveChemistryStep(YT, i, dt_, kf, prograte, rrfrrb, prodYsp);
-
-          // Fill in the vectors storing rate coefficients (kf), reaction rates, rate of forward / backward rate from values
-          // returned by solveChemistryStep()
-          // for(int nr = 0; nr < nReactions_; nr++) {
-          //   datakfwd[i + nr * sDofInt_] = std::max(0.0,kf[nr]);
-          //   dataReac[i + nr * sDofInt_] = prograte[nr];
-          //   if (nr % 2 == 0) {
-          //     datarrfbyrrb[i + int(nr/2) * sDofInt_] = std::max(0.0, prograte[nr] / (1e-28 + prograte[nr + 1]));
-          //   }
-          // }
-
-          // for (int sp = 0; sp < nSpecies_; sp++) {
-          //   dataProd[i + sp*sDofInt_] = prodYsp[sp];
-          // }
-          // --------------------------END OF TESTING--------------------------
+          for (int sp = 0; sp < nSpecies_; sp++) {
+            dataProd[i + sp*sDofInt_] = prodYsp[sp];
+          }
         } else{
-#endif
-          // double *kf = new double[nReactions_];
-          // double *prograte = new double[nReactions_];
-          // double *rrfrrb = new double[int(nReactions_/2)];
-          // double *prodYsp = new double[nSpecies_];
-          
+#endif    
           prodYsp = 0.0;
           kf = 0.0;
           prograte = 0.0;
@@ -2747,17 +2682,17 @@ void ReactingFlow::step() {
 
           // Fill in the vectors storing rate coefficients (kf), reaction rates, rate of forward / backward rate from values
           // returned by solveChemistryStep()
-          // for(int nr = 0; nr < nReactions_; nr++) {
-          //   datakfwd[i + nr * sDofInt_] = std::max(0.0,kf[nr]);
-          //   // dataReac[i + nr * sDofInt_] = prograte[nr];
-          //   if (nr % 2 == 0) {
-          //     datarrfbyrrb[i + int(nr/2) * sDofInt_] = std::max(0.0, prograte[nr] / (1e-28 + prograte[nr + 1]));
-          //   }
-          // }
+          for(int nr = 0; nr < nReactions_; nr++) {
+            datakfwd[i + nr * sDofInt_] = std::max(0.0,kf[nr]);
+            dataReac[i + nr * sDofInt_] = prograte[nr];
+            if (nr % 2 == 0) {
+              datarrfbyrrb[i + int(nr/2) * sDofInt_] = std::max(0.0, prograte[nr] / (1e-28 + prograte[nr + 1]));
+            }
+          }
 
-          // for (int sp = 0; sp < nSpecies_; sp++) {
-          //   dataProd[i + sp*sDofInt_] = prodYsp[sp];
-          // }
+          for (int sp = 0; sp < nSpecies_; sp++) {
+            dataProd[i + sp*sDofInt_] = prodYsp[sp];
+          }
 #ifdef HAVE_PYTHON
         }
 #endif
@@ -2774,17 +2709,17 @@ void ReactingFlow::step() {
       int myRank;
       MPI_Comm_rank(tpsP_->getTPSCommWorld(), &myRank);
 
-      // kReac_gf_.SetFromTrueDofs(kReac_);
-      // reacR_gf_.SetFromTrueDofs(reacR_);
-      // productY_gf_.SetFromTrueDofs(prodY_);
-      // rrf_by_rrb_gf_.SetFromTrueDofs(rrf_by_rrb_);
+      kReac_gf_.SetFromTrueDofs(kReac_);
+      reacR_gf_.SetFromTrueDofs(reacR_);
+      productY_gf_.SetFromTrueDofs(prodY_);
+      rrf_by_rrb_gf_.SetFromTrueDofs(rrf_by_rrb_);
 
-      // BTEkReac_gf_.SetFromTrueDofs(BTEkReac_);
-      // BTEreacR_gf_.SetFromTrueDofs(BTEreacR_);
-      // BTErrf_by_rrb_gf_.SetFromTrueDofs(BTErrf_by_rrb_);
+      BTEkReac_gf_.SetFromTrueDofs(BTEkReac_);
+      BTEreacR_gf_.SetFromTrueDofs(BTEreacR_);
+      BTErrf_by_rrb_gf_.SetFromTrueDofs(BTErrf_by_rrb_);
 
-      // er_gf_.SetFromTrueDofs(er_);
-      // ei_gf_.SetFromTrueDofs(ei_);
+      er_gf_.SetFromTrueDofs(er_);
+      ei_gf_.SetFromTrueDofs(ei_);
 
       if (bte_from_tps_) {
         // UPDATE THE BLENDING FRACTION
@@ -3412,7 +3347,7 @@ void ReactingFlow::speciesProduction() {
   double *dataProd = prodY_.HostWrite();
   double *dataEmit = prodE_.HostWrite();
 
-  // double *dataReac = reacR_.HostWrite();
+  double *dataReac = reacR_.HostWrite();
 
   // const int nEq = dim_ + 2 + nActiveSpecies_;
   Vector state(gpudata::MAXEQUATIONS);
@@ -3473,9 +3408,9 @@ void ReactingFlow::speciesProduction() {
     }
 
     // Write the reaction progress rates into dataReac
-    // for(int nr = 0; nr < nReactions_; nr++){
-    //   dataReac[i + nr * sDofInt_] = progressRate[nr];
-    // }
+    for(int nr = 0; nr < nReactions_; nr++){
+      dataReac[i + nr * sDofInt_] = progressRate[nr];
+    }
   }
 
   // prodY_gf stores the species production rates for each species
@@ -3666,72 +3601,72 @@ void ReactingFlow::initializeViz(ParaViewDataCollection &pvdc) {
   }
 
   // WRITING THE REACTION PRODUCT TERMS TO THE PARAVIEW FILE
-  // vizProdFields_.clear();
-  // vizProdNames_.clear();
-  // for (int sp = 0; sp < nSpecies_; sp++) {
-  //   vizProdFields_.push_back(new ParGridFunction(sfes_, productY_gf_, (sp * sDof_)));
-  //   vizProdNames_.push_back(std::string("prodYn_" + speciesNames_[sp]));
-  //   pvdc.RegisterField(vizProdNames_[sp], vizProdFields_[sp]);
-  // }
+  vizProdFields_.clear();
+  vizProdNames_.clear();
+  for (int sp = 0; sp < nSpecies_; sp++) {
+    vizProdFields_.push_back(new ParGridFunction(sfes_, productY_gf_, (sp * sDof_)));
+    vizProdNames_.push_back(std::string("prodYn_" + speciesNames_[sp]));
+    pvdc.RegisterField(vizProdNames_[sp], vizProdFields_[sp]);
+  }
 
   // WRITING THE REACTION PROGRESS RATES TO THE PARAVIEW FILE
-  // vizReacFields_.clear();
-  // vizReacNames_.clear();
-  // for (int nr = 0; nr < nReactions_; nr++) {
-  //   auto sr = std::to_string(nr);
-  //   vizReacFields_.push_back(new ParGridFunction(sfes_, reacR_gf_, (nr * sDof_)));
-  //   vizReacNames_.push_back(std::string("reacR_" + sr));
-  //   pvdc.RegisterField(vizReacNames_[nr], vizReacFields_[nr]);
-  // }
+  vizReacFields_.clear();
+  vizReacNames_.clear();
+  for (int nr = 0; nr < nReactions_; nr++) {
+    auto sr = std::to_string(nr);
+    vizReacFields_.push_back(new ParGridFunction(sfes_, reacR_gf_, (nr * sDof_)));
+    vizReacNames_.push_back(std::string("reacR_" + sr));
+    pvdc.RegisterField(vizReacNames_[nr], vizReacFields_[nr]);
+  }
 
 #ifdef HAVE_PYTHON
   // WRITING THE REACTION RATE COEFFICIENTS TO THE PARAVIEW FILE
-  // vizkReacFields_.clear();
-  // vizkReacNames_.clear();
-  // for (int nr = 0; nr < nReactions_; nr++) {
-  //   auto sr = std::to_string(nr);
-  //   vizkReacFields_.push_back(new ParGridFunction(sfes_, kReac_gf_, (nr * sDof_)));
-  //   vizkReacNames_.push_back(std::string("kReac_" + sr));
-  //   pvdc.RegisterField(vizkReacNames_[nr], vizkReacFields_[nr]);
-  // }
+  vizkReacFields_.clear();
+  vizkReacNames_.clear();
+  for (int nr = 0; nr < nReactions_; nr++) {
+    auto sr = std::to_string(nr);
+    vizkReacFields_.push_back(new ParGridFunction(sfes_, kReac_gf_, (nr * sDof_)));
+    vizkReacNames_.push_back(std::string("kReac_" + sr));
+    pvdc.RegisterField(vizkReacNames_[nr], vizkReacFields_[nr]);
+  }
 
   // WRITING THE RATIO OF FORWARD TO BACKWARD REACTION RATES TO THE PARAVIEW FILE
-  // vizrrfbyrrbFields_.clear();
-  // vizrrfbyrrbNames_.clear();
-  // for (int nr = 0; nr < int(nReactions_/2); nr++) {
-  //     auto sr = std::to_string(nr);
-  //     vizrrfbyrrbFields_.push_back(new ParGridFunction(sfes_, rrf_by_rrb_gf_, (nr * sDof_)));
-  //     vizrrfbyrrbNames_.push_back(std::string("rrf_by_rrb_" + sr));
-  //     pvdc.RegisterField(vizrrfbyrrbNames_[nr], vizrrfbyrrbFields_[nr]);
-  // }
+  vizrrfbyrrbFields_.clear();
+  vizrrfbyrrbNames_.clear();
+  for (int nr = 0; nr < int(nReactions_/2); nr++) {
+      auto sr = std::to_string(nr);
+      vizrrfbyrrbFields_.push_back(new ParGridFunction(sfes_, rrf_by_rrb_gf_, (nr * sDof_)));
+      vizrrfbyrrbNames_.push_back(std::string("rrf_by_rrb_" + sr));
+      pvdc.RegisterField(vizrrfbyrrbNames_[nr], vizrrfbyrrbFields_[nr]);
+  }
 
   // WRITING THE BTE REACTION PROGRESS RATES TO THE PARAVIEW FILE
-  // vizBTEReacFields_.clear();
-  // vizBTEReacNames_.clear();
-  // for (int nr = 0; nr < nReactions_; nr++) {
-  //   auto sr = std::to_string(nr);
-  //   vizBTEReacFields_.push_back(new ParGridFunction(sfes_, BTEreacR_gf_, (nr * sDof_)));
-  //   vizBTEReacNames_.push_back(std::string("BTEreacR_" + sr));
-  //   pvdc.RegisterField(vizBTEReacNames_[nr], vizBTEReacFields_[nr]);
-  // }
+  vizBTEReacFields_.clear();
+  vizBTEReacNames_.clear();
+  for (int nr = 0; nr < nReactions_; nr++) {
+    auto sr = std::to_string(nr);
+    vizBTEReacFields_.push_back(new ParGridFunction(sfes_, BTEreacR_gf_, (nr * sDof_)));
+    vizBTEReacNames_.push_back(std::string("BTEreacR_" + sr));
+    pvdc.RegisterField(vizBTEReacNames_[nr], vizBTEReacFields_[nr]);
+  }
 
-  // vizBTEkReacFields_.clear();
-  // vizBTEkReacNames_.clear();
-  // for (int nr = 0; nr < nReactions_; nr++) {
-  //   auto sr = std::to_string(nr);
-  //   vizBTEkReacFields_.push_back(new ParGridFunction(sfes_, BTEkReac_gf_, (nr * sDof_)));
-  //   vizBTEkReacNames_.push_back(std::string("BTEkReac_" + sr));
-  //   pvdc.RegisterField(vizBTEkReacNames_[nr], vizBTEkReacFields_[nr]);
-  // }
+  vizBTEkReacFields_.clear();
+  vizBTEkReacNames_.clear();
+  for (int nr = 0; nr < nReactions_; nr++) {
+    auto sr = std::to_string(nr);
+    vizBTEkReacFields_.push_back(new ParGridFunction(sfes_, BTEkReac_gf_, (nr * sDof_)));
+    vizBTEkReacNames_.push_back(std::string("BTEkReac_" + sr));
+    pvdc.RegisterField(vizBTEkReacNames_[nr], vizBTEkReacFields_[nr]);
+  }
 
-  // vizBTErrfbyrrbFields_.clear();
-  // vizBTErrfbyrrbNames_.clear();
-  // for (int nr = 0; nr < int(nReactions_/2); nr++) {
-  //     auto sr = std::to_string(nr);
-  //     vizBTErrfbyrrbFields_.push_back(new ParGridFunction(sfes_, BTErrf_by_rrb_gf_, (nr * sDof_)));
-  //     vizBTErrfbyrrbNames_.push_back(std::string("BTErrf_by_rrb_" + sr));
-  //     pvdc.RegisterField(vizBTErrfbyrrbNames_[nr], vizBTErrfbyrrbFields_[nr]);
-  // }
+  vizBTErrfbyrrbFields_.clear();
+  vizBTErrfbyrrbNames_.clear();
+  for (int nr = 0; nr < int(nReactions_/2); nr++) {
+      auto sr = std::to_string(nr);
+      vizBTErrfbyrrbFields_.push_back(new ParGridFunction(sfes_, BTErrf_by_rrb_gf_, (nr * sDof_)));
+      vizBTErrfbyrrbNames_.push_back(std::string("BTErrf_by_rrb_" + sr));
+      pvdc.RegisterField(vizBTErrfbyrrbNames_[nr], vizBTErrfbyrrbFields_[nr]);
+  }
 #endif
 }
 
@@ -4675,17 +4610,17 @@ void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, 
   chemistry_->computeProgressRate(n_sp, kfwd, keq, progressRate);
   chemistry_->computeCreationRate(progressRate, creationRate, emissionRate);
 
-  // for (int nr = 0; nr < nReactions_; nr++) {
-  //   kf[nr] = kfwd[nr];
-  //   prograte[nr] = progressRate[nr];
-  //   if (nr % 2 == 0) {
-  //     rrfrrb[int(nr/2)] = progressRate[nr] / (1e-20 + progressRate[nr+1]);
-  //   }
-  // }
+  for (int nr = 0; nr < nReactions_; nr++) {
+    kf[nr] = kfwd[nr];
+    prograte[nr] = progressRate[nr];
+    if (nr % 2 == 0) {
+      rrfrrb[int(nr/2)] = progressRate[nr] / (1e-20 + progressRate[nr+1]);
+    }
+  }
 
-  // for(int sp = 0; sp < nSpecies_; sp++){
-  //   prodYsp[sp] = creationRate[sp];
-  // }
+  for(int sp = 0; sp < nSpecies_; sp++){
+    prodYsp[sp] = creationRate[sp];
+  }
 
   // And store in returned variable
   for (int sp = 0; sp < nActiveSpecies_; sp++) {
