@@ -2372,6 +2372,9 @@ double smoothMin(double val1, double val2) {
   double C = 4.0;
   double val;
   val = -1.0 / C * std::log(std::exp(-C * val1) + std::exp(-C * val2));
+  // if (val > 1e10) {
+  //   std::cout << "min " << val1 << " "  << std::exp(val1) << " " << val2 << " "  << std::exp(val2) << " " << val << std::endl;
+  // }
   return val;
 }
 
@@ -2380,5 +2383,6 @@ double smoothMax(double val1, double val2) {
   double C = 4.0;
   double val;
   val = 1.0 / C * std::log(std::exp(C * val1) + std::exp(C * val2));
+  // std::cout << "max " << val1 << " " << val2 << " " << val << std::endl;
   return val;
 }
