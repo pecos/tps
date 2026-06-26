@@ -977,7 +977,7 @@ void GaussianInterpExtData::setInletTurbScalars() {
         double buffer = std::stod(substr);
         entry++;
 
-        // using the current format, SHOULD CHANGE
+        // using the current format
         if (entry == 1) {
           tke_pr[nLines].x = buffer;
         } else if (entry == 2) {
@@ -1039,10 +1039,14 @@ void GaussianInterpExtData::setInletTurbScalars() {
         if (tke_pr[j].tke < 0.0 && tke_pr[j].v2 < 0.0) {
           continue;
         }
-
-        dist = sqrt((xp[0] - tke_pr[j].x) * (xp[0] - tke_pr[j].x) + (xp[1] - tke_pr[j].y) * (xp[1] - tke_pr[j].y) +
-                    (xp[2] - tke_pr[j].z) * (xp[2] - tke_pr[j].z));
+       
+        dist = (xp[0] - tke_pr[j].x) * (xp[0] - tke_pr[j].x) + (xp[1] - tke_pr[j].y) * (xp[1] - tke_pr[j].y);
+	if (dim_ == 3) {
+	  dist += (xp[2] - tke_pr[j].z) * (xp[2] - tke_pr[j].z);
+        }
+	dist = std::sqrt(dist);
         distMin = std::min(distMin, dist);
+	
       }
 
       // find second closest data pt
@@ -1053,11 +1057,15 @@ void GaussianInterpExtData::setInletTurbScalars() {
           continue;
         }
 
-        dist = sqrt((xp[0] - tke_pr[j].x) * (xp[0] - tke_pr[j].x) + (xp[1] - tke_pr[j].y) * (xp[1] - tke_pr[j].y) +
-                    (xp[2] - tke_pr[j].z) * (xp[2] - tke_pr[j].z));
+        dist = (xp[0] - tke_pr[j].x) * (xp[0] - tke_pr[j].x) + (xp[1] - tke_pr[j].y) * (xp[1] - tke_pr[j].y);
+	if (dim_ == 3) {      
+          dist += (xp[2] - tke_pr[j].z) * (xp[2] - tke_pr[j].z);
+	}
+	dist = std::sqrt(dist);	
         if (dist > distMin) {
           distMinSecond = std::min(distMinSecond, dist);
         }
+	
       }
 
       // radius for Gaussian interpolation
@@ -1069,9 +1077,10 @@ void GaussianInterpExtData::setInletTurbScalars() {
           continue;
         }
 
-        dist = sqrt((xp[0] - tke_pr[j].x) * (xp[0] - tke_pr[j].x) + (xp[1] - tke_pr[j].y) * (xp[1] - tke_pr[j].y) +
-                    (xp[2] - tke_pr[j].z) * (xp[2] - tke_pr[j].z));
-
+        // dist = sqrt((xp[0] - tke_pr[j].x) * (xp[0] - tke_pr[j].x) + (xp[1] - tke_pr[j].y) * (xp[1] - tke_pr[j].y) +
+        //            (xp[2] - tke_pr[j].z) * (xp[2] - tke_pr[j].z));
+        dist = sqrt((xp[0] - tke_pr[j].x) * (xp[0] - tke_pr[j].x));
+	
         // gaussian interpolation
         if (dist <= 1.5 * radius) {
           wt = exp(-(dist * dist) / (radius * radius));

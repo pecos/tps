@@ -101,6 +101,15 @@ class LteThermoChem final : public ThermoChemModelBase {
   int max_iter_;        /**< Maximum number of linear solver iterations */
   double rtol_ = 1e-12; /**< Linear solver relative tolerance */
 
+  int dim_;
+  int sDofInt_;
+
+  // flow spark
+  bool spark_ = false;
+  double spark_radius_;
+  double spark_peak_;
+  Vector spark_center_;  
+  
   // Boundary condition info
   Array<int> temp_ess_attr_; /**< List of patches with Dirichlet BC on temperature */
   Array<int> Qt_ess_attr_;   /**< List of patches with Dirichlet BC on Q (thermal divergence) */
@@ -129,6 +138,9 @@ class LteThermoChem final : public ThermoChemModelBase {
   double Prt_;
   double invPrt_;
 
+  double Pr_;
+  double invPr_;
+  
   bool Tclip_ = false;
   double Tmin_ = 0.0;
   double Tmax_ = 100000.0;
@@ -141,6 +153,9 @@ class LteThermoChem final : public ThermoChemModelBase {
   // Scalar \f$H^1\f$ finite element space.
   ParFiniteElementSpace* sfes_ = nullptr;
 
+  FiniteElementCollection* vfec_ = nullptr;
+  ParFiniteElementSpace* vfes_ = nullptr;
+  
   // Fields
   ParGridFunction Tnm1_gf_, Tnm2_gf_;
   ParGridFunction Tn_gf_, Tn_next_gf_, Text_gf_, resT_gf_;

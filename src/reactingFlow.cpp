@@ -2414,7 +2414,7 @@ void ReactingFlow::temperatureStep() {
       dist = x * x;
       if (dim_ == 3) {
         z = coordsDof(2 * sDofInt_ + i);
-        z = z - spark_center_[2];
+        // z = z - spark_center_[2];
         dist += z * z;
       }
       dist = std::sqrt(dist);
@@ -3564,7 +3564,7 @@ void ReactingFlow::computeQtTO() {
       dist = x * x;
       if (dim_ == 3) {
         z = coordsDof(2 * sDofInt_ + i);
-        z = z - spark_center_[2];
+        // z = z - spark_center_[2];
         dist += z * z;
       }
       dist = std::sqrt(dist);

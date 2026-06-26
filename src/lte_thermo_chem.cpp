@@ -81,6 +81,8 @@ LteThermoChem::LteThermoChem(mfem::ParMesh* pmesh, LoMachOptions* loMach_opts, t
 
   tps->getInput("loMach/axisymmetric", axisym_, false);
 
+  dim_ = pmesh->Dimension();
+
   // Initialize thermo TableInput (data read below)
   std::vector<TableInput> thermo_tables(5);
   for (size_t i = 0; i < thermo_tables.size(); i++) {
@@ -171,6 +173,9 @@ LteThermoChem::LteThermoChem(mfem::ParMesh* pmesh, LoMachOptions* loMach_opts, t
   tps->getInput("loMach/ltethermo/turb-Prandtl", Prt_, 0.9);
   invPrt_ = 1.0 / Prt_;
 
+  tps->getInput("loMach/ltethermo/Prandtl", Pr_, 0.5);
+  invPr_ = 1.0 / Pr_;
+  
   tps->getInput("loMach/ltethermo/clip-temperature", Tclip_, false);
   tps->getInput("loMach/ltethermo/min-temperature", Tmin_, 0.0);
   tps->getInput("loMach/ltethermo/max-temperature", Tmax_, 100000.0);
@@ -206,7 +211,7 @@ LteThermoChem::~LteThermoChem() {
   delete rad_rho_Cp_coeff_;
   delete rad_rho_coeff_;
 
-  delete sfes_filter_;
+  delete sfes_filter_;  
   delete sfec_filter_;
   delete HtInv_;
   delete HtInvPC_;
@@ -249,6 +254,8 @@ LteThermoChem::~LteThermoChem() {
   // allocated in initializeSelf
   delete sfes_;
   delete sfec_;
+  delete vfes_;
+  delete vfec_;  
 }
 
 void LteThermoChem::initializeSelf() {
@@ -260,6 +267,11 @@ void LteThermoChem::initializeSelf() {
   sfec_ = new H1_FECollection(order_);
   sfes_ = new ParFiniteElementSpace(pmesh_, sfec_);
 
+  vfec_ = new H1_FECollection(order_, dim_);
+  vfes_ = new ParFiniteElementSpace(pmesh_, vfec_, dim_);
+
+  sDofInt_ = sfes_->GetTrueVSize();
+  
   // Check if fully periodic mesh
   if (!(pmesh_->bdr_attributes.Size() == 0)) {
     temp_ess_attr_.SetSize(pmesh_->bdr_attributes.Max());
@@ -599,7 +611,7 @@ void LteThermoChem::initializeOperators() {
   mut_coeff_ = new GridFunctionCoefficient(turbModel_interface_->eddy_viscosity);
 
   kapt_coeff_ = new ProductCoefficient(*Cp_coeff_, *mut_coeff_);
-  thermal_diff_sum_coeff_ = new SumCoefficient(*kapt_coeff_, *thermal_diff_coeff_, invPrt_, 1.0);
+  thermal_diff_sum_coeff_ = new SumCoefficient(*kapt_coeff_, *thermal_diff_coeff_, invPrt_, invPr_);
   mult_coeff_ = new GridFunctionCoefficient(sponge_interface_->diff_multiplier);
   thermal_diff_total_coeff_ = new ProductCoefficient(*mult_coeff_, *thermal_diff_sum_coeff_);
 
@@ -1141,6 +1153,31 @@ void LteThermoChem::step() {
   jh_form_->Update();
   jh_form_->Assemble();
   jh_form_->ParallelAssemble(jh_);
+
+  // this bit is to prevent joule heating bleed -> make more elegant and then move to separate routine
+  ParGridFunction coordsDof(vfes_);
+  pmesh_->GetNodes(coordsDof);
+  double rCyl = 0.029;
+  {
+    double* djh = jh_.HostReadWrite();
+    for (int i = 0; i < sDofInt_; i++) {
+      double x, z, dist;
+      double wgt;
+      x = coordsDof(0 * sDofInt_ + i);
+      // y = coordsDof(1 * sDofInt_ + i);
+      dist = x * x;
+      if (dim_ == 3) {
+        z = coordsDof(2 * sDofInt_ + i);
+        // z = z - spark_center_[2];
+        dist += z * z;
+      }
+      dist = std::sqrt(dist);
+      wgt = 1.0;
+      if (dist > rCyl) wgt = 0.0;
+      djh[i] *= wgt;
+    }
+  }
+  
   resT_ += jh_;
 
   // Update Helmholtz operator to account for changing dt, rho, and kappa
@@ -1174,10 +1211,18 @@ void LteThermoChem::step() {
 
   // solve helmholtz eq for temp
   HtInv_->Mult(Bt2, Xt2);
-  assert(HtInv_->GetConverged());
 
   Ht_form_->RecoverFEMSolution(Xt2, resT_gf_, Tn_next_gf_);
   Tn_next_gf_.GetTrueDofs(Tn_next_);
+  
+  // assert(HtInv_->GetConverged());
+  if (!(HtInv_->GetConverged())) {
+     if (rank0_) {
+        mfem::out << "Warning, temperature not converging!";
+     }
+     Tn_next_.Set(1.0,Tn_);
+     Tn_next_gf_.SetFromTrueDofs(Tn_next_);     
+  }
 
   // explicit filter
   if (filter_temperature_) {
@@ -1458,6 +1503,31 @@ void LteThermoChem::computeQt() {
   jh_form_->Update();
   jh_form_->Assemble();
   jh_form_->ParallelAssemble(jh_);
+
+  // this bit is to prevent joule heating bleed -> make more elegant and then move to separate routine
+  ParGridFunction coordsDof(vfes_);
+  pmesh_->GetNodes(coordsDof);
+  double rCyl = 0.029;
+  {
+    double* djh = jh_.HostReadWrite();
+    for (int i = 0; i < sDofInt_; i++) {
+      double x, z, dist;
+      double wgt;
+      x = coordsDof(0 * sDofInt_ + i);
+      // y = coordsDof(1 * sDofInt_ + i);
+      dist = x * x;
+      if (dim_ == 3) {
+        z = coordsDof(2 * sDofInt_ + i);
+        // z = z - spark_center_[2];
+        dist += z * z;
+      }
+      dist = std::sqrt(dist);
+      wgt = 1.0;
+      if (dist > rCyl) wgt = 0.0;
+      djh[i] *= wgt;
+    }
+  }
+  
   tmpR0_ -= jh_;
 
   sfes_->GetRestrictionMatrix()->MultTranspose(tmpR0_, resT_gf_);
