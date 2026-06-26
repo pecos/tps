@@ -51,6 +51,10 @@ class DirichletBC_T {
     obj.coeff = nullptr;
   }
 
+  // Delete copy constructor and assignment to prevent shallow copies
+  DirichletBC_T(const DirichletBC_T&) = delete;
+  DirichletBC_T& operator=(const DirichletBC_T&) = delete;
+
   ~DirichletBC_T() { delete coeff; }
 
   mfem::Array<int> attr;

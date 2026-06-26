@@ -845,20 +845,20 @@ ReactingFlow::~ReactingFlow() {
   delete supg_coeff_;
   delete supg_cp_coeff_;
 
-  delete umag_coeff_;
-  delete gscale_coeff_;
-  delete visc_coeff_;
-  delete visc_inv_coeff_;
-  delete reh1_coeff_;
-  delete reh2_coeff_;
-  delete Reh_coeff_;
-  delete csupg_coeff_;
-  delete uw1_coeff_;
-  delete uw2_coeff_;
-  delete upwind_coeff_;
-  delete swdiff_coeff_;
-  delete supg_coeff_;
-  delete supg_cp_coeff_;
+  // delete umag_coeff_;
+  // delete gscale_coeff_;
+  // delete visc_coeff_;
+  // delete visc_inv_coeff_;
+  // delete reh1_coeff_;
+  // delete reh2_coeff_;
+  // delete Reh_coeff_;
+  // delete csupg_coeff_;
+  // delete uw1_coeff_;
+  // delete uw2_coeff_;
+  // delete upwind_coeff_;
+  // delete swdiff_coeff_;
+  // delete supg_coeff_;
+  // delete supg_cp_coeff_;
 
   // allocated in initializeSelf
   delete vfes_;

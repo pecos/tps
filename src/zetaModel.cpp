@@ -144,7 +144,8 @@ ZetaModel::~ZetaModel() {
   // delete two_nu_delta_coeff_;
 
   // NOTE: seg fault originates from deleting coeffs used for BCs, which is done automatically in
-  // dirichlet_bc_helper.hpp delete tdr_wall_coeff_;
+  // dirichlet_bc_helper.hpp 
+  delete tdr_wall_coeff_;
 
   // delete gradZeta_coeff_;
   // delete two_nuNeg_delta_coeff_;
@@ -588,7 +589,8 @@ void ZetaModel::initializeSelf() {
         // ConstantCoefficient *tdr_wall_coeff = new ConstantCoefficient();
         // tdr_wall_coeff->constant = 0.0;
         // AddTDRDirichletBC(0.0, attr_wall);
-        AddTDRDirichletBC(tdr_wall_coeff_, attr_wall);
+        // AddTDRDirichletBC(tdr_wall_coeff_, attr_wall);
+        AddTDRDirichletBC(new GridFunctionCoefficient(&tke_lapl_gf_), attr_wall);
         // DivergenceGridFunctionCoefficient *tdr_wall_coeff = new
         // DivergenceGridFunctionCoefficient(*nu_gradTKE_coeff_);
         // AddTDRDirichletBC(tdr_wall_coeff, attr_wall);
