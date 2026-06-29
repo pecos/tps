@@ -70,10 +70,11 @@ AlgebraicSubgridModels::AlgebraicSubgridModels(mfem::ParMesh *pmesh, LoMachOptio
   } else if (sModel_ == 2) {
     sgs_const = 0.135;
 
-    // WALE
-  } else if (sModel_ == 3) {
-    sgs_const = 0.5;
-  }
+  } 
+  // else if (sModel_ == 3) {
+  // WALE
+  //   sgs_const = 0.5;
+  // }
 
   tpsP_->getInput("loMach/sgsModelConstant", sgs_model_const_, sgs_const);
 
@@ -86,7 +87,7 @@ AlgebraicSubgridModels::AlgebraicSubgridModels(mfem::ParMesh *pmesh, LoMachOptio
   }
 
   tpsP_->getInput("loMach/sgsSmooth", sgs_model_smooth_, false);
-  tpsP_->getInput("loMach/sgsSmooth-steps", aveSteps_, 100);
+  // tpsP_->getInput("loMach/sgsSmooth-steps", aveSteps_, 100);
 }
 
 AlgebraicSubgridModels::~AlgebraicSubgridModels() {
@@ -129,9 +130,17 @@ void AlgebraicSubgridModels::initializeSelf() {
 
   muT_NM0_.SetSize(sfes_truevsize);
   muT_NM1_.SetSize(sfes_truevsize);
+
+  muT_NM2_.SetSize(sfes_truevsize);
+  muT_NM3_.SetSize(sfes_truevsize);
+
   muT_NM0_ = 0.0;
   muT_NM1_ = 0.0;
-  activeSteps_ = 0;
+
+  // activeSteps_ = 0;
+  muT_NM2_ = 0.0;
+  muT_NM3_ = 0.0;
+  aveSteps_ = 0;
 
   gradU_.SetSize(vfes_truevsize);
   gradV_.SetSize(vfes_truevsize);
@@ -172,7 +181,8 @@ void AlgebraicSubgridModels::setup() {
 }
 
 void AlgebraicSubgridModels::step() {
-  if (sModel_ != 1 && sModel_ != 2 && sModel_ != 3) {
+  // if (sModel_ != 1 && sModel_ != 2 && sModel_ != 3) {
+  if (sModel_ != 1 && sModel_ != 2) {
     return;
   }
 
@@ -226,24 +236,25 @@ void AlgebraicSubgridModels::step() {
       data[i] = rho[i] * nu_sgs;
     }
 
-  } else if (sModel_ == 3) {
-    for (int i = 0; i < SdofInt_; i++) {
-      double nu_sgs = 0.;
-      DenseMatrix gradUp;
-      gradUp.SetSize(nvel_, dim_);
-      for (int dir = 0; dir < dim_; dir++) {
-        gradUp(0, dir) = dGradU[i + dir * SdofInt_];
-      }
-      for (int dir = 0; dir < dim_; dir++) {
-        gradUp(1, dir) = dGradV[i + dir * SdofInt_];
-      }
-      for (int dir = 0; dir < dim_; dir++) {
-        gradUp(2, dir) = dGradW[i + dir * SdofInt_];
-      }
-      sgsWALE(gradUp, del[i], nu_sgs);
-      data[i] = rho[i] * nu_sgs;
-    }
-  }
+  } 
+  // else if (sModel_ == 3) {
+  //   for (int i = 0; i < SdofInt_; i++) {
+  //     double nu_sgs = 0.;
+  //     DenseMatrix gradUp;
+  //     gradUp.SetSize(nvel_, dim_);
+  //     for (int dir = 0; dir < dim_; dir++) {
+  //       gradUp(0, dir) = dGradU[i + dir * SdofInt_];
+  //     }
+  //     for (int dir = 0; dir < dim_; dir++) {
+  //       gradUp(1, dir) = dGradV[i + dir * SdofInt_];
+  //     }
+  //     for (int dir = 0; dir < dim_; dir++) {
+  //       gradUp(2, dir) = dGradW[i + dir * SdofInt_];
+  //     }
+  //     sgsWALE(gradUp, del[i], nu_sgs);
+  //     data[i] = rho[i] * nu_sgs;
+  //   }
+  // }
 
   subgridVisc_gf_.SetFromTrueDofs(subgridVisc_);
 
@@ -257,33 +268,54 @@ void AlgebraicSubgridModels::step() {
     MFEM_FORALL(i, subgridVisc_gf_.Size(),
                 { d_muT_gf[i] = (1.0 - filter_alpha) * d_muT_gf[i] + filter_alpha * d_muT_filtered_gf[i]; });
     subgridVisc_gf_.GetTrueDofs(subgridVisc_);
-
+  }
+    // clip any small negatives resulting from filtering
+    // double *dmuT = subgridVisc_.HostReadWrite();
+    // for (int i = 0; i < SdofInt_; i++) {
+    //   dmuT[i] = std::max(dmuT[i], 1.0e-15);
+    // }
+    // subgridVisc_gf_.SetFromTrueDofs(subgridVisc_);
     // clip any small negatives resulting from filtering
     double *dmuT = subgridVisc_.HostReadWrite();
     for (int i = 0; i < SdofInt_; i++) {
-      dmuT[i] = std::max(dmuT[i], 1.0e-15);
+      dmuT[i] = std::max(dmuT[i], 1.0e-12);
     }
-    subgridVisc_gf_.SetFromTrueDofs(subgridVisc_);
-  }
 
   if (sgs_model_smooth_) {
     // take average of recent steps
-    activeSteps_++;
-    double wt0 = 1.0 / std::min((double)aveSteps_, (double)activeSteps_);
-    double wt1 = 1.0 - wt0;
+    // activeSteps_++;
+    // double wt0 = 1.0 / std::min((double)aveSteps_, (double)activeSteps_);
+    // double wt1 = 1.0 - wt0;
+    aveSteps_++;
+    aveSteps_ = std::min(aveSteps_, 4);
 
-    double *dmuT = subgridVisc_.HostReadWrite();
-    double *dmuT0 = muT_NM1_.HostReadWrite();
-    for (int i = 0; i < SdofInt_; i++) {
-      // \bar{muT}^{n} = wt0*muT' + wt1*\bar{muT}^{n-1}
-      dmuT[i] *= wt0;
-      dmuT[i] += wt1 * dmuT0[i];
+    // double *dmuT = subgridVisc_.HostReadWrite();
+    // double *dmuT0 = muT_NM1_.HostReadWrite();
+    // for (int i = 0; i < SdofInt_; i++) {
+    //   // \bar{muT}^{n} = wt0*muT' + wt1*\bar{muT}^{n-1}
+    //   dmuT[i] *= wt0;
+    //   dmuT[i] += wt1 * dmuT0[i];
 
-      // shift storage
-      dmuT0[i] = dmuT[i];
-    }
-    subgridVisc_gf_.SetFromTrueDofs(subgridVisc_);
+    //   // shift storage
+    //   dmuT0[i] = dmuT[i];
+    // }
+    // subgridVisc_gf_.SetFromTrueDofs(subgridVisc_);
+    
+    // take average of recent steps
+    muT_NM0_ = subgridVisc_;
+    double Cave = 1.0 / (double)aveSteps_;
+    subgridVisc_ = 0.0;
+    subgridVisc_.Add(Cave, muT_NM0_);
+    subgridVisc_.Add(Cave, muT_NM1_);
+    subgridVisc_.Add(Cave, muT_NM2_);
+    subgridVisc_.Add(Cave, muT_NM3_);
+
+    // shift storage
+    muT_NM3_ = muT_NM2_;
+    muT_NM2_ = muT_NM1_;
+    muT_NM1_ = subgridVisc_;
   }
+  subgridVisc_gf_.SetFromTrueDofs(subgridVisc_);
 }
 
 /**
@@ -321,60 +353,60 @@ void AlgebraicSubgridModels::sgsSmag(const DenseMatrix &gradUp, double delta, do
 WALE model, see: Weicker 2010
 Note: gradUp is in (eq,dim) form
 */
-void AlgebraicSubgridModels::sgsWALE(const DenseMatrix &gradUp, double delta, double &nu) {
-  DenseMatrix Sij(dim_, dim_);
-  DenseMatrix Oij(dim_, dim_);
-  DenseMatrix gij(dim_, dim_);
-  DenseMatrix S2ij(dim_, dim_);
-  DenseMatrix O2ij(dim_, dim_);
-  double Smag = 0.0;
-  double Omag = 0.0;
-  double Gmag = 0.0;
-  double SSOO = 0.0;
-  double Cd;
-  double d_model;
-  double omega;
+// void AlgebraicSubgridModels::sgsWALE(const DenseMatrix &gradUp, double delta, double &nu) {
+  // DenseMatrix Sij(dim_, dim_);
+  // DenseMatrix Oij(dim_, dim_);
+  // DenseMatrix gij(dim_, dim_);
+  // DenseMatrix S2ij(dim_, dim_);
+  // DenseMatrix O2ij(dim_, dim_);
+  // double Smag = 0.0;
+  // double Omag = 0.0;
+  // double Gmag = 0.0;
+  // double SSOO = 0.0;
+  // double Cd;
+  // double d_model;
+  // double omega;
 
-  // read-in model constant
-  Cd = sgs_model_const_;
+  // // read-in model constant
+  // Cd = sgs_model_const_;
 
-  // Strain
-  Sij(0, 0) = gradUp(0, 0);
-  Sij(1, 1) = gradUp(1, 1);
-  Sij(2, 2) = gradUp(2, 2);
-  Sij(0, 1) = 0.5 * (gradUp(0, 1) + gradUp(1, 0));
-  Sij(0, 2) = 0.5 * (gradUp(0, 2) + gradUp(2, 0));
-  Sij(1, 2) = 0.5 * (gradUp(1, 2) + gradUp(2, 1));
-  Sij(1, 0) = Sij(0, 1);
-  Sij(2, 0) = Sij(0, 2);
-  Sij(2, 1) = Sij(1, 2);
+  // // Strain
+  // Sij(0, 0) = gradUp(0, 0);
+  // Sij(1, 1) = gradUp(1, 1);
+  // Sij(2, 2) = gradUp(2, 2);
+  // Sij(0, 1) = 0.5 * (gradUp(0, 1) + gradUp(1, 0));
+  // Sij(0, 2) = 0.5 * (gradUp(0, 2) + gradUp(2, 0));
+  // Sij(1, 2) = 0.5 * (gradUp(1, 2) + gradUp(2, 1));
+  // Sij(1, 0) = Sij(0, 1);
+  // Sij(2, 0) = Sij(0, 2);
+  // Sij(2, 1) = Sij(1, 2);
 
-  // strain magnitude
-  for (int i = 0; i < 3; i++) {
-    for (int j = 0; j < 3; j++) {
-      Smag = Smag + Sij(i, j) * Sij(i, j);
-    }
-  }
-  Smag = std::sqrt(Smag);
+  // // strain magnitude
+  // for (int i = 0; i < 3; i++) {
+  //   for (int j = 0; j < 3; j++) {
+  //     Smag = Smag + Sij(i, j) * Sij(i, j);
+  //   }
+  // }
+  // Smag = std::sqrt(Smag);
 
-  // Rotation
-  Oij(0, 0) = gradUp(0, 0);
-  Oij(1, 1) = gradUp(1, 1);
-  Oij(2, 2) = gradUp(2, 2);
-  Oij(0, 1) = 0.5 * (gradUp(0, 1) - gradUp(1, 0));
-  Oij(0, 2) = 0.5 * (gradUp(0, 2) - gradUp(2, 0));
-  Oij(1, 2) = 0.5 * (gradUp(1, 2) - gradUp(2, 1));
-  Oij(1, 0) = -Oij(0, 1);
-  Oij(2, 0) = -Oij(0, 2);
-  Oij(2, 1) = -Oij(1, 2);
+  // // Rotation
+  // Oij(0, 0) = gradUp(0, 0);
+  // Oij(1, 1) = gradUp(1, 1);
+  // Oij(2, 2) = gradUp(2, 2);
+  // Oij(0, 1) = 0.5 * (gradUp(0, 1) - gradUp(1, 0));
+  // Oij(0, 2) = 0.5 * (gradUp(0, 2) - gradUp(2, 0));
+  // Oij(1, 2) = 0.5 * (gradUp(1, 2) - gradUp(2, 1));
+  // Oij(1, 0) = -Oij(0, 1);
+  // Oij(2, 0) = -Oij(0, 2);
+  // Oij(2, 1) = -Oij(1, 2);
 
-  // rotation magnitude
-  for (int i = 0; i < 3; i++) {
-    for (int j = 0; j < 3; j++) {
-      Omag = Omag + Oij(i, j) * Oij(i, j);
-    }
-  }
-  Omag = std::sqrt(Omag);
+  // // rotation magnitude
+  // for (int i = 0; i < 3; i++) {
+  //   for (int j = 0; j < 3; j++) {
+  //     Omag = Omag + Oij(i, j) * Oij(i, j);
+  //   }
+  // }
+  // Omag = std::sqrt(Omag);
 
   // "g_{ij}" in paper
   /*
@@ -405,51 +437,51 @@ void AlgebraicSubgridModels::sgsWALE(const DenseMatrix &gradUp, double delta, do
 
   // (g_{ij}g_{ij})^(1/2) directly (Ducros et. al., Wall-Adapting Local Eddy-Viscosity models for simulations in complex
   // geometries)
-  for (int i = 0; i < 3; i++) {
-    for (int j = 0; j < 3; j++) {
-      S2ij(i, j) = 0.0;
-    }
-  }
-  for (int i = 0; i < 3; i++) {
-    for (int j = 0; j < 3; j++) {
-      for (int k = 0; k < 3; k++) {
-        S2ij(i, j) = S2ij(i, j) + Sij(i, k) * Sij(k, j);
-      }
-    }
-  }
+  // for (int i = 0; i < 3; i++) {
+  //   for (int j = 0; j < 3; j++) {
+  //     S2ij(i, j) = 0.0;
+  //   }
+  // }
+  // for (int i = 0; i < 3; i++) {
+  //   for (int j = 0; j < 3; j++) {
+  //     for (int k = 0; k < 3; k++) {
+  //       S2ij(i, j) = S2ij(i, j) + Sij(i, k) * Sij(k, j);
+  //     }
+  //   }
+  // }
 
-  for (int i = 0; i < 3; i++) {
-    for (int j = 0; j < 3; j++) {
-      O2ij(i, j) = 0.0;
-    }
-  }
-  for (int i = 0; i < 3; i++) {
-    for (int j = 0; j < 3; j++) {
-      for (int k = 0; k < 3; k++) {
-        O2ij(i, j) = O2ij(i, j) + Oij(i, k) * Oij(k, j);
-      }
-    }
-  }
+  // for (int i = 0; i < 3; i++) {
+  //   for (int j = 0; j < 3; j++) {
+  //     O2ij(i, j) = 0.0;
+  //   }
+  // }
+  // for (int i = 0; i < 3; i++) {
+  //   for (int j = 0; j < 3; j++) {
+  //     for (int k = 0; k < 3; k++) {
+  //       O2ij(i, j) = O2ij(i, j) + Oij(i, k) * Oij(k, j);
+  //     }
+  //   }
+  // }
 
-  for (int i = 0; i < 3; i++) {
-    for (int j = 0; j < 3; j++) {
-      SSOO = SSOO + S2ij(i, j) * O2ij(i, j);
-    }
-  }
+  // for (int i = 0; i < 3; i++) {
+  //   for (int j = 0; j < 3; j++) {
+  //     SSOO = SSOO + S2ij(i, j) * O2ij(i, j);
+  //   }
+  // }
 
-  Gmag = 1.0 / 6.0 * (std::pow(Smag, 4) + std::pow(Omag, 4)) + 2.0 / 3.0 * (std::pow(Smag, 2) * std::pow(Omag, 2)) +
-         2.0 * SSOO;
-  Gmag = std::sqrt(Gmag);
+  // Gmag = 1.0 / 6.0 * (std::pow(Smag, 4) + std::pow(Omag, 4)) + 2.0 / 3.0 * (std::pow(Smag, 2) * std::pow(Omag, 2)) +
+  //        2.0 * SSOO;
+  // Gmag = std::sqrt(Gmag);
 
-  // final inverse timescale
-  omega = std::pow(Gmag, 3.0) / std::max(std::pow(Smag, 5.0) + std::pow(Gmag, 2.5), 1.0e-12);
+  // // final inverse timescale
+  // omega = std::pow(Gmag, 3.0) / std::max(std::pow(Smag, 5.0) + std::pow(Gmag, 2.5), 1.0e-12);
 
-  // eddy viscosity with delta shift
-  // l_floor = config->GetSgsFloor();
-  // d_model = Cd * max(delta-l_floor,0.0);
-  d_model = Cd * delta;
-  nu = d_model * d_model * omega;
-}
+  // // eddy viscosity with delta shift
+  // // l_floor = config->GetSgsFloor();
+  // // d_model = Cd * max(delta-l_floor,0.0);
+  // d_model = Cd * delta;
+  // nu = d_model * d_model * omega;
+// }
 
 /**
 NOT TESTED: Sigma subgrid model following Nicoud et.al., "Using singular values to build a
