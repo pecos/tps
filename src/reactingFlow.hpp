@@ -36,6 +36,7 @@
 // forward-declaration for Tps support class
 namespace TPS {
 class Tps;
+class Tps2Boltzmann;
 }
 
 #include <hdf5.h>
@@ -88,6 +89,17 @@ class ReactingFlow : public ThermoChemModelBase {
   int sDof_, sDofInt_;
   int yDof_, yDofInt_;
 
+  // #ifdef HAVE_PYTHON
+  // int nBTEReactions_;
+  // #endif
+
+  // Number of reactions and dofs
+  // int rDof_, rDofInt_;
+
+  // #ifdef HAVE_PYTHON
+  // int rrf_by_rrbDof_, rrf_by_rrbDofInt_;
+  // #endif
+
   WorkingFluid workFluid_;
   GasType gasType_;
   GasModel gasModel_;
@@ -104,6 +116,9 @@ class ReactingFlow : public ThermoChemModelBase {
   PerfectMixture *mixture_ = NULL;
   GasMixtureTransport *transport_ = NULL;
   Chemistry *chemistry_ = NULL;
+  // External reaction rates when chemistry is implemented using the BTE option
+  std::unique_ptr<ParGridFunction> externalReactionRates_gf_;  // Has repeated interface dofs.
+  Vector externalReactionRates_;  // Only true data
   Chemistry *chemistryBase_ = NULL;
 
   std::vector<std::string> speciesNames_;
@@ -114,6 +129,7 @@ class ReactingFlow : public ThermoChemModelBase {
   bool radiative_decay_NECincluded_;
 
   // Flags
+
   bool rank0_;                        /**< true if this is rank 0 */
   bool partial_assembly_ = false;     /**< Enable/disable partial assembly of forms. */
   bool numerical_integ_ = false;      // true;     /**< Enable/disable numerical integration rules of forms. */
@@ -125,6 +141,12 @@ class ReactingFlow : public ThermoChemModelBase {
   bool neumann_temp_ = false;         /**< only applies to inlet */
   bool neumann_species_inlet_ = true; /**< only applies to inlet */
   bool neumann_species_wall_ = true;  /**< only applies to inlet */
+
+  // #ifdef HAVE_PYTHON
+  // bool bte_from_tps_ = false;       /**< true if the BTE solver is called from within TPS (C++ call Python) */
+  // std::string collisionsFile, solver_type;       /**< string to store the path of the collisions cross-sections file, BTE solver type (will be passed to BTE) */
+  // int ee_collisions = 0;            /**< flag to enable electron-electron collisions in BTE solver */
+  // #endif
 
   // Linear-solver-related options
   int pl_solve_ = 0;    /**< Verbosity level passed to mfem solvers */
@@ -157,6 +179,8 @@ class ReactingFlow : public ThermoChemModelBase {
   double Tmin_ = 0.0;
   double Tmax_ = 100000.0;
 
+  bool fixed_conductivity_ = false;
+
   /// pressure-related, closed-system thermo pressure changes
   double ambient_pressure_, thermo_pressure_, system_mass_;
   double dtP_;
@@ -167,6 +191,12 @@ class ReactingFlow : public ThermoChemModelBase {
   // streamwise-stabilization
   bool sw_stab_;
   double Reh_factor_, Reh_offset_;
+
+  // flow spark
+  bool spark_ = false;
+  double spark_radius_;
+  double spark_peak_;
+  Vector spark_center_;
 
   // FEM related fields and objects
 
@@ -188,6 +218,25 @@ class ReactingFlow : public ThermoChemModelBase {
   // Vector \f$H^1\f$ finite element space.
   ParFiniteElementSpace *vfes_ = nullptr;
 
+  // Reactions \f$H^1\f$ finite element collection.
+  // FiniteElementCollection *rfec_ = nullptr;
+
+  // // Reactions \f$H^1\f$ finite element space.
+  // ParFiniteElementSpace *rfes_ = nullptr;
+
+// #ifdef HAVE_PYTHON
+//   // Reaction rate ratio (forward to backward) \f$H^1\f$ finite element collection (stores ratio of rates used to advance TPS, can be from tabulated, BTE, or blended).
+//   FiniteElementCollection *rrf_by_rrbfec_ = nullptr;
+
+//   // // Reaction rate ratio \f$H^1\f$ finite element space.
+//   ParFiniteElementSpace *rrf_by_rrbfes_ = nullptr;
+
+//   // // BTE Reaction rate ratio (forward to backward) \f$H^1\f$ finite element collection (stores the rate ratio computed from BTE).
+//   FiniteElementCollection *BTErrf_by_rrbfec_ = nullptr;
+
+//   // // Reaction rate ratio \f$H^1\f$ finite element space.
+//   ParFiniteElementSpace *BTErrf_by_rrbfes_ = nullptr;
+// #endif
   ParGridFunction *gridScale_gf_ = nullptr;
 
   // Fields
@@ -200,6 +249,8 @@ class ReactingFlow : public ThermoChemModelBase {
   // additions for species
   ParGridFunction Ynm1_gf_, Ynm2_gf_;
   ParGridFunction Yn_gf_, Yn_next_gf_, Yext_gf_, resY_gf_;
+  // ParGridFunction prodY_gf_; 
+  // ParGridFunction productY_gf_;
   ParGridFunction prodY_gf_;
   ParGridFunction YnFull_gf_;
   ParGridFunction CpY_gf_;
@@ -207,6 +258,14 @@ class ReactingFlow : public ThermoChemModelBase {
   ParGridFunction Rmix_gf_;
   ParGridFunction Mmix_gf_;
   ParGridFunction emission_gf_;
+
+
+  // additions for reaction progress rates
+  // ParGridFunction reacR_gf_;
+
+// #ifdef HAVE_PYTHON
+//   ParGridFunction BTEreacR_gf_;
+// #endif
 
   ParGridFunction visc_gf_;
   ParGridFunction kappa_gf_;
@@ -219,6 +278,21 @@ class ReactingFlow : public ThermoChemModelBase {
   // Interface with EM
   ParGridFunction sigma_gf_;
   ParGridFunction jh_gf_;
+
+// #ifdef HAVE_PYTHON
+//   // ParGridFunctions for the real and imaginary parts of the electric field
+//   // We only store the magnitude (works only for axisymmetric case)
+//   ParGridFunction er_gf_;
+//   ParGridFunction ei_gf_;
+
+//   ParGridFunction rrf_by_rrb_gf_;
+
+//   ParGridFunction BTErrf_by_rrb_gf_;
+
+//   // // additions for rate coefficients
+//   ParGridFunction kReac_gf_;
+//   ParGridFunction BTEkReac_gf_;
+// #endif
 
   // viz for qt rhs
   // ParGridFunction rhsqt_bd_;
@@ -341,6 +415,17 @@ class ReactingFlow : public ThermoChemModelBase {
   Vector jh_;
   Vector radiation_sink_;
 
+// #ifdef HAVE_PYTHON
+//   // Vectors for real and imaginary parts of electric field magnitude
+//   Vector er_, ei_;
+//   Vector bterates_;
+//   Vector bte_rr_mapping_;
+//   // additions for reaction rate coefficients
+//   Vector kReac_, BTEkReac_;
+//   // Ratio of forward to reverse reaction rates
+//   Vector rrf_by_rrb_, BTErrf_by_rrb_;
+// #endif
+
   // additions for species
   Vector Yn_, Yn_next_, Ynm1_, Ynm2_;
   Vector NYn_, NYnm1_, NYnm2_;
@@ -358,6 +443,13 @@ class ReactingFlow : public ThermoChemModelBase {
   Vector initialMassFraction_;
   Vector atomMW_;
   Vector CpMix_;
+
+  // additions for reaction progress rates
+  // Vector reacR_;
+
+// #ifdef HAVE_PYTHON
+//   Vector BTEreacR_;
+// #endif
 
   Vector Qt_;
   Vector rn_;
@@ -393,6 +485,9 @@ class ReactingFlow : public ThermoChemModelBase {
   int filter_cutoff_modes_ = 0;
   double filter_alpha_ = 0.0;
 
+  // set a static sigma field
+  bool torch_cold_start_ = false;
+  
   FiniteElementCollection *sfec_filter_ = nullptr;
   ParFiniteElementSpace *sfes_filter_ = nullptr;
   ParGridFunction Tn_NM1_gf_;
@@ -403,6 +498,66 @@ class ReactingFlow : public ThermoChemModelBase {
   std::list<mfem::DenseMatrix> tableHost_;
   std::vector<ParGridFunction *> vizSpecFields_;
   std::vector<std::string> vizSpecNames_;
+
+  // std::vector<ParGridFunction *> vizProdFields_;
+  // std::vector<std::string> vizProdNames_;
+
+  // // PARGRID FUNCTION AND STRING FOR REACTION PROGRESS RATES
+  // std::vector<ParGridFunction *> vizReacFields_;
+  // std::vector<std::string> vizReacNames_;
+
+// #ifdef HAVE_PYTHON
+  // PARGRID FUNCTION AND STRING FOR REACTION PROGRESS RATES
+  // std::vector<ParGridFunction *> vizBTEReacFields_;
+  // std::vector<std::string> vizBTEReacNames_;
+
+  // // // PARGRID FUNCTION AND STRING FOR REACTION PROGRESS RATES
+  // std::vector<ParGridFunction *> vizkReacFields_;
+  // std::vector<std::string> vizkReacNames_;
+
+  // // PARGRID FUNCTION AND STRING FOR REACTION PROGRESS RATES
+  // std::vector<ParGridFunction *> vizBTEkReacFields_;
+  // std::vector<std::string> vizBTEkReacNames_;
+
+  // // PARGRID FUNCTION AND STRING FOR REACTION PROGRESS RATES
+  // std::vector<ParGridFunction *> vizrrfbyrrbFields_;
+  // std::vector<std::string> vizrrfbyrrbNames_;
+
+  // std::vector<ParGridFunction *> vizBTErrfbyrrbFields_;
+  // std::vector<std::string> vizBTErrfbyrrbNames_;
+
+  // k_blend = bl_frac * k_BTE + (1 - bl_frac)*k_LTE
+  // bl_frac is the blending coefficient which is initialized as bl_frac_init
+  // and incremented by bl_frac_increment after every bl_frac_change_freq steps of the main TPS solver
+  // bl_frac_init -> specify in inputs file to say what is the blending fraction at start of simulation
+  // This needs to be updated if you are starting a BTE blended run from a check point
+  // double bl_frac_init_, bl_frac_increment_, bl_frac_;
+  // int bl_frac_change_freq_ = 1;
+  // int solve_bte_every_n = 1;
+  // int do_bte_sub_cluster = 1; // Setting to 1 means we are doing sub-clustering to reduce DoFs for the BTE solver
+  // int num_sub_clusters_bte = 50;
+
+  // // Number of v-space grids per MPI rank for the BTE solver
+  // int n_vspace_grids = 1;
+  // int regrid_bte_every_n = 1; // call the BTE grid_setup function to setup v-space grids every nth step
+
+  // grid_idx_to_npts : Vector of length n_vspace_grids where each element contains the number of points in that v-space grid
+  // grid_idx_to_spatial_idx_map: Vector of length sDofInt_ which contains the indices of the points in each v-space grid
+  // For example, if grid_idx = i contains ng_i points, grid_idx_to_spatial_idx_map[ilo:ilo+ng] contains the indices of the 
+  // points in the ith v-space grid. Here, ilo_{i} = (\sum_{m=0}^{m=i} ng_m) - ng_i
+  // std::vector<std::int32_t> grid_idx_to_npts;
+  // std::vector<std::int64_t> grid_idx_to_spatial_idx_map;
+  // std::vector<double> Te_vec;
+
+  // int Nr_BTE = 128; // Number of elements in the radial direction for the BTE solver
+  // double dt_BTE = 5e-3; // timestep relative to electric field frequency if BTE uses transient solver
+  // double BTE_rtol = 1e-6; // relative tolerance for the BTE solver to converge
+  // int store_csv = 0; // store the BTE QoIs in CSV file
+
+  // int clip_rr = 0; // Set to 1 if you want to clip the forward reaction rate to a multiple of the backward reaction rate (to deal with transients)
+  // double clip_frac = 10; // The forward reaction rate is clipped to a maximum = clip_frac*backward reaction rate
+
+// #endif
 
  public:
   ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff,
@@ -448,7 +603,16 @@ class ReactingFlow : public ThermoChemModelBase {
    * The incoming YT must contain the nActiveSpecies_ mass fractions
    * for the active species and temperature.
    */
-  void evaluateReactingSource(const double *YT, const int dofindex, double *omega);
+//   void evaluateReactingSource(const double *YT, const int dofindex, double *omega, 
+//     double *kf, double *prograte, double *rrfrrb, double *prodYsp);
+
+// #ifdef HAVE_PYTHON
+// // This function does the same job as evaluateReactingSource when BTE rates are used
+//   void evaluateReactingSourceBTE(const double *YT, const int dofindex, double *omega, double *BTErr,
+//   double *kf, double *prograte, double *rrfrrb,
+//   double *kfBTE, double *prograteBTE, double *rrfrrbBTE, double *prodYsp);
+// #endif
+    void evaluateReactingSource(const double *YT, const int dofindex, double *omega);
 
   /**
    * @brief Solve the thermochemistry update
@@ -460,7 +624,17 @@ class ReactingFlow : public ThermoChemModelBase {
    * for the active species and temperature.  This state is
    * overwritten with the new local state at the end of the time step.
    */
-  void solveChemistryStep(double *YT, const int dofindex, const double dt);
+//   void solveChemistryStep(double *YT, const int dofindex, const double dt, 
+//     double *kf, double* prograte, double* rrfrrb, double *prodYsp);
+
+// #ifdef HAVE_PYTHON
+// // Solve the thermochemistry update at a point when BTE is used to model chemical reactions
+// void solveChemistryStepBTE(double *YT, const int dofindex, const double dt, double *BTErr,
+//   double *kf, double *prograte, double *rrfrrb,
+//   double *kfBTE, double *prograteBTE, double *rrfrrbBTE, double *prodYsp
+//   );
+// #endif
+    void solveChemistryStep(double *YT, const int dofindex, const double dt);
 
   // time-splitting
   void substepState();
@@ -504,5 +678,8 @@ class ReactingFlow : public ThermoChemModelBase {
 
   void evalSubstepNumber();
   void readTableWrapper(std::string inputPath, TableInput &result);
+
+  void push(TPS::Tps2Boltzmann &interface) override;
+  void fetch(TPS::Tps2Boltzmann &interface) override;
 };
 #endif  // REACTINGFLOW_HPP_

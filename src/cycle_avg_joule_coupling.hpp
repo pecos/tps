@@ -72,6 +72,14 @@ class CycleAvgJouleCoupling : public TPS::Solver {
   //! Flag to specify the electrical conductivity should not be updated
   bool fixed_conductivity_;
 
+#ifdef HAVE_PYTHON
+  // bool bte_from_tps_ = false;       /**< true if the BTE solver is called from within TPS (C++ call Python) */
+  // std::string bte_path;
+  // std::string tps_src_path;
+  // std::string torch_chem_path;
+#endif
+
+
 #ifdef HAVE_GSLIB
   FindPointsGSLIB *interp_flow_to_em_;
   FindPointsGSLIB *interp_em_to_flow_;
@@ -112,6 +120,10 @@ class CycleAvgJouleCoupling : public TPS::Solver {
   void interpConductivityFromFlowToEM();
   void interpJouleHeatingFromEMToFlow();
   void interpElectricFieldFromEMToFlow();
+
+#ifdef HAVE_PYTHON
+  // void interpElectricFieldFromEMToFlowforBTE();
+#endif
 
   void parseSolverOptions() override;
   void initialize() override;

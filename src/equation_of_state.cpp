@@ -638,9 +638,10 @@ MFEM_HOST_DEVICE double PerfectMixture::computeBackgroundMassDensity(const doubl
 
   // assert(rhoB >= 0.0);
   if (rhoB < 0.) {
-    // grvy_printf(GRVY_ERROR, "\nNegative background density -> %f\n", rhoB);
-    printf("\nERROR: Negative background density -> %f\n", rhoB);
-    MFEM_ABORT("Fatal error: Negative background density. Aborting");
+    grvy_printf(GRVY_ERROR, "\nNegative background density -> %f\n", rhoB);
+    // printf("\nERROR: Negative background density -> %f\n", rhoB);
+    MFEM_ABORT("Fatal Error: Negative background density in PerfectMixture::computeBackgroundMassDensity!");
+    exit(-1);
 #ifdef _GPU_
     assert(rhoB >= 0.0);
 #else

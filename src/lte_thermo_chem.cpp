@@ -181,8 +181,8 @@ LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, t
   tpsP_->getInput("loMach/ltethermo/streamwise-stabilization", sw_stab_, false);
   tpsP_->getInput("loMach/ltethermo/Reh_factor", Reh_factor_, 0.5);
   tpsP_->getInput("loMach/ltethermo/Reh_offset", Reh_offset_, 1.0);
-
   tpsP_->getInput("loMach/ltethermo/neumann-temp", neumann_temp_, false);
+
   if (sw_stab_) {
     if (rank0_) std::cout << "Using SUPG in LTE thermo chem!" << std::endl;
   }
@@ -465,7 +465,7 @@ void LteThermoChem::initializeSelf() {
             std::cout << "Calorically Perfect: Setting zero Neumann temperature on patch = " << patch << std::endl;
           }
         }
-
+        // AddTempDirichletBC(temperature_value, inlet_attr);
       } else if (type == "interpolate") {
         temperature_bc_field_ = new GridFunctionCoefficient(extData_interface_->Tdata);
         if (!neumann_temp_) {
@@ -514,7 +514,7 @@ void LteThermoChem::initializeSelf() {
 
   // Wall BCs
   {
-    if (rank0_) std::cout << "There are " << pmesh_->bdr_attributes.Max() << " boundary attributes!" << std::endl;
+    if (rank0_) std::cout << "There are " << pmesh_->bdr_attributes.Max() << " boundary attributes" << std::endl;
     Array<int> attr_wall(pmesh_->bdr_attributes.Max());
     attr_wall = 0;
 
@@ -557,7 +557,9 @@ void LteThermoChem::initializeOperators() {
   const double dt_ = time_coeff_.dt;
 
   // TODO(trevilo): Put a flag for this!!!!
+  // if(torch_cold_start_) {
   sigma_gf_.ProjectCoefficient(sigma_start_up);
+  // }
 
   Array<int> empty;
 

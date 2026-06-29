@@ -41,6 +41,23 @@
 #include "loMach.hpp"
 #include "loMach_options.hpp"
 #include "radiation.hpp"
+#include "tps2Boltzmann.hpp"
+
+#ifdef HAVE_PYTHON
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/embed.h>
+#include <pybind11/numpy.h>
+
+namespace py = pybind11;
+using namespace py::literals;
+
+#ifdef HAVE_MPI4PY
+#include <mpi4py/mpi4py.h>
+#endif
+ 
+#endif
+
 
 using namespace mfem;
 using namespace mfem::common;
@@ -53,6 +70,44 @@ double binaryTest(const Vector &coords, double t);
 
 static double radius(const Vector &pos) { return pos[0]; }
 static FunctionCoefficient radius_coeff(radius);
+
+static double sigmaTorchStartUp(const Vector &pos) {
+  // const double x = pos[0];  // radial location
+  const double x = std::sqrt(pos[0] * pos[0] + pos[2] * pos[2]);  // radial location
+  const double y = pos[1];                                        // axial location
+
+  // const double r0 = 0.005;
+  // const double y0 = 0.135;
+  // const double ysig = 0.015;
+
+  /*
+  const double sigma =
+      2000. * std::exp(-0.5 * (x / r0) * (x / r0)) * std::exp(-0.5 * ((y - y0) / ysig) * ((y - y0) / ysig));
+  */
+
+  // additions for 3d, this should just use "SetConstantPlasmaConductivity" in equation_of_state.cpp
+  const double z = pos[2];
+  const double rCyl = 0.029;
+  const double rsig = 0.005;  // 5mm
+  const double ysig = 0.01;
+  const double y0 = 0.15;  // step location
+
+  double radius_here = std::sqrt(x * x + z * z);
+  double rwgt, hwgt;
+  double sigma;
+  rwgt = std::exp(-0.5 * (radius_here / rsig) * (radius_here / rsig));
+  hwgt = std::exp(-0.5 * ((y - y0) / ysig) * ((y - y0) / ysig));
+  if (radius_here >= rCyl) rwgt = 0.0;
+  sigma = 2000. * rwgt * hwgt;
+
+  // if (sigma > 1.0) {
+  //   std::cout << "sigma: " << sigma << " radius: " << radius_here << " y: " << y << endl;
+  // }
+
+  return sigma;
+}
+
+static FunctionCoefficient sigma_start_up(sigmaTorchStartUp);
 
 ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &time_coeff,
                            ParGridFunction *gridScale, TPS::Tps *tps)
@@ -86,10 +141,39 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   tpsP_->getInput("loMach/reacting/eddy-Pr", Pr_, 0.72);
   tpsP_->getInput("loMach/reacting/eddy-Sc", Sc_, 1.0);
 
+#ifdef HAVE_PYTHON
+  // tpsP_->getInput("cycle-avg-joule-coupled/bte-from-tps", bte_from_tps_, false);
+  // if (bte_from_tps_) {
+  //   tpsP_->getRequiredInput("boltzmannSolver/collisionsFile", collisionsFile);
+  //   tpsP_->getRequiredInput("boltzmannSolver/solver_type", solver_type);
+  //   tpsP_->getInput("boltzmannSolver/ee_collisions", ee_collisions, 0);
+  //   tpsP_->getInput("boltzmannSolver/blend-frac-init", bl_frac_init_, 0.01);
+  //   tpsP_->getInput("boltzmannSolver/blend-frac-increment", bl_frac_increment_, 0.01);
+  //   tpsP_->getInput("boltzmannSolver/blend-frac-change-freq", bl_frac_change_freq_, 1);
+  //   bl_frac_ = bl_frac_init_;
+  //   tpsP_->getInput("boltzmannSolver/solve-bte-every-n", solve_bte_every_n, 1);
+  //   tpsP_->getInput("boltzmannSolver/regrid-bte-every-n", regrid_bte_every_n, 1);
+  //   tpsP_->getInput("boltzmannSolver/do-bte-sub-cluster", do_bte_sub_cluster, 1);
+  //   tpsP_->getInput("boltzmannSolver/num-bte-sub-clusters", num_sub_clusters_bte, 50);
+  //   tpsP_->getInput("boltzmannSolver/n_grids", n_vspace_grids, 1);
+  //   grid_idx_to_npts.resize(n_vspace_grids);
+  //   Te_vec.resize(n_vspace_grids);
+  //   tpsP_->getInput("boltzmannSolver/Nr", Nr_BTE, 128);
+  //   tpsP_->getInput("boltzmannSolver/rtol", BTE_rtol, 1e-6);
+  //   tpsP_->getInput("boltzmannSolver/dt_BTE", dt_BTE, 5e-3);
+  //   tpsP_->getInput("boltzmannSolver/store_csv", store_csv, 1);
+  //   tpsP_->getInput("boltzmannSolver/clip_rr", clip_rr, 0);
+  //   tpsP_->getInput("boltzmannSolver/clip_frac", clip_frac, 10.0);
+  // }
+#endif
+
+  // plasma conditions. ???
   tpsP_->getInput("loMach/reacting/clip-temperature", Tclip_, false);
   tpsP_->getInput("loMach/reacting/min-temperature", Tmin_, 0.0);
   tpsP_->getInput("loMach/reacting/max-temperature", Tmax_, 100000.0);
 
+  // Duplicating this logical here as w/o it, sigma will be updated with diffusivities
+  tpsP_->getInput("cycle-avg-joule-coupled/fixed-conductivity", fixed_conductivity_, false);
   workFluid_ = USER_DEFINED;
   gasModel_ = PERFECT_MIXTURE;
   chemistryModel_ = NUM_CHEMISTRYMODEL;
@@ -471,6 +555,23 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   tpsP_->getInput("reactions/number_of_reactions", nReactions_, 0);
   tpsP_->getInput("reactions/minimum_chemistry_temperature", chemistryInput_.minimumTemperature, 0.0);
 
+#ifdef HAVE_PYTHON
+  // tpsP_->getInput("reactions/number_of_BTE_reactions", nBTEReactions_, 0);
+  // if (bte_from_tps_) {
+  //   // Define the mapping of the reaction indices from TPS to BTE
+  //   // TPS reaction index (starting from 0) is obtained from the input file
+  //   // For BTE, the reaction index is obtained from the collisionsFile
+  //   bte_rr_mapping_.SetSize(nBTEReactions_);
+  //   bte_rr_mapping_ = -1;
+  //   Array<double> btemap(nBTEReactions_);
+  //   tpsP_->getRequiredVec("reactions/bte_rr_mapping", btemap, nBTEReactions_);
+  //   double* mapping = bte_rr_mapping_.HostWrite();
+  //   for (int rr = 0; rr < nBTEReactions_; rr++) {
+  //     mapping[rr] = btemap[rr];
+  //   }
+  // }
+#endif
+
   Vector reactionEnergies(nReactions_);
   Vector detailedBalance(nReactions_);
   Array<ReactionModel> reactionModels;
@@ -524,7 +625,14 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
       tpsP_->getRequiredInput((basepath + "/radius").c_str(), R);
       rxnModelParamsHost.push_back(Vector({R}));
 
-    } else {
+    } 
+    // else if (model == "bte") {
+    //   reactionModels[r - 1] = GRIDFUNCTION_RXN;
+    //   int index;
+    //   tpsP_->getRequiredInput((basepath + "/bte/index").c_str(), index);
+    //   chemistryInput_.reactionInputs[r - 1].indexInput = index;
+    // } 
+    else {
       grvy_printf(GRVY_ERROR, "\nUnknown reaction_model -> %s", model.c_str());
       exit(ERROR);
     }
@@ -582,6 +690,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
           equilibriumConstantParams[p + r * gpudata::MAXCHEMPARAMS];
     }
 
+    // if (reactionModels[r] != TABULATED_RXN && reactionModels[r] != GRIDFUNCTION_RXN) {
     if (reactionModels[r] != TABULATED_RXN) {
       assert(rxn_param_idx < rxnModelParamsHost.size());
       chemistryInput_.reactionInputs[r].modelParams = rxnModelParamsHost[rxn_param_idx].Read();
@@ -706,6 +815,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     tpsP_->getInput("loMach/reactingFlow/implicit-chemistry/species-min", implicit_chemistry_smin_, 1e-12);
   }
 
+  tps->getInput("loMach/torch-cold-start", torch_cold_start_, false);
   tpsP_->getInput("loMach/reactingFlow/explicit-destruction", explicit_destruction_, false);
   tpsP_->getInput("loMach/reactingFlow/sub-steps", nSub_, 1);
   tpsP_->getInput("loMach/reactingFlow/dynamic-substep", dynamic_substepping_, false);
@@ -737,22 +847,61 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
 
   // artificial diffusion (SUPG)
   tpsP_->getInput("loMach/reactingFlow/streamwise-stabilization", sw_stab_, false);
-  tpsP_->getInput("loMach/reactingFlow/Reh_factor", Reh_factor_, 0.5);
-  tpsP_->getInput("loMach/reactingFlow/Reh_offset", Reh_offset_, 1.0);
 
   // specified plasma initial condition
   tpsP_->getInput("plasma_models/initialize_species", species_init_, false);
+  tpsP_->getInput("loMach/reactingFlow/Reh_factor", Reh_factor_, 0.5);
+  tpsP_->getInput("loMach/reactingFlow/Reh_offset", Reh_offset_, 1.0);
 
   // zero-gradient BCs
   tpsP_->getInput("loMach/reactingFlow/neumann-temp", neumann_temp_, false);
   tpsP_->getInput("loMach/reactingFlow/neumann-species-inlet", neumann_species_inlet_, true);
   tpsP_->getInput("loMach/reactingFlow/neumann-species-wall", neumann_species_wall_, true);
+
+  // spark flow
+  spark_center_.SetSize(dim_);
+  Vector zero(dim_);
+  zero = 0.0;
+  tpsP_->getInput("loMach/reactingFlow/spark", spark_, false);
+  tpsP_->getVec("loMach/reactingFlow/spark-center", spark_center_, dim_, zero);
+  tpsP_->getInput("loMach/reactingFlow/spark-radius", spark_radius_, 1.0);
+  tpsP_->getInput("loMach/reactingFlow/spark-electron-mass-fraction", spark_peak_, 1.0e-18);
 }  // NOLINT
 
 ReactingFlow::~ReactingFlow() {
   for (unsigned int i = 0; i < vizSpecFields_.size(); i++) {
     delete vizSpecFields_[i];
   }
+
+#ifdef HAVE_PYTHON
+  // for (unsigned int i = 0; i < vizReacFields_.size(); i++) {
+  //   delete vizReacFields_[i];
+  // }
+
+  // for (unsigned int i = 0; i < vizProdFields_.size(); i++) {
+  //   delete vizProdFields_[i];
+  // }
+
+  // for (unsigned int i = 0; i < vizkReacFields_.size(); i++) {
+  //   delete vizkReacFields_[i];
+  // }
+
+  // for (unsigned int i = 0; i < vizrrfbyrrbFields_.size(); i++) {
+  //   delete vizrrfbyrrbFields_[i];
+  // }
+
+  // for (unsigned int i = 0; i < vizBTEReacFields_.size(); i++) {
+  //   delete vizBTEReacFields_[i];
+  // }
+
+  // for (unsigned int i = 0; i < vizBTEkReacFields_.size(); i++) {
+  //   delete vizBTEkReacFields_[i];
+  // }
+
+  // for (unsigned int i = 0; i < vizBTErrfbyrrbFields_.size(); i++) {
+  //   delete vizBTErrfbyrrbFields_[i];
+  // }
+#endif
 
   // allocated in initializeOperators
   delete sfes_filter_;
@@ -867,6 +1016,13 @@ ReactingFlow::~ReactingFlow() {
   delete sfec_;
   delete yfes_;
   delete yfec_;
+  // delete rfes_;
+  // delete rfec_;
+
+// #ifdef HAVE_PYTHON
+  // delete rrf_by_rrbfes_;
+  // delete rrf_by_rrbfec_;
+// #endif
 }
 
 void ReactingFlow::initializeSelf() {
@@ -890,6 +1046,16 @@ void ReactingFlow::initializeSelf() {
   vfec_ = new H1_FECollection(order_, dim_);
   vfes_ = new ParFiniteElementSpace(pmesh_, vfec_, dim_);
 
+  // PREPARING FINITE ELEMENT SPACE FOR REACTION PROGRESS RATES
+  // rfec_ = new H1_FECollection(order_, dim_);
+  // rfes_ = new ParFiniteElementSpace(pmesh_, yfec_, nReactions_);
+
+// #ifdef HAVE_PYTHON
+//   // PREPARING FINITE ELEMENT SPACE FOR REACTION RATE RATIO (forward rate / backward rate)
+//   rrf_by_rrbfec_ = new H1_FECollection(order_, dim_);
+//   rrf_by_rrbfes_ = new ParFiniteElementSpace(pmesh_, yfec_, int(nReactions_/2));
+// #endif
+
   // Check if fully periodic mesh
   if (!(pmesh_->bdr_attributes.Size() == 0)) {
     temp_ess_attr_.SetSize(pmesh_->bdr_attributes.Max());
@@ -906,6 +1072,16 @@ void ReactingFlow::initializeSelf() {
   yDof_ = yfes_->GetVSize();
   sDofInt_ = sfes_->GetTrueVSize();
   yDofInt_ = yfes_->GetTrueVSize();
+
+  // SETTING Dof PARAMETERS FOR REACTION PROGRESS RATES
+  // rDof_ = rfes_->GetVSize();
+  // rDofInt_ = rfes_->GetTrueVSize();
+
+// #ifdef HAVE_PYTHON
+//   // SETTING Dof PARAMETERS FOR RATIO OF FORWARD TO BACKWARD REACTION RATES
+//   rrf_by_rrbDof_ = rrf_by_rrbfes_->GetVSize();
+//   rrf_by_rrbDofInt_ = rrf_by_rrbfes_->GetTrueVSize();
+// #endif
 
   weff_gf_.SetSpace(vfes_);
   weff_gf_ = 0.0;
@@ -978,6 +1154,35 @@ void ReactingFlow::initializeSelf() {
   YnFull_gf_.SetSpace(yfes_);
   YnFull_gf_ = 0.0;
 
+  // prodY for plotting
+  // productY_gf_.SetSpace(yfes_);
+  // productY_gf_ = 0.0;
+
+  // reaction progress rates for plotting
+  // reacR_gf_.SetSpace(rfes_);
+  // reacR_gf_ = 0.0;
+
+// #ifdef HAVE_PYTHON
+  // reaction rate coefficients for plotting
+  // kReac_gf_.SetSpace(rfes_);
+  // kReac_gf_ = 0.0;
+
+  // // reaction rate coefficients for plotting
+  // rrf_by_rrb_gf_.SetSpace(rrf_by_rrbfes_);
+  // rrf_by_rrb_gf_ = 0.0;
+
+  // BTEkReac_gf_.SetSpace(rfes_);
+  // BTEkReac_gf_ = 0.0;
+
+  // // reaction progress rates for plotting
+  // BTEreacR_gf_.SetSpace(rfes_);
+  // BTEreacR_gf_ = 0.0;
+
+  // // reaction rate coefficients for plotting
+  // BTErrf_by_rrb_gf_.SetSpace(rrf_by_rrbfes_);
+  // BTErrf_by_rrb_gf_ = 0.0;
+// #endif
+
   // rest can just be sfes
   Yn_gf_.SetSpace(sfes_);
   Yext_gf_.SetSpace(sfes_);
@@ -1015,6 +1220,21 @@ void ReactingFlow::initializeSelf() {
   prodY_gf_.SetSpace(sfes_);
   prodY_gf_ = 0.0;
 
+  // reaction progress rates to be passed to reacR_gf
+  // reacR_.SetSize(rDofInt_);
+  // reacR_ = 0.0;
+
+// #ifdef HAVE_PYTHON
+//   BTEreacR_.SetSize(rDofInt_);
+//   BTEreacR_ = 0.0; 
+
+//   rrf_by_rrb_.SetSize(int(rDofInt_/2));
+//   rrf_by_rrb_ = 0.0;
+
+//   BTErrf_by_rrb_.SetSize(int(rDofInt_/2));
+//   BTErrf_by_rrb_ = 0.0;
+// #endif
+
   prodE_.SetSize(yDofInt_);
   prodE_ = 1.0e-12;
 
@@ -1032,6 +1252,35 @@ void ReactingFlow::initializeSelf() {
 
   jh_.SetSize(sDofInt_);
   jh_ = 0.0;
+
+// #ifdef HAVE_PYTHON
+// Initialize ParGridFunction and Vectors
+// for real and imaginary parts
+// of electric field magnitude
+  // er_gf_.SetSpace(sfes_);
+  // er_gf_ = 0.0;
+
+  // er_.SetSize(sDofInt_);
+  // er_ = 0.0;
+
+  // ei_gf_.SetSpace(sfes_);
+  // ei_gf_ = 0.0;
+
+  // ei_.SetSize(sDofInt_);
+  // ei_ = 0.0;
+
+  // bterates_.SetSize(sDofInt_*nBTEReactions_);
+  // bterates_ = 0.0;
+
+  // reaction rate coefficients to be passed to kReac_gf_
+//   kReac_.SetSize(rDofInt_);
+//   kReac_ = 0.0;
+
+//   BTEkReac_.SetSize(rDofInt_);
+//   BTEkReac_ = 0.0;
+
+//   grid_idx_to_spatial_idx_map.resize(sDofInt_);
+// #endif
 
   radiation_sink_gf_.SetSpace(sfes_);
   radiation_sink_gf_ = 0.0;
@@ -1093,6 +1342,11 @@ void ReactingFlow::initializeSelf() {
 
   plasma_conductivity_gf_ = &sigma_gf_;
   joule_heating_gf_ = &jh_gf_;
+
+// #ifdef HAVE_PYTHON
+//   efield_real_gf_ = &er_gf_;
+//   efield_imag_gf_ = &ei_gf_;
+// #endif
 
   //-----------------------------------------------------
   // 2) Set the initial condition
@@ -1175,6 +1429,17 @@ void ReactingFlow::initializeSelf() {
   Yn_next_gf_ = Yn_gf_;
   YnFull_gf_.SetFromTrueDofs(Yn_);
 
+// #ifdef HAVE_PYTHON
+//   productY_gf_.SetFromTrueDofs(prodY_);
+//   reacR_gf_.SetFromTrueDofs(reacR_);
+//   kReac_gf_.SetFromTrueDofs(kReac_);
+//   rrf_by_rrb_gf_.SetFromTrueDofs(rrf_by_rrb_);
+
+//   BTEreacR_gf_.SetFromTrueDofs(BTEreacR_);
+//   BTEkReac_gf_.SetFromTrueDofs(BTEkReac_);
+//   BTErrf_by_rrb_gf_.SetFromTrueDofs(BTErrf_by_rrb_);
+// #endif
+
   ConstantCoefficient t_ic_coef;
   t_ic_coef.constant = T_ic_;
   Tn_gf_.ProjectCoefficient(t_ic_coef);
@@ -1222,6 +1487,9 @@ void ReactingFlow::initializeSelf() {
           }
         }
 
+        // AddTempDirichletBC(temperature_value, inlet_attr);
+        // AddSpecDirichletBC(0.0, inlet_attr);
+
         if (neumann_species_inlet_) {
           if (rank0_) {
             std::cout << "Rx Flow: Setting zero Neumann species on patch = " << patch << std::endl;
@@ -1236,6 +1504,7 @@ void ReactingFlow::initializeSelf() {
       } else if (type == "interpolate") {
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
         temperature_bc_field_ = new GridFunctionCoefficient(extData_interface_->Tdata);
+
         if (!neumann_temp_) {
           inlet_attr = 0;
           inlet_attr[patch - 1] = 1;
@@ -1270,6 +1539,22 @@ void ReactingFlow::initializeSelf() {
           AddSpecDirichletBC(species_bc_field_, inlet_attr);
           Yn_gf_.ProjectBdrCoefficient(*species_bc_field_, inlet_attr);
         }
+
+        // AddSpecDirichletBC(species_bc_field_, inlet_attr);
+        // Yn_gf_.ProjectBdrCoefficient(*species_bc_field_, inlet_attr);
+
+      } else if (type == "normal") {
+        Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
+        inlet_attr = 0;
+        inlet_attr[patch - 1] = 1;
+        double temperature_value;
+        tpsP_->getRequiredInput((basepath + "/temperature").c_str(), temperature_value);
+        if (rank0_) {
+          std::cout << "Rx Flow: Setting uniform Dirichlet temperature on patch = " << patch << std::endl;
+        }
+        AddTempDirichletBC(temperature_value, inlet_attr);
+
+        // do nothing for species for time being
 
       } else {
         if (rank0_) {
@@ -1345,6 +1630,12 @@ void ReactingFlow::initializeSelf() {
 
 void ReactingFlow::initializeOperators() {
   dt_ = time_coeff_.dt;
+
+  // TODO(trevilo): Put a flag for this!!!!
+  if (torch_cold_start_) {
+    if (rank0_) std::cout << " Cold start selected.  Specifying sigma field." << endl;
+    sigma_gf_.ProjectCoefficient(sigma_start_up);
+  }
 
   Array<int> empty;
 
@@ -1866,6 +2157,17 @@ void ReactingFlow::initializeOperators() {
     Ynm1_ = Yn_;
     Ynm2_ = Yn_;
     YnFull_gf_.SetFromTrueDofs(Yn_);
+
+// #ifdef HAVE_PYTHON
+    // productY_gf_.SetFromTrueDofs(prodY_);
+    // reacR_gf_.SetFromTrueDofs(reacR_);
+    // kReac_gf_.SetFromTrueDofs(kReac_);
+    // rrf_by_rrb_gf_.SetFromTrueDofs(rrf_by_rrb_);
+
+    // BTEreacR_gf_.SetFromTrueDofs(BTEreacR_);
+    // BTEkReac_gf_.SetFromTrueDofs(BTEkReac_);
+    // BTErrf_by_rrb_gf_.SetFromTrueDofs(BTErrf_by_rrb_);
+// #endif
   }
 
   // Ensure Yn_ is consistent with YnFull_gf_.  Specifically this is
@@ -1873,6 +2175,16 @@ void ReactingFlow::initializeOperators() {
   // YnFull_gf_ after the Yn_ IC is set.
   YnFull_gf_.GetTrueDofs(Yn_);
 
+// #ifdef HAVE_PYTHON
+  // productY_gf_.GetTrueDofs(prodY_);  
+  // reacR_gf_.GetTrueDofs(reacR_);  
+  // kReac_gf_.GetTrueDofs(kReac_);  
+  // rrf_by_rrb_gf_.GetTrueDofs(rrf_by_rrb_);  
+
+  // BTEreacR_gf_.GetTrueDofs(BTEreacR_);  
+  // BTEkReac_gf_.GetTrueDofs(BTEkReac_);  
+  // BTErrf_by_rrb_gf_.GetTrueDofs(BTErrf_by_rrb_);  
+// #endif
   // override species initial condition
   if (species_init_) {
     if (rank0_) std::cout << "Projecting initial species fields." << endl;
@@ -1928,6 +2240,64 @@ void ReactingFlow::UpdateTimestepHistory(double dt) {
 void ReactingFlow::step() {
   dt_ = time_coeff_.dt;
   time_ = time_coeff_.time;
+
+  // spark flow at specified location if triggered
+  // TODO(swh) move to seperate function
+  if (spark_) {
+    if(rank0_) std::cout << "Sparking flow" << endl;
+    
+    // TODO(swh) confirm that this check is alreay enforced elsewhere
+    int nSlot = nSpecies_ - 1;
+    int eSlot = nSpecies_ - 2;
+    int ionSlot = nSpecies_ - 3;
+
+    const double m_n = mixture_->GetGasParams(nSlot, GasParams::SPECIES_MW);
+    const double m_e = mixture_->GetGasParams(eSlot, GasParams::SPECIES_MW);
+    const double m_ion = mixture_->GetGasParams(ionSlot, GasParams::SPECIES_MW);
+
+    ParGridFunction coordsDof(vfes_);
+    pmesh_->GetNodes(coordsDof);
+    auto h_Yn = Yn_.HostReadWrite();
+    for (int i = 0; i < sDofInt_; i++) {
+      
+      // spark volume weight
+      double x, y, z, dist;
+      double wgt;
+      x = coordsDof(0 * sDofInt_ + i);
+      y = coordsDof(1 * sDofInt_ + i);
+      x = x - spark_center_[0];
+      y = y - spark_center_[1];
+      dist = x * x + y * y;
+      if (dim_ == 3) {
+        z = coordsDof(2 * sDofInt_ + i);
+        z = z - spark_center_[2];
+        dist += z * z;
+      }
+      dist = std::sqrt(dist);
+      wgt = std::exp(-0.5 * (dist / spark_radius_) * (dist / spark_radius_));
+      //if (rank0_) std::cout << "SPARK WGT: " << wgt << " | dist: " << dist << " | spark_radius: " << spark_radius_ << endl;
+      //wgt = 1.0;
+      //if(wgt < 0) {
+      //std::cout << "BAD WGT: " << wgt << endl;
+      //}
+      //if(wgt >1) {
+      //std::cout << "BAD WGT: " << wgt << endl;
+      //}
+      
+      // free electron value (mass-fraction)
+      h_Yn[eSlot * sDofInt_ + i] += wgt * spark_peak_;
+
+      // correct ion value to stay consistent
+      h_Yn[ionSlot * sDofInt_ + i] += h_Yn[eSlot * sDofInt_ + i] * m_ion / m_e;
+
+      // correct nuetral
+      h_Yn[nSlot * sDofInt_ + i] -= h_Yn[eSlot * sDofInt_ + i] * m_n / m_e;
+    }
+    YnFull_gf_.SetFromTrueDofs(Yn_);
+
+    // only do this once
+    spark_ = false;
+  }  // end spark loop
 
   // Set current time for velocity Dirichlet boundary conditions.
   for (auto &temp_dbc : temp_dbcs_) {
@@ -2013,7 +2383,6 @@ void ReactingFlow::step() {
 
   if (operator_split_) {
     /// PART II: time-splitting of reaction
-
     // Save Yn_ and Tn_ because substep routines overwrite these as
     // with the {n}+iSub substates, which is convenient b/c helper
     // functions (like speciesProduction) use these Vectors
@@ -2024,6 +2393,240 @@ void ReactingFlow::step() {
       auto h_Yn = Yn_next_.HostReadWrite();
       auto h_Tn = Tn_next_.HostReadWrite();
       double *YT = new double[nActiveSpecies_ + 1];
+    
+// #ifdef HAVE_PYTHON
+// -----------------------OBTAIN BTE RATE COEFFICIENTS HERE BEFORE CALLING IMPLICIT TIME STEPPING ----------------------------------------
+    // Get the BTE rates by calling Python solver
+    // Pass temperature as input to Python function
+    // const double *dataT = Tn_.HostRead();
+    // const double *dataRho = rn_.HostRead();
+    // const double *dataY = Yn_.HostRead();
+
+    // ei_gf_.GetTrueDofs(ei_);
+    // er_gf_.GetTrueDofs(er_);
+
+    // int iter = this->GetCurrentIter();
+    // int update_bte_rates = (iter - 1) % solve_bte_every_n;
+
+    // int regrid_bte = (iter - 1) % regrid_bte_every_n;
+    
+    // if (rank0_) {
+    //   int iter_number_ = this->GetCurrentIter();
+    //   std::cout << "[C++] Iter = " << iter_number_ << "sDofInt = " << sDofInt_ 
+    //   << ", update_bte_rates = " << update_bte_rates << ", regrid_bte = " << regrid_bte << ", " << regrid_bte_every_n <<
+    //   ", bl_frac_ = " << bl_frac_ << ", bl_frac_change_freq_ = " << bl_frac_change_freq_ <<
+    //   ", nBTEReactions, nReactions = " << nBTEReactions_ << ", " << nReactions_ << ", bte_from_tps = " << bte_from_tps_ << "\n";
+    // }
+
+    // if (bte_from_tps_ && regrid_bte == 0) {
+      // if (rank0_) {
+      //   int iter_number_ = this->GetCurrentIter();
+      //   std::cout << "[C++] Iter = " << iter_number_ << ", Setting up the v-space grids for BTE..." << "\n";
+      // }
+
+      // int size = Tn_.Size();
+      // auto Tarr = py::array_t<double>(
+      //     {size},                 // shape
+      //     {sizeof(double)},       // stride
+      //     dataT                    // const double* pointer
+      // );
+      // Tarr.attr("flags").attr("writeable") = false; // mark read-only
+
+      // int n_bte_grids = n_vspace_grids;
+      // py::object result;
+      // try {
+      //   // IMPORT THE PYTHON SCRIPT
+      //   py::object script = py::module_::import("tps-get-bte-rates");
+      //   // CALL THE PYTHON FUNCTION
+      //   result = script.attr("bte_grid_setup")(Tarr, n_bte_grids);
+      // } catch (const py::error_already_set &e) {
+      //   std::cerr << "ReactingFlow::step(), Python error in BTE grid setup: " << e.what() << std::endl;
+      //   exit(-1);
+      // }
+      // py::tuple arrays = result.cast<py::tuple>();
+
+      // Unpack arrays
+      // py::array_t<int32_t> gid_to_npts_arr = arrays[0].cast<py::array_t<int32_t>>();
+      // py::array_t<int64_t> gid_spatin_map  = arrays[1].cast<py::array_t<int64_t>>();
+      // py::array_t<double> Te_arr  = arrays[2].cast<py::array_t<double>>();
+
+      // // Access data
+      // auto buf_gid_npts_arr   = gid_to_npts_arr.request();
+      // auto buf_gid_spatin_map = gid_spatin_map.request();
+      // auto buf_Te_arr = Te_arr.request();
+
+      // int32_t* ptr_gid_to_npts = static_cast<int32_t*>(buf_gid_npts_arr.ptr);
+      // int64_t* ptr_gid_spatin_map = static_cast<int64_t*>(buf_gid_spatin_map.ptr);
+      // double* ptr_Te_arr = static_cast<double*>(buf_Te_arr.ptr);
+
+      // grid_idx_to_npts.assign(ptr_gid_to_npts, ptr_gid_to_npts + buf_gid_npts_arr.size);
+
+      // grid_idx_to_spatial_idx_map.assign(ptr_gid_spatin_map, ptr_gid_spatin_map + buf_gid_spatin_map.size);
+
+      // Te_vec.assign(ptr_Te_arr, ptr_Te_arr + buf_Te_arr.size);
+
+      // int myRank;
+      // MPI_Comm_rank(tpsP_->getTPSCommWorld(), &myRank);
+
+      // std::cout << "Rank " << myRank << ", back to TPS after setting up BTE grids\n";
+
+    // }
+
+    // if (bte_from_tps_ && update_bte_rates == 0) {
+      // // Wrap const pointer into NumPy array (no copy)
+      // // Dimensions given as {size}, stride as {sizeof(double)}
+      // int size = Tn_.Size();
+      // auto Tarr = py::array_t<double>(
+      //     {size},                 // shape
+      //     {sizeof(double)},       // stride
+      //     dataT                    // const double* pointer
+      // );
+      // Tarr.attr("flags").attr("writeable") = false; // mark read-only
+
+      // BELOW, WE GET VECTOR OF NUMBER DENSITIES FOR EACH SPECIES
+      // THIS WILL BE PASSED TO BTE
+      // mfem::Vector speciesInt_(sDofInt_*nSpecies_);
+      // double *species_data = speciesInt_.HostWrite();
+      // int specsize = speciesInt_.Size();
+
+      // double state_local[gpudata::MAXEQUATIONS];
+      // double species_local[gpudata::MAXSPECIES];
+
+      // for (int i = 0; i < gpudata::MAXEQUATIONS; ++i)
+      //   state_local[i] = 0.;
+
+      // for (int i = 0; i < gpudata::MAXSPECIES; ++i)
+      //   species_local[i] = 0.;
+
+      // for (int i = 0; i < sDofInt_; i++) {
+      //   state_local[0] = dataRho[i];
+      //   for (int asp = 0; asp < nActiveSpecies_; asp++)
+      //     state_local[dim_ + 2 + asp] = dataRho[i]*dataY[i+asp*sDofInt_];
+      //   mixture_->computeNumberDensities(state_local, species_local);
+
+      //   for (int sp = 0; sp < nSpecies_; sp++)
+      //     species_data[i + sp * sDofInt_] = AVOGADRONUMBER * species_local[sp];
+      // }
+
+      // if (rank0_) {
+      //   std::cout << "iter = " << iter << ", Updating BTE rates...... \n";
+      // }
+
+      // const double *species_read = speciesInt_.HostRead();
+      // auto specarr = py::array_t<double>(
+      //   {specsize},                 // shape
+      //   {sizeof(double)},       // stride
+      //   species_read                    // const double* pointer
+      // );
+      // specarr.attr("flags").attr("writeable") = false; // mark read-only
+
+      // ei_gf_.GetTrueDofs(ei_);
+      // er_gf_.GetTrueDofs(er_);
+
+      // const double *dataEr = er_.HostRead();
+      // const double *dataEi = ei_.HostRead();
+
+      // int ersize = er_.Size();
+      // auto Erarr = py::array_t<double>(
+      //     {ersize},                 // shape
+      //     {sizeof(double)},       // stride
+      //     dataEr                    // const double* pointer
+      // );
+      // Erarr.attr("flags").attr("writeable") = false; // mark read-only
+
+      // int eisize = ei_.Size();
+      // auto Eiarr = py::array_t<double>(
+      //     {eisize},                 // shape
+      //     {sizeof(double)},       // stride
+      //     dataEi                    // const double* pointer
+      // );
+      // Eiarr.attr("flags").attr("writeable") = false; // mark read-only
+
+      // Convert the grid_idx_to_npts and grid_idx_to_spatial_idx_map to Python arrays of int32 and int64 type respectively
+      // py::array_t<int32_t> py_grid_idx_to_npts(grid_idx_to_npts.size(), grid_idx_to_npts.data());
+      // py::array_t<int64_t> py_grid_idx_to_spatial_idx_map(grid_idx_to_spatial_idx_map.size(), grid_idx_to_spatial_idx_map.data());
+      // py::array_t<double>  te_array(Te_vec.size(), Te_vec.data());
+
+      // py_grid_idx_to_npts.attr("flags").attr("writeable") = false; // mark read-only
+      // py_grid_idx_to_spatial_idx_map.attr("flags").attr("writeable") = false; // mark read-only
+
+      // int n_bte_grids = n_vspace_grids;
+      // int use_interp = do_bte_sub_cluster;
+      // int n_sub_clusters = num_sub_clusters_bte;
+      // int n_bte_reactions = nBTEReactions_;
+      // int Nr = Nr_BTE;
+      // int csv_store = store_csv;
+      // double rtolBTE = BTE_rtol;
+      // double BTE_dt = dt_BTE;
+
+      // py::object result;
+      // try {
+      //   // IMPORT THE PYTHON SCRIPT
+      //   py::object script = py::module_::import("tps-get-bte-rates");
+      //   // CALL THE PYTHON FUNCTION
+      //   result = script.attr("bte_from_tps")(Tarr, specarr, Erarr, Eiarr, collisionsFile, n_bte_reactions, solver_type, ee_collisions, 
+      //             n_bte_grids, py_grid_idx_to_npts, py_grid_idx_to_spatial_idx_map, use_interp, n_sub_clusters, te_array,
+      //             Nr, rtolBTE, csv_store, BTE_dt);
+      // } catch (const py::error_already_set &e) {
+      //   std::cerr << "ReactingFlow::step(), Python error: " << e.what() << std::endl;
+      //   exit(-1);
+      // }
+
+      // int myRank;
+      // MPI_Comm_rank(tpsP_->getTPSCommWorld(), &myRank);
+
+      // std::cout << "Rank " << myRank << ", back to TPS after solving BTE in Python\n";
+  
+      // Convert "result" to an MFEM Vector
+      // py::array res_array = result.cast<py::array>();
+      // py::buffer_info buf = res_array.request();
+
+      // if(buf.ndim != 1) {
+      //   throw std::runtime_error("Expected 1D array from Python");
+      // }
+
+      // SET THE bterates_ Vector to zero before writing the new rates
+      // bterates_ = 0.0;
+
+      // // MFEM::Vector bterates_ stores the returned Python array
+      // double *dst = bterates_.HostWrite();
+      // double *src = static_cast<double *>(buf.ptr);
+
+      // int bterr_size = bterates_.Size();
+
+      // assert(buf.shape[0] == bterr_size);
+
+      // for (int i = 0; i < buf.shape[0]; i++) {
+      //   dst[i] = src[i];
+      // }
+    // } 
+// #endif
+
+      // auto btearr = bterates_.HostRead();
+      
+      // auto datakfwd = kReac_.HostWrite();
+      // auto dataReac = reacR_.HostWrite();
+      // auto datarrfbyrrb = rrf_by_rrb_.HostWrite();
+
+      // auto dataProd = prodY_.HostWrite();
+
+      // auto dataBTEkfwd = BTEkReac_.HostWrite();
+      // auto dataBTEReac = BTEreacR_.HostWrite();
+      // auto dataBTErrfbyrrb = BTErrf_by_rrb_.HostWrite();
+
+      // // Define Vectors to be passed to solveChemistryStep
+      // mfem::Vector bterates(nBTEReactions_);
+      // mfem::Vector kfBTE(nReactions_);
+      // mfem::Vector prograteBTE(nReactions_);
+      // mfem::Vector rrfrrbBTE(nReactions_/2);
+      
+      // mfem::Vector kf(nReactions_);
+      // mfem::Vector prograte(nReactions_);
+      // mfem::Vector rrfrrb(nReactions_/2);
+      // mfem::Vector prodYsp(nSpecies_);
+
+      // bterates = 0.0;
+      
       for (int i = 0; i < sDofInt_; i++) {
         // Extract point state
         for (int sp = 0; sp < nActiveSpecies_; sp++) {
@@ -2031,11 +2634,71 @@ void ReactingFlow::step() {
         }
         YT[nActiveSpecies_] = h_Tn[i];
 
-        // Solve backward Euler update
-        // printf("Chem %d/%d\n", i, sDofInt_);
-        // Vector loc(3);
-        // pmesh_->GetNode(i, loc);
-        // printf("Coord %f, %f, %f\n", loc[0], loc[1], loc[2]);
+// #ifdef HAVE_PYTHON
+        // if (bte_from_tps_) {
+          // Extract point state for the BTE rates
+          // double *bterates = new double[nBTEReactions_];
+          // for (int rr = 0; rr < nBTEReactions_; rr++) {
+          //   bterates[rr] = btearr[i + rr*sDofInt_];
+          // }
+
+          // kfBTE = 0.0; 
+          // prograteBTE = 0.0;
+          // rrfrrbBTE = 0.0;
+          // prodYsp = 0.0;
+
+          // kf = 0.0;
+          // prograte = 0.0;
+          // rrfrrb = 0.0;
+
+          // Solve backward Euler update (with BTE rates)
+          // solveChemistryStepBTE(YT, i, dt_, bterates.GetData(), 
+          //   kf.GetData(), prograte.GetData(), rrfrrb.GetData(),
+          //   kfBTE.GetData(), prograteBTE.GetData(), rrfrrbBTE.GetData(), prodYsp.GetData()
+          // );
+
+          // for (int nr = 0; nr < nReactions_; nr++) {
+          //   datakfwd[i + nr*sDofInt_] = std::max(0.0,kf[nr]);
+          //   dataBTEkfwd[i + nr*sDofInt_] = std::max(0.0,kfBTE[nr]);
+          //   dataReac[i + nr * sDofInt_] = prograte[nr];
+          //   dataBTEReac[i + nr * sDofInt_] = prograteBTE[nr];
+          //   if (nr % 2 == 0) {
+          //     datarrfbyrrb[i + int(nr/2) * sDofInt_] = std::max(0.0, prograte[nr] / (1e-28 + prograte[nr + 1]));
+          //     dataBTErrfbyrrb[i + int(nr/2) * sDofInt_] = std::max(0.0, prograteBTE[nr] / (1e-28 + prograteBTE[nr + 1]));
+          //   }
+          // }
+
+          // for (int sp = 0; sp < nSpecies_; sp++) {
+          //   dataProd[i + sp*sDofInt_] = prodYsp[sp];
+          // }
+        // } else{
+// #endif    
+          // prodYsp = 0.0;
+          // kf = 0.0;
+          // prograte = 0.0;
+          // rrfrrb = 0.0;
+
+          // Solve backward Euler update (with tabulated rates)
+        //   solveChemistryStep(YT, i, dt_, kf.GetData(), prograte.GetData(), rrfrrb.GetData(), prodYsp.GetData()
+        // );
+
+          // Fill in the vectors storing rate coefficients (kf), reaction rates, rate of forward / backward rate from values
+          // returned by solveChemistryStep()
+//           for(int nr = 0; nr < nReactions_; nr++) {
+//             datakfwd[i + nr * sDofInt_] = std::max(0.0,kf[nr]);
+//             dataReac[i + nr * sDofInt_] = prograte[nr];
+//             if (nr % 2 == 0) {
+//               datarrfbyrrb[i + int(nr/2) * sDofInt_] = std::max(0.0, prograte[nr] / (1e-28 + prograte[nr + 1]));
+//             }
+//           }
+
+//           for (int sp = 0; sp < nSpecies_; sp++) {
+//             dataProd[i + sp*sDofInt_] = prodYsp[sp];
+//           }
+// #ifdef HAVE_PYTHON
+//         }
+// #endif
+        
         solveChemistryStep(YT, i, dt_);
         // Overwrite point state data
         for (int sp = 0; sp < nActiveSpecies_; sp++) {
@@ -2044,6 +2707,90 @@ void ReactingFlow::step() {
         h_Tn[i] = YT[nActiveSpecies_];
       }
       delete[] YT;
+
+// #ifdef HAVE_PYTHON
+      // int myRank;
+      // MPI_Comm_rank(tpsP_->getTPSCommWorld(), &myRank);
+
+      // kReac_gf_.SetFromTrueDofs(kReac_);
+      // reacR_gf_.SetFromTrueDofs(reacR_);
+      // productY_gf_.SetFromTrueDofs(prodY_);
+      // rrf_by_rrb_gf_.SetFromTrueDofs(rrf_by_rrb_);
+
+      // BTEkReac_gf_.SetFromTrueDofs(BTEkReac_);
+      // BTEreacR_gf_.SetFromTrueDofs(BTEreacR_);
+      // BTErrf_by_rrb_gf_.SetFromTrueDofs(BTErrf_by_rrb_);
+
+      // er_gf_.SetFromTrueDofs(er_);
+      // ei_gf_.SetFromTrueDofs(ei_);
+
+      // if (bte_from_tps_) {
+      //   // UPDATE THE BLENDING FRACTION
+      //   int iter_number_ = this->GetCurrentIter();
+      //   if (iter_number_ % bl_frac_change_freq_ == 0) {
+      //     bl_frac_ = bl_frac_ + bl_frac_increment_;
+      //   }
+      //   bl_frac_ = std::min(bl_frac_, 1.0);
+      // }
+      
+      // for (int rr = 0; rr < nReactions_; rr++) {
+      //   mfem::Vector rr_view(kReac_.GetData() + rr*sDofInt_, sDofInt_);
+      //   mfem::Vector BTErr_view(BTEkReac_.GetData() + rr*sDofInt_, sDofInt_);
+
+      //   double local_min = rr_view.Min();
+      //   double local_max = rr_view.Max();
+
+      //   double BTElocal_min = BTErr_view.Min();
+      //   double BTElocal_max = BTErr_view.Max();
+
+      //   double global_min, global_max;
+      //   double BTEglobal_min, BTEglobal_max;
+
+      //   MPI_Allreduce(&local_min, &global_min, 1, MPI_DOUBLE, MPI_MIN, tpsP_->getTPSCommWorld());
+      //   MPI_Allreduce(&local_max, &global_max, 1, MPI_DOUBLE, MPI_MAX, tpsP_->getTPSCommWorld());
+
+      //   MPI_Allreduce(&BTElocal_min, &BTEglobal_min, 1, MPI_DOUBLE, MPI_MIN, tpsP_->getTPSCommWorld());
+      //   MPI_Allreduce(&BTElocal_max, &BTEglobal_max, 1, MPI_DOUBLE, MPI_MAX, tpsP_->getTPSCommWorld());
+
+      //   if (rank0_) {
+      //     std::cout << "[C++], Reaction " << rr << ", Rate coefficient Local = " 
+      //               << local_min << " to " << local_max 
+      //               << ", Global = " 
+      //               << global_min << " to " << global_max << ", BTE global = " << BTEglobal_min << ", to " << BTEglobal_max << "\n";
+      //   }
+
+      //   if (rr % 2 == 0) {
+      //     mfem::Vector rrf_by_rrb_view(rrf_by_rrb_.GetData() + int(rr/2)*sDofInt_, sDofInt_);
+      //     mfem::Vector BTErrf_by_rrb_view(BTErrf_by_rrb_.GetData() + int(rr/2)*sDofInt_, sDofInt_);
+
+      //     double loc_min = rrf_by_rrb_view.Min();
+      //     double loc_max = rrf_by_rrb_view.Max();
+
+      //     double BTEloc_min = BTErrf_by_rrb_view.Min();
+      //     double BTEloc_max = BTErrf_by_rrb_view.Max();
+
+      //     double glob_min, glob_max;
+      //     double BTEglob_min, BTEglob_max;
+
+      //     MPI_Allreduce(&loc_min, &glob_min, 1, MPI_DOUBLE, MPI_MIN, tpsP_->getTPSCommWorld());
+      //     MPI_Allreduce(&loc_max, &glob_max, 1, MPI_DOUBLE, MPI_MAX, tpsP_->getTPSCommWorld());
+
+      //     MPI_Allreduce(&BTEloc_min, &BTEglob_min, 1, MPI_DOUBLE, MPI_MIN, tpsP_->getTPSCommWorld());
+      //     MPI_Allreduce(&BTEloc_max, &BTEglob_max, 1, MPI_DOUBLE, MPI_MAX, tpsP_->getTPSCommWorld());
+
+      //     if (rank0_) {
+      //       std::cout << "Reaction set " << int(rr/2) << ", Ratio of forward to backward rates Local = " 
+      //                 << loc_min << " to " << loc_max 
+      //                 << ", Global = " 
+      //                 << glob_min << " to " << glob_max 
+      //                 << ", BTE local = " << BTEloc_min << " to " << BTEloc_max
+      //                 << ", Global = " << BTEglob_min << " to " << BTEglob_max << "\n";
+      //     }
+      //   }
+      // }
+
+      // std::cout << "Rank " << myRank << ", TPS Obtained global max/min of rate coefficients\n";
+// #endif
 
       if (mixtureInput_.ambipolar) {
         // Evaluate electron mass fraction based on quasi-neutrality
@@ -2125,6 +2872,17 @@ void ReactingFlow::step() {
     Yn_ = spec_buffer_;
     Tn_ = temp_buffer_;
     Tn_gf_.SetFromTrueDofs(Tn_);
+
+// #ifdef HAVE_PYTHON
+    // kReac_gf_.SetFromTrueDofs(kReac_);
+    // reacR_gf_.SetFromTrueDofs(reacR_);
+    // productY_gf_.SetFromTrueDofs(prodY_);
+    // rrf_by_rrb_gf_.SetFromTrueDofs(rrf_by_rrb_);
+
+    // BTEkReac_gf_.SetFromTrueDofs(BTEkReac_);
+    // BTEreacR_gf_.SetFromTrueDofs(BTEreacR_);
+    // BTErrf_by_rrb_gf_.SetFromTrueDofs(BTErrf_by_rrb_);
+// #endif
   }
 
   /// PART III: prepare for external use
@@ -2300,6 +3058,46 @@ void ReactingFlow::temperatureStep() {
   Tn_next_gf_.SetFromTrueDofs(Tn_next_);
 }
 
+/*
+void ReactingFlow::temperatureSubstep(int iSub) {
+  // substep dt
+  double dtSub = dt_ / (double)nSub_;
+
+  CpMix_gf_.GetTrueDofs(CpMix_);
+
+  // heat of formation term
+  tmpR0_.Set(1.0, hw_);
+
+  // pressure
+  tmpR0_ += dtP_;
+
+  // contribution to temperature update is dt * rhs / (rho * Cp)
+  tmpR0_ /= rn_;
+  tmpR0_ /= CpMix_;
+  tmpR0_ *= dtSub;
+
+  double *data = tmpR0_.HostReadWrite();
+  double *dTstar = TnStar_.HostReadWrite();
+  double *dTn = Tn_.HostReadWrite();
+  for (int i = 0; i < sDofInt_; i++) {
+    // increasing T
+    if (data[i] > 0.0) {
+      data[i] += dTstar[i];
+      data[i] += dTn[i];
+
+    // reducing T
+    } else {
+      double tmp = 1.0 - data[i] / dTn[i];
+      data[i] = dTn[i] / tmp + dTstar[i];
+    }
+  }
+
+  // Tn now has full state at substep
+  Tn_.Set(1.0, tmpR0_);
+}
+*/
+
+/**/
 void ReactingFlow::temperatureSubstep(int iSub) {
   // substep dt
   double dtSub = dt_ / (double)nSub_;
@@ -2353,6 +3151,7 @@ void ReactingFlow::temperatureSubstep(int iSub) {
   // Tn now has full state at substep
   Tn_.Set(1.0, tmpR0_);
 }
+/**/
 
 void ReactingFlow::speciesLastStep() {
   tmpR0_ = 0.0;
@@ -2542,6 +3341,7 @@ void ReactingFlow::speciesSubstep(int iSpec, int iSub) {
   // Yn now has full state at substep
   setVectorFromScalar(tmpR0_, iSpec, &Yn_);
 }
+/**/
 
 void ReactingFlow::speciesProduction() {
   const double *dataT = Tn_.HostRead();
@@ -2549,6 +3349,8 @@ void ReactingFlow::speciesProduction() {
   const double *dataY = Yn_.HostRead();
   double *dataProd = prodY_.HostWrite();
   double *dataEmit = prodE_.HostWrite();
+
+  // double *dataReac = reacR_.HostWrite();
 
   // const int nEq = dim_ + 2 + nActiveSpecies_;
   Vector state(gpudata::MAXEQUATIONS);
@@ -2607,8 +3409,17 @@ void ReactingFlow::speciesProduction() {
       dataProd[i + sp * sDofInt_] = creationRate[sp];
       dataEmit[i + sp * sDofInt_] = emissionRate[sp];
     }
+
+    // Write the reaction progress rates into dataReac
+    // for(int nr = 0; nr < nReactions_; nr++){
+    //   dataReac[i + nr * sDofInt_] = progressRate[nr];
+    // }
   }
 
+  // prodY_gf stores the species production rates for each species
+  // reacR_gf stores the reaction progress rates for each reaction
+  // productY_gf_.SetFromTrueDofs(prodY_);
+  // reacR_gf_.SetFromTrueDofs(reacR_);
   // if Yn + P_Y*(dt*N) > 1 (or < 0) can we clip the value?
   // N = 4 or something (maybe nSub?)
   // P_Y*(dt_remaining), dt_remaining = dt - N * dt/nSub
@@ -2750,6 +3561,7 @@ void ReactingFlow::initializeIO(IODataOrganizer &io) {
   const bool species_in_restart_file = !restart_from_lte;
 
   io.registerIOFamily("Species", "/species", &YnFull_gf_, true, species_in_restart_file, yfec_);
+
   for (int sp = 0; sp < nSpecies_; sp++) {
     std::string speciesName = std::to_string(sp);
     io.registerIOVar("/species", "Y_" + speciesName, sp, species_in_restart_file);
@@ -2770,6 +3582,10 @@ void ReactingFlow::initializeViz(ParaViewDataCollection &pvdc) {
   pvdc.RegisterField("weff", &weff_gf_);
   pvdc.RegisterField("emission", &emission_gf_);
 
+// #ifdef HAVE_PYTHON
+//   pvdc.RegisterField("EfieldR", &er_gf_);
+//   pvdc.RegisterField("EfieldI", &ei_gf_);
+// #endif
   // diagnose Qt issues, rhs contributions
   // pvdc.RegisterField("rhsqt_bd", &rhsqt_bd_); //boundary terms
   // pvdc.RegisterField("rhsqt_fo", &rhsqt_fo_); //bilinear form
@@ -2786,6 +3602,75 @@ void ReactingFlow::initializeViz(ParaViewDataCollection &pvdc) {
     vizSpecNames_.push_back(std::string("Yn_" + speciesNames_[sp]));
     pvdc.RegisterField(vizSpecNames_[sp], vizSpecFields_[sp]);
   }
+
+  // WRITING THE REACTION PRODUCT TERMS TO THE PARAVIEW FILE
+  // vizProdFields_.clear();
+  // vizProdNames_.clear();
+  // for (int sp = 0; sp < nSpecies_; sp++) {
+  //   vizProdFields_.push_back(new ParGridFunction(sfes_, productY_gf_, (sp * sDof_)));
+  //   vizProdNames_.push_back(std::string("prodYn_" + speciesNames_[sp]));
+  //   pvdc.RegisterField(vizProdNames_[sp], vizProdFields_[sp]);
+  // }
+
+  // WRITING THE REACTION PROGRESS RATES TO THE PARAVIEW FILE
+  // vizReacFields_.clear();
+  // vizReacNames_.clear();
+  // for (int nr = 0; nr < nReactions_; nr++) {
+  //   auto sr = std::to_string(nr);
+  //   vizReacFields_.push_back(new ParGridFunction(sfes_, reacR_gf_, (nr * sDof_)));
+  //   vizReacNames_.push_back(std::string("reacR_" + sr));
+  //   pvdc.RegisterField(vizReacNames_[nr], vizReacFields_[nr]);
+  // }
+
+// #ifdef HAVE_PYTHON
+  // WRITING THE REACTION RATE COEFFICIENTS TO THE PARAVIEW FILE
+  // vizkReacFields_.clear();
+  // vizkReacNames_.clear();
+  // for (int nr = 0; nr < nReactions_; nr++) {
+  //   auto sr = std::to_string(nr);
+  //   vizkReacFields_.push_back(new ParGridFunction(sfes_, kReac_gf_, (nr * sDof_)));
+  //   vizkReacNames_.push_back(std::string("kReac_" + sr));
+  //   pvdc.RegisterField(vizkReacNames_[nr], vizkReacFields_[nr]);
+  // }
+
+  // // WRITING THE RATIO OF FORWARD TO BACKWARD REACTION RATES TO THE PARAVIEW FILE
+  // vizrrfbyrrbFields_.clear();
+  // vizrrfbyrrbNames_.clear();
+  // for (int nr = 0; nr < int(nReactions_/2); nr++) {
+  //     auto sr = std::to_string(nr);
+  //     vizrrfbyrrbFields_.push_back(new ParGridFunction(sfes_, rrf_by_rrb_gf_, (nr * sDof_)));
+  //     vizrrfbyrrbNames_.push_back(std::string("rrf_by_rrb_" + sr));
+  //     pvdc.RegisterField(vizrrfbyrrbNames_[nr], vizrrfbyrrbFields_[nr]);
+  // }
+
+  // WRITING THE BTE REACTION PROGRESS RATES TO THE PARAVIEW FILE
+  // vizBTEReacFields_.clear();
+  // vizBTEReacNames_.clear();
+  // for (int nr = 0; nr < nReactions_; nr++) {
+  //   auto sr = std::to_string(nr);
+  //   vizBTEReacFields_.push_back(new ParGridFunction(sfes_, BTEreacR_gf_, (nr * sDof_)));
+  //   vizBTEReacNames_.push_back(std::string("BTEreacR_" + sr));
+  //   pvdc.RegisterField(vizBTEReacNames_[nr], vizBTEReacFields_[nr]);
+  // }
+
+  // vizBTEkReacFields_.clear();
+  // vizBTEkReacNames_.clear();
+  // for (int nr = 0; nr < nReactions_; nr++) {
+  //   auto sr = std::to_string(nr);
+  //   vizBTEkReacFields_.push_back(new ParGridFunction(sfes_, BTEkReac_gf_, (nr * sDof_)));
+  //   vizBTEkReacNames_.push_back(std::string("BTEkReac_" + sr));
+  //   pvdc.RegisterField(vizBTEkReacNames_[nr], vizBTEkReacFields_[nr]);
+  // }
+
+//   vizBTErrfbyrrbFields_.clear();
+//   vizBTErrfbyrrbNames_.clear();
+//   for (int nr = 0; nr < int(nReactions_/2); nr++) {
+//       auto sr = std::to_string(nr);
+//       vizBTErrfbyrrbFields_.push_back(new ParGridFunction(sfes_, BTErrf_by_rrb_gf_, (nr * sDof_)));
+//       vizBTErrfbyrrbNames_.push_back(std::string("BTErrf_by_rrb_" + sr));
+//       pvdc.RegisterField(vizBTErrfbyrrbNames_[nr], vizBTErrfbyrrbFields_[nr]);
+//   }
+// #endif
 }
 
 /**
@@ -2846,23 +3731,32 @@ void ReactingFlow::updateMixture() {
     Mmix_gf_ = 0.0;
 
     for (int sp = 0; sp < nSpecies_; sp++) {
+      // Extract scalar component from Yn_ and store in tmpR0_
       setScalarFromVector(Yn_, sp, &tmpR0_);
+      // Yn_gf_ stores mass fractions for species "sp" at each DOFs
       Yn_gf_.SetFromTrueDofs(tmpR0_);
+      // Iteration over Finite Element DOFs
       for (int i = 0; i < sDof_; i++) {
+        // Stores inverse of the average mixture molar mass at each DOF
+        // 1 / avg(M) = \sum_{nSpecies_} Y_{sp} / Mw_{sp}
         dataM[i] += dataY[i] / gasParams_(sp, GasParams::SPECIES_MW);
       }
     }
 
     for (int i = 0; i < sDof_; i++) {
+      // Take inverse to obtain the average molar mass
       dataM[i] = 1.0 / dataM[i];
     }
     for (int i = 0; i < sDof_; i++) {
+      // Specific gas constant, Rsp = RU / avg(M)
       dataR[i] = Rgas_ / dataM[i];
     }
   }
 
   // can use mixture calls directly for this
   for (int sp = 0; sp < nSpecies_; sp++) {
+    // Extract scalar component corresponding to "sp" from Yn_, Xn_ and store 
+    // in tmpR0a_, tmpR0b_ respectively
     setScalarFromVector(Yn_, sp, &tmpR0a_);
     setScalarFromVector(Xn_, sp, &tmpR0b_);
     Mmix_gf_.GetTrueDofs(tmpR0c_);
@@ -2870,6 +3764,8 @@ void ReactingFlow::updateMixture() {
     double *d_X = tmpR0b_.HostReadWrite();
     double *d_M = tmpR0c_.HostReadWrite();
     for (int i = 0; i < sDofInt_; i++) {
+      // Get the mole fractions for each species
+      // X_{sp} = Y_{sp} * avg(M) / Mw_{sp}
       d_X[i] = d_Y[i] * d_M[i] / gasParams_(sp, GasParams::SPECIES_MW);
     }
     setVectorFromScalar(tmpR0b_, sp, &Xn_);
@@ -2894,10 +3790,12 @@ void ReactingFlow::updateMixture() {
       // Set up conserved state (just the mass densities, which is all we need here)
       state[0] = d_Rho[i];
       for (int sp = 0; sp < nActiveSpecies_; sp++) {
+        // dim_ + 1 = mass + momentum + energy equations
+        // species conserved state (rho * Y_{sp}) indices start from dim_ + 1 + 1
         state[dim_ + 1 + sp + 1] = d_Rho[i] * d_Yn[i + sp * sDofInt_];
       }
 
-      // Evaluate the mole densities (from mass densities)
+      // Evaluate the mole densities in mol-m^{-3} (from mass densities) and store in n_sp
       mixture_->computeNumberDensities(state, n_sp);
 
       // GetMixtureCp returns cpMix = sum_s X_s Cp_s, where X_s is
@@ -2957,6 +3855,7 @@ void ReactingFlow::updateThermoP() {
 }
 
 void ReactingFlow::updateDiffusivity() {
+  
   (flow_interface_->velocity)->GetTrueDofs(tmpR1_);
   const double *dataTemp = Tn_.HostRead();
   const double *dataRho = rn_.HostRead();
@@ -3045,8 +3944,49 @@ void ReactingFlow::updateDiffusivity() {
   kappa_gf_.SetFromTrueDofs(kappa_);
 
   // electrical conductivity
-  {
-    double *h_sig = sigma_.HostReadWrite();
+  if (!torch_cold_start_ && !fixed_conductivity_) {
+    // if(rank0_) std::cout << " sigma update portion... " << endl;
+    {
+      double *h_sig = sigma_.HostReadWrite();
+      for (int i = 0; i < sDofInt_; i++) {
+        // int nEq = dim_ + 2 + nActiveSpecies_;
+        double state[gpudata::MAXEQUATIONS];
+        double conservedState[gpudata::MAXEQUATIONS];
+
+        // Populate *primitive* state vector = [rho, velocity, temperature, species mole densities]
+        state[0] = dataRho[i];
+        for (int eq = 0; eq < dim_; eq++) {
+          state[eq + 1] = dataU[i + eq * sDofInt_];
+        }
+        state[dim_ + 1] = dataTemp[i];
+        for (int sp = 0; sp < nActiveSpecies_; sp++) {
+          state[dim_ + 2 + sp] =
+              dataRho[i] * Yn_[i + sp * sDofInt_] / mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
+        }
+
+        mixture_->GetConservativesFromPrimitives(state, conservedState);
+
+        double sig;
+        transport_->ComputeElectricalConductivity(conservedState, sig);
+        h_sig[i] = sig;
+      }
+    }
+
+    sigma_gf_.SetFromTrueDofs(sigma_);
+  }
+}
+
+void ReactingFlow::evaluatePlasmaConductivityGF() {
+  if (rank0_) std::cout << " we are in evaluatePlasmaConductivityGF " << endl;
+
+  (flow_interface_->velocity)->GetTrueDofs(tmpR1_);
+  const double *dataTemp = Tn_.HostRead();
+  const double *dataRho = rn_.HostRead();
+  const double *dataU = tmpR1_.HostRead();
+
+  double *h_sig = sigma_.HostReadWrite();
+
+  if (!torch_cold_start_) {
     for (int i = 0; i < sDofInt_; i++) {
       // int nEq = dim_ + 2 + nActiveSpecies_;
       double state[gpudata::MAXEQUATIONS];
@@ -3068,39 +4008,9 @@ void ReactingFlow::updateDiffusivity() {
       transport_->ComputeElectricalConductivity(conservedState, sig);
       h_sig[i] = sig;
     }
+
+    sigma_gf_.SetFromTrueDofs(sigma_);
   }
-  sigma_gf_.SetFromTrueDofs(sigma_);
-}
-
-void ReactingFlow::evaluatePlasmaConductivityGF() {
-  (flow_interface_->velocity)->GetTrueDofs(tmpR1_);
-  const double *dataTemp = Tn_.HostRead();
-  const double *dataRho = rn_.HostRead();
-  const double *dataU = tmpR1_.HostRead();
-
-  double *h_sig = sigma_.HostReadWrite();
-  for (int i = 0; i < sDofInt_; i++) {
-    // int nEq = dim_ + 2 + nActiveSpecies_;
-    double state[gpudata::MAXEQUATIONS];
-    double conservedState[gpudata::MAXEQUATIONS];
-
-    // Populate *primitive* state vector = [rho, velocity, temperature, species mole densities]
-    state[0] = dataRho[i];
-    for (int eq = 0; eq < dim_; eq++) {
-      state[eq + 1] = dataU[i + eq * sDofInt_];
-    }
-    state[dim_ + 1] = dataTemp[i];
-    for (int sp = 0; sp < nActiveSpecies_; sp++) {
-      state[dim_ + 2 + sp] = dataRho[i] * Yn_[i + sp * sDofInt_] / mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
-    }
-
-    mixture_->GetConservativesFromPrimitives(state, conservedState);
-
-    double sig;
-    transport_->ComputeElectricalConductivity(conservedState, sig);
-    h_sig[i] = sig;
-  }
-  sigma_gf_.SetFromTrueDofs(sigma_);
 }
 
 void ReactingFlow::updateDensity(double tStep, bool update_mass_matrix) {
@@ -3579,6 +4489,8 @@ void ReactingFlow::identifyCollisionType(const Array<GasSpcs> &speciesType, GasC
   return;
 }
 
+// void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, double *omega, 
+//   double *kf, double *prograte, double *rrfrrb, double *prodYsp) {
 void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, double *omega) {
   // This function evaluates the reacting flow source terms at a given
   // state (i.e., at a point in the grid) which is necessary for a
@@ -3702,6 +4614,18 @@ void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, 
   chemistry_->computeProgressRate(n_sp, kfwd, keq, progressRate);
   chemistry_->computeCreationRate(progressRate, creationRate, emissionRate);
 
+  // for (int nr = 0; nr < nReactions_; nr++) {
+  //   kf[nr] = kfwd[nr];
+  //   prograte[nr] = progressRate[nr];
+  //   if (nr % 2 == 0) {
+  //     rrfrrb[int(nr/2)] = progressRate[nr] / (1e-20 + progressRate[nr+1]);
+  //   }
+  // }
+
+  // for(int sp = 0; sp < nSpecies_; sp++){
+  //   prodYsp[sp] = creationRate[sp];
+  // }
+
   // And store in returned variable
   for (int sp = 0; sp < nActiveSpecies_; sp++) {
     omega[sp] = creationRate[sp] / rho;
@@ -3736,6 +4660,8 @@ void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, 
   omega[nActiveSpecies_] = hw / rho / Cpmix;
 }
 
+// void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const double dt, 
+//   double *kf, double *prograte, double *rrfrrb, double *prodYsp) {
 void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const double dt) {
   const int nState = nActiveSpecies_ + 1;         // Number of variables in YT
   const double eps = implicit_chemistry_fd_eps_;  // Perturbation for finite difference Jacobian
@@ -3756,6 +4682,7 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
   // Jacobian for a backward Euler step
 
   // Evaluate RHS...
+  // this->evaluateReactingSource(YT, dofindex, rhs, kf, prograte, rrfrrb, prodYsp);
   this->evaluateReactingSource(YT, dofindex, rhs);
 
   // ... and Jacobian (via finite difference)
@@ -3769,6 +4696,7 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
       YT1[i] *= (1 + eps);
     }
 
+    // this->evaluateReactingSource(YT1, dofindex, rhs1, kf, prograte, rrfrrb, prodYsp);
     this->evaluateReactingSource(YT1, dofindex, rhs1);
 
     for (int j = 0; j < nState; j++) {
@@ -3805,6 +4733,7 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
     }
 
     // Compute rhs and Jacobian, in preparation for next step
+    // this->evaluateReactingSource(YT, dofindex, rhs, kf, prograte, rrfrrb, prodYsp);
     this->evaluateReactingSource(YT, dofindex, rhs);
 
     for (int i = 0; i < nState; i++) {
@@ -3817,6 +4746,7 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
         YT1[i] *= (1 + eps);
       }
 
+      // this->evaluateReactingSource(YT1, dofindex, rhs1, kf, prograte, rrfrrb, prodYsp);
       this->evaluateReactingSource(YT1, dofindex, rhs1);
       for (int j = 0; j < nState; j++) {
         Jac(j, i) = (rhs1[j] - rhs[j]) / (YT1[i] - YT[i]);
@@ -3862,6 +4792,323 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
   delete[] rhs1;
   delete[] rhs;
 }
+
+// #ifdef HAVE_PYTHON
+// void ReactingFlow::evaluateReactingSourceBTE(const double *YT, const int dofindex, double *omega, double *BTErr, 
+//   double *kf, double *prograte, double *rrfrrb, double *kfBTE, double *prograteBTE, double *rrfrrbBTE, double *prodYsp) {
+    // This function evaluates the reacting flow source terms at a given
+    // state (i.e., at a point in the grid) which is necessary for a
+    // nonlinear solve for an implicit time step at each point.  The
+    // sequence of calls that does this for the full field is below:
+    //
+    // updateMixture();
+    // updateThermoP();
+    // updateDensity(0.0, false);
+    // speciesProduction();
+    // heatOfFormation();
+    //
+  
+    // Extract data from incoming state and populate full set of mass & mole fractions
+    // std::vector<double> Y(nSpecies_);  // mass fractions
+    // std::vector<double> X(nSpecies_);  // mole fractions
+    // double T = 0.0;                    // temperature
+  
+    // // Set the species we are carrying, and evaluate charge density as we go
+    // double ne = 0.0;
+    // double sumy = 0.0;
+    // for (int sp = 0; sp < nActiveSpecies_; sp++) {
+    //   Y[sp] = YT[sp];
+  
+    //   sumy += Y[sp];
+  
+    //   const double q_sp = mixture_->GetGasParams(sp, GasParams::SPECIES_CHARGES);
+    //   const double m_sp = mixture_->GetGasParams(sp, GasParams::SPECIES_MW);
+    //   const double fac = q_sp / m_sp;
+    //   ne += fac * Y[sp];
+    // }
+  
+    // if (mixtureInput_.ambipolar) {
+    //   // Electron density is determined from charge neutrality
+    //   const int iElectron = nSpecies_ - 2;
+    //   const double m_electron = mixture_->GetGasParams(iElectron, GasParams::SPECIES_MW);
+    //   Y[iElectron] = ne * m_electron;
+    //   sumy += Y[iElectron];
+    // }
+  
+    // // 'Background' species density is 1 - sum of the rest
+    // Y[nSpecies_ - 1] = 1.0 - sumy;
+  
+    // // Temperature is the last element of the incoming state
+    // T = YT[nActiveSpecies_];
+  
+    // double Rmix = 0;
+    // double Mmix = 0;
+  
+    // // Evaluate mixture molecular weight and gas constant
+    // for (int sp = 0; sp < nSpecies_; sp++) {
+    //   Mmix += Y[sp] / gasParams_(sp, GasParams::SPECIES_MW);
+    // }
+    // Mmix = 1.0 / Mmix;
+    // Rmix = Rgas_ / Mmix;
+  
+    // // Evaluate mole fractions
+    // for (int sp = 0; sp < nSpecies_; sp++) {
+    //   X[sp] = Y[sp] * Mmix / gasParams_(sp, GasParams::SPECIES_MW);
+    // }
+  
+    // Compute mixture density
+    // assert(domain_is_open_);  // TODO(trevilo): handle variable pressure case!!
+    // double rho = thermo_pressure_ / (Rmix * T);
+  
+    // // int nEq = dim_ + 2 + nActiveSpecies_;
+    // Vector state(gpudata::MAXEQUATIONS);
+    // state = 0.0;
+  
+    // Vector n_sp;
+  
+    // // Set up conserved state (just the mass densities, which is all we need here)
+    // state[0] = rho;
+    // for (int sp = 0; sp < nActiveSpecies_; sp++) {
+    //   state[dim_ + 1 + sp + 1] = rho * Y[sp];
+    // }
+  
+    // // Evaluate the mole densities (from mass densities)
+    // mixture_->computeNumberDensities(state, n_sp);
+  
+    // GetMixtureCp returns cpMix = sum_s X_s Cp_s, where X_s is
+    // mole density of species s and Cp_s is molar specific heat
+    // (constant pressure) of species s, so cpMix at this point
+    // (units J/m^3), which is rho*Cp, where rho is the mixture
+    // density (kg/m^3) and Cp is the is the mixture mass specific
+    // heat (units J/(kg*K).
+    // double Cpmix = 0;
+    // mixture_->GetMixtureCp(n_sp, rho, Cpmix);
+  
+    // Everything else expects CpMix_gf_ to be the mixture mass Cp
+    // (with units J/(kg*K)), so divide by mixture density
+    // Cpmix /= rho;
+  
+    // // Vectors used in computing chemical sources at each point
+    // Vector kfwd;          // set to size nReactions_ in computeForwardRareCoeffs
+    // Vector keq;           // set to size nReactions_ in computeEquilibriumConstants
+    // Vector progressRate;  // set to size nReactions_ in computeProgressRate
+    // Vector creationRate;  // set to size nSpecies_ in computeCreationRate
+    // Vector emissionRate;  // set to size nSpecies_ in computeCreationRate
+  
+    // kfwd.SetSize(chemistry_->getNumReactions());
+    // keq.SetSize(chemistry_->getNumReactions());
+  
+    // const double Th = T;
+    // const double Te = Th;
+  
+    // Evaluate the chemical source terms
+    // chemistry_->computeForwardRateCoeffs(n_sp.Read(), Th, Te, dofindex, kfwd.HostWrite());
+    
+    // Vector BTEkfwd;          // set to size nReactions_ in computeForwardRareCoeffs  
+    // Vector BTEprogressRate;  // set to size nReactions_ in computeProgressRate
+    // BTEkfwd.SetSize(chemistry_->getNumReactions());
+    // BTEkfwd = 0.0;
+    
+    // const double* mapping = bte_rr_mapping_.HostRead();
+    // for (int rr = 0; rr < nBTEReactions_; rr++) {
+    //     int tpi = int(mapping[rr]); // tpi stores TPS index of reaction given by BTE index rr
+    //     double kblend = bl_frac_ * BTErr[rr] + (1.0 - bl_frac_) * kfwd[tpi];
+    //     kfwd[tpi] = std::max(kblend, 0.0);
+    //     BTEkfwd[tpi] = BTErr[rr];
+    // }
+    // chemistry_->computeEquilibriumConstants(Th, Te, keq.HostWrite());
+    // chemistry_->computeProgressRate(n_sp, kfwd, keq, progressRate);
+    
+    // chemistry_->computeProgressRate(n_sp, BTEkfwd, keq, BTEprogressRate); //will be accurate only if detailed balance is False
+    
+    // Write the reaction progress rates into dataReac
+    // for(int nr = 0; nr < nReactions_; nr++){
+    //   kf[nr] = kfwd[nr];
+    //   kfBTE[nr] = std::max(0.0, BTEkfwd[nr]);
+
+    //   if (nr % 2 == 0) {
+    //     if (clip_rr == 1) {
+    //       // Clip the forward reaction rate to a fraction of backward reaction rate (ONLY FOR DEBUGGING)
+    //       progressRate[nr] = std::max(0.0, std::min(clip_frac*progressRate[nr+1], progressRate[nr]));
+    //     }
+    //   }
+    //   prograte[nr] = progressRate[nr];
+    //   prograteBTE[nr] = BTEprogressRate[nr];
+  
+    //   if (nr % 2 == 0){
+    //     rrfrrb[int(nr/2)] = progressRate[nr] / (1e-20 + progressRate[nr + 1]);
+    //     rrfrrbBTE[int(nr/2)] = std::max(0.0, BTEprogressRate[nr] / (1e-28 + BTEprogressRate[nr + 1]));
+    //   }
+    // }
+    // chemistry_->computeCreationRate(progressRate, creationRate, emissionRate);
+    
+    // Write the reaction progress rates into dataReac
+    // for(int sp = 0; sp < nSpecies_; sp++){
+    //   prodYsp[sp] = creationRate[sp];
+    // }
+  
+    // And store in returned variable
+    // for (int sp = 0; sp < nActiveSpecies_; sp++) {
+    //   omega[sp] = creationRate[sp] / rho;
+    // }
+  
+    // And finally, handle the temperature source term
+    // double hw = 0.0;
+    // double hspecies;
+  
+    // if (radiative_decay_NECincluded_) {
+    //   // Sum over species to get enthalpy term
+    //   for (int sp = 0; sp < nSpecies_; sp++) {
+    //     double molarCV = speciesMolarCv_[sp];
+    //     molarCV *= UNIVERSALGASCONSTANT;
+    //     double molarCP = molarCV + UNIVERSALGASCONSTANT;
+  
+    //     hspecies = (molarCP * T + gasParams_(sp, GasParams::FORMATION_ENERGY)) / gasParams_(sp, GasParams::SPECIES_MW);
+    //     hw -= hspecies * (creationRate[sp] - emissionRate[sp]);
+    //   }
+    // } else {
+    //   // Sum over species to get enthalpy term
+    //   for (int sp = 0; sp < nSpecies_; sp++) {
+    //     double molarCV = speciesMolarCv_[sp];
+    //     molarCV *= UNIVERSALGASCONSTANT;
+    //     double molarCP = molarCV + UNIVERSALGASCONSTANT;
+  
+    //     hspecies = (molarCP * T + gasParams_(sp, GasParams::FORMATION_ENERGY)) / gasParams_(sp, GasParams::SPECIES_MW);
+    //     hw -= hspecies * creationRate[sp];
+    //   }
+    // }
+  
+    // omega[nActiveSpecies_] = hw / rho / Cpmix;
+  // }
+
+// void ReactingFlow::solveChemistryStepBTE(double *YT, const int dofindex, const double dt, double *BTErr,
+//   double *kf, double *prograte, double *rrfrrb,
+//   double *kfBTE, double *prograteBTE, double *rrfrrbBTE, double *prodYsp) {
+    // const int nState = nActiveSpecies_ + 1;         // Number of variables in YT
+    // const double eps = implicit_chemistry_fd_eps_;  // Perturbation for finite difference Jacobian
+  
+    // double *YT1 = new double[nState];
+    // double *YT0 = new double[nState];
+    // double *rhs1 = new double[nState];
+    // double *rhs = new double[nState];
+  
+    // mfem::DenseMatrix Jac(nState);
+  
+    // // Store state at beginning of the step
+    // for (int i = 0; i < nState; i++) {
+    //   YT0[i] = YT[i];
+    // }
+  
+    // Before starting the Newton iteration, evaluate the rhs and
+    // Jacobian for a backward Euler step
+  
+    // Evaluate RHS...
+    // this->evaluateReactingSourceBTE(YT, dofindex, rhs, BTErr, 
+    //   kf, prograte, rrfrrb, kfBTE, prograteBTE, rrfrrbBTE, prodYsp);
+  
+    // // ... and Jacobian (via finite difference)
+    // for (int i = 0; i < nState; i++) {
+    //   for (int j = 0; j < nState; j++) {
+    //     YT1[j] = YT[j];
+    //   }
+    //   if (YT[i] < implicit_chemistry_smin_) {
+    //     YT1[i] = implicit_chemistry_smin_ * (1 + eps);
+    //   } else {
+    //     YT1[i] *= (1 + eps);
+    //   }
+  
+    //   this->evaluateReactingSourceBTE(YT1, dofindex, rhs1, BTErr,
+    //   kf, prograte, rrfrrb, kfBTE, prograteBTE, rrfrrbBTE, prodYsp);
+  
+    //   for (int j = 0; j < nState; j++) {
+    //     Jac(j, i) = (rhs1[j] - rhs[j]) / (YT1[i] - YT[i]);
+    //   }
+    // }
+  
+    // for (int i = 0; i < nState; i++) {
+    //   rhs[i] *= -dt;
+  
+    //   for (int j = 0; j < nState; j++) {
+    //     Jac(j, i) *= -dt;
+    //   }
+    //   Jac(i, i) += 1.0;
+    // }
+  
+    // double res_norm0 = 0;
+    // for (int i = 0; i < nState; i++) {
+    //   res_norm0 += rhs[i] * rhs[i];
+    // }
+    // res_norm0 = sqrt(res_norm0);
+  
+    // int iiter = 0;
+    // double res_norm = res_norm0;
+  
+    // // Newton solver loop
+    // while (iiter < implicit_chemistry_maxiter_ && res_norm > implicit_chemistry_atol_ &&
+    //        (res_norm / res_norm0) > implicit_chemistry_rtol_) {
+    //   mfem::LinearSolve(Jac, rhs, 1.e-9);
+  
+    //   // Update the solution
+    //   for (int i = 0; i < nState; i++) {
+    //     YT[i] += -rhs[i];
+    //   }
+  
+      // Compute rhs and Jacobian, in preparation for next step
+      // this->evaluateReactingSourceBTE(YT, dofindex, rhs, BTErr,
+      // kf, prograte, rrfrrb, kfBTE, prograteBTE, rrfrrbBTE, prodYsp);
+  
+      // for (int i = 0; i < nState; i++) {
+      //   for (int j = 0; j < nState; j++) {
+      //     YT1[j] = YT[j];
+      //   }
+      //   if (YT[i] < 1e-10) {
+      //     YT1[i] = 1e-17;
+      //   } else {
+      //     YT1[i] *= (1 + eps);
+      //   }
+  
+      //   this->evaluateReactingSourceBTE(YT1, dofindex, rhs1, BTErr,
+      //   kf, prograte, rrfrrb, kfBTE, prograteBTE, rrfrrbBTE, prodYsp);
+
+      //   for (int j = 0; j < nState; j++) {
+      //     Jac(j, i) = (rhs1[j] - rhs[j]) / (YT1[i] - YT[i]);
+      //   }
+      // }
+  
+    //   for (int i = 0; i < nState; i++) {
+    //     rhs[i] *= -dt;
+    //     rhs[i] += YT[i] - YT0[i];
+  
+    //     for (int j = 0; j < nState; j++) {
+    //       Jac(j, i) *= -dt;
+    //     }
+    //     Jac(i, i) += 1.0;
+    //   }
+  
+    //   res_norm = 0;
+    //   for (int i = 0; i < nState; i++) {
+    //     res_norm += rhs[i] * rhs[i];
+    //   }
+    //   res_norm = sqrt(res_norm);
+    //   iiter += 1;
+    // }
+  
+    // if (iiter >= implicit_chemistry_maxiter_ && implicit_chemistry_verbose_) {
+    //   std::cout << "WARNING: Implicit chemistry Newton solve did not converge." << std::endl;
+    //   std::cout << "    YT =";
+    //   for (int i = 0; i < nState; i++) {
+    //     std::cout << " " << YT[i];
+    //   }
+    //   std::cout << std::endl;
+    //   std::cout << "    iiter = " << iiter << ", r0 = " << res_norm0 << ", r/r0 = " << res_norm / res_norm0 << std::endl;
+    // }
+  
+    // delete[] YT1;
+    // delete[] YT0;
+    // delete[] rhs1;
+    // delete[] rhs;
+  // }
+// #endif
 
 double binaryTest(const Vector &coords, double t) {
   double x = coords(0);
@@ -3915,6 +5162,71 @@ double species_uniform(const Vector &coords, double t) {
   yn = 1.0e-12;
   return yn;
 }
+
+void ReactingFlow::push(TPS::Tps2Boltzmann &interface) {
+  assert(interface.IsInitialized());
+
+  // const int nscalardofs(vfes_->GetNDofs());
+
+  mfem::ParGridFunction *species =
+      new mfem::ParGridFunction(&interface.NativeFes(TPS::Tps2Boltzmann::Index::SpeciesDensities));
+
+  mfem::Vector speciesInt(sDofInt_*interface.Nspecies());
+  double *species_data = speciesInt.HostWrite();
+
+  const double *dataRho = rn_.HostRead();
+  const double *dataY = Yn_.HostRead();
+
+  double state_local[gpudata::MAXEQUATIONS];
+  double species_local[gpudata::MAXSPECIES];
+
+  for (int i = 0; i < gpudata::MAXEQUATIONS; ++i)
+    state_local[i] = 0.;
+
+  for (int i = 0; i < gpudata::MAXSPECIES; ++i)
+    species_local[i] = 0.;
+
+  for (int i = 0; i < sDofInt_; i++) {
+    state_local[0] = dataRho[i];
+    for (int asp = 0; asp < nActiveSpecies_; asp++)
+      state_local[dim_ + 2 + asp] = dataRho[i]*dataY[i+asp*sDofInt_];
+    mixture_->computeNumberDensities(state_local, species_local);
+
+    for (int sp = 0; sp < interface.Nspecies(); sp++)
+      species_data[i + sp * sDofInt_] = AVOGADRONUMBER * species_local[sp];
+  }
+
+  species->SetFromTrueDofs(speciesInt);
+  Tn_gf_.SetFromTrueDofs(Tn_);
+  interface.interpolateFromNativeFES(*species, TPS::Tps2Boltzmann::Index::SpeciesDensities);
+  interface.interpolateFromNativeFES(Tn_gf_, TPS::Tps2Boltzmann::Index::HeavyTemperature);
+  interface.interpolateFromNativeFES(Tn_gf_, TPS::Tps2Boltzmann::Index::ElectronTemperature);
+
+  interface.setTimeStep(this->dt_);
+  interface.setCurrentTime(this->time_);
+
+  delete species;
+}
+
+void ReactingFlow::fetch(TPS::Tps2Boltzmann &interface) {
+  // NOTE: Chemistry is only address by truedofs indexes.
+  mfem::ParFiniteElementSpace *reaction_rates_fes(&(interface.NativeFes(TPS::Tps2Boltzmann::Index::ReactionRates)));
+  externalReactionRates_gf_.reset(new mfem::ParGridFunction(reaction_rates_fes));
+  interface.interpolateToNativeFES(*externalReactionRates_gf_, TPS::Tps2Boltzmann::Index::ReactionRates);
+  externalReactionRates_gf_->GetTrueDofs(externalReactionRates_);
+  int size = sDofInt_;
+#if defined(_CUDA_) || defined(_HIP_)
+  const double *data(externalReactionRates_.Read());
+  // int size(externalReactionRates_->FESpace()->GetNDofs());
+  assert(externalReactionRates_gf_->FESpace()->GetOrdering() == mfem::Ordering::byNODES);
+  gpu::deviceSetChemistryReactionData<<<1, 1>>>(data, size, chemistry_);
+#else
+  // chemistry_->setGridFunctionRates(*externalReactionRates_gf_);
+  const double *data(externalReactionRates_.HostRead());
+  chemistry_->setRates(data, size);
+#endif
+}
+
 
 #if 0
 void ReactingFlow::uniformInlet() {
