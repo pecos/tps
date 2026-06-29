@@ -66,7 +66,6 @@ AlgebraicSubgridModels::AlgebraicSubgridModels(mfem::ParMesh *pmesh, LoMachOptio
   } else if (sModel_ == 2) {
     sgs_const = 0.135;
   }
-
   tpsP_->getInput("loMach/sgsModelConstant", sgs_model_const_, sgs_const);
 
   tpsP_->getInput("loMach/sgsFilterModes", sgs_model_nFilter_, 0);
@@ -220,7 +219,7 @@ void AlgebraicSubgridModels::step() {
       sgsSigma(gradUp, del[i], nu_sgs);
       data[i] = rho[i] * nu_sgs;
     }
-  } 
+  }
 
   subgridVisc_gf_.SetFromTrueDofs(subgridVisc_);
 
@@ -235,6 +234,7 @@ void AlgebraicSubgridModels::step() {
                 { d_muT_gf[i] = (1.0 - filter_alpha) * d_muT_gf[i] + filter_alpha * d_muT_filtered_gf[i]; });
     subgridVisc_gf_.GetTrueDofs(subgridVisc_);
   }
+
   // clip any small negatives resulting from filtering
   double *dmuT = subgridVisc_.HostReadWrite();
   for (int i = 0; i < SdofInt_; i++) {
@@ -244,7 +244,7 @@ void AlgebraicSubgridModels::step() {
   if (sgs_model_smooth_) {
     aveSteps_++;
     aveSteps_ = std::min(aveSteps_, 4);
-    
+  
     // take average of recent steps
     muT_NM0_ = subgridVisc_;
     double Cave = 1.0 / (double)aveSteps_;

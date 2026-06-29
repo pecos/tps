@@ -61,7 +61,6 @@ using namespace mfem;
 // }
 void velIC_user(const Vector &x, double t, Vector &u) {
   u(0) = 0.0;
-  // u(1) = 0.0;
   u(1) = 2.0;
   u(2) = 0.0;
 }
@@ -163,10 +162,10 @@ vfptr vel_ic(std::string ic_string_) {
     return vel_exact_tgv2d;
   } else if (ic_string_ == "tgv2d_uniform") {
     return vel_tgv2d_uniform;
-  } else if (ic_string_ == "channel-uniform") {
-    return vel_channel_uniform;
   } else if (ic_string_ == "channel") {
     return vel_channel;
+  } else if (ic_string_ == "channel-uniform") {
+    return vel_channel_uniform;
   } else if (ic_string_ == "user") {
     return velIC_user;
   } else {
@@ -243,7 +242,6 @@ double temp_channel(const Vector &coords, double t) {
   double Tlo = 200.0;
   double y = coords(1);
   double temp;
-  // temp = Tlo + (y + 0.5) * (Thi - Tlo);
   temp = Tlo + 0.5 * (y + 1.0) * (Thi - Tlo);
   return temp;
 }
