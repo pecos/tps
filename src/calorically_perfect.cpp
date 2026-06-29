@@ -264,7 +264,6 @@ void CaloricallyPerfectThermoChem::initializeSelf() {
 
   R0PM0_gf_.SetSpace(sfes_);
 
-  // rhoDt.SetSpace(sfes_);
   rhoDt_gf_.SetSpace(sfes_);
 
   if (rank0_) grvy_printf(ginfo, "CaloricallyPerfectThermoChem vectors and gf initialized...\n");
@@ -453,9 +452,6 @@ void CaloricallyPerfectThermoChem::initializeOperators() {
   // coefficients for operators
   rho_coeff_ = new GridFunctionCoefficient(&rn_gf_);
 
-  // rhoDt = rn_gf_;
-  // rhoDt /= dt_;
-  // rho_over_dt_coeff_ = new GridFunctionCoefficient(&rhoDt);
   rhoDt_gf_ = rn_gf_;
   rhoDt_gf_ /= dt_;
   rho_over_dt_coeff_ = new GridFunctionCoefficient(&rhoDt_gf_);
@@ -742,8 +738,6 @@ void CaloricallyPerfectThermoChem::step() {
   // NB: adiabatic natural BC is handled, but don't have ability to impose non-zero heat flux yet
 
   // Update Helmholtz operator to account for changing dt, rho, and kappa
-  // rhoDt = rn_gf_;
-  // rhoDt *= (time_coeff_.bd0 / dt_);
   rhoDt_gf_ = rn_gf_;
   rhoDt_gf_ *= (time_coeff_.bd0 / dt_);
 
