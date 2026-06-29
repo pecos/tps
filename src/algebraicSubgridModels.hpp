@@ -146,7 +146,6 @@ class AlgebraicSubgridModels : public TurbModelBase {
   int sgs_model_nFilter_;
   bool sgs_model_smooth_;
   int aveSteps_;
-  // int activeSteps_;
 
  public:
   AlgebraicSubgridModels(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, TPS::Tps *tps, ParGridFunction *gridScale,
@@ -166,6 +165,5 @@ class AlgebraicSubgridModels : public TurbModelBase {
   // subgrid scale models => move to turb model class
   void sgsSmag(const DenseMatrix &gradUp, double delta, double &nu_sgs);
   void sgsSigma(const DenseMatrix &gradUp, double delta, double &nu_sgs);
-  // void sgsWALE(const DenseMatrix &gradUp, double delta, double &nu_sgs);
 };
 #endif  // ALGEBRAICSUBGRIDMODELS_HPP_
