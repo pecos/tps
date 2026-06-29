@@ -490,6 +490,7 @@ void Tomboulides::initializeSelf() {
         tpsP_->getInput((basepath + "/swirl").c_str(), swirl, 0.0);
         addSwirlDirichletBC(swirl, inlet_attr);
       }
+
     } else if (type == "interpolate") {
       if (pmesh_->GetMyRank() == 0) {
         std::cout << "Tomboulides: Setting interpolated Dirichlet velocity on patch = " << patch << std::endl;
