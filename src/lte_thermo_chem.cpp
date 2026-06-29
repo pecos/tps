@@ -183,7 +183,6 @@ LteThermoChem::LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, t
   tpsP_->getInput("loMach/ltethermo/Reh_offset", Reh_offset_, 1.0);
 
   tpsP_->getInput("loMach/ltethermo/neumann-temp", neumann_temp_, false);
-
   if (sw_stab_) {
     if (rank0_) std::cout << "Using SUPG in LTE thermo chem!" << std::endl;
   }
