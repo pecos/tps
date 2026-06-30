@@ -203,7 +203,7 @@ void CycleAvgJouleCoupling::initializeInterpolationData() {
   for (int i = 0; i < flow_mesh->GetNE(); i++) {
     n_flow_interp_nodes_ += flow_fespace->GetFE(i)->GetNodes().GetNPoints();
   }
-  if (verbose) grvy_printf(ginfo, "Completed em-flow interpolation setup.\n");
+  // if (verbose) grvy_printf(ginfo, "Completed em-flow interpolation setup.\n");
 
 #else
   mfem_error("Cannot initialize interpolation without GSLIB support.");
@@ -356,7 +356,6 @@ void CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow() {
     joule_heating_flow->SetTrueVector();
     joule_heating_flow->SetFromTrueVector();
   }
-
 #else
   mfem_error("Cannot interpolate without GSLIB support.");
 #endif
@@ -592,14 +591,15 @@ void CycleAvgJouleCoupling::solveStep() {
     
     // update the power if necessary
     double delta_power = 0;
-    if (input_power_ > 0.0 && initial_input_power_ > 0.0) {
+    // if (input_power_ > 0.0 && initial_input_power_ > 0.0) {
+    if (input_power_ > 0) {
       delta_power = (input_power_ - initial_input_power_) * static_cast<double>(solve_em_every_n_) /
                     static_cast<double>(max_iters_);
-      if (rank0_) {
-        grvy_printf(GRVY_INFO, "input_power = %.6e\n", input_power_);
-        grvy_printf(GRVY_INFO, "initial_input_power = %.6e\n", initial_input_power_);
-        grvy_printf(GRVY_INFO, "delta_power = %.6e\n", delta_power);
-      }
+      // if (rank0_) {
+      //   grvy_printf(GRVY_INFO, "input_power = %.6e\n", input_power_);
+      //   grvy_printf(GRVY_INFO, "initial_input_power = %.6e\n", initial_input_power_);
+      //   grvy_printf(GRVY_INFO, "delta_power = %.6e\n", delta_power);
+      // }
     }
 
     // evaluate electric conductivity and interpolate it to EM mesh
@@ -612,7 +612,8 @@ void CycleAvgJouleCoupling::solveStep() {
     // report the "raw" Joule heating
     const double tot_jh = qmsa_solver_->totalJouleHeating();
     if (rank0_) {
-      grvy_printf(GRVY_INFO, "(cycle_avg_joule_coupling) The total input Joule heating = %.6e\n", tot_jh);
+      // grvy_printf(GRVY_INFO, "(cycle_avg_joule_coupling) The total input Joule heating = %.6e\n", tot_jh);
+      grvy_printf(GRVY_INFO, "The total input Joule heating = %.6e\n", tot_jh);
     }
 
     if (qmsa_solver_->evalRplasma()) {
@@ -637,50 +638,51 @@ void CycleAvgJouleCoupling::solveStep() {
     }
 
     // scale the Joule heating (if we are controlling the power input)
-    if (input_power_ > 0.0) {
+    if (input_power_ > 0) {
       double target_power = initial_input_power_ + (current_iter_ / solve_em_every_n_ + 1) * delta_power;
-      if (rank0_) {
-        grvy_printf(GRVY_INFO, "target_power_ = %.6e\n", target_power);
-      }
+      // if (rank0_) {
+      //   grvy_printf(GRVY_INFO, "target_power_ = %.6e\n", target_power);
+      // }
       if (oscillating_power_) {
         const double tau = ((double)current_iter_) / power_period_;
         target_power = input_power_ + power_amplitude_ * sin(2 * M_PI * tau);
         if (rank0_) {
-          grvy_printf(GRVY_INFO, "oscillating target_power = %.6e\n", target_power);
+        //   grvy_printf(GRVY_INFO, "oscillating target_power = %.6e\n", target_power);
+        // }
+      // }
+
+      // double ratio;
+      // if (initial_input_power_ > -1.0e-8) {
+      //   double target_power = initial_input_power_ + (current_iter_ / solve_em_every_n_ + 1) * delta_power;
+      //   // grvy_printf(GRVY_INFO, "initial_input_power, current_iter_, solve_em_every_n_, and delta_power = %.6e, %i,
+      //   // %i, %.6e \n", initial_input_power_, current_iter_, solve_em_every_n_, delta_power); grvy_printf(GRVY_INFO,
+      //   // "target_power and tot_jh = %.6e %.6e \n", target_power, tot_jh);
+      //   if (tot_jh > 0.0) {
+      //     ratio = target_power / tot_jh;
+      //   } else {
+      //     ratio = 1.0;  // hack, dont know what is correct here
+          grvy_printf(GRVY_INFO, "target_power = %.6e\n", target_power);
         }
+      // } else {
+      //   grvy_printf(GRVY_INFO, "input_power_ and tot_jh = %.6e %.6e \n", input_power_, tot_jh);
+      //   if (tot_jh > 0.0) {
+      //     ratio = input_power_ / tot_jh;
+      //   } else {
+      //     // odd situation here as we are requesting power be put in but the em-side says nothign can enter
+      //     ratio = 0.0;
+      //   }
+      //   // ratio = input_power_ / tot_jh;
+      // }
+      // if (rank0_) {
+      //   grvy_printf(GRVY_INFO, "ratio sent to qmsa_solver_ = %.6e\n", ratio);
       }
 
-      double ratio;
-      if (initial_input_power_ > -1.0e-8) {
-        double target_power = initial_input_power_ + (current_iter_ / solve_em_every_n_ + 1) * delta_power;
-        // grvy_printf(GRVY_INFO, "initial_input_power, current_iter_, solve_em_every_n_, and delta_power = %.6e, %i,
-        // %i, %.6e \n", initial_input_power_, current_iter_, solve_em_every_n_, delta_power); grvy_printf(GRVY_INFO,
-        // "target_power and tot_jh = %.6e %.6e \n", target_power, tot_jh);
-        if (tot_jh > 0.0) {
-          ratio = target_power / tot_jh;
-        } else {
-          ratio = 1.0;  // hack, dont know what is correct here
-        }
-
-      } else {
-        grvy_printf(GRVY_INFO, "input_power_ and tot_jh = %.6e %.6e \n", input_power_, tot_jh);
-        if (tot_jh > 0.0) {
-          ratio = input_power_ / tot_jh;
-        } else {
-          // odd situation here as we are requesting power be put in but the em-side says nothign can enter
-          ratio = 0.0;
-        }
-        // ratio = input_power_ / tot_jh;
-      }
-      if (rank0_) {
-        grvy_printf(GRVY_INFO, "ratio sent to qmsa_solver_ = %.6e\n", ratio);
-      }
-
+      const double ratio = target_power / tot_jh;
       qmsa_solver_->scaleJouleHeating(ratio);
       const double upd_jh = qmsa_solver_->totalJouleHeating();
       if (rank0_) {
         grvy_printf(GRVY_INFO, "current_iter = %d\n", current_iter_);
-        grvy_printf(GRVY_INFO, "Joule heating scaling ratio = %d\n", ratio);
+        // grvy_printf(GRVY_INFO, "Joule heating scaling ratio = %d\n", ratio);
         grvy_printf(GRVY_INFO, "The total input Joule heating after scaling = %.6e\n", upd_jh);
       }
     }
