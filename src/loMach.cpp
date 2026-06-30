@@ -413,13 +413,12 @@ void LoMachSolver::solveBegin() {
 void LoMachSolver::solveStep() {
   sw_step_.Start();
 
-  // int iter_number_ = iter - iter_start_ + 1;
+  int iter_number_ = iter - iter_start_ + 1;
   // if (rank0_) {
   //   std::cout << "LoMach::solveStep(), iter = " << iter << ", iter_start = " << iter_start_ 
   //             << ", iter_number_ = " << iter_number_ << ", disable_flow_ = " << disable_flow_ << "\n";
   // }
-
-  // thermo_->SetCurrentIter(iter_number_);
+  thermo_->SetCurrentIter(iter_number_);
 
   if (loMach_opts_.ts_opts_.integrator_type_ == LoMachTemporalOptions::CURL_CURL) {
     SetTimeIntegrationCoefficients(iter - iter_start_);
