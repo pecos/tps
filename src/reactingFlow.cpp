@@ -847,11 +847,11 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
 
   // artificial diffusion (SUPG)
   tpsP_->getInput("loMach/reactingFlow/streamwise-stabilization", sw_stab_, false);
+  tpsP_->getInput("loMach/reactingFlow/Reh_factor", Reh_factor_, 0.5);
+  tpsP_->getInput("loMach/reactingFlow/Reh_offset", Reh_offset_, 1.0);
 
   // specified plasma initial condition
   tpsP_->getInput("plasma_models/initialize_species", species_init_, false);
-  tpsP_->getInput("loMach/reactingFlow/Reh_factor", Reh_factor_, 0.5);
-  tpsP_->getInput("loMach/reactingFlow/Reh_offset", Reh_offset_, 1.0);
 
   // zero-gradient BCs
   tpsP_->getInput("loMach/reactingFlow/neumann-temp", neumann_temp_, false);
@@ -1487,9 +1487,6 @@ void ReactingFlow::initializeSelf() {
           }
         }
 
-        // AddTempDirichletBC(temperature_value, inlet_attr);
-        // AddSpecDirichletBC(0.0, inlet_attr);
-
         if (neumann_species_inlet_) {
           if (rank0_) {
             std::cout << "Rx Flow: Setting zero Neumann species on patch = " << patch << std::endl;
@@ -1543,19 +1540,17 @@ void ReactingFlow::initializeSelf() {
         // AddSpecDirichletBC(species_bc_field_, inlet_attr);
         // Yn_gf_.ProjectBdrCoefficient(*species_bc_field_, inlet_attr);
 
-      } else if (type == "normal") {
-        Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
-        inlet_attr = 0;
-        inlet_attr[patch - 1] = 1;
-        double temperature_value;
-        tpsP_->getRequiredInput((basepath + "/temperature").c_str(), temperature_value);
-        if (rank0_) {
-          std::cout << "Rx Flow: Setting uniform Dirichlet temperature on patch = " << patch << std::endl;
-        }
-        AddTempDirichletBC(temperature_value, inlet_attr);
-
-        // do nothing for species for time being
-
+      // } else if (type == "normal") {
+      //   Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
+      //   inlet_attr = 0;
+      //   inlet_attr[patch - 1] = 1;
+      //   double temperature_value;
+      //   tpsP_->getRequiredInput((basepath + "/temperature").c_str(), temperature_value);
+      //   if (rank0_) {
+      //     std::cout << "Rx Flow: Setting uniform Dirichlet temperature on patch = " << patch << std::endl;
+      //   }
+      //   AddTempDirichletBC(temperature_value, inlet_attr);
+      //   // do nothing for species for time being
       } else {
         if (rank0_) {
           std::cout << "ERROR: Rx Flow inlet type = " << type << " not supported." << std::endl;
@@ -1636,7 +1631,6 @@ void ReactingFlow::initializeOperators() {
     if (rank0_) std::cout << " Cold start selected.  Specifying sigma field." << endl;
     sigma_gf_.ProjectCoefficient(sigma_start_up);
   }
-
   Array<int> empty;
 
   // GLL integration rule (Numerical Integration)
@@ -2275,14 +2269,14 @@ void ReactingFlow::step() {
       }
       dist = std::sqrt(dist);
       wgt = std::exp(-0.5 * (dist / spark_radius_) * (dist / spark_radius_));
-      //if (rank0_) std::cout << "SPARK WGT: " << wgt << " | dist: " << dist << " | spark_radius: " << spark_radius_ << endl;
-      //wgt = 1.0;
-      //if(wgt < 0) {
-      //std::cout << "BAD WGT: " << wgt << endl;
-      //}
-      //if(wgt >1) {
-      //std::cout << "BAD WGT: " << wgt << endl;
-      //}
+      // if (rank0_) std::cout << "SPARK WGT: " << wgt << " | dist: " << dist << " | spark_radius: " << spark_radius_ << endl;
+      // wgt = 1.0;
+      // if(wgt < 0) {
+      // std::cout << "BAD WGT: " << wgt << endl;
+      // }
+      // if(wgt >1) {
+      // std::cout << "BAD WGT: " << wgt << endl;
+      // }
       
       // free electron value (mass-fraction)
       h_Yn[eSlot * sDofInt_ + i] += wgt * spark_peak_;
@@ -2383,6 +2377,7 @@ void ReactingFlow::step() {
 
   if (operator_split_) {
     /// PART II: time-splitting of reaction
+  
     // Save Yn_ and Tn_ because substep routines overwrite these as
     // with the {n}+iSub substates, which is convenient b/c helper
     // functions (like speciesProduction) use these Vectors
@@ -3561,7 +3556,6 @@ void ReactingFlow::initializeIO(IODataOrganizer &io) {
   const bool species_in_restart_file = !restart_from_lte;
 
   io.registerIOFamily("Species", "/species", &YnFull_gf_, true, species_in_restart_file, yfec_);
-
   for (int sp = 0; sp < nSpecies_; sp++) {
     std::string speciesName = std::to_string(sp);
     io.registerIOVar("/species", "Y_" + speciesName, sp, species_in_restart_file);
