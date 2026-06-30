@@ -588,7 +588,6 @@ void CycleAvgJouleCoupling::solveBegin() {
 void CycleAvgJouleCoupling::solveStep() {
   // Run the em solver when it is due
   if (current_iter_ % solve_em_every_n_ == 0) {
-    
     // update the power if necessary
     double delta_power = 0;
     // if (input_power_ > 0.0 && initial_input_power_ > 0.0) {
