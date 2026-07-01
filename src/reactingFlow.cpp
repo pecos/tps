@@ -142,32 +142,31 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   tpsP_->getInput("loMach/reacting/eddy-Sc", Sc_, 1.0);
 
 #ifdef HAVE_PYTHON
-  // tpsP_->getInput("cycle-avg-joule-coupled/bte-from-tps", bte_from_tps_, false);
-  // if (bte_from_tps_) {
-  //   tpsP_->getRequiredInput("boltzmannSolver/collisionsFile", collisionsFile);
-  //   tpsP_->getRequiredInput("boltzmannSolver/solver_type", solver_type);
-  //   tpsP_->getInput("boltzmannSolver/ee_collisions", ee_collisions, 0);
-  //   tpsP_->getInput("boltzmannSolver/blend-frac-init", bl_frac_init_, 0.01);
-  //   tpsP_->getInput("boltzmannSolver/blend-frac-increment", bl_frac_increment_, 0.01);
-  //   tpsP_->getInput("boltzmannSolver/blend-frac-change-freq", bl_frac_change_freq_, 1);
-  //   bl_frac_ = bl_frac_init_;
-  //   tpsP_->getInput("boltzmannSolver/solve-bte-every-n", solve_bte_every_n, 1);
-  //   tpsP_->getInput("boltzmannSolver/regrid-bte-every-n", regrid_bte_every_n, 1);
-  //   tpsP_->getInput("boltzmannSolver/do-bte-sub-cluster", do_bte_sub_cluster, 1);
-  //   tpsP_->getInput("boltzmannSolver/num-bte-sub-clusters", num_sub_clusters_bte, 50);
-  //   tpsP_->getInput("boltzmannSolver/n_grids", n_vspace_grids, 1);
-  //   grid_idx_to_npts.resize(n_vspace_grids);
-  //   Te_vec.resize(n_vspace_grids);
-  //   tpsP_->getInput("boltzmannSolver/Nr", Nr_BTE, 128);
-  //   tpsP_->getInput("boltzmannSolver/rtol", BTE_rtol, 1e-6);
-  //   tpsP_->getInput("boltzmannSolver/dt_BTE", dt_BTE, 5e-3);
-  //   tpsP_->getInput("boltzmannSolver/store_csv", store_csv, 1);
-  //   tpsP_->getInput("boltzmannSolver/clip_rr", clip_rr, 0);
-  //   tpsP_->getInput("boltzmannSolver/clip_frac", clip_frac, 10.0);
-  // }
+  tpsP_->getInput("cycle-avg-joule-coupled/bte-from-tps", bte_from_tps_, false);
+  if (bte_from_tps_) {
+    tpsP_->getRequiredInput("boltzmannSolver/collisionsFile", collisionsFile);
+    tpsP_->getRequiredInput("boltzmannSolver/solver_type", solver_type);
+    tpsP_->getInput("boltzmannSolver/ee_collisions", ee_collisions, 0);
+    tpsP_->getInput("boltzmannSolver/blend-frac-init", bl_frac_init_, 0.01);
+    tpsP_->getInput("boltzmannSolver/blend-frac-increment", bl_frac_increment_, 0.01);
+    tpsP_->getInput("boltzmannSolver/blend-frac-change-freq", bl_frac_change_freq_, 1);
+    bl_frac_ = bl_frac_init_;
+    tpsP_->getInput("boltzmannSolver/solve-bte-every-n", solve_bte_every_n, 1);
+    tpsP_->getInput("boltzmannSolver/regrid-bte-every-n", regrid_bte_every_n, 1);
+    tpsP_->getInput("boltzmannSolver/do-bte-sub-cluster", do_bte_sub_cluster, 1);
+    tpsP_->getInput("boltzmannSolver/num-bte-sub-clusters", num_sub_clusters_bte, 50);
+    tpsP_->getInput("boltzmannSolver/n_grids", n_vspace_grids, 1);
+    grid_idx_to_npts.resize(n_vspace_grids);
+    Te_vec.resize(n_vspace_grids);
+    tpsP_->getInput("boltzmannSolver/Nr", Nr_BTE, 128);
+    tpsP_->getInput("boltzmannSolver/rtol", BTE_rtol, 1e-6);
+    tpsP_->getInput("boltzmannSolver/dt_BTE", dt_BTE, 5e-3);
+    tpsP_->getInput("boltzmannSolver/store_csv", store_csv, 1);
+    tpsP_->getInput("boltzmannSolver/clip_rr", clip_rr, 0);
+    tpsP_->getInput("boltzmannSolver/clip_frac", clip_frac, 10.0);
+  }
 #endif
 
-  // plasma conditions. ???
   tpsP_->getInput("loMach/reacting/clip-temperature", Tclip_, false);
   tpsP_->getInput("loMach/reacting/min-temperature", Tmin_, 0.0);
   tpsP_->getInput("loMach/reacting/max-temperature", Tmax_, 100000.0);
@@ -556,20 +555,20 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   tpsP_->getInput("reactions/minimum_chemistry_temperature", chemistryInput_.minimumTemperature, 0.0);
 
 #ifdef HAVE_PYTHON
-  // tpsP_->getInput("reactions/number_of_BTE_reactions", nBTEReactions_, 0);
-  // if (bte_from_tps_) {
-  //   // Define the mapping of the reaction indices from TPS to BTE
-  //   // TPS reaction index (starting from 0) is obtained from the input file
-  //   // For BTE, the reaction index is obtained from the collisionsFile
-  //   bte_rr_mapping_.SetSize(nBTEReactions_);
-  //   bte_rr_mapping_ = -1;
-  //   Array<double> btemap(nBTEReactions_);
-  //   tpsP_->getRequiredVec("reactions/bte_rr_mapping", btemap, nBTEReactions_);
-  //   double* mapping = bte_rr_mapping_.HostWrite();
-  //   for (int rr = 0; rr < nBTEReactions_; rr++) {
-  //     mapping[rr] = btemap[rr];
-  //   }
-  // }
+  tpsP_->getInput("reactions/number_of_BTE_reactions", nBTEReactions_, 0);
+  if (bte_from_tps_) {
+    // Define the mapping of the reaction indices from TPS to BTE
+    // TPS reaction index (starting from 0) is obtained from the input file
+    // For BTE, the reaction index is obtained from the collisionsFile
+    bte_rr_mapping_.SetSize(nBTEReactions_);
+    bte_rr_mapping_ = -1;
+    Array<double> btemap(nBTEReactions_);
+    tpsP_->getRequiredVec("reactions/bte_rr_mapping", btemap, nBTEReactions_);
+    double* mapping = bte_rr_mapping_.HostWrite();
+    for (int rr = 0; rr < nBTEReactions_; rr++) {
+      mapping[rr] = btemap[rr];
+    }
+  }
 #endif
 
   Vector reactionEnergies(nReactions_);
@@ -626,13 +625,12 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
       rxnModelParamsHost.push_back(Vector({R}));
 
     } 
-    // else if (model == "bte") {
-    //   reactionModels[r - 1] = GRIDFUNCTION_RXN;
-    //   int index;
-    //   tpsP_->getRequiredInput((basepath + "/bte/index").c_str(), index);
-    //   chemistryInput_.reactionInputs[r - 1].indexInput = index;
-    // } 
-    else {
+    else if (model == "bte") {
+      reactionModels[r - 1] = GRIDFUNCTION_RXN;
+      int index;
+      tpsP_->getRequiredInput((basepath + "/bte/index").c_str(), index);
+      chemistryInput_.reactionInputs[r - 1].indexInput = index;
+    } else {
       grvy_printf(GRVY_ERROR, "\nUnknown reaction_model -> %s", model.c_str());
       exit(ERROR);
     }
@@ -690,8 +688,8 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
           equilibriumConstantParams[p + r * gpudata::MAXCHEMPARAMS];
     }
 
-    // if (reactionModels[r] != TABULATED_RXN && reactionModels[r] != GRIDFUNCTION_RXN) {
-    if (reactionModels[r] != TABULATED_RXN) {
+    if (reactionModels[r] != TABULATED_RXN && reactionModels[r] != GRIDFUNCTION_RXN) {
+    // if (reactionModels[r] != TABULATED_RXN) {
       assert(rxn_param_idx < rxnModelParamsHost.size());
       chemistryInput_.reactionInputs[r].modelParams = rxnModelParamsHost[rxn_param_idx].Read();
       rxn_param_idx += 1;
@@ -1253,24 +1251,24 @@ void ReactingFlow::initializeSelf() {
   jh_.SetSize(sDofInt_);
   jh_ = 0.0;
 
-// #ifdef HAVE_PYTHON
+#ifdef HAVE_PYTHON
 // Initialize ParGridFunction and Vectors
 // for real and imaginary parts
 // of electric field magnitude
-  // er_gf_.SetSpace(sfes_);
-  // er_gf_ = 0.0;
+  er_gf_.SetSpace(sfes_);
+  er_gf_ = 0.0;
 
-  // er_.SetSize(sDofInt_);
-  // er_ = 0.0;
+  er_.SetSize(sDofInt_);
+  er_ = 0.0;
 
-  // ei_gf_.SetSpace(sfes_);
-  // ei_gf_ = 0.0;
+  ei_gf_.SetSpace(sfes_);
+  ei_gf_ = 0.0;
 
-  // ei_.SetSize(sDofInt_);
-  // ei_ = 0.0;
+  ei_.SetSize(sDofInt_);
+  ei_ = 0.0;
 
-  // bterates_.SetSize(sDofInt_*nBTEReactions_);
-  // bterates_ = 0.0;
+  bterates_.SetSize(sDofInt_*nBTEReactions_);
+  bterates_ = 0.0;
 
   // reaction rate coefficients to be passed to kReac_gf_
 //   kReac_.SetSize(rDofInt_);
@@ -1279,8 +1277,8 @@ void ReactingFlow::initializeSelf() {
 //   BTEkReac_.SetSize(rDofInt_);
 //   BTEkReac_ = 0.0;
 
-//   grid_idx_to_spatial_idx_map.resize(sDofInt_);
-// #endif
+  grid_idx_to_spatial_idx_map.resize(sDofInt_);
+#endif
 
   radiation_sink_gf_.SetSpace(sfes_);
   radiation_sink_gf_ = 0.0;
@@ -1343,10 +1341,10 @@ void ReactingFlow::initializeSelf() {
   plasma_conductivity_gf_ = &sigma_gf_;
   joule_heating_gf_ = &jh_gf_;
 
-// #ifdef HAVE_PYTHON
-//   efield_real_gf_ = &er_gf_;
-//   efield_imag_gf_ = &ei_gf_;
-// #endif
+#ifdef HAVE_PYTHON
+  efield_real_gf_ = &er_gf_;
+  efield_imag_gf_ = &ei_gf_;
+#endif
 
   //-----------------------------------------------------
   // 2) Set the initial condition
@@ -1537,20 +1535,6 @@ void ReactingFlow::initializeSelf() {
           Yn_gf_.ProjectBdrCoefficient(*species_bc_field_, inlet_attr);
         }
 
-        // AddSpecDirichletBC(species_bc_field_, inlet_attr);
-        // Yn_gf_.ProjectBdrCoefficient(*species_bc_field_, inlet_attr);
-
-      // } else if (type == "normal") {
-      //   Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
-      //   inlet_attr = 0;
-      //   inlet_attr[patch - 1] = 1;
-      //   double temperature_value;
-      //   tpsP_->getRequiredInput((basepath + "/temperature").c_str(), temperature_value);
-      //   if (rank0_) {
-      //     std::cout << "Rx Flow: Setting uniform Dirichlet temperature on patch = " << patch << std::endl;
-      //   }
-      //   AddTempDirichletBC(temperature_value, inlet_attr);
-      //   // do nothing for species for time being
       } else {
         if (rank0_) {
           std::cout << "ERROR: Rx Flow inlet type = " << type << " not supported." << std::endl;
@@ -2389,21 +2373,21 @@ void ReactingFlow::step() {
       auto h_Tn = Tn_next_.HostReadWrite();
       double *YT = new double[nActiveSpecies_ + 1];
     
-// #ifdef HAVE_PYTHON
+#ifdef HAVE_PYTHON
 // -----------------------OBTAIN BTE RATE COEFFICIENTS HERE BEFORE CALLING IMPLICIT TIME STEPPING ----------------------------------------
     // Get the BTE rates by calling Python solver
     // Pass temperature as input to Python function
-    // const double *dataT = Tn_.HostRead();
-    // const double *dataRho = rn_.HostRead();
-    // const double *dataY = Yn_.HostRead();
+    const double *dataT = Tn_.HostRead();
+    const double *dataRho = rn_.HostRead();
+    const double *dataY = Yn_.HostRead();
 
-    // ei_gf_.GetTrueDofs(ei_);
-    // er_gf_.GetTrueDofs(er_);
+    ei_gf_.GetTrueDofs(ei_);
+    er_gf_.GetTrueDofs(er_);
 
-    // int iter = this->GetCurrentIter();
-    // int update_bte_rates = (iter - 1) % solve_bte_every_n;
+    int iter = this->GetCurrentIter();
+    int update_bte_rates = (iter - 1) % solve_bte_every_n;
 
-    // int regrid_bte = (iter - 1) % regrid_bte_every_n;
+    int regrid_bte = (iter - 1) % regrid_bte_every_n;
     
     // if (rank0_) {
     //   int iter_number_ = this->GetCurrentIter();
@@ -2413,159 +2397,160 @@ void ReactingFlow::step() {
     //   ", nBTEReactions, nReactions = " << nBTEReactions_ << ", " << nReactions_ << ", bte_from_tps = " << bte_from_tps_ << "\n";
     // }
 
-    // if (bte_from_tps_ && regrid_bte == 0) {
-      // if (rank0_) {
-      //   int iter_number_ = this->GetCurrentIter();
-      //   std::cout << "[C++] Iter = " << iter_number_ << ", Setting up the v-space grids for BTE..." << "\n";
-      // }
+    if (bte_from_tps_ && regrid_bte == 0) {
+      if (rank0_) {
+        int iter_number_ = this->GetCurrentIter();
+        std::cout << "[C++] Iter = " << iter_number_ << ", Setting up the v-space grids for BTE..." << "\n";
+      }
 
-      // int size = Tn_.Size();
-      // auto Tarr = py::array_t<double>(
-      //     {size},                 // shape
-      //     {sizeof(double)},       // stride
-      //     dataT                    // const double* pointer
-      // );
-      // Tarr.attr("flags").attr("writeable") = false; // mark read-only
+      int size = Tn_.Size();
+      auto Tarr = py::array_t<double>(
+          {size},                 // shape
+          {sizeof(double)},       // stride
+          dataT                    // const double* pointer
+      );
+      Tarr.attr("flags").attr("writeable") = false; // mark read-only
 
-      // int n_bte_grids = n_vspace_grids;
-      // py::object result;
-      // try {
-      //   // IMPORT THE PYTHON SCRIPT
-      //   py::object script = py::module_::import("tps-get-bte-rates");
-      //   // CALL THE PYTHON FUNCTION
-      //   result = script.attr("bte_grid_setup")(Tarr, n_bte_grids);
-      // } catch (const py::error_already_set &e) {
-      //   std::cerr << "ReactingFlow::step(), Python error in BTE grid setup: " << e.what() << std::endl;
-      //   exit(-1);
-      // }
-      // py::tuple arrays = result.cast<py::tuple>();
+      int n_bte_grids = n_vspace_grids;
+      py::object result;
+      try {
+        // IMPORT THE PYTHON SCRIPT
+        py::object script = py::module_::import("tps-get-bte-rates");
+        // CALL THE PYTHON FUNCTION
+        result = script.attr("bte_grid_setup")(Tarr, n_bte_grids);
+      } catch (const py::error_already_set &e) {
+        std::cerr << "ReactingFlow::step(), Python error in BTE grid setup: " << e.what() << std::endl;
+        exit(-1);
+      }
+      py::tuple arrays = result.cast<py::tuple>();
 
       // Unpack arrays
-      // py::array_t<int32_t> gid_to_npts_arr = arrays[0].cast<py::array_t<int32_t>>();
-      // py::array_t<int64_t> gid_spatin_map  = arrays[1].cast<py::array_t<int64_t>>();
-      // py::array_t<double> Te_arr  = arrays[2].cast<py::array_t<double>>();
+      py::array_t<int32_t> gid_to_npts_arr = arrays[0].cast<py::array_t<int32_t>>();
+      py::array_t<int64_t> gid_spatin_map  = arrays[1].cast<py::array_t<int64_t>>();
+      py::array_t<double> Te_arr  = arrays[2].cast<py::array_t<double>>();
 
       // // Access data
-      // auto buf_gid_npts_arr   = gid_to_npts_arr.request();
-      // auto buf_gid_spatin_map = gid_spatin_map.request();
-      // auto buf_Te_arr = Te_arr.request();
+      auto buf_gid_npts_arr   = gid_to_npts_arr.request();
+      auto buf_gid_spatin_map = gid_spatin_map.request();
+      auto buf_Te_arr = Te_arr.request();
 
-      // int32_t* ptr_gid_to_npts = static_cast<int32_t*>(buf_gid_npts_arr.ptr);
-      // int64_t* ptr_gid_spatin_map = static_cast<int64_t*>(buf_gid_spatin_map.ptr);
-      // double* ptr_Te_arr = static_cast<double*>(buf_Te_arr.ptr);
+      int32_t* ptr_gid_to_npts = static_cast<int32_t*>(buf_gid_npts_arr.ptr);
+      int64_t* ptr_gid_spatin_map = static_cast<int64_t*>(buf_gid_spatin_map.ptr);
+      double* ptr_Te_arr = static_cast<double*>(buf_Te_arr.ptr);
 
-      // grid_idx_to_npts.assign(ptr_gid_to_npts, ptr_gid_to_npts + buf_gid_npts_arr.size);
+      grid_idx_to_npts.assign(ptr_gid_to_npts, ptr_gid_to_npts + buf_gid_npts_arr.size);
 
-      // grid_idx_to_spatial_idx_map.assign(ptr_gid_spatin_map, ptr_gid_spatin_map + buf_gid_spatin_map.size);
+      grid_idx_to_spatial_idx_map.assign(ptr_gid_spatin_map, ptr_gid_spatin_map + buf_gid_spatin_map.size);
 
-      // Te_vec.assign(ptr_Te_arr, ptr_Te_arr + buf_Te_arr.size);
+      Te_vec.assign(ptr_Te_arr, ptr_Te_arr + buf_Te_arr.size);
 
       // int myRank;
       // MPI_Comm_rank(tpsP_->getTPSCommWorld(), &myRank);
 
       // std::cout << "Rank " << myRank << ", back to TPS after setting up BTE grids\n";
 
-    // }
+    }
 
-    // if (bte_from_tps_ && update_bte_rates == 0) {
+    // Above call sets up the BTE v-space grids. Now call the BTE solver and return the rate coefficients
+    if (bte_from_tps_ && update_bte_rates == 0) {
       // // Wrap const pointer into NumPy array (no copy)
       // // Dimensions given as {size}, stride as {sizeof(double)}
-      // int size = Tn_.Size();
-      // auto Tarr = py::array_t<double>(
-      //     {size},                 // shape
-      //     {sizeof(double)},       // stride
-      //     dataT                    // const double* pointer
-      // );
-      // Tarr.attr("flags").attr("writeable") = false; // mark read-only
+      int size = Tn_.Size();
+      auto Tarr = py::array_t<double>(
+          {size},                 // shape
+          {sizeof(double)},       // stride
+          dataT                    // const double* pointer
+      );
+      Tarr.attr("flags").attr("writeable") = false; // mark read-only
 
       // BELOW, WE GET VECTOR OF NUMBER DENSITIES FOR EACH SPECIES
       // THIS WILL BE PASSED TO BTE
-      // mfem::Vector speciesInt_(sDofInt_*nSpecies_);
-      // double *species_data = speciesInt_.HostWrite();
-      // int specsize = speciesInt_.Size();
+      mfem::Vector speciesInt_(sDofInt_*nSpecies_);
+      double *species_data = speciesInt_.HostWrite();
+      int specsize = speciesInt_.Size();
 
-      // double state_local[gpudata::MAXEQUATIONS];
-      // double species_local[gpudata::MAXSPECIES];
+      double state_local[gpudata::MAXEQUATIONS];
+      double species_local[gpudata::MAXSPECIES];
 
-      // for (int i = 0; i < gpudata::MAXEQUATIONS; ++i)
-      //   state_local[i] = 0.;
+      for (int i = 0; i < gpudata::MAXEQUATIONS; ++i)
+        state_local[i] = 0.;
 
-      // for (int i = 0; i < gpudata::MAXSPECIES; ++i)
-      //   species_local[i] = 0.;
+      for (int i = 0; i < gpudata::MAXSPECIES; ++i)
+        species_local[i] = 0.;
 
-      // for (int i = 0; i < sDofInt_; i++) {
-      //   state_local[0] = dataRho[i];
-      //   for (int asp = 0; asp < nActiveSpecies_; asp++)
-      //     state_local[dim_ + 2 + asp] = dataRho[i]*dataY[i+asp*sDofInt_];
-      //   mixture_->computeNumberDensities(state_local, species_local);
+      for (int i = 0; i < sDofInt_; i++) {
+        state_local[0] = dataRho[i];
+        for (int asp = 0; asp < nActiveSpecies_; asp++)
+          state_local[dim_ + 2 + asp] = dataRho[i]*dataY[i+asp*sDofInt_];
+        mixture_->computeNumberDensities(state_local, species_local);
 
-      //   for (int sp = 0; sp < nSpecies_; sp++)
-      //     species_data[i + sp * sDofInt_] = AVOGADRONUMBER * species_local[sp];
-      // }
+        for (int sp = 0; sp < nSpecies_; sp++)
+          species_data[i + sp * sDofInt_] = AVOGADRONUMBER * species_local[sp];
+      }
 
-      // if (rank0_) {
-      //   std::cout << "iter = " << iter << ", Updating BTE rates...... \n";
-      // }
+      if (rank0_) {
+        std::cout << "iter = " << iter << ", Updating BTE rates...... \n";
+      }
 
-      // const double *species_read = speciesInt_.HostRead();
-      // auto specarr = py::array_t<double>(
-      //   {specsize},                 // shape
-      //   {sizeof(double)},       // stride
-      //   species_read                    // const double* pointer
-      // );
-      // specarr.attr("flags").attr("writeable") = false; // mark read-only
+      const double *species_read = speciesInt_.HostRead();
+      auto specarr = py::array_t<double>(
+        {specsize},                 // shape
+        {sizeof(double)},       // stride
+        species_read                    // const double* pointer
+      );
+      specarr.attr("flags").attr("writeable") = false; // mark read-only
 
-      // ei_gf_.GetTrueDofs(ei_);
-      // er_gf_.GetTrueDofs(er_);
+      ei_gf_.GetTrueDofs(ei_);
+      er_gf_.GetTrueDofs(er_);
 
-      // const double *dataEr = er_.HostRead();
-      // const double *dataEi = ei_.HostRead();
+      const double *dataEr = er_.HostRead();
+      const double *dataEi = ei_.HostRead();
 
-      // int ersize = er_.Size();
-      // auto Erarr = py::array_t<double>(
-      //     {ersize},                 // shape
-      //     {sizeof(double)},       // stride
-      //     dataEr                    // const double* pointer
-      // );
-      // Erarr.attr("flags").attr("writeable") = false; // mark read-only
+      int ersize = er_.Size();
+      auto Erarr = py::array_t<double>(
+          {ersize},                 // shape
+          {sizeof(double)},       // stride
+          dataEr                    // const double* pointer
+      );
+      Erarr.attr("flags").attr("writeable") = false; // mark read-only
 
-      // int eisize = ei_.Size();
-      // auto Eiarr = py::array_t<double>(
-      //     {eisize},                 // shape
-      //     {sizeof(double)},       // stride
-      //     dataEi                    // const double* pointer
-      // );
-      // Eiarr.attr("flags").attr("writeable") = false; // mark read-only
+      int eisize = ei_.Size();
+      auto Eiarr = py::array_t<double>(
+          {eisize},                 // shape
+          {sizeof(double)},       // stride
+          dataEi                    // const double* pointer
+      );
+      Eiarr.attr("flags").attr("writeable") = false; // mark read-only
 
       // Convert the grid_idx_to_npts and grid_idx_to_spatial_idx_map to Python arrays of int32 and int64 type respectively
-      // py::array_t<int32_t> py_grid_idx_to_npts(grid_idx_to_npts.size(), grid_idx_to_npts.data());
-      // py::array_t<int64_t> py_grid_idx_to_spatial_idx_map(grid_idx_to_spatial_idx_map.size(), grid_idx_to_spatial_idx_map.data());
-      // py::array_t<double>  te_array(Te_vec.size(), Te_vec.data());
+      py::array_t<int32_t> py_grid_idx_to_npts(grid_idx_to_npts.size(), grid_idx_to_npts.data());
+      py::array_t<int64_t> py_grid_idx_to_spatial_idx_map(grid_idx_to_spatial_idx_map.size(), grid_idx_to_spatial_idx_map.data());
+      py::array_t<double>  te_array(Te_vec.size(), Te_vec.data());
 
-      // py_grid_idx_to_npts.attr("flags").attr("writeable") = false; // mark read-only
-      // py_grid_idx_to_spatial_idx_map.attr("flags").attr("writeable") = false; // mark read-only
+      py_grid_idx_to_npts.attr("flags").attr("writeable") = false; // mark read-only
+      py_grid_idx_to_spatial_idx_map.attr("flags").attr("writeable") = false; // mark read-only
 
-      // int n_bte_grids = n_vspace_grids;
-      // int use_interp = do_bte_sub_cluster;
-      // int n_sub_clusters = num_sub_clusters_bte;
-      // int n_bte_reactions = nBTEReactions_;
-      // int Nr = Nr_BTE;
-      // int csv_store = store_csv;
-      // double rtolBTE = BTE_rtol;
-      // double BTE_dt = dt_BTE;
+      int n_bte_grids = n_vspace_grids;
+      int use_interp = do_bte_sub_cluster;
+      int n_sub_clusters = num_sub_clusters_bte;
+      int n_bte_reactions = nBTEReactions_;
+      int Nr = Nr_BTE;
+      int csv_store = store_csv;
+      double rtolBTE = BTE_rtol;
+      double BTE_dt = dt_BTE;
 
-      // py::object result;
-      // try {
-      //   // IMPORT THE PYTHON SCRIPT
-      //   py::object script = py::module_::import("tps-get-bte-rates");
-      //   // CALL THE PYTHON FUNCTION
-      //   result = script.attr("bte_from_tps")(Tarr, specarr, Erarr, Eiarr, collisionsFile, n_bte_reactions, solver_type, ee_collisions, 
-      //             n_bte_grids, py_grid_idx_to_npts, py_grid_idx_to_spatial_idx_map, use_interp, n_sub_clusters, te_array,
-      //             Nr, rtolBTE, csv_store, BTE_dt);
-      // } catch (const py::error_already_set &e) {
-      //   std::cerr << "ReactingFlow::step(), Python error: " << e.what() << std::endl;
-      //   exit(-1);
-      // }
+      py::object result;
+      try {
+        // IMPORT THE PYTHON SCRIPT
+        py::object script = py::module_::import("tps-get-bte-rates");
+        // CALL THE PYTHON FUNCTION
+        result = script.attr("bte_from_tps")(Tarr, specarr, Erarr, Eiarr, collisionsFile, n_bte_reactions, solver_type, ee_collisions, 
+                  n_bte_grids, py_grid_idx_to_npts, py_grid_idx_to_spatial_idx_map, use_interp, n_sub_clusters, te_array,
+                  Nr, rtolBTE, csv_store, BTE_dt);
+      } catch (const py::error_already_set &e) {
+        std::cerr << "ReactingFlow::step(), Python error: " << e.what() << std::endl;
+        exit(-1);
+      }
 
       // int myRank;
       // MPI_Comm_rank(tpsP_->getTPSCommWorld(), &myRank);
@@ -2573,31 +2558,31 @@ void ReactingFlow::step() {
       // std::cout << "Rank " << myRank << ", back to TPS after solving BTE in Python\n";
   
       // Convert "result" to an MFEM Vector
-      // py::array res_array = result.cast<py::array>();
-      // py::buffer_info buf = res_array.request();
+      py::array res_array = result.cast<py::array>();
+      py::buffer_info buf = res_array.request();
 
-      // if(buf.ndim != 1) {
-      //   throw std::runtime_error("Expected 1D array from Python");
-      // }
+      if(buf.ndim != 1) {
+        throw std::runtime_error("Expected 1D array from Python");
+      }
 
       // SET THE bterates_ Vector to zero before writing the new rates
-      // bterates_ = 0.0;
+      bterates_ = 0.0;
 
       // // MFEM::Vector bterates_ stores the returned Python array
-      // double *dst = bterates_.HostWrite();
-      // double *src = static_cast<double *>(buf.ptr);
+      double *dst = bterates_.HostWrite();
+      double *src = static_cast<double *>(buf.ptr);
 
-      // int bterr_size = bterates_.Size();
+      int bterr_size = bterates_.Size();
 
-      // assert(buf.shape[0] == bterr_size);
+      assert(buf.shape[0] == bterr_size);
 
-      // for (int i = 0; i < buf.shape[0]; i++) {
-      //   dst[i] = src[i];
-      // }
-    // } 
-// #endif
+      for (int i = 0; i < buf.shape[0]; i++) {
+        dst[i] = src[i];
+      }
+    } 
+#endif
 
-      // auto btearr = bterates_.HostRead();
+      auto btearr = bterates_.HostRead();
       
       // auto datakfwd = kReac_.HostWrite();
       // auto dataReac = reacR_.HostWrite();
@@ -2610,7 +2595,7 @@ void ReactingFlow::step() {
       // auto dataBTErrfbyrrb = BTErrf_by_rrb_.HostWrite();
 
       // // Define Vectors to be passed to solveChemistryStep
-      // mfem::Vector bterates(nBTEReactions_);
+      mfem::Vector bterates(nBTEReactions_);
       // mfem::Vector kfBTE(nReactions_);
       // mfem::Vector prograteBTE(nReactions_);
       // mfem::Vector rrfrrbBTE(nReactions_/2);
@@ -2620,7 +2605,7 @@ void ReactingFlow::step() {
       // mfem::Vector rrfrrb(nReactions_/2);
       // mfem::Vector prodYsp(nSpecies_);
 
-      // bterates = 0.0;
+      bterates = 0.0;
       
       for (int i = 0; i < sDofInt_; i++) {
         // Extract point state
@@ -2630,12 +2615,12 @@ void ReactingFlow::step() {
         YT[nActiveSpecies_] = h_Tn[i];
 
 // #ifdef HAVE_PYTHON
-        // if (bte_from_tps_) {
+        if (bte_from_tps_) {
           // Extract point state for the BTE rates
-          // double *bterates = new double[nBTEReactions_];
-          // for (int rr = 0; rr < nBTEReactions_; rr++) {
-          //   bterates[rr] = btearr[i + rr*sDofInt_];
-          // }
+          double *bterates = new double[nBTEReactions_];
+          for (int rr = 0; rr < nBTEReactions_; rr++) {
+            bterates[rr] = btearr[i + rr*sDofInt_];
+          }
 
           // kfBTE = 0.0; 
           // prograteBTE = 0.0;
@@ -2647,8 +2632,8 @@ void ReactingFlow::step() {
           // rrfrrb = 0.0;
 
           // Solve backward Euler update (with BTE rates)
-          // solveChemistryStepBTE(YT, i, dt_, bterates.GetData(), 
-          //   kf.GetData(), prograte.GetData(), rrfrrb.GetData(),
+          solveChemistryStepBTE(YT, i, dt_, bterates.GetData()); 
+          //   , kf.GetData(), prograte.GetData(), rrfrrb.GetData(),
           //   kfBTE.GetData(), prograteBTE.GetData(), rrfrrbBTE.GetData(), prodYsp.GetData()
           // );
 
@@ -2666,8 +2651,8 @@ void ReactingFlow::step() {
           // for (int sp = 0; sp < nSpecies_; sp++) {
           //   dataProd[i + sp*sDofInt_] = prodYsp[sp];
           // }
-        // } else{
-// #endif    
+        } else{
+#endif    
           // prodYsp = 0.0;
           // kf = 0.0;
           // prograte = 0.0;
@@ -2690,11 +2675,11 @@ void ReactingFlow::step() {
 //           for (int sp = 0; sp < nSpecies_; sp++) {
 //             dataProd[i + sp*sDofInt_] = prodYsp[sp];
 //           }
-// #ifdef HAVE_PYTHON
-//         }
-// #endif
         
         solveChemistryStep(YT, i, dt_);
+#ifdef HAVE_PYTHON
+        }
+#endif
         // Overwrite point state data
         for (int sp = 0; sp < nActiveSpecies_; sp++) {
           h_Yn[sp * sDofInt_ + i] = YT[sp];
@@ -2703,7 +2688,7 @@ void ReactingFlow::step() {
       }
       delete[] YT;
 
-// #ifdef HAVE_PYTHON
+#ifdef HAVE_PYTHON
       // int myRank;
       // MPI_Comm_rank(tpsP_->getTPSCommWorld(), &myRank);
 
@@ -2716,76 +2701,18 @@ void ReactingFlow::step() {
       // BTEreacR_gf_.SetFromTrueDofs(BTEreacR_);
       // BTErrf_by_rrb_gf_.SetFromTrueDofs(BTErrf_by_rrb_);
 
-      // er_gf_.SetFromTrueDofs(er_);
-      // ei_gf_.SetFromTrueDofs(ei_);
+      er_gf_.SetFromTrueDofs(er_);
+      ei_gf_.SetFromTrueDofs(ei_);
 
-      // if (bte_from_tps_) {
-      //   // UPDATE THE BLENDING FRACTION
-      //   int iter_number_ = this->GetCurrentIter();
-      //   if (iter_number_ % bl_frac_change_freq_ == 0) {
-      //     bl_frac_ = bl_frac_ + bl_frac_increment_;
-      //   }
-      //   bl_frac_ = std::min(bl_frac_, 1.0);
-      // }
-      
-      // for (int rr = 0; rr < nReactions_; rr++) {
-      //   mfem::Vector rr_view(kReac_.GetData() + rr*sDofInt_, sDofInt_);
-      //   mfem::Vector BTErr_view(BTEkReac_.GetData() + rr*sDofInt_, sDofInt_);
-
-      //   double local_min = rr_view.Min();
-      //   double local_max = rr_view.Max();
-
-      //   double BTElocal_min = BTErr_view.Min();
-      //   double BTElocal_max = BTErr_view.Max();
-
-      //   double global_min, global_max;
-      //   double BTEglobal_min, BTEglobal_max;
-
-      //   MPI_Allreduce(&local_min, &global_min, 1, MPI_DOUBLE, MPI_MIN, tpsP_->getTPSCommWorld());
-      //   MPI_Allreduce(&local_max, &global_max, 1, MPI_DOUBLE, MPI_MAX, tpsP_->getTPSCommWorld());
-
-      //   MPI_Allreduce(&BTElocal_min, &BTEglobal_min, 1, MPI_DOUBLE, MPI_MIN, tpsP_->getTPSCommWorld());
-      //   MPI_Allreduce(&BTElocal_max, &BTEglobal_max, 1, MPI_DOUBLE, MPI_MAX, tpsP_->getTPSCommWorld());
-
-      //   if (rank0_) {
-      //     std::cout << "[C++], Reaction " << rr << ", Rate coefficient Local = " 
-      //               << local_min << " to " << local_max 
-      //               << ", Global = " 
-      //               << global_min << " to " << global_max << ", BTE global = " << BTEglobal_min << ", to " << BTEglobal_max << "\n";
-      //   }
-
-      //   if (rr % 2 == 0) {
-      //     mfem::Vector rrf_by_rrb_view(rrf_by_rrb_.GetData() + int(rr/2)*sDofInt_, sDofInt_);
-      //     mfem::Vector BTErrf_by_rrb_view(BTErrf_by_rrb_.GetData() + int(rr/2)*sDofInt_, sDofInt_);
-
-      //     double loc_min = rrf_by_rrb_view.Min();
-      //     double loc_max = rrf_by_rrb_view.Max();
-
-      //     double BTEloc_min = BTErrf_by_rrb_view.Min();
-      //     double BTEloc_max = BTErrf_by_rrb_view.Max();
-
-      //     double glob_min, glob_max;
-      //     double BTEglob_min, BTEglob_max;
-
-      //     MPI_Allreduce(&loc_min, &glob_min, 1, MPI_DOUBLE, MPI_MIN, tpsP_->getTPSCommWorld());
-      //     MPI_Allreduce(&loc_max, &glob_max, 1, MPI_DOUBLE, MPI_MAX, tpsP_->getTPSCommWorld());
-
-      //     MPI_Allreduce(&BTEloc_min, &BTEglob_min, 1, MPI_DOUBLE, MPI_MIN, tpsP_->getTPSCommWorld());
-      //     MPI_Allreduce(&BTEloc_max, &BTEglob_max, 1, MPI_DOUBLE, MPI_MAX, tpsP_->getTPSCommWorld());
-
-      //     if (rank0_) {
-      //       std::cout << "Reaction set " << int(rr/2) << ", Ratio of forward to backward rates Local = " 
-      //                 << loc_min << " to " << loc_max 
-      //                 << ", Global = " 
-      //                 << glob_min << " to " << glob_max 
-      //                 << ", BTE local = " << BTEloc_min << " to " << BTEloc_max
-      //                 << ", Global = " << BTEglob_min << " to " << BTEglob_max << "\n";
-      //     }
-      //   }
-      // }
-
-      // std::cout << "Rank " << myRank << ", TPS Obtained global max/min of rate coefficients\n";
-// #endif
+      if (bte_from_tps_) {
+        // UPDATE THE BLENDING FRACTION
+        int iter_number_ = this->GetCurrentIter();
+        if (iter_number_ % bl_frac_change_freq_ == 0) {
+          bl_frac_ = bl_frac_ + bl_frac_increment_;
+        }
+        bl_frac_ = std::min(bl_frac_, 1.0);
+      }
+#endif
 
       if (mixtureInput_.ambipolar) {
         // Evaluate electron mass fraction based on quasi-neutrality
@@ -3053,46 +2980,6 @@ void ReactingFlow::temperatureStep() {
   Tn_next_gf_.SetFromTrueDofs(Tn_next_);
 }
 
-/*
-void ReactingFlow::temperatureSubstep(int iSub) {
-  // substep dt
-  double dtSub = dt_ / (double)nSub_;
-
-  CpMix_gf_.GetTrueDofs(CpMix_);
-
-  // heat of formation term
-  tmpR0_.Set(1.0, hw_);
-
-  // pressure
-  tmpR0_ += dtP_;
-
-  // contribution to temperature update is dt * rhs / (rho * Cp)
-  tmpR0_ /= rn_;
-  tmpR0_ /= CpMix_;
-  tmpR0_ *= dtSub;
-
-  double *data = tmpR0_.HostReadWrite();
-  double *dTstar = TnStar_.HostReadWrite();
-  double *dTn = Tn_.HostReadWrite();
-  for (int i = 0; i < sDofInt_; i++) {
-    // increasing T
-    if (data[i] > 0.0) {
-      data[i] += dTstar[i];
-      data[i] += dTn[i];
-
-    // reducing T
-    } else {
-      double tmp = 1.0 - data[i] / dTn[i];
-      data[i] = dTn[i] / tmp + dTstar[i];
-    }
-  }
-
-  // Tn now has full state at substep
-  Tn_.Set(1.0, tmpR0_);
-}
-*/
-
-/**/
 void ReactingFlow::temperatureSubstep(int iSub) {
   // substep dt
   double dtSub = dt_ / (double)nSub_;
@@ -3146,7 +3033,6 @@ void ReactingFlow::temperatureSubstep(int iSub) {
   // Tn now has full state at substep
   Tn_.Set(1.0, tmpR0_);
 }
-/**/
 
 void ReactingFlow::speciesLastStep() {
   tmpR0_ = 0.0;
@@ -3336,7 +3222,6 @@ void ReactingFlow::speciesSubstep(int iSpec, int iSub) {
   // Yn now has full state at substep
   setVectorFromScalar(tmpR0_, iSpec, &Yn_);
 }
-/**/
 
 void ReactingFlow::speciesProduction() {
   const double *dataT = Tn_.HostRead();
