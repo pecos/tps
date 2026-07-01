@@ -2537,6 +2537,7 @@ void ZetaModel::AddFRATEDirichletBC(Coefficient* coeff, Array<int>& attr) {
 // switched back to basic min for now as smoothed functions
 // were causing issues with small numbers
 double smoothMin(double val1, double val2) {
+  
   // double C = 4.0;
   double k = 0.001;
   double tanh_half = 0.54930615;
@@ -2617,6 +2618,5 @@ double smoothMinTwo(double val1, double val2) {
   // val = 0.5 * (val1 + val2 - std::sqrt((val1-val2)*(val1-val2) + k));
 
   // val = std::min(val1,val2);
-
   return val;
 }
