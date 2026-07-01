@@ -699,7 +699,7 @@ double QuasiMagnetostaticSolver3D::elementJouleHeating(const FiniteElement& el, 
     double qpcontrib = soln[0];
 
     const double wt = ip.weight * Tr.Weight();
-    elem_jh += qpcontrib * wt;
+    // elem_jh += qpcontrib * wt;
 
     // HERE
     // need to modify here so that joule heating is only IN torch
@@ -718,7 +718,7 @@ double QuasiMagnetostaticSolver3D::elementJouleHeating(const FiniteElement& el, 
     }
     dist = std::sqrt(dist);
     if (dist > rCyl) wgt = 0.0;
-    elem_jh *= wgt;
+    elem_jh += qpcontrib * wt * wgt;
   }
 
   return elem_jh;
