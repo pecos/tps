@@ -1039,14 +1039,13 @@ void GaussianInterpExtData::setInletTurbScalars() {
         if (tke_pr[j].tke < 0.0 && tke_pr[j].v2 < 0.0) {
           continue;
         }
-       
+
         dist = (xp[0] - tke_pr[j].x) * (xp[0] - tke_pr[j].x) + (xp[1] - tke_pr[j].y) * (xp[1] - tke_pr[j].y);
-	if (dim_ == 3) {
-	  dist += (xp[2] - tke_pr[j].z) * (xp[2] - tke_pr[j].z);
+        if (dim_ == 3) {
+          dist += (xp[2] - tke_pr[j].z) * (xp[2] - tke_pr[j].z);
         }
-	dist = std::sqrt(dist);
+        dist = std::sqrt(dist);
         distMin = std::min(distMin, dist);
-	
       }
 
       // find second closest data pt
@@ -1058,14 +1057,13 @@ void GaussianInterpExtData::setInletTurbScalars() {
         }
 
         dist = (xp[0] - tke_pr[j].x) * (xp[0] - tke_pr[j].x) + (xp[1] - tke_pr[j].y) * (xp[1] - tke_pr[j].y);
-	if (dim_ == 3) {      
+        if (dim_ == 3) {
           dist += (xp[2] - tke_pr[j].z) * (xp[2] - tke_pr[j].z);
-	}
-	dist = std::sqrt(dist);	
+        }
+        dist = std::sqrt(dist);
         if (dist > distMin) {
           distMinSecond = std::min(distMinSecond, dist);
         }
-	
       }
 
       // radius for Gaussian interpolation
@@ -1080,7 +1078,7 @@ void GaussianInterpExtData::setInletTurbScalars() {
         // dist = sqrt((xp[0] - tke_pr[j].x) * (xp[0] - tke_pr[j].x) + (xp[1] - tke_pr[j].y) * (xp[1] - tke_pr[j].y) +
         //            (xp[2] - tke_pr[j].z) * (xp[2] - tke_pr[j].z));
         dist = sqrt((xp[0] - tke_pr[j].x) * (xp[0] - tke_pr[j].x));
-	
+
         // gaussian interpolation
         if (dist <= 1.5 * radius) {
           wt = exp(-(dist * dist) / (radius * radius));

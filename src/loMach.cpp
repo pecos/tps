@@ -422,20 +422,20 @@ void LoMachSolver::solveStep() {
     sw_thermChem_.Start();
     thermo_->step();
     sw_thermChem_.Stop();
-    // if (rank0_ == true) std::cout << "thermoChem complete" << endl;    
-    
+    // if (rank0_ == true) std::cout << "thermoChem complete" << endl;
+
     sw_flow_.Start();
     if (!disable_flow_) {
       flow_->step();
     }
     sw_flow_.Stop();
-    // if (rank0_ == true) std::cout << "flow complete" << endl;        
-    
+    // if (rank0_ == true) std::cout << "flow complete" << endl;
+
     sw_turb_.Start();
     turbModel_->step();
     sw_turb_.Stop();
-    // if (rank0_ == true) std::cout << "turbulence model complete" << endl;        
-    
+    // if (rank0_ == true) std::cout << "turbulence model complete" << endl;
+
   } else {
     if (rank0_) std::cout << "Time integration not updated." << endl;
     exit(1);

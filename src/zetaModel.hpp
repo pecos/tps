@@ -103,6 +103,9 @@ class ZetaModel : public TurbModelBase {
   bool numerical_integ_ = false;
   // bool numerical_integ_ = true;
 
+  // alternative f-formulation
+  bool robust_ = false;
+
   // Linear-solver-related options
   int pl_solve_ = 0;
   int max_iter_;  // = 2000;
@@ -123,7 +126,7 @@ class ZetaModel : public TurbModelBase {
   double zfp_max_;
   double v2Prod_fLimiter_coeff_;
   double mutMax_scale_;
-  
+
   // streamwise stabilization
   bool sw_stab_ = false;           /**< Enable/disable supg stabilization. */
   double Reh_factor_, Reh_offset_; /**< supg stabilization parameters */
@@ -241,7 +244,10 @@ class ZetaModel : public TurbModelBase {
 
   ParGridFunction prod_plus_tkeDiff_gf_;
   Vector prod_plus_tkeDiff_;
-  
+
+  // implicit part of destruction for f
+  ParGridFunction Df_gf_;
+
   /// model coefficients
   double Cmu_ = 0.22;
   double sigmaK_ = 1.0;
@@ -256,8 +262,10 @@ class ZetaModel : public TurbModelBase {
   // double Cn_ = 85.0;
   double Cl_ = 0.23;
   double Cn_ = 70.0;
-  double Ce1_;  // function of local zeta
-  double inlet_scale_;  
+  double Ce1_;         // function of local zeta
+  double C3_ = 0.075;  // tune
+  double C4_ = 1.28;   // tune
+  double inlet_scale_;
 
   ParGridFunction res_gf_;
   Vector res_;
@@ -311,6 +319,7 @@ class ZetaModel : public TurbModelBase {
   ProductCoefficient* rad_zeta_diff_total_coeff_ = nullptr;
   ProductCoefficient* rad_scalar_diff_coeff_ = nullptr;
   ScalarVectorProductCoefficient* rad_nu_gradTKE_coeff_ = nullptr;
+  ProductCoefficient* rad_tls2_coeff_ = nullptr;
 
   GridFunctionCoefficient* tts_coeff_ = nullptr;
   GridFunctionCoefficient* tls2_coeff_ = nullptr;
@@ -355,11 +364,11 @@ class ZetaModel : public TurbModelBase {
 
   GridFunctionCoefficient* tke_field_ = nullptr;
   GridFunctionCoefficient* v2_field_ = nullptr;
-  GridFunctionCoefficient* tdr_field_ = nullptr;  
+  GridFunctionCoefficient* tdr_field_ = nullptr;
   ProductCoefficient* tke_scaled_field_ = nullptr;
   ProductCoefficient* v2_scaled_field_ = nullptr;
   ConstantCoefficient* scaling_coeff_ = nullptr;
-  
+
   // streamwise stabilization
   VectorMagnitudeCoefficient* umag_coeff_ = nullptr;
   GridFunctionCoefficient* gscale_coeff_ = nullptr;
@@ -375,6 +384,8 @@ class ZetaModel : public TurbModelBase {
   ProductCoefficient* upwind_coeff_ = nullptr;
   TransformedMatrixVectorCoefficient* swdiff_coeff_ = nullptr;
   ScalarMatrixProductCoefficient* supg_coeff_ = nullptr;
+
+  GridFunctionCoefficient* f_destruction_coeff_ = nullptr;
 
   /// operators and solvers
   ParBilinearForm* As_form_ = nullptr;
@@ -457,7 +468,7 @@ class ZetaModel : public TurbModelBase {
   void zetaStep();
   void v2Step();
   void fStep();
-  void fStepRobustified();  
+  void fStepRobustified();
   void convection(string scalar);
   void updateTimestepHistory();
   void updateZeta();

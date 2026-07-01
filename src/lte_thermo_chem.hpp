@@ -108,8 +108,8 @@ class LteThermoChem final : public ThermoChemModelBase {
   bool spark_ = false;
   double spark_radius_;
   double spark_peak_;
-  Vector spark_center_;  
-  
+  Vector spark_center_;
+
   // Boundary condition info
   Array<int> temp_ess_attr_; /**< List of patches with Dirichlet BC on temperature */
   Array<int> Qt_ess_attr_;   /**< List of patches with Dirichlet BC on Q (thermal divergence) */
@@ -140,7 +140,7 @@ class LteThermoChem final : public ThermoChemModelBase {
 
   double Pr_;
   double invPr_;
-  
+
   bool Tclip_ = false;
   double Tmin_ = 0.0;
   double Tmax_ = 100000.0;
@@ -155,7 +155,7 @@ class LteThermoChem final : public ThermoChemModelBase {
 
   FiniteElementCollection* vfec_ = nullptr;
   ParFiniteElementSpace* vfes_ = nullptr;
-  
+
   // Fields
   ParGridFunction Tnm1_gf_, Tnm2_gf_;
   ParGridFunction Tn_gf_, Tn_next_gf_, Text_gf_, resT_gf_;

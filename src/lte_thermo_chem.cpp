@@ -175,7 +175,7 @@ LteThermoChem::LteThermoChem(mfem::ParMesh* pmesh, LoMachOptions* loMach_opts, t
 
   tps->getInput("loMach/ltethermo/Prandtl", Pr_, 0.5);
   invPr_ = 1.0 / Pr_;
-  
+
   tps->getInput("loMach/ltethermo/clip-temperature", Tclip_, false);
   tps->getInput("loMach/ltethermo/min-temperature", Tmin_, 0.0);
   tps->getInput("loMach/ltethermo/max-temperature", Tmax_, 100000.0);
@@ -211,7 +211,7 @@ LteThermoChem::~LteThermoChem() {
   delete rad_rho_Cp_coeff_;
   delete rad_rho_coeff_;
 
-  delete sfes_filter_;  
+  delete sfes_filter_;
   delete sfec_filter_;
   delete HtInv_;
   delete HtInvPC_;
@@ -255,7 +255,7 @@ LteThermoChem::~LteThermoChem() {
   delete sfes_;
   delete sfec_;
   delete vfes_;
-  delete vfec_;  
+  delete vfec_;
 }
 
 void LteThermoChem::initializeSelf() {
@@ -271,7 +271,7 @@ void LteThermoChem::initializeSelf() {
   vfes_ = new ParFiniteElementSpace(pmesh_, vfec_, dim_);
 
   sDofInt_ = sfes_->GetTrueVSize();
-  
+
   // Check if fully periodic mesh
   if (!(pmesh_->bdr_attributes.Size() == 0)) {
     temp_ess_attr_.SetSize(pmesh_->bdr_attributes.Max());
@@ -1177,7 +1177,7 @@ void LteThermoChem::step() {
       djh[i] *= wgt;
     }
   }
-  
+
   resT_ += jh_;
 
   // Update Helmholtz operator to account for changing dt, rho, and kappa
@@ -1214,14 +1214,14 @@ void LteThermoChem::step() {
 
   Ht_form_->RecoverFEMSolution(Xt2, resT_gf_, Tn_next_gf_);
   Tn_next_gf_.GetTrueDofs(Tn_next_);
-  
+
   // assert(HtInv_->GetConverged());
   if (!(HtInv_->GetConverged())) {
-     if (rank0_) {
-        mfem::out << "Warning, temperature not converging!";
-     }
-     Tn_next_.Set(1.0,Tn_);
-     Tn_next_gf_.SetFromTrueDofs(Tn_next_);     
+    if (rank0_) {
+      mfem::out << "Warning, temperature not converging!";
+    }
+    Tn_next_.Set(1.0, Tn_);
+    Tn_next_gf_.SetFromTrueDofs(Tn_next_);
   }
 
   // explicit filter
@@ -1527,7 +1527,7 @@ void LteThermoChem::computeQt() {
       djh[i] *= wgt;
     }
   }
-  
+
   tmpR0_ -= jh_;
 
   sfes_->GetRestrictionMatrix()->MultTranspose(tmpR0_, resT_gf_);
