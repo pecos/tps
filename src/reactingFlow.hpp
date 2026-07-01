@@ -89,9 +89,9 @@ class ReactingFlow : public ThermoChemModelBase {
   int sDof_, sDofInt_;
   int yDof_, yDofInt_;
 
-  // #ifdef HAVE_PYTHON
-  // int nBTEReactions_;
-  // #endif
+#ifdef HAVE_PYTHON
+  int nBTEReactions_;
+#endif
 
   // Number of reactions and dofs
   // int rDof_, rDofInt_;
@@ -142,11 +142,11 @@ class ReactingFlow : public ThermoChemModelBase {
   bool neumann_species_inlet_ = true; /**< only applies to inlet */
   bool neumann_species_wall_ = true;  /**< only applies to inlet */
 
-  // #ifdef HAVE_PYTHON
-  // bool bte_from_tps_ = false;       /**< true if the BTE solver is called from within TPS (C++ call Python) */
-  // std::string collisionsFile, solver_type;       /**< string to store the path of the collisions cross-sections file, BTE solver type (will be passed to BTE) */
-  // int ee_collisions = 0;            /**< flag to enable electron-electron collisions in BTE solver */
-  // #endif
+#ifdef HAVE_PYTHON
+  bool bte_from_tps_ = false;       /**< true if the BTE solver is called from within TPS (C++ call Python) */
+  std::string collisionsFile, solver_type;       /**< string to store the path of the collisions cross-sections file, BTE solver type (will be passed to BTE) */
+  int ee_collisions = 0;            /**< flag to enable electron-electron collisions in BTE solver */
+#endif
 
   // Linear-solver-related options
   int pl_solve_ = 0;    /**< Verbosity level passed to mfem solvers */
@@ -279,20 +279,20 @@ class ReactingFlow : public ThermoChemModelBase {
   ParGridFunction sigma_gf_;
   ParGridFunction jh_gf_;
 
-// #ifdef HAVE_PYTHON
-//   // ParGridFunctions for the real and imaginary parts of the electric field
-//   // We only store the magnitude (works only for axisymmetric case)
-//   ParGridFunction er_gf_;
-//   ParGridFunction ei_gf_;
+#ifdef HAVE_PYTHON
+  // ParGridFunctions for the real and imaginary parts of the electric field
+  // We only store the magnitude (works only for axisymmetric case)
+  ParGridFunction er_gf_;
+  ParGridFunction ei_gf_;
 
+// // Additions for ratio of forward to backward reaction rates
 //   ParGridFunction rrf_by_rrb_gf_;
-
 //   ParGridFunction BTErrf_by_rrb_gf_;
 
 //   // // additions for rate coefficients
 //   ParGridFunction kReac_gf_;
 //   ParGridFunction BTEkReac_gf_;
-// #endif
+#endif
 
   // viz for qt rhs
   // ParGridFunction rhsqt_bd_;
@@ -415,16 +415,16 @@ class ReactingFlow : public ThermoChemModelBase {
   Vector jh_;
   Vector radiation_sink_;
 
-// #ifdef HAVE_PYTHON
-//   // Vectors for real and imaginary parts of electric field magnitude
-//   Vector er_, ei_;
-//   Vector bterates_;
-//   Vector bte_rr_mapping_;
+#ifdef HAVE_PYTHON
+  // Vectors for real and imaginary parts of electric field magnitude
+  Vector er_, ei_;
+  Vector bterates_;
+  Vector bte_rr_mapping_;
 //   // additions for reaction rate coefficients
 //   Vector kReac_, BTEkReac_;
 //   // Ratio of forward to reverse reaction rates
 //   Vector rrf_by_rrb_, BTErrf_by_rrb_;
-// #endif
+#endif
 
   // additions for species
   Vector Yn_, Yn_next_, Ynm1_, Ynm2_;
@@ -506,7 +506,7 @@ class ReactingFlow : public ThermoChemModelBase {
   // std::vector<ParGridFunction *> vizReacFields_;
   // std::vector<std::string> vizReacNames_;
 
-// #ifdef HAVE_PYTHON
+#ifdef HAVE_PYTHON
   // PARGRID FUNCTION AND STRING FOR REACTION PROGRESS RATES
   // std::vector<ParGridFunction *> vizBTEReacFields_;
   // std::vector<std::string> vizBTEReacNames_;
@@ -531,33 +531,33 @@ class ReactingFlow : public ThermoChemModelBase {
   // and incremented by bl_frac_increment after every bl_frac_change_freq steps of the main TPS solver
   // bl_frac_init -> specify in inputs file to say what is the blending fraction at start of simulation
   // This needs to be updated if you are starting a BTE blended run from a check point
-  // double bl_frac_init_, bl_frac_increment_, bl_frac_;
-  // int bl_frac_change_freq_ = 1;
-  // int solve_bte_every_n = 1;
-  // int do_bte_sub_cluster = 1; // Setting to 1 means we are doing sub-clustering to reduce DoFs for the BTE solver
-  // int num_sub_clusters_bte = 50;
+  double bl_frac_init_, bl_frac_increment_, bl_frac_;
+  int bl_frac_change_freq_ = 1;
+  int solve_bte_every_n = 1;
+  int do_bte_sub_cluster = 1; // Setting to 1 means we are doing sub-clustering to reduce DoFs for the BTE solver
+  int num_sub_clusters_bte = 50;
 
-  // // Number of v-space grids per MPI rank for the BTE solver
-  // int n_vspace_grids = 1;
-  // int regrid_bte_every_n = 1; // call the BTE grid_setup function to setup v-space grids every nth step
+  // Number of v-space grids per MPI rank for the BTE solver
+  int n_vspace_grids = 1;
+  int regrid_bte_every_n = 1; // call the BTE grid_setup function to setup v-space grids every nth step
 
   // grid_idx_to_npts : Vector of length n_vspace_grids where each element contains the number of points in that v-space grid
   // grid_idx_to_spatial_idx_map: Vector of length sDofInt_ which contains the indices of the points in each v-space grid
   // For example, if grid_idx = i contains ng_i points, grid_idx_to_spatial_idx_map[ilo:ilo+ng] contains the indices of the 
   // points in the ith v-space grid. Here, ilo_{i} = (\sum_{m=0}^{m=i} ng_m) - ng_i
-  // std::vector<std::int32_t> grid_idx_to_npts;
-  // std::vector<std::int64_t> grid_idx_to_spatial_idx_map;
-  // std::vector<double> Te_vec;
+  std::vector<std::int32_t> grid_idx_to_npts;
+  std::vector<std::int64_t> grid_idx_to_spatial_idx_map;
+  std::vector<double> Te_vec;
 
-  // int Nr_BTE = 128; // Number of elements in the radial direction for the BTE solver
-  // double dt_BTE = 5e-3; // timestep relative to electric field frequency if BTE uses transient solver
-  // double BTE_rtol = 1e-6; // relative tolerance for the BTE solver to converge
-  // int store_csv = 0; // store the BTE QoIs in CSV file
+  int Nr_BTE = 128; // Number of elements in the radial direction for the BTE solver
+  double dt_BTE = 5e-3; // timestep relative to electric field frequency if BTE uses transient solver
+  double BTE_rtol = 1e-6; // relative tolerance for the BTE solver to converge
+  int store_csv = 0; // store the BTE QoIs in CSV file
 
-  // int clip_rr = 0; // Set to 1 if you want to clip the forward reaction rate to a multiple of the backward reaction rate (to deal with transients)
-  // double clip_frac = 10; // The forward reaction rate is clipped to a maximum = clip_frac*backward reaction rate
+  int clip_rr = 0; // Set to 1 if you want to clip the forward reaction rate to a multiple of the backward reaction rate (to deal with transients)
+  double clip_frac = 10; // The forward reaction rate is clipped to a maximum = clip_frac*backward reaction rate
 
-// #endif
+#endif
 
  public:
   ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff,
@@ -606,13 +606,14 @@ class ReactingFlow : public ThermoChemModelBase {
 //   void evaluateReactingSource(const double *YT, const int dofindex, double *omega, 
 //     double *kf, double *prograte, double *rrfrrb, double *prodYsp);
 
-// #ifdef HAVE_PYTHON
-// // This function does the same job as evaluateReactingSource when BTE rates are used
-//   void evaluateReactingSourceBTE(const double *YT, const int dofindex, double *omega, double *BTErr,
-//   double *kf, double *prograte, double *rrfrrb,
-//   double *kfBTE, double *prograteBTE, double *rrfrrbBTE, double *prodYsp);
-// #endif
-    void evaluateReactingSource(const double *YT, const int dofindex, double *omega);
+#ifdef HAVE_PYTHON
+// This function does the same job as evaluateReactingSource when BTE rates are used
+  // void evaluateReactingSourceBTE(const double *YT, const int dofindex, double *omega, double *BTErr,
+  // double *kf, double *prograte, double *rrfrrb,
+  // double *kfBTE, double *prograteBTE, double *rrfrrbBTE, double *prodYsp);
+  void evaluateReactingSourceBTE(const double *YT, const int dofindex, double *omega, double *BTErr);
+#endif
+  void evaluateReactingSource(const double *YT, const int dofindex, double *omega);
 
   /**
    * @brief Solve the thermochemistry update
@@ -627,13 +628,14 @@ class ReactingFlow : public ThermoChemModelBase {
 //   void solveChemistryStep(double *YT, const int dofindex, const double dt, 
 //     double *kf, double* prograte, double* rrfrrb, double *prodYsp);
 
-// #ifdef HAVE_PYTHON
-// // Solve the thermochemistry update at a point when BTE is used to model chemical reactions
+#ifdef HAVE_PYTHON
+// Solve the thermochemistry update at a point when BTE is used to model chemical reactions
 // void solveChemistryStepBTE(double *YT, const int dofindex, const double dt, double *BTErr,
 //   double *kf, double *prograte, double *rrfrrb,
 //   double *kfBTE, double *prograteBTE, double *rrfrrbBTE, double *prodYsp
 //   );
-// #endif
+    void solveChemistryStepBTE(double *YT, const int dofindex, const double dt, double *BTErr);
+#endif
     void solveChemistryStep(double *YT, const int dofindex, const double dt);
 
   // time-splitting
