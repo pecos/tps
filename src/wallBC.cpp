@@ -34,10 +34,10 @@
 
 #include "riemann_solver.hpp"
 
-WallBC::WallBC(RiemannSolverTPS *_rsolver, GasMixture *_mixture, GasMixture *d_mixture, Equations _eqSystem,
-               Fluxes *_fluxClass, ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt,
+WallBC::WallBC(RiemannSolverTPS* _rsolver, GasMixture* _mixture, GasMixture* d_mixture, Equations _eqSystem,
+               Fluxes* _fluxClass, ParFiniteElementSpace* _vfes, IntegrationRules* _intRules, double& _dt,
                const int _dim, const int _num_equation, int _patchNumber, WallType _bcType, const WallData _inputData,
-               const boundaryFaceIntegrationData &boundary_face_data, const int &_maxIntPoints, bool axisym,
+               const boundaryFaceIntegrationData& boundary_face_data, const int& _maxIntPoints, bool axisym,
                bool useBCinGrad)
     : BoundaryCondition(_rsolver, _mixture, _eqSystem, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber, 1,
                         axisym),  // so far walls do not require ref. length. Left at 1
@@ -202,8 +202,8 @@ void WallBC::buildWallElemsArray() {
   wallElems.ReadWrite();
 }
 
-void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip, double delta,
-                            double time, double distance, Vector &bdrFlux) {
+void WallBC::computeBdrFlux(Vector& normal, Vector& stateIn, DenseMatrix& gradState, Vector transip, double delta,
+                            double time, double distance, Vector& bdrFlux) {
   switch (wallType_) {
       /*
       case INV:
@@ -238,7 +238,7 @@ void WallBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradSt
   }
 }
 
-void WallBC::computeBdrPrimitiveStateForGradient(const Vector &primIn, Vector &primBC) const {
+void WallBC::computeBdrPrimitiveStateForGradient(const Vector& primIn, Vector& primBC) const {
   primBC = primIn;
 
   switch (wallType_) {
@@ -265,17 +265,17 @@ void WallBC::computeBdrPrimitiveStateForGradient(const Vector &primIn, Vector &p
   }
 }
 
-void WallBC::integrationBC(Vector &y, const Vector &x, const elementIndexingData &elem_index_data, ParGridFunction *Up,
-                           ParGridFunction *gradUp, const boundaryFaceIntegrationData &boundary_face_data,
-                           const int &maxIntPoints, const int &maxDofs) {
+void WallBC::integrationBC(Vector& y, const Vector& x, const elementIndexingData& elem_index_data, ParGridFunction* Up,
+                           ParGridFunction* gradUp, const boundaryFaceIntegrationData& boundary_face_data,
+                           const int& maxIntPoints, const int& maxDofs) {
   interpWalls_gpu(x, elem_index_data, Up, gradUp, boundary_face_data, maxDofs);
 
   integrateWalls_gpu(y,  // output
                      x, elem_index_data, boundary_face_data, maxDofs);
 }
 
-void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip, double delta,
-                                double distance, Vector &bdrFlux) {
+void WallBC::computeINVwallFlux(Vector& normal, Vector& stateIn, DenseMatrix& gradState, Vector transip, double delta,
+                                double distance, Vector& bdrFlux) {
   Vector vel(nvel_);
   for (int d = 0; d < nvel_; d++) vel[d] = stateIn[1 + d] / stateIn[0];
 
@@ -323,8 +323,8 @@ void WallBC::computeINVwallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gr
 Inviscid slip boundary condition.  Finds interior velocity in wall-coordinates, flips normal
 component (mirror state), transforms back to global, send to riemann
 */
-void WallBC::computeSlipWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip, double delta,
-                                 Vector &bdrFlux) {
+void WallBC::computeSlipWallFlux(Vector& normal, Vector& stateIn, DenseMatrix& gradState, Vector transip, double delta,
+                                 Vector& bdrFlux) {
   Vector prim(num_equation_);
   mixture->GetPrimitivesFromConservatives(stateIn, prim);
 
@@ -427,8 +427,8 @@ void WallBC::computeSlipWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &g
   rsolver->Eval(stateIn, state2, normal, bdrFlux);
 }
 
-void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip,
-                                      double delta, Vector &bdrFlux) {
+void WallBC::computeAdiabaticWallFlux(Vector& normal, Vector& stateIn, DenseMatrix& gradState, Vector transip,
+                                      double delta, Vector& bdrFlux) {
   Vector wallState(num_equation_);
   mixture->computeStagnationState(stateIn, wallState);
 
@@ -468,8 +468,8 @@ void WallBC::computeAdiabaticWallFlux(Vector &normal, Vector &stateIn, DenseMatr
   }
 }
 
-void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip,
-                                       double delta, Vector &bdrFlux) {
+void WallBC::computeIsothermalWallFlux(Vector& normal, Vector& stateIn, DenseMatrix& gradState, Vector transip,
+                                       double delta, Vector& bdrFlux) {
   Vector wallState(num_equation_);
   wallState = stateIn;
 
@@ -509,8 +509,8 @@ void WallBC::computeIsothermalWallFlux(Vector &normal, Vector &stateIn, DenseMat
   }
 }
 
-void WallBC::computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip,
-                                    double delta, Vector &bdrFlux) {
+void WallBC::computeGeneralWallFlux(Vector& normal, Vector& stateIn, DenseMatrix& gradState, Vector transip,
+                                    double delta, Vector& bdrFlux) {
   Vector wallState(num_equation_);
   mixture->modifyStateFromPrimitive(stateIn, bcState_, wallState);
 
@@ -542,20 +542,20 @@ void WallBC::computeGeneralWallFlux(Vector &normal, Vector &stateIn, DenseMatrix
   }
 }
 
-void WallBC::integrateWalls_gpu(Vector &y, const Vector &x, const elementIndexingData &elem_index_data,
-                                const boundaryFaceIntegrationData &boundary_face_data, const int &maxDofs) {
+void WallBC::integrateWalls_gpu(Vector& y, const Vector& x, const elementIndexingData& elem_index_data,
+                                const boundaryFaceIntegrationData& boundary_face_data, const int& maxDofs) {
 #ifdef _GPU_
-  double *d_y = y.ReadWrite();
+  double* d_y = y.ReadWrite();
   //   const double *d_U = x.Read();
-  const int *d_elem_dofs_list = elem_index_data.dofs_list.Read();
-  const int *d_elem_dof_off = elem_index_data.dof_offset.Read();
-  const int *d_elem_dof_num = elem_index_data.dof_number.Read();
-  const double *d_face_shape = boundary_face_data.shape.Read();
-  const double *d_weight = boundary_face_data.quad_weight.Read();
-  const int *d_face_el = boundary_face_data.el.Read();
-  const int *d_face_num_quad = boundary_face_data.num_quad.Read();
-  const int *d_wallElems = wallElems.Read();
-  const int *d_listElems = listElems.Read();
+  const int* d_elem_dofs_list = elem_index_data.dofs_list.Read();
+  const int* d_elem_dof_off = elem_index_data.dof_offset.Read();
+  const int* d_elem_dof_num = elem_index_data.dof_number.Read();
+  const double* d_face_shape = boundary_face_data.shape.Read();
+  const double* d_weight = boundary_face_data.quad_weight.Read();
+  const int* d_face_el = boundary_face_data.el.Read();
+  const int* d_face_num_quad = boundary_face_data.num_quad.Read();
+  const int* d_wallElems = wallElems.Read();
+  const int* d_listElems = listElems.Read();
 
   const int totDofs = x.Size() / num_equation_;
   // const int numBdrElem = listElems.Size();
@@ -563,7 +563,7 @@ void WallBC::integrateWalls_gpu(Vector &y, const Vector &x, const elementIndexin
   const int num_equation = num_equation_;
   const int maxIntPoints = maxIntPoints_;
 
-  const double *d_flux = face_flux_.Read();
+  const double* d_flux = face_flux_.Read();
 
   // clang-format on
   // MFEM_FORALL(el_wall, wallElems.Size() / 7, {
@@ -631,25 +631,25 @@ void WallBC::integrateWalls_gpu(Vector &y, const Vector &x, const elementIndexin
 #endif
 }
 
-void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &elem_index_data,
-                             mfem::ParGridFunction *Up, mfem::ParGridFunction *gradUp,
-                             const boundaryFaceIntegrationData &boundary_face_data, const int &maxDofs) {
+void WallBC::interpWalls_gpu(const mfem::Vector& x, const elementIndexingData& elem_index_data,
+                             mfem::ParGridFunction* Up, mfem::ParGridFunction* gradUp,
+                             const boundaryFaceIntegrationData& boundary_face_data, const int& maxDofs) {
 #ifdef _GPU_
-  double *d_flux = face_flux_.Write();
+  double* d_flux = face_flux_.Write();
 
-  const double *d_U = x.Read();
-  const double *d_gradUp = gradUp->Read();
-  const int *d_elem_dofs_list = elem_index_data.dofs_list.Read();
-  const int *d_elem_dof_off = elem_index_data.dof_offset.Read();
-  const int *d_elem_dof_num = elem_index_data.dof_number.Read();
-  const double *d_face_shape = boundary_face_data.shape.Read();
-  const double *d_normal = boundary_face_data.normal.Read();
-  const double *d_xyz = boundary_face_data.xyz.Read();
-  const int *d_face_num_quad = boundary_face_data.num_quad.Read();
-  const int *d_face_el = boundary_face_data.el.Read();
-  const int *d_wallElems = wallElems.Read();
-  const int *d_listElems = listElems.Read();
-  const double *d_dist = boundary_face_data.dist.Read();
+  const double* d_U = x.Read();
+  const double* d_gradUp = gradUp->Read();
+  const int* d_elem_dofs_list = elem_index_data.dofs_list.Read();
+  const int* d_elem_dof_off = elem_index_data.dof_offset.Read();
+  const int* d_elem_dof_num = elem_index_data.dof_number.Read();
+  const double* d_face_shape = boundary_face_data.shape.Read();
+  const double* d_normal = boundary_face_data.normal.Read();
+  const double* d_xyz = boundary_face_data.xyz.Read();
+  const int* d_face_num_quad = boundary_face_data.num_quad.Read();
+  const int* d_face_el = boundary_face_data.el.Read();
+  const int* d_wallElems = wallElems.Read();
+  const int* d_listElems = listElems.Read();
+  const double* d_dist = boundary_face_data.dist.Read();
 
   auto d_delta = boundary_face_data.delta_el1.Read();
 
@@ -667,9 +667,9 @@ void WallBC::interpWalls_gpu(const mfem::Vector &x, const elementIndexingData &e
 
   const bool computeSheath = (wallData_.elecThermalCond == SHTH);
 
-  const RiemannSolverTPS *d_rsolver = rsolver;
-  GasMixture *d_mix = d_mixture_;
-  Fluxes *d_fluxclass = fluxClass;
+  const RiemannSolverTPS* d_rsolver = rsolver;
+  GasMixture* d_mix = d_mixture_;
+  Fluxes* d_fluxclass = fluxClass;
 
   const bool useBCinGrad = useBCinGrad_;
 

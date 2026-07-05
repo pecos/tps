@@ -34,7 +34,7 @@
 
 using namespace mfem;
 
-ZeroTurbModel::ZeroTurbModel(ParMesh *pmesh, int sorder) : pmesh_(pmesh), sorder_(sorder) {}
+ZeroTurbModel::ZeroTurbModel(ParMesh* pmesh, int sorder) : pmesh_(pmesh), sorder_(sorder) {}
 
 ZeroTurbModel::~ZeroTurbModel() {
   delete eddy_viscosity_;

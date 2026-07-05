@@ -95,7 +95,7 @@ class ElectromagneticOptions {
     variable_current = false;
   }
 
-  void print(std::ostream &out) {
+  void print(std::ostream& out) {
     out << std::endl;
     out << "Electromagnetics options:" << std::endl;
     out << "  mesh_file   = " << mesh_file << std::endl;

@@ -48,11 +48,11 @@ class Tps;
 class IndependentCoupling : public TPS::Solver {
  private:
   ElectromagneticOptions em_opt_;
-  QuasiMagnetostaticSolverAxiSym *qmsa_solver_;
-  M2ulPhyS *flow_solver_;
+  QuasiMagnetostaticSolverAxiSym* qmsa_solver_;
+  M2ulPhyS* flow_solver_;
 
  public:
-  IndependentCoupling(string &inputFileName, TPS::Tps *tps);
+  IndependentCoupling(string& inputFileName, TPS::Tps* tps);
   ~IndependentCoupling();
 
   void parseSolverOptions() override;

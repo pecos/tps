@@ -46,49 +46,49 @@ using namespace std;
 
 namespace mms {
 
-void exactSolnFunction(const Vector &x, double tin, Vector &y);
-void evaluateForcing(const Vector &x, double time, Array<double> &y);
+void exactSolnFunction(const Vector& x, double tin, Vector& y);
+void evaluateForcing(const Vector& x, double time, Array<double>& y);
 
 }  // namespace mms
 
 namespace dryair2d {
 
-void evaluateForcing(const Vector &x, double time, Array<double> &y);
-void exactSolnFunction(const Vector &x, double tin, Vector &y);
-void initEuler2D(const int dim, RunConfiguration &config);
-void initCNS2DSutherlands(const int dim, RunConfiguration &config);
+void evaluateForcing(const Vector& x, double time, Array<double>& y);
+void exactSolnFunction(const Vector& x, double tin, Vector& y);
+void initEuler2D(const int dim, RunConfiguration& config);
+void initCNS2DSutherlands(const int dim, RunConfiguration& config);
 
 }  // namespace dryair2d
 
 namespace dryair3d {
 
-void evaluateForcing(const Vector &x, double time, Array<double> &y);
+void evaluateForcing(const Vector& x, double time, Array<double>& y);
 
-void exactSolnFunction(const Vector &x, double tin, Vector &y);
-void exactDenFunction(const Vector &x, double tin, Vector &y);
-void exactVelFunction(const Vector &x, double tin, Vector &y);
-void exactPreFunction(const Vector &x, double tin, Vector &y);
+void exactSolnFunction(const Vector& x, double tin, Vector& y);
+void exactDenFunction(const Vector& x, double tin, Vector& y);
+void exactVelFunction(const Vector& x, double tin, Vector& y);
+void exactPreFunction(const Vector& x, double tin, Vector& y);
 
-void initEuler3DTransient(const int dim, RunConfiguration &config);
-void initNS3DTransient(const int dim, RunConfiguration &config);
+void initEuler3DTransient(const int dim, RunConfiguration& config);
+void initNS3DTransient(const int dim, RunConfiguration& config);
 
 }  // namespace dryair3d
 
 namespace ternary2d {
 
-void initTernary2DBase(GasMixture *mixture, RunConfiguration &config, const double Lx, const double Ly);
+void initTernary2DBase(GasMixture* mixture, RunConfiguration& config, const double Lx, const double Ly);
 
-void initTernary2DPeriodic(GasMixture *mixture, RunConfiguration &config, const double Lx, const double Ly);
+void initTernary2DPeriodic(GasMixture* mixture, RunConfiguration& config, const double Lx, const double Ly);
 
-void initTernary2DPeriodicAmbipolar(GasMixture *mixture, RunConfiguration &config, const double Lx, const double Ly);
+void initTernary2DPeriodicAmbipolar(GasMixture* mixture, RunConfiguration& config, const double Lx, const double Ly);
 
-void initTernary2D2TPeriodicAmbipolar(GasMixture *mixture, RunConfiguration &config, const double Lx, const double Ly);
+void initTernary2D2TPeriodicAmbipolar(GasMixture* mixture, RunConfiguration& config, const double Lx, const double Ly);
 
-void initTernary2D2TAmbipolarWall(GasMixture *mixture, RunConfiguration &config, const double Lx, const double Ly);
+void initTernary2D2TAmbipolarWall(GasMixture* mixture, RunConfiguration& config, const double Lx, const double Ly);
 
-void initTernary2D2TAmbipolarInoutlet(GasMixture *mixture, RunConfiguration &config, const double Lx, const double Ly);
+void initTernary2D2TAmbipolarInoutlet(GasMixture* mixture, RunConfiguration& config, const double Lx, const double Ly);
 
-void initTernary2DSheath(GasMixture *mixture, RunConfiguration &config, const double Lx, const double Ly);
+void initTernary2DSheath(GasMixture* mixture, RunConfiguration& config, const double Lx, const double Ly);
 
 }  // namespace ternary2d
 

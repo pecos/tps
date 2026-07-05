@@ -51,8 +51,8 @@ class Tps;
 #include "tps_mfem_wrap.hpp"
 #include "utils.hpp"
 
-using VecFuncT = void(const Vector &x, double t, Vector &u);
-using ScalarFuncT = double(const Vector &x, double t);
+using VecFuncT = void(const Vector& x, double t, Vector& u);
+using ScalarFuncT = double(const Vector& x, double t);
 
 class LoMachOptions;
 struct temporalSchemeCoefficients;
@@ -76,13 +76,13 @@ class Radiation;
 class LteThermoChem final : public ThermoChemModelBase {
  private:
   // Options-related structures
-  TPS::Tps *tpsP_ = nullptr;
+  TPS::Tps* tpsP_ = nullptr;
 
   // Mesh and discretization scheme info
-  ParMesh *pmesh_ = nullptr;
+  ParMesh* pmesh_ = nullptr;
   int order_;
   IntegrationRules gll_rules_;
-  const temporalSchemeCoefficients &time_coeff_;
+  const temporalSchemeCoefficients& time_coeff_;
 
   // Flags
   bool rank0_;                    /**< true if this is rank 0 */
@@ -101,6 +101,15 @@ class LteThermoChem final : public ThermoChemModelBase {
   int max_iter_;        /**< Maximum number of linear solver iterations */
   double rtol_ = 1e-12; /**< Linear solver relative tolerance */
 
+  int dim_;
+  int sDofInt_;
+
+  // flow spark
+  bool spark_ = false;
+  double spark_radius_;
+  double spark_peak_;
+  Vector spark_center_;
+
   // Boundary condition info
   Array<int> temp_ess_attr_; /**< List of patches with Dirichlet BC on temperature */
   Array<int> Qt_ess_attr_;   /**< List of patches with Dirichlet BC on Q (thermal divergence) */
@@ -111,13 +120,13 @@ class LteThermoChem final : public ThermoChemModelBase {
   std::vector<DirichletBC_T<Coefficient>> temp_dbcs_; /**< vector of Dirichlet BC coefficients for T*/
   std::vector<DirichletBC_T<Coefficient>> Qt_dbcs_;   /**< vector of Dirichlet BC coefficients for Q*/
 
-  LinearTable *mu_table_;     // dynamic viscosity
-  LinearTable *kappa_table_;  // thermal conductivity
-  LinearTable *sigma_table_;  // electrical conductivity
-  LinearTable *Rgas_table_;   // specific gas constant
-  LinearTable *Cp_table_;     // specific heat at constant pressure
+  LinearTable* mu_table_;     // dynamic viscosity
+  LinearTable* kappa_table_;  // thermal conductivity
+  LinearTable* sigma_table_;  // electrical conductivity
+  LinearTable* Rgas_table_;   // specific gas constant
+  LinearTable* Cp_table_;     // specific heat at constant pressure
 
-  Radiation *radiation_ = nullptr;
+  Radiation* radiation_ = nullptr;
 
   /// pressure-related, closed-system thermo pressure changes
   double ambient_pressure_, thermo_pressure_, system_mass_;
@@ -129,6 +138,9 @@ class LteThermoChem final : public ThermoChemModelBase {
   double Prt_;
   double invPrt_;
 
+  double Pr_;
+  double invPr_;
+
   bool Tclip_ = false;
   double Tmin_ = 0.0;
   double Tmax_ = 100000.0;
@@ -136,10 +148,13 @@ class LteThermoChem final : public ThermoChemModelBase {
   // FEM related fields and objects
 
   // Scalar \f$H^1\f$ finite element collection.
-  FiniteElementCollection *sfec_ = nullptr;
+  FiniteElementCollection* sfec_ = nullptr;
 
   // Scalar \f$H^1\f$ finite element space.
-  ParFiniteElementSpace *sfes_ = nullptr;
+  ParFiniteElementSpace* sfes_ = nullptr;
+
+  FiniteElementCollection* vfec_ = nullptr;
+  ParFiniteElementSpace* vfes_ = nullptr;
 
   // Fields
   ParGridFunction Tnm1_gf_, Tnm2_gf_;
@@ -158,69 +173,69 @@ class LteThermoChem final : public ThermoChemModelBase {
   ParGridFunction R0PM0_gf_;
   ParGridFunction Qt_gf_;
 
-  ParGridFunction *gridScale_gf_ = nullptr;
+  ParGridFunction* gridScale_gf_ = nullptr;
 
   // ParGridFunction *buffer_tInlet_ = nullptr;
-  GridFunctionCoefficient *temperature_bc_field_ = nullptr;
+  GridFunctionCoefficient* temperature_bc_field_ = nullptr;
 
   ConstantCoefficient bd0_over_dt;
-  VectorGridFunctionCoefficient *un_next_coeff_ = nullptr;
-  GridFunctionCoefficient *rhon_next_coeff_ = nullptr;
-  ScalarVectorProductCoefficient *rho_Cp_u_coeff_ = nullptr;
-  GridFunctionCoefficient *thermal_diff_coeff_ = nullptr;
-  GridFunctionCoefficient *mut_coeff_ = nullptr;
-  ProductCoefficient *kapt_coeff_ = nullptr;
-  GridFunctionCoefficient *mult_coeff_ = nullptr;
-  SumCoefficient *thermal_diff_sum_coeff_ = nullptr;
-  ProductCoefficient *thermal_diff_total_coeff_ = nullptr;
-  GradientGridFunctionCoefficient *gradT_coeff_ = nullptr;
-  ScalarVectorProductCoefficient *kap_gradT_coeff_ = nullptr;
-  GridFunctionCoefficient *rho_coeff_ = nullptr;
-  GridFunctionCoefficient *Cp_coeff_ = nullptr;
-  ProductCoefficient *rho_Cp_over_dt_coeff_ = nullptr;
-  ProductCoefficient *rho_Cp_coeff_ = nullptr;
-  GridFunctionCoefficient *jh_coeff_ = nullptr;
-  GridFunctionCoefficient *radiation_sink_coeff_ = nullptr;
+  VectorGridFunctionCoefficient* un_next_coeff_ = nullptr;
+  GridFunctionCoefficient* rhon_next_coeff_ = nullptr;
+  ScalarVectorProductCoefficient* rho_Cp_u_coeff_ = nullptr;
+  GridFunctionCoefficient* thermal_diff_coeff_ = nullptr;
+  GridFunctionCoefficient* mut_coeff_ = nullptr;
+  ProductCoefficient* kapt_coeff_ = nullptr;
+  GridFunctionCoefficient* mult_coeff_ = nullptr;
+  SumCoefficient* thermal_diff_sum_coeff_ = nullptr;
+  ProductCoefficient* thermal_diff_total_coeff_ = nullptr;
+  GradientGridFunctionCoefficient* gradT_coeff_ = nullptr;
+  ScalarVectorProductCoefficient* kap_gradT_coeff_ = nullptr;
+  GridFunctionCoefficient* rho_coeff_ = nullptr;
+  GridFunctionCoefficient* Cp_coeff_ = nullptr;
+  ProductCoefficient* rho_Cp_over_dt_coeff_ = nullptr;
+  ProductCoefficient* rho_Cp_coeff_ = nullptr;
+  GridFunctionCoefficient* jh_coeff_ = nullptr;
+  GridFunctionCoefficient* radiation_sink_coeff_ = nullptr;
 
-  ProductCoefficient *rad_rho_coeff_ = nullptr;
-  ProductCoefficient *rad_rho_Cp_coeff_ = nullptr;
-  ScalarVectorProductCoefficient *rad_rho_Cp_u_coeff_ = nullptr;
-  ProductCoefficient *rad_rho_Cp_over_dt_coeff_ = nullptr;
-  ProductCoefficient *rad_thermal_diff_total_coeff_ = nullptr;
-  ScalarVectorProductCoefficient *rad_un_next_coeff_ = nullptr;
-  ProductCoefficient *rad_jh_coeff_ = nullptr;
-  ProductCoefficient *rad_radiation_sink_coeff_ = nullptr;
-  ScalarVectorProductCoefficient *rad_kap_gradT_coeff_ = nullptr;
+  ProductCoefficient* rad_rho_coeff_ = nullptr;
+  ProductCoefficient* rad_rho_Cp_coeff_ = nullptr;
+  ScalarVectorProductCoefficient* rad_rho_Cp_u_coeff_ = nullptr;
+  ProductCoefficient* rad_rho_Cp_over_dt_coeff_ = nullptr;
+  ProductCoefficient* rad_thermal_diff_total_coeff_ = nullptr;
+  ScalarVectorProductCoefficient* rad_un_next_coeff_ = nullptr;
+  ProductCoefficient* rad_jh_coeff_ = nullptr;
+  ProductCoefficient* rad_radiation_sink_coeff_ = nullptr;
+  ScalarVectorProductCoefficient* rad_kap_gradT_coeff_ = nullptr;
 
-  VectorMagnitudeCoefficient *umag_coeff_ = nullptr;
-  GridFunctionCoefficient *gscale_coeff_ = nullptr;
-  ProductCoefficient *gscale2_coeff_ = nullptr;
-  GridFunctionCoefficient *visc_coeff_ = nullptr;
-  PowerCoefficient *visc_inv_coeff_ = nullptr;
-  ProductCoefficient *reh1_coeff_ = nullptr;
-  ProductCoefficient *reh2_coeff_ = nullptr;
-  ProductCoefficient *Reh_coeff_ = nullptr;
-  ExtTransformedCoefficient *csupg_coeff_ = nullptr;
-  ProductCoefficient *uw1_coeff_ = nullptr;
-  ProductCoefficient *uw2_coeff_ = nullptr;
-  ProductCoefficient *upwind_coeff_ = nullptr;
-  TransformedMatrixVectorCoefficient *swdiff_coeff_ = nullptr;
-  ScalarMatrixProductCoefficient *supg_coeff_ = nullptr;
+  VectorMagnitudeCoefficient* umag_coeff_ = nullptr;
+  GridFunctionCoefficient* gscale_coeff_ = nullptr;
+  ProductCoefficient* gscale2_coeff_ = nullptr;
+  GridFunctionCoefficient* visc_coeff_ = nullptr;
+  PowerCoefficient* visc_inv_coeff_ = nullptr;
+  ProductCoefficient* reh1_coeff_ = nullptr;
+  ProductCoefficient* reh2_coeff_ = nullptr;
+  ProductCoefficient* Reh_coeff_ = nullptr;
+  ExtTransformedCoefficient* csupg_coeff_ = nullptr;
+  ProductCoefficient* uw1_coeff_ = nullptr;
+  ProductCoefficient* uw2_coeff_ = nullptr;
+  ProductCoefficient* upwind_coeff_ = nullptr;
+  TransformedMatrixVectorCoefficient* swdiff_coeff_ = nullptr;
+  ScalarMatrixProductCoefficient* supg_coeff_ = nullptr;
 
   // operators and solvers
-  ParBilinearForm *At_form_ = nullptr;
-  ParBilinearForm *Ms_form_ = nullptr;
-  ParBilinearForm *M_rho_Cp_form_ = nullptr;
-  ParBilinearForm *Ht_form_ = nullptr;
+  ParBilinearForm* At_form_ = nullptr;
+  ParBilinearForm* Ms_form_ = nullptr;
+  ParBilinearForm* M_rho_Cp_form_ = nullptr;
+  ParBilinearForm* Ht_form_ = nullptr;
 
-  ParBilinearForm *M_rho_form_ = nullptr;
-  ParBilinearForm *A_rho_form_ = nullptr;
+  ParBilinearForm* M_rho_form_ = nullptr;
+  ParBilinearForm* A_rho_form_ = nullptr;
 
-  ParLinearForm *jh_form_ = nullptr;
+  ParLinearForm* jh_form_ = nullptr;
 
-  ParBilinearForm *Mq_form_ = nullptr;
-  ParBilinearForm *LQ_form_ = nullptr;
-  ParLinearForm *LQ_bdry_ = nullptr;
+  ParBilinearForm* Mq_form_ = nullptr;
+  ParBilinearForm* LQ_form_ = nullptr;
+  ParLinearForm* LQ_bdry_ = nullptr;
 
   OperatorHandle At_;
   OperatorHandle Ht_;
@@ -231,14 +246,14 @@ class LteThermoChem final : public ThermoChemModelBase {
   OperatorHandle M_rho_;
   OperatorHandle A_rho_;
 
-  mfem::Solver *MsInvPC_ = nullptr;
-  mfem::CGSolver *MsInv_ = nullptr;
-  mfem::Solver *MqInvPC_ = nullptr;
-  mfem::CGSolver *MqInv_ = nullptr;
-  mfem::Solver *MrhoInvPC_ = nullptr;
-  mfem::CGSolver *MrhoInv_ = nullptr;
-  mfem::Solver *HtInvPC_ = nullptr;
-  mfem::CGSolver *HtInv_ = nullptr;
+  mfem::Solver* MsInvPC_ = nullptr;
+  mfem::CGSolver* MsInv_ = nullptr;
+  mfem::Solver* MqInvPC_ = nullptr;
+  mfem::CGSolver* MqInv_ = nullptr;
+  mfem::Solver* MrhoInvPC_ = nullptr;
+  mfem::CGSolver* MrhoInv_ = nullptr;
+  mfem::Solver* HtInvPC_ = nullptr;
+  mfem::CGSolver* HtInv_ = nullptr;
 
   // Vectors
   Vector Tn_, Tn_next_, Tnm1_, Tnm2_;
@@ -262,23 +277,23 @@ class LteThermoChem final : public ThermoChemModelBase {
   int filter_cutoff_modes_ = 0;
   double filter_alpha_ = 0.0;
 
-  FiniteElementCollection *sfec_filter_ = nullptr;
-  ParFiniteElementSpace *sfes_filter_ = nullptr;
+  FiniteElementCollection* sfec_filter_ = nullptr;
+  ParFiniteElementSpace* sfes_filter_ = nullptr;
   ParGridFunction Tn_NM1_gf_;
   ParGridFunction Tn_filtered_gf_;
 
  public:
-  LteThermoChem(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &timeCoeff,
-                ParGridFunction *gridScale, TPS::Tps *tps);
+  LteThermoChem(mfem::ParMesh* pmesh, LoMachOptions* loMach_opts, temporalSchemeCoefficients& timeCoeff,
+                ParGridFunction* gridScale, TPS::Tps* tps);
   virtual ~LteThermoChem();
 
   // Functions overriden from base class
   void initializeSelf() final;
   void initializeOperators() final;
-  void initializeStats(Averaging &average, IODataOrganizer &io, bool continuation) final;
+  void initializeStats(Averaging& average, IODataOrganizer& io, bool continuation) final;
   void step() final;
-  void initializeIO(IODataOrganizer &io) final;
-  void initializeViz(ParaViewDataCollection &pvdc) final;
+  void initializeIO(IODataOrganizer& io) final;
+  void initializeViz(ParaViewDataCollection& pvdc) final;
   void evaluatePlasmaConductivityGF() final;
 
   // Functions added here
@@ -292,25 +307,25 @@ class LteThermoChem final : public ThermoChemModelBase {
   void updateHistory();
 
   /// Return a pointer to the current temperature ParGridFunction.
-  ParGridFunction *GetCurrentTemperature() { return &Tn_gf_; }
+  ParGridFunction* GetCurrentTemperature() { return &Tn_gf_; }
 
   /// Return a pointer to the current density ParGridFunction.
-  ParGridFunction *GetCurrentDensity() { return &rn_gf_; }
+  ParGridFunction* GetCurrentDensity() { return &rn_gf_; }
 
   /// Return a pointer to the current total viscosity ParGridFunction.
-  ParGridFunction *GetCurrentViscosity() { return &mu_gf_; }
+  ParGridFunction* GetCurrentViscosity() { return &mu_gf_; }
 
   /// Return a pointer to the current total thermal diffusivity ParGridFunction.
-  ParGridFunction *GetCurrentThermalDiffusivity() { return &kappa_gf_; }
+  ParGridFunction* GetCurrentThermalDiffusivity() { return &kappa_gf_; }
 
   /// Return a pointer to the current total thermal diffusivity ParGridFunction.
-  ParGridFunction *GetCurrentThermalDiv() { return &Qt_gf_; }
+  ParGridFunction* GetCurrentThermalDiv() { return &Qt_gf_; }
 
   /// Add a Dirichlet boundary condition to the temperature and Qt field.
-  void AddTempDirichletBC(const double &temp, Array<int> &attr);
-  void AddTempDirichletBC(Coefficient *coeff, Array<int> &attr);
-  void AddTempDirichletBC(ScalarFuncT *f, Array<int> &attr);
-  void AddQtDirichletBC(Coefficient *coeff, Array<int> &attr);
-  void AddQtDirichletBC(ScalarFuncT *f, Array<int> &attr);
+  void AddTempDirichletBC(const double& temp, Array<int>& attr);
+  void AddTempDirichletBC(Coefficient* coeff, Array<int>& attr);
+  void AddTempDirichletBC(ScalarFuncT* f, Array<int>& attr);
+  void AddQtDirichletBC(Coefficient* coeff, Array<int>& attr);
+  void AddQtDirichletBC(ScalarFuncT* f, Array<int>& attr);
 };
 #endif  // LTE_THERMO_CHEM_HPP_

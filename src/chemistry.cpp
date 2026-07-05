@@ -35,9 +35,9 @@
 using namespace mfem;
 using namespace std;
 
-Chemistry::Chemistry(GasMixture *mixture, RunConfiguration &config) : Chemistry(mixture, config.chemistryInput) {}
+Chemistry::Chemistry(GasMixture* mixture, RunConfiguration& config) : Chemistry(mixture, config.chemistryInput) {}
 
-MFEM_HOST_DEVICE Chemistry::Chemistry(GasMixture *mixture, const ChemistryInput &inputs) : mixture_(mixture) {
+MFEM_HOST_DEVICE Chemistry::Chemistry(GasMixture* mixture, const ChemistryInput& inputs) : mixture_(mixture) {
   numEquations_ = mixture->GetNumEquations();
   numSpecies_ = mixture->GetNumSpecies();
   numActiveSpecies_ = mixture->GetNumActiveSpecies();
@@ -121,19 +121,19 @@ MFEM_HOST_DEVICE Chemistry::~Chemistry() {
   }
 }
 
-MFEM_HOST_DEVICE void Chemistry::setRates(const double *data, int size) {
+MFEM_HOST_DEVICE void Chemistry::setRates(const double* data, int size) {
   for (int r = 0; r < numReactions_; r++) {
     if (reactions_[r]->reactionModel == GRIDFUNCTION_RXN) {
-      GridFunctionReaction *rx = (GridFunctionReaction *)(reactions_[r]);
+      GridFunctionReaction* rx = (GridFunctionReaction*)(reactions_[r]);
       rx->setData(data, size);
     }
   }
 }
 
-void Chemistry::setGridFunctionRates(mfem::GridFunction &f) {
+void Chemistry::setGridFunctionRates(mfem::GridFunction& f) {
   for (int r = 0; r < numReactions_; r++) {
     if (reactions_[r]->reactionModel == GRIDFUNCTION_RXN) {
-      GridFunctionReaction *rx = dynamic_cast<GridFunctionReaction *>(reactions_[r]);
+      GridFunctionReaction* rx = dynamic_cast<GridFunctionReaction*>(reactions_[r]);
       rx->setGridFunction(f);
     }
   }
@@ -158,8 +158,8 @@ void Chemistry::computeForwardRateCoeffs(const mfem::Vector &ns, const double &T
 }
 #endif
 
-MFEM_HOST_DEVICE void Chemistry::computeForwardRateCoeffs(const double *ns, const double &T_h, const double &T_e,
-                                                          const int &dofindex, double *kfwd) {
+MFEM_HOST_DEVICE void Chemistry::computeForwardRateCoeffs(const double* ns, const double& T_h, const double& T_e,
+                                                          const int& dofindex, double* kfwd) {
   // kfwd.SetSize(numReactions_);
   for (int r = 0; r < numReactions_; r++) kfwd[r] = 0.0;
 
@@ -198,7 +198,7 @@ void Chemistry::computeEquilibriumConstants(const double &T_h, const double &T_e
 }
 #endif
 
-MFEM_HOST_DEVICE void Chemistry::computeEquilibriumConstants(const double &T_h, const double &T_e, double *kC) {
+MFEM_HOST_DEVICE void Chemistry::computeEquilibriumConstants(const double& T_h, const double& T_e, double* kC) {
   for (int r = 0; r < numReactions_; r++) kC[r] = 0.0;
 
   const double Thlim = max(T_h, min_temperature_);
@@ -217,8 +217,8 @@ MFEM_HOST_DEVICE void Chemistry::computeEquilibriumConstants(const double &T_h, 
 }
 
 // compute progress rate based on mass-action law.
-void Chemistry::computeProgressRate(const mfem::Vector &ns, const mfem::Vector &kfwd, const mfem::Vector &keq,
-                                    mfem::Vector &progressRate) {
+void Chemistry::computeProgressRate(const mfem::Vector& ns, const mfem::Vector& kfwd, const mfem::Vector& keq,
+                                    mfem::Vector& progressRate) {
   progressRate.SetSize(numReactions_);
   computeProgressRate(&ns[0], &kfwd[0], &keq[0], &progressRate[0]);
   // for (int r = 0; r < numReactions_; r++) {
@@ -235,8 +235,8 @@ void Chemistry::computeProgressRate(const mfem::Vector &ns, const mfem::Vector &
   // }
 }
 
-MFEM_HOST_DEVICE void Chemistry::computeProgressRate(const double *ns, const double *kfwd, const double *keq,
-                                                     double *progressRate) {
+MFEM_HOST_DEVICE void Chemistry::computeProgressRate(const double* ns, const double* kfwd, const double* keq,
+                                                     double* progressRate) {
   // progressRate.SetSize(numReactions_);
   for (int r = 0; r < numReactions_; r++) {
     // forward reaction rate
@@ -253,8 +253,8 @@ MFEM_HOST_DEVICE void Chemistry::computeProgressRate(const double *ns, const dou
 }
 
 // compute creation rate based on progress rates.
-void Chemistry::computeCreationRate(const mfem::Vector &progressRate, mfem::Vector &creationRate,
-                                    mfem::Vector &emissionRate) {
+void Chemistry::computeCreationRate(const mfem::Vector& progressRate, mfem::Vector& creationRate,
+                                    mfem::Vector& emissionRate) {
   creationRate.SetSize(numSpecies_);
   emissionRate.SetSize(numSpecies_);
   computeCreationRate(&progressRate[0], &creationRate[0], &emissionRate[0]);
@@ -274,8 +274,8 @@ void Chemistry::computeCreationRate(const mfem::Vector &progressRate, mfem::Vect
   // //   assert(fabs(totMass) < 1e-7);
 }
 
-MFEM_HOST_DEVICE void Chemistry::computeCreationRate(const double *progressRate, double *creationRate,
-                                                     double *emissionRate) {
+MFEM_HOST_DEVICE void Chemistry::computeCreationRate(const double* progressRate, double* creationRate,
+                                                     double* emissionRate) {
   // creationRate.SetSize(numSpecies_);
   for (int sp = 0; sp < numSpecies_; sp++) creationRate[sp] = 0.;
   for (int sp = 0; sp < numSpecies_; sp++) emissionRate[sp] = 0.;

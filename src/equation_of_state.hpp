@@ -146,7 +146,7 @@ class GasMixture {
   }
 
  public:
-  GasMixture(RunConfiguration &_runfile, int _dim, int nvel);
+  GasMixture(RunConfiguration& _runfile, int _dim, int nvel);
   MFEM_HOST_DEVICE GasMixture(WorkingFluid f, int _dim, int nvel, double pc = 0);
   GasMixture() {}
 
@@ -181,20 +181,20 @@ class GasMixture {
   int GetNumConservativeVariables() { return Nconservative; }
   int GetNumPrimitiveVariables() { return Nprimitive; }
 
-  virtual double ComputePressure(const Vector &state,
-                                 double *electronPressure = NULL) = 0;  // pressure from conservatives
-  MFEM_HOST_DEVICE virtual double ComputePressure(const double *state, double *electronPressure = NULL) {
+  virtual double ComputePressure(const Vector& state,
+                                 double* electronPressure = NULL) = 0;  // pressure from conservatives
+  MFEM_HOST_DEVICE virtual double ComputePressure(const double* state, double* electronPressure = NULL) {
     printf("ComputePressure not implemented");
     return 0;
   }
 
-  virtual double ComputePressureFromPrimitives(const Vector &Up) = 0;  // pressure from primitive variables
-  MFEM_HOST_DEVICE virtual double ComputePressureFromPrimitives(const double *Up) {
+  virtual double ComputePressureFromPrimitives(const Vector& Up) = 0;  // pressure from primitive variables
+  MFEM_HOST_DEVICE virtual double ComputePressureFromPrimitives(const double* Up) {
     // mfem_error("ComputePressureFromPrimitives is not implemented.");
     return -1.0;
   }
-  virtual double ComputeTemperature(const Vector &state) = 0;
-  MFEM_HOST_DEVICE virtual double ComputeTemperature(const double *state) {
+  virtual double ComputeTemperature(const Vector& state) = 0;
+  MFEM_HOST_DEVICE virtual double ComputeTemperature(const double* state) {
     // mfem_error("ComputeTemperature is not implemented.");
     return -1.0;
   }
@@ -202,53 +202,53 @@ class GasMixture {
   // virtual double Temperature(double *rho, double *p,
   //                            int nsp) = 0;  // temperature given densities and pressures of all species
 
-  virtual void computeSpeciesPrimitives(const Vector &conservedState, Vector &X_sp, Vector &Y_sp, Vector &n_sp) {
+  virtual void computeSpeciesPrimitives(const Vector& conservedState, Vector& X_sp, Vector& Y_sp, Vector& n_sp) {
     mfem_error("computeSpeciesPrimitives not implemented");
   }
-  MFEM_HOST_DEVICE virtual void computeSpeciesPrimitives(const double *conservedState, double *X_sp, double *Y_sp,
-                                                         double *n_sp) {
+  MFEM_HOST_DEVICE virtual void computeSpeciesPrimitives(const double* conservedState, double* X_sp, double* Y_sp,
+                                                         double* n_sp) {
     printf("ERROR: computeSpeciesPrimitives is not implemented!\n");
     assert(false);  // device-compatible exit?
   }
-  virtual void computeSpeciesEnthalpies(const Vector &state, Vector &speciesEnthalpies) = 0;
-  MFEM_HOST_DEVICE virtual void computeSpeciesEnthalpies(const double *state, double *speciesEnthalpies) = 0;
+  virtual void computeSpeciesEnthalpies(const Vector& state, Vector& speciesEnthalpies) = 0;
+  MFEM_HOST_DEVICE virtual void computeSpeciesEnthalpies(const double* state, double* speciesEnthalpies) = 0;
 
-  virtual void GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit) = 0;
-  virtual void GetConservativesFromPrimitives(const Vector &primit, Vector &conserv) = 0;
+  virtual void GetPrimitivesFromConservatives(const Vector& conserv, Vector& primit) = 0;
+  virtual void GetConservativesFromPrimitives(const Vector& primit, Vector& conserv) = 0;
 
-  MFEM_HOST_DEVICE virtual void GetPrimitivesFromConservatives(const double *conserv, double *primit) {
+  MFEM_HOST_DEVICE virtual void GetPrimitivesFromConservatives(const double* conserv, double* primit) {
     printf("GetPrimitivesFromConservatives is not implemented.");
     return;
   }
-  MFEM_HOST_DEVICE virtual void GetConservativesFromPrimitives(const double *primit, double *conserv) {
+  MFEM_HOST_DEVICE virtual void GetConservativesFromPrimitives(const double* primit, double* conserv) {
     printf("GetPrimitivesFromConservatives is not implemented.");
     return;
   }
 
-  virtual double ComputeSpeedOfSound(const Vector &Uin, bool primitive = true) = 0;
+  virtual double ComputeSpeedOfSound(const Vector& Uin, bool primitive = true) = 0;
 
   // Compute the maximum characteristic speed.
-  virtual double ComputeMaxCharSpeed(const Vector &state) = 0;
-  MFEM_HOST_DEVICE virtual double ComputeMaxCharSpeed(const double *state) {
+  virtual double ComputeMaxCharSpeed(const Vector& state) = 0;
+  MFEM_HOST_DEVICE virtual double ComputeMaxCharSpeed(const double* state) {
     printf("ComputeMaxCharSpeed not implemented");
     return 0;
   }
 
-  virtual double ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin, bool primitive = true) = 0;
+  virtual double ComputePressureDerivative(const Vector& dUp_dx, const Vector& Uin, bool primitive = true) = 0;
 
   // Physicality check (at end)
-  virtual bool StateIsPhysical(const Vector &state) = 0;
+  virtual bool StateIsPhysical(const Vector& state) = 0;
 
   // Compute X, Y gradients from number density gradient.
   // NOTE(kevin): for axisymmetric case, these handle only r- and z-direction.
-  virtual void ComputeMassFractionGradient(const double rho, const Vector &numberDensities, const DenseMatrix &gradUp,
-                                           DenseMatrix &massFractionGrad) = 0;
-  virtual void ComputeMoleFractionGradient(const Vector &numberDensities, const DenseMatrix &gradUp,
-                                           DenseMatrix &moleFractionGrad) = 0;
-  MFEM_HOST_DEVICE virtual void ComputeMoleFractionGradient(const double *numberDensities, const double *gradUp,
-                                                            double *moleFractionGrad) = 0;
+  virtual void ComputeMassFractionGradient(const double rho, const Vector& numberDensities, const DenseMatrix& gradUp,
+                                           DenseMatrix& massFractionGrad) = 0;
+  virtual void ComputeMoleFractionGradient(const Vector& numberDensities, const DenseMatrix& gradUp,
+                                           DenseMatrix& moleFractionGrad) = 0;
+  MFEM_HOST_DEVICE virtual void ComputeMoleFractionGradient(const double* numberDensities, const double* gradUp,
+                                                            double* moleFractionGrad) = 0;
   // TODO(kevin): Compute pressure gradient from temperature gradient.
-  virtual void ComputePressureGradient(const Vector &state, const DenseMatrix &gradUp, DenseMatrix &PressureGrad) {
+  virtual void ComputePressureGradient(const Vector& state, const DenseMatrix& gradUp, DenseMatrix& PressureGrad) {
     mfem_error("ComputePressureGradient not implemented");
   }
 
@@ -264,13 +264,13 @@ class GasMixture {
   virtual double GetGasConstant() = 0;
 #endif
 
-  virtual void computeNumberDensities(const Vector &conservedState, Vector &n_sp) {
+  virtual void computeNumberDensities(const Vector& conservedState, Vector& n_sp) {
     mfem::mfem_error("GasMixture::computeNumberDensities not implemented");
   }
 
-  void SetConstantPlasmaConductivity(ParGridFunction *pc, const ParGridFunction *Up, const ParGridFunction *coords);
+  void SetConstantPlasmaConductivity(ParGridFunction* pc, const ParGridFunction* Up, const ParGridFunction* coords);
 
-  virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up);
+  virtual void UpdatePressureGridFunction(ParGridFunction* press, const ParGridFunction* Up);
 
 // TODO(kevin): GPU routines are not yet fully gas-agnostic. Need to be removed.
 #ifdef _GPU_
@@ -290,15 +290,15 @@ class GasMixture {
   }
 
   // BC related functions
-  virtual void computeStagnationState(const Vector &stateIn, Vector &stagnationState);
-  virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp, Vector &stateOut) {
+  virtual void computeStagnationState(const Vector& stateIn, Vector& stagnationState);
+  virtual void computeStagnantStateWithTemp(const Vector& stateIn, const double Temp, Vector& stateOut) {
     mfem_error("computeStagnantStateWithTemp not implemented");
   }
-  virtual void modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p,
+  virtual void modifyEnergyForPressure(const Vector& stateIn, Vector& stateOut, const double& p,
                                        bool modifyElectronEnergy = false) {
     mfem_error("modifyEnergyForPressure not implemented");
   }
-  MFEM_HOST_DEVICE virtual void modifyEnergyForPressure(const double *stateIn, double *stateOut, const double &p,
+  MFEM_HOST_DEVICE virtual void modifyEnergyForPressure(const double* stateIn, double* stateOut, const double& p,
                                                         bool modifyElectronEnergy = false) {
     // mfem_error("modifyEnergyForPressure not implemented");
     return;
@@ -306,11 +306,11 @@ class GasMixture {
 
   // Modify state with a prescribed condition at boundary.
   // TODO(kevin): it is possible to use this routine for all BCs, so no need of making so many functions as above.
-  void modifyStateFromPrimitive(const Vector &state, const BoundaryPrimitiveData &bcState, Vector &outputState);
-  MFEM_HOST_DEVICE void modifyStateFromPrimitive(const double *state, const BoundaryPrimitiveData &bcState,
-                                                 double *outputState);
-  virtual void computeSheathBdrFlux(const Vector &state, BoundaryViscousFluxData &bcFlux) = 0;
-  MFEM_HOST_DEVICE virtual void computeSheathBdrFlux(const double *state, BoundaryViscousFluxData &bcFlux) {
+  void modifyStateFromPrimitive(const Vector& state, const BoundaryPrimitiveData& bcState, Vector& outputState);
+  MFEM_HOST_DEVICE void modifyStateFromPrimitive(const double* state, const BoundaryPrimitiveData& bcState,
+                                                 double* outputState);
+  virtual void computeSheathBdrFlux(const Vector& state, BoundaryViscousFluxData& bcFlux) = 0;
+  MFEM_HOST_DEVICE virtual void computeSheathBdrFlux(const double* state, BoundaryViscousFluxData& bcFlux) {
     // mfem_error("computeSheathBdrFlux is not implemented");
     return;
   }
@@ -326,26 +326,26 @@ class GasMixture {
   //  }
 
   // TODO(kevin): check if this works for axisymmetric case.
-  virtual void computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal,
-                                                       Vector &conservedState) {
+  virtual void computeConservedStateFromConvectiveFlux(const Vector& meanNormalFluxes, const Vector& normal,
+                                                       Vector& conservedState) {
     mfem_error("computeConservedStateFromConvectiveFlux not implemented");
   }
 
   virtual double computeElectronEnergy(const double n_e, const double T_e) = 0;
   virtual double computeElectronPressure(const double n_e, const double T_e) = 0;
   // NOTE(kevin): for axisymmetric case, this handles only r- and z-direction.
-  virtual void computeElectronPressureGrad(const double n_e, const double T_e, const DenseMatrix &gradUp,
-                                           Vector &gradPe) = 0;
-  MFEM_HOST_DEVICE virtual void computeElectronPressureGrad(const double n_e, const double T_e, const double *gradUp,
-                                                            double *gradPe) = 0;
+  virtual void computeElectronPressureGrad(const double n_e, const double T_e, const DenseMatrix& gradUp,
+                                           Vector& gradPe) = 0;
+  MFEM_HOST_DEVICE virtual void computeElectronPressureGrad(const double n_e, const double T_e, const double* gradUp,
+                                                            double* gradPe) = 0;
 
-  virtual void GetSpeciesFromLTE(double *conserv, double *primit, TableInterpolator2D *energy_table,
-                                 TableInterpolator2D *R_table, TableInterpolator2D *c_table,
-                                 TableInterpolator2D *T_table) {
+  virtual void GetSpeciesFromLTE(double* conserv, double* primit, TableInterpolator2D* energy_table,
+                                 TableInterpolator2D* R_table, TableInterpolator2D* c_table,
+                                 TableInterpolator2D* T_table) {
     printf("GetSpeciesFromLTE is not implemented.");
     return;
   }
-  virtual void GetSpeciesFromLTE(const double T, const double p, double *n_sp) {
+  virtual void GetSpeciesFromLTE(const double T, const double p, double* n_sp) {
     printf("GetSpeciesFromLTE is not implemented.");
     return;
   }
@@ -363,7 +363,7 @@ class DryAir : public GasMixture {
   virtual void setNumEquations();
 
  public:
-  DryAir(RunConfiguration &_runfile, int _dim, int nvel);
+  DryAir(RunConfiguration& _runfile, int _dim, int nvel);
   // MFEM_HOST_DEVICE DryAir(const WorkingFluid f, const Equations eq_sys, const double viscosity_multiplier,
   //                         const double bulk_viscosity, int _dim, int nvel);
   MFEM_HOST_DEVICE DryAir(const DryAirInput inputs, int _dim, int nvel);
@@ -378,47 +378,47 @@ class DryAir : public GasMixture {
   }
 
   // implementation virtual methods
-  virtual double ComputePressure(const Vector &state, double *electronPressure = NULL);
-  MFEM_HOST_DEVICE virtual double ComputePressure(const double *state, double *electronPressure = NULL);
+  virtual double ComputePressure(const Vector& state, double* electronPressure = NULL);
+  MFEM_HOST_DEVICE virtual double ComputePressure(const double* state, double* electronPressure = NULL);
 
-  virtual double ComputePressureFromPrimitives(const Vector &Up);
-  MFEM_HOST_DEVICE virtual double ComputePressureFromPrimitives(const double *Up);
-  virtual double ComputeTemperature(const Vector &state);
-  MFEM_HOST_DEVICE virtual double ComputeTemperature(const double *state);
+  virtual double ComputePressureFromPrimitives(const Vector& Up);
+  MFEM_HOST_DEVICE virtual double ComputePressureFromPrimitives(const double* Up);
+  virtual double ComputeTemperature(const Vector& state);
+  MFEM_HOST_DEVICE virtual double ComputeTemperature(const double* state);
   // virtual double Temperature(double *rho, double *p, int nsp = 1) { return p[0] / gas_constant / rho[0]; }
 
-  virtual void computeSpeciesEnthalpies(const Vector &state, Vector &speciesEnthalpies);
-  MFEM_HOST_DEVICE virtual void computeSpeciesEnthalpies(const double *state, double *speciesEnthalpies);
+  virtual void computeSpeciesEnthalpies(const Vector& state, Vector& speciesEnthalpies);
+  MFEM_HOST_DEVICE virtual void computeSpeciesEnthalpies(const double* state, double* speciesEnthalpies);
 
-  virtual void GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit);
-  MFEM_HOST_DEVICE virtual void GetPrimitivesFromConservatives(const double *conserv, double *primit);
-  virtual void GetConservativesFromPrimitives(const Vector &primit, Vector &conserv);
-  MFEM_HOST_DEVICE virtual void GetConservativesFromPrimitives(const double *primit, double *conserv);
+  virtual void GetPrimitivesFromConservatives(const Vector& conserv, Vector& primit);
+  MFEM_HOST_DEVICE virtual void GetPrimitivesFromConservatives(const double* conserv, double* primit);
+  virtual void GetConservativesFromPrimitives(const Vector& primit, Vector& conserv);
+  MFEM_HOST_DEVICE virtual void GetConservativesFromPrimitives(const double* primit, double* conserv);
 
-  virtual double ComputeSpeedOfSound(const Vector &Uin, bool primitive = true);
+  virtual double ComputeSpeedOfSound(const Vector& Uin, bool primitive = true);
 
   // Compute the maximum characteristic speed.
-  virtual double ComputeMaxCharSpeed(const Vector &state);
-  MFEM_HOST_DEVICE virtual double ComputeMaxCharSpeed(const double *state);
+  virtual double ComputeMaxCharSpeed(const Vector& state);
+  MFEM_HOST_DEVICE virtual double ComputeMaxCharSpeed(const double* state);
 
-  virtual double ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin, bool primitive = true);
+  virtual double ComputePressureDerivative(const Vector& dUp_dx, const Vector& Uin, bool primitive = true);
 
   // Physicality check (at end)
-  virtual bool StateIsPhysical(const Vector &state);
+  virtual bool StateIsPhysical(const Vector& state);
 
   MFEM_HOST_DEVICE virtual double GetSpecificHeatRatio() { return specific_heat_ratio; }
   MFEM_HOST_DEVICE virtual double GetGasConstant() { return gas_constant; }
 
-  virtual void ComputeMassFractionGradient(const double rho, const Vector &numberDensities, const DenseMatrix &gradUp,
-                                           DenseMatrix &massFractionGrad) {
+  virtual void ComputeMassFractionGradient(const double rho, const Vector& numberDensities, const DenseMatrix& gradUp,
+                                           DenseMatrix& massFractionGrad) {
     mfem_error("computeMassFractionGradient not implemented");
   }
-  virtual void ComputeMoleFractionGradient(const Vector &numberDensities, const DenseMatrix &gradUp,
-                                           DenseMatrix &moleFractionGrad) {
+  virtual void ComputeMoleFractionGradient(const Vector& numberDensities, const DenseMatrix& gradUp,
+                                           DenseMatrix& moleFractionGrad) {
     mfem_error("computeMoleFractionGradient not implemented");
   }
-  MFEM_HOST_DEVICE virtual void ComputeMoleFractionGradient(const double *numberDensities, const double *gradUp,
-                                                            double *moleFractionGrad) {
+  MFEM_HOST_DEVICE virtual void ComputeMoleFractionGradient(const double* numberDensities, const double* gradUp,
+                                                            double* moleFractionGrad) {
     printf("computeMoleFractionGradient not implemented");
     assert(false);
   }
@@ -426,23 +426,23 @@ class DryAir : public GasMixture {
   // virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up);
 
   // BC related functions
-  virtual void computeStagnationState(const Vector &stateIn, Vector &stagnationState);
-  virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp, Vector &stateOut);
-  virtual void modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p,
+  virtual void computeStagnationState(const Vector& stateIn, Vector& stagnationState);
+  virtual void computeStagnantStateWithTemp(const Vector& stateIn, const double Temp, Vector& stateOut);
+  virtual void modifyEnergyForPressure(const Vector& stateIn, Vector& stateOut, const double& p,
                                        bool modifyElectronEnergy = false);
-  MFEM_HOST_DEVICE virtual void modifyEnergyForPressure(const double *stateIn, double *stateOut, const double &p,
+  MFEM_HOST_DEVICE virtual void modifyEnergyForPressure(const double* stateIn, double* stateOut, const double& p,
                                                         bool modifyElectronEnergy = false);
 
-  virtual void computeSheathBdrFlux(const Vector &state, BoundaryViscousFluxData &bcFlux) {
+  virtual void computeSheathBdrFlux(const Vector& state, BoundaryViscousFluxData& bcFlux) {
     mfem_error("computeSheathBdrFlux not implemented");
   }
-  MFEM_HOST_DEVICE virtual void computeSheathBdrFlux(const double *state, BoundaryViscousFluxData &bcFlux) {
+  MFEM_HOST_DEVICE virtual void computeSheathBdrFlux(const double* state, BoundaryViscousFluxData& bcFlux) {
     printf("ERROR: computeSheathBdrFlux is not supposed to be executed for DryAir!");
     return;
   }
 
-  virtual void computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal,
-                                                       Vector &conservedState);
+  virtual void computeConservedStateFromConvectiveFlux(const Vector& meanNormalFluxes, const Vector& normal,
+                                                       Vector& conservedState);
 
   virtual double computeElectronEnergy(const double n_e, const double T_e) {
     mfem_error("computeElectronEnergy not implemented");
@@ -452,39 +452,39 @@ class DryAir : public GasMixture {
     mfem_error("computeElectronPressure not implemented");
     return 0;
   }
-  virtual void computeElectronPressureGrad(const double n_e, const double T_e, const DenseMatrix &gradUp,
-                                           Vector &gradPe) {
+  virtual void computeElectronPressureGrad(const double n_e, const double T_e, const DenseMatrix& gradUp,
+                                           Vector& gradPe) {
     mfem_error("computeElectronPressureGrad not implemented");
   }
-  MFEM_HOST_DEVICE virtual void computeElectronPressureGrad(const double n_e, const double T_e, const double *gradUp,
-                                                            double *gradPe) {
+  MFEM_HOST_DEVICE virtual void computeElectronPressureGrad(const double n_e, const double T_e, const double* gradUp,
+                                                            double* gradPe) {
     printf("computeElectronPressureGrad not implemented");
   }
 
   // GPU functions
   // TODO(kevin): GPU part is not refactored for axisymmetric case.
 #ifdef _GPU_
-  static MFEM_HOST_DEVICE double pressure(const double *state, double *KE, const double &gamma, const int &dim,
-                                          const int &num_equation) {
+  static MFEM_HOST_DEVICE double pressure(const double* state, double* KE, const double& gamma, const int& dim,
+                                          const int& num_equation) {
     double p = 0.;
     for (int k = 0; k < dim; k++) p += KE[k];
     return (gamma - 1.) * (state[1 + dim] - p);
   }
 
-  static MFEM_HOST_DEVICE double ComputePressureFromPrimitives_gpu(const double *Up, const double &Rg, const int &dim) {
+  static MFEM_HOST_DEVICE double ComputePressureFromPrimitives_gpu(const double* Up, const double& Rg, const int& dim) {
     return Up[0] * Rg * Up[1 + dim];
   }
 
-  static MFEM_HOST_DEVICE double temperature(const double *state, double *KE, const double &gamma, const double &Rgas,
-                                             const int &dim, const int &num_equation) {
+  static MFEM_HOST_DEVICE double temperature(const double* state, double* KE, const double& gamma, const double& Rgas,
+                                             const int& dim, const int& num_equation) {
     double temp = 0.;
     for (int k = 0; k < dim; k++) temp += KE[k];
     temp /= state[0];
     return (gamma - 1.0) / Rgas * (state[1 + dim] / state[0] - temp);
   }
 
-  static MFEM_HOST_DEVICE double temperatureFromConservative(const double *u, const double &gamma, const double &Rg,
-                                                             const int &dim, const int &num_equation) {
+  static MFEM_HOST_DEVICE double temperatureFromConservative(const double* u, const double& gamma, const double& Rg,
+                                                             const int& dim, const int& num_equation) {
     double k = 0.;
     for (int d = 0; d < dim; d++) k += u[1 + d] * u[1 + d];
     k /= u[0] * u[0];
@@ -492,38 +492,38 @@ class DryAir : public GasMixture {
   }
 
   // Sutherland's law
-  static MFEM_HOST_DEVICE double GetViscosity_gpu(const double &temp) {
+  static MFEM_HOST_DEVICE double GetViscosity_gpu(const double& temp) {
     return 1.458e-6 * pow(temp, 1.5) / (temp + 110.4);
   }
 
-  static MFEM_HOST_DEVICE double GetThermalConductivity_gpu(const double &visc, const double &gamma, const double &Rg,
-                                                            const double &Pr) {
+  static MFEM_HOST_DEVICE double GetThermalConductivity_gpu(const double& visc, const double& gamma, const double& Rg,
+                                                            const double& Pr) {
     const double cp = gamma * Rg / (gamma - 1.);
     return visc * cp / Pr;
   }
 
-  static MFEM_HOST_DEVICE void computeStagnantStateWithTemp_gpu(const double *stateIn, double *stagState,
-                                                                const double &Temp, const double &gamma,
-                                                                const double &Rg, const int &num_equation,
-                                                                const int &dim, const int &thrd,
-                                                                const int &maxThreads) {
+  static MFEM_HOST_DEVICE void computeStagnantStateWithTemp_gpu(const double* stateIn, double* stagState,
+                                                                const double& Temp, const double& gamma,
+                                                                const double& Rg, const int& num_equation,
+                                                                const int& dim, const int& thrd,
+                                                                const int& maxThreads) {
     if (thrd > 0 && thrd <= dim) stagState[thrd] = 0.;
 
     if (thrd == 1 + dim) stagState[thrd] = Rg / (gamma - 1.) * stateIn[0] * Temp;
   }
 
-  static MFEM_HOST_DEVICE void computeStagnantStateWithTemp_gpu_serial(const double *stateIn, double *stagState,
-                                                                       const double &Temp, const double &gamma,
-                                                                       const double &Rg, const int &num_equation,
-                                                                       const int &dim) {
+  static MFEM_HOST_DEVICE void computeStagnantStateWithTemp_gpu_serial(const double* stateIn, double* stagState,
+                                                                       const double& Temp, const double& gamma,
+                                                                       const double& Rg, const int& num_equation,
+                                                                       const int& dim) {
     for (int d = 0; d < dim; d++) stagState[1 + d] = 0.;
     stagState[1 + dim] = Rg / (gamma - 1.) * stateIn[0] * Temp;
   }
 
-  static MFEM_HOST_DEVICE void modifyEnergyForPressure_gpu(const double *stateIn, double *stateOut, const double &p,
-                                                           const double &gamma, const double &Rg,
-                                                           const int &num_equation, const int &dim, const int &thrd,
-                                                           const int &maxThreads) {
+  static MFEM_HOST_DEVICE void modifyEnergyForPressure_gpu(const double* stateIn, double* stateOut, const double& p,
+                                                           const double& gamma, const double& Rg,
+                                                           const int& num_equation, const int& dim, const int& thrd,
+                                                           const int& maxThreads) {
     MFEM_SHARED double ke;
     if (thrd == maxThreads - 1) {
       ke = 0.;
@@ -536,10 +536,10 @@ class DryAir : public GasMixture {
     if (thrd == 0) stateOut[1 + dim] = p / (gamma - 1.) + ke;
   }
 
-  static MFEM_HOST_DEVICE void modifyEnergyForPressure_gpu_serial(const double *stateIn, double *stateOut,
-                                                                  const double &p, const double &gamma,
-                                                                  const double &Rg, const int &num_equation,
-                                                                  const int &dim) {
+  static MFEM_HOST_DEVICE void modifyEnergyForPressure_gpu_serial(const double* stateIn, double* stateOut,
+                                                                  const double& p, const double& gamma,
+                                                                  const double& Rg, const int& num_equation,
+                                                                  const int& dim) {
     double ke;
     ke = 0.;
     for (int d = 0; d < dim; d++) ke += stateIn[1 + d] * stateIn[1 + d];
@@ -602,12 +602,12 @@ class DryAir : public GasMixture {
 // };
 
 // additional functions inlined for speed...
-inline double DryAir::ComputePressure(const Vector &state, double *electronPressure) {
+inline double DryAir::ComputePressure(const Vector& state, double* electronPressure) {
   return ComputePressure(state.GetData(), electronPressure);
 }
 
 // additional functions inlined for speed...
-MFEM_HOST_DEVICE inline double DryAir::ComputePressure(const double *state, double *electronPressure) {
+MFEM_HOST_DEVICE inline double DryAir::ComputePressure(const double* state, double* electronPressure) {
   if (electronPressure != NULL) *electronPressure = 0.0;
   double den_vel2 = 0;
   for (int d = 0; d < nvel_; d++) den_vel2 += state[d + 1] * state[d + 1];
@@ -616,9 +616,9 @@ MFEM_HOST_DEVICE inline double DryAir::ComputePressure(const double *state, doub
   return (specific_heat_ratio - 1.0) * (state[1 + nvel_] - 0.5 * den_vel2);
 }
 
-inline double DryAir::ComputeTemperature(const Vector &state) { return ComputeTemperature(state.GetData()); }
+inline double DryAir::ComputeTemperature(const Vector& state) { return ComputeTemperature(state.GetData()); }
 
-MFEM_HOST_DEVICE inline double DryAir::ComputeTemperature(const double *state) {
+MFEM_HOST_DEVICE inline double DryAir::ComputeTemperature(const double* state) {
   double den_vel2 = 0;
   for (int d = 0; d < nvel_; d++) den_vel2 += state[d + 1] * state[d + 1];
   den_vel2 /= state[0];
@@ -648,7 +648,7 @@ class PerfectMixture : public GasMixture {
 
   // virtual void SetNumEquations();
  public:
-  PerfectMixture(RunConfiguration &_runfile, int _dim, int nvel);
+  PerfectMixture(RunConfiguration& _runfile, int _dim, int nvel);
   MFEM_HOST_DEVICE PerfectMixture(const PerfectMixtureInput inputs, int _dim, int nvel, double pc = 0);
 
   // FIXME: Generates compiler warning b/c this dtor implicitly calls
@@ -671,104 +671,104 @@ class PerfectMixture : public GasMixture {
   MFEM_HOST_DEVICE virtual double GetSpecificHeatRatio() { return molarCP_[iBackground] / molarCV_[iBackground]; }
   MFEM_HOST_DEVICE virtual double GetGasConstant() { return specificGasConstants_[iBackground]; }
 
-  MFEM_HOST_DEVICE double computeHeaviesHeatCapacity(const double *n_sp, const double &nB) const;
-  MFEM_HOST_DEVICE double computeHeaviesCp(const double *n_sp, const double &nB) const;
-  MFEM_HOST_DEVICE double computeSpeciesCp(const double *n_sp, const double &nB, int sp);
-  MFEM_HOST_DEVICE double computeAmbipolarElectronNumberDensity(const double *n_sp) const;
-  MFEM_HOST_DEVICE double computeBackgroundMassDensity(const double &rho, const double *n_sp, double &n_e,
+  MFEM_HOST_DEVICE double computeHeaviesHeatCapacity(const double* n_sp, const double& nB) const;
+  MFEM_HOST_DEVICE double computeHeaviesCp(const double* n_sp, const double& nB) const;
+  MFEM_HOST_DEVICE double computeSpeciesCp(const double* n_sp, const double& nB, int sp);
+  MFEM_HOST_DEVICE double computeAmbipolarElectronNumberDensity(const double* n_sp) const;
+  MFEM_HOST_DEVICE double computeBackgroundMassDensity(const double& rho, const double* n_sp, double& n_e,
                                                        bool isElectronComputed = false) const;
 
-  virtual void GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit);
-  virtual void GetConservativesFromPrimitives(const Vector &primit, Vector &conserv);
+  virtual void GetPrimitivesFromConservatives(const Vector& conserv, Vector& primit);
+  virtual void GetConservativesFromPrimitives(const Vector& primit, Vector& conserv);
 
-  MFEM_HOST_DEVICE virtual void GetPrimitivesFromConservatives(const double *conserv, double *primit);
-  MFEM_HOST_DEVICE virtual void GetConservativesFromPrimitives(const double *primit, double *conserv);
+  MFEM_HOST_DEVICE virtual void GetPrimitivesFromConservatives(const double* conserv, double* primit);
+  MFEM_HOST_DEVICE virtual void GetConservativesFromPrimitives(const double* primit, double* conserv);
 
-  virtual void GetMixtureCp(const Vector &ns, const double &rho, double &CpMix);
-  MFEM_HOST_DEVICE virtual void GetMixtureCp(const double *ns, const double *rho, double *CpMix);
+  virtual void GetMixtureCp(const Vector& ns, const double& rho, double& CpMix);
+  MFEM_HOST_DEVICE virtual void GetMixtureCp(const double* ns, const double* rho, double* CpMix);
 
-  virtual void GetSpeciesCp(const Vector &ns, const double &rho, int sp, double &CpY);
-  MFEM_HOST_DEVICE virtual void GetSpeciesCp(const double *ns, const double *rho, int sp, double *CpY);
+  virtual void GetSpeciesCp(const Vector& ns, const double& rho, int sp, double& CpY);
+  MFEM_HOST_DEVICE virtual void GetSpeciesCp(const double* ns, const double* rho, int sp, double* CpY);
 
-  virtual void computeSpeciesPrimitives(const Vector &conservedState, Vector &X_sp, Vector &Y_sp, Vector &n_sp);
-  MFEM_HOST_DEVICE virtual void computeSpeciesPrimitives(const double *conservedState, double *X_sp, double *Y_sp,
-                                                         double *n_sp);
-  virtual void computeNumberDensities(const Vector &conservedState, Vector &n_sp);
-  MFEM_HOST_DEVICE void computeNumberDensities(const double *conservedState, double *n_sp) const;
+  virtual void computeSpeciesPrimitives(const Vector& conservedState, Vector& X_sp, Vector& Y_sp, Vector& n_sp);
+  MFEM_HOST_DEVICE virtual void computeSpeciesPrimitives(const double* conservedState, double* X_sp, double* Y_sp,
+                                                         double* n_sp);
+  virtual void computeNumberDensities(const Vector& conservedState, Vector& n_sp);
+  MFEM_HOST_DEVICE void computeNumberDensities(const double* conservedState, double* n_sp) const;
 
-  virtual double ComputePressure(const Vector &state, double *electronPressure = NULL);
-  MFEM_HOST_DEVICE virtual double ComputePressure(const double *state, double *electronPressure = NULL);
-  virtual double ComputePressureFromPrimitives(const Vector &Up);
-  MFEM_HOST_DEVICE virtual double ComputePressureFromPrimitives(const double *Up);
-  MFEM_HOST_DEVICE virtual double computePressureBase(const double *n_sp, const double n_e, const double n_B,
+  virtual double ComputePressure(const Vector& state, double* electronPressure = NULL);
+  MFEM_HOST_DEVICE virtual double ComputePressure(const double* state, double* electronPressure = NULL);
+  virtual double ComputePressureFromPrimitives(const Vector& Up);
+  MFEM_HOST_DEVICE virtual double ComputePressureFromPrimitives(const double* Up);
+  MFEM_HOST_DEVICE virtual double computePressureBase(const double* n_sp, const double n_e, const double n_B,
                                                       const double T_h, const double T_e) const;
 
   // Physicality check (at end)
-  virtual bool StateIsPhysical(const Vector &state);
+  virtual bool StateIsPhysical(const Vector& state);
 
-  virtual double ComputeTemperature(const Vector &state);
-  MFEM_HOST_DEVICE virtual double ComputeTemperature(const double *state);
-  MFEM_HOST_DEVICE virtual void computeTemperaturesBase(const double *conservedState, const double *n_sp,
-                                                        const double n_e, const double n_B, double &T_h,
-                                                        double &T_e) const;
+  virtual double ComputeTemperature(const Vector& state);
+  MFEM_HOST_DEVICE virtual double ComputeTemperature(const double* state);
+  MFEM_HOST_DEVICE virtual void computeTemperaturesBase(const double* conservedState, const double* n_sp,
+                                                        const double n_e, const double n_B, double& T_h,
+                                                        double& T_e) const;
 
-  virtual void computeSpeciesEnthalpies(const Vector &state, Vector &speciesEnthalpies);
-  MFEM_HOST_DEVICE virtual void computeSpeciesEnthalpies(const double *state, double *speciesEnthalpies);
+  virtual void computeSpeciesEnthalpies(const Vector& state, Vector& speciesEnthalpies);
+  MFEM_HOST_DEVICE virtual void computeSpeciesEnthalpies(const double* state, double* speciesEnthalpies);
 
   // TODO(kevin): Kevin - I don't think we should use this for boundary condition.
   // virtual double Temperature(double *rho, double *p, int nsp = 1) { return p[0] / rho[0] / GetGasConstant(); }
 
-  virtual double ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin, bool primitive = true);
-  virtual double computePressureDerivativeFromPrimitives(const Vector &dUp_dx, const Vector &Uin);
-  virtual double computePressureDerivativeFromConservatives(const Vector &dUp_dx, const Vector &Uin);
+  virtual double ComputePressureDerivative(const Vector& dUp_dx, const Vector& Uin, bool primitive = true);
+  virtual double computePressureDerivativeFromPrimitives(const Vector& dUp_dx, const Vector& Uin);
+  virtual double computePressureDerivativeFromConservatives(const Vector& dUp_dx, const Vector& Uin);
 
   // virtual void UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up);
 
   // Compute the maximum characteristic speed.
-  virtual double ComputeMaxCharSpeed(const Vector &state);
-  MFEM_HOST_DEVICE virtual double ComputeMaxCharSpeed(const double *state);
+  virtual double ComputeMaxCharSpeed(const Vector& state);
+  MFEM_HOST_DEVICE virtual double ComputeMaxCharSpeed(const double* state);
 
-  virtual double ComputeSpeedOfSound(const Vector &Uin, bool primitive = true);
-  MFEM_HOST_DEVICE virtual double ComputeSpeedOfSound(const double *Uin, bool primitive = true) const;
-  MFEM_HOST_DEVICE double computeSpeedOfSoundBase(const double *n_sp, const double n_B, const double rho,
+  virtual double ComputeSpeedOfSound(const Vector& Uin, bool primitive = true);
+  MFEM_HOST_DEVICE virtual double ComputeSpeedOfSound(const double* Uin, bool primitive = true) const;
+  MFEM_HOST_DEVICE double computeSpeedOfSoundBase(const double* n_sp, const double n_B, const double rho,
                                                   const double p) const;
 
-  MFEM_HOST_DEVICE double computeHeaviesMixtureCV(const double *n_sp, const double n_B) const;
-  MFEM_HOST_DEVICE double computeHeaviesMixtureHeatRatio(const double *n_sp, const double n_B) const;
+  MFEM_HOST_DEVICE double computeHeaviesMixtureCV(const double* n_sp, const double n_B) const;
+  MFEM_HOST_DEVICE double computeHeaviesMixtureHeatRatio(const double* n_sp, const double n_B) const;
 
-  virtual void ComputeMassFractionGradient(const double rho, const Vector &numberDensities, const DenseMatrix &gradUp,
-                                           DenseMatrix &massFractionGrad);
-  virtual void ComputeMoleFractionGradient(const Vector &numberDensities, const DenseMatrix &gradUp,
-                                           DenseMatrix &moleFractionGrad);
-  MFEM_HOST_DEVICE virtual void ComputeMoleFractionGradient(const double *numberDensities, const double *gradUp,
-                                                            double *moleFractionGrad);
+  virtual void ComputeMassFractionGradient(const double rho, const Vector& numberDensities, const DenseMatrix& gradUp,
+                                           DenseMatrix& massFractionGrad);
+  virtual void ComputeMoleFractionGradient(const Vector& numberDensities, const DenseMatrix& gradUp,
+                                           DenseMatrix& moleFractionGrad);
+  MFEM_HOST_DEVICE virtual void ComputeMoleFractionGradient(const double* numberDensities, const double* gradUp,
+                                                            double* moleFractionGrad);
 
   // functions needed for BCs
-  virtual void computeStagnantStateWithTemp(const Vector &stateIn, const double Temp, Vector &stateOut);
-  virtual void modifyEnergyForPressure(const Vector &stateIn, Vector &stateOut, const double &p,
+  virtual void computeStagnantStateWithTemp(const Vector& stateIn, const double Temp, Vector& stateOut);
+  virtual void modifyEnergyForPressure(const Vector& stateIn, Vector& stateOut, const double& p,
                                        bool modifyElectronEnergy = false);
-  MFEM_HOST_DEVICE virtual void modifyEnergyForPressure(const double *stateIn, double *stateOut, const double &p,
+  MFEM_HOST_DEVICE virtual void modifyEnergyForPressure(const double* stateIn, double* stateOut, const double& p,
                                                         bool modifyElectronEnergy = false);
-  virtual void computeSheathBdrFlux(const Vector &state, BoundaryViscousFluxData &bcFlux);
-  MFEM_HOST_DEVICE virtual void computeSheathBdrFlux(const double *state, BoundaryViscousFluxData &bcFlux);
+  virtual void computeSheathBdrFlux(const Vector& state, BoundaryViscousFluxData& bcFlux);
+  MFEM_HOST_DEVICE virtual void computeSheathBdrFlux(const double* state, BoundaryViscousFluxData& bcFlux);
 
-  virtual void computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal,
-                                                       Vector &conservedState);
+  virtual void computeConservedStateFromConvectiveFlux(const Vector& meanNormalFluxes, const Vector& normal,
+                                                       Vector& conservedState);
 
   virtual double computeElectronEnergy(const double n_e, const double T_e) { return n_e * molarCV_[iElectron] * T_e; }
   virtual double computeElectronPressure(const double n_e, const double T_e) {
     return n_e * UNIVERSALGASCONSTANT * T_e;
   }
-  virtual void computeElectronPressureGrad(const double n_e, const double T_e, const DenseMatrix &gradUp,
-                                           Vector &gradPe);
-  MFEM_HOST_DEVICE virtual void computeElectronPressureGrad(const double n_e, const double T_e, const double *gradUp,
-                                                            double *gradPe);
+  virtual void computeElectronPressureGrad(const double n_e, const double T_e, const DenseMatrix& gradUp,
+                                           Vector& gradPe);
+  MFEM_HOST_DEVICE virtual void computeElectronPressureGrad(const double n_e, const double T_e, const double* gradUp,
+                                                            double* gradPe);
 
   // Compute species mass densities based on LTE assumptions.
-  virtual void GetSpeciesFromLTE(double *conserv, double *primit, TableInterpolator2D *energy_table,
-                                 TableInterpolator2D *R_table, TableInterpolator2D *c_table,
-                                 TableInterpolator2D *T_table);
-  virtual void GetSpeciesFromLTE(const double T, const double p, double *n_sp);
+  virtual void GetSpeciesFromLTE(double* conserv, double* primit, TableInterpolator2D* energy_table,
+                                 TableInterpolator2D* R_table, TableInterpolator2D* c_table,
+                                 TableInterpolator2D* T_table);
+  virtual void GetSpeciesFromLTE(const double T, const double p, double* n_sp);
 
   // GPU functions
 #ifdef _GPU_

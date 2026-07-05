@@ -53,28 +53,28 @@ class QuasiMagnetostaticSolverBase : public TPS::Solver {
   ElectromagneticOptions em_opts_;
 
   // pointer to parent Tps class
-  TPS::Tps *tpsP_;
+  TPS::Tps* tpsP_;
 
-  mfem::ParMesh *pmesh_;
+  mfem::ParMesh* pmesh_;
   int dim_;
   int true_size_;
   Array<int> offsets_;
 
-  mfem::ParGridFunction *plasma_conductivity_;
-  mfem::GridFunctionCoefficient *plasma_conductivity_coef_;
+  mfem::ParGridFunction* plasma_conductivity_;
+  mfem::GridFunctionCoefficient* plasma_conductivity_coef_;
 
-  mfem::ParGridFunction *joule_heating_;
+  mfem::ParGridFunction* joule_heating_;
 
   bool storeE_;
-  mfem::ParGridFunction *Ereal_;
-  mfem::ParGridFunction *Eimag_;
+  mfem::ParGridFunction* Ereal_;
+  mfem::ParGridFunction* Eimag_;
 
   int rank_;
   int nprocs_;
   bool rank0_;
 
  public:
-  QuasiMagnetostaticSolverBase(ElectromagneticOptions em_opts, TPS::Tps *tps);
+  QuasiMagnetostaticSolverBase(ElectromagneticOptions em_opts, TPS::Tps* tps);
   virtual ~QuasiMagnetostaticSolverBase() {}
 
   /** Initialize current for axisymmetric quasi-magnetostatic problem
@@ -83,21 +83,21 @@ class QuasiMagnetostaticSolverBase : public TPS::Solver {
    */
   virtual void InitializeCurrent() = 0;
 
-  mfem::ParMesh *getMesh() const override { return pmesh_; }
-  mfem::ParGridFunction *getPlasmaConductivityGF() { return plasma_conductivity_; }
-  mfem::ParGridFunction *getJouleHeatingGF() { return joule_heating_; }
-  mfem::ParGridFunction *getElectricFieldreal() {
+  mfem::ParMesh* getMesh() const override { return pmesh_; }
+  mfem::ParGridFunction* getPlasmaConductivityGF() { return plasma_conductivity_; }
+  mfem::ParGridFunction* getJouleHeatingGF() { return joule_heating_; }
+  mfem::ParGridFunction* getElectricFieldreal() {
     assert(storeE_);
     return Ereal_;
   }
-  mfem::ParGridFunction *getElectricFieldimag() {
+  mfem::ParGridFunction* getElectricFieldimag() {
     assert(storeE_);
     return Eimag_;
   }
 
   virtual void setStoreE(bool storeE) = 0;
 
-  virtual double elementJouleHeating(const FiniteElement &el, ElementTransformation &Tr, const Vector &elfun) = 0;
+  virtual double elementJouleHeating(const FiniteElement& el, ElementTransformation& Tr, const Vector& elfun) = 0;
   virtual double totalJouleHeating() = 0;
 
   void scaleJouleHeating(const double val) { (*joule_heating_) *= val; }
@@ -129,14 +129,14 @@ class QuasiMagnetostaticSolverBase : public TPS::Solver {
  */
 class JouleHeatingCoefficient3D : public Coefficient {
  private:
-  GridFunctionCoefficient &sigma_;
-  ParGridFunction &Ereal_;
-  ParGridFunction &Eimag_;
+  GridFunctionCoefficient& sigma_;
+  ParGridFunction& Ereal_;
+  ParGridFunction& Eimag_;
 
  public:
-  JouleHeatingCoefficient3D(GridFunctionCoefficient &sigma, ParGridFunction &Ereal, ParGridFunction &Eimag)
+  JouleHeatingCoefficient3D(GridFunctionCoefficient& sigma, ParGridFunction& Ereal, ParGridFunction& Eimag)
       : sigma_(sigma), Ereal_(Ereal), Eimag_(Eimag) {}
-  virtual double Eval(ElementTransformation &T, const IntegrationPoint &ip);
+  virtual double Eval(ElementTransformation& T, const IntegrationPoint& ip);
   virtual ~JouleHeatingCoefficient3D() {}
 };
 
@@ -149,29 +149,29 @@ class JouleHeatingCoefficient3D : public Coefficient {
 // class QuasiMagnetostaticSolver3D : public TPS::Solver {
 class QuasiMagnetostaticSolver3D : public QuasiMagnetostaticSolverBase {
  protected:
-  mfem::FiniteElementCollection *hcurl_;
-  mfem::FiniteElementCollection *h1_;
-  mfem::FiniteElementCollection *hdiv_;
-  mfem::FiniteElementCollection *L2_;
+  mfem::FiniteElementCollection* hcurl_;
+  mfem::FiniteElementCollection* h1_;
+  mfem::FiniteElementCollection* hdiv_;
+  mfem::FiniteElementCollection* L2_;
 
-  mfem::ParFiniteElementSpace *Aspace_;
-  mfem::ParFiniteElementSpace *pspace_;
-  mfem::ParFiniteElementSpace *Bspace_;
-  mfem::ParFiniteElementSpace *jh_space_;
+  mfem::ParFiniteElementSpace* Aspace_;
+  mfem::ParFiniteElementSpace* pspace_;
+  mfem::ParFiniteElementSpace* Bspace_;
+  mfem::ParFiniteElementSpace* jh_space_;
 
   mfem::Array<int> ess_bdr_tdofs_;
 
-  mfem::ParBilinearForm *K_;
-  mfem::ParLinearForm *r_;
+  mfem::ParBilinearForm* K_;
+  mfem::ParLinearForm* r_;
 
-  mfem::common::ParDiscreteGradOperator *grad_;
-  mfem::common::DivergenceFreeProjector *div_free_;
+  mfem::common::ParDiscreteGradOperator* grad_;
+  mfem::common::DivergenceFreeProjector* div_free_;
 
-  mfem::ParGridFunction *Areal_;
-  mfem::ParGridFunction *Aimag_;
+  mfem::ParGridFunction* Areal_;
+  mfem::ParGridFunction* Aimag_;
 
-  mfem::ParGridFunction *Breal_;
-  mfem::ParGridFunction *Bimag_;
+  mfem::ParGridFunction* Breal_;
+  mfem::ParGridFunction* Bimag_;
 
   // mfem::ParGridFunction *plasma_conductivity_;
   // mfem::GridFunctionCoefficient *plasma_conductivity_coef_;
@@ -182,7 +182,7 @@ class QuasiMagnetostaticSolver3D : public QuasiMagnetostaticSolverBase {
   void InterpolateToYAxis() const;
 
  public:
-  QuasiMagnetostaticSolver3D(ElectromagneticOptions em_opts, TPS::Tps *tps);
+  QuasiMagnetostaticSolver3D(ElectromagneticOptions em_opts, TPS::Tps* tps);
   ~QuasiMagnetostaticSolver3D();
 
   /** Initialize quasi-magnetostatic problem
@@ -214,10 +214,10 @@ class QuasiMagnetostaticSolver3D : public QuasiMagnetostaticSolverBase {
   /** Does nothing */
   void solveEnd() override;
 
-  mfem::ParFiniteElementSpace *getFESpace() const override { return pspace_; }
+  mfem::ParFiniteElementSpace* getFESpace() const override { return pspace_; }
   void setStoreE(bool storeE) override;
 
-  double elementJouleHeating(const FiniteElement &el, ElementTransformation &Tr, const Vector &elfun) override;
+  double elementJouleHeating(const FiniteElement& el, ElementTransformation& Tr, const Vector& elfun) override;
   double totalJouleHeating() override;
 };
 
@@ -229,17 +229,17 @@ class QuasiMagnetostaticSolver3D : public QuasiMagnetostaticSolverBase {
  */
 class QuasiMagnetostaticSolverAxiSym : public QuasiMagnetostaticSolverBase {  // public TPS::Solver {
  protected:
-  mfem::FiniteElementCollection *h1_;
+  mfem::FiniteElementCollection* h1_;
 
-  mfem::ParFiniteElementSpace *Atheta_space_;
+  mfem::ParFiniteElementSpace* Atheta_space_;
 
   mfem::Array<int> ess_bdr_tdofs_;
 
-  mfem::ParBilinearForm *K_;
-  mfem::ParLinearForm *r_;
+  mfem::ParBilinearForm* K_;
+  mfem::ParLinearForm* r_;
 
-  mfem::ParGridFunction *Atheta_real_;
-  mfem::ParGridFunction *Atheta_imag_;
+  mfem::ParGridFunction* Atheta_real_;
+  mfem::ParGridFunction* Atheta_imag_;
 
   bool operator_initialized_;
   bool current_initialized_;
@@ -247,7 +247,7 @@ class QuasiMagnetostaticSolverAxiSym : public QuasiMagnetostaticSolverBase {  //
   void InterpolateToYAxis() const;
 
  public:
-  QuasiMagnetostaticSolverAxiSym(ElectromagneticOptions em_opts, TPS::Tps *tps);
+  QuasiMagnetostaticSolverAxiSym(ElectromagneticOptions em_opts, TPS::Tps* tps);
   ~QuasiMagnetostaticSolverAxiSym();
 
   /** Initialize axisymmetric quasi-magnetostatic problem
@@ -278,10 +278,10 @@ class QuasiMagnetostaticSolverAxiSym : public QuasiMagnetostaticSolverBase {  //
   /** Does nothing */
   void solveEnd() override;
 
-  mfem::ParFiniteElementSpace *getFESpace() const override { return Atheta_space_; }
+  mfem::ParFiniteElementSpace* getFESpace() const override { return Atheta_space_; }
   void setStoreE(bool storeE) override;
 
-  double elementJouleHeating(const FiniteElement &el, ElementTransformation &Tr, const Vector &elfun) override;
+  double elementJouleHeating(const FiniteElement& el, ElementTransformation& Tr, const Vector& elfun) override;
   double totalJouleHeating() override;
 
   double coilCurrent() const final;

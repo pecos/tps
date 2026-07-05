@@ -35,10 +35,10 @@
 #include "riemann_solver.hpp"
 
 // TODO(kevin): non-reflecting bc for plasam.
-InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolverTPS *_rsolver, GasMixture *_mixture,
-                 GasMixture *d_mixture, ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt,
+InletBC::InletBC(MPI_Groups* _groupsMPI, Equations _eqSystem, RiemannSolverTPS* _rsolver, GasMixture* _mixture,
+                 GasMixture* d_mixture, ParFiniteElementSpace* _vfes, IntegrationRules* _intRules, double& _dt,
                  const int _dim, const int _num_equation, int _patchNumber, double _refLength, InletType _bcType,
-                 const Array<double> &_inputData, const int &_maxIntPoints, const int &_maxDofs, bool axisym)
+                 const Array<double>& _inputData, const int& _maxIntPoints, const int& _maxDofs, bool axisym)
     : BoundaryCondition(_rsolver, _mixture, _eqSystem, _vfes, _intRules, _dt, _dim, _num_equation, _patchNumber,
                         _refLength, axisym),
       groupsMPI(_groupsMPI),
@@ -111,7 +111,7 @@ InletBC::InletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolverTPS *
   for (int bel = 0; bel < vfes->GetNBE(); bel++) {
     int attr = vfes->GetBdrAttribute(bel);
     if (attr == patchNumber) {
-      FaceElementTransformations *Tr = vfes->GetMesh()->GetBdrFaceTransformations(bel);
+      FaceElementTransformations* Tr = vfes->GetMesh()->GetBdrFaceTransformations(bel);
       Array<int> dofs;
 
       vfes->GetElementVDofs(Tr->Elem1No, dofs);
@@ -254,7 +254,7 @@ void InletBC::initBdrElemsShape() {
   for (int bel = 0; bel < vfes->GetNBE(); bel++) {
     int attr = vfes->GetBdrAttribute(bel);
     if (attr == patchNumber) {
-      FaceElementTransformations *Tr = vfes->GetMesh()->GetBdrFaceTransformations(bel);
+      FaceElementTransformations* Tr = vfes->GetMesh()->GetBdrFaceTransformations(bel);
       int elDofs = vfes->GetFE(Tr->Elem1No)->GetDof();
       Array<int> dofs;
       vfes->GetElementVDofs(Tr->Elem1No, dofs);
@@ -323,16 +323,16 @@ void InletBC::initBCs() {
   }
 }
 
-void InletBC::updateMean_gpu(ParGridFunction *Up, Vector &localMeanUp, const int num_equation, const int numBdrElems,
-                             const int totDofs, Vector &bdrUp, Array<int> &bdrElemsQ, Array<int> &bdrDofs,
-                             Vector &bdrShape, const int &maxIntPoints, const int &maxDofs) {
+void InletBC::updateMean_gpu(ParGridFunction* Up, Vector& localMeanUp, const int num_equation, const int numBdrElems,
+                             const int totDofs, Vector& bdrUp, Array<int>& bdrElemsQ, Array<int>& bdrDofs,
+                             Vector& bdrShape, const int& maxIntPoints, const int& maxDofs) {
 #ifdef _GPU_
-  const double *d_Up = Up->Read();
-  double *d_localMeanUp = localMeanUp.Write();
-  double *d_bdrUp = bdrUp.Write();
+  const double* d_Up = Up->Read();
+  double* d_localMeanUp = localMeanUp.Write();
+  double* d_bdrUp = bdrUp.Write();
   auto d_bdrElemQ = bdrElemsQ.Read();
   auto d_bdrDofs = bdrDofs.Read();
-  const double *d_bdrShape = bdrShape.Read();
+  const double* d_bdrShape = bdrShape.Read();
 
   int groupAveraging = numBdrElems;
   if (groupAveraging % 2 != 0) groupAveraging++;
@@ -391,7 +391,7 @@ void InletBC::updateMean_gpu(ParGridFunction *Up, Vector &localMeanUp, const int
 #endif
 }
 
-void InletBC::initBoundaryU(ParGridFunction *Up) {
+void InletBC::initBoundaryU(ParGridFunction* Up) {
   Vector elUp;
   elUp.UseDevice(false);
   Vector shape;
@@ -403,7 +403,7 @@ void InletBC::initBoundaryU(ParGridFunction *Up) {
   for (int bel = 0; bel < vfes->GetNBE(); bel++) {
     int attr = vfes->GetBdrAttribute(bel);
     if (attr == patchNumber) {
-      FaceElementTransformations *Tr = vfes->GetMesh()->GetBdrFaceTransformations(bel);
+      FaceElementTransformations* Tr = vfes->GetMesh()->GetBdrFaceTransformations(bel);
 
       int elDofs = vfes->GetFE(Tr->Elem1No)->GetDof();
 
@@ -442,8 +442,8 @@ void InletBC::initBoundaryU(ParGridFunction *Up) {
   boundaryUp.Read();
 }
 
-void InletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip, double delta,
-                             double time, double distance, Vector &bdrFlux) {
+void InletBC::computeBdrFlux(Vector& normal, Vector& stateIn, DenseMatrix& gradState, Vector transip, double delta,
+                             double time, double distance, Vector& bdrFlux) {
   Vector tangentW(dim_);
   for (int d = 0; d < dim_; d++) tangentW[d] = 0.0;
   switch (inletType_) {
@@ -479,7 +479,7 @@ void InletBC::computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradS
   }
 }
 
-void InletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
+void InletBC::updateMean(IntegrationRules* intRules, ParGridFunction* Up) {
   if (inletType_ == SUB_DENS_VEL) return;
   bdrN = 0;
 
@@ -504,7 +504,7 @@ void InletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
   for (int bel = 0; bel < vfes->GetNBE(); bel++) {
     int attr = vfes->GetBdrAttribute(bel);
     if (attr == patchNumber) {
-      FaceElementTransformations *Tr = vfes->GetMesh()->GetBdrFaceTransformations(bel);
+      FaceElementTransformations* Tr = vfes->GetMesh()->GetBdrFaceTransformations(bel);
 
       int elDofs = vfes->GetFE(Tr->Elem1No)->GetDof();
 
@@ -541,11 +541,11 @@ void InletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
   }
 #endif
 
-  double *h_localMeanUp = localMeanUp.HostReadWrite();
+  double* h_localMeanUp = localMeanUp.HostReadWrite();
   int totNbdr = boundaryU.Size() / num_equation_;
   h_localMeanUp[num_equation_] = static_cast<double>(totNbdr);
 
-  double *h_sum = glob_sum.HostWrite();
+  double* h_sum = glob_sum.HostWrite();
   MPI_Allreduce(h_localMeanUp, h_sum, num_equation_ + 1, MPI_DOUBLE, MPI_SUM, groupsMPI->getComm(patchNumber));
 
   BoundaryCondition::copyValues(glob_sum, meanUp, 1. / h_sum[num_equation_]);
@@ -563,18 +563,18 @@ void InletBC::updateMean(IntegrationRules *intRules, ParGridFunction *Up) {
   }
 }
 
-void InletBC::integrationBC(Vector &y,  // output
-                            const Vector &x, const elementIndexingData &elem_index_data, ParGridFunction *Up,
-                            ParGridFunction *gradUp, const boundaryFaceIntegrationData &boundary_face_data,
-                            const int &maxIntPoints, const int &maxDofs) {
+void InletBC::integrationBC(Vector& y,  // output
+                            const Vector& x, const elementIndexingData& elem_index_data, ParGridFunction* Up,
+                            ParGridFunction* gradUp, const boundaryFaceIntegrationData& boundary_face_data,
+                            const int& maxIntPoints, const int& maxDofs) {
   interpInlet_gpu(x, elem_index_data, boundary_face_data, listElems, offsetsBoundaryU);
 
   integrateInlets_gpu(y,  // output
                       x, elem_index_data, boundary_face_data, listElems, offsetsBoundaryU);
 }
 
-void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &stateIn, DenseMatrix &gradState,
-                                                   Vector &bdrFlux) {
+void InletBC::subsonicNonReflectingDensityVelocity(Vector& normal, Vector& stateIn, DenseMatrix& gradState,
+                                                   Vector& bdrFlux) {
   const double gamma = mixture->GetSpecificHeatRatio();
   // const double p = eqState->ComputePressure(stateIn, dim);
 
@@ -726,7 +726,7 @@ void InletBC::subsonicNonReflectingDensityVelocity(Vector &normal, Vector &state
   rsolver->Eval(stateIn, state2, normal, bdrFlux, true);
 }
 
-void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn, Vector &bdrFlux) {
+void InletBC::subsonicReflectingDensityVelocity(Vector& normal, Vector& stateIn, Vector& bdrFlux) {
   // NOTE: it is likely that for two-temperature case inlet will also specify electron temperature,
   // whether it is equal to the gas temperature or not.
   const double p = mixture->ComputePressure(stateIn);
@@ -757,8 +757,8 @@ void InletBC::subsonicReflectingDensityVelocity(Vector &normal, Vector &stateIn,
 
 /// Specifying subsonic vel and rho wher v is relative to the FACE-coordinate system specifyied by the face normal and
 /// tangentW
-void InletBC::subsonicReflectingDensityVelocityFace(Vector &normal, Vector tangentW, Vector &stateIn, Vector transip,
-                                                    double time, Vector &bdrFlux) {
+void InletBC::subsonicReflectingDensityVelocityFace(Vector& normal, Vector tangentW, Vector& stateIn, Vector transip,
+                                                    double time, Vector& bdrFlux) {
   const double p = mixture->ComputePressure(stateIn);
 
   Vector state2(num_equation_);
@@ -863,22 +863,22 @@ void InletBC::subsonicReflectingDensityVelocityFace(Vector &normal, Vector tange
   bdrN++;
 }
 
-void InletBC::integrateInlets_gpu(Vector &y, const Vector &x, const elementIndexingData &elem_index_data,
-                                  const boundaryFaceIntegrationData &boundary_face_data, Array<int> &listElems,
-                                  Array<int> &offsetsBoundaryU) {
+void InletBC::integrateInlets_gpu(Vector& y, const Vector& x, const elementIndexingData& elem_index_data,
+                                  const boundaryFaceIntegrationData& boundary_face_data, Array<int>& listElems,
+                                  Array<int>& offsetsBoundaryU) {
 #ifdef _GPU_
-  double *d_y = y.ReadWrite();
-  const int *d_elem_dofs_list = elem_index_data.dofs_list.Read();
-  const int *d_elem_dof_off = elem_index_data.dof_offset.Read();
-  const int *d_elem_dof_num = elem_index_data.dof_number.Read();
-  const double *d_face_shape = boundary_face_data.shape.Read();
-  const double *d_weight = boundary_face_data.quad_weight.Read();
-  const int *d_face_el = boundary_face_data.el.Read();
-  const int *d_face_num_quad = boundary_face_data.num_quad.Read();
-  const int *d_listElems = listElems.Read();
+  double* d_y = y.ReadWrite();
+  const int* d_elem_dofs_list = elem_index_data.dofs_list.Read();
+  const int* d_elem_dof_off = elem_index_data.dof_offset.Read();
+  const int* d_elem_dof_num = elem_index_data.dof_number.Read();
+  const double* d_face_shape = boundary_face_data.shape.Read();
+  const double* d_weight = boundary_face_data.quad_weight.Read();
+  const int* d_face_el = boundary_face_data.el.Read();
+  const int* d_face_num_quad = boundary_face_data.num_quad.Read();
+  const int* d_listElems = listElems.Read();
   // const int *d_offsetBoundaryU = offsetsBoundaryU.Read();
 
-  const double *d_flux = face_flux_.Read();
+  const double* d_flux = face_flux_.Read();
 
   const int totDofs = x.Size() / num_equation_;
   const int numBdrElem = listElems.Size();
@@ -928,24 +928,24 @@ void InletBC::integrateInlets_gpu(Vector &y, const Vector &x, const elementIndex
 #endif
 }
 
-void InletBC::interpInlet_gpu(const mfem::Vector &x, const elementIndexingData &elem_index_data,
-                              const boundaryFaceIntegrationData &boundary_face_data, Array<int> &listElems,
-                              Array<int> &offsetsBoundaryU) {
+void InletBC::interpInlet_gpu(const mfem::Vector& x, const elementIndexingData& elem_index_data,
+                              const boundaryFaceIntegrationData& boundary_face_data, Array<int>& listElems,
+                              Array<int>& offsetsBoundaryU) {
 #ifdef _GPU_
-  const double *d_inputState = inputState.Read();
-  const double *d_U = x.Read();
-  const int *d_elem_dofs_list = elem_index_data.dofs_list.Read();
-  const int *d_elem_dof_off = elem_index_data.dof_offset.Read();
-  const int *d_elem_dof_num = elem_index_data.dof_number.Read();
-  const double *d_face_shape = boundary_face_data.shape.Read();
-  const double *d_normal = boundary_face_data.normal.Read();
-  const double *d_xyz = boundary_face_data.xyz.Read();
-  const int *d_face_el = boundary_face_data.el.Read();
-  const int *d_face_num_quad = boundary_face_data.num_quad.Read();
-  const int *d_listElems = listElems.Read();
+  const double* d_inputState = inputState.Read();
+  const double* d_U = x.Read();
+  const int* d_elem_dofs_list = elem_index_data.dofs_list.Read();
+  const int* d_elem_dof_off = elem_index_data.dof_offset.Read();
+  const int* d_elem_dof_num = elem_index_data.dof_number.Read();
+  const double* d_face_shape = boundary_face_data.shape.Read();
+  const double* d_normal = boundary_face_data.normal.Read();
+  const double* d_xyz = boundary_face_data.xyz.Read();
+  const int* d_face_el = boundary_face_data.el.Read();
+  const int* d_face_num_quad = boundary_face_data.num_quad.Read();
+  const int* d_listElems = listElems.Read();
   // const int *d_offsetBoundaryU = offsetsBoundaryU.Read();
 
-  double *d_flux = face_flux_.Write();
+  double* d_flux = face_flux_.Write();
 
   const int totDofs = x.Size() / num_equation_;
   const int numBdrElem = listElems.Size();
@@ -966,8 +966,8 @@ void InletBC::interpInlet_gpu(const mfem::Vector &x, const elementIndexingData &
   const int maxIntPoints = maxIntPoints_;
   const int maxDofs = maxDofs_;
 
-  const RiemannSolverTPS *d_rsolver = rsolver;
-  GasMixture *d_mix = d_mixture_;
+  const RiemannSolverTPS* d_rsolver = rsolver;
+  GasMixture* d_mix = d_mixture_;
 
   // MFEM_FORALL(n, numBdrElem, {
   MFEM_FORALL_2D(n, numBdrElem, maxIntPoints, 1, 1, {

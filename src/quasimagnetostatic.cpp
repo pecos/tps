@@ -43,9 +43,9 @@ using namespace mfem;
 using namespace mfem::common;
 
 static Vector axis(3);
-void JFun(const Vector &x, Vector &f);
+void JFun(const Vector& x, Vector& f);
 
-QuasiMagnetostaticSolverBase::QuasiMagnetostaticSolverBase(ElectromagneticOptions em_opts, TPS::Tps *tps)
+QuasiMagnetostaticSolverBase::QuasiMagnetostaticSolverBase(ElectromagneticOptions em_opts, TPS::Tps* tps)
     : em_opts_(em_opts), offsets_(3), storeE_(false), Ereal_(NULL), Eimag_(NULL) {
   MPI_Comm_size(tps->getTPSCommWorld(), &nprocs_);
   MPI_Comm_rank(tps->getTPSCommWorld(), &rank_);
@@ -69,7 +69,7 @@ QuasiMagnetostaticSolverBase::QuasiMagnetostaticSolverBase(ElectromagneticOption
   joule_heating_ = NULL;
 }
 
-double JouleHeatingCoefficient3D::Eval(ElementTransformation &T, const IntegrationPoint &ip) {
+double JouleHeatingCoefficient3D::Eval(ElementTransformation& T, const IntegrationPoint& ip) {
   Vector Er, Ei;
   double sig;
   Ereal_.GetVectorValue(T, ip, Er);
@@ -78,7 +78,7 @@ double JouleHeatingCoefficient3D::Eval(ElementTransformation &T, const Integrati
   return sig * (Er * Er + Ei * Ei);
 }
 
-QuasiMagnetostaticSolver3D::QuasiMagnetostaticSolver3D(ElectromagneticOptions em_opts, TPS::Tps *tps)
+QuasiMagnetostaticSolver3D::QuasiMagnetostaticSolver3D(ElectromagneticOptions em_opts, TPS::Tps* tps)
     : QuasiMagnetostaticSolverBase(em_opts, tps) {
   hcurl_ = NULL;
   h1_ = NULL;
@@ -142,7 +142,7 @@ void QuasiMagnetostaticSolver3D::initialize() {
   //-----------------------------------------------------
 
   // 1a) Read the serial mesh (on each mpi rank)
-  Mesh *mesh = new Mesh(em_opts_.mesh_file.c_str(), 1, 1);
+  Mesh* mesh = new Mesh(em_opts_.mesh_file.c_str(), 1, 1);
   dim_ = mesh->Dimension();
   if (dim_ != 3) {
     if (verbose) {
@@ -222,6 +222,7 @@ void QuasiMagnetostaticSolver3D::initialize() {
 
   joule_heating_ = new ParGridFunction(jh_space_);
   *joule_heating_ = 0.0;
+  if (rank0_) std::cout << "QM3D initialize okay..." << endl;
 }
 
 void QuasiMagnetostaticSolver3D::InitializeCurrent() {
@@ -281,8 +282,8 @@ void QuasiMagnetostaticSolver3D::InitializeCurrent() {
   // 2) Build a discretely divergence-free approximation of the source
   // current that lives in the Nedelec FE space defined in
   // Initialize()
-  ParGridFunction *Jorig = new ParGridFunction(Aspace_);
-  ParGridFunction *Jproj = new ParGridFunction(Aspace_);
+  ParGridFunction* Jorig = new ParGridFunction(Aspace_);
+  ParGridFunction* Jproj = new ParGridFunction(Aspace_);
 
   r_ = new ParLinearForm(Aspace_);
 
@@ -305,7 +306,7 @@ void QuasiMagnetostaticSolver3D::InitializeCurrent() {
   delete Jorig;
 
   // 3) Multiply by the mass matrix to get the RHS vector
-  ParBilinearForm *mass = new ParBilinearForm(Aspace_);
+  ParBilinearForm* mass = new ParBilinearForm(Aspace_);
   mass->AddDomainIntegrator(new VectorFEMassIntegrator);
   mass->Assemble();
   mass->Finalize();
@@ -316,6 +317,7 @@ void QuasiMagnetostaticSolver3D::InitializeCurrent() {
   delete Jproj;
 
   current_initialized_ = true;
+  if (rank0_) std::cout << "InitializeCurrent okay..." << endl;
 }
 
 // query solver-specific runtime controls
@@ -418,8 +420,8 @@ void QuasiMagnetostaticSolver3D::solveStep() {
   OperatorPtr Koffd;
   Kconductivity->FormSystemMatrix(ess_bdr_tdofs_, Koffd);
 
-  HypreParMatrix *Kdiag_mat = Kdiag.As<HypreParMatrix>();
-  HypreParMatrix *Koffd_mat = Koffd.As<HypreParMatrix>();
+  HypreParMatrix* Kdiag_mat = Kdiag.As<HypreParMatrix>();
+  HypreParMatrix* Koffd_mat = Koffd.As<HypreParMatrix>();
 
   Koffd_mat->EliminateRows(ess_bdr_tdofs_);
 
@@ -486,7 +488,7 @@ void QuasiMagnetostaticSolver3D::solveStep() {
     if (Bimag_ == NULL) Bimag_ = new ParGridFunction(Bspace_);
     *Breal_ = 0;
 
-    ParDiscreteLinearOperator *curl = new ParDiscreteLinearOperator(Aspace_, Bspace_);
+    ParDiscreteLinearOperator* curl = new ParDiscreteLinearOperator(Aspace_, Bspace_);
     curl->AddDomainInterpolator(new CurlInterpolator);
     curl->Assemble();
     curl->Finalize();
@@ -571,8 +573,8 @@ void QuasiMagnetostaticSolver3D::InterpolateToYAxis() const {
 
   Array<int> eid;
   Array<IntegrationPoint> ips;
-  double *Byloc = new double[em_opts_.nBy];
-  double *By = new double[em_opts_.nBy];
+  double* Byloc = new double[em_opts_.nBy];
+  double* By = new double[em_opts_.nBy];
   Vector Bpoint(dim_);
 
   // Get element numbers and integration points
@@ -660,8 +662,8 @@ void QuasiMagnetostaticSolver3D::setStoreE(bool storeE) {
   }
 }
 
-double QuasiMagnetostaticSolver3D::elementJouleHeating(const FiniteElement &el, ElementTransformation &Tr,
-                                                       const Vector &elfun) {
+double QuasiMagnetostaticSolver3D::elementJouleHeating(const FiniteElement& el, ElementTransformation& Tr,
+                                                       const Vector& elfun) {
   // Get size info
   const int dof = el.GetDof();
   const int nvar = 1;
@@ -678,13 +680,13 @@ double QuasiMagnetostaticSolver3D::elementJouleHeating(const FiniteElement &el, 
   // Get quadrature rule
   const int order = el.GetOrder();
   const int intorder = order + 1;
-  const IntegrationRule *ir = &IntRules.Get(el.GetGeomType(), intorder);
+  const IntegrationRule* ir = &IntRules.Get(el.GetGeomType(), intorder);
 
   double elem_jh = 0;
 
   // for every quadrature point...
   for (int i = 0; i < ir->GetNPoints(); i++) {
-    const IntegrationPoint &ip = ir->IntPoint(i);
+    const IntegrationPoint& ip = ir->IntPoint(i);
     Tr.SetIntPoint(&ip);
 
     // evaluate basis functions
@@ -697,7 +699,26 @@ double QuasiMagnetostaticSolver3D::elementJouleHeating(const FiniteElement &el, 
     double qpcontrib = soln[0];
 
     const double wt = ip.weight * Tr.Weight();
-    elem_jh += qpcontrib * wt;
+    // elem_jh += qpcontrib * wt;
+
+    // HERE
+    // need to modify here so that joule heating is only IN torch
+    // this is a problem-specific hack (HACK)
+    double rCyl = 0.028;
+    double x, z, dist;
+    double wgt = 1.0;
+    Vector coords(Tr.GetSpaceDim());
+    Tr.Transform(ip, coords);
+    x = coords[0];
+    // unused, but if we need it later... y = coords[1];
+    dist = x * x;
+    if (dim_ == Tr.GetSpaceDim()) {
+      z = coords[2];
+      dist += z * z;
+    }
+    dist = std::sqrt(dist);
+    if (dist > rCyl) wgt = 0.0;
+    elem_jh += qpcontrib * wt * wgt;
   }
 
   return elem_jh;
@@ -705,7 +726,7 @@ double QuasiMagnetostaticSolver3D::elementJouleHeating(const FiniteElement &el, 
 
 double QuasiMagnetostaticSolver3D::totalJouleHeating() {
   const int NE = pmesh_->GetNE();
-  const ParFiniteElementSpace *fes = jh_space_;
+  const ParFiniteElementSpace* fes = jh_space_;
 
   double int_jh = 0;
 
@@ -714,10 +735,10 @@ double QuasiMagnetostaticSolver3D::totalJouleHeating() {
 
   // loop over elements on this mpi rank and integrate joule heating
   for (int ielem = 0; ielem < NE; ielem++) {
-    const FiniteElement *fe = fes->GetFE(ielem);
-    ElementTransformation *T = fes->GetElementTransformation(ielem);
+    const FiniteElement* fe = fes->GetFE(ielem);
+    ElementTransformation* T = fes->GetElementTransformation(ielem);
 #if MFEM_VERSION >= 40400
-    DofTransformation *doftrans = fes->GetElementVDofs(ielem, vdofs);
+    DofTransformation* doftrans = fes->GetElementVDofs(ielem, vdofs);
     joule_heating_->GetSubVector(vdofs, el_x);
     if (doftrans) {
       doftrans->InvTransformPrimal(el_x);
@@ -737,7 +758,7 @@ double QuasiMagnetostaticSolver3D::totalJouleHeating() {
   return total_int_jh;
 }
 
-void JFun(const Vector &x, Vector &J) {
+void JFun(const Vector& x, Vector& J) {
   Vector axx(3);
 
   axx(0) = axis(1) * x(2) - axis(2) * x(1);
@@ -748,11 +769,11 @@ void JFun(const Vector &x, Vector &J) {
   J = axx;
 }
 
-static double radius(const Vector &x) { return x[0]; }
+static double radius(const Vector& x) { return x[0]; }
 
-static double oneOverRadius(const Vector &x) { return 1.0 / x[0]; }
+static double oneOverRadius(const Vector& x) { return 1.0 / x[0]; }
 
-QuasiMagnetostaticSolverAxiSym::QuasiMagnetostaticSolverAxiSym(ElectromagneticOptions em_opts, TPS::Tps *tps)
+QuasiMagnetostaticSolverAxiSym::QuasiMagnetostaticSolverAxiSym(ElectromagneticOptions em_opts, TPS::Tps* tps)
     : QuasiMagnetostaticSolverBase(em_opts, tps) {
   h1_ = NULL;
   Atheta_space_ = NULL;
@@ -799,7 +820,7 @@ void QuasiMagnetostaticSolverAxiSym::initialize() {
 
   // 1a) Read the serial mesh (on each mpi rank)
   if (verbose) grvy_printf(ginfo, "Reading EM mesh file: %s\n", em_opts_.mesh_file.c_str());
-  Mesh *mesh = new Mesh(em_opts_.mesh_file.c_str(), 1, 1);
+  Mesh* mesh = new Mesh(em_opts_.mesh_file.c_str(), 1, 1);
   dim_ = mesh->Dimension();
   if (dim_ != 2) {
     if (verbose) {
@@ -1022,8 +1043,8 @@ void QuasiMagnetostaticSolverAxiSym::solveStep() {
   OperatorPtr Koffd;
   Kconductivity->FormSystemMatrix(ess_bdr_tdofs_, Koffd);
 
-  HypreParMatrix *Kdiag_mat = Kdiag.As<HypreParMatrix>();
-  HypreParMatrix *Koffd_mat = Koffd.As<HypreParMatrix>();
+  HypreParMatrix* Kdiag_mat = Kdiag.As<HypreParMatrix>();
+  HypreParMatrix* Koffd_mat = Koffd.As<HypreParMatrix>();
 
   Koffd_mat->EliminateRows(ess_bdr_tdofs_);
 
@@ -1131,8 +1152,8 @@ void QuasiMagnetostaticSolverAxiSym::setStoreE(bool storeE) {
   }
 }
 
-double QuasiMagnetostaticSolverAxiSym::elementJouleHeating(const FiniteElement &el, ElementTransformation &Tr,
-                                                           const Vector &elfun) {
+double QuasiMagnetostaticSolverAxiSym::elementJouleHeating(const FiniteElement& el, ElementTransformation& Tr,
+                                                           const Vector& elfun) {
   // Get size info
   const int dof = el.GetDof();
   const int dim = el.GetDim();
@@ -1152,13 +1173,13 @@ double QuasiMagnetostaticSolverAxiSym::elementJouleHeating(const FiniteElement &
   // Get quadrature rule
   const int order = el.GetOrder();
   const int intorder = order + 1;
-  const IntegrationRule *ir = &IntRules.Get(el.GetGeomType(), intorder);
+  const IntegrationRule* ir = &IntRules.Get(el.GetGeomType(), intorder);
 
   double elem_jh = 0;
 
   // for every quadrature point...
   for (int i = 0; i < ir->GetNPoints(); i++) {
-    const IntegrationPoint &ip = ir->IntPoint(i);
+    const IntegrationPoint& ip = ir->IntPoint(i);
     Tr.SetIntPoint(&ip);
 
     // evaluate radius
@@ -1185,7 +1206,7 @@ double QuasiMagnetostaticSolverAxiSym::elementJouleHeating(const FiniteElement &
 
 double QuasiMagnetostaticSolverAxiSym::totalJouleHeating() {
   const int NE = pmesh_->GetNE();
-  const ParFiniteElementSpace *fes = this->getFESpace();
+  const ParFiniteElementSpace* fes = this->getFESpace();
 
   double int_jh = 0;
 
@@ -1194,10 +1215,10 @@ double QuasiMagnetostaticSolverAxiSym::totalJouleHeating() {
 
   // loop over elements on this mpi rank and integrate joule heating
   for (int ielem = 0; ielem < NE; ielem++) {
-    const FiniteElement *fe = fes->GetFE(ielem);
-    ElementTransformation *T = fes->GetElementTransformation(ielem);
+    const FiniteElement* fe = fes->GetFE(ielem);
+    ElementTransformation* T = fes->GetElementTransformation(ielem);
 #if MFEM_VERSION >= 40400
-    DofTransformation *doftrans = fes->GetElementVDofs(ielem, vdofs);
+    DofTransformation* doftrans = fes->GetElementVDofs(ielem, vdofs);
     joule_heating_->GetSubVector(vdofs, el_x);
     if (doftrans) {
       doftrans->InvTransformPrimal(el_x);
@@ -1241,18 +1262,18 @@ double QuasiMagnetostaticSolverAxiSym::coilCurrent() const {
   // factor of 2 \pi radius
   double current = 0;
   const int NE = pmesh_->GetNE();
-  const ParFiniteElementSpace *fes = Atheta_space_;
+  const ParFiniteElementSpace* fes = Atheta_space_;
 
   for (int ielem = 0; ielem < NE; ielem++) {
-    const FiniteElement *fe = fes->GetFE(ielem);
-    ElementTransformation *T = fes->GetElementTransformation(ielem);
+    const FiniteElement* fe = fes->GetFE(ielem);
+    ElementTransformation* T = fes->GetElementTransformation(ielem);
 
     // B/c the current is piecewise constant, first order rule is sufficient
     const int intorder = 1;
-    const IntegrationRule *ir = &IntRules.Get(fe->GetGeomType(), intorder);
+    const IntegrationRule* ir = &IntRules.Get(fe->GetGeomType(), intorder);
 
     for (int i = 0; i < ir->GetNPoints(); i++) {
-      const IntegrationPoint &ip = ir->IntPoint(i);
+      const IntegrationPoint& ip = ir->IntPoint(i);
       T->SetIntPoint(&ip);
       current += ip.weight * T->Weight() * J0coef.Eval(*T, ip);
     }
@@ -1270,11 +1291,11 @@ double QuasiMagnetostaticSolverAxiSym::magneticEnergy() const {
 
   const double mu0 = em_opts_.mu0;
   const int NE = pmesh_->GetNE();
-  const ParFiniteElementSpace *fes = Atheta_space_;
+  const ParFiniteElementSpace* fes = Atheta_space_;
 
   for (int ielem = 0; ielem < NE; ielem++) {
-    const FiniteElement *fe = fes->GetFE(ielem);
-    ElementTransformation *T = fes->GetElementTransformation(ielem);
+    const FiniteElement* fe = fes->GetFE(ielem);
+    ElementTransformation* T = fes->GetElementTransformation(ielem);
 
     // Get size info
     const int dof = fe->GetDof();
@@ -1307,7 +1328,7 @@ double QuasiMagnetostaticSolverAxiSym::magneticEnergy() const {
     Vector el_Areal;
     Vector el_Aimag;
 
-    DofTransformation *doftrans = fes->GetElementVDofs(ielem, vdofs);
+    DofTransformation* doftrans = fes->GetElementVDofs(ielem, vdofs);
     Atheta_real_->GetSubVector(vdofs, el_Areal);
     if (doftrans) {
       doftrans->InvTransformPrimal(el_Areal);
@@ -1324,11 +1345,11 @@ double QuasiMagnetostaticSolverAxiSym::magneticEnergy() const {
     // Get quadrature rule
     const int order = fe->GetOrder();
     const int intorder = 2 * order + 1;
-    const IntegrationRule *ir = &IntRules.Get(fe->GetGeomType(), intorder);
+    const IntegrationRule* ir = &IntRules.Get(fe->GetGeomType(), intorder);
 
     // for every quadrature point...
     for (int i = 0; i < ir->GetNPoints(); i++) {
-      const IntegrationPoint &ip = ir->IntPoint(i);
+      const IntegrationPoint& ip = ir->IntPoint(i);
       T->SetIntPoint(&ip);
 
       // evaluate radius
@@ -1351,13 +1372,13 @@ double QuasiMagnetostaticSolverAxiSym::magneticEnergy() const {
       MultAtB(el_Areal_mat, dshape, Areal_x);
       MultAtB(el_Aimag_mat, dshape, Aimag_x);
 
-      const double *hAr = Areal.HostRead();
-      const double *hAi = Aimag.HostRead();
-      const double *hAr_x = Areal_x.HostRead();
-      const double *hAi_x = Aimag_x.HostRead();
+      const double* hAr = Areal.HostRead();
+      const double* hAi = Aimag.HostRead();
+      const double* hAr_x = Areal_x.HostRead();
+      const double* hAi_x = Aimag_x.HostRead();
 
-      double *hBr = Breal.HostWrite();
-      double *hBi = Bimag.HostWrite();
+      double* hBr = Breal.HostWrite();
+      double* hBi = Bimag.HostWrite();
 
       // B = curl(A)
       hBr[0] = -hAr_x[1];

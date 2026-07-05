@@ -33,13 +33,13 @@
 
 #include "riemann_solver.hpp"
 
-GradNonLinearForm::GradNonLinearForm(ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, const int _dim,
+GradNonLinearForm::GradNonLinearForm(ParFiniteElementSpace* _vfes, IntegrationRules* _intRules, const int _dim,
                                      const int _num_equation)
     : ParNonlinearForm(_vfes), vfes(_vfes), intRules(_intRules), dim(_dim), num_equation(_num_equation) {}
 
-void GradNonLinearForm::Apply(const ParGridFunction *Up, Vector &y) {
+void GradNonLinearForm::Apply(const ParGridFunction* Up, Vector& y) {
   Vector x;
-  const double *data = Up->GetData();
+  const double* data = Up->GetData();
 
   // NB: Setting x here accounts for the fact that the space Up lives
   // in is different from the space of the gradient.

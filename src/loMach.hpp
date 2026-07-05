@@ -109,13 +109,13 @@ struct temporalSchemeCoefficients {
 class LoMachSolver : public TPS::PlasmaSolver {
  protected:
   // pointer to parent Tps class
-  TPS::Tps *tpsP_ = nullptr;
+  TPS::Tps* tpsP_ = nullptr;
 
   // Run options
   LoMachOptions loMach_opts_;
 
   // MPI helpers
-  MPI_Groups *groupsMPI = nullptr;
+  MPI_Groups* groupsMPI = nullptr;
   int nprocs_;  // total number of MPI procs
   int rank_;    // local MPI rank
   bool rank0_;  // flag to indicate rank 0
@@ -126,18 +126,18 @@ class LoMachSolver : public TPS::PlasmaSolver {
   bool disable_flow_;
 
   // Model classes
-  MeshBase *meshData_ = nullptr;
-  TurbModelBase *turbModel_ = nullptr;
-  ThermoChemModelBase *thermo_ = nullptr;
-  FlowBase *flow_ = nullptr;
-  SpongeBase *sponge_ = nullptr;
-  ExternalDataBase *extData_ = nullptr;
-  AveragingOptions *avg_opts_ = nullptr;
-  Averaging *average_ = nullptr;
+  MeshBase* meshData_ = nullptr;
+  TurbModelBase* turbModel_ = nullptr;
+  ThermoChemModelBase* thermo_ = nullptr;
+  FlowBase* flow_ = nullptr;
+  SpongeBase* sponge_ = nullptr;
+  ExternalDataBase* extData_ = nullptr;
+  AveragingOptions* avg_opts_ = nullptr;
+  Averaging* average_ = nullptr;
 
   // Mesh and geometry related
-  ParMesh *pmesh_ = nullptr;
-  Mesh *serial_mesh_ = nullptr;
+  ParMesh* pmesh_ = nullptr;
+  Mesh* serial_mesh_ = nullptr;
 
   int dim_;
   int nvel_;
@@ -160,10 +160,10 @@ class LoMachSolver : public TPS::PlasmaSolver {
   double xmax_, ymax_, zmax_;
 
   /// Scalar \f$H^1\f$ finite element collection.
-  FiniteElementCollection *sfec_ = nullptr;
+  FiniteElementCollection* sfec_ = nullptr;
 
   /// Scalar \f$H^1\f$ finite element space.
-  ParFiniteElementSpace *sfes_ = nullptr;
+  ParFiniteElementSpace* sfes_ = nullptr;
 
   /*
   Vector gridScaleSml;
@@ -197,7 +197,7 @@ class LoMachSolver : public TPS::PlasmaSolver {
   double tlast_;
 
   // I/O helpers
-  ParaViewDataCollection *pvdc_ = nullptr;  // visualization
+  ParaViewDataCollection* pvdc_ = nullptr;  // visualization
   IODataOrganizer ioData;                   // restart
 
   /// Update the EXTk/BDF time integration coefficient.
@@ -205,7 +205,7 @@ class LoMachSolver : public TPS::PlasmaSolver {
 
  public:
   /// Ctor
-  LoMachSolver(TPS::Tps *tps);
+  LoMachSolver(TPS::Tps* tps);
 
   /// Dtor
   virtual ~LoMachSolver();
@@ -237,8 +237,8 @@ class LoMachSolver : public TPS::PlasmaSolver {
 
   // Functions necessary for coupled EM+plasma simulations
   // These are overriden from TPS::Solver or TPS::PlasmaSolver
-  mfem::ParMesh *getMesh() const override { return pmesh_; }
-  const mfem::FiniteElementCollection *getFEC() const override {
+  mfem::ParMesh* getMesh() const override { return pmesh_; }
+  const mfem::FiniteElementCollection* getFEC() const override {
     if (thermo_->getJouleHeatingGF() != nullptr) {
       return thermo_->getJouleHeatingGF()->ParFESpace()->FEColl();
     } else {
@@ -246,7 +246,7 @@ class LoMachSolver : public TPS::PlasmaSolver {
     }
   }
 
-  mfem::ParFiniteElementSpace *getFESpace() const override {
+  mfem::ParFiniteElementSpace* getFESpace() const override {
     if (thermo_->getJouleHeatingGF() != nullptr) {
       return thermo_->getJouleHeatingGF()->ParFESpace();
     } else {
@@ -254,11 +254,11 @@ class LoMachSolver : public TPS::PlasmaSolver {
     }
   }
 
-  mfem::ParGridFunction *getPlasmaConductivityGF() override { return thermo_->getPlasmaConductivityGF(); }
+  mfem::ParGridFunction* getPlasmaConductivityGF() override { return thermo_->getPlasmaConductivityGF(); }
 
   void evaluatePlasmaConductivityGF() override { thermo_->evaluatePlasmaConductivityGF(); }
 
-  mfem::ParGridFunction *getJouleHeatingGF() override { return thermo_->getJouleHeatingGF(); }
+  mfem::ParGridFunction* getJouleHeatingGF() override { return thermo_->getJouleHeatingGF(); }
 };
 
 #endif  // LOMACH_HPP_

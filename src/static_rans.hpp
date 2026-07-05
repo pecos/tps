@@ -47,24 +47,24 @@
  */
 class StaticRans : public TurbModelBase {
  protected:
-  mfem::ParMesh *pmesh_ = nullptr;
+  mfem::ParMesh* pmesh_ = nullptr;
   int order_;
   int dim_;
   bool axisym_;
 
-  mfem::FiniteElementCollection *sfec_ = nullptr;
-  mfem::ParFiniteElementSpace *sfes_ = nullptr;
+  mfem::FiniteElementCollection* sfec_ = nullptr;
+  mfem::ParFiniteElementSpace* sfes_ = nullptr;
 
-  mfem::ParGridFunction *mut_ = nullptr;
-  mfem::GridFunctionCoefficient *nut_field_ = nullptr;
+  mfem::ParGridFunction* mut_ = nullptr;
+  mfem::GridFunctionCoefficient* nut_field_ = nullptr;
 
-  ExternalDataBase *extData_ = nullptr;
+  ExternalDataBase* extData_ = nullptr;
 
  public:
   /// Constructor
   //  StaticRans(mfem::Mesh *smesh, mfem::ParMesh *pmesh, const mfem::Array<int> &partitioning, int order, TPS::Tps
   //  *tps);
-  StaticRans(mfem::ParMesh *pmesh, const mfem::Array<int> &partitioning, int order, TPS::Tps *tps);
+  StaticRans(mfem::ParMesh* pmesh, const mfem::Array<int>& partitioning, int order, TPS::Tps* tps);
 
   /// Destructor
   virtual ~StaticRans();
@@ -79,7 +79,7 @@ class StaticRans : public TurbModelBase {
   /**
    * @brief Add eddy viscosity and distance function to the visualization output
    */
-  void initializeViz(mfem::ParaViewDataCollection &pvdc) override;
+  void initializeViz(mfem::ParaViewDataCollection& pvdc) override;
 
   /**
    * @brief Initialize the eddy viscosity.
@@ -98,7 +98,7 @@ class StaticRans : public TurbModelBase {
    */
   void setup() override {}
 
-  mfem::ParGridFunction *getCurrentEddyViscosity() override { return mut_; }
+  mfem::ParGridFunction* getCurrentEddyViscosity() override { return mut_; }
 };
 
 #endif  // STATIC_RANS_HPP_

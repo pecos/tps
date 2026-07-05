@@ -56,7 +56,7 @@ class InterpolatorBase {
 
 #ifdef HAVE_GSLIB
   // mfem interpolator
-  mfem::FindPointsGSLIB *finder_;
+  mfem::FindPointsGSLIB* finder_;
 #endif
 
  public:
@@ -71,7 +71,7 @@ class InterpolatorBase {
   virtual ~InterpolatorBase();
 
   /** Initialize the internal FindPointsGSLIB object */
-  void initializeFinder(mfem::ParMesh *mesh);
+  void initializeFinder(mfem::ParMesh* mesh);
 
   /** Sets the interpolation points from user input */
   void setInterpolationPoints(mfem::Vector xyz);
@@ -82,7 +82,7 @@ class InterpolatorBase {
    *
    * Must call initializeFinder and setInterpolationPoints prior.
    */
-  void interpolate(mfem::ParGridFunction *u);
+  void interpolate(mfem::ParGridFunction* u);
 
   /** Write the data to an ascii file */
   virtual void writeAscii(std::string oname, bool rank0 = true) const;

@@ -32,7 +32,7 @@
 
 #include "radiation.hpp"
 
-MFEM_HOST_DEVICE NetEmission::NetEmission(const RadiationInput &inputs)
+MFEM_HOST_DEVICE NetEmission::NetEmission(const RadiationInput& inputs)
     : Radiation(), necTable_(LinearTable(inputs.necTableInput)) {
   assert(inputs.model == NET_EMISSION);
   assert(inputs.necModel == TABULATED_NEC);

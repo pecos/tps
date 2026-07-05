@@ -44,8 +44,8 @@ using namespace mfem;
 
 class OutletBC : public BoundaryCondition {
  private:
-  MPI_Groups *groupsMPI;
-  GasMixture *d_mixture_;
+  MPI_Groups* groupsMPI;
+  GasMixture* d_mixture_;
 
   const OutletType outletType_;
 
@@ -64,8 +64,8 @@ class OutletBC : public BoundaryCondition {
   Array<int> bdrElemsQ;  // element dofs and face num. of integration points
   Array<int> bdrDofs;    // indexes of the D
   Vector bdrShape;       // shape functions evaluated at the integration points
-  const int &maxIntPoints_;
-  const int &maxDofs_;
+  const int& maxIntPoints_;
+  const int& maxDofs_;
 
   // local vector for mean calculation
   Vector localMeanUp;
@@ -82,57 +82,57 @@ class OutletBC : public BoundaryCondition {
   Vector inverseNorm2cartesian;
 
   void initBdrElemsShape();
-  void initBoundaryU(ParGridFunction *Up);
+  void initBoundaryU(ParGridFunction* Up);
 
-  void subsonicReflectingPressure(Vector &normal, Vector &stateIn, Vector &bdrFlux);
+  void subsonicReflectingPressure(Vector& normal, Vector& stateIn, Vector& bdrFlux);
 
-  void subsonicNonReflectingPressure(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
+  void subsonicNonReflectingPressure(Vector& normal, Vector& stateIn, DenseMatrix& gradState, Vector& bdrFlux);
 
-  void subsonicNonRefMassFlow(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
+  void subsonicNonRefMassFlow(Vector& normal, Vector& stateIn, DenseMatrix& gradState, Vector& bdrFlux);
 
-  void subsonicNonRefPWMassFlow(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector &bdrFlux);
+  void subsonicNonRefPWMassFlow(Vector& normal, Vector& stateIn, DenseMatrix& gradState, Vector& bdrFlux);
 
-  virtual void updateMean(IntegrationRules *intRules, ParGridFunction *Up);
+  virtual void updateMean(IntegrationRules* intRules, ParGridFunction* Up);
 
   void computeParallelArea();
 
  public:
-  OutletBC(MPI_Groups *_groupsMPI, Equations _eqSystem, RiemannSolverTPS *rsolver_, GasMixture *mixture,
-           GasMixture *d_mixture, ParFiniteElementSpace *_vfes, IntegrationRules *_intRules, double &_dt,
+  OutletBC(MPI_Groups* _groupsMPI, Equations _eqSystem, RiemannSolverTPS* rsolver_, GasMixture* mixture,
+           GasMixture* d_mixture, ParFiniteElementSpace* _vfes, IntegrationRules* _intRules, double& _dt,
            const int _dim, const int _num_equation, int _patchNumber, double _refLength, OutletType _bcType,
-           const Array<double> &_inputData, const int &_maxIntPoints, const int &maxDofs, bool axisym);
+           const Array<double>& _inputData, const int& _maxIntPoints, const int& maxDofs, bool axisym);
   ~OutletBC();
 
-  void computeBdrFlux(Vector &normal, Vector &stateIn, DenseMatrix &gradState, Vector transip, double delta,
-                      double time, double distance, Vector &bdrFlux);
+  void computeBdrFlux(Vector& normal, Vector& stateIn, DenseMatrix& gradState, Vector transip, double delta,
+                      double time, double distance, Vector& bdrFlux);
 
   virtual void initBCs();
 
-  virtual void integrationBC(Vector &y,  // output
-                             const Vector &x, const elementIndexingData &elem_index_data, ParGridFunction *Up,
-                             ParGridFunction *gradUp, const boundaryFaceIntegrationData &boundary_face_data,
-                             const int &maxIntPoints, const int &maxDofs);
+  virtual void integrationBC(Vector& y,  // output
+                             const Vector& x, const elementIndexingData& elem_index_data, ParGridFunction* Up,
+                             ParGridFunction* gradUp, const boundaryFaceIntegrationData& boundary_face_data,
+                             const int& maxIntPoints, const int& maxDofs);
 
-  static void updateMean_gpu(ParGridFunction *Up, Vector &localMeanUp, const int _num_equation, const int numBdrElems,
-                             const int totalDofs, Vector &bdrUp, Array<int> &bdrElemsQ, Array<int> &bdrDofs,
-                             Vector &bdrShape, const int &maxIntPoints, const int &maxDofs);
+  static void updateMean_gpu(ParGridFunction* Up, Vector& localMeanUp, const int _num_equation, const int numBdrElems,
+                             const int totalDofs, Vector& bdrUp, Array<int>& bdrElemsQ, Array<int>& bdrDofs,
+                             Vector& bdrShape, const int& maxIntPoints, const int& maxDofs);
 
   // functions for BC integration on GPU
 
-  void integrateOutlets_gpu(Vector &y,  // output
-                            const Vector &x, const elementIndexingData &elem_index_data,
-                            const boundaryFaceIntegrationData &boundary_face_data, Array<int> &listElems,
-                            Array<int> &offsetBoundaryU);
+  void integrateOutlets_gpu(Vector& y,  // output
+                            const Vector& x, const elementIndexingData& elem_index_data,
+                            const boundaryFaceIntegrationData& boundary_face_data, Array<int>& listElems,
+                            Array<int>& offsetBoundaryU);
 
-  void interpOutlet_gpu(const Vector &x, const elementIndexingData &elem_index_data, ParGridFunction *Up,
-                        ParGridFunction *gradUp, const boundaryFaceIntegrationData &boundary_face_data,
-                        Array<int> &listElems, Array<int> &offsetsBoundaryU);
+  void interpOutlet_gpu(const Vector& x, const elementIndexingData& elem_index_data, ParGridFunction* Up,
+                        ParGridFunction* gradUp, const boundaryFaceIntegrationData& boundary_face_data,
+                        Array<int>& listElems, Array<int>& offsetsBoundaryU);
 
 #ifdef _GPU_  // GPU functions
-  static MFEM_HOST_DEVICE void computeSubPressure(const double *u1, double *u2, const double *nor, const double &press,
-                                                  const double &gamma, const double &Rg, const int &dim,
-                                                  const int &num_equation, const WorkingFluid &fluid,
-                                                  const Equations &eqSystem, const int &thrd, const int &maxThreads) {
+  static MFEM_HOST_DEVICE void computeSubPressure(const double* u1, double* u2, const double* nor, const double& press,
+                                                  const double& gamma, const double& Rg, const int& dim,
+                                                  const int& num_equation, const WorkingFluid& fluid,
+                                                  const Equations& eqSystem, const int& thrd, const int& maxThreads) {
     if (fluid == WorkingFluid::DRY_AIR) {
       DryAir::modifyEnergyForPressure_gpu(u1, u2, press, gamma, Rg, num_equation, dim, thrd, maxThreads);
     }
@@ -147,10 +147,10 @@ class OutletBC : public BoundaryCondition {
     //     }
   }
 
-  static MFEM_HOST_DEVICE void computeSubPressure_gpu_serial(const double *u1, double *u2, const double *nor,
-                                                             const double &press, const double &gamma, const double &Rg,
-                                                             const int &dim, const int &num_equation,
-                                                             const WorkingFluid &fluid) {
+  static MFEM_HOST_DEVICE void computeSubPressure_gpu_serial(const double* u1, double* u2, const double* nor,
+                                                             const double& press, const double& gamma, const double& Rg,
+                                                             const int& dim, const int& num_equation,
+                                                             const WorkingFluid& fluid) {
     if (fluid == WorkingFluid::DRY_AIR) {
       DryAir::modifyEnergyForPressure_gpu_serial(u1, u2, press, gamma, Rg, num_equation, dim);
     }
@@ -165,12 +165,12 @@ class OutletBC : public BoundaryCondition {
     //     }
   }
 
-  static MFEM_HOST_DEVICE void computeNRSubPress(const int &thrd, const int &n, const double *u1, const double *gradUp,
-                                                 const double *meanUp, const double &dt, double *u2, double *boundaryU,
-                                                 const double *inputState, const double *nor, const double *d_tang1,
-                                                 const double *d_tang2, const double *d_inv, const double &refLength,
-                                                 const double &gamma, const double &Rg, const int &elDof,
-                                                 const int &dim, const int &num_equation, const Equations &eqSystem) {
+  static MFEM_HOST_DEVICE void computeNRSubPress(const int& thrd, const int& n, const double* u1, const double* gradUp,
+                                                 const double* meanUp, const double& dt, double* u2, double* boundaryU,
+                                                 const double* inputState, const double* nor, const double* d_tang1,
+                                                 const double* d_tang2, const double* d_inv, const double& refLength,
+                                                 const double& gamma, const double& Rg, const int& elDof,
+                                                 const int& dim, const int& num_equation, const Equations& eqSystem) {
     MFEM_SHARED double unitNorm[3], meanVel[3], normGrad[20];
     MFEM_SHARED double mod;
     MFEM_SHARED double speedSound, meanK, dpdn;
@@ -312,10 +312,10 @@ class OutletBC : public BoundaryCondition {
   }
 
   static MFEM_HOST_DEVICE void computeNRSubPress_serial(
-      const int &n, const double *u1, const double *gradUp, const double *meanUp, const double &dt, double *u2,
-      double *boundaryU, const double *inputState, const double *nor, const double *d_tang1, const double *d_tang2,
-      const double *d_inv, const double &refLength, const double &gamma, const double &Rg, const int &elDof,
-      const int &dim, const int &num_equation, const Equations &eqSystem) {
+      const int& n, const double* u1, const double* gradUp, const double* meanUp, const double& dt, double* u2,
+      double* boundaryU, const double* inputState, const double* nor, const double* d_tang1, const double* d_tang2,
+      const double* d_inv, const double& refLength, const double& gamma, const double& Rg, const int& elDof,
+      const int& dim, const int& num_equation, const Equations& eqSystem) {
     double unitNorm[3], meanVel[3], normGrad[20];
     double mod;
     double speedSound, meanK, dpdn;
@@ -434,10 +434,10 @@ class OutletBC : public BoundaryCondition {
   }
 
   static MFEM_HOST_DEVICE void computeNRSubMassFlow(
-      const int &thrd, const int &n, const double *u1, const double *gradUp, const double *meanUp, const double &dt,
-      double *u2, double *boundaryU, const double *inputState, const double *nor, const double *d_tang1,
-      const double *d_tang2, const double *d_inv, const double &refLength, const double &area, const double &gamma,
-      const double &Rg, const int &elDof, const int &dim, const int &num_equation, const Equations &eqSystem) {
+      const int& thrd, const int& n, const double* u1, const double* gradUp, const double* meanUp, const double& dt,
+      double* u2, double* boundaryU, const double* inputState, const double* nor, const double* d_tang1,
+      const double* d_tang2, const double* d_inv, const double& refLength, const double& area, const double& gamma,
+      const double& Rg, const int& elDof, const int& dim, const int& num_equation, const Equations& eqSystem) {
     MFEM_SHARED double unitNorm[3], meanVel[3], normGrad[20];
     MFEM_SHARED double mod;
     MFEM_SHARED double speedSound, meanK, dpdn;
@@ -580,10 +580,10 @@ class OutletBC : public BoundaryCondition {
   }
 
   static MFEM_HOST_DEVICE void computeNRSubMassFlow_serial(
-      const int &n, const double *u1, const double *gradUp, const double *meanUp, const double &dt, double *u2,
-      double *boundaryU, const double *inputState, const double *nor, const double *d_tang1, const double *d_tang2,
-      const double *d_inv, const double &refLength, const double &area, const double &gamma, const double &Rg,
-      const int &elDof, const int &dim, const int &num_equation, const Equations &eqSystem) {
+      const int& n, const double* u1, const double* gradUp, const double* meanUp, const double& dt, double* u2,
+      double* boundaryU, const double* inputState, const double* nor, const double* d_tang1, const double* d_tang2,
+      const double* d_inv, const double& refLength, const double& area, const double& gamma, const double& Rg,
+      const int& elDof, const int& dim, const int& num_equation, const Equations& eqSystem) {
     double unitNorm[3], meanVel[3], normGrad[20];
     double mod;
     double speedSound, meanK, dpdn;
@@ -705,13 +705,13 @@ class OutletBC : public BoundaryCondition {
     }
   }
 
-  static MFEM_HOST_DEVICE void computeNR_PW_SubMF(const int &thrd, const int &n, const double *u1, const double *gradUp,
-                                                  const double *meanUp, const double &dt, double *u2, double *boundaryU,
-                                                  const double *inputState, const double *nor, const double *d_tang1,
-                                                  const double *d_tang2, const double *d_inv, const double &refLength,
-                                                  const double &area, const double &gamma, const double &Rg,
-                                                  const int &elDof, const int &dim, const int &num_equation,
-                                                  const Equations &eqSystem) {
+  static MFEM_HOST_DEVICE void computeNR_PW_SubMF(const int& thrd, const int& n, const double* u1, const double* gradUp,
+                                                  const double* meanUp, const double& dt, double* u2, double* boundaryU,
+                                                  const double* inputState, const double* nor, const double* d_tang1,
+                                                  const double* d_tang2, const double* d_inv, const double& refLength,
+                                                  const double& area, const double& gamma, const double& Rg,
+                                                  const int& elDof, const int& dim, const int& num_equation,
+                                                  const Equations& eqSystem) {
     MFEM_SHARED double unitNorm[3], meanVel[3], normGrad[20];
     MFEM_SHARED double mod;
     MFEM_SHARED double speedSound, meanK, dpdn;

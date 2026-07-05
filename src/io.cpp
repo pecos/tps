@@ -179,8 +179,8 @@ void M2ulPhyS::read_restart_files_hdf5(hid_t file, bool serialized_read) {
     // rhsOperator has not been constructed yet.  As a workaround,
     // that code is duplicated here.
     // TODO(kevin): use mixture comptue primitive.
-    double *dataUp = Up->HostReadWrite();
-    const double *x = U->HostRead();
+    double* dataUp = Up->HostReadWrite();
+    const double* x = U->HostRead();
     for (int i = 0; i < vfes->GetNDofs(); i++) {
       Vector conserved(num_equation);
       Vector primitive(num_equation);
@@ -270,7 +270,7 @@ void M2ulPhyS::restart_files_hdf5(string mode, string inputFileName) {
   return;
 }
 
-void partitioning_file_hdf5(std::string mode, MPI_Groups *groupsMPI, int nelemGlobal, Array<int> &partitioning,
+void partitioning_file_hdf5(std::string mode, MPI_Groups* groupsMPI, int nelemGlobal, Array<int>& partitioning,
                             std::string pathName) {
   MPI_Comm TPSCommWorld = groupsMPI->getTPSCommWorld();
   const bool rank0 = groupsMPI->isWorldRoot();
@@ -396,7 +396,7 @@ hsize_t get_variable_size_hdf5(hid_t file, std::string name) {
 }
 
 // convenience function to read solution data for parallel restarts
-void read_variable_data_hdf5(hid_t file, string varName, size_t index, double *data) {
+void read_variable_data_hdf5(hid_t file, string varName, size_t index, double* data) {
   hid_t data_soln;
   herr_t status;
 
@@ -409,7 +409,7 @@ void read_variable_data_hdf5(hid_t file, string varName, size_t index, double *d
 
 IOOptions::IOOptions() : output_dir_("output"), restart_dir_("./"), restart_mode_("standard") {}
 
-void IOOptions::read(TPS::Tps *tps, std::string prefix) {
+void IOOptions::read(TPS::Tps* tps, std::string prefix) {
   std::string basename;
   if (!prefix.empty()) {
     basename = prefix + "/io";
@@ -458,7 +458,7 @@ void IOOptions::setRestartFlags() {
 }
 
 // convenience function to read and distribute solution data for serialized restarts
-void IOFamily::readDistributeSerializedVariable(hid_t file, const IOVar &var, int numDof, double *data) {
+void IOFamily::readDistributeSerializedVariable(hid_t file, const IOVar& var, int numDof, double* data) {
   std::string varName = group_ + "/" + var.varName_;
   if (rank0_) grvy_printf(ginfo, "--> Reading h5 path = %s\n", varName.c_str());
 
@@ -468,7 +468,7 @@ void IOFamily::readDistributeSerializedVariable(hid_t file, const IOVar &var, in
   const int myrank = pfunc_->ParFESpace()->GetMyRank();
   const int nprocs = pfunc_->ParFESpace()->GetNRanks();
 
-  Array<int> &partitioning = *partitioning_;
+  Array<int>& partitioning = *partitioning_;
   assert(partitioning.Size() == global_ne_);
 
   const unsigned int numStateVars = pfunc_->Size() / pfunc_->ParFESpace()->GetNDofs();
@@ -565,7 +565,7 @@ void IOFamily::readDistributeSerializedVariable(hid_t file, const IOVar &var, in
 }
 
 // convenience function to write HDF5 data
-void write_variable_data_hdf5(hid_t group, string varName, hid_t dataspace, const double *data) {
+void write_variable_data_hdf5(hid_t group, string varName, hid_t dataspace, const double* data) {
   hid_t data_soln;
   herr_t status;
   assert(group >= 0);
@@ -582,7 +582,7 @@ void write_variable_data_hdf5(hid_t group, string varName, hid_t dataspace, cons
 // Routines for I/O data organizer helper class
 // ---------------------------------------------
 
-IOFamily::IOFamily(std::string desc, std::string grp, mfem::ParGridFunction *pf)
+IOFamily::IOFamily(std::string desc, std::string grp, mfem::ParGridFunction* pf)
     : description_(desc), group_(grp), pfunc_(pf) {
   rank0_ = (pfunc_->ParFESpace()->GetMyRank() == 0);
 
@@ -600,13 +600,13 @@ IOFamily::IOFamily(std::string desc, std::string grp, mfem::ParGridFunction *pf)
 void IOFamily::serializeForWrite() {
   MPI_Comm comm = this->pfunc_->ParFESpace()->GetComm();
 
-  const Array<int> &partitioning = *(this->partitioning_);
+  const Array<int>& partitioning = *(this->partitioning_);
   assert(partitioning.Size() == global_ne_);
 
-  const int *locToGlobElem = this->local_to_global_elem_;
+  const int* locToGlobElem = this->local_to_global_elem_;
   assert(locToGlobElem != NULL);
 
-  ParGridFunction *pfunc = this->pfunc_;
+  ParGridFunction* pfunc = this->pfunc_;
   if (rank0_) {
     grvy_printf(ginfo, "Generating serialized restart file (group %s...)\n", this->group_.c_str());
     // copy my own data
@@ -637,7 +637,7 @@ void IOFamily::serializeForWrite() {
     }
 
     // Second, receive the messages
-    Vector *soln = new Vector[nprocs];
+    Vector* soln = new Vector[nprocs];
     for (int irank = 1; irank < nprocs; irank++) {
       soln[irank].SetSize(nvar[irank]);
       MPI_Recv(soln[irank].HostReadWrite(), nvar[irank], MPI_DOUBLE, irank, 0, comm, MPI_STATUS_IGNORE);
@@ -649,11 +649,11 @@ void IOFamily::serializeForWrite() {
     for (int gelem = 0; gelem < global_ne_; gelem++) {
       int from_rank = partitioning[gelem];
       if (from_rank != 0) {
-        const double *d_soln = soln[from_rank].HostRead();
+        const double* d_soln = soln[from_rank].HostRead();
 
         this->serial_fes_->GetElementVDofs(gelem, gvdofs);
         lsoln.SetSize(gvdofs.Size());
-        double *d_lsoln = lsoln.HostWrite();
+        double* d_lsoln = lsoln.HostWrite();
 
         for (int i = 0; i < lsoln.Size(); i++) {
           d_lsoln[i] = d_soln[nvar[from_rank] + i];
@@ -681,12 +681,12 @@ void IOFamily::serializeForWrite() {
 
     // Second, fill the send buffer
     Vector send_buffer(nvar);
-    double *h_send_buffer = send_buffer.HostWrite();
+    double* h_send_buffer = send_buffer.HostWrite();
     int n = 0;
     for (int elem = 0; elem < local_ne_; elem++) {
       this->pfunc_->ParFESpace()->GetElementVDofs(elem, lvdofs);
       pfunc->GetSubVector(lvdofs, lsoln);  // work for gpu build?
-      const double *h_lsoln = lsoln.HostRead();
+      const double* h_lsoln = lsoln.HostRead();
       for (int i = 0; i < lsoln.Size(); i++) {
         h_send_buffer[n + i] = h_lsoln[i];
       }
@@ -711,7 +711,7 @@ void IOFamily::writePartitioned(hid_t file) {
   assert(group >= 0);
 
   // get pointer to raw data
-  const double *data = pfunc_->HostRead();
+  const double* data = pfunc_->HostRead();
 
   // save raw data
   for (auto var : vars_) {
@@ -743,7 +743,7 @@ void IOFamily::writeSerial(hid_t file) {
 
     // get pointer to raw data
     assert(serial_sol_ != NULL);
-    const double *data = serial_sol_->HostRead();
+    const double* data = serial_sol_->HostRead();
 
     // save raw data
     for (auto var : vars_) {
@@ -763,7 +763,7 @@ void IOFamily::readPartitioned(hid_t file) {
   assert((int)numInSoln == local_ndofs_);
 
   // get pointer to raw data
-  double *data = pfunc_->HostWrite();
+  double* data = pfunc_->HostWrite();
 
   // read from file into appropriate spot in data
   for (auto var : vars_) {
@@ -784,7 +784,7 @@ void IOFamily::readSerial(hid_t file) {
   }
 
   // get pointer to raw data
-  double *data = pfunc_->HostWrite();
+  double* data = pfunc_->HostWrite();
 
   // read on rank 0 and distribute into data
   for (auto var : vars_) {
@@ -803,7 +803,7 @@ void IOFamily::readChangeOrder(hid_t file, int read_order) {
     // Set up "auxilliary" ParGridFunction, to read data into before order change
     const int nvars = vars_.size();
     aux_pfes_ = new ParFiniteElementSpace(pfunc_->ParFESpace()->GetParMesh(), aux_fec_, nvars, Ordering::byNODES);
-    double *aux_U_data = new double[nvars * aux_pfes_->GetNDofs()];
+    double* aux_U_data = new double[nvars * aux_pfes_->GetNDofs()];
     aux_pfunc_ = new ParGridFunction(aux_pfes_, aux_U_data);
     const int aux_dof = aux_pfes_->GetNDofs();
 
@@ -813,7 +813,7 @@ void IOFamily::readChangeOrder(hid_t file, int read_order) {
     assert((int)numInSoln == aux_dof);
 
     // get pointer to raw data
-    double *data = aux_pfunc_->HostWrite();
+    double* data = aux_pfunc_->HostWrite();
 
     for (auto var : vars_) {
       if (var.inRestartFile_) {
@@ -848,8 +848,8 @@ void IOFamily::readChangeOrder(hid_t file, int read_order) {
 }
 
 // register a new IO family which maps to a ParGridFunction
-void IODataOrganizer::registerIOFamily(std::string description, std::string group, ParGridFunction *pfunc,
-                                       bool auxRestart, bool inRestartFile, FiniteElementCollection *fec) {
+void IODataOrganizer::registerIOFamily(std::string description, std::string group, ParGridFunction* pfunc,
+                                       bool auxRestart, bool inRestartFile, FiniteElementCollection* fec) {
   IOFamily family(description, group, pfunc);
   family.allowsAuxRestart_ = auxRestart;
   family.inRestartFile_ = inRestartFile;
@@ -877,12 +877,12 @@ int IODataOrganizer::getIOFamilyIndex(std::string group) const {
   return (-1);
 }
 
-void IODataOrganizer::initializeSerial(bool root, bool serial, Mesh *serial_mesh, int *locToGlob, Array<int> *part) {
+void IODataOrganizer::initializeSerial(bool root, bool serial, Mesh* serial_mesh, int* locToGlob, Array<int>* part) {
   supports_serial_ = serial;
 
   // loop through families
   for (size_t n = 0; n < families_.size(); n++) {
-    IOFamily &fam = families_[n];
+    IOFamily& fam = families_[n];
     fam.serial_fes_ = NULL;
     fam.serial_sol_ = NULL;
 
@@ -891,7 +891,7 @@ void IODataOrganizer::initializeSerial(bool root, bool serial, Mesh *serial_mesh
       fam.local_to_global_elem_ = locToGlob;
       fam.partitioning_ = part;
       if (root) {
-        const FiniteElementCollection *fec = fam.pfunc_->ParFESpace()->FEColl();
+        const FiniteElementCollection* fec = fam.pfunc_->ParFESpace()->FEColl();
         int numVars = fam.pfunc_->Size() / fam.pfunc_->ParFESpace()->GetNDofs();
 
         fam.serial_fes_ = new FiniteElementSpace(serial_mesh, fec, numVars, Ordering::byNODES);

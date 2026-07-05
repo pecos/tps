@@ -47,7 +47,7 @@
 
 using namespace mfem;
 
-MeshBase::MeshBase(TPS::Tps *tps, LoMachOptions *loMach_opts, int order)
+MeshBase::MeshBase(TPS::Tps* tps, LoMachOptions* loMach_opts, int order)
     : tpsP_(tps),
       groupsMPI(new MPI_Groups(tps->getTPSCommWorld())),
       rank0_(groupsMPI->isWorldRoot()),
@@ -155,7 +155,7 @@ void MeshBase::initializeMesh() {
   if (loMach_opts_->scale_mesh != 1) {
     if (rank0_) grvy_printf(ginfo, "Scaling mesh factor of scale_mesh = %.6e\n", loMach_opts_->scale_mesh);
     serial_mesh_->EnsureNodes();
-    GridFunction *nodes = serial_mesh_->GetNodes();
+    GridFunction* nodes = serial_mesh_->GetNodes();
     *nodes *= loMach_opts_->scale_mesh;
   }
 
@@ -272,7 +272,7 @@ void MeshBase::initializeMesh() {
   }
 }
 
-void MeshBase::initializeViz(ParaViewDataCollection &pvdc) {
+void MeshBase::initializeViz(ParaViewDataCollection& pvdc) {
   pvdc.RegisterField("resolution", gridScale_);
   if (loMach_opts_->compute_wallDistance) {
     pvdc.RegisterField("wall_dist", distance_);
@@ -296,8 +296,8 @@ void MeshBase::computeGridScale() {
     zones_per_vdofALL.SetSize(fes_->GetVSize());
     zones_per_vdofALL = 0;
 
-    double *data = gridScale_->HostReadWrite();
-    double *count = dofCount.HostReadWrite();
+    double* data = gridScale_->HostReadWrite();
+    double* count = dofCount.HostReadWrite();
 
     for (int i = 0; i < fes_->GetNDofs(); i++) {
       data[i] = 0.0;
@@ -308,14 +308,14 @@ void MeshBase::computeGridScale() {
     for (int e = 0; e < fes_->GetNE(); ++e) {
       fes_->GetElementVDofs(e, vdofs);
       vals.SetSize(vdofs.Size());
-      ElementTransformation *tr = fes_->GetElementTransformation(e);
-      const FiniteElement *el = fes_->GetFE(e);
+      ElementTransformation* tr = fes_->GetElementTransformation(e);
+      const FiniteElement* el = fes_->GetFE(e);
       elndofs = el->GetDof();
       double delta;
 
       // element dof
       for (int dof = 0; dof < elndofs; ++dof) {
-        const IntegrationPoint &ip = el->GetNodes().IntPoint(dof);
+        const IntegrationPoint& ip = el->GetNodes().IntPoint(dof);
         tr->SetIntPoint(&ip);
         delta = pmesh_->GetElementSize(tr->ElementNo, 1);
         delta = delta / ((double)order_);
@@ -335,7 +335,7 @@ void MeshBase::computeGridScale() {
     }
 
     // Count the zones globally.
-    GroupCommunicator &gcomm = gridScale_->ParFESpace()->GroupComm();
+    GroupCommunicator& gcomm = gridScale_->ParFESpace()->GroupComm();
     gcomm.Reduce<int>(zones_per_vdof, GroupCommunicator::Sum);
     gcomm.Bcast(zones_per_vdof);
 

@@ -50,7 +50,7 @@ InterpolatorBase::~InterpolatorBase() {
 #endif
 }
 
-void InterpolatorBase::initializeFinder(ParMesh *mesh) {
+void InterpolatorBase::initializeFinder(ParMesh* mesh) {
   dim_ = mesh->Dimension();
 #ifdef HAVE_GSLIB
   finder_ = new FindPointsGSLIB(mesh->GetComm());
@@ -66,7 +66,7 @@ void InterpolatorBase::setInterpolationPoints() {
   mfem_error("InterpolatorBase::setInterpolationPoints() is not implemented");
 }
 
-void InterpolatorBase::interpolate(ParGridFunction *u) {
+void InterpolatorBase::interpolate(ParGridFunction* u) {
   assert(dim_ == 2 || dim_ == 3);
 
   const int totalPts = xyz_.Size();

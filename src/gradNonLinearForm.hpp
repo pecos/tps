@@ -42,15 +42,15 @@ using namespace std;
 
 class GradNonLinearForm : public ParNonlinearForm {
  private:
-  ParFiniteElementSpace *vfes;
-  IntegrationRules *intRules;
+  ParFiniteElementSpace* vfes;
+  IntegrationRules* intRules;
   const int dim;
   const int num_equation;
 
  public:
-  GradNonLinearForm(ParFiniteElementSpace *f, IntegrationRules *intRules, const int dim, const int num_equation);
+  GradNonLinearForm(ParFiniteElementSpace* f, IntegrationRules* intRules, const int dim, const int num_equation);
 
-  void Apply(const ParGridFunction *Up, Vector &y);
+  void Apply(const ParGridFunction* Up, Vector& y);
 };
 
 #endif  // GRADNONLINEARFORM_HPP_

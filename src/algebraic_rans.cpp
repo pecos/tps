@@ -40,8 +40,8 @@
 
 using namespace mfem;
 
-AlgebraicRans::AlgebraicRans(ParMesh *pmesh, const Array<int> &partitioning, int order, TPS::Tps *tps,
-                             ParGridFunction *distance)
+AlgebraicRans::AlgebraicRans(ParMesh* pmesh, const Array<int>& partitioning, int order, TPS::Tps* tps,
+                             ParGridFunction* distance)
     : pmesh_(pmesh), order_(order), distance_(distance) {
   dim_ = pmesh_->Dimension();
 
@@ -112,7 +112,7 @@ void AlgebraicRans::initializeSelf() {
   toThermoChem_interface_.eddy_viscosity = mut_;
 }
 
-void AlgebraicRans::initializeViz(mfem::ParaViewDataCollection &pvdc) {
+void AlgebraicRans::initializeViz(mfem::ParaViewDataCollection& pvdc) {
   pvdc.RegisterField("muT", mut_);
   pvdc.RegisterField("distance", distance_);
 }
@@ -134,9 +134,9 @@ void AlgebraicRans::step() {
   // mut_, since rest of operations are multiplicative
   if (axisym_) {
     int ndof = sfes_->GetNDofs();
-    double *d_mut = mut_->Write();
-    const double *d_omega = vorticity_gf_->Read();
-    const double *d_swirl_omega = swirl_vorticity_gf_->Read();
+    double* d_mut = mut_->Write();
+    const double* d_omega = vorticity_gf_->Read();
+    const double* d_swirl_omega = swirl_vorticity_gf_->Read();
     MFEM_FORALL(i, ndof, {
       double omega_r = d_swirl_omega[i];
       double omega_th = d_omega[i];
@@ -147,8 +147,8 @@ void AlgebraicRans::step() {
   } else {
     if (dim_ == 2) {
       int ndof = sfes_->GetNDofs();
-      double *d_mut = mut_->Write();
-      const double *d_omega = vorticity_gf_->Read();
+      double* d_mut = mut_->Write();
+      const double* d_omega = vorticity_gf_->Read();
       MFEM_FORALL(i, ndof, {
         double omega_z = d_omega[i];
         double magn_omega_2 = omega_z * omega_z;
@@ -156,8 +156,8 @@ void AlgebraicRans::step() {
       });
     } else {  // dim_ == 3
       int ndof = sfes_->GetNDofs();
-      double *d_mut = mut_->Write();
-      const double *d_omega = vorticity_gf_->Read();
+      double* d_mut = mut_->Write();
+      const double* d_omega = vorticity_gf_->Read();
       MFEM_FORALL(i, ndof, {
         double omega_x = d_omega[i];
         double omega_y = d_omega[ndof + i];
@@ -171,8 +171,8 @@ void AlgebraicRans::step() {
   // Evaluate the mixing length
   {
     int ndof = sfes_->GetNDofs();
-    double *d_ellmix = ell_mix_gf_->Write();
-    const double *d_dist = distance_->Read();
+    double* d_ellmix = ell_mix_gf_->Write();
+    const double* d_dist = distance_->Read();
     const double kap = kappa_von_karman_;
     const double max_ell = max_mixing_length_;
     MFEM_FORALL(i, ndof, { d_ellmix[i] = min(kap * d_dist[i], max_ell); });

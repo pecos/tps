@@ -34,7 +34,7 @@
 
 // EquationOfState::EquationOfState() {}
 
-GasMixture::GasMixture(RunConfiguration &_runfile, int _dim, int nvel)
+GasMixture::GasMixture(RunConfiguration& _runfile, int _dim, int nvel)
     : GasMixture(_runfile.workFluid, _dim, nvel, _runfile.const_plasma_conductivity_) {}
 
 MFEM_HOST_DEVICE GasMixture::GasMixture(WorkingFluid f, int _dim, int nvel, double pc) {
@@ -44,13 +44,13 @@ MFEM_HOST_DEVICE GasMixture::GasMixture(WorkingFluid f, int _dim, int nvel, doub
   const_plasma_conductivity_ = pc;
 }
 
-void GasMixture::SetConstantPlasmaConductivity(ParGridFunction *pc, const ParGridFunction *Up,
-                                               const ParGridFunction *coords) {
+void GasMixture::SetConstantPlasmaConductivity(ParGridFunction* pc, const ParGridFunction* Up,
+                                               const ParGridFunction* coords) {
   // quick return if pc is NULL (nothing to set)
   if (pc == NULL) return;
 
   // otherwise, set plasma conductivity
-  double *plasma_conductivity_gf = pc->HostWrite();
+  double* plasma_conductivity_gf = pc->HostWrite();
 
   // To a constant
   const int nnode = pc->FESpace()->GetNDofs();
@@ -79,9 +79,9 @@ void GasMixture::SetConstantPlasmaConductivity(ParGridFunction *pc, const ParGri
   // }
 }
 
-void GasMixture::UpdatePressureGridFunction(ParGridFunction *press, const ParGridFunction *Up) {
-  double *pGridFunc = press->HostWrite();
-  const double *UpData = Up->HostRead();
+void GasMixture::UpdatePressureGridFunction(ParGridFunction* press, const ParGridFunction* Up) {
+  double* pGridFunc = press->HostWrite();
+  const double* UpData = Up->HostRead();
 
   const int nnode = press->FESpace()->GetNDofs();
 
@@ -97,7 +97,7 @@ void GasMixture::UpdatePressureGridFunction(ParGridFunction *press, const ParGri
 // total energy of stagnation state is essentially the same as
 // the total energy of input state subtracted by its bulk kinetic energy.
 // Do not necessarily need mixture-specific routines.
-void GasMixture::computeStagnationState(const mfem::Vector &stateIn, mfem::Vector &stagnationState) {
+void GasMixture::computeStagnationState(const mfem::Vector& stateIn, mfem::Vector& stagnationState) {
   stagnationState.SetSize(num_equation);
   stagnationState = stateIn;
 
@@ -114,8 +114,8 @@ void GasMixture::computeStagnationState(const mfem::Vector &stateIn, mfem::Vecto
   // NOTE: electron energy is purely internal energy, so no change.
 }
 
-void GasMixture::modifyStateFromPrimitive(const Vector &state, const BoundaryPrimitiveData &bcState,
-                                          Vector &outputState) {
+void GasMixture::modifyStateFromPrimitive(const Vector& state, const BoundaryPrimitiveData& bcState,
+                                          Vector& outputState) {
   outputState.SetSize(num_equation);
   // assert(bcState.prim.Size() == num_equation);
 
@@ -128,8 +128,8 @@ void GasMixture::modifyStateFromPrimitive(const Vector &state, const BoundaryPri
   GetConservativesFromPrimitives(prim, outputState);
 }
 
-MFEM_HOST_DEVICE void GasMixture::modifyStateFromPrimitive(const double *state, const BoundaryPrimitiveData &bcState,
-                                                           double *outputState) {
+MFEM_HOST_DEVICE void GasMixture::modifyStateFromPrimitive(const double* state, const BoundaryPrimitiveData& bcState,
+                                                           double* outputState) {
   double prim[gpudata::MAXEQUATIONS];
   GetPrimitivesFromConservatives(state, prim);
   for (int i = 0; i < num_equation; i++) {
@@ -143,7 +143,7 @@ MFEM_HOST_DEVICE void GasMixture::modifyStateFromPrimitive(const double *state, 
 //////// Dry Air mixture
 //////////////////////////////////////////////////////
 
-DryAir::DryAir(RunConfiguration &_runfile, int _dim, int nvel)
+DryAir::DryAir(RunConfiguration& _runfile, int _dim, int nvel)
     // : DryAir(_runfile.workFluid, _runfile.GetEquationSystem(), _runfile.visc_mult, _runfile.bulk_visc, _dim, nvel) {}
     : DryAir(_runfile.dryAirInput, _dim, nvel) {}
 
@@ -217,19 +217,19 @@ void DryAir::setNumEquations() {
 //   }
 // }
 
-void DryAir::computeSpeciesEnthalpies(const Vector &state, Vector &speciesEnthalpies) {
+void DryAir::computeSpeciesEnthalpies(const Vector& state, Vector& speciesEnthalpies) {
   speciesEnthalpies.SetSize(numSpecies);
   speciesEnthalpies = 0.0;
 
   return;
 }
 
-MFEM_HOST_DEVICE void DryAir::computeSpeciesEnthalpies(const double *state, double *speciesEnthalpies) {
+MFEM_HOST_DEVICE void DryAir::computeSpeciesEnthalpies(const double* state, double* speciesEnthalpies) {
   for (int sp = 0; sp < numSpecies; sp++) speciesEnthalpies[sp] = 0.0;
   return;
 }
 
-bool DryAir::StateIsPhysical(const mfem::Vector &state) {
+bool DryAir::StateIsPhysical(const mfem::Vector& state) {
   const double den = state(0);
   const Vector den_vel(state.GetData() + 1, nvel_);
   const double den_energy = state(iTh);
@@ -273,9 +273,9 @@ bool DryAir::StateIsPhysical(const mfem::Vector &state) {
 // TODO(kevin): We need to move this routine to upper level, i.e. M2ulPhys.
 // Diffusion velocity contributes to the characteristic speed, which mixture cannot handle or know.
 // Compute the maximum characteristic speed.
-double DryAir::ComputeMaxCharSpeed(const Vector &state) { return ComputeMaxCharSpeed(state.GetData()); }
+double DryAir::ComputeMaxCharSpeed(const Vector& state) { return ComputeMaxCharSpeed(state.GetData()); }
 
-MFEM_HOST_DEVICE double DryAir::ComputeMaxCharSpeed(const double *state) {
+MFEM_HOST_DEVICE double DryAir::ComputeMaxCharSpeed(const double* state) {
   const double den = state[0];
 
   double den_vel2 = 0;
@@ -291,11 +291,11 @@ MFEM_HOST_DEVICE double DryAir::ComputeMaxCharSpeed(const double *state) {
   return vel + sound;
 }
 
-void DryAir::GetConservativesFromPrimitives(const Vector &primit, Vector &conserv) {
+void DryAir::GetConservativesFromPrimitives(const Vector& primit, Vector& conserv) {
   GetConservativesFromPrimitives(primit.GetData(), conserv.GetData());
 }
 
-MFEM_HOST_DEVICE void DryAir::GetConservativesFromPrimitives(const double *primit, double *conserv) {
+MFEM_HOST_DEVICE void DryAir::GetConservativesFromPrimitives(const double* primit, double* conserv) {
   for (int eq = 0; eq < num_equation; eq++) conserv[eq] = primit[eq];
 
   double v2 = 0.;
@@ -314,11 +314,11 @@ MFEM_HOST_DEVICE void DryAir::GetConservativesFromPrimitives(const double *primi
   }
 }
 
-void DryAir::GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit) {
+void DryAir::GetPrimitivesFromConservatives(const Vector& conserv, Vector& primit) {
   GetPrimitivesFromConservatives(conserv.GetData(), primit.GetData());
 }
 
-MFEM_HOST_DEVICE void DryAir::GetPrimitivesFromConservatives(const double *conserv, double *primit) {
+MFEM_HOST_DEVICE void DryAir::GetPrimitivesFromConservatives(const double* conserv, double* primit) {
   double T = ComputeTemperature(conserv);
   for (int eq = 0; eq < num_equation; eq++) primit[eq] = conserv[eq];
 
@@ -334,7 +334,7 @@ MFEM_HOST_DEVICE void DryAir::GetPrimitivesFromConservatives(const double *conse
   }
 }
 
-double DryAir::ComputeSpeedOfSound(const mfem::Vector &Uin, bool primitive) {
+double DryAir::ComputeSpeedOfSound(const mfem::Vector& Uin, bool primitive) {
   double T;
 
   if (primitive) {
@@ -347,7 +347,7 @@ double DryAir::ComputeSpeedOfSound(const mfem::Vector &Uin, bool primitive) {
   return sqrt(specific_heat_ratio * gas_constant * T);
 }
 
-double DryAir::ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin, bool primitive) {
+double DryAir::ComputePressureDerivative(const Vector& dUp_dx, const Vector& Uin, bool primitive) {
   double T;
   if (primitive) {
     T = Uin[iTh];
@@ -358,13 +358,13 @@ double DryAir::ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin
   return gas_constant * (T * dUp_dx[0] + Uin[0] * dUp_dx[iTh]);
 }
 
-double DryAir::ComputePressureFromPrimitives(const mfem::Vector &Up) { return gas_constant * Up[0] * Up[iTh]; }
+double DryAir::ComputePressureFromPrimitives(const mfem::Vector& Up) { return gas_constant * Up[0] * Up[iTh]; }
 
-MFEM_HOST_DEVICE double DryAir::ComputePressureFromPrimitives(const double *Up) {
+MFEM_HOST_DEVICE double DryAir::ComputePressureFromPrimitives(const double* Up) {
   return gas_constant * Up[0] * Up[iTh];
 }
 
-void DryAir::computeStagnationState(const mfem::Vector &stateIn, mfem::Vector &stagnationState) {
+void DryAir::computeStagnationState(const mfem::Vector& stateIn, mfem::Vector& stagnationState) {
   const double p = ComputePressure(stateIn);
 
   stagnationState.SetSize(num_equation);
@@ -377,7 +377,7 @@ void DryAir::computeStagnationState(const mfem::Vector &stateIn, mfem::Vector &s
   stagnationState(iTh) = p / (specific_heat_ratio - 1.);
 }
 
-void DryAir::computeStagnantStateWithTemp(const mfem::Vector &stateIn, const double Temp, mfem::Vector &stateOut) {
+void DryAir::computeStagnantStateWithTemp(const mfem::Vector& stateIn, const double Temp, mfem::Vector& stateOut) {
   stateOut.SetSize(num_equation);
   stateOut = stateIn;
 
@@ -387,7 +387,7 @@ void DryAir::computeStagnantStateWithTemp(const mfem::Vector &stateIn, const dou
 }
 
 // NOTE: modifyElectronEnergy will not be used for DryAir.
-void DryAir::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::Vector &stateOut, const double &p,
+void DryAir::modifyEnergyForPressure(const mfem::Vector& stateIn, mfem::Vector& stateOut, const double& p,
                                      bool modifyElectronEnergy) {
   stateOut.SetSize(num_equation);
   stateOut = stateIn;
@@ -399,7 +399,7 @@ void DryAir::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::Vector &
   stateOut(iTh) = p / (specific_heat_ratio - 1.) + ke;
 }
 
-MFEM_HOST_DEVICE void DryAir::modifyEnergyForPressure(const double *stateIn, double *stateOut, const double &p,
+MFEM_HOST_DEVICE void DryAir::modifyEnergyForPressure(const double* stateIn, double* stateOut, const double& p,
                                                       bool modifyElectronEnergy) {
   for (int eq = 0; eq < num_equation; eq++) stateOut[eq] = stateIn[eq];
 
@@ -411,8 +411,8 @@ MFEM_HOST_DEVICE void DryAir::modifyEnergyForPressure(const double *stateIn, dou
 }
 
 // TODO(kevin): check if this works for axisymmetric case.
-void DryAir::computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal,
-                                                     Vector &conservedState) {
+void DryAir::computeConservedStateFromConvectiveFlux(const Vector& meanNormalFluxes, const Vector& normal,
+                                                     Vector& conservedState) {
   const double gamma = specific_heat_ratio;
 
   double temp = 0.;
@@ -472,7 +472,7 @@ double EquationOfState::pressure( double *state,
 ////// Perfect Mixture GasMixture                     ////////////////////
 //////////////////////////////////////////////////////////////////////////
 
-PerfectMixture::PerfectMixture(RunConfiguration &_runfile, int _dim, int nvel)
+PerfectMixture::PerfectMixture(RunConfiguration& _runfile, int _dim, int nvel)
     : PerfectMixture(_runfile.perfectMixtureInput, _dim, nvel, _runfile.const_plasma_conductivity_) {}
 
 MFEM_HOST_DEVICE PerfectMixture::PerfectMixture(PerfectMixtureInput inputs, int _dim, int nvel, double pc)
@@ -573,7 +573,7 @@ MFEM_HOST_DEVICE PerfectMixture::PerfectMixture(PerfectMixtureInput inputs, int 
 }
 
 // compute heavy-species heat capacity from number densities.
-MFEM_HOST_DEVICE double PerfectMixture::computeHeaviesHeatCapacity(const double *n_sp, const double &nB) const {
+MFEM_HOST_DEVICE double PerfectMixture::computeHeaviesHeatCapacity(const double* n_sp, const double& nB) const {
   double heatCapacity = 0.0;
   for (int sp = 0; sp < numActiveSpecies; sp++) {
     if (sp == iElectron) continue;  // neglect electron.
@@ -583,7 +583,7 @@ MFEM_HOST_DEVICE double PerfectMixture::computeHeaviesHeatCapacity(const double 
   return heatCapacity;
 }
 
-MFEM_HOST_DEVICE double PerfectMixture::computeHeaviesCp(const double *n_sp, const double &nB) const {
+MFEM_HOST_DEVICE double PerfectMixture::computeHeaviesCp(const double* n_sp, const double& nB) const {
   double heatCapacity = 0.0;
   for (int sp = 0; sp < numActiveSpecies; sp++) {
     if (sp == iElectron) continue;  // neglect electron.
@@ -594,7 +594,7 @@ MFEM_HOST_DEVICE double PerfectMixture::computeHeaviesCp(const double *n_sp, con
   return heatCapacity;
 }
 
-MFEM_HOST_DEVICE double PerfectMixture::computeSpeciesCp(const double *n_sp, const double &nB, int sp) {
+MFEM_HOST_DEVICE double PerfectMixture::computeSpeciesCp(const double* n_sp, const double& nB, int sp) {
   double heatCapacity;
   if (sp == iBackground) {
     heatCapacity = nB * molarCP_[iBackground];
@@ -604,7 +604,7 @@ MFEM_HOST_DEVICE double PerfectMixture::computeSpeciesCp(const double *n_sp, con
   return heatCapacity;
 }
 
-MFEM_HOST_DEVICE double PerfectMixture::computeAmbipolarElectronNumberDensity(const double *n_sp) const {
+MFEM_HOST_DEVICE double PerfectMixture::computeAmbipolarElectronNumberDensity(const double* n_sp) const {
   double n_e = 0.0;
 
   for (int sp = 0; sp < numActiveSpecies; sp++) {
@@ -617,7 +617,7 @@ MFEM_HOST_DEVICE double PerfectMixture::computeAmbipolarElectronNumberDensity(co
   return n_e;
 }
 
-MFEM_HOST_DEVICE double PerfectMixture::computeBackgroundMassDensity(const double &rho, const double *n_sp, double &n_e,
+MFEM_HOST_DEVICE double PerfectMixture::computeBackgroundMassDensity(const double& rho, const double* n_sp, double& n_e,
                                                                      bool isElectronComputed) const {
   if ((!isElectronComputed) && (ambipolar)) {
     n_e = computeAmbipolarElectronNumberDensity(n_sp);
@@ -653,7 +653,7 @@ MFEM_HOST_DEVICE double PerfectMixture::computeBackgroundMassDensity(const doubl
 // Right now, it's alwasy the same as conserved variables, to minimize gradient computation.
 // Additional primitive variables (such as temperature currently) needs to be evaluated every time it is needed.
 // Gradient computation can still keep the same number, while expanding the primitive variables.
-void PerfectMixture::GetPrimitivesFromConservatives(const Vector &conserv, Vector &primit) {
+void PerfectMixture::GetPrimitivesFromConservatives(const Vector& conserv, Vector& primit) {
   // Vector n_sp;
   // computeNumberDensities(conserv, n_sp);
   //
@@ -676,7 +676,7 @@ void PerfectMixture::GetPrimitivesFromConservatives(const Vector &conserv, Vecto
   GetPrimitivesFromConservatives(&conserv[0], &primit[0]);
 }
 
-MFEM_HOST_DEVICE void PerfectMixture::GetPrimitivesFromConservatives(const double *conserv, double *primit) {
+MFEM_HOST_DEVICE void PerfectMixture::GetPrimitivesFromConservatives(const double* conserv, double* primit) {
   double n_sp[gpudata::MAXSPECIES];
 
   computeNumberDensities(conserv, n_sp);
@@ -699,7 +699,7 @@ MFEM_HOST_DEVICE void PerfectMixture::GetPrimitivesFromConservatives(const doubl
     primit[iTe] = T_e;
 }
 
-void PerfectMixture::GetConservativesFromPrimitives(const Vector &primit, Vector &conserv) {
+void PerfectMixture::GetConservativesFromPrimitives(const Vector& primit, Vector& conserv) {
   // conserv[0] = primit[0];
   // for (int d = 0; d < nvel_; d++) conserv[d + 1] = primit[d + 1] * primit[0];
   //
@@ -741,7 +741,7 @@ void PerfectMixture::GetConservativesFromPrimitives(const Vector &primit, Vector
   GetConservativesFromPrimitives(&primit[0], &conserv[0]);
 }
 
-MFEM_HOST_DEVICE void PerfectMixture::GetConservativesFromPrimitives(const double *primit, double *conserv) {
+MFEM_HOST_DEVICE void PerfectMixture::GetConservativesFromPrimitives(const double* primit, double* conserv) {
   conserv[0] = primit[0];
   for (int d = 0; d < nvel_; d++) conserv[d + 1] = primit[d + 1] * primit[0];
 
@@ -782,11 +782,11 @@ MFEM_HOST_DEVICE void PerfectMixture::GetConservativesFromPrimitives(const doubl
   conserv[iTh] = totalEnergy;
 }
 
-void PerfectMixture::GetMixtureCp(const Vector &ns, const double &rho, double &CpMix) {
+void PerfectMixture::GetMixtureCp(const Vector& ns, const double& rho, double& CpMix) {
   GetMixtureCp(&ns[0], &rho, &CpMix);
 }
 
-MFEM_HOST_DEVICE void PerfectMixture::GetMixtureCp(const double *ns, const double *rho, double *CpMix) {
+MFEM_HOST_DEVICE void PerfectMixture::GetMixtureCp(const double* ns, const double* rho, double* CpMix) {
   double n_e = 0.0;
   if (ambipolar) {
     n_e = computeAmbipolarElectronNumberDensity(ns);
@@ -803,11 +803,11 @@ MFEM_HOST_DEVICE void PerfectMixture::GetMixtureCp(const double *ns, const doubl
   *CpMix = totalHeatCapacity;
 }
 
-void PerfectMixture::GetSpeciesCp(const Vector &ns, const double &rho, int sp, double &CpY) {
+void PerfectMixture::GetSpeciesCp(const Vector& ns, const double& rho, int sp, double& CpY) {
   GetSpeciesCp(&ns[0], &rho, sp, &CpY);
 }
 
-MFEM_HOST_DEVICE void PerfectMixture::GetSpeciesCp(const double *ns, const double *rho, int sp, double *CpY) {
+MFEM_HOST_DEVICE void PerfectMixture::GetSpeciesCp(const double* ns, const double* rho, int sp, double* CpY) {
   double n_e = 0.0;
   if (ambipolar) {
     n_e = computeAmbipolarElectronNumberDensity(ns);
@@ -831,7 +831,7 @@ MFEM_HOST_DEVICE void PerfectMixture::GetSpeciesCp(const double *ns, const doubl
 // Mole fraction X will be needed almost everywhere, though it requires Y and n to be evaluated first.
 // TODO(kevin): It is better to include all X, Y, n into primitive variable Up,
 // in order to reduce repeated evaluation.
-void PerfectMixture::computeSpeciesPrimitives(const Vector &conservedState, Vector &X_sp, Vector &Y_sp, Vector &n_sp) {
+void PerfectMixture::computeSpeciesPrimitives(const Vector& conservedState, Vector& X_sp, Vector& Y_sp, Vector& n_sp) {
   X_sp.SetSize(numSpecies);
   Y_sp.SetSize(numSpecies);
   n_sp.SetSize(numSpecies);
@@ -879,8 +879,8 @@ void PerfectMixture::computeSpeciesPrimitives(const Vector &conservedState, Vect
   computeSpeciesPrimitives(&conservedState[0], &X_sp[0], &Y_sp[0], &n_sp[0]);
 }
 
-MFEM_HOST_DEVICE void PerfectMixture::computeSpeciesPrimitives(const double *conservedState, double *X_sp, double *Y_sp,
-                                                               double *n_sp) {
+MFEM_HOST_DEVICE void PerfectMixture::computeSpeciesPrimitives(const double* conservedState, double* X_sp, double* Y_sp,
+                                                               double* n_sp) {
   for (int sp = 0; sp < numSpecies; sp++) {
     X_sp[sp] = 0.0;
     Y_sp[sp] = 0.0;
@@ -926,7 +926,7 @@ MFEM_HOST_DEVICE void PerfectMixture::computeSpeciesPrimitives(const double *con
   for (int sp = 0; sp < numSpecies; sp++) X_sp[sp] = n_sp[sp] / n;
 }
 
-void PerfectMixture::computeNumberDensities(const Vector &conservedState, Vector &n_sp) {
+void PerfectMixture::computeNumberDensities(const Vector& conservedState, Vector& n_sp) {
   n_sp.SetSize(numSpecies);
   // n_sp = 0.0;
   //
@@ -944,7 +944,7 @@ void PerfectMixture::computeNumberDensities(const Vector &conservedState, Vector
   computeNumberDensities(&conservedState[0], &n_sp[0]);
 }
 
-MFEM_HOST_DEVICE void PerfectMixture::computeNumberDensities(const double *conservedState, double *n_sp) const {
+MFEM_HOST_DEVICE void PerfectMixture::computeNumberDensities(const double* conservedState, double* n_sp) const {
   for (int sp = 0; sp < numSpecies; sp++) n_sp[sp] = 0.0;
 
   double n_e = 0.0;
@@ -960,7 +960,7 @@ MFEM_HOST_DEVICE void PerfectMixture::computeNumberDensities(const double *conse
   n_sp[iBackground] = rhoB / GetGasParams(iBackground, GasParams::SPECIES_MW);
 }
 
-double PerfectMixture::ComputePressureFromPrimitives(const mfem::Vector &Up) {
+double PerfectMixture::ComputePressureFromPrimitives(const mfem::Vector& Up) {
   // // NOTE: For now, we do not include all species number densities into Up.
   // // This requires us to re-evaluate electron/background-species number density.
   // double n_e = 0.0;
@@ -985,7 +985,7 @@ double PerfectMixture::ComputePressureFromPrimitives(const mfem::Vector &Up) {
   return ComputePressureFromPrimitives(&Up[0]);
 }
 
-MFEM_HOST_DEVICE double PerfectMixture::ComputePressureFromPrimitives(const double *Up) {
+MFEM_HOST_DEVICE double PerfectMixture::ComputePressureFromPrimitives(const double* Up) {
   // NOTE: For now, we do not include all species number densities into Up.
   // This requires us to re-evaluate electron/background-species number density.
   double n_e = 0.0;
@@ -1010,7 +1010,7 @@ MFEM_HOST_DEVICE double PerfectMixture::ComputePressureFromPrimitives(const doub
 }
 
 // NOTE: This is almost the same as GetPrimitivesFromConservatives except storing other primitive variables.
-double PerfectMixture::ComputePressure(const Vector &state, double *electronPressure) {
+double PerfectMixture::ComputePressure(const Vector& state, double* electronPressure) {
   // Vector n_sp;
   // computeNumberDensities(state, n_sp);
   //
@@ -1026,7 +1026,7 @@ double PerfectMixture::ComputePressure(const Vector &state, double *electronPres
   return ComputePressure(&state[0], electronPressure);
 }
 
-MFEM_HOST_DEVICE double PerfectMixture::ComputePressure(const double *state, double *electronPressure) {
+MFEM_HOST_DEVICE double PerfectMixture::ComputePressure(const double* state, double* electronPressure) {
   double n_sp[gpudata::MAXSPECIES];
   computeNumberDensities(state, n_sp);
 
@@ -1041,7 +1041,7 @@ MFEM_HOST_DEVICE double PerfectMixture::ComputePressure(const double *state, dou
   return p;
 }
 
-MFEM_HOST_DEVICE double PerfectMixture::computePressureBase(const double *n_sp, const double n_e, const double n_B,
+MFEM_HOST_DEVICE double PerfectMixture::computePressureBase(const double* n_sp, const double n_e, const double n_B,
                                                             const double T_h, const double T_e) const {
   // NOTE: compute pressure.
   double n_h = 0.0;  // total number density of all heavy species.
@@ -1062,7 +1062,7 @@ MFEM_HOST_DEVICE double PerfectMixture::computePressureBase(const double *n_sp, 
   return p;
 }
 
-bool PerfectMixture::StateIsPhysical(const Vector &state) {
+bool PerfectMixture::StateIsPhysical(const Vector& state) {
   bool physical = true;
 
   if (state(0) < 0) {
@@ -1116,7 +1116,7 @@ bool PerfectMixture::StateIsPhysical(const Vector &state) {
 }
 
 // NOTE: this routine only return heavy-species temperature. Need name-change.
-double PerfectMixture::ComputeTemperature(const Vector &state) {
+double PerfectMixture::ComputeTemperature(const Vector& state) {
   // Vector n_sp;
   // computeNumberDensities(state, n_sp);
   //
@@ -1128,7 +1128,7 @@ double PerfectMixture::ComputeTemperature(const Vector &state) {
 }
 
 // NOTE: this routine only return heavy-species temperature. Need name-change.
-MFEM_HOST_DEVICE double PerfectMixture::ComputeTemperature(const double *state) {
+MFEM_HOST_DEVICE double PerfectMixture::ComputeTemperature(const double* state) {
   double n_sp[gpudata::MAXSPECIES];
   computeNumberDensities(state, n_sp);
 
@@ -1138,9 +1138,9 @@ MFEM_HOST_DEVICE double PerfectMixture::ComputeTemperature(const double *state) 
   return T_h;
 }
 
-MFEM_HOST_DEVICE void PerfectMixture::computeTemperaturesBase(const double *conservedState, const double *n_sp,
-                                                              const double n_e, const double n_B, double &T_h,
-                                                              double &T_e) const {
+MFEM_HOST_DEVICE void PerfectMixture::computeTemperaturesBase(const double* conservedState, const double* n_sp,
+                                                              const double n_e, const double n_B, double& T_h,
+                                                              double& T_e) const {
   // compute mixture heat capacity.
   double totalHeatCapacity = computeHeaviesHeatCapacity(&n_sp[0], n_B);
   if (!twoTemperature_) totalHeatCapacity += n_e * molarCV_[iElectron];
@@ -1171,7 +1171,7 @@ MFEM_HOST_DEVICE void PerfectMixture::computeTemperaturesBase(const double *cons
   return;
 }
 
-void PerfectMixture::computeSpeciesEnthalpies(const Vector &state, Vector &speciesEnthalpies) {
+void PerfectMixture::computeSpeciesEnthalpies(const Vector& state, Vector& speciesEnthalpies) {
   speciesEnthalpies.SetSize(numSpecies);
 
   // Vector n_sp;
@@ -1189,7 +1189,7 @@ void PerfectMixture::computeSpeciesEnthalpies(const Vector &state, Vector &speci
   return;
 }
 
-MFEM_HOST_DEVICE void PerfectMixture::computeSpeciesEnthalpies(const double *state, double *speciesEnthalpies) {
+MFEM_HOST_DEVICE void PerfectMixture::computeSpeciesEnthalpies(const double* state, double* speciesEnthalpies) {
   for (int sp = 0; sp < numSpecies; sp++) speciesEnthalpies[sp] = 0.0;
 
   double n_sp[gpudata::MAXSPECIES];
@@ -1206,7 +1206,7 @@ MFEM_HOST_DEVICE void PerfectMixture::computeSpeciesEnthalpies(const double *sta
   return;
 }
 
-double PerfectMixture::ComputePressureDerivative(const Vector &dUp_dx, const Vector &Uin, bool primitive) {
+double PerfectMixture::ComputePressureDerivative(const Vector& dUp_dx, const Vector& Uin, bool primitive) {
   if (primitive) {
     return computePressureDerivativeFromPrimitives(dUp_dx, Uin);
   } else {
@@ -1215,7 +1215,7 @@ double PerfectMixture::ComputePressureDerivative(const Vector &dUp_dx, const Vec
 }
 
 // NOTE(kevin): normal-vector-related parts are already handled.
-double PerfectMixture::computePressureDerivativeFromPrimitives(const Vector &dUp_dx, const Vector &Uin) {
+double PerfectMixture::computePressureDerivativeFromPrimitives(const Vector& dUp_dx, const Vector& Uin) {
   double pressureGradient = 0.0;
 
   double n_e = 0.0;
@@ -1263,7 +1263,7 @@ double PerfectMixture::computePressureDerivativeFromPrimitives(const Vector &dUp
 }
 
 // NOTE(kevin): normal-vector-related parts are already handled.
-double PerfectMixture::computePressureDerivativeFromConservatives(const Vector &dUp_dx, const Vector &Uin) {
+double PerfectMixture::computePressureDerivativeFromConservatives(const Vector& dUp_dx, const Vector& Uin) {
   double pressureGradient = 0.0;
 
   Vector n_sp;
@@ -1308,7 +1308,7 @@ double PerfectMixture::computePressureDerivativeFromConservatives(const Vector &
   return pressureGradient;
 }
 
-MFEM_HOST_DEVICE double PerfectMixture::computeHeaviesMixtureCV(const double *n_sp, const double n_B) const {
+MFEM_HOST_DEVICE double PerfectMixture::computeHeaviesMixtureCV(const double* n_sp, const double n_B) const {
   double mixtureCV = 0.0;
 
   for (int sp = 0; sp < numActiveSpecies; sp++) {
@@ -1320,7 +1320,7 @@ MFEM_HOST_DEVICE double PerfectMixture::computeHeaviesMixtureCV(const double *n_
   return mixtureCV;
 }
 
-MFEM_HOST_DEVICE double PerfectMixture::computeHeaviesMixtureHeatRatio(const double *n_sp, const double n_B) const {
+MFEM_HOST_DEVICE double PerfectMixture::computeHeaviesMixtureHeatRatio(const double* n_sp, const double n_B) const {
   double mixtureCV = computeHeaviesMixtureCV(n_sp, n_B);
   double n_h = n_B;
   for (int sp = 0; sp < numActiveSpecies; sp++) {
@@ -1331,7 +1331,7 @@ MFEM_HOST_DEVICE double PerfectMixture::computeHeaviesMixtureHeatRatio(const dou
   return 1.0 + n_h * UNIVERSALGASCONSTANT / mixtureCV;
 }
 
-MFEM_HOST_DEVICE double PerfectMixture::computeSpeedOfSoundBase(const double *n_sp, const double n_B, const double rho,
+MFEM_HOST_DEVICE double PerfectMixture::computeSpeedOfSoundBase(const double* n_sp, const double n_B, const double rho,
                                                                 const double p) const {
   double gamma = computeHeaviesMixtureHeatRatio(n_sp, n_B);
 
@@ -1339,7 +1339,7 @@ MFEM_HOST_DEVICE double PerfectMixture::computeSpeedOfSoundBase(const double *n_
 }
 
 // Compute the maximum characteristic speed.
-double PerfectMixture::ComputeMaxCharSpeed(const Vector &state) {
+double PerfectMixture::ComputeMaxCharSpeed(const Vector& state) {
   // const double den = state(0);
   // const Vector den_vel(state.GetData() + 1, nvel_);
   //
@@ -1356,7 +1356,7 @@ double PerfectMixture::ComputeMaxCharSpeed(const Vector &state) {
   return ComputeMaxCharSpeed(&state[0]);
 }
 
-MFEM_HOST_DEVICE double PerfectMixture::ComputeMaxCharSpeed(const double *state) {
+MFEM_HOST_DEVICE double PerfectMixture::ComputeMaxCharSpeed(const double* state) {
   const double den = state[0];
   // const double den_vel(state.GetData() + 1, nvel_);
 
@@ -1372,7 +1372,7 @@ MFEM_HOST_DEVICE double PerfectMixture::ComputeMaxCharSpeed(const double *state)
   return vel + sound;
 }
 
-double PerfectMixture::ComputeSpeedOfSound(const mfem::Vector &Uin, bool primitive) {
+double PerfectMixture::ComputeSpeedOfSound(const mfem::Vector& Uin, bool primitive) {
   // if (primitive) {
   //   double n_e = 0.0;
   //   if (ambipolar) {
@@ -1402,7 +1402,7 @@ double PerfectMixture::ComputeSpeedOfSound(const mfem::Vector &Uin, bool primiti
   return ComputeSpeedOfSound(&Uin[0], primitive);
 }
 
-MFEM_HOST_DEVICE double PerfectMixture::ComputeSpeedOfSound(const double *Uin, bool primitive) const {
+MFEM_HOST_DEVICE double PerfectMixture::ComputeSpeedOfSound(const double* Uin, bool primitive) const {
   if (primitive) {
     double n_e = 0.0;
     if (ambipolar) {
@@ -1433,8 +1433,8 @@ MFEM_HOST_DEVICE double PerfectMixture::ComputeSpeedOfSound(const double *Uin, b
 
 // NOTE: numberDensities have all species number density.
 // NOTE(kevin): for axisymmetric case, this handles only r- and z-direction.
-void PerfectMixture::ComputeMassFractionGradient(const double rho, const Vector &numberDensities,
-                                                 const DenseMatrix &gradUp, DenseMatrix &massFractionGrad) {
+void PerfectMixture::ComputeMassFractionGradient(const double rho, const Vector& numberDensities,
+                                                 const DenseMatrix& gradUp, DenseMatrix& massFractionGrad) {
   massFractionGrad.SetSize(numSpecies, dim);
   massFractionGrad = 0.0;
   for (int sp = 0; sp < numActiveSpecies; sp++) {  // if not ambipolar, electron is included.
@@ -1472,8 +1472,8 @@ void PerfectMixture::ComputeMassFractionGradient(const double rho, const Vector 
 }
 
 // NOTE(kevin): for axisymmetric case, this handles only r- and z-direction.
-void PerfectMixture::ComputeMoleFractionGradient(const Vector &numberDensities, const DenseMatrix &gradUp,
-                                                 DenseMatrix &moleFractionGrad) {
+void PerfectMixture::ComputeMoleFractionGradient(const Vector& numberDensities, const DenseMatrix& gradUp,
+                                                 DenseMatrix& moleFractionGrad) {
   moleFractionGrad.SetSize(numSpecies, dim);
   // double totalN = 0.0;
   // for (int sp = 0; sp < numSpecies; sp++) totalN += numberDensities(sp);
@@ -1526,13 +1526,13 @@ void PerfectMixture::ComputeMoleFractionGradient(const Vector &numberDensities, 
   // for (int d = 0; d < dim; d++) {
   //   moleFractionGrad(sp, d) = nBGrad(d) / totalN - numberDensities(sp) / totalN / totalN * totalNGrad(d);
   // }
-  const double *d_gradUp = gradUp.Read();
-  double *d_moleFractionGrad = moleFractionGrad.Write();
+  const double* d_gradUp = gradUp.Read();
+  double* d_moleFractionGrad = moleFractionGrad.Write();
   ComputeMoleFractionGradient(&numberDensities[0], d_gradUp, d_moleFractionGrad);
 }
 
-MFEM_HOST_DEVICE void PerfectMixture::ComputeMoleFractionGradient(const double *numberDensities, const double *gradUp,
-                                                                  double *moleFractionGrad) {
+MFEM_HOST_DEVICE void PerfectMixture::ComputeMoleFractionGradient(const double* numberDensities, const double* gradUp,
+                                                                  double* moleFractionGrad) {
   // moleFractionGrad.SetSize(numSpecies, dim);
   for (int d = 0; d < dim; d++) {
     for (int sp = 0; sp < numSpecies; sp++) moleFractionGrad[sp + d * numSpecies] = 0.0;
@@ -1593,8 +1593,8 @@ MFEM_HOST_DEVICE void PerfectMixture::ComputeMoleFractionGradient(const double *
 
 // NOTE: this is used in isothermal wall, where gas temperature and electron temperature is assumed equal.
 // i.e. it assumes single temperature at the wall regardless of two temperature condition inside the domain.
-void PerfectMixture::computeStagnantStateWithTemp(const mfem::Vector &stateIn, const double Temp,
-                                                  mfem::Vector &stateOut) {
+void PerfectMixture::computeStagnantStateWithTemp(const mfem::Vector& stateIn, const double Temp,
+                                                  mfem::Vector& stateOut) {
   stateOut.SetSize(num_equation);
   stateOut = stateIn;
 
@@ -1621,7 +1621,7 @@ void PerfectMixture::computeStagnantStateWithTemp(const mfem::Vector &stateIn, c
 
 // At Inlet BC, for two-temperature, electron temperature is set to be equal to gas temperature, where the total
 // pressure is p.
-void PerfectMixture::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::Vector &stateOut, const double &p,
+void PerfectMixture::modifyEnergyForPressure(const mfem::Vector& stateIn, mfem::Vector& stateOut, const double& p,
                                              bool modifyElectronEnergy) {
   // // will change the total energy to adjust to p
   // stateOut.SetSize(num_equation);
@@ -1695,7 +1695,7 @@ void PerfectMixture::modifyEnergyForPressure(const mfem::Vector &stateIn, mfem::
   modifyEnergyForPressure(&stateIn[0], &stateOut[0], p, modifyElectronEnergy);
 }
 
-MFEM_HOST_DEVICE void PerfectMixture::modifyEnergyForPressure(const double *stateIn, double *stateOut, const double &p,
+MFEM_HOST_DEVICE void PerfectMixture::modifyEnergyForPressure(const double* stateIn, double* stateOut, const double& p,
                                                               bool modifyElectronEnergy) {
   // will change the total energy to adjust to p
   for (int eq = 0; eq < num_equation; eq++) stateOut[eq] = stateIn[eq];
@@ -1741,8 +1741,8 @@ MFEM_HOST_DEVICE void PerfectMixture::modifyEnergyForPressure(const double *stat
 }
 
 // TODO(kevin): check if this works for axisymmetric case.
-void PerfectMixture::computeConservedStateFromConvectiveFlux(const Vector &meanNormalFluxes, const Vector &normal,
-                                                             Vector &conservedState) {
+void PerfectMixture::computeConservedStateFromConvectiveFlux(const Vector& meanNormalFluxes, const Vector& normal,
+                                                             Vector& conservedState) {
   Vector Up(num_equation);
 
   Vector numberDensityFluxes(numActiveSpecies);
@@ -1820,8 +1820,8 @@ void PerfectMixture::computeConservedStateFromConvectiveFlux(const Vector &meanN
 }
 
 // NOTE(kevin): for axisymmetric case, this handles only r- and z-direction.
-void PerfectMixture::computeElectronPressureGrad(const double n_e, const double T_e, const DenseMatrix &gradUp,
-                                                 Vector &gradPe) {
+void PerfectMixture::computeElectronPressureGrad(const double n_e, const double T_e, const DenseMatrix& gradUp,
+                                                 Vector& gradPe) {
   gradPe.SetSize(dim);
 
   // Vector neGrad;
@@ -1840,12 +1840,12 @@ void PerfectMixture::computeElectronPressureGrad(const double n_e, const double 
   //   gradPe(d) = (neGrad(d) * T_e + n_e * gradUp(iTe, d)) * UNIVERSALGASCONSTANT;
   //
   // return;
-  const double *d_gradUp = gradUp.Read();
+  const double* d_gradUp = gradUp.Read();
   computeElectronPressureGrad(n_e, T_e, d_gradUp, &gradPe[0]);
 }
 
 MFEM_HOST_DEVICE void PerfectMixture::computeElectronPressureGrad(const double n_e, const double T_e,
-                                                                  const double *gradUp, double *gradPe) {
+                                                                  const double* gradUp, double* gradPe) {
   for (int d = 0; d < dim; d++) gradPe[d] = 0.0;
 
   double neGrad[gpudata::MAXDIM];
@@ -1870,7 +1870,7 @@ MFEM_HOST_DEVICE void PerfectMixture::computeElectronPressureGrad(const double n
 // are recombined with electron into the background species.
 // For air plasma, we will need specific reaction inputs.
 // We may need to move this to rather chemistry class.
-void PerfectMixture::computeSheathBdrFlux(const Vector &state, BoundaryViscousFluxData &bcFlux) {
+void PerfectMixture::computeSheathBdrFlux(const Vector& state, BoundaryViscousFluxData& bcFlux) {
   // Vector n_sp(numSpecies);
   // computeNumberDensities(state, n_sp);
   //
@@ -1906,7 +1906,7 @@ void PerfectMixture::computeSheathBdrFlux(const Vector &state, BoundaryViscousFl
   computeSheathBdrFlux(&state[0], bcFlux);
 }
 
-MFEM_HOST_DEVICE void PerfectMixture::computeSheathBdrFlux(const double *state, BoundaryViscousFluxData &bcFlux) {
+MFEM_HOST_DEVICE void PerfectMixture::computeSheathBdrFlux(const double* state, BoundaryViscousFluxData& bcFlux) {
   double n_sp[gpudata::MAXSPECIES];
   computeNumberDensities(state, n_sp);
 
@@ -1941,9 +1941,9 @@ MFEM_HOST_DEVICE void PerfectMixture::computeSheathBdrFlux(const double *state, 
   }
 }
 
-void PerfectMixture::GetSpeciesFromLTE(double *conserv, double *primit, TableInterpolator2D *energy_table,
-                                       TableInterpolator2D *R_table, TableInterpolator2D *c_table,
-                                       TableInterpolator2D *T_table) {
+void PerfectMixture::GetSpeciesFromLTE(double* conserv, double* primit, TableInterpolator2D* energy_table,
+                                       TableInterpolator2D* R_table, TableInterpolator2D* c_table,
+                                       TableInterpolator2D* T_table) {
   for (int sp = 0; sp < numActiveSpecies; sp++) {
     conserv[nvel_ + 2 + sp] = 0.0;
     primit[nvel_ + 2 + sp] = 0.0;
@@ -2093,7 +2093,7 @@ void PerfectMixture::GetSpeciesFromLTE(double *conserv, double *primit, TableInt
   primit[iTh] = T;
 }
 
-void PerfectMixture::GetSpeciesFromLTE(const double T, const double p, double *n_sp) {
+void PerfectMixture::GetSpeciesFromLTE(const double T, const double p, double* n_sp) {
   // This routine makes the following assumptions:
   //
   // 1) There is only 1 charged specie and it is a positive ion with

@@ -56,8 +56,8 @@ class Tps;
 #include "tps_mfem_wrap.hpp"
 #include "turb_model_base.hpp"
 
-using VecFuncT = void(const Vector &x, double t, Vector &u);
-using ScalarFuncT = double(const Vector &x, double t);
+using VecFuncT = void(const Vector& x, double t, Vector& u);
+using ScalarFuncT = double(const Vector& x, double t);
 
 class LoMachSolver;
 class LoMachOptions;
@@ -68,14 +68,14 @@ class ZetaModel : public TurbModelBase {
   friend class LoMachSolver;
 
  private:
-  TPS::Tps *tpsP_;
-  LoMachOptions *loMach_opts_ = nullptr;
+  TPS::Tps* tpsP_;
+  LoMachOptions* loMach_opts_ = nullptr;
 
   // Mesh and discretization scheme info
-  ParMesh *pmesh_ = nullptr;
+  ParMesh* pmesh_ = nullptr;
   int order_;
   IntegrationRules gll_rules_;
-  const temporalSchemeCoefficients &time_coeff_;
+  const temporalSchemeCoefficients& time_coeff_;
   double dt_;
   double time_;
   int nvel_, dim_;
@@ -103,6 +103,9 @@ class ZetaModel : public TurbModelBase {
   bool numerical_integ_ = false;
   // bool numerical_integ_ = true;
 
+  // alternative f-formulation
+  bool robust_ = false;
+
   // Linear-solver-related options
   int pl_solve_ = 0;
   int max_iter_;  // = 2000;
@@ -122,37 +125,42 @@ class ZetaModel : public TurbModelBase {
   double prod_wgt_;
   double zfp_max_;
   double v2Prod_fLimiter_coeff_;
+  double mutMax_scale_;
+
+  // streamwise stabilization
+  bool sw_stab_ = false;           /**< Enable/disable supg stabilization. */
+  double Reh_factor_, Reh_offset_; /**< supg stabilization parameters */
 
   // just keep these saved for ease
   int numWalls_, numInlets_, numOutlets_;
 
   // Scalar \f$H^1\f$ finite element collection.
-  FiniteElementCollection *sfec_ = nullptr;
+  FiniteElementCollection* sfec_ = nullptr;
 
   // Scalar \f$H^1\f$ finite element space.
-  ParFiniteElementSpace *sfes_ = nullptr;
+  ParFiniteElementSpace* sfes_ = nullptr;
 
   /// Velocity \f$H^1\f$ finite element collection.
-  FiniteElementCollection *vfec_ = nullptr;
+  FiniteElementCollection* vfec_ = nullptr;
 
   /// Velocity \f$(H^1)^d\f$ finite element space.
-  ParFiniteElementSpace *vfes_ = nullptr;
+  ParFiniteElementSpace* vfes_ = nullptr;
 
-  FiniteElementCollection *ffec_ = nullptr;
-  ParFiniteElementSpace *ffes_ = nullptr;
+  FiniteElementCollection* ffec_ = nullptr;
+  ParFiniteElementSpace* ffes_ = nullptr;
 
   /// velocity
-  ParGridFunction *vel_gf_ = nullptr;
+  ParGridFunction* vel_gf_ = nullptr;
   Vector vel_;
 
   /// swirl
-  ParGridFunction *swirl_gf_ = nullptr;
+  ParGridFunction* swirl_gf_ = nullptr;
   Vector swirl_;
 
   /// velocity gradients
-  ParGridFunction *gradU_gf_ = nullptr;
-  ParGridFunction *gradV_gf_ = nullptr;
-  ParGridFunction *gradW_gf_ = nullptr;
+  ParGridFunction* gradU_gf_ = nullptr;
+  ParGridFunction* gradV_gf_ = nullptr;
+  ParGridFunction* gradW_gf_ = nullptr;
   Vector gradU_;
   Vector gradV_;
   Vector gradW_;
@@ -171,7 +179,7 @@ class ZetaModel : public TurbModelBase {
   Vector mult_;
 
   /// grid information
-  ParGridFunction *gridScale_gf_ = nullptr;
+  ParGridFunction* gridScale_gf_ = nullptr;
 
   /// eddy viscosity
   ParGridFunction eddyVisc_gf_;
@@ -195,7 +203,7 @@ class ZetaModel : public TurbModelBase {
   Vector tdr_nm1_, tdr_nm2_;
   Vector Ntdr_, Ntdr_nm1_, Ntdr_nm2_;
   ParGridFunction tdr_wall_gf_;
-  GridFunctionCoefficient *tdr_bc_ = nullptr;
+  GridFunctionCoefficient* tdr_bc_ = nullptr;
 
   /// ratio of wall normal stress component to k
   ParGridFunction zeta_gf_;
@@ -234,6 +242,12 @@ class ZetaModel : public TurbModelBase {
   ParGridFunction prod_next_gf_;
   Vector prod_, prod_next_, prod_nm1_, prod_nm2_;
 
+  ParGridFunction prod_plus_tkeDiff_gf_;
+  Vector prod_plus_tkeDiff_;
+
+  // implicit part of destruction for f
+  ParGridFunction Df_gf_;
+
   /// model coefficients
   double Cmu_ = 0.22;
   double sigmaK_ = 1.0;
@@ -248,13 +262,19 @@ class ZetaModel : public TurbModelBase {
   // double Cn_ = 85.0;
   double Cl_ = 0.23;
   double Cn_ = 70.0;
-  double Ce1_;  // function of local zeta
+  double Ce1_;         // function of local zeta
+  double C3_ = 0.075;  // tune
+  double C4_ = 1.28;   // tune
+  double inlet_scale_;
 
   ParGridFunction res_gf_;
   Vector res_;
 
   ParGridFunction resf_gf_;
   Vector resf_;
+
+  ParGridFunction filter_gf_;
+  Vector filter_;
 
   ParGridFunction vfres_gf_;
 
@@ -269,95 +289,118 @@ class ZetaModel : public TurbModelBase {
   Vector radius_v_;
 
   /// coefficient fields for operators
-  GridFunctionCoefficient *delta_coeff_ = nullptr;
-  GradientGridFunctionCoefficient *gradTKE_coeff_ = nullptr;
-  ScalarVectorProductCoefficient *nu_gradTKE_coeff_ = nullptr;
-  GridFunctionCoefficient *mu_coeff_ = nullptr;
-  RatioCoefficient *nu_coeff_ = nullptr;
-  RatioCoefficient *nu_delta_coeff_ = nullptr;
-  ProductCoefficient *two_nu_delta_coeff_ = nullptr;
-  ProductCoefficient *two_nuNeg_delta_coeff_ = nullptr;
-  GradientGridFunctionCoefficient *gradZeta_coeff_ = nullptr;
+  GridFunctionCoefficient* delta_coeff_ = nullptr;
+  GradientGridFunctionCoefficient* gradTKE_coeff_ = nullptr;
+  ScalarVectorProductCoefficient* nu_gradTKE_coeff_ = nullptr;
+  GridFunctionCoefficient* mu_coeff_ = nullptr;
+  RatioCoefficient* nu_coeff_ = nullptr;
+  RatioCoefficient* nu_delta_coeff_ = nullptr;
+  ProductCoefficient* two_nu_delta_coeff_ = nullptr;
+  ProductCoefficient* two_nuNeg_delta_coeff_ = nullptr;
+  GradientGridFunctionCoefficient* gradZeta_coeff_ = nullptr;
   // ScalarVectorProductCoefficient *tdr_wall_coeff_ = nullptr;
   // DivergenceGridFunctionCoefficient *tdr_wall_coeff_ = nullptr;
-  GridFunctionCoefficient *tdr_wall_coeff_ = nullptr;
-  ScalarVectorProductCoefficient *fRate_wall_coeff_ = nullptr;
-  ScalarVectorProductCoefficient *wall_coeff_ = nullptr;
-  GridFunctionCoefficient *tdr_wall_eval_coeff_ = nullptr;
+  GridFunctionCoefficient* tdr_wall_coeff_ = nullptr;
+  ScalarVectorProductCoefficient* fRate_wall_coeff_ = nullptr;
+  ScalarVectorProductCoefficient* wall_coeff_ = nullptr;
+  GridFunctionCoefficient* tdr_wall_eval_coeff_ = nullptr;
 
-  GridFunctionCoefficient *swirl_coeff_ = nullptr;
-  ProductCoefficient *rad_rho_coeff_ = nullptr;
-  ScalarVectorProductCoefficient *rad_rhou_coeff_ = nullptr;
-  ProductCoefficient *rad_tke_diag_coeff_ = nullptr;
-  ProductCoefficient *rad_tke_diff_total_coeff_ = nullptr;
-  ProductCoefficient *rad_tdr_diag_coeff_ = nullptr;
-  ProductCoefficient *rad_tdr_diff_total_coeff_ = nullptr;
-  ProductCoefficient *rad_v2_diag_coeff_ = nullptr;
-  ProductCoefficient *rad_f_diag_coeff_ = nullptr;
-  ProductCoefficient *rad_unity_coeff_ = nullptr;
-  ProductCoefficient *rad_zeta_diag_coeff_ = nullptr;
-  ProductCoefficient *rad_zeta_diff_total_coeff_ = nullptr;
-  ProductCoefficient *rad_scalar_diff_coeff_ = nullptr;
-  ScalarVectorProductCoefficient *rad_nu_gradTKE_coeff_ = nullptr;
+  GridFunctionCoefficient* swirl_coeff_ = nullptr;
+  ProductCoefficient* rad_rho_coeff_ = nullptr;
+  ScalarVectorProductCoefficient* rad_rhou_coeff_ = nullptr;
+  ProductCoefficient* rad_tke_diag_coeff_ = nullptr;
+  ProductCoefficient* rad_tke_diff_total_coeff_ = nullptr;
+  ProductCoefficient* rad_tdr_diag_coeff_ = nullptr;
+  ProductCoefficient* rad_tdr_diff_total_coeff_ = nullptr;
+  ProductCoefficient* rad_v2_diag_coeff_ = nullptr;
+  ProductCoefficient* rad_f_diag_coeff_ = nullptr;
+  ProductCoefficient* rad_unity_coeff_ = nullptr;
+  ProductCoefficient* rad_zeta_diag_coeff_ = nullptr;
+  ProductCoefficient* rad_zeta_diff_total_coeff_ = nullptr;
+  ProductCoefficient* rad_scalar_diff_coeff_ = nullptr;
+  ScalarVectorProductCoefficient* rad_nu_gradTKE_coeff_ = nullptr;
+  ProductCoefficient* rad_tls2_coeff_ = nullptr;
 
-  GridFunctionCoefficient *tts_coeff_ = nullptr;
-  GridFunctionCoefficient *tls2_coeff_ = nullptr;
-  GridFunctionCoefficient *prod_coeff_ = nullptr;
-  GridFunctionCoefficient *tke_coeff_ = nullptr;
-  GridFunctionCoefficient *tdr_coeff_ = nullptr;
-  GridFunctionCoefficient *rho_coeff_ = nullptr;
-  VectorGridFunctionCoefficient *vel_coeff_ = nullptr;
-  ScalarVectorProductCoefficient *rhou_coeff_ = nullptr;
-  GridFunctionCoefficient *scalar_diff_coeff_ = nullptr;
-  GridFunctionCoefficient *mut_coeff_ = nullptr;
-  GridFunctionCoefficient *mult_coeff_ = nullptr;
-  SumCoefficient *tke_diff_sum_coeff_ = nullptr;
-  SumCoefficient *tdr_diff_sum_coeff_ = nullptr;
-  SumCoefficient *zeta_diff_sum_coeff_ = nullptr;
-  ProductCoefficient *tke_diff_total_coeff_ = nullptr;
-  ProductCoefficient *tdr_diff_total_coeff_ = nullptr;
-  ProductCoefficient *zeta_diff_total_coeff_ = nullptr;
-  ConstantCoefficient *unity_diff_coeff_ = nullptr;
+  GridFunctionCoefficient* tts_coeff_ = nullptr;
+  GridFunctionCoefficient* tls2_coeff_ = nullptr;
+  GridFunctionCoefficient* prod_coeff_ = nullptr;
+  GridFunctionCoefficient* tke_coeff_ = nullptr;
+  GridFunctionCoefficient* tdr_coeff_ = nullptr;
+  GridFunctionCoefficient* rho_coeff_ = nullptr;
+  VectorGridFunctionCoefficient* vel_coeff_ = nullptr;
+  ScalarVectorProductCoefficient* rhou_coeff_ = nullptr;
+  GridFunctionCoefficient* scalar_diff_coeff_ = nullptr;
+  GridFunctionCoefficient* mut_coeff_ = nullptr;
+  GridFunctionCoefficient* mult_coeff_ = nullptr;
+  SumCoefficient* tke_diff_sum_coeff_ = nullptr;
+  SumCoefficient* tdr_diff_sum_coeff_ = nullptr;
+  SumCoefficient* zeta_diff_sum_coeff_ = nullptr;
+  ProductCoefficient* tke_diff_total_coeff_ = nullptr;
+  ProductCoefficient* tdr_diff_total_coeff_ = nullptr;
+  ProductCoefficient* zeta_diff_total_coeff_ = nullptr;
+  ConstantCoefficient* unity_diff_coeff_ = nullptr;
   // ProductCoefficient *unity_diff_total_coeff_ = nullptr;
-  ConstantCoefficient *unity_coeff_ = nullptr;
-  ConstantCoefficient *zero_coeff_ = nullptr;
-  ConstantCoefficient *posTwo_coeff_ = nullptr;
-  ConstantCoefficient *negTwo_coeff_ = nullptr;
+  ConstantCoefficient* unity_coeff_ = nullptr;
+  ConstantCoefficient* zero_coeff_ = nullptr;
+  ConstantCoefficient* posTwo_coeff_ = nullptr;
+  ConstantCoefficient* negTwo_coeff_ = nullptr;
 
-  GridFunctionCoefficient *rhoDt_coeff_ = nullptr;
-  RatioCoefficient *rhoTTS_coeff_ = nullptr;
-  ConstantCoefficient *Ce2_coeff_ = nullptr;
-  ProductCoefficient *Ce2rhoTTS_coeff_ = nullptr;
-  RatioCoefficient *Pk_coeff_ = nullptr;
-  RatioCoefficient *ek_coeff_ = nullptr;
-  ProductCoefficient *ek_rho_coeff_ = nullptr;
-  SumCoefficient *tke_diag_coeff_ = nullptr;
-  SumCoefficient *tdr_diag_coeff_ = nullptr;
-  SumCoefficient *zeta_diag_coeff_ = nullptr;
-  SumCoefficient *v2_diag_coeff_ = nullptr;
-  RatioCoefficient *f_diag_coeff_ = nullptr;
-  SumCoefficient *f_diag_total_coeff_ = nullptr;
+  GridFunctionCoefficient* rhoDt_coeff_ = nullptr;
+  RatioCoefficient* rhoTTS_coeff_ = nullptr;
+  ConstantCoefficient* Ce2_coeff_ = nullptr;
+  ProductCoefficient* Ce2rhoTTS_coeff_ = nullptr;
+  RatioCoefficient* Pk_coeff_ = nullptr;
+  RatioCoefficient* ek_coeff_ = nullptr;
+  ProductCoefficient* ek_rho_coeff_ = nullptr;
+  SumCoefficient* tke_diag_coeff_ = nullptr;
+  SumCoefficient* tdr_diag_coeff_ = nullptr;
+  SumCoefficient* zeta_diag_coeff_ = nullptr;
+  SumCoefficient* v2_diag_coeff_ = nullptr;
+  RatioCoefficient* f_diag_coeff_ = nullptr;
+  SumCoefficient* f_diag_total_coeff_ = nullptr;
 
-  ProductCoefficient *diff_total_coeff_ = nullptr;
-  SumCoefficient *diag_coeff_ = nullptr;
+  ProductCoefficient* diff_total_coeff_ = nullptr;
+  SumCoefficient* diag_coeff_ = nullptr;
 
-  GridFunctionCoefficient *tke_field_ = nullptr;
-  GridFunctionCoefficient *v2_field_ = nullptr;
+  GridFunctionCoefficient* tke_field_ = nullptr;
+  GridFunctionCoefficient* v2_field_ = nullptr;
+  GridFunctionCoefficient* tdr_field_ = nullptr;
+  ProductCoefficient* tke_scaled_field_ = nullptr;
+  ProductCoefficient* v2_scaled_field_ = nullptr;
+  ConstantCoefficient* scaling_coeff_ = nullptr;
+
+  // streamwise stabilization
+  VectorMagnitudeCoefficient* umag_coeff_ = nullptr;
+  GridFunctionCoefficient* gscale_coeff_ = nullptr;
+  ProductCoefficient* gscale2_coeff_ = nullptr;
+  GridFunctionCoefficient* visc_coeff_ = nullptr;
+  PowerCoefficient* visc_inv_coeff_ = nullptr;
+  ProductCoefficient* reh1_coeff_ = nullptr;
+  ProductCoefficient* reh2_coeff_ = nullptr;
+  ProductCoefficient* Reh_coeff_ = nullptr;
+  ExtTransformedCoefficient* csupg_coeff_ = nullptr;
+  ProductCoefficient* uw1_coeff_ = nullptr;
+  ProductCoefficient* uw2_coeff_ = nullptr;
+  ProductCoefficient* upwind_coeff_ = nullptr;
+  TransformedMatrixVectorCoefficient* swdiff_coeff_ = nullptr;
+  ScalarMatrixProductCoefficient* supg_coeff_ = nullptr;
+
+  GridFunctionCoefficient* f_destruction_coeff_ = nullptr;
 
   /// operators and solvers
-  ParBilinearForm *As_form_ = nullptr;
-  ParBilinearForm *Ms_form_ = nullptr;
-  ParBilinearForm *MsRho_form_ = nullptr;
-  ParBilinearForm *Mf_form_ = nullptr;
-  ParBilinearForm *Hk_form_ = nullptr;
-  ParBilinearForm *He_form_ = nullptr;
-  ParBilinearForm *Hv_form_ = nullptr;
-  ParBilinearForm *Hf_form_ = nullptr;
-  ParBilinearForm *Hz_form_ = nullptr;
-  ParBilinearForm *Lk_form_ = nullptr;
-  ParBilinearForm *Lf_form_ = nullptr;
-  ParLinearForm *Lk_bdry_ = nullptr;
-  ParLinearForm *He_bdry_ = nullptr;
+  ParBilinearForm* As_form_ = nullptr;
+  ParBilinearForm* Ms_form_ = nullptr;
+  ParBilinearForm* MsRho_form_ = nullptr;
+  ParBilinearForm* Mf_form_ = nullptr;
+  ParBilinearForm* Hk_form_ = nullptr;
+  ParBilinearForm* He_form_ = nullptr;
+  ParBilinearForm* Hv_form_ = nullptr;
+  ParBilinearForm* Hf_form_ = nullptr;
+  ParBilinearForm* Hz_form_ = nullptr;
+  ParBilinearForm* Lk_form_ = nullptr;
+  ParBilinearForm* Lf_form_ = nullptr;
+  ParLinearForm* Lk_bdry_ = nullptr;
+  ParLinearForm* He_bdry_ = nullptr;
 
   OperatorHandle As_;
   OperatorHandle Ms_;
@@ -371,21 +414,21 @@ class ZetaModel : public TurbModelBase {
   OperatorHandle Lk_;
   OperatorHandle Lf_;
 
-  mfem::Solver *MsInvPC_ = nullptr;
-  mfem::CGSolver *MsInv_ = nullptr;
-  mfem::Solver *MsRhoInvPC_ = nullptr;
-  mfem::CGSolver *MsRhoInv_ = nullptr;
-  mfem::Solver *HkInvPC_ = nullptr;
-  mfem::Solver *HeInvPC_ = nullptr;
-  mfem::Solver *HvInvPC_ = nullptr;
-  mfem::Solver *HfInvPC_ = nullptr;
-  mfem::Solver *HzInvPC_ = nullptr;
-  mfem::CGSolver *HkInv_ = nullptr;
-  mfem::CGSolver *HeInv_ = nullptr;
-  mfem::CGSolver *HvInv_ = nullptr;
-  mfem::CGSolver *HfInv_ = nullptr;
+  mfem::Solver* MsInvPC_ = nullptr;
+  mfem::CGSolver* MsInv_ = nullptr;
+  mfem::Solver* MsRhoInvPC_ = nullptr;
+  mfem::CGSolver* MsRhoInv_ = nullptr;
+  mfem::Solver* HkInvPC_ = nullptr;
+  mfem::Solver* HeInvPC_ = nullptr;
+  mfem::Solver* HvInvPC_ = nullptr;
+  mfem::Solver* HfInvPC_ = nullptr;
+  mfem::Solver* HzInvPC_ = nullptr;
+  mfem::CGSolver* HkInv_ = nullptr;
+  mfem::CGSolver* HeInv_ = nullptr;
+  mfem::CGSolver* HvInv_ = nullptr;
+  mfem::CGSolver* HfInv_ = nullptr;
   // mfem::GMRESSolver *HfInv_ = nullptr;
-  mfem::CGSolver *HzInv_ = nullptr;
+  mfem::CGSolver* HzInv_ = nullptr;
 
   // Boundary condition info
   Array<int> tke_ess_attr_;
@@ -398,8 +441,8 @@ class ZetaModel : public TurbModelBase {
   Array<int> zeta_ess_tdof_;
   Array<int> v2_ess_tdof_;
   Array<int> fRate_ess_tdof_;
-  Array<int> *ess_attr_ = nullptr;
-  Array<int> *ess_tdof_ = nullptr;
+  Array<int>* ess_attr_ = nullptr;
+  Array<int>* ess_tdof_ = nullptr;
 
   std::vector<DirichletBC_T<Coefficient>> tke_dbcs_;
   std::vector<DirichletBC_T<Coefficient>> tdr_dbcs_;
@@ -408,8 +451,8 @@ class ZetaModel : public TurbModelBase {
   std::vector<DirichletBC_T<Coefficient>> fRate_dbcs_;
 
  public:
-  ZetaModel(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &time_coeff, TPS::Tps *tps,
-            ParGridFunction *gridScale);
+  ZetaModel(mfem::ParMesh* pmesh, LoMachOptions* loMach_opts, temporalSchemeCoefficients& time_coeff, TPS::Tps* tps,
+            ParGridFunction* gridScale);
   virtual ~ZetaModel();
 
   // Functions overriden from base class
@@ -418,13 +461,14 @@ class ZetaModel : public TurbModelBase {
   void updateBC(int current_step);
   void step() final;
   void setup() final;
-  void initializeIO(IODataOrganizer &io) final;
-  void initializeViz(ParaViewDataCollection &pvdc) final;
+  void initializeIO(IODataOrganizer& io) final;
+  void initializeViz(ParaViewDataCollection& pvdc) final;
   void tkeStep();
   void tdrStep();
   void zetaStep();
   void v2Step();
   void fStep();
+  void fStepRobustified();
   void convection(string scalar);
   void updateTimestepHistory();
   void updateZeta();
@@ -439,27 +483,27 @@ class ZetaModel : public TurbModelBase {
   void computeTDRwall();
 
   /// Return a pointer to the current temperature ParGridFunction.
-  ParGridFunction *getCurrentEddyViscosity() { return &eddyVisc_gf_; }
+  ParGridFunction* getCurrentEddyViscosity() { return &eddyVisc_gf_; }
 
   /// Add a Dirichlet boundary condition to the temperature and Qt field.
-  void AddTKEDirichletBC(const double &tke, Array<int> &attr);
-  void AddTKEDirichletBC(Coefficient *coeff, Array<int> &attr);
-  void AddTKEDirichletBC(ScalarFuncT *f, Array<int> &attr);
+  void AddTKEDirichletBC(const double& tke, Array<int>& attr);
+  void AddTKEDirichletBC(Coefficient* coeff, Array<int>& attr);
+  void AddTKEDirichletBC(ScalarFuncT* f, Array<int>& attr);
 
-  void AddV2DirichletBC(const double &tke, Array<int> &attr);
-  void AddV2DirichletBC(Coefficient *coeff, Array<int> &attr);
-  void AddV2DirichletBC(ScalarFuncT *f, Array<int> &attr);
+  void AddV2DirichletBC(const double& tke, Array<int>& attr);
+  void AddV2DirichletBC(Coefficient* coeff, Array<int>& attr);
+  void AddV2DirichletBC(ScalarFuncT* f, Array<int>& attr);
 
-  void AddTDRDirichletBC(const double &tdr, Array<int> &attr);
-  void AddTDRDirichletBC(Coefficient *coeff, Array<int> &attr);
-  void AddTDRDirichletBC(ScalarFuncT *f, Array<int> &attr);
+  void AddTDRDirichletBC(const double& tdr, Array<int>& attr);
+  void AddTDRDirichletBC(Coefficient* coeff, Array<int>& attr);
+  void AddTDRDirichletBC(ScalarFuncT* f, Array<int>& attr);
 
-  void AddZETADirichletBC(const double &zeta, Array<int> &attr);
-  void AddZETADirichletBC(Coefficient *coeff, Array<int> &attr);
-  void AddZETADirichletBC(ScalarFuncT *f, Array<int> &attr);
+  void AddZETADirichletBC(const double& zeta, Array<int>& attr);
+  void AddZETADirichletBC(Coefficient* coeff, Array<int>& attr);
+  void AddZETADirichletBC(ScalarFuncT* f, Array<int>& attr);
 
-  void AddFRATEDirichletBC(const double &fRate, Array<int> &attr);
-  void AddFRATEDirichletBC(Coefficient *coeff, Array<int> &attr);
-  void AddFRATEDirichletBC(ScalarFuncT *f, Array<int> &attr);
+  void AddFRATEDirichletBC(const double& fRate, Array<int>& attr);
+  void AddFRATEDirichletBC(Coefficient* coeff, Array<int>& attr);
+  void AddFRATEDirichletBC(ScalarFuncT* f, Array<int>& attr);
 };
 #endif  // ZETAMODEL_HPP_

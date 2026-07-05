@@ -50,30 +50,30 @@ struct spongeToFlow;
 struct extDataToFlow;
 
 struct flowToThermoChem {
-  const mfem::ParGridFunction *velocity = nullptr;
+  const mfem::ParGridFunction* velocity = nullptr;
 
   bool swirl_supported = false;
-  const mfem::ParGridFunction *swirl = nullptr;
+  const mfem::ParGridFunction* swirl = nullptr;
 };
 
 struct flowToTurbModel {
-  const mfem::ParGridFunction *velocity = nullptr;
+  const mfem::ParGridFunction* velocity = nullptr;
 
   bool swirl_supported = false;
-  const mfem::ParGridFunction *swirl = nullptr;
-  const mfem::ParGridFunction *gradS = nullptr;
+  const mfem::ParGridFunction* swirl = nullptr;
+  const mfem::ParGridFunction* gradS = nullptr;
 
-  const mfem::ParGridFunction *gradU = nullptr;
-  const mfem::ParGridFunction *gradV = nullptr;
-  const mfem::ParGridFunction *gradW = nullptr;
+  const mfem::ParGridFunction* gradU = nullptr;
+  const mfem::ParGridFunction* gradV = nullptr;
+  const mfem::ParGridFunction* gradW = nullptr;
 };
 
 class FlowBase {
  protected:
-  const thermoChemToFlow *thermo_interface_;
-  const turbModelToFlow *turbModel_interface_;
-  const spongeToFlow *sponge_interface_;
-  const extDataToFlow *extData_interface_;
+  const thermoChemToFlow* thermo_interface_;
+  const turbModelToFlow* turbModel_interface_;
+  const spongeToFlow* sponge_interface_;
+  const extDataToFlow* extData_interface_;
 
  public:
   /// Destructor
@@ -83,22 +83,22 @@ class FlowBase {
 
   virtual void step() = 0;
 
-  virtual mfem::ParGridFunction *getCurrentVelocity() = 0;
-  virtual mfem::ParGridFunction *getCurrentVelocityGradientU() { return nullptr; }
-  virtual mfem::ParGridFunction *getCurrentVelocityGradientV() { return nullptr; }
-  virtual mfem::ParGridFunction *getCurrentVelocityGradientW() { return nullptr; }
+  virtual mfem::ParGridFunction* getCurrentVelocity() = 0;
+  virtual mfem::ParGridFunction* getCurrentVelocityGradientU() { return nullptr; }
+  virtual mfem::ParGridFunction* getCurrentVelocityGradientV() { return nullptr; }
+  virtual mfem::ParGridFunction* getCurrentVelocityGradientW() { return nullptr; }
 
-  void initializeFromThermoChem(thermoChemToFlow *thermo) { thermo_interface_ = thermo; }
-  void initializeFromTurbModel(turbModelToFlow *turbModel) { turbModel_interface_ = turbModel; }
-  void initializeFromSponge(spongeToFlow *sponge) { sponge_interface_ = sponge; }
-  void initializeFromExtData(extDataToFlow *extData) { extData_interface_ = extData; }
+  void initializeFromThermoChem(thermoChemToFlow* thermo) { thermo_interface_ = thermo; }
+  void initializeFromTurbModel(turbModelToFlow* turbModel) { turbModel_interface_ = turbModel; }
+  void initializeFromSponge(spongeToFlow* sponge) { sponge_interface_ = sponge; }
+  void initializeFromExtData(extDataToFlow* extData) { extData_interface_ = extData; }
 
   virtual void initializeOperators() {}
 
-  virtual void initializeIO(IODataOrganizer &io) const {}
-  virtual void initializeViz(mfem::ParaViewDataCollection &pvdc) const {}
-  virtual void initializeStats(Averaging &average, IODataOrganizer &io, bool continuation) const {}
-  virtual void computeDissipation(Averaging &average, const int iter) {}
+  virtual void initializeIO(IODataOrganizer& io) const {}
+  virtual void initializeViz(mfem::ParaViewDataCollection& pvdc) const {}
+  virtual void initializeStats(Averaging& average, IODataOrganizer& io, bool continuation) const {}
+  virtual void computeDissipation(Averaging& average, const int iter) {}
 
   virtual void setup() {}
 
@@ -108,7 +108,7 @@ class FlowBase {
    * Provides a hook for derived classes to pass a set of header
    * strings that will be printed to the screen
    */
-  virtual void screenHeader(std::vector<std::string> &header) const { header.resize(0); }
+  virtual void screenHeader(std::vector<std::string>& header) const { header.resize(0); }
 
   /**
    * @brief Values for screen dump
@@ -116,25 +116,25 @@ class FlowBase {
    * Provides values that will be printed to the screen at user requested
    * frequency (as often as each iteration).
    */
-  virtual void screenValues(std::vector<double> &values) { values.resize(0); }
+  virtual void screenValues(std::vector<double>& values) { values.resize(0); }
 
   /// Interface object, provides fields necessary for the thermochemistry model
   flowToThermoChem toThermoChem_interface_;
 
   /// Get interface provided by thermo model
-  const thermoChemToFlow *getThermoInterface() const { return thermo_interface_; }
+  const thermoChemToFlow* getThermoInterface() const { return thermo_interface_; }
 
   /// Interface object, provides fields necessary for the turbulence model
   flowToTurbModel toTurbModel_interface_;
 
   /// Get interface provided by thermo model
-  const turbModelToFlow *getTurbModelInterface() const { return turbModel_interface_; }
+  const turbModelToFlow* getTurbModelInterface() const { return turbModel_interface_; }
 
   /// Get interface provided by sponge
-  const spongeToFlow *getSpongeInterface() const { return sponge_interface_; }
+  const spongeToFlow* getSpongeInterface() const { return sponge_interface_; }
 
   /// Get interface provided by external data
-  const extDataToFlow *getExtDataInterface() const { return extData_interface_; }
+  const extDataToFlow* getExtDataInterface() const { return extData_interface_; }
 
   /**
    * @brief A hook to evaluate L2 norm of error
@@ -154,21 +154,21 @@ class ZeroFlow final : public FlowBase {
   // Options
   bool nonzero_flow_;
 
-  mfem::ParMesh *pmesh_;
+  mfem::ParMesh* pmesh_;
   const int vorder_;
   const int dim_;
 
   // Options-related structures
-  TPS::Tps *tpsP_ = nullptr;
+  TPS::Tps* tpsP_ = nullptr;
 
-  mfem::FiniteElementCollection *fec_ = nullptr;
-  mfem::ParFiniteElementSpace *fes_ = nullptr;
-  mfem::ParGridFunction *velocity_ = nullptr;
-  mfem::ParGridFunction *zero_ = nullptr;
+  mfem::FiniteElementCollection* fec_ = nullptr;
+  mfem::ParFiniteElementSpace* fes_ = nullptr;
+  mfem::ParGridFunction* velocity_ = nullptr;
+  mfem::ParGridFunction* zero_ = nullptr;
 
  public:
   /// Constructor
-  ZeroFlow(mfem::ParMesh *pmesh, int vorder, TPS::Tps *tps = nullptr);
+  ZeroFlow(mfem::ParMesh* pmesh, int vorder, TPS::Tps* tps = nullptr);
 
   /// Destructor
   ~ZeroFlow() final;
@@ -178,7 +178,7 @@ class ZeroFlow final : public FlowBase {
   /// Velocity is always zero, so nothing to do
   void step() {}
 
-  mfem::ParGridFunction *getCurrentVelocity() final { return velocity_; }
+  mfem::ParGridFunction* getCurrentVelocity() final { return velocity_; }
 };
 
 #endif  // SPLIT_FLOW_BASE_HPP_

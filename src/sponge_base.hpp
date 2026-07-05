@@ -42,7 +42,7 @@
  * viscousSponge to the flow.
  */
 struct spongeToFlow {
-  const mfem::ParGridFunction *visc_multiplier = nullptr;
+  const mfem::ParGridFunction* visc_multiplier = nullptr;
 };
 
 /**
@@ -50,7 +50,7 @@ struct spongeToFlow {
  * visc sponge to the thermo chem model.
  */
 struct spongeToThermoChem {
-  const mfem::ParGridFunction *diff_multiplier = nullptr;
+  const mfem::ParGridFunction* diff_multiplier = nullptr;
 };
 
 /**
@@ -58,7 +58,7 @@ struct spongeToThermoChem {
  * visc sponge to the turbulence model.
  */
 struct spongeToTurbModel {
-  const mfem::ParGridFunction *diff_multiplier = nullptr;
+  const mfem::ParGridFunction* diff_multiplier = nullptr;
 };
 
 /**
@@ -83,7 +83,7 @@ class SpongeBase {
   /**
    * @brief Hook to let derived classes register visualization fields with ParaViewDataCollection
    */
-  virtual void initializeViz(mfem::ParaViewDataCollection &pvdc) {}
+  virtual void initializeViz(mfem::ParaViewDataCollection& pvdc) {}
 
   /**
    * @brief Take a single time step
@@ -109,13 +109,13 @@ class SpongeBase {
  */
 class UnitySponge final : public SpongeBase {
  protected:
-  mfem::ParMesh *pmesh_;
+  mfem::ParMesh* pmesh_;
   const int sorder_;
 
-  mfem::FiniteElementCollection *fec_ = nullptr;
-  mfem::ParFiniteElementSpace *fes_ = nullptr;
+  mfem::FiniteElementCollection* fec_ = nullptr;
+  mfem::ParFiniteElementSpace* fes_ = nullptr;
 
-  mfem::ParGridFunction *multiplier_ = nullptr;
+  mfem::ParGridFunction* multiplier_ = nullptr;
 
  public:
   /**
@@ -127,7 +127,7 @@ class UnitySponge final : public SpongeBase {
    * @param sorder The polynomial order for scalar fields
    * @param viscMult The (unity) value to use for enhancing viscosity
    */
-  UnitySponge(mfem::ParMesh *pmesh, int sorder);
+  UnitySponge(mfem::ParMesh* pmesh, int sorder);
 
   /// Free the interface fields and support objects
   ~UnitySponge() final;

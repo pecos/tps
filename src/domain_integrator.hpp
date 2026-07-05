@@ -50,20 +50,20 @@ using namespace std;
 // dim) and test space = scalar L2 space.
 class DomainIntegrator : public BilinearFormIntegrator {
  private:
-  Fluxes *fluxClass;
+  Fluxes* fluxClass;
 
   const int dim;
   const int num_equation;
-  IntegrationRules *intRules;
+  IntegrationRules* intRules;
   const int intRuleType;
   const bool axisymmetric_;
 
  public:
-  DomainIntegrator(Fluxes *_fluxClass, IntegrationRules *_intRules, int _intRuleType, const int _dim,
+  DomainIntegrator(Fluxes* _fluxClass, IntegrationRules* _intRules, int _intRuleType, const int _dim,
                    const int _num_equation, bool axisym);
 
-  virtual void AssembleElementMatrix2(const FiniteElement &trial_fe, const FiniteElement &test_fe,
-                                      ElementTransformation &Tr, DenseMatrix &elmat);
+  virtual void AssembleElementMatrix2(const FiniteElement& trial_fe, const FiniteElement& test_fe,
+                                      ElementTransformation& Tr, DenseMatrix& elmat);
 };
 
 #endif  // DOMAIN_INTEGRATOR_HPP_

@@ -53,9 +53,9 @@ struct extDataToThermoChem;
  * thermochemistry model to the flow.
  */
 struct thermoChemToFlow {
-  const mfem::ParGridFunction *density = nullptr;
-  const mfem::ParGridFunction *viscosity = nullptr;
-  const mfem::ParGridFunction *thermal_divergence = nullptr;
+  const mfem::ParGridFunction* density = nullptr;
+  const mfem::ParGridFunction* viscosity = nullptr;
+  const mfem::ParGridFunction* thermal_divergence = nullptr;
 };
 
 /**
@@ -63,8 +63,8 @@ struct thermoChemToFlow {
  * thermochemistry model to the flow.
  */
 struct thermoChemToTurbModel {
-  const mfem::ParGridFunction *density = nullptr;
-  const mfem::ParGridFunction *viscosity = nullptr;
+  const mfem::ParGridFunction* density = nullptr;
+  const mfem::ParGridFunction* viscosity = nullptr;
 };
 
 /**
@@ -74,15 +74,15 @@ struct thermoChemToTurbModel {
  */
 class ThermoChemModelBase {
  protected:
-  const flowToThermoChem *flow_interface_;
-  const turbModelToThermoChem *turbModel_interface_;
-  const spongeToThermoChem *sponge_interface_;
-  const extDataToThermoChem *extData_interface_;
+  const flowToThermoChem* flow_interface_;
+  const turbModelToThermoChem* turbModel_interface_;
+  const spongeToThermoChem* sponge_interface_;
+  const extDataToThermoChem* extData_interface_;
 
   double thermo_pressure_;
 
-  mfem::ParGridFunction *plasma_conductivity_gf_ = nullptr;
-  mfem::ParGridFunction *joule_heating_gf_ = nullptr;
+  mfem::ParGridFunction* plasma_conductivity_gf_ = nullptr;
+  mfem::ParGridFunction* joule_heating_gf_ = nullptr;
 
  public:
   /// Destructor
@@ -118,17 +118,17 @@ class ThermoChemModelBase {
   /**
    * @brief Hook to let derived classes register restart fields with the IODataOrganizer.
    */
-  virtual void initializeIO(IODataOrganizer &io) {}
+  virtual void initializeIO(IODataOrganizer& io) {}
 
   /**
    * @brief Hook to let derived classes register visualization fields with ParaViewDataCollection
    */
-  virtual void initializeViz(mfem::ParaViewDataCollection &pvdc) {}
+  virtual void initializeViz(mfem::ParaViewDataCollection& pvdc) {}
 
   /**
    * @brief Hook to let averaging register fields and restart fields with the IODataOrganizer.
    */
-  virtual void initializeStats(Averaging &average, IODataOrganizer &io, bool continuation) {}
+  virtual void initializeStats(Averaging& average, IODataOrganizer& io, bool continuation) {}
 
   /**
    * @brief Header strings for screen dump
@@ -136,7 +136,7 @@ class ThermoChemModelBase {
    * Provides a hook for derived classes to pass a set of header
    * strings that will be printed to the screen
    */
-  virtual void screenHeader(std::vector<std::string> &header) const { header.resize(0); }
+  virtual void screenHeader(std::vector<std::string>& header) const { header.resize(0); }
 
   /**
    * @brief Values for screen dump
@@ -144,7 +144,7 @@ class ThermoChemModelBase {
    * Provides values that will be printed to the screen at user requested
    * frequency (as often as each iteration).
    */
-  virtual void screenValues(std::vector<double> &values) { values.resize(0); }
+  virtual void screenValues(std::vector<double>& values) { values.resize(0); }
 
   /**
    * @brief Initialize data from the flow class
@@ -152,10 +152,10 @@ class ThermoChemModelBase {
    * Initialize fields that the thermochemistry model needs from the
    * flow.
    */
-  void initializeFromFlow(flowToThermoChem *flow) { flow_interface_ = flow; }
+  void initializeFromFlow(flowToThermoChem* flow) { flow_interface_ = flow; }
 
   /// Get interface provided by flow model
-  const flowToThermoChem *getFlowInterface() const { return flow_interface_; }
+  const flowToThermoChem* getFlowInterface() const { return flow_interface_; }
 
   /// Interface object, provides fields necessary for the flow
   thermoChemToFlow toFlow_interface_;
@@ -166,10 +166,10 @@ class ThermoChemModelBase {
    * Initialize fields that the thermochemistry model needs from the
    * turbulence model.
    */
-  void initializeFromTurbModel(turbModelToThermoChem *turbModel) { turbModel_interface_ = turbModel; }
+  void initializeFromTurbModel(turbModelToThermoChem* turbModel) { turbModel_interface_ = turbModel; }
 
   /// Get interface provided by turb model
-  const turbModelToThermoChem *getTurbModelInterface() const { return turbModel_interface_; }
+  const turbModelToThermoChem* getTurbModelInterface() const { return turbModel_interface_; }
 
   /// Interface object, provides fields necessary for the turbModel
   thermoChemToTurbModel toTurbModel_interface_;
@@ -180,20 +180,20 @@ class ThermoChemModelBase {
    * Initialize fields that the thermochemistry model needs from the
    * sponge class.
    */
-  void initializeFromSponge(spongeToThermoChem *sponge) { sponge_interface_ = sponge; }
+  void initializeFromSponge(spongeToThermoChem* sponge) { sponge_interface_ = sponge; }
 
   /// Get interface provided by flow model
-  const spongeToThermoChem *getSpongeInterface() const { return sponge_interface_; }
+  const spongeToThermoChem* getSpongeInterface() const { return sponge_interface_; }
 
-  void initializeFromExtData(extDataToThermoChem *extData) { extData_interface_ = extData; }
-  const extDataToThermoChem *getExtDataInterface() const { return extData_interface_; }
+  void initializeFromExtData(extDataToThermoChem* extData) { extData_interface_ = extData; }
+  const extDataToThermoChem* getExtDataInterface() const { return extData_interface_; }
 
   /// Return thermodynamic pressure for restarts
   double GetThermoPressure() { return thermo_pressure_; }
-  void SetThermoPressure(double &Po) { thermo_pressure_ = Po; }
+  void SetThermoPressure(double& Po) { thermo_pressure_ = Po; }
 
-  mfem::ParGridFunction *getPlasmaConductivityGF() { return plasma_conductivity_gf_; }
-  mfem::ParGridFunction *getJouleHeatingGF() { return joule_heating_gf_; }
+  mfem::ParGridFunction* getPlasmaConductivityGF() { return plasma_conductivity_gf_; }
+  mfem::ParGridFunction* getJouleHeatingGF() { return joule_heating_gf_; }
   virtual void evaluatePlasmaConductivityGF() {
     std::cout << "ERROR: " << __func__ << " remains unimplemented" << std::endl;
     exit(1);
@@ -206,17 +206,17 @@ class ThermoChemModelBase {
  */
 class ConstantPropertyThermoChem final : public ThermoChemModelBase {
  protected:
-  mfem::ParMesh *pmesh_;
+  mfem::ParMesh* pmesh_;
   const int sorder_;
   double rho_;
   double mu_;
 
-  mfem::FiniteElementCollection *fec_ = nullptr;
-  mfem::ParFiniteElementSpace *fes_ = nullptr;
+  mfem::FiniteElementCollection* fec_ = nullptr;
+  mfem::ParFiniteElementSpace* fes_ = nullptr;
 
-  mfem::ParGridFunction *density_ = nullptr;
-  mfem::ParGridFunction *viscosity_ = nullptr;
-  mfem::ParGridFunction *thermal_divergence_ = nullptr;
+  mfem::ParGridFunction* density_ = nullptr;
+  mfem::ParGridFunction* viscosity_ = nullptr;
+  mfem::ParGridFunction* thermal_divergence_ = nullptr;
 
  public:
   /**
@@ -229,7 +229,7 @@ class ConstantPropertyThermoChem final : public ThermoChemModelBase {
    * @param rho The (constant) value to use for the density
    * @param mu The (constant) value to use for the viscosity
    */
-  ConstantPropertyThermoChem(mfem::ParMesh *pmesh, int sorder, double rho, double mu);
+  ConstantPropertyThermoChem(mfem::ParMesh* pmesh, int sorder, double rho, double mu);
 
   /**
    * @brief Constructor
@@ -238,7 +238,7 @@ class ConstantPropertyThermoChem final : public ThermoChemModelBase {
    * @param sorder The polynomial order for scalar fields
    * @param tps Pointer to Tps object so that rho and mu can be obtained from input file
    */
-  ConstantPropertyThermoChem(mfem::ParMesh *pmesh, int sorder, TPS::Tps *tps);
+  ConstantPropertyThermoChem(mfem::ParMesh* pmesh, int sorder, TPS::Tps* tps);
 
   /// Free the interface fields and support objects
   ~ConstantPropertyThermoChem() final;

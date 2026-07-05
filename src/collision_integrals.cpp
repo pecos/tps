@@ -50,67 +50,67 @@ namespace charged {
   laser-plasma interactions. Journal of Computational Physics, 406, 109190. https://doi.org/10.1016/j.jcp.2019.109190
 */
 
-MFEM_HOST_DEVICE double att11(const double &Tp) {
+MFEM_HOST_DEVICE double att11(const double& Tp) {
   return 0.2150 * pow(log(1.0 + 5.2194 * pow(Tp, 1.0472)), 1.2435) / Tp / Tp;
 }
 
-MFEM_HOST_DEVICE double att12(const double &Tp) {
+MFEM_HOST_DEVICE double att12(const double& Tp) {
   return 0.0991 * pow(log(1.0 + 7.4684 * pow(Tp, 1.0155)), 1.1536) / Tp / Tp;
 }
 
-MFEM_HOST_DEVICE double att13(const double &Tp) {
+MFEM_HOST_DEVICE double att13(const double& Tp) {
   return 0.0616 * pow(log(1.0 + 7.8271 * pow(Tp, 0.9452)), 1.1105) / Tp / Tp;
 }
 
-MFEM_HOST_DEVICE double att14(const double &Tp) {
+MFEM_HOST_DEVICE double att14(const double& Tp) {
   return 0.0308 * pow(log(1.0 + 13.9567 * pow(Tp, 0.9511)), 1.1803) / Tp / Tp;
 }
 
-MFEM_HOST_DEVICE double att15(const double &Tp) {
+MFEM_HOST_DEVICE double att15(const double& Tp) {
   return 0.0232 * pow(log(1.0 + 13.7888 * pow(Tp, 0.9148)), 1.1532) / Tp / Tp;
 }
 
-MFEM_HOST_DEVICE double att22(const double &Tp) {
+MFEM_HOST_DEVICE double att22(const double& Tp) {
   return 0.2423 * pow(log(1.0 + 4.6796 * pow(Tp, 1.3290)), 1.1279) / Tp / Tp;
 }
 
-MFEM_HOST_DEVICE double att23(const double &Tp) {
+MFEM_HOST_DEVICE double att23(const double& Tp) {
   return 0.1221 * pow(log(1.0 + 8.7542 * pow(Tp, 1.3875)), 1.1110) / Tp / Tp;
 }
 
-MFEM_HOST_DEVICE double att24(const double &Tp) {
+MFEM_HOST_DEVICE double att24(const double& Tp) {
   return 0.0619 * pow(log(1.0 + 18.2538 * pow(Tp, 1.4341)), 1.1618) / Tp / Tp;
 }
 
-MFEM_HOST_DEVICE double rep11(const double &Tp) {
+MFEM_HOST_DEVICE double rep11(const double& Tp) {
   return 0.3904 * pow(log(1.0 + 0.9100 * pow(Tp, 1.1025)), 1.0544) / Tp / Tp;
 }
 
-MFEM_HOST_DEVICE double rep12(const double &Tp) {
+MFEM_HOST_DEVICE double rep12(const double& Tp) {
   return 0.1547 * pow(log(1.0 + 1.6597 * pow(Tp, 1.1725)), 0.9792) / Tp / Tp;
 }
 
-MFEM_HOST_DEVICE double rep13(const double &Tp) {
+MFEM_HOST_DEVICE double rep13(const double& Tp) {
   return 0.0814 * pow(log(1.0 + 2.5815 * pow(Tp, 1.1948)), 0.9570) / Tp / Tp;
 }
 
-MFEM_HOST_DEVICE double rep14(const double &Tp) {
+MFEM_HOST_DEVICE double rep14(const double& Tp) {
   return 0.0683 * pow(log(1.0 + 1.9774 * pow(Tp, 1.2033)), 0.8264) / Tp / Tp;
 }
 
-MFEM_HOST_DEVICE double rep15(const double &Tp) {
+MFEM_HOST_DEVICE double rep15(const double& Tp) {
   return 0.0346 * pow(log(1.0 + 4.5177 * pow(Tp, 1.2132)), 0.9294) / Tp / Tp;
 }
 
-MFEM_HOST_DEVICE double rep22(const double &Tp) {
+MFEM_HOST_DEVICE double rep22(const double& Tp) {
   return 0.4128 * pow(log(1.0 + 1.2436 * pow(Tp, 1.1830)), 1.0123) / Tp / Tp;
 }
 
-MFEM_HOST_DEVICE double rep23(const double &Tp) {
+MFEM_HOST_DEVICE double rep23(const double& Tp) {
   return 0.2203 * pow(log(1.0 + 1.8832 * pow(Tp, 1.2059)), 0.9851) / Tp / Tp;
 }
 
-MFEM_HOST_DEVICE double rep24(const double &Tp) {
+MFEM_HOST_DEVICE double rep24(const double& Tp) {
   return 0.1323 * pow(log(1.0 + 2.7248 * pow(Tp, 1.2129)), 0.9847) / Tp / Tp;
 }
 
@@ -121,13 +121,13 @@ MFEM_HOST_DEVICE double rep24(const double &Tp) {
 // Takes T in Kelvin, returns in unit of m^2.
 namespace argon {
 
-MFEM_HOST_DEVICE double ArAr11(const double &T) {
+MFEM_HOST_DEVICE double ArAr11(const double& T) {
   // Reference : fitted from tabulated data of Amdur, I., & Mason, E. A. (1958). Properties of gases at very high
   // temperatures. Physics of Fluids, 1(5), 370–383. https://doi.org/10.1063/1.1724353
   return 2.2910e-18 * pow(T, -0.3032);
 }
 
-MFEM_HOST_DEVICE double ArAr22(const double &T) {
+MFEM_HOST_DEVICE double ArAr22(const double& T) {
   // Reference : Liu, W. S., Whitten, B. T., & Glass, I. I. (1978). Ionizing argon boundary layers. Part 1. Quasi-steady
   // flat-plate laminar boundary-layer flows. Journal of Fluid Mechanics, 87(4), 609–640.
   // https://doi.org/10.1017/S0022112078001792
@@ -135,7 +135,7 @@ MFEM_HOST_DEVICE double ArAr22(const double &T) {
 }
 
 // argon neutral (Ar) - argon positive ion (Ar1P)
-MFEM_HOST_DEVICE double ArAr1P11(const double &T) {
+MFEM_HOST_DEVICE double ArAr1P11(const double& T) {
   // Reference: fitted from tabulated data of Devoto, R. S. (1973). Transport coefficients of ionized argon. Physics of
   // Fluids, 16(5), 616–623. https://doi.org/10.1063/1.1694396
   return 4.574321e-18 * pow(T, -0.1805);
@@ -165,35 +165,35 @@ MFEM_HOST_DEVICE double logT_fit(const double logT, const double coeff[9]) {
   Q_{e,Ar}^(1), elastic momentum transfer cross section, is determined by a 7-parameter shifted MERT model,
   fitted over BSR LXCat dataset.
 */
-MFEM_HOST_DEVICE double eAr11(const double &T) {
+MFEM_HOST_DEVICE double eAr11(const double& T) {
   const double logT = log(T);
   const double coeff[9] = {6.36254140e-18, 1.84835040e-18,  -5.87727093e-18, 3.20023027e-18, -8.50509054e-19,
                            1.28163820e-19, -1.11712910e-20, 5.25649382e-22,  -1.03296658e-23};
   return logT_fit(logT, coeff);
 }
 
-MFEM_HOST_DEVICE double eAr12(const double &T) {
+MFEM_HOST_DEVICE double eAr12(const double& T) {
   const double logT = log(T);
   const double coeff[9] = {1.91338172e-17, 5.45418129e-18,  -1.78361685e-17, 9.75657946e-18, -2.61115722e-18,
                            3.98310268e-19, -3.53503678e-20, 1.70375066e-21,  -3.45211955e-23};
   return logT_fit(logT, coeff);
 }
 
-MFEM_HOST_DEVICE double eAr13(const double &T) {
+MFEM_HOST_DEVICE double eAr13(const double& T) {
   const double logT = log(T);
   const double coeff[9] = {3.04685398e-17, 8.39750994e-18,  -2.88132528e-17, 1.60147037e-17, -4.34837891e-18,
                            6.73136845e-19, -6.06704580e-20, 2.97216168e-21,  -6.12760944e-23};
   return logT_fit(logT, coeff);
 }
 
-MFEM_HOST_DEVICE double eAr14(const double &T) {
+MFEM_HOST_DEVICE double eAr14(const double& T) {
   const double logT = log(T);
   const double coeff[9] = {3.90777949e-17, 1.04696956e-17,  -3.73774204e-17, 2.10610498e-17, -5.79029566e-18,
                            9.07573157e-19, -8.28466766e-20, 4.11188110e-21,  -8.59225098e-23};
   return logT_fit(logT, coeff);
 }
 
-MFEM_HOST_DEVICE double eAr15(const double &T) {
+MFEM_HOST_DEVICE double eAr15(const double& T) {
   const double logT = log(T);
   const double coeff[9] = {4.41333290e-17, 1.15696010e-17,  -4.25651305e-17, 2.42442440e-17, -6.73359258e-18,
                            1.06641697e-18, -9.83933863e-20, 4.93775812e-21,  -1.04362372e-22};
@@ -211,7 +211,7 @@ namespace nitrogen {
 
 // Reference : Levin et. al. (1990). "Collision Integrals and High Temperature Transport Properties for N-N, O-O, and
 // N-O".
-MFEM_HOST_DEVICE double NiNi11(const double &T) {
+MFEM_HOST_DEVICE double NiNi11(const double& T) {
   /*
   double logT = log(T);
   double c[5];
@@ -238,7 +238,7 @@ MFEM_HOST_DEVICE double NiNi11(const double &T) {
 
 // Reference : Levin et. al. (1990). "Collision Integrals and High Temperature Transport Properties for N-N, O-O, and
 // N-O".
-MFEM_HOST_DEVICE double NiNi22(const double &T) {
+MFEM_HOST_DEVICE double NiNi22(const double& T) {
   /*
   double logT = log(T);
   double c[5];
@@ -266,7 +266,7 @@ MFEM_HOST_DEVICE double NiNi22(const double &T) {
 
 // N-N+: NO DATA (using N-N)
 // see: su 2023
-MFEM_HOST_DEVICE double NiNi1P11(const double &T) {
+MFEM_HOST_DEVICE double NiNi1P11(const double& T) {
   /*
   double logT = log(T);
   double c[5];
@@ -296,7 +296,7 @@ MFEM_HOST_DEVICE double NiNi1P11(const double &T) {
 
 // Reference : A. V. Phelps. (1991). "Cross Sections and Swarm Coefficients for Nitrogen Ions and Neutrals in N2 and
 // Argon Ions and Neutrals in Ar for Energies from 0.1 eV to 10 keV" see also: Capitelli 2000
-MFEM_HOST_DEVICE double N2N211(const double &T) {
+MFEM_HOST_DEVICE double N2N211(const double& T) {
   /*
   double logT = log(T);
   double c[5];
@@ -324,7 +324,7 @@ MFEM_HOST_DEVICE double N2N211(const double &T) {
 
 // Reference : A. V. Phelps. (1991). "Cross Sections and Swarm Coefficients for Nitrogen Ions and Neutrals in N2 and
 // Argon Ions and Neutrals in Ar for Energies from 0.1 eV to 10 keV" see also: Capitelli 2000
-MFEM_HOST_DEVICE double N2N222(const double &T) {
+MFEM_HOST_DEVICE double N2N222(const double& T) {
   /*
   double logT = log(T);
   double c[5];
@@ -352,7 +352,7 @@ MFEM_HOST_DEVICE double N2N222(const double &T) {
 
 // Reference : A. V. Phelps. (1991). "Cross Sections and Swarm Coefficients for Nitrogen Ions and Neutrals in N2 and
 // Argon Ions and Neutrals in Ar for Energies from 0.1 eV to 10 keV"
-MFEM_HOST_DEVICE double N2N21P11(const double &T) {
+MFEM_HOST_DEVICE double N2N21P11(const double& T) {
   double logT = log(T);
   double c[5];
   c[0] = -96.770585022102779;
@@ -366,7 +366,7 @@ MFEM_HOST_DEVICE double N2N21P11(const double &T) {
 
 // Reference : A. V. Phelps. (1991). "Cross Sections and Swarm Coefficients for Nitrogen Ions and Neutrals in N2 and
 // Argon Ions and Neutrals in Ar for Energies from 0.1 eV to 10 keV"
-MFEM_HOST_DEVICE double N2Ni1P11(const double &T) {
+MFEM_HOST_DEVICE double N2Ni1P11(const double& T) {
   double logT = log(T);
   double c[7];
   c[0] = -7.070758182949830;
@@ -383,7 +383,7 @@ MFEM_HOST_DEVICE double N2Ni1P11(const double &T) {
 
 // N-N2+ : NO DATA (using N2-N+)
 // NOTE: this one doesnt really matter as N2 is all N by the temp of N2+
-MFEM_HOST_DEVICE double NiN21P11(const double &T) {
+MFEM_HOST_DEVICE double NiN21P11(const double& T) {
   double logT = log(T);
   double c[7];
   c[0] = -7.070758182949830;
@@ -400,7 +400,7 @@ MFEM_HOST_DEVICE double NiN21P11(const double &T) {
 
 // N2-N : NO DATA (using N2-N+)
 // see: su2023
-MFEM_HOST_DEVICE double N2Ni11(const double &T) {
+MFEM_HOST_DEVICE double N2Ni11(const double& T) {
   /*
   double logT = log(T);
   double c[5];
@@ -430,7 +430,7 @@ MFEM_HOST_DEVICE double N2Ni11(const double &T) {
 
 // N2-N : NO DATA  (using N-N 22)
 // see: su2023
-MFEM_HOST_DEVICE double N2Ni22(const double &T) {
+MFEM_HOST_DEVICE double N2Ni22(const double& T) {
   /*
   double logT = log(T);
   double c[5];
@@ -463,7 +463,7 @@ MFEM_HOST_DEVICE double N2Ni22(const double &T) {
   Q_{e,N}^(1), elastic momentum transfer cross section,
   fitted over IAA LXCat dataset.
 */
-MFEM_HOST_DEVICE double eNi11(const double &T) {
+MFEM_HOST_DEVICE double eNi11(const double& T) {
   double logT = log(T);
   double c[7];
   c[0] = 2.583657310241357;
@@ -479,7 +479,7 @@ MFEM_HOST_DEVICE double eNi11(const double &T) {
   return exp(expOmega);
 }
 
-MFEM_HOST_DEVICE double eNi12(const double &T) {
+MFEM_HOST_DEVICE double eNi12(const double& T) {
   double logT = log(T);
   double c[7];
   c[0] = -1.934755833917042;
@@ -495,7 +495,7 @@ MFEM_HOST_DEVICE double eNi12(const double &T) {
   return exp(expOmega);
 }
 
-MFEM_HOST_DEVICE double eNi13(const double &T) {
+MFEM_HOST_DEVICE double eNi13(const double& T) {
   double logT = log(T);
   double c[7];
   c[0] = -2.837349005539165;
@@ -511,7 +511,7 @@ MFEM_HOST_DEVICE double eNi13(const double &T) {
   return exp(expOmega);
 }
 
-MFEM_HOST_DEVICE double eNi14(const double &T) {
+MFEM_HOST_DEVICE double eNi14(const double& T) {
   double logT = log(T);
   double c[7];
   c[0] = -1.673254218486384;
@@ -527,7 +527,7 @@ MFEM_HOST_DEVICE double eNi14(const double &T) {
   return exp(expOmega);
 }
 
-MFEM_HOST_DEVICE double eNi15(const double &T) {
+MFEM_HOST_DEVICE double eNi15(const double& T) {
   double logT = log(T);
   double c[7];
   c[0] = -1.245791078716272;
@@ -543,7 +543,7 @@ MFEM_HOST_DEVICE double eNi15(const double &T) {
   return exp(expOmega);
 }
 
-MFEM_HOST_DEVICE double eN211(const double &T) {
+MFEM_HOST_DEVICE double eN211(const double& T) {
   double logT = log(T);
   double c[6];
   c[0] = -3.847278097767338;
@@ -558,7 +558,7 @@ MFEM_HOST_DEVICE double eN211(const double &T) {
   return exp(expOmega);
 }
 
-MFEM_HOST_DEVICE double eN212(const double &T) {
+MFEM_HOST_DEVICE double eN212(const double& T) {
   double logT = log(T);
   double c[6];
   c[0] = -5.337534425696322;
@@ -573,7 +573,7 @@ MFEM_HOST_DEVICE double eN212(const double &T) {
   return exp(expOmega);
 }
 
-MFEM_HOST_DEVICE double eN213(const double &T) {
+MFEM_HOST_DEVICE double eN213(const double& T) {
   double logT = log(T);
   double c[6];
   c[0] = -6.527006679994851;
@@ -588,7 +588,7 @@ MFEM_HOST_DEVICE double eN213(const double &T) {
   return exp(expOmega);
 }
 
-MFEM_HOST_DEVICE double eN214(const double &T) {
+MFEM_HOST_DEVICE double eN214(const double& T) {
   double logT = log(T);
   double c[6];
   c[0] = -6.527006679994851;
@@ -603,7 +603,7 @@ MFEM_HOST_DEVICE double eN214(const double &T) {
   return exp(expOmega);
 }
 
-MFEM_HOST_DEVICE double eN215(const double &T) {
+MFEM_HOST_DEVICE double eN215(const double& T) {
   double logT = log(T);
   double c[6];
   c[0] = -5.131403805671025;

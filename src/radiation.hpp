@@ -47,7 +47,7 @@ class Radiation {
   MFEM_HOST_DEVICE virtual ~Radiation() {}
 
   // Currently has the minimal format required for NEC model.
-  MFEM_HOST_DEVICE virtual double computeEnergySink(const double &T_h) {
+  MFEM_HOST_DEVICE virtual double computeEnergySink(const double& T_h) {
     printf("computeEnergySink not implemented");
     assert(false);
     return 0;
@@ -62,11 +62,11 @@ class NetEmission : public Radiation {
   LinearTable necTable_;
 
  public:
-  MFEM_HOST_DEVICE NetEmission(const RadiationInput &inputs);
+  MFEM_HOST_DEVICE NetEmission(const RadiationInput& inputs);
 
   MFEM_HOST_DEVICE ~NetEmission();
 
-  MFEM_HOST_DEVICE double computeEnergySink(const double &T_h) override { return -4.0 * PI_ * necTable_.eval(T_h); }
+  MFEM_HOST_DEVICE double computeEnergySink(const double& T_h) override { return -4.0 * PI_ * necTable_.eval(T_h); }
 };
 
 #endif  // RADIATION_HPP_

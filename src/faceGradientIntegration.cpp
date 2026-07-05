@@ -33,12 +33,12 @@
 #include "faceGradientIntegration.hpp"
 
 // Implementation of class FaceIntegrator
-GradFaceIntegrator::GradFaceIntegrator(IntegrationRules *_intRules, const int _dim, const int _num_equation,
-                                       BCintegrator *bc, bool useBCinGrad)
+GradFaceIntegrator::GradFaceIntegrator(IntegrationRules* _intRules, const int _dim, const int _num_equation,
+                                       BCintegrator* bc, bool useBCinGrad)
     : dim(_dim), num_equation(_num_equation), intRules(_intRules), bc_(bc), useBCinGrad_(useBCinGrad) {}
 
-void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const FiniteElement &el2,
-                                            FaceElementTransformations &Tr, const Vector &elfun, Vector &elvect) {
+void GradFaceIntegrator::AssembleFaceVector(const FiniteElement& el1, const FiniteElement& el2,
+                                            FaceElementTransformations& Tr, const Vector& elfun, Vector& elvect) {
   // Compute the term <nU,[w]> on the interior faces.
   Vector nor(dim);
   Vector mean(num_equation);
@@ -75,11 +75,11 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const Fini
   if (el1.Space() == FunctionSpace::Pk) {
     intorder++;
   }
-  const IntegrationRule *ir = &intRules->Get(Tr.GetGeometryType(), intorder);
+  const IntegrationRule* ir = &intRules->Get(Tr.GetGeometryType(), intorder);
 
   // Quadrature point loop
   for (int i = 0; i < ir->GetNPoints(); i++) {
-    const IntegrationPoint &ip = ir->IntPoint(i);
+    const IntegrationPoint& ip = ir->IntPoint(i);
 
     Tr.SetAllIntPoints(&ip);  // set face and element int. points
 
@@ -98,9 +98,9 @@ void GradFaceIntegrator::AssembleFaceVector(const FiniteElement &el1, const Fini
 
       if (useBCinGrad_) {
         const int attr = Tr.Attribute;
-        std::unordered_map<int, BoundaryCondition *>::const_iterator ibc = bc_->inletBCmap.find(attr);
-        std::unordered_map<int, BoundaryCondition *>::const_iterator obc = bc_->outletBCmap.find(attr);
-        std::unordered_map<int, BoundaryCondition *>::const_iterator wbc = bc_->wallBCmap.find(attr);
+        std::unordered_map<int, BoundaryCondition*>::const_iterator ibc = bc_->inletBCmap.find(attr);
+        std::unordered_map<int, BoundaryCondition*>::const_iterator obc = bc_->outletBCmap.find(attr);
+        std::unordered_map<int, BoundaryCondition*>::const_iterator wbc = bc_->wallBCmap.find(attr);
         if (ibc != bc_->inletBCmap.end()) {
           ibc->second->computeBdrPrimitiveStateForGradient(iUp1, iUp2);
         }

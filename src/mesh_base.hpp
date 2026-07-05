@@ -45,19 +45,19 @@ class LoMachOptions;
 
 class MeshBase {
  private:
-  TPS::Tps *tpsP_ = nullptr;
+  TPS::Tps* tpsP_ = nullptr;
 
-  MPI_Groups *groupsMPI = nullptr;
+  MPI_Groups* groupsMPI = nullptr;
   bool rank0_;
   int nprocs_;  // total number of MPI procs
   int rank_;    // local MPI rank
 
-  LoMachOptions *loMach_opts_ = nullptr;
+  LoMachOptions* loMach_opts_ = nullptr;
   const int order_;
   int dim_;
 
-  ParMesh *pmesh_ = nullptr;
-  Mesh *serial_mesh_ = nullptr;
+  ParMesh* pmesh_ = nullptr;
+  Mesh* serial_mesh_ = nullptr;
 
   // mapping from local to global element index
   // int *locToGlobElem = nullptr;
@@ -70,7 +70,7 @@ class MeshBase {
   const int defaultPartMethod = 1;
 
   // mapping from local to global element index
-  int *local_to_global_element_ = nullptr;
+  int* local_to_global_element_ = nullptr;
 
   // min/max element size
   double hmin_, hmax_;
@@ -79,32 +79,32 @@ class MeshBase {
   double xmin_, ymin_, zmin_;
   double xmax_, ymax_, zmax_;
 
-  mfem::FiniteElementCollection *fec_ = nullptr;
-  mfem::ParFiniteElementSpace *fes_ = nullptr;
-  mfem::ParGridFunction *gridScale_ = nullptr;
-  mfem::ParGridFunction *distance_ = nullptr;
+  mfem::FiniteElementCollection* fec_ = nullptr;
+  mfem::ParFiniteElementSpace* fes_ = nullptr;
+  mfem::ParGridFunction* gridScale_ = nullptr;
+  mfem::ParGridFunction* distance_ = nullptr;
 
   // used in loMach
   int sDof_;
 
  public:
-  MeshBase(TPS::Tps *tps, LoMachOptions *loMach_opts, int order);
+  MeshBase(TPS::Tps* tps, LoMachOptions* loMach_opts, int order);
   virtual ~MeshBase();
 
   virtual void initializeMesh();
   virtual void computeGridScale();
   virtual void computeWallDistance();
-  virtual void initializeViz(mfem::ParaViewDataCollection &pvdc);
+  virtual void initializeViz(mfem::ParaViewDataCollection& pvdc);
 
-  virtual ParMesh *getMesh() { return pmesh_; }
-  virtual Mesh *getSerialMesh() { return serial_mesh_; }
-  virtual ParGridFunction *getGridScale() { return gridScale_; }
-  virtual ParGridFunction *getWallDistance() { return distance_; }
+  virtual ParMesh* getMesh() { return pmesh_; }
+  virtual Mesh* getSerialMesh() { return serial_mesh_; }
+  virtual ParGridFunction* getGridScale() { return gridScale_; }
+  virtual ParGridFunction* getWallDistance() { return distance_; }
   virtual int getDofSize() { return sDof_; }
   virtual double getMinGridScale() { return hmin_; }
   virtual Array<int> getPartition() { return partitioning_; }
   // virtual int getDim() final { return dim_; }
 
-  int *getLocalToGlobalElementMap() const { return local_to_global_element_; }
+  int* getLocalToGlobalElementMap() const { return local_to_global_element_; }
 };
 #endif  // MESH_BASE_HPP_

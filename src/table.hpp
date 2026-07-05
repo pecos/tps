@@ -49,12 +49,12 @@ class TableInterface {
  public:
   MFEM_HOST_DEVICE TableInterface() {}
   MFEM_HOST_DEVICE virtual ~TableInterface() {}
-  MFEM_HOST_DEVICE virtual double eval(const double &xEval) = 0;
-  MFEM_HOST_DEVICE virtual double eval(const double &xEval, const double &yEval) = 0;
+  MFEM_HOST_DEVICE virtual double eval(const double& xEval) = 0;
+  MFEM_HOST_DEVICE virtual double eval(const double& xEval, const double& yEval) = 0;
 
-  MFEM_HOST_DEVICE virtual double eval_x(const double &xEval) = 0;
-  MFEM_HOST_DEVICE virtual double eval_x(const double &xEval, const double &yEval) = 0;
-  MFEM_HOST_DEVICE virtual double eval_y(const double &xEval, const double &yEval) = 0;
+  MFEM_HOST_DEVICE virtual double eval_x(const double& xEval) = 0;
+  MFEM_HOST_DEVICE virtual double eval_x(const double& xEval, const double& yEval) = 0;
+  MFEM_HOST_DEVICE virtual double eval_y(const double& xEval, const double& yEval) = 0;
 };
 
 class TableInterpolator : public TableInterface {
@@ -67,12 +67,12 @@ class TableInterpolator : public TableInterface {
   bool fLogScale_;
 
  public:
-  MFEM_HOST_DEVICE TableInterpolator(const int &Ndata, const double *xdata, const double *fdata, const bool &xLogScale,
-                                     const bool &fLogScale);
+  MFEM_HOST_DEVICE TableInterpolator(const int& Ndata, const double* xdata, const double* fdata, const bool& xLogScale,
+                                     const bool& fLogScale);
 
   MFEM_HOST_DEVICE virtual ~TableInterpolator() {}
 
-  MFEM_HOST_DEVICE int findInterval(const double &xEval);
+  MFEM_HOST_DEVICE int findInterval(const double& xEval);
 };
 
 //////////////////////////////////////////////////////
@@ -86,17 +86,17 @@ class LinearTable : public TableInterpolator {
   double b_[gpudata::MAXTABLE];
 
  public:
-  MFEM_HOST_DEVICE LinearTable(const TableInput &input);
+  MFEM_HOST_DEVICE LinearTable(const TableInput& input);
 
   MFEM_HOST_DEVICE virtual ~LinearTable() {}
 
-  MFEM_HOST_DEVICE double eval(const double &xEval) final;
-  MFEM_HOST_DEVICE double eval(const double &xEval, const double &yEval) final { return eval(xEval); }
+  MFEM_HOST_DEVICE double eval(const double& xEval) final;
+  MFEM_HOST_DEVICE double eval(const double& xEval, const double& yEval) final { return eval(xEval); }
 
-  MFEM_HOST_DEVICE double eval_x(const double &xEval) final;
-  MFEM_HOST_DEVICE double eval_x(const double &xEval, const double &yEval) final { return eval_x(xEval); }
+  MFEM_HOST_DEVICE double eval_x(const double& xEval) final;
+  MFEM_HOST_DEVICE double eval_x(const double& xEval, const double& yEval) final { return eval_x(xEval); }
 
-  MFEM_HOST_DEVICE double eval_y(const double &xEval, const double &yEval) final {
+  MFEM_HOST_DEVICE double eval_y(const double& xEval, const double& yEval) final {
     assert(false);
     return nan("");
   }
@@ -109,9 +109,9 @@ class LinearTable : public TableInterpolator {
  */
 class TableInterpolator2D : public TableInterface {
  protected:
-  double *xdata_;
-  double *ydata_;
-  double *fdata_;
+  double* xdata_;
+  double* ydata_;
+  double* fdata_;
 
   unsigned int nx_;
   unsigned int ny_;
@@ -124,29 +124,29 @@ class TableInterpolator2D : public TableInterface {
   /// Reset size and re-allocate data arrays
   MFEM_HOST_DEVICE void resize(unsigned int nx, unsigned int ny);
 
-  MFEM_HOST_DEVICE double eval(const double &xEval) final {
+  MFEM_HOST_DEVICE double eval(const double& xEval) final {
     assert(false);
     return nan("");
   }
-  MFEM_HOST_DEVICE double eval_x(const double &xEval) final {
+  MFEM_HOST_DEVICE double eval_x(const double& xEval) final {
     assert(false);
     return nan("");
   }
 
   /// Interpolate fcn to (x,y) --- must be implemented in derived class
-  MFEM_HOST_DEVICE double eval(const double &x, const double &y) override {
+  MFEM_HOST_DEVICE double eval(const double& x, const double& y) override {
     printf("TableInterpolator2D not initialized!");
     return -1.0;
   }
 
   /// Derivative of interpolant wrt x
-  MFEM_HOST_DEVICE double eval_x(const double &x, const double &y) override {
+  MFEM_HOST_DEVICE double eval_x(const double& x, const double& y) override {
     printf("TableInterpolator2D not initialized!");
     return -1.0;
   }
 
   /// Derivative of interpolant wrt y
-  MFEM_HOST_DEVICE double eval_y(const double &x, const double &y) override {
+  MFEM_HOST_DEVICE double eval_y(const double& x, const double& y) override {
     printf("TableInterpolator2D not initialized!");
     return -1.0;
   }
@@ -164,26 +164,26 @@ class TableInterpolator2D : public TableInterface {
  */
 class GslTableInterpolator2D : public TableInterpolator2D {
  protected:
-  const gsl_interp2d_type *itype_;
-  gsl_spline2d *spline_;
+  const gsl_interp2d_type* itype_;
+  gsl_spline2d* spline_;
   gsl_interp_accel *xacc_, *yacc_;
 
  public:
   GslTableInterpolator2D(std::string plato_file, int xcol, int ycol, int fcol, int ncol = 11);
-  GslTableInterpolator2D(unsigned int nx, unsigned int ny, const double *xdata, const double *ydata,
-                         const double *fdata);
+  GslTableInterpolator2D(unsigned int nx, unsigned int ny, const double* xdata, const double* ydata,
+                         const double* fdata);
   virtual ~GslTableInterpolator2D();
 
   /// Interpolate function to (x,y) using GSL
-  virtual double eval(const double &x, const double &y) { return gsl_spline2d_eval(spline_, x, y, xacc_, yacc_); }
+  virtual double eval(const double& x, const double& y) { return gsl_spline2d_eval(spline_, x, y, xacc_, yacc_); }
 
   /// Derivative of GSL interpolant wrt x
-  virtual double eval_x(const double &x, const double &y) {
+  virtual double eval_x(const double& x, const double& y) {
     return gsl_spline2d_eval_deriv_x(spline_, x, y, xacc_, yacc_);
   }
 
   /// Derivative of GSL interpolant wrt y
-  virtual double eval_y(const double &x, const double &y) {
+  virtual double eval_y(const double& x, const double& y) {
     return gsl_spline2d_eval_deriv_y(spline_, x, y, xacc_, yacc_);
   }
 };

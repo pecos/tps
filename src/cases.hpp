@@ -44,27 +44,27 @@
 
 #include "tps_mfem_wrap.hpp"
 
-typedef std::function<void(const mfem::Vector &, double, mfem::Vector &)> vfptr;
+typedef std::function<void(const mfem::Vector&, double, mfem::Vector&)> vfptr;
 vfptr vel_ic(std::string ic_string_);
 vfptr vel_bc(std::string type);
 
-typedef std::function<double(const mfem::Vector &, double)> sfptr;
+typedef std::function<double(const mfem::Vector&, double)> sfptr;
 sfptr temp_ic(std::string ic_string_);
 sfptr temp_bc(std::string type);
 
-void velIC_user(const mfem::Vector &x, double t, mfem::Vector &u);
-void velBC_user(const mfem::Vector &x, double t, mfem::Vector &u);
-void vel_exact_tgv2d(const mfem::Vector &x, double t, mfem::Vector &u);
-void vel_tgv2d_uniform(const mfem::Vector &x, double t, mfem::Vector &u);
-void vel_channel(const mfem::Vector &x, double t, mfem::Vector &u);
-void vel_exact_pipe(const mfem::Vector &x, double t, mfem::Vector &u);
+void velIC_user(const mfem::Vector& x, double t, mfem::Vector& u);
+void velBC_user(const mfem::Vector& x, double t, mfem::Vector& u);
+void vel_exact_tgv2d(const mfem::Vector& x, double t, mfem::Vector& u);
+void vel_tgv2d_uniform(const mfem::Vector& x, double t, mfem::Vector& u);
+void vel_channel(const mfem::Vector& x, double t, mfem::Vector& u);
+void vel_exact_pipe(const mfem::Vector& x, double t, mfem::Vector& u);
 
-double swirl_pipe(const mfem::Vector &x, double t);
-double tke_pipe(const mfem::Vector &x, double t);
+double swirl_pipe(const mfem::Vector& x, double t);
+double tke_pipe(const mfem::Vector& x, double t);
 
-double tempIC_user(const mfem::Vector &x, double t);
-double temp_rt3d(const mfem::Vector &x, double t);
-double temp_channel(const mfem::Vector &x, double t);
-double temp_lequereBox(const mfem::Vector &x, double t);
+double tempIC_user(const mfem::Vector& x, double t);
+double temp_rt3d(const mfem::Vector& x, double t);
+double temp_channel(const mfem::Vector& x, double t);
+double temp_lequereBox(const mfem::Vector& x, double t);
 
 #endif  // CASES_HPP_

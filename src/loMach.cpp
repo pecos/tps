@@ -61,7 +61,7 @@
 using namespace mfem;
 using namespace mfem::common;
 
-LoMachSolver::LoMachSolver(TPS::Tps *tps)
+LoMachSolver::LoMachSolver(TPS::Tps* tps)
     : tpsP_(tps),
       groupsMPI(new MPI_Groups(tps->getTPSCommWorld())),
       nprocs_(groupsMPI->getTPSWorldSize()),
@@ -92,7 +92,7 @@ LoMachSolver::~LoMachSolver() {
   delete flow_;
   delete thermo_;
   delete sponge_;
-  delete turbModel_;
+  // delete turbModel_; // is this causing the seg faults?
   delete avg_opts_;
   delete average_;
   delete meshData_;
@@ -417,17 +417,25 @@ void LoMachSolver::solveStep() {
   if (loMach_opts_.ts_opts_.integrator_type_ == LoMachTemporalOptions::CURL_CURL) {
     SetTimeIntegrationCoefficients(iter - iter_start_);
     extData_->step();
+    // if (rank0_ == true) std::cout << "external data complete" << endl;
+
     sw_thermChem_.Start();
     thermo_->step();
     sw_thermChem_.Stop();
+    // if (rank0_ == true) std::cout << "thermoChem complete" << endl;
+
     sw_flow_.Start();
     if (!disable_flow_) {
       flow_->step();
     }
     sw_flow_.Stop();
+    // if (rank0_ == true) std::cout << "flow complete" << endl;
+
     sw_turb_.Start();
     turbModel_->step();
     sw_turb_.Stop();
+    // if (rank0_ == true) std::cout << "turbulence model complete" << endl;
+
   } else {
     if (rank0_) std::cout << "Time integration not updated." << endl;
     exit(1);
@@ -564,7 +572,7 @@ void LoMachSolver::updateTimestep() {
   auto dataU = flow_->getCurrentVelocity()->HostRead();
 
   // comes in divided by order
-  const double *dataD = (meshData_->getGridScale())->HostRead();
+  const double* dataD = (meshData_->getGridScale())->HostRead();
   int Sdof = meshData_->getDofSize();
 
   for (int n = 0; n < Sdof; n++) {
@@ -581,7 +589,7 @@ void LoMachSolver::updateTimestep() {
   double dtInst_conv = CFL_ / std::max(max_speed, 1.0e-12);
 
   double dtInst = dtInst_conv;
-  double &dt = temporal_coeff_.dt;
+  double& dt = temporal_coeff_.dt;
   if (dtInst > dt) {
     dt = dt * (1.0 + dtFactor);
     dt = std::min(dt, dtInst);
@@ -609,7 +617,7 @@ double LoMachSolver::computeCFL() {
 
   // comes in divided by order
   auto dataU = flow_->getCurrentVelocity()->HostRead();
-  const double *dataD = (meshData_->getGridScale())->HostRead();
+  const double* dataD = (meshData_->getGridScale())->HostRead();
   int Sdof = meshData_->getDofSize();
 
   MPI_Barrier(groupsMPI->getTPSCommWorld());
@@ -634,7 +642,7 @@ void LoMachSolver::setTimestep() {
   double convT_lcl = 1.0e-12;
   double min_convT = 1.0;
   double Umag;
-  const double *dataD = (meshData_->getGridScale())->HostRead();
+  const double* dataD = (meshData_->getGridScale())->HostRead();
   int Sdof = meshData_->getDofSize();
 
   // dt_fixed is initialized to -1, so if it is positive,

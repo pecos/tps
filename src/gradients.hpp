@@ -46,67 +46,67 @@ using namespace std;
 
 class Gradients : public ParNonlinearForm {
  private:
-  ParFiniteElementSpace *vfes;
-  ParFiniteElementSpace *gradUpfes;
+  ParFiniteElementSpace* vfes;
+  ParFiniteElementSpace* gradUpfes;
   const int dim_;
   const int num_equation_;
   const int nvel_;
 
-  ParGridFunction *Up;
-  ParGridFunction *gradUp;
+  ParGridFunction* Up;
+  ParGridFunction* gradUp;
 
-  GasMixture *mixture;
+  GasMixture* mixture;
 
   // ParNonlinearForm *gradUp_A;
-  GradNonLinearForm *gradUp_A;
+  GradNonLinearForm* gradUp_A;
 
-  IntegrationRules *intRules;
+  IntegrationRules* intRules;
   const int intRuleType;
 
-  const precomputedIntegrationData &gpu_precomputed_data_;
+  const precomputedIntegrationData& gpu_precomputed_data_;
   Vector uk_el1;
   Vector uk_el2;
   Vector dun_face;
 
-  const int *h_num_elems_of_type;
+  const int* h_num_elems_of_type;
 
   // DenseMatrix *Me_inv;
-  Array<DenseMatrix *> &Me_inv;
-  Array<DenseMatrix *> Ke;
+  Array<DenseMatrix*>& Me_inv;
+  Array<DenseMatrix*> Ke;
   Vector Ke_array_;
   Array<int> Ke_positions_;
 
-  Vector &invMArray;
-  Array<int> &posDofInvM;
+  Vector& invMArray;
+  Array<int>& posDofInvM;
 
-  const int &maxIntPoints_;
-  const int &maxDofs_;
+  const int& maxIntPoints_;
+  const int& maxDofs_;
 
   // gradients of shape functions for all nodes and weight multiplied by det(Jac)
   // at each integration point
   //   Vector elemShapeDshapeWJ; // [...l_0(i),...,l_dof(i),l_0_x(i),...,l_dof_d(i), w_i*detJac_i ...]
   //   Array<int> elemPosQ_shapeDshapeWJ; // position and num. of integration points for each element
 
-  dataTransferArrays *transferUp;
+  dataTransferArrays* transferUp;
 
   Vector dun_shared_face;
   Vector dun_bdry_face;
 
  public:
-  Gradients(ParFiniteElementSpace *_vfes, ParFiniteElementSpace *_gradUpfes, int _dim, int _num_equation,
-            ParGridFunction *_Up, ParGridFunction *_gradUp, GasMixture *_mixture, GradNonLinearForm *_gradUp_A,
-            IntegrationRules *_intRules, int _intRuleType, const precomputedIntegrationData &gpu_precomputed_data,
-            Array<DenseMatrix *> &Me_inv, Vector &_invMArray, Array<int> &_posDofInvM, const int &_maxIntPoints,
-            const int &_maxDofs, int nvel);
+  Gradients(ParFiniteElementSpace* _vfes, ParFiniteElementSpace* _gradUpfes, int _dim, int _num_equation,
+            ParGridFunction* _Up, ParGridFunction* _gradUp, GasMixture* _mixture, GradNonLinearForm* _gradUp_A,
+            IntegrationRules* _intRules, int _intRuleType, const precomputedIntegrationData& gpu_precomputed_data,
+            Array<DenseMatrix*>& Me_inv, Vector& _invMArray, Array<int>& _posDofInvM, const int& _maxIntPoints,
+            const int& _maxDofs, int nvel);
 
   ~Gradients();
 
-  void setParallelData(dataTransferArrays *_transferUp) {
+  void setParallelData(dataTransferArrays* _transferUp) {
     transferUp = _transferUp;
 
     dun_shared_face.UseDevice(true);
 
-    const sharedFaceIntegrationData &shared_face_data = gpu_precomputed_data_.shared_face_data;
+    const sharedFaceIntegrationData& shared_face_data = gpu_precomputed_data_.shared_face_data;
 
     // number of elements with shared faces
     int maxNumElems = shared_face_data.shared_elements_to_shared_faces.Size() / 7;
@@ -133,7 +133,7 @@ class Gradients : public ParNonlinearForm {
 
   void multInverse_gpu(const int numElems, const int offsetElems, const int elDof);
 
-  void interpFaceData_gpu(const Vector &x, int elType, int elemOffset, int elDof);
+  void interpFaceData_gpu(const Vector& x, int elType, int elemOffset, int elDof);
   void evalFaceIntegrand_gpu();
 #endif
 };

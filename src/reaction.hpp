@@ -58,10 +58,10 @@ class Reaction {
 
   MFEM_HOST_DEVICE virtual ~Reaction() {}
 
-  MFEM_HOST_DEVICE virtual double computeRateCoefficient(const double &T_h, const double &T_e,
-                                                         [[maybe_unused]] const int &dofindex,
+  MFEM_HOST_DEVICE virtual double computeRateCoefficient(const double& T_h, const double& T_e,
+                                                         [[maybe_unused]] const int& dofindex,
                                                          const bool isElectronInvolved = false,
-                                                         [[maybe_unused]] const double *nsp = 0) {
+                                                         [[maybe_unused]] const double* nsp = 0) {
     printf("computeRateCoefficient not implemented");
     return 0;
   }
@@ -75,14 +75,14 @@ class Arrhenius : public Reaction {
   double E_;
 
  public:
-  MFEM_HOST_DEVICE Arrhenius(const double &A, const double &b, const double &E);
+  MFEM_HOST_DEVICE Arrhenius(const double& A, const double& b, const double& E);
 
   MFEM_HOST_DEVICE virtual ~Arrhenius() {}
 
-  MFEM_HOST_DEVICE virtual double computeRateCoefficient(const double &T_h, const double &T_e,
-                                                         [[maybe_unused]] const int &dofindex,
+  MFEM_HOST_DEVICE virtual double computeRateCoefficient(const double& T_h, const double& T_e,
+                                                         [[maybe_unused]] const int& dofindex,
                                                          const bool isElectronInvolved = false,
-                                                         [[maybe_unused]] const double *nsp = 0);
+                                                         [[maybe_unused]] const double* nsp = 0);
 };
 
 class HoffertLien : public Reaction {
@@ -97,34 +97,34 @@ class HoffertLien : public Reaction {
   double E_;
 
  public:
-  MFEM_HOST_DEVICE HoffertLien(const double &A, const double &b, const double &E);
+  MFEM_HOST_DEVICE HoffertLien(const double& A, const double& b, const double& E);
 
   MFEM_HOST_DEVICE virtual ~HoffertLien() {}
 
-  MFEM_HOST_DEVICE virtual double computeRateCoefficient(const double &T_h, const double &T_e,
-                                                         [[maybe_unused]] const int &dofindex,
+  MFEM_HOST_DEVICE virtual double computeRateCoefficient(const double& T_h, const double& T_e,
+                                                         [[maybe_unused]] const int& dofindex,
                                                          const bool isElectronInvolved = false,
-                                                         [[maybe_unused]] const double *nsp = 0);
+                                                         [[maybe_unused]] const double* nsp = 0);
 };
 
 class Tabulated : public Reaction {
  private:
-  TableInterpolator *table_ = NULL;
+  TableInterpolator* table_ = NULL;
 
  public:
-  MFEM_HOST_DEVICE Tabulated(const TableInput &input);
+  MFEM_HOST_DEVICE Tabulated(const TableInput& input);
 
   MFEM_HOST_DEVICE virtual ~Tabulated();
 
-  MFEM_HOST_DEVICE virtual double computeRateCoefficient(const double &T_h, const double &T_e,
-                                                         [[maybe_unused]] const int &dofindex,
+  MFEM_HOST_DEVICE virtual double computeRateCoefficient(const double& T_h, const double& T_e,
+                                                         [[maybe_unused]] const int& dofindex,
                                                          const bool isElectronInvolved = false,
-                                                         [[maybe_unused]] const double *nsp = 0);
+                                                         [[maybe_unused]] const double* nsp = 0);
 };
 
 class GridFunctionReaction : public Reaction {
  private:
-  const double *data_;
+  const double* data_;
   const int comp_;
   int size_;
 
@@ -133,14 +133,14 @@ class GridFunctionReaction : public Reaction {
 
   MFEM_HOST_DEVICE virtual ~GridFunctionReaction();
 
-  void setGridFunction(const mfem::GridFunction &f);
+  void setGridFunction(const mfem::GridFunction& f);
 
-  MFEM_HOST_DEVICE void setData(const double *data, int size);
+  MFEM_HOST_DEVICE void setData(const double* data, int size);
 
-  MFEM_HOST_DEVICE virtual double computeRateCoefficient([[maybe_unused]] const double &T_h,
-                                                         [[maybe_unused]] const double &T_e, const int &dofindex,
+  MFEM_HOST_DEVICE virtual double computeRateCoefficient([[maybe_unused]] const double& T_h,
+                                                         [[maybe_unused]] const double& T_e, const int& dofindex,
                                                          [[maybe_unused]] const bool isElectronInvolved = false,
-                                                         [[maybe_unused]] const double *nsp = 0);
+                                                         [[maybe_unused]] const double* nsp = 0);
 };
 
 class RadiativeDecay : public Reaction {
@@ -167,13 +167,13 @@ class RadiativeDecay : public Reaction {
 
   // Variables
   int NumOfInteral_lvl_u;
-  std::vector<double> *E_lvl_u;
-  std::vector<double> *g_lvl_u;
+  std::vector<double>* E_lvl_u;
+  std::vector<double>* g_lvl_u;
   std::vector<double> n_sp_lvl_u;
-  std::vector<std::vector<double>> *Aji;
+  std::vector<std::vector<double>>* Aji;
   std::vector<double> effAcoef_lvl;
-  std::vector<double> *E_lvl_l;
-  std::vector<double> *g_lvl_l;
+  std::vector<double>* E_lvl_l;
+  std::vector<double>* g_lvl_l;
   std::vector<double> n_sp_lvl_l;
   int numSpecies_;
 
@@ -287,23 +287,23 @@ class RadiativeDecay : public Reaction {
   // 750.59       Ar(4p'[1/2]0)     ->    Ar(4s'[1/2]1)   45000000.0
 
  public:
-  MFEM_HOST_DEVICE RadiativeDecay(const double _R, const std::map<std::string, int> *_speciesMapping,
-                                  const std::vector<std::string> *_speciesNames, const int *numSpecies,
-                                  const double *_reactantStoich, const double *_productStoich);
+  MFEM_HOST_DEVICE RadiativeDecay(const double _R, const std::map<std::string, int>* _speciesMapping,
+                                  const std::vector<std::string>* _speciesNames, const int* numSpecies,
+                                  const double* _reactantStoich, const double* _productStoich);
 
   MFEM_HOST_DEVICE virtual ~RadiativeDecay();
 
-  MFEM_HOST_DEVICE virtual double computeRateCoefficient(const double &T_h, const double &T_e, const int &dofindex,
+  MFEM_HOST_DEVICE virtual double computeRateCoefficient(const double& T_h, const double& T_e, const int& dofindex,
                                                          [[maybe_unused]] const bool isElectronInvolved = false,
-                                                         const double *nsp = 0);
+                                                         const double* nsp = 0);
 
-  MFEM_HOST_DEVICE void GetEinsteinACoefficient(const double &T_h, const double &T_e, double *effAcoef);
+  MFEM_HOST_DEVICE void GetEinsteinACoefficient(const double& T_h, const double& T_e, double* effAcoef);
 
-  MFEM_HOST_DEVICE void GetNumDensityOfInteralLevels(const int NumOfInteral_lvl, const double &n_sp, const double &T_e,
-                                                     double *n_sp_internal);
+  MFEM_HOST_DEVICE void GetNumDensityOfInteralLevels(const int NumOfInteral_lvl, const double& n_sp, const double& T_e,
+                                                     double* n_sp_internal);
 
-  MFEM_HOST_DEVICE double escapeFactCalc(const double &n_i, const double &E_j, const double &E_i, const double &g_j,
-                                         const double &g_i, const double &A_ji, const double &T_g);
+  MFEM_HOST_DEVICE double escapeFactCalc(const double& n_i, const double& E_j, const double& E_i, const double& g_j,
+                                         const double& g_i, const double& A_ji, const double& T_g);
 };
 
 #endif  // REACTION_HPP_

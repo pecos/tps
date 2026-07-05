@@ -47,7 +47,7 @@ TurbulenceModelOptions::TurbulenceModelOptions()
   turb_model_type_ = turb_model_map_[turb_model_string_];
 }
 
-void TurbulenceModelOptions::read(TPS::Tps *tps, std::string prefix) {
+void TurbulenceModelOptions::read(TPS::Tps* tps, std::string prefix) {
   // At the moment, SGS model options are under either "flow" or
   // "loMach", so we must have a prefix
   assert(!prefix.empty());
@@ -88,7 +88,7 @@ LoMachTemporalOptions::LoMachTemporalOptions()
   integrator_map_["deltaP"] = DELTA_P;
 }
 
-void LoMachTemporalOptions::read(TPS::Tps *tps, std::string prefix) {
+void LoMachTemporalOptions::read(TPS::Tps* tps, std::string prefix) {
   std::string basename;
   if (!prefix.empty()) {
     basename = prefix + "/time";

@@ -80,37 +80,37 @@ class Solver {
   }
 
   /// Initialize the interface
-  virtual void initInterface(Tps2Boltzmann &interface) {
+  virtual void initInterface(Tps2Boltzmann& interface) {
     cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
     exit(1);
   }
 
   /// Push solver variables to interface
-  virtual void push(Tps2Boltzmann &interface) {
+  virtual void push(Tps2Boltzmann& interface) {
     cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
     exit(1);
   }
 
   /// Fetch solver variables from interface
-  virtual void fetch(Tps2Boltzmann &interface) {
+  virtual void fetch(Tps2Boltzmann& interface) {
     cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
     exit(1);
   }
 
   /// Get the mesh used by this Solver
-  virtual mfem::ParMesh *getMesh() const {
+  virtual mfem::ParMesh* getMesh() const {
     cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
     exit(1);
     return nullptr;
   }
 
-  virtual const mfem::FiniteElementCollection *getFEC() const {
+  virtual const mfem::FiniteElementCollection* getFEC() const {
     cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
     exit(1);
     return nullptr;
   }
 
-  virtual mfem::ParFiniteElementSpace *getFESpace() const {
+  virtual mfem::ParFiniteElementSpace* getFESpace() const {
     cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
     exit(1);
     return nullptr;
@@ -123,7 +123,7 @@ class PlasmaSolver : public Solver {
   virtual ~PlasmaSolver() {}
 
   /// Fetch the plasma electrical conductivity grid function
-  virtual mfem::ParGridFunction *getPlasmaConductivityGF() {
+  virtual mfem::ParGridFunction* getPlasmaConductivityGF() {
     cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
     exit(1);
     return nullptr;
@@ -136,7 +136,7 @@ class PlasmaSolver : public Solver {
   }
 
   /// Fetch the Joule heating grid function
-  virtual mfem::ParGridFunction *getJouleHeatingGF() {
+  virtual mfem::ParGridFunction* getJouleHeatingGF() {
     cout << "ERROR: " << __func__ << " remains unimplemented" << endl;
     exit(1);
     return nullptr;

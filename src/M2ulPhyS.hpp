@@ -92,13 +92,13 @@ class Tps2Boltzmann;
 
 class M2ulPhyS : public TPS::PlasmaSolver {
  private:
-  MPI_Groups *groupsMPI;
+  MPI_Groups* groupsMPI;
   int nprocs_;  // total number of MPI procs
   int rank_;    // local MPI rank
   bool rank0_;  // flag to indicate rank 0
 
   // pointer to parent Tps class
-  TPS::Tps *tpsP;
+  TPS::Tps* tpsP;
 
   // Run options
   RunConfiguration config;
@@ -140,40 +140,40 @@ class M2ulPhyS : public TPS::PlasmaSolver {
   double max_char_speed;
 
   // reference to mesh
-  ParMesh *mesh;
+  ParMesh* mesh;
 
   // original mesh partition info (stored on rank 0)
   Array<int> partitioning_;
   const int defaultPartMethod = 1;
 
   // time integrator
-  ODESolver *timeIntegrator;
+  ODESolver* timeIntegrator;
 
   // Pointers to the different classes
-  GasMixture *mixture;    // valid on host
-  GasMixture *d_mixture;  // valid on device, when available; otherwise = mixture
+  GasMixture* mixture;    // valid on host
+  GasMixture* d_mixture;  // valid on device, when available; otherwise = mixture
 
-  TransportProperties *transportPtr = NULL;  // valid on both host and device
+  TransportProperties* transportPtr = NULL;  // valid on both host and device
   // TransportProperties *d_transport = NULL;  // valid on device, when available; otherwise = transportPtr
 
-  Chemistry *chemistry_ = NULL;
+  Chemistry* chemistry_ = NULL;
 
-  Radiation *radiation_ = NULL;
+  Radiation* radiation_ = NULL;
 
   // space varying viscosity multiplier
-  ParGridFunction *spaceVaryViscMult;
+  ParGridFunction* spaceVaryViscMult;
 
   /// Distance to nearest no-slip wall
-  ParGridFunction *distance_;
+  ParGridFunction* distance_;
 
-  Fluxes *fluxClass;    // valid on host
-  Fluxes *d_fluxClass;  // valid on device, when available; otherwise = fluxClass
+  Fluxes* fluxClass;    // valid on host
+  Fluxes* d_fluxClass;  // valid on device, when available; otherwise = fluxClass
 
-  RHSoperator *rhsOperator;
+  RHSoperator* rhsOperator;
 
   // Integration rule
   int intRuleType;  // 0: GaussLegendre; 1: GaussLobatto
-  IntegrationRules *intRules;
+  IntegrationRules* intRules;
 
   // Interpolant function
   // 0: GaussLegendre; 1: GaussLobatto
@@ -182,19 +182,19 @@ class M2ulPhyS : public TPS::PlasmaSolver {
   // Finite element collection
   // DG_FECollection *fec;
   // H1_FECollection *fec;
-  FiniteElementCollection *fec;
+  FiniteElementCollection* fec;
 
   // Finite element space for a scalar (thermodynamic quantity)
-  ParFiniteElementSpace *fes;
+  ParFiniteElementSpace* fes;
 
   // Finite element space for a mesh-dim vector quantity (momentum)
-  ParFiniteElementSpace *dfes;
+  ParFiniteElementSpace* dfes;
 
   // Finite element space for a nvel vector quantity. only for visualization (diffusion velocity).
-  ParFiniteElementSpace *nvelfes;
+  ParFiniteElementSpace* nvelfes;
 
   // Finite element space for all variables together (total thermodynamic state)
-  ParFiniteElementSpace *vfes;
+  ParFiniteElementSpace* vfes;
 
   // nodes IDs and indirection array
   const int maxIntPoints = gpudata::MAXINTPOINTS;  // corresponding to HEX face with p=5
@@ -205,56 +205,56 @@ class M2ulPhyS : public TPS::PlasmaSolver {
 
   // The solution u has components {density, x-momentum, y-momentum, energy}.
   // These are stored contiguously in the BlockVector u_block.
-  Array<int> *offsets;
-  BlockVector *u_block;
-  BlockVector *up_block;
+  Array<int>* offsets;
+  BlockVector* u_block;
+  BlockVector* up_block;
 
   // paraview collection pointer
-  ParaViewDataCollection *paraviewColl = NULL;
+  ParaViewDataCollection* paraviewColl = NULL;
   // DataCollection *visitColl = NULL;
 
   // Riemann Solver
-  RiemannSolverTPS *rsolver;
+  RiemannSolverTPS* rsolver;
 
   // RHS operators
   // ParNonlinearForm *A;
-  DGNonLinearForm *A;
+  DGNonLinearForm* A;
 
-  FaceIntegrator *faceIntegrator;
+  FaceIntegrator* faceIntegrator;
 
-  MixedBilinearForm *Aflux;
-  DomainIntegrator *domainIntegrator;
+  MixedBilinearForm* Aflux;
+  DomainIntegrator* domainIntegrator;
 
   // Boundary condition non-linear integrator
-  BCintegrator *bcIntegrator;
+  BCintegrator* bcIntegrator;
 
   // Conservative variables
-  ParGridFunction *U;
+  ParGridFunction* U;
 
   // Primitive variables
-  ParGridFunction *Up;
+  ParGridFunction* Up;
 
   // Visualization functions (these are pointers to Up)
   ParGridFunction *temperature, *dens, *vel, *vtheta, *passiveScalar;
-  ParGridFunction *electron_temp_field;
-  ParGridFunction *press;
-  std::vector<ParGridFunction *> visualizationVariables_;
+  ParGridFunction* electron_temp_field;
+  ParGridFunction* press;
+  std::vector<ParGridFunction*> visualizationVariables_;
   std::vector<std::string> visualizationNames_;
   AuxiliaryVisualizationIndexes visualizationIndexes_;
-  ParGridFunction *plasma_conductivity_;
-  ParGridFunction *joule_heating_;
+  ParGridFunction* plasma_conductivity_;
+  ParGridFunction* joule_heating_;
 
   // gradient of primitive variables
-  ParGridFunction *gradUp;
-  ParFiniteElementSpace *gradUpfes;
+  ParGridFunction* gradUp;
+  ParFiniteElementSpace* gradUpfes;
   // ParNonlinearForm *gradUp_A;
-  GradNonLinearForm *gradUp_A;
+  GradNonLinearForm* gradUp_A;
 
   // Auxiliary grid function to store external reaction rates
   std::unique_ptr<ParGridFunction> externalReactionRates;
 
   // Average handler
-  Averaging *average;
+  Averaging* average;
 
   // time variable
   double time;
@@ -289,11 +289,11 @@ class M2ulPhyS : public TPS::PlasmaSolver {
   int exit_status_;
 
   // mapping from local to global element index
-  int *locToGlobElem;
+  int* locToGlobElem;
 
   // a serial mesh, finite element space, and grid function
   // for use if we want to write a serial file
-  Mesh *serial_mesh;
+  Mesh* serial_mesh;
 
   // I/O organizer
   IODataOrganizer ioData;
@@ -302,12 +302,12 @@ class M2ulPhyS : public TPS::PlasmaSolver {
 
 #ifdef HAVE_MASA
   VectorFunctionCoefficient *DenMMS_, *VelMMS_, *PreMMS_;
-  VectorFunctionCoefficient *stateMMS_;
-  std::vector<VectorConstantCoefficient *> componentWindow_;
+  VectorFunctionCoefficient* stateMMS_;
+  std::vector<VectorConstantCoefficient*> componentWindow_;
 
-  ParGridFunction *zeroU_;    // to compute L2 norm of exact solution via ComputeLpError.
-  ParGridFunction *masaU_;    // for visualization of the exact solution.
-  ParGridFunction *masaRhs_;  // for visualization of the right-hand side.
+  ParGridFunction* zeroU_;    // to compute L2 norm of exact solution via ComputeLpError.
+  ParGridFunction* masaU_;    // for visualization of the exact solution.
+  ParGridFunction* masaRhs_;  // for visualization of the right-hand side.
   BlockVector *zeroUBlock_, *masaUBlock_;
 #endif
 
@@ -315,7 +315,7 @@ class M2ulPhyS : public TPS::PlasmaSolver {
   Array<int> loc_print;
 #endif
 
-  void getAttributesInPartition(Array<int> &local_attr);
+  void getAttributesInPartition(Array<int>& local_attr);
 
   /** @brief Fill precomputedIntegrationData struct
    *
@@ -341,8 +341,8 @@ class M2ulPhyS : public TPS::PlasmaSolver {
   void initSolutionAndVisualizationVectors();
   void initialTimeStep();
 
-  static void InitialConditionEulerVortex(const Vector &x, Vector &y);
-  static void testInitialCondition(const Vector &x, Vector &y);
+  static void InitialConditionEulerVortex(const Vector& x, Vector& y);
+  static void testInitialCondition(const Vector& x, Vector& y);
   // void dryAirUniformInitialConditions();
   void uniformInitialConditions();
   void initGradUp();
@@ -360,14 +360,14 @@ class M2ulPhyS : public TPS::PlasmaSolver {
 
 #ifdef HAVE_MASA
   void initMasaHandler();
-  void projectExactSolution(const double _time, ParGridFunction *prjU);
+  void projectExactSolution(const double _time, ParGridFunction* prjU);
   void initMMSCoefficients();
   void checkSolutionError(const double _time, const bool final = false);
 #endif
 
  public:
-  M2ulPhyS(string &inputFileName, TPS::Tps *tps);
-  M2ulPhyS(TPS::Tps *tps);
+  M2ulPhyS(string& inputFileName, TPS::Tps* tps);
+  M2ulPhyS(TPS::Tps* tps);
   ~M2ulPhyS();
 
   void parseSolverOptions() override;
@@ -395,11 +395,11 @@ class M2ulPhyS : public TPS::PlasmaSolver {
   void parsePostProcessVisualizationInputs();
   void parseRadiationInputs();
   void parsePlaneDump();
-  void readTableWrapper(std::string inputPath, TableInput &result);
+  void readTableWrapper(std::string inputPath, TableInput& result);
 
   void packUpGasMixtureInput();
-  void identifySpeciesType(Array<GasSpcs> &speciesType);
-  void identifyCollisionType(const Array<GasSpcs> &speciesType, GasColl *collisionIndex);
+  void identifySpeciesType(Array<GasSpcs>& speciesType);
+  void identifyCollisionType(const Array<GasSpcs>& speciesType, GasColl* collisionIndex);
 
   void checkSolverOptions() const;
   void projectInitialSolution();
@@ -416,39 +416,39 @@ class M2ulPhyS : public TPS::PlasmaSolver {
   void solveBegin() override;
   void solveEnd() override;
   void visualization() override;
-  ParMesh *getMesh() const override { return mesh; }
-  ParFiniteElementSpace *getFESpace() const override { return vfes; }
-  const FiniteElementCollection *getFEC() const override { return fec; }
+  ParMesh* getMesh() const override { return mesh; }
+  ParFiniteElementSpace* getFESpace() const override { return vfes; }
+  const FiniteElementCollection* getFEC() const override { return fec; }
 
-  ParGridFunction *getPlasmaConductivityGF() override { return plasma_conductivity_; }
-  ParGridFunction *getJouleHeatingGF() override { return joule_heating_; }
+  ParGridFunction* getPlasmaConductivityGF() override { return plasma_conductivity_; }
+  ParGridFunction* getJouleHeatingGF() override { return joule_heating_; }
   void evaluatePlasmaConductivityGF() override;
 
   void updateVisualizationVariables();
 
   // Accessors
-  RHSoperator *getRHSoperator() { return rhsOperator; }
-  ParFiniteElementSpace *GetScalarFES() { return fes; }
-  ParFiniteElementSpace *GetVectorFES() { return dfes; }
-  ParaViewDataCollection *GetParaviewColl() { return paraviewColl; }
-  ParGridFunction *GetSolutionGF() { return U; }
-  ParGridFunction *getPrimitiveGF() { return Up; }
-  ParGridFunction *getGradientGF() { return gradUp; }
-  ParGridFunction *getPressureGF() { return press; }
-  IntegrationRules *getIntegrationRules() { return intRules; }
-  RunConfiguration &GetConfig() { return config; }
-  GasMixture *getMixture() { return mixture; }
-  Chemistry *getChemistry() { return chemistry_; }
+  RHSoperator* getRHSoperator() { return rhsOperator; }
+  ParFiniteElementSpace* GetScalarFES() { return fes; }
+  ParFiniteElementSpace* GetVectorFES() { return dfes; }
+  ParaViewDataCollection* GetParaviewColl() { return paraviewColl; }
+  ParGridFunction* GetSolutionGF() { return U; }
+  ParGridFunction* getPrimitiveGF() { return Up; }
+  ParGridFunction* getGradientGF() { return gradUp; }
+  ParGridFunction* getPressureGF() { return press; }
+  IntegrationRules* getIntegrationRules() { return intRules; }
+  RunConfiguration& GetConfig() { return config; }
+  GasMixture* getMixture() { return mixture; }
+  Chemistry* getChemistry() { return chemistry_; }
 
-  const ParGridFunction *getDistanceFcn() { return distance_; }
+  const ParGridFunction* getDistanceFcn() { return distance_; }
 
   void updatePrimitives();
 
-  static int Check_NaN_GPU(ParGridFunction *U, int lengthU, Array<int> &loc_print);
+  static int Check_NaN_GPU(ParGridFunction* U, int lengthU, Array<int>& loc_print);
   void Check_Undershoot();
 
   void setConstantPlasmaConductivityGF() {
-    ParGridFunction *coordsDof = new ParGridFunction(dfes);
+    ParGridFunction* coordsDof = new ParGridFunction(dfes);
     mesh->GetNodes(*coordsDof);
     mixture->SetConstantPlasmaConductivity(plasma_conductivity_, Up, coordsDof);
     delete coordsDof;
@@ -456,9 +456,9 @@ class M2ulPhyS : public TPS::PlasmaSolver {
 
   // tps2Boltzmann interface (implemented in M2ulPhyS2Boltzmann.cpp)
   /// Push solver variables to interface
-  void push(TPS::Tps2Boltzmann &interface) override;
+  void push(TPS::Tps2Boltzmann& interface) override;
   /// Fetch solver variables from interface
-  void fetch(TPS::Tps2Boltzmann &interface) override;
+  void fetch(TPS::Tps2Boltzmann& interface) override;
 
   // Exit code access
   void SetStatus(int code) {

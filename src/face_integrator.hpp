@@ -52,21 +52,21 @@ using namespace mfem;
 // Interior face term: <F.n(u),[w]>
 class FaceIntegrator : public NonlinearFormIntegrator {
  private:
-  RiemannSolverTPS *rsolver;
-  Fluxes *fluxClass;
-  ParFiniteElementSpace *vfes;
+  RiemannSolverTPS* rsolver;
+  Fluxes* fluxClass;
+  ParFiniteElementSpace* vfes;
 
   const int dim;
   const int num_equation;
 
-  double &max_char_speed;
+  double& max_char_speed;
 
-  const ParGridFunction *gradUp;
-  const ParFiniteElementSpace *gradUpfes;
+  const ParGridFunction* gradUp;
+  const ParFiniteElementSpace* gradUpfes;
 
-  const ParGridFunction *distance_;
+  const ParGridFunction* distance_;
 
-  IntegrationRules *intRules;
+  IntegrationRules* intRules;
 
   DenseMatrix *faceMassMatrix1, *faceMassMatrix2;
   int faceNum;
@@ -96,29 +96,29 @@ class FaceIntegrator : public NonlinearFormIntegrator {
   DenseMatrix elvect1_mat;
   DenseMatrix elvect2_mat;
 
-  void getElementsGrads_cpu(FaceElementTransformations &Tr, const FiniteElement &el1, const FiniteElement &el2,
-                            DenseTensor &gradUp1, DenseTensor &gradUp2);
+  void getElementsGrads_cpu(FaceElementTransformations& Tr, const FiniteElement& el1, const FiniteElement& el2,
+                            DenseTensor& gradUp1, DenseTensor& gradUp2);
 
-  void NonLinearFaceIntegration(const FiniteElement &el1, const FiniteElement &el2, FaceElementTransformations &Tr,
-                                const Vector &elfun, Vector &elvect);
+  void NonLinearFaceIntegration(const FiniteElement& el1, const FiniteElement& el2, FaceElementTransformations& Tr,
+                                const Vector& elfun, Vector& elvect);
 
-  void getDistanceDofs(FaceElementTransformations &Tr, const FiniteElement &el1, const FiniteElement &el2,
-                       Vector &dist1, Vector &dist2);
+  void getDistanceDofs(FaceElementTransformations& Tr, const FiniteElement& el1, const FiniteElement& el2,
+                       Vector& dist1, Vector& dist2);
 
  public:
-  FaceIntegrator(IntegrationRules *_intRules, RiemannSolverTPS *rsolver_, Fluxes *_fluxClass,
-                 ParFiniteElementSpace *_vfes, bool _useLinear, const int _dim, const int _num_equation,
-                 ParGridFunction *_gradUp, ParFiniteElementSpace *_gradUpfes, double &_max_char_speed, bool axisym,
-                 ParGridFunction *distance);
+  FaceIntegrator(IntegrationRules* _intRules, RiemannSolverTPS* rsolver_, Fluxes* _fluxClass,
+                 ParFiniteElementSpace* _vfes, bool _useLinear, const int _dim, const int _num_equation,
+                 ParGridFunction* _gradUp, ParFiniteElementSpace* _gradUpfes, double& _max_char_speed, bool axisym,
+                 ParGridFunction* distance);
   ~FaceIntegrator();
 
-  virtual void AssembleFaceVector(const FiniteElement &el1, const FiniteElement &el2, FaceElementTransformations &Tr,
-                                  const Vector &elfun, Vector &elvect);
+  virtual void AssembleFaceVector(const FiniteElement& el1, const FiniteElement& el2, FaceElementTransformations& Tr,
+                                  const Vector& elfun, Vector& elvect);
 
-  static void getElementsGrads_gpu(const ParGridFunction *gradUp, ParFiniteElementSpace *vfes,
-                                   const ParFiniteElementSpace *gradUpfes, FaceElementTransformations &Tr,
-                                   const FiniteElement &el1, const FiniteElement &el2, DenseTensor &gradUp1,
-                                   DenseTensor &gradUp2, const int &num_equation, const int &totalDofs, const int &dim);
+  static void getElementsGrads_gpu(const ParGridFunction* gradUp, ParFiniteElementSpace* vfes,
+                                   const ParFiniteElementSpace* gradUpfes, FaceElementTransformations& Tr,
+                                   const FiniteElement& el1, const FiniteElement& el2, DenseTensor& gradUp1,
+                                   DenseTensor& gradUp2, const int& num_equation, const int& totalDofs, const int& dim);
 };
 
 #endif  // FACE_INTEGRATOR_HPP_

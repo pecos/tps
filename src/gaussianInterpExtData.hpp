@@ -65,13 +65,13 @@ class GaussianInterpExtData : public ExternalDataBase {
 
  private:
   // pointer to parent Tps class
-  TPS::Tps *tpsP_ = nullptr;
+  TPS::Tps* tpsP_ = nullptr;
 
   // Run options
-  LoMachOptions *loMach_opts_;  //  = nullptr;
+  LoMachOptions* loMach_opts_;  //  = nullptr;
 
   // MPI helpers
-  MPI_Groups *groupsMPI_ = nullptr;
+  MPI_Groups* groupsMPI_ = nullptr;
   int nprocs_;  // total number of MPI procs
   int rank_;    // local MPI rank
   bool rank0_;  // flag to indicate rank 0
@@ -85,7 +85,7 @@ class GaussianInterpExtData : public ExternalDataBase {
   /// Enable/disable verbose output.
   bool verbose = true;
 
-  ParMesh *pmesh_;  //  = nullptr;
+  ParMesh* pmesh_;  //  = nullptr;
 
   // The order of the scalar spaces
   int order_;
@@ -96,7 +96,7 @@ class GaussianInterpExtData : public ExternalDataBase {
   // Coefficients necessary to take a time step (including dt).
   // Assumed to be externally managed and determined, so just get a
   // reference here.
-  const temporalSchemeCoefficients &coeff_;
+  const temporalSchemeCoefficients& coeff_;
 
   // to-be used fro time or timestep dep bc
   // double dt;
@@ -122,18 +122,18 @@ class GaussianInterpExtData : public ExternalDataBase {
   double tke_bc_fac_;
 
   // Scalar \f$H^1\f$ finite element collection.
-  FiniteElementCollection *sfec_ = nullptr;
+  FiniteElementCollection* sfec_ = nullptr;
 
   // Scalar \f$H^1\f$ finite element space.
-  ParFiniteElementSpace *sfes_ = nullptr;
+  ParFiniteElementSpace* sfes_ = nullptr;
 
   // Vector \f$H^1\f$ finite element collection & space
-  FiniteElementCollection *vfec_ = nullptr;
-  ParFiniteElementSpace *vfes_ = nullptr;
+  FiniteElementCollection* vfec_ = nullptr;
+  ParFiniteElementSpace* vfes_ = nullptr;
 
   // for species dirichlet bc
-  FiniteElementCollection *yfec_ = nullptr;
-  ParFiniteElementSpace *yfes_ = nullptr;
+  FiniteElementCollection* yfec_ = nullptr;
+  ParFiniteElementSpace* yfes_ = nullptr;
 
   ParGridFunction temperature_gf_;
   ParGridFunction velocity_gf_;
@@ -153,12 +153,12 @@ class GaussianInterpExtData : public ExternalDataBase {
   const int maxSpec_ = 10;
 
  public:
-  GaussianInterpExtData(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, temporalSchemeCoefficients &coeff,
-                        TPS::Tps *tps);
+  GaussianInterpExtData(mfem::ParMesh* pmesh, LoMachOptions* loMach_opts, temporalSchemeCoefficients& coeff,
+                        TPS::Tps* tps);
   virtual ~GaussianInterpExtData();
 
   void initializeSelf();
-  void initializeViz(ParaViewDataCollection &pvdc) final;
+  void initializeViz(ParaViewDataCollection& pvdc) final;
   void setup();
   void setInlet();
   void setInletTurbScalars();
@@ -167,18 +167,18 @@ class GaussianInterpExtData : public ExternalDataBase {
   void step();
 
   /// Return a pointer to the current temperature ParGridFunction.
-  ParGridFunction *GetExternalInterpolatedTemperature() { return &temperature_gf_; }
+  ParGridFunction* GetExternalInterpolatedTemperature() { return &temperature_gf_; }
 
   /// Return a pointer to the current velocity ParGridFunction.
-  ParGridFunction *GetExternalInterpolatedVelocity() { return &velocity_gf_; }
+  ParGridFunction* GetExternalInterpolatedVelocity() { return &velocity_gf_; }
 
   /// Return a pointer to the current TKE ParGridFunction.
-  ParGridFunction *GetExternalInterpolatedTurbKineticEnergy() { return &tke_gf_; }
+  ParGridFunction* GetExternalInterpolatedTurbKineticEnergy() { return &tke_gf_; }
 
   /// Return a pointer to the current v2 ParGridFunction.
-  ParGridFunction *GetExternalInterpolatedTurbV2() { return &v2_gf_; }
+  ParGridFunction* GetExternalInterpolatedTurbV2() { return &v2_gf_; }
 
   /// Return a pointer to the current eddy viscosity ParGridFunction.
-  ParGridFunction *GetExternalInterpolatedEddyViscosity() { return &nut_gf_; }
+  ParGridFunction* GetExternalInterpolatedEddyViscosity() { return &nut_gf_; }
 };
 #endif  // GAUSSIANINTERPEXTDATA_HPP_

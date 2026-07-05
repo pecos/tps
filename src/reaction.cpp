@@ -35,32 +35,32 @@
 using namespace mfem;
 using namespace std;
 
-MFEM_HOST_DEVICE Arrhenius::Arrhenius(const double &A, const double &b, const double &E)
+MFEM_HOST_DEVICE Arrhenius::Arrhenius(const double& A, const double& b, const double& E)
     : Reaction(ARRHENIUS), A_(A), b_(b), E_(E) {}
 
-MFEM_HOST_DEVICE double Arrhenius::computeRateCoefficient(const double &T_h, const double &T_e,
-                                                          [[maybe_unused]] const int &dofindex,
+MFEM_HOST_DEVICE double Arrhenius::computeRateCoefficient(const double& T_h, const double& T_e,
+                                                          [[maybe_unused]] const int& dofindex,
                                                           const bool isElectronInvolved,
-                                                          [[maybe_unused]] const double *nsp) {
+                                                          [[maybe_unused]] const double* nsp) {
   double temp = (isElectronInvolved) ? T_e : T_h;
 
   return A_ * pow(temp, b_) * exp(-E_ / UNIVERSALGASCONSTANT / temp);
 }
 
-MFEM_HOST_DEVICE HoffertLien::HoffertLien(const double &A, const double &b, const double &E)
+MFEM_HOST_DEVICE HoffertLien::HoffertLien(const double& A, const double& b, const double& E)
     : Reaction(HOFFERTLIEN), A_(A), b_(b), E_(E) {}
 
-MFEM_HOST_DEVICE double HoffertLien::computeRateCoefficient(const double &T_h, const double &T_e,
-                                                            [[maybe_unused]] const int &dofindex,
+MFEM_HOST_DEVICE double HoffertLien::computeRateCoefficient(const double& T_h, const double& T_e,
+                                                            [[maybe_unused]] const int& dofindex,
                                                             const bool isElectronInvolved,
-                                                            [[maybe_unused]] const double *nsp) {
+                                                            [[maybe_unused]] const double* nsp) {
   double temp = (isElectronInvolved) ? T_e : T_h;
   double tempFactor = E_ / BOLTZMANNCONSTANT / temp;
 
   return A_ * pow(temp, b_) * (tempFactor + 2.0) * exp(-tempFactor);
 }
 
-MFEM_HOST_DEVICE Tabulated::Tabulated(const TableInput &input) : Reaction(TABULATED_RXN) {
+MFEM_HOST_DEVICE Tabulated::Tabulated(const TableInput& input) : Reaction(TABULATED_RXN) {
   switch (input.order) {
     case 1: {
       table_ = new LinearTable(input);
@@ -74,10 +74,10 @@ MFEM_HOST_DEVICE Tabulated::Tabulated(const TableInput &input) : Reaction(TABULA
 
 MFEM_HOST_DEVICE Tabulated::~Tabulated() { delete table_; }
 
-MFEM_HOST_DEVICE double Tabulated::computeRateCoefficient(const double &T_h, const double &T_e,
-                                                          [[maybe_unused]] const int &dofindex,
+MFEM_HOST_DEVICE double Tabulated::computeRateCoefficient(const double& T_h, const double& T_e,
+                                                          [[maybe_unused]] const int& dofindex,
                                                           const bool isElectronInvolved,
-                                                          [[maybe_unused]] const double *nsp) {
+                                                          [[maybe_unused]] const double* nsp) {
   double temp = (isElectronInvolved) ? T_e : T_h;
   return table_->eval(temp);
 }
@@ -87,12 +87,12 @@ MFEM_HOST_DEVICE GridFunctionReaction::GridFunctionReaction(int comp)
 
 MFEM_HOST_DEVICE GridFunctionReaction::~GridFunctionReaction() {}
 
-MFEM_HOST_DEVICE void GridFunctionReaction::setData(const double *data, int size) {
+MFEM_HOST_DEVICE void GridFunctionReaction::setData(const double* data, int size) {
   data_ = data + comp_ * size_;
   size_ = size;
 }
 
-void GridFunctionReaction::setGridFunction(const mfem::GridFunction &f) {
+void GridFunctionReaction::setGridFunction(const mfem::GridFunction& f) {
   size_ = f.FESpace()->GetNDofs();
   assert(comp_ < f.FESpace()->GetVDim());
   assert(f.FESpace()->GetOrdering() == mfem::Ordering::byNODES);
@@ -103,11 +103,11 @@ void GridFunctionReaction::setGridFunction(const mfem::GridFunction &f) {
 #endif
 }
 
-MFEM_HOST_DEVICE double GridFunctionReaction::computeRateCoefficient([[maybe_unused]] const double &T_h,
-                                                                     [[maybe_unused]] const double &T_e,
-                                                                     const int &dofindex,
+MFEM_HOST_DEVICE double GridFunctionReaction::computeRateCoefficient([[maybe_unused]] const double& T_h,
+                                                                     [[maybe_unused]] const double& T_e,
+                                                                     const int& dofindex,
                                                                      [[maybe_unused]] const bool isElectronInvolved,
-                                                                     [[maybe_unused]] const double *nsp) {
+                                                                     [[maybe_unused]] const double* nsp) {
   if (data_) {
     assert(dofindex < size_);
     return data_[dofindex];
@@ -118,9 +118,9 @@ MFEM_HOST_DEVICE double GridFunctionReaction::computeRateCoefficient([[maybe_unu
 
 #ifndef _GPU_
 // Radiative decay portion: extracted from commit (de27f14)
-MFEM_HOST_DEVICE RadiativeDecay::RadiativeDecay(const double _R, const std::map<std::string, int> *_speciesMapping,
-                                                const std::vector<std::string> *_speciesNames, const int *numSpecies,
-                                                const double *_reactantStoich, const double *_productStoich)
+MFEM_HOST_DEVICE RadiativeDecay::RadiativeDecay(const double _R, const std::map<std::string, int>* _speciesMapping,
+                                                const std::vector<std::string>* _speciesNames, const int* numSpecies,
+                                                const double* _reactantStoich, const double* _productStoich)
     : Reaction(RADIATIVE_DECAY), Rcyl(_R) {
   rank0_ = Mpi::Root();
   Lcyl = 2.0 * Rcyl;
@@ -190,10 +190,10 @@ MFEM_HOST_DEVICE RadiativeDecay::RadiativeDecay(const double _R, const std::map<
 
 MFEM_HOST_DEVICE RadiativeDecay::~RadiativeDecay() {}
 
-MFEM_HOST_DEVICE double RadiativeDecay::computeRateCoefficient(const double &T_h, const double &T_e,
-                                                               const int &dofindex,
+MFEM_HOST_DEVICE double RadiativeDecay::computeRateCoefficient(const double& T_h, const double& T_e,
+                                                               const int& dofindex,
                                                                [[maybe_unused]] const bool isElectronInvolved,
-                                                               const double *nsp) {
+                                                               const double* nsp) {
   double n_sp_u = nsp[iAr_u];  // Find the index corresponding to the correct species
   double n_sp_l = nsp[iAr_l];
 
@@ -214,8 +214,8 @@ MFEM_HOST_DEVICE double RadiativeDecay::computeRateCoefficient(const double &T_h
   return effAcoef;
 }
 
-MFEM_HOST_DEVICE void RadiativeDecay::GetNumDensityOfInteralLevels(const int NumOfInteral_lvl, const double &n_sp,
-                                                                   const double &T_e, double *n_sp_internal) {
+MFEM_HOST_DEVICE void RadiativeDecay::GetNumDensityOfInteralLevels(const int NumOfInteral_lvl, const double& n_sp,
+                                                                   const double& T_e, double* n_sp_internal) {
   // n_sp in [mol/m^3] is the number concentration of a lumped state/level.
   // Here, we evaluate the number concentration of the internal levels assuming that they
   // are Boltzmann distributed.
@@ -235,7 +235,7 @@ MFEM_HOST_DEVICE void RadiativeDecay::GetNumDensityOfInteralLevels(const int Num
   }
 }
 
-MFEM_HOST_DEVICE void RadiativeDecay::GetEinsteinACoefficient(const double &T_h, const double &T_e, double *effAcoef) {
+MFEM_HOST_DEVICE void RadiativeDecay::GetEinsteinACoefficient(const double& T_h, const double& T_e, double* effAcoef) {
   for (int i_lvl = 0; i_lvl < NumOfInteral_lvl_u; i_lvl++) {
     for (int itrans = 0; itrans < int((*Aji)[i_lvl].size()); itrans++) {
       double Acoef = (*Aji)[i_lvl][itrans];
@@ -246,9 +246,9 @@ MFEM_HOST_DEVICE void RadiativeDecay::GetEinsteinACoefficient(const double &T_h,
   }
 }
 
-MFEM_HOST_DEVICE double RadiativeDecay::escapeFactCalc(const double &n_i, const double &E_j, const double &E_i,
-                                                       const double &g_j, const double &g_i, const double &A_ji,
-                                                       const double &T_g) {
+MFEM_HOST_DEVICE double RadiativeDecay::escapeFactCalc(const double& n_i, const double& E_j, const double& E_i,
+                                                       const double& g_j, const double& g_i, const double& A_ji,
+                                                       const double& T_g) {
   //  Calculations for escape factor
   // i -> lower level
   // j -> upper level

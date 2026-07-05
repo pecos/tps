@@ -48,8 +48,8 @@
 using namespace mfem;
 using namespace mfem::common;
 
-AlgebraicSubgridModels::AlgebraicSubgridModels(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, TPS::Tps *tps,
-                                               ParGridFunction *gridScale, int sModel)
+AlgebraicSubgridModels::AlgebraicSubgridModels(mfem::ParMesh* pmesh, LoMachOptions* loMach_opts, TPS::Tps* tps,
+                                               ParGridFunction* gridScale, int sModel)
     : tpsP_(tps), loMach_opts_(loMach_opts), pmesh_(pmesh) {
   rank_ = pmesh_->GetMyRank();
   rank0_ = (pmesh_->GetMyRank() == 0);
@@ -163,7 +163,7 @@ void AlgebraicSubgridModels::initializeOperators() {
   this->step();
 }
 
-void AlgebraicSubgridModels::initializeViz(ParaViewDataCollection &pvdc) {
+void AlgebraicSubgridModels::initializeViz(ParaViewDataCollection& pvdc) {
   pvdc.RegisterField("muT", &subgridVisc_gf_);
 }
 
@@ -183,12 +183,12 @@ void AlgebraicSubgridModels::step() {
   (thermoChem_interface_->density)->GetTrueDofs(rn_);
 
   subgridVisc_ = 0.0;
-  const double *dGradU = gradU_.HostRead();
-  const double *dGradV = gradV_.HostRead();
-  const double *dGradW = gradW_.HostRead();
-  const double *rho = rn_.HostRead();
-  const double *del = gridScale_->HostRead();
-  double *data = subgridVisc_.HostReadWrite();
+  const double* dGradU = gradU_.HostRead();
+  const double* dGradV = gradV_.HostRead();
+  const double* dGradW = gradW_.HostRead();
+  const double* rho = rn_.HostRead();
+  const double* del = gridScale_->HostRead();
+  double* data = subgridVisc_.HostReadWrite();
 
   if (sModel_ == 1) {
     for (int i = 0; i < SdofInt_; i++) {
@@ -259,7 +259,7 @@ void AlgebraicSubgridModels::step() {
     subgridVisc_gf_.GetTrueDofs(subgridVisc_);
 
     // clip any small negatives resulting from filtering
-    double *dmuT = subgridVisc_.HostReadWrite();
+    double* dmuT = subgridVisc_.HostReadWrite();
     for (int i = 0; i < SdofInt_; i++) {
       dmuT[i] = std::max(dmuT[i], 1.0e-15);
     }
@@ -272,8 +272,8 @@ void AlgebraicSubgridModels::step() {
     double wt0 = 1.0 / std::min((double)aveSteps_, (double)activeSteps_);
     double wt1 = 1.0 - wt0;
 
-    double *dmuT = subgridVisc_.HostReadWrite();
-    double *dmuT0 = muT_NM1_.HostReadWrite();
+    double* dmuT = subgridVisc_.HostReadWrite();
+    double* dmuT0 = muT_NM1_.HostReadWrite();
     for (int i = 0; i < SdofInt_; i++) {
       // \bar{muT}^{n} = wt0*muT' + wt1*\bar{muT}^{n-1}
       dmuT[i] *= wt0;
@@ -289,7 +289,7 @@ void AlgebraicSubgridModels::step() {
 /**
 Basic Smagorinksy subgrid model with user-specified coefficient
 */
-void AlgebraicSubgridModels::sgsSmag(const DenseMatrix &gradUp, double delta, double &nu) {
+void AlgebraicSubgridModels::sgsSmag(const DenseMatrix& gradUp, double delta, double& nu) {
   Vector Sij(6);
   double Smag = 0.;
   double Cd;
@@ -321,7 +321,7 @@ void AlgebraicSubgridModels::sgsSmag(const DenseMatrix &gradUp, double delta, do
 WALE model, see: Weicker 2010
 Note: gradUp is in (eq,dim) form
 */
-void AlgebraicSubgridModels::sgsWALE(const DenseMatrix &gradUp, double delta, double &nu) {
+void AlgebraicSubgridModels::sgsWALE(const DenseMatrix& gradUp, double delta, double& nu) {
   DenseMatrix Sij(dim_, dim_);
   DenseMatrix Oij(dim_, dim_);
   DenseMatrix gij(dim_, dim_);
@@ -455,7 +455,7 @@ void AlgebraicSubgridModels::sgsWALE(const DenseMatrix &gradUp, double delta, do
 NOT TESTED: Sigma subgrid model following Nicoud et.al., "Using singular values to build a
 subgrid-scale model for large eddy simulations", PoF 2011.
 */
-void AlgebraicSubgridModels::sgsSigma(const DenseMatrix &gradUp, double delta, double &nu) {
+void AlgebraicSubgridModels::sgsSigma(const DenseMatrix& gradUp, double delta, double& nu) {
   DenseMatrix Qij(dim_, dim_);
   DenseMatrix du(dim_, dim_);
   DenseMatrix B(dim_, dim_);

@@ -32,7 +32,7 @@
 
 #include "transport_properties.hpp"
 
-MFEM_HOST_DEVICE TransportProperties::TransportProperties(GasMixture *_mixture) : mixture(_mixture) {
+MFEM_HOST_DEVICE TransportProperties::TransportProperties(GasMixture* _mixture) : mixture(_mixture) {
   numSpecies = mixture->GetNumSpecies();
   dim = mixture->GetDimension();
   nvel_ = mixture->GetNumVels();
@@ -42,7 +42,7 @@ MFEM_HOST_DEVICE TransportProperties::TransportProperties(GasMixture *_mixture) 
   num_equation = mixture->GetNumEquations();
 }
 
-void TransportProperties::correctMassDiffusionFlux(const Vector &Y_sp, DenseMatrix &diffusionVelocity) {
+void TransportProperties::correctMassDiffusionFlux(const Vector& Y_sp, DenseMatrix& diffusionVelocity) {
   correctMassDiffusionFlux(&Y_sp[0], diffusionVelocity.Write());
   // // Correction Velocity
   // Vector Vc(nvel_);
@@ -56,7 +56,7 @@ void TransportProperties::correctMassDiffusionFlux(const Vector &Y_sp, DenseMatr
   // }
 }
 
-MFEM_HOST_DEVICE void TransportProperties::correctMassDiffusionFlux(const double *Y_sp, double *diffusionVelocity) {
+MFEM_HOST_DEVICE void TransportProperties::correctMassDiffusionFlux(const double* Y_sp, double* diffusionVelocity) {
   // Correction Velocity
   double Vc[gpudata::MAXDIM];
   for (int v = 0; v < nvel_; v++) Vc[v] = 0.0;
@@ -69,7 +69,7 @@ MFEM_HOST_DEVICE void TransportProperties::correctMassDiffusionFlux(const double
   }
 }
 
-double TransportProperties::computeMixtureElectricConductivity(const Vector &mobility, const Vector &n_sp) {
+double TransportProperties::computeMixtureElectricConductivity(const Vector& mobility, const Vector& n_sp) {
   return computeMixtureElectricConductivity(&mobility[0], &n_sp[0]);
   // double mho = 0.0;  // electric conductivity.
   //
@@ -80,8 +80,8 @@ double TransportProperties::computeMixtureElectricConductivity(const Vector &mob
   // return mho;
 }
 
-MFEM_HOST_DEVICE double TransportProperties::computeMixtureElectricConductivity(const double *mobility,
-                                                                                const double *n_sp) {
+MFEM_HOST_DEVICE double TransportProperties::computeMixtureElectricConductivity(const double* mobility,
+                                                                                const double* n_sp) {
   double mho = 0.0;  // electric conductivity.
 
   for (int sp = 0; sp < numSpecies; sp++) {
@@ -91,8 +91,8 @@ MFEM_HOST_DEVICE double TransportProperties::computeMixtureElectricConductivity(
   return mho;
 }
 
-void TransportProperties::addAmbipolarEfield(const Vector &mobility, const Vector &n_sp,
-                                             DenseMatrix &diffusionVelocity) {
+void TransportProperties::addAmbipolarEfield(const Vector& mobility, const Vector& n_sp,
+                                             DenseMatrix& diffusionVelocity) {
   addAmbipolarEfield(&mobility[0], &n_sp[0], diffusionVelocity.Write());
   // double mho = computeMixtureElectricConductivity(mobility, n_sp);
   //
@@ -112,8 +112,8 @@ void TransportProperties::addAmbipolarEfield(const Vector &mobility, const Vecto
   // }
 }
 
-MFEM_HOST_DEVICE void TransportProperties::addAmbipolarEfield(const double *mobility, const double *n_sp,
-                                                              double *diffusionVelocity) {
+MFEM_HOST_DEVICE void TransportProperties::addAmbipolarEfield(const double* mobility, const double* n_sp,
+                                                              double* diffusionVelocity) {
   double mho = computeMixtureElectricConductivity(mobility, n_sp);
 
   double ambE[gpudata::MAXDIM];
@@ -133,8 +133,8 @@ MFEM_HOST_DEVICE void TransportProperties::addAmbipolarEfield(const double *mobi
   }
 }
 
-void TransportProperties::addMixtureDrift(const Vector &mobility, const Vector &n_sp, const Vector &Efield,
-                                          DenseMatrix &diffusionVelocity) {
+void TransportProperties::addMixtureDrift(const Vector& mobility, const Vector& n_sp, const Vector& Efield,
+                                          DenseMatrix& diffusionVelocity) {
   addMixtureDrift(&mobility[0], &n_sp[0], &Efield[0], diffusionVelocity.Write());
   // for (int sp = 0; sp < numSpecies; sp++) {
   //   if (mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) == 0.0) continue;
@@ -143,8 +143,8 @@ void TransportProperties::addMixtureDrift(const Vector &mobility, const Vector &
   // }
 }
 
-MFEM_HOST_DEVICE void TransportProperties::addMixtureDrift(const double *mobility, const double *n_sp,
-                                                           const double *Efield, double *diffusionVelocity) {
+MFEM_HOST_DEVICE void TransportProperties::addMixtureDrift(const double* mobility, const double* n_sp,
+                                                           const double* Efield, double* diffusionVelocity) {
   for (int sp = 0; sp < numSpecies; sp++) {
     if (mixture->GetGasParams(sp, GasParams::SPECIES_CHARGES) == 0.0) continue;
 
@@ -152,7 +152,7 @@ MFEM_HOST_DEVICE void TransportProperties::addMixtureDrift(const double *mobilit
   }
 }
 
-double TransportProperties::linearAverage(const Vector &X_sp, const Vector &speciesTransport) {
+double TransportProperties::linearAverage(const Vector& X_sp, const Vector& speciesTransport) {
   return linearAverage(&X_sp[0], &speciesTransport[0]);
   // double average = 0.0;
   //
@@ -161,7 +161,7 @@ double TransportProperties::linearAverage(const Vector &X_sp, const Vector &spec
   // return average;
 }
 
-MFEM_HOST_DEVICE double TransportProperties::linearAverage(const double *X_sp, const double *speciesTransport) {
+MFEM_HOST_DEVICE double TransportProperties::linearAverage(const double* X_sp, const double* speciesTransport) {
   double average = 0.0;
 
   for (int sp = 0; sp < numSpecies; sp++) average += X_sp[sp] * speciesTransport[sp];
@@ -169,8 +169,8 @@ MFEM_HOST_DEVICE double TransportProperties::linearAverage(const double *X_sp, c
   return average;
 }
 
-void TransportProperties::CurtissHirschfelder(const Vector &X_sp, const Vector &Y_sp, const DenseMatrix &binaryDiff,
-                                              Vector &avgDiff) {
+void TransportProperties::CurtissHirschfelder(const Vector& X_sp, const Vector& Y_sp, const DenseMatrix& binaryDiff,
+                                              Vector& avgDiff) {
   CurtissHirschfelder(&X_sp[0], &Y_sp[0], binaryDiff.Read(), &avgDiff[0]);
   // avgDiff.SetSize(numSpecies);
   // avgDiff = 0.0;
@@ -185,8 +185,8 @@ void TransportProperties::CurtissHirschfelder(const Vector &X_sp, const Vector &
   // }
 }
 
-MFEM_HOST_DEVICE void TransportProperties::CurtissHirschfelder(const double *X_sp, const double *Y_sp,
-                                                               const double *binaryDiff, double *avgDiff) {
+MFEM_HOST_DEVICE void TransportProperties::CurtissHirschfelder(const double* X_sp, const double* Y_sp,
+                                                               const double* binaryDiff, double* avgDiff) {
   for (int sp = 0; sp < numSpecies; sp++) avgDiff[sp] = 0.0;
 
   for (int spI = 0; spI < numSpecies; spI++) {
@@ -202,11 +202,11 @@ MFEM_HOST_DEVICE void TransportProperties::CurtissHirschfelder(const double *X_s
 //////// Dry Air mixture
 //////////////////////////////////////////////////////
 
-DryAirTransport::DryAirTransport(GasMixture *_mixture, RunConfiguration &_runfile)
+DryAirTransport::DryAirTransport(GasMixture* _mixture, RunConfiguration& _runfile)
     : DryAirTransport(_mixture, _runfile.GetViscMult(), _runfile.GetBulkViscMult(), _runfile.sutherland_.C1,
                       _runfile.sutherland_.S0, _runfile.sutherland_.Pr) {}
 
-MFEM_HOST_DEVICE DryAirTransport::DryAirTransport(GasMixture *_mixture, const double viscosity_multiplier,
+MFEM_HOST_DEVICE DryAirTransport::DryAirTransport(GasMixture* _mixture, const double viscosity_multiplier,
                                                   const double bulk_viscosity, const double C1, const double S,
                                                   const double Pr)
     : MolecularTransport(_mixture),
@@ -221,9 +221,9 @@ MFEM_HOST_DEVICE DryAirTransport::DryAirTransport(GasMixture *_mixture, const do
   cp_div_pr = specific_heat_ratio * gas_constant / (Pr_ * (specific_heat_ratio - 1.));
 }
 
-MFEM_HOST_DEVICE void DryAirTransport::ComputeFluxMolecularTransport(const double *state, const double *gradUp,
-                                                                     const double *Efield, double *transportBuffer,
-                                                                     double *diffusionVelocity) {
+MFEM_HOST_DEVICE void DryAirTransport::ComputeFluxMolecularTransport(const double* state, const double* gradUp,
+                                                                     const double* Efield, double* transportBuffer,
+                                                                     double* diffusionVelocity) {
   double p = mixture->ComputePressure(state);
   double temp = p / gas_constant / state[0];
 
@@ -269,7 +269,7 @@ MFEM_HOST_DEVICE void DryAirTransport::ComputeFluxMolecularTransport(const doubl
 //////// Constant transport
 //////////////////////////////////////////////////////
 
-ConstantTransport::ConstantTransport(GasMixture *_mixture, RunConfiguration &_runfile)
+ConstantTransport::ConstantTransport(GasMixture* _mixture, RunConfiguration& _runfile)
     : ConstantTransport(_mixture, _runfile.constantTransport) {}
 // ConstantTransport::ConstantTransport(GasMixture *_mixture, RunConfiguration &_runfile) :
 // TransportProperties(_mixture) {
@@ -300,7 +300,7 @@ ConstantTransport::ConstantTransport(GasMixture *_mixture, RunConfiguration &_ru
 //   }
 // }
 
-MFEM_HOST_DEVICE ConstantTransport::ConstantTransport(GasMixture *_mixture, const constantTransportData &inputs)
+MFEM_HOST_DEVICE ConstantTransport::ConstantTransport(GasMixture* _mixture, const constantTransportData& inputs)
     : MolecularTransport(_mixture) {
   viscosity_ = inputs.viscosity;
   bulkViscosity_ = inputs.bulkViscosity;
@@ -331,9 +331,9 @@ MFEM_HOST_DEVICE ConstantTransport::ConstantTransport(GasMixture *_mixture, cons
   }
 }
 
-MFEM_HOST_DEVICE void ConstantTransport::ComputeFluxMolecularTransport(const double *state, const double *gradUp,
-                                                                       const double *Efield, double *transportBuffer,
-                                                                       double *diffusionVelocity) {
+MFEM_HOST_DEVICE void ConstantTransport::ComputeFluxMolecularTransport(const double* state, const double* gradUp,
+                                                                       const double* Efield, double* transportBuffer,
+                                                                       double* diffusionVelocity) {
   transportBuffer[FluxTrns::VISCOSITY] = viscosity_;
   transportBuffer[FluxTrns::BULK_VISCOSITY] = bulkViscosity_;
   transportBuffer[FluxTrns::HEAVY_THERMAL_CONDUCTIVITY] = thermalConductivity_;
@@ -386,11 +386,11 @@ MFEM_HOST_DEVICE void ConstantTransport::ComputeFluxMolecularTransport(const dou
   }
 }
 
-MFEM_HOST_DEVICE void ConstantTransport::ComputeSourceMolecularTransport(const double *state, const double *Up,
-                                                                         const double *gradUp, const double *Efield,
-                                                                         double *globalTransport,
-                                                                         double *speciesTransport,
-                                                                         double *diffusionVelocity, double *n_sp) {
+MFEM_HOST_DEVICE void ConstantTransport::ComputeSourceMolecularTransport(const double* state, const double* Up,
+                                                                         const double* gradUp, const double* Efield,
+                                                                         double* globalTransport,
+                                                                         double* speciesTransport,
+                                                                         double* diffusionVelocity, double* n_sp) {
   for (int i = 0; i < SrcTrns::NUM_SRC_TRANS; i++) globalTransport[i] = 0.0;
   for (int c = 0; c < SpeciesTrns::NUM_SPECIES_COEFFS; c++)
     for (int sp = 0; sp < numSpecies; sp++) speciesTransport[sp + c * numSpecies] = 0.0;
