@@ -1310,7 +1310,7 @@ void ZetaModel::updateMuT() {
     const double* dk = tke_next_.HostRead();
     const double* dTTS = tts_.HostRead();
     const double* dTTS_strain = tts_strain_.HostRead();
-    const double* dMu = mu_.HostRead();
+    // const double* dMu = mu_.HostRead();
     double* muT = eddyVisc_.HostReadWrite();
 
     // for (int i = 0; i < SdofInt_; i++) muT[i] *= std::min(dv2[i], twoThirds * dk[i]);
@@ -2134,14 +2134,12 @@ void ZetaModel::v2Step() {
 
   // hard-clip
   {
-    const double* dtke = tke_next_.HostReadWrite();
+    // const double* dtke = tke_next_.HostReadWrite();
     double* dv2 = v2_next_.HostReadWrite();
     for (int i = 0; i < SdofInt_; i++) {
       dv2[i] = std::max(dv2[i], 0.0);
-
       // clip when used in certain areas, allow to be above 2/3k for destruction in v2
       // dv2[i] = std::min(dv2[i], 2.0/3.0 * dtke[i]);
-
       // if (dv2[i] != dv2[i]) std::cout << " v2 is actually NaN!" << endl;
     }
   }
@@ -2537,11 +2535,11 @@ void ZetaModel::AddFRATEDirichletBC(Coefficient* coeff, Array<int>& attr) {
 // switched back to basic min for now as smoothed functions
 // were causing issues with small numbers
 double smoothMin(double val1, double val2) {
-  
   // double C = 4.0;
-  double k = 0.001;
-  double tanh_half = 0.54930615;
-  double val, arg, wt;
+  // double k = 0.001;
+  // double tanh_half = 0.54930615;
+  // double arg, wt;
+  double val;
 
   // val = -1.0 / C * std::log(std::exp(-C * val1) + std::exp(-C * val2));
 
@@ -2568,10 +2566,11 @@ double smoothMin(double val1, double val2) {
 // switched back to basic max for now as smoothed functions
 // were causing issues with small numbers
 double smoothMax(double val1, double val2) {
-  double C = 4.0;
-  double k = 0.001;
-  double tanh_half = 0.54930615;
-  double val, arg, wt;
+  // double C = 4.0;
+  // double k = 0.001;
+  // double tanh_half = 0.54930615;
+  // double arg, wt;
+  double val;
 
   // val = 1.0 / C * std::log(std::exp(C * val1) + std::exp(C * val2));
 
@@ -2597,9 +2596,10 @@ double smoothMax(double val1, double val2) {
 // Smoothed-min (C-infinity) function which does not over-shoot
 double smoothMinTwo(double val1, double val2) {
   double C = 20.0;
-  double k = 0.001;
-  double tanh_half = 0.54930615;
-  double val, arg, wt;
+  // double k = 0.001;
+  // double tanh_half = 0.54930615;
+  // double arg, wt;
+  double val;
 
   val = -1.0 / C * std::log(std::exp(-C * val1) + std::exp(-C * val2));
 
