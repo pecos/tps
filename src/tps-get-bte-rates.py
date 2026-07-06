@@ -46,10 +46,10 @@ clstr_threshold       = 1e-3
 n0_param              = 3.22e22 
 kB                    = scipy.constants.Boltzmann
 
-varyT_cs = 1
+varyT_cs = 0
 append_recomb_cs = 1
 
-cs_datbase = "/work2/10565/ashwathsv/frontera/tps-venv/frontera/tps-venv/tps/tps-inputs/axisymmetric/argon/highP/cs_data"
+cs_datbase = "/scratch2/10565/ashwathsv/tps-venv/frontera/tps-venv/tps/tps-inputs/axisymmetric/argon/highP/cs_data"
 
 logfile = "outlog.txt"
 
@@ -74,7 +74,7 @@ parser.add_argument("-runs", "--runs"                             , help="runs "
 parser.add_argument("-n_pts", "--n_pts"                           , help="number of points for batched solver", type=int, default=10)
 parser.add_argument("-store_eedf", "--store_eedf"                 , help="store EEDF"          , type=int, default=0)
 parser.add_argument("-store_csv", "--store_csv"                   , help="store csv format of QoI comparisons", type=int, default=0)
-parser.add_argument("-plot_data", "--plot_data"                   , help="plot data", type=int, default=1)
+parser.add_argument("-plot_data", "--plot_data"                   , help="plot data", type=int, default=0)
 parser.add_argument("-ee_collisions", "--ee_collisions"           , help="enable electron-electron collisions", type=int, default=0)
 parser.add_argument("-verbose", "--verbose"                       , help="verbose with debug information", type=int, default=0)
 parser.add_argument("-use_gpu", "--use_gpu"                       , help="use gpus for batched solver", type=int, default=1)
@@ -755,6 +755,20 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
                 comm.Abort(1)
 
     data = rates[1:rates.shape[0]].flatten()
+
+    # --- NEW: check for NaN/Inf before anything else touches this array ---
+    bad_mask = ~np.isfinite(data)
+    n_bad = np.sum(bad_mask)
+    if n_bad > 0:
+        bad_idx = np.where(bad_mask)[0]
+        print(f"[rank {rank_}/{size_}] WARNING: {n_bad} non-finite values in BTE rates "
+              f"(indices {bad_idx[:10]}{'...' if len(bad_idx) > 10 else ''})", flush=True)
+        # Optional: print the actual bad values too
+        print(f"[rank {rank_}/{size_}] bad values: {data[bad_idx[:10]]}", flush=True)
+        sys.stderr.flush()
+        comm.Abort(1)
+    # --- END NEW ---
+
     data[data < 1.0e-21] = 0.0
     comm.Barrier()
 

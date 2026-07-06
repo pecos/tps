@@ -147,9 +147,9 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     tpsP_->getRequiredInput("boltzmannSolver/collisionsFile", collisionsFile);
     tpsP_->getRequiredInput("boltzmannSolver/solver_type", solver_type);
     tpsP_->getInput("boltzmannSolver/ee_collisions", ee_collisions, 0);
-    tpsP_->getInput("boltzmannSolver/blend-frac-init", bl_frac_init_, 0.01);
-    tpsP_->getInput("boltzmannSolver/blend-frac-increment", bl_frac_increment_, 0.01);
-    tpsP_->getInput("boltzmannSolver/blend-frac-change-freq", bl_frac_change_freq_, 1);
+    tpsP_->getInput("boltzmannSolver/blend-frac-init", bl_frac_init_, 0.00);
+    tpsP_->getInput("boltzmannSolver/blend-frac-increment", bl_frac_increment_, 0.00);
+    tpsP_->getInput("boltzmannSolver/blend-frac-change-freq", bl_frac_change_freq_, 1000000);
     bl_frac_ = bl_frac_init_;
     tpsP_->getInput("boltzmannSolver/solve-bte-every-n", solve_bte_every_n, 1);
     tpsP_->getInput("boltzmannSolver/regrid-bte-every-n", regrid_bte_every_n, 1);
@@ -167,6 +167,11 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
   }
 #endif
 
+  if (rank0_) {
+      std::cout << ", solve_bte_every_n = " << solve_bte_every_n << ", regrid_bte_every_n = " << regrid_bte_every_n << ", "
+      ", bl_frac_init_ = " << bl_frac_init_ << ", bl_frac_change_freq_ = " << bl_frac_change_freq_ << 
+      ", bl_frac_increment_ = " << bl_frac_increment_ << ", bte_from_tps = " << bte_from_tps_ << "\n";
+  }
   tpsP_->getInput("loMach/reacting/clip-temperature", Tclip_, false);
   tpsP_->getInput("loMach/reacting/min-temperature", Tmin_, 0.0);
   tpsP_->getInput("loMach/reacting/max-temperature", Tmax_, 100000.0);
@@ -2398,10 +2403,10 @@ void ReactingFlow::step() {
     // }
 
     if (bte_from_tps_ && regrid_bte == 0) {
-      if (rank0_) {
-        int iter_number_ = this->GetCurrentIter();
-        std::cout << "[C++] Iter = " << iter_number_ << ", Setting up the v-space grids for BTE..." << "\n";
-      }
+      // if (rank0_) {
+      //   int iter_number_ = this->GetCurrentIter();
+      //   std::cout << "[C++] Iter = " << iter_number_ << ", Setting up the v-space grids for BTE..." << "\n";
+      // }
 
       int size = Tn_.Size();
       auto Tarr = py::array_t<double>(
@@ -2454,8 +2459,8 @@ void ReactingFlow::step() {
 
     // Above call sets up the BTE v-space grids. Now call the BTE solver which returns the rate coefficients
     if (bte_from_tps_ && update_bte_rates == 0) {
-      // // Wrap const pointer into NumPy array (no copy)
-      // // Dimensions given as {size}, stride as {sizeof(double)}
+      // Wrap const pointer into NumPy array (no copy)
+      // Dimensions given as {size}, stride as {sizeof(double)}
       int size = Tn_.Size();
       auto Tarr = py::array_t<double>(
           {size},                 // shape
@@ -2553,8 +2558,8 @@ void ReactingFlow::step() {
         exit(-1);
       }
 
-      // int myRank;
-      // MPI_Comm_rank(tpsP_->getTPSCommWorld(), &myRank);
+      int myRank;
+      MPI_Comm_rank(tpsP_->getTPSCommWorld(), &myRank);
 
       if (rank0_) {
         std::cout << "Rank 0, back to TPS after solving BTE in Python\n";
@@ -2563,6 +2568,17 @@ void ReactingFlow::step() {
       // Convert "result" to an MFEM Vector
       py::array res_array = result.cast<py::array>();
       py::buffer_info buf = res_array.request();
+
+      if (buf.format != py::format_descriptor<double>::format()) {
+        std::cerr << "[rank " << myRank << "] FATAL: BTE array dtype mismatch, got format '"
+                  << buf.format << "'" << std::endl;
+        MFEM_ABORT("FATAL: BTE array dtype mismatch in buf.format");
+      }
+      if (buf.strides[0] != sizeof(double)) {
+        std::cerr << "[rank " << myRank << "] FATAL: BTE array not contiguous double, stride="
+                  << buf.strides[0] << std::endl;
+        MFEM_ABORT("FATAL: BTE array dtype mismatch in buf.strides");
+      }
 
       if(buf.ndim != 1) {
         throw std::runtime_error("Expected 1D array from Python");
@@ -2578,6 +2594,9 @@ void ReactingFlow::step() {
       int bterr_size = bterates_.Size();
 
       assert(buf.shape[0] == bterr_size);
+      MFEM_VERIFY(buf.shape[0] == bterr_size,
+        "BTE rate coefficient array size mismatch: got " << buf.shape[0]
+        << " expected " << bterr_size);
 
       for (int i = 0; i < buf.shape[0]; i++) {
         dst[i] = src[i];
@@ -2636,6 +2655,7 @@ void ReactingFlow::step() {
 
           // Solve backward Euler update (with BTE rates)
           solveChemistryStepBTE(YT, i, dt_, bterates.GetData()); 
+          // solveChemistryStep(YT, i, dt_);
           //   , kf.GetData(), prograte.GetData(), rrfrrb.GetData(),
           //   kfBTE.GetData(), prograteBTE.GetData(), rrfrrbBTE.GetData(), prodYsp.GetData()
           // );
@@ -4772,6 +4792,9 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
   
     // Evaluate the chemical source terms
     chemistry_->computeForwardRateCoeffs(n_sp.Read(), Th, Te, dofindex, kfwd.HostWrite());
+
+    int rank_local_;
+    MPI_Comm_rank(tpsP_->getTPSCommWorld(), &rank_local_);
     
     // Vector BTEkfwd;          // set to size nReactions_ in computeForwardRareCoeffs  
     // Vector BTEprogressRate;  // set to size nReactions_ in computeProgressRate
@@ -4782,6 +4805,21 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
     for (int rr = 0; rr < nBTEReactions_; rr++) {
         int tpi = int(mapping[rr]); // tpi stores TPS index of reaction given by BTE index rr
         double kblend = bl_frac_ * BTErr[rr] + (1.0 - bl_frac_) * kfwd[tpi];
+      //   MFEM_VERIFY(kblend == kfwd[tpi], "kblend != kfwd[tpi] " << kblend
+      //   << ", " << kfwd[tpi]);
+      //   if (!std::isfinite(BTErr[rr]) || !std::isfinite(kblend) || kblend != kfwd[tpi]) {
+      //     std::cerr << "[rank " << rank_local_ << "] FATAL: BTErr[" << rr << "] = " << BTErr[rr]
+      //               << " NOT FINITE at dofindex=" << dofindex
+      //               << ", tpi=" << tpi
+      //               << ", Th = " << Th << ", Te = " << Te << ", kblend = " << kblend
+      //               << ", bl_frac_ = " << bl_frac_ << ", " << (1.0 - bl_frac_)
+      //               << ", kfwd[tpi] = " << kfwd[tpi]
+      //               << std::endl;
+      //     std::cerr << "[rank " << rank_local_ << "] n_sp contents:" << std::endl;
+      //     n_sp.Print(std::cerr);
+      //     std::cerr.flush();
+      //     MFEM_ABORT("FATAL: BTE rate coefficients are infinite or NaN. Check the rate coefficients");
+      // }
         kfwd[tpi] = std::max(kblend, 0.0);
         // BTEkfwd[tpi] = BTErr[rr];
     }
@@ -4889,7 +4927,7 @@ void ReactingFlow::solveChemistryStepBTE(double *YT, const int dofindex, const d
         YT1[i] *= (1 + eps);
       }
   
-      this->evaluateReactingSourceBTE(YT, dofindex, rhs, BTErr);
+      this->evaluateReactingSourceBTE(YT1, dofindex, rhs1, BTErr);
     //   this->evaluateReactingSourceBTE(YT1, dofindex, rhs1, BTErr,
     //   kf, prograte, rrfrrb, kfBTE, prograteBTE, rrfrrbBTE, prodYsp);
   
@@ -4943,8 +4981,7 @@ void ReactingFlow::solveChemistryStepBTE(double *YT, const int dofindex, const d
   
       //   this->evaluateReactingSourceBTE(YT1, dofindex, rhs1, BTErr,
       //   kf, prograte, rrfrrb, kfBTE, prograteBTE, rrfrrbBTE, prodYsp);
-      this->evaluateReactingSourceBTE(YT, dofindex, rhs, BTErr);
-
+        this->evaluateReactingSourceBTE(YT1, dofindex, rhs1, BTErr);
         for (int j = 0; j < nState; j++) {
           Jac(j, i) = (rhs1[j] - rhs[j]) / (YT1[i] - YT[i]);
         }

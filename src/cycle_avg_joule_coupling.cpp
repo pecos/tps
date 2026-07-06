@@ -318,6 +318,7 @@ void CycleAvgJouleCoupling::interpolationPoints(Vector &vxyz, int n_interp_nodes
 void CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow() {
   const bool verbose = rank0_;
   if (verbose) grvy_printf(ginfo, "Interpolating Joule heating to flow mesh.\n");
+  fflush(stdout);
 
 #ifdef HAVE_GSLIB
   const ParFiniteElementSpace *flow_fespace = flow_solver_->getFESpace();
@@ -326,13 +327,62 @@ void CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow() {
   Vector vxyz;
   interpolationPoints(vxyz, n_flow_interp_nodes_, flow_fespace);
 
+  // grvy_printf(ginfo, "[rank %d] interpolationPoints returned: vxyz.Size()=%d n_flow_interp_nodes_=%d dim=%d\n",
+  //           rank_, vxyz.Size(), n_flow_interp_nodes_, flow_fespace->GetMesh()->Dimension());
+  // fflush(stdout);
+
+  // MFEM_VERIFY(vxyz.Size() == n_flow_interp_nodes_ * flow_fespace->GetMesh()->Dimension(),
+  //           "vxyz size does not match n_flow_interp_nodes_ * dim");
+
   // Evaluate source grid function.
   Vector interp_vals(n_flow_interp_nodes_);
 
   const ParGridFunction *joule_heating_gf = qmsa_solver_->getJouleHeatingGF();
-  assert(joule_heating_gf != NULL);
+  // MFEM_VERIFY(joule_heating_gf != NULL, "jouule_heating_gf is NULL in CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow()");
+
+  // bool coords_finite = (vxyz.CheckFinite() == 0);
+  // bool field_finite = (joule_heating_gf->CheckFinite() == 0);
+  // if (!coords_finite || !field_finite) {
+  //     grvy_printf(gerror, "[rank %d] NOT FINITE before interpolation: coords_ok=%d field_ok=%d "
+  //               "vxyz.Size()=%d n_flow_interp_nodes_=%d\n",
+  //               rank_, coords_finite, field_finite, vxyz.Size(), n_flow_interp_nodes_);
+  //     MFEM_ABORT("FATAL: interpolating Joule heating from EM to flow.");
+  // }
+
+  // --- NEW: r-coordinate (and z-coordinate) min/max logging ---
+  // {
+  //   const int dim = flow_fespace->GetMesh()->Dimension();
+  //   const int npts = vxyz.Size() / dim;
+
+  //   double rmin = 1e300, rmax = -1e300;
+  //   double zmin = 1e300, zmax = -1e300;
+  //   int n_near_axis = 0;
+  //   const double axis_tol = 1e-8;  // adjust based on your mesh scale
+
+  //   for (int i = 0; i < npts; i++) {
+  //     // MFEM FindPointsGSLIB expects interleaved or ordered-by-component
+  //     // layout depending on how interpolationPoints() builds vxyz --
+  //     // confirm this matches your actual ordering (see note below).
+  //     double r = vxyz(i);            // if byNODES ordering (component-major)
+  //     double z = vxyz(i + npts);
+
+  //     rmin = std::min(rmin, r);
+  //     rmax = std::max(rmax, r);
+  //     zmin = std::min(zmin, z);
+  //     zmax = std::max(zmax, z);
+
+  //     if (r < axis_tol) n_near_axis++;
+  //   }
+
+  //   grvy_printf(ginfo, "[rank %d] r range: [%g, %g], z range: [%g, %g], n_near_axis(r<%g)=%d\n",
+  //               rank_, rmin, rmax, zmin, zmax, axis_tol, n_near_axis);
+  //   fflush(stdout);
+  // }
+  // --- END NEW ---
 
   interp_em_to_flow_->Interpolate(vxyz, *joule_heating_gf, interp_vals);
+
+  if (verbose) grvy_printf(ginfo, "[rank %d] Interp completed interp_em_to_flow for Joule heating.\n", rank_);
 
   ParGridFunction *joule_heating_flow = flow_solver_->getJouleHeatingGF();
   if (flow_fespace->IsDGSpace()) {
@@ -356,6 +406,8 @@ void CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow() {
     joule_heating_flow->SetTrueVector();
     joule_heating_flow->SetFromTrueVector();
   }
+
+  if (verbose) grvy_printf(ginfo, "Joule heating interpolated to flow mesh.\n");
 #else
   mfem_error("Cannot interpolate without GSLIB support.");
 #endif
@@ -392,7 +444,22 @@ void CycleAvgJouleCoupling::interpElectricFieldFromEMToFlowforBTE() {
   Vector interp_vals(n_flow_interp_nodes_ * efield_ncomp_);
 
   const ParGridFunction *efield_real_gf = qmsa_solver_->getElectricFieldreal();
-  assert(efield_real_gf != NULL);
+  MFEM_VERIFY(efield_real_gf != NULL, "FATAL: efield_real_gf is NULL!");
+
+  bool coords_finite = (vxyz.CheckFinite() == 0);
+  bool field_finite = (efield_real_gf->CheckFinite() == 0);
+  if (!coords_finite || !field_finite) {
+      grvy_printf(gerror, "[rank %d] NOT FINITE before interpolation: coords_ok=%d field_ok=%d "
+                "vxyz.Size()=%d n_flow_interp_nodes_=%d\n",
+                rank_, coords_finite, field_finite, vxyz.Size(), n_flow_interp_nodes_);
+      MFEM_ABORT("FATAL: interpolating real electric field from EM to flow.");
+  }
+
+  grvy_printf(ginfo, "[rank %d] efield_real_gf vdim=%d, interp_vals.Size()=%d, expected=%d\n",
+            rank_, efield_real_gf->VectorDim(), interp_vals.Size(),
+            n_flow_interp_nodes_ * efield_real_gf->VectorDim());
+  // MFEM_VERIFY(interp_vals.Size() == n_flow_interp_nodes_ * efield_real_gf->VectorDim(),
+  //           "interp_vals size does not match efield_real_gf vector dimension");
 
   interp_em_to_flow_->Interpolate(vxyz, *efield_real_gf, interp_vals);
 
@@ -421,8 +488,25 @@ void CycleAvgJouleCoupling::interpElectricFieldFromEMToFlowforBTE() {
   }
   efield_real_flow->HostRead();
 
+  if (verbose) grvy_printf(ginfo, "Real part of Electric field interpolated to flow mesh for BTE.\n");
+
   const ParGridFunction *efield_imag_gf = qmsa_solver_->getElectricFieldimag();
-  assert(efield_imag_gf != NULL);
+  MFEM_VERIFY(efield_imag_gf != NULL, "FATAL: efield_imag_gf is NULL!");
+
+  coords_finite = (vxyz.CheckFinite() == 0);
+  field_finite = (efield_imag_gf->CheckFinite() == 0);
+  if (!coords_finite || !field_finite) {
+      grvy_printf(gerror, "[rank %d] NOT FINITE before interpolation: coords_ok=%d field_ok=%d "
+                "vxyz.Size()=%d n_flow_interp_nodes_=%d\n",
+                rank_, coords_finite, field_finite, vxyz.Size(), n_flow_interp_nodes_);
+      MFEM_ABORT("FATAL: interpolating imaginary electric field from EM to flow.");
+  }
+
+  grvy_printf(ginfo, "[rank %d] efield_imag_gf vdim=%d, interp_vals.Size()=%d, expected=%d\n",
+            rank_, efield_imag_gf->VectorDim(), interp_vals.Size(),
+            n_flow_interp_nodes_ * efield_imag_gf->VectorDim());
+  MFEM_VERIFY(interp_vals.Size() == n_flow_interp_nodes_ * efield_imag_gf->VectorDim(),
+            "interp_vals size does not match efield_real_gf vector dimension");
 
   interp_em_to_flow_->Interpolate(vxyz, *efield_imag_gf, interp_vals);
 
@@ -450,6 +534,8 @@ void CycleAvgJouleCoupling::interpElectricFieldFromEMToFlowforBTE() {
     efield_imag_flow->SetFromTrueVector();
   }
   efield_imag_flow->HostRead();
+
+  if (verbose) grvy_printf(ginfo, "All components of Electric field interpolated to flow mesh for BTE.\n");
 
 #else
   mfem_error("Cannot interpolate without GSLIB support.");

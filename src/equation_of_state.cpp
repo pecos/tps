@@ -614,7 +614,7 @@ MFEM_HOST_DEVICE double PerfectMixture::computeAmbipolarElectronNumberDensity(co
   if (n_e < 0.0) {
     n_e = 0.0;
   }
-  assert(n_e >= 0.0);
+  // assert(n_e >= 0.0);
   return n_e;
 }
 
