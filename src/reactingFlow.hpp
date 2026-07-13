@@ -557,6 +557,8 @@ class ReactingFlow : public ThermoChemModelBase {
   int clip_rr = 0; // Set to 1 if you want to clip the forward reaction rate to a multiple of the backward reaction rate (to deal with transients)
   double clip_frac = 10; // The forward reaction rate is clipped to a maximum = clip_frac*backward reaction rate
 
+  int use_Efield = 1; // Does the BTE solver use the Efield to compute the EEDF and rate coefficients? If this is zero, a low value of the Efield is manually input on Python side
+
 #endif
 
  public:

@@ -52,9 +52,10 @@
 namespace py = pybind11;
 using namespace py::literals;
 
-#ifdef HAVE_MPI4PY
-#include <mpi4py/mpi4py.h>
-#endif
+// ##ifdef HAVE_MPI4PY
+// ##include <mpi4py/mpi4py.h>
+// ##endif
+#include <cuda_runtime.h>
  
 #endif
 
@@ -164,6 +165,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     tpsP_->getInput("boltzmannSolver/store_csv", store_csv, 1);
     tpsP_->getInput("boltzmannSolver/clip_rr", clip_rr, 0);
     tpsP_->getInput("boltzmannSolver/clip_frac", clip_frac, 10.0);
+    tpsP_->getInput("boltzmannSolver/use_Efield", use_Efield, 1);
   }
 #endif
 
@@ -171,6 +173,13 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
       std::cout << ", solve_bte_every_n = " << solve_bte_every_n << ", regrid_bte_every_n = " << regrid_bte_every_n << ", "
       ", bl_frac_init_ = " << bl_frac_init_ << ", bl_frac_change_freq_ = " << bl_frac_change_freq_ << 
       ", bl_frac_increment_ = " << bl_frac_increment_ << ", bte_from_tps = " << bte_from_tps_ << "\n";
+
+      if (bte_from_tps_){
+        if (rank0_) {
+          std::cout << "do-bte-sub-cluster = " << do_bte_sub_cluster << ", ee_collisions = " << ee_collisions
+          << ", store_csv = " << store_csv << ", use_Efield = " << use_Efield << "\n";
+        }
+      }
   }
   tpsP_->getInput("loMach/reacting/clip-temperature", Tclip_, false);
   tpsP_->getInput("loMach/reacting/min-temperature", Tmin_, 0.0);
@@ -2408,6 +2417,9 @@ void ReactingFlow::step() {
       //   std::cout << "[C++] Iter = " << iter_number_ << ", Setting up the v-space grids for BTE..." << "\n";
       // }
 
+      int myRank;
+      MPI_Comm_rank(tpsP_->getTPSCommWorld(), &myRank);
+
       int size = Tn_.Size();
       auto Tarr = py::array_t<double>(
           {size},                 // shape
@@ -2425,8 +2437,18 @@ void ReactingFlow::step() {
         result = script.attr("bte_grid_setup")(Tarr, n_bte_grids);
       } catch (const py::error_already_set &e) {
         std::cerr << "ReactingFlow::step(), Python error in BTE grid setup: " << e.what() << std::endl;
-        exit(-1);
+        MFEM_ABORT("FATAL: Error in Python script bte_grid_setup()");
       }
+
+      // --- NEW: same CUDA check here too, for symmetry/coverage ---
+      cudaError_t cuda_err = cudaGetLastError();
+      if (cuda_err != cudaSuccess) {
+        std::cerr << "[rank " << myRank << "] CUDA error after bte_grid_setup: "
+              << cudaGetErrorString(cuda_err) << std::endl;
+        MFEM_ABORT("FATAL: CUDA error after bte_grid_setup");
+      }
+      // --- END NEW ---
+      
       py::tuple arrays = result.cast<py::tuple>();
 
       // Unpack arrays
@@ -2448,9 +2470,6 @@ void ReactingFlow::step() {
       grid_idx_to_spatial_idx_map.assign(ptr_gid_spatin_map, ptr_gid_spatin_map + buf_gid_spatin_map.size);
 
       Te_vec.assign(ptr_Te_arr, ptr_Te_arr + buf_Te_arr.size);
-
-      // int myRank;
-      // MPI_Comm_rank(tpsP_->getTPSCommWorld(), &myRank);
 
       if (rank0_) {
         std::cout << "Rank 0 back to TPS after setting up BTE grids\n";
@@ -2509,23 +2528,39 @@ void ReactingFlow::step() {
       ei_gf_.GetTrueDofs(ei_);
       er_gf_.GetTrueDofs(er_);
 
-      const double *dataEr = er_.HostRead();
-      const double *dataEi = ei_.HostRead();
+      // Pointers to the vectors that will be passed to Python
+      const mfem::Vector *Er_vec = &er_;
+      const mfem::Vector *Ei_vec = &ei_;
 
-      int ersize = er_.Size();
+      // Zero vectors used when the electric field is disabled
+      mfem::Vector Er_zero, Ei_zero;
+      if (!use_Efield)
+      {
+        Er_zero.SetSize(er_.Size());
+        Ei_zero.SetSize(ei_.Size());
+
+        Er_zero = 1e-6; // Pass a very small value only to the real component
+        Ei_zero = 0.0;
+
+        Er_vec = &Er_zero;
+        Ei_vec = &Ei_zero;
+      }
+
+      const double *dataEr = Er_vec->HostRead();
+      const double *dataEi = Ei_vec->HostRead();
+
+      int ersize = Er_vec->Size();
       auto Erarr = py::array_t<double>(
-          {ersize},                 // shape
-          {sizeof(double)},       // stride
-          dataEr                    // const double* pointer
-      );
+                  {ersize},
+                  {sizeof(double)},
+                  dataEr);
       Erarr.attr("flags").attr("writeable") = false; // mark read-only
 
-      int eisize = ei_.Size();
+      int eisize = Ei_vec->Size();
       auto Eiarr = py::array_t<double>(
-          {eisize},                 // shape
-          {sizeof(double)},       // stride
-          dataEi                    // const double* pointer
-      );
+                  {eisize},
+                  {sizeof(double)},
+                  dataEi);
       Eiarr.attr("flags").attr("writeable") = false; // mark read-only
 
       // Convert the grid_idx_to_npts and grid_idx_to_spatial_idx_map to Python arrays of int32 and int64 type respectively
@@ -2552,14 +2587,33 @@ void ReactingFlow::step() {
         // CALL THE PYTHON FUNCTION
         result = script.attr("bte_from_tps")(Tarr, specarr, Erarr, Eiarr, collisionsFile, n_bte_reactions, solver_type, ee_collisions, 
                   n_bte_grids, py_grid_idx_to_npts, py_grid_idx_to_spatial_idx_map, use_interp, n_sub_clusters, te_array,
-                  Nr, rtolBTE, csv_store, BTE_dt);
+                  Nr, rtolBTE, csv_store, BTE_dt, use_Efield);
       } catch (const py::error_already_set &e) {
         std::cerr << "ReactingFlow::step(), Python error: " << e.what() << std::endl;
-        exit(-1);
+        MFEM_ABORT("FATAL: Error in Python script that calls the BTE solver.");
       }
 
       int myRank;
       MPI_Comm_rank(tpsP_->getTPSCommWorld(), &myRank);
+
+      // --- NEW: CUDA error/sync check, immediately after Python returns ---
+      cudaError_t cuda_err = cudaGetLastError();
+      if (cuda_err != cudaSuccess) {
+        std::cerr << "[rank " << myRank << "] CUDA error after bte_from_tps: "
+              << cudaGetErrorString(cuda_err) << std::endl;
+        MFEM_ABORT("FATAL: CUDA error after Python/CuPy call");
+      }
+      cuda_err = cudaDeviceSynchronize();
+      if (cuda_err != cudaSuccess) {
+        std::cerr << "[rank " << myRank << "] CUDA sync error after bte_from_tps: "
+              << cudaGetErrorString(cuda_err) << std::endl;
+        MFEM_ABORT("FATAL: CUDA sync error after Python/CuPy call");
+      }
+      size_t free_mem, total_mem;
+      cudaMemGetInfo(&free_mem, &total_mem);
+      std::cerr << "[rank " << myRank << "] GPU mem after bte_from_tps: "
+          << (total_mem - free_mem) / (1024.0*1024.0) << " MB used" << std::endl;
+      // --- END NEW ---
 
       if (rank0_) {
         std::cout << "Rank 0, back to TPS after solving BTE in Python\n";

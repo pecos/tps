@@ -115,11 +115,7 @@ int main(int argc, char *argv[]) {
     prograte = 0.0;
     rrfrrb = 0.0;
 
-    thermo->solveChemistryStep(YT, 0, dt
-#ifdef HAVE_PYTHON
-      , kf.GetData(), prograte.GetData(), rrfrrb.GetData(), prodYsp.GetData()
-#endif
-    );
+    thermo->solveChemistryStep(YT, 0, dt);
     time += dt;
   }
 

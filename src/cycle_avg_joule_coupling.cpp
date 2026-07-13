@@ -51,10 +51,11 @@
 namespace py = pybind11;
 using namespace py::literals;
 
-#ifdef HAVE_MPI4PY
-#include <mpi4py/mpi4py.h>
-#endif
+// ##ifdef HAVE_MPI4PY
+// ##include <mpi4py/mpi4py.h>
+// ##endif
 
+#include <cuda_runtime.h>
 #endif
 
 CycleAvgJouleCoupling::CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tps)
@@ -620,10 +621,24 @@ void CycleAvgJouleCoupling::solve() {
     } catch (const py::error_already_set& e) {
         // Catch and print Python errors
         std::cerr << "CycleAvgJouleCoupling::solve(), Python error: " << e.what() << std::endl;
+        MFEM_ABORT("FATAL: Error in importing system Paths for Python in Cycle_Avg_Joule_Coupling::Solve()");
     } catch (const std::exception& e) {
         // Catch other C++ exceptions
         std::cerr << "CycleAvgJouleCoupling::solve(), C++ error: " << e.what() << std::endl;
+        MFEM_ABORT("FATAL: Error in C++ in Cycle_Avg_Joule_Coupling::Solve()");
     }
+
+    // --- NEW: baseline GPU memory reading, before any CUDA context exists ---
+    size_t free_mem0, total_mem0;
+    cudaError_t err0 = cudaMemGetInfo(&free_mem0, &total_mem0);
+    if (err0 == cudaSuccess) {
+        std::cerr << "[rank " << rank_ << "] [baseline] GPU mem before any BTE calls: "
+                  << (total_mem0 - free_mem0) / (1024.0*1024.0) << " MB used" << std::endl;
+    } else {
+        std::cerr << "[rank " << rank_ << "] [baseline] cudaMemGetInfo failed: "
+                  << cudaGetErrorString(err0) << std::endl;
+    }
+    // --- END NEW ---
 
   }
 #endif

@@ -45,11 +45,12 @@ clstr_maxiter         = 10
 clstr_threshold       = 1e-3
 n0_param              = 3.22e22 
 kB                    = scipy.constants.Boltzmann
+Elow                  = 1e-6
 
-varyT_cs = 0
+varyT_cs = 1
 append_recomb_cs = 1
 
-cs_datbase = "/scratch2/10565/ashwathsv/tps-venv/frontera/tps-venv/tps/tps-inputs/axisymmetric/argon/highP/cs_data"
+cs_datbase = "/scratch/10565/ashwathsv/tps-venv/vista/tps/tps-inputs/axisymmetric/argon/highP/cs_data"
 
 logfile = "outlog.txt"
 
@@ -58,10 +59,10 @@ parser.add_argument("-threads", "--threads"                       , help="number
 parser.add_argument("-out_fname", "--out_fname"                   , help="output file name for the qois", type=str, default="bte")
 parser.add_argument("-solver_type", "--solver_type"               , help="solver type", type=str, default="steady-state")
 parser.add_argument("-l_max", "--l_max"                           , help="max polar modes in SH expansion", type=int, default=1)
-parser.add_argument("-c", "--collisions"                          , help="collisions model", type=str, default="/work2/10565/ashwathsv/frontera/tps-venv/frontera/tps-venv/tps/boltzmann/BESolver/python/lxcat_data/fully_lumped_argon_mechanism_cs_recomb.lxcat")
+parser.add_argument("-c", "--collisions"                          , help="collisions model", type=str, default="/scratch/10565/ashwathsv/tps-venv/vista/tps/boltzmann/BESolver/python/lxcat_data/fully_lumped_argon_mechanism_cs_recomb.lxcat")
 parser.add_argument("-sp_order", "--sp_order"                     , help="b-spline order", type=int, default=3)
 parser.add_argument("-spline_qpts", "--spline_qpts"               , help="q points per knots", type=int, default=11)
-parser.add_argument("-atol", "--atol"                             , help="absolute tolerance", type=float, default=1e-20)
+parser.add_argument("-atol", "--atol"                             , help="absolute tolerance", type=float, default=1e-4)
 parser.add_argument("-rtol", "--rtol"                             , help="relative tolerance", type=float, default=1e-10)
 parser.add_argument("-max_iter", "--max_iter"                     , help="max number of iterations for newton solve", type=int, default=50)
 parser.add_argument("-Te", "--Te"                                 , help="approximate electron temperature (eV)" , type=float, default=0.5)
@@ -74,8 +75,9 @@ parser.add_argument("-runs", "--runs"                             , help="runs "
 parser.add_argument("-n_pts", "--n_pts"                           , help="number of points for batched solver", type=int, default=10)
 parser.add_argument("-store_eedf", "--store_eedf"                 , help="store EEDF"          , type=int, default=0)
 parser.add_argument("-store_csv", "--store_csv"                   , help="store csv format of QoI comparisons", type=int, default=0)
-parser.add_argument("-plot_data", "--plot_data"                   , help="plot data", type=int, default=0)
+parser.add_argument("-plot_data", "--plot_data"                   , help="plot data", type=int, default=1)
 parser.add_argument("-ee_collisions", "--ee_collisions"           , help="enable electron-electron collisions", type=int, default=0)
+parser.add_argument("-use_Efield", "--use_Efield"                 , help="Is the Electric field used by the BTE. If no (0), the EEDF does not depend on Ef", type=int, default=1)
 parser.add_argument("-verbose", "--verbose"                       , help="verbose with debug information", type=int, default=0)
 parser.add_argument("-use_gpu", "--use_gpu"                       , help="use gpus for batched solver", type=int, default=1)
 parser.add_argument("-cycles", "--cycles"                         , help="number of max cycles to evolve to compute cycle average rates", type=float, default=5)
@@ -85,7 +87,7 @@ parser.add_argument("-input", "--input"                           , help="tps da
 #python3 bte_0d3v_batched_driver.py --threads 1 -out_fname bte_ss -solver_type steady-state -c lxcat_data/eAr_crs.synthetic.3sp2r -sp_order 3 -spline_qpts 5 -atol 1e-10 -rtol 1e-10 -max_iter 300 -Te 3 -n0 3.22e22 -ev_max 30 -Nr 127 -n_pts 1 -ee_collisions 1 -cycles 2 -dt 1e-3
 args                  = parser.parse_args()
 
-def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type, ee_collisions, n_grids, grid_idx_to_npts, grid_idx_to_spatial_idx_map_vec, use_interp, n_sub_clusters, Te_vec, Nr, rtol, store_csv, dt_bte):
+def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type, ee_collisions, n_grids, grid_idx_to_npts, grid_idx_to_spatial_idx_map_vec, use_interp, n_sub_clusters, Te_vec, Nr, rtol, store_csv, dt_bte, use_Ef):
     # INPUTS:
     # Tarr : Array of heavies temperature (1D array of length sDofInt)
     # narr : Array of species number densities (1D array of length sDofInt * nspecies)
@@ -96,11 +98,16 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
     # grid_idx_to_npts : vector of length n_grids (ith element gives number of points in ith grid)
     # grid_idx_to_spatial_idx_map_vec : vector of length sDofInt_ (the elements are indices of the points belonging to each grid)
     # For example, for i = 0 grid, grid_idx_to_spatial_idx_map[0:grid_idx_to_npts[0]] gives the indices of the points belonging to the grid
+    # use_Ef: Flag to tell if the Electric field are passed to BTE. If this is 0, then a low value of Efield (~1e-8 Td) is passed to the BTE
+    # Effectively, setting use_Ef = 0 solves for a EEDF f_e(Tg, n_sp) instead of f_e(Tg, Ef, n_sp)
 
     # Set up the MPI communicators
     comm = MPI.COMM_WORLD
     rank_ = comm.Get_rank()
     size_ = comm.Get_size()
+
+    if rank_ == 0:
+        print("solver_type = ", solver_type, ", ee_collisions = ", ee_collisions, ", use_Efield = ", use_Ef, flush=True)
 
     try:
         args.Nr = Nr
@@ -108,6 +115,9 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
         args.rtol = rtol
         if solver_type == "transient":
             args.dt = dt_bte
+        args.solver_type = solver_type
+        args.ee_collisions = ee_collisions
+        args.use_Efield = use_Ef
 
         crs_folder = "lxcat_data/argon/crs_lxcat"
         if rank_ == 0:
@@ -345,6 +355,9 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
     # 8D SUB-CLUSTERING OF THE PLASMA PARAMETERS
     ERe = Er
     EIm = Ei
+    # if args.use_Efield == 0:
+    #     ERe = Elow * np.ones(len(Er))
+    #     EIm = Elow * np.ones(len(Ei))
     EMag                    = np.sqrt( ERe**2 + EIm**2 )
     e_idx                   = EMag < EMag_threshold
 
@@ -705,7 +718,7 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
                     for col_idx, g in enumerate(coll_list):
                         data_csv[: , idx + 7 + col_idx]    = asnumpy(qoi["rates"][col_idx])
 
-                    fname=args.out_fname+"_grid_%02d_rank_%d_npes_%d"%(grid_idx, rank_, size_)
+                    fname=args.out_fname+"useEF%02d_grid_%02d_rank_%d_npes_%d"%(args.use_Efield, grid_idx, rank_, size_)
                     with open("%s_qoi.csv"%(fname), 'w', encoding='UTF8') as f:
                         writer = csv.writer(f,delimiter=',')
                         # write the header
@@ -771,6 +784,13 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
 
     data[data < 1.0e-21] = 0.0
     comm.Barrier()
+
+    if args.use_gpu == 1:
+        # Right before returning `data`, explicitly free all CuPy-held memory
+        mempool = cp.get_default_memory_pool()
+        pinned_mempool = cp.get_default_pinned_memory_pool()
+        mempool.free_all_blocks()
+        pinned_mempool.free_all_blocks()
 
     return data
 

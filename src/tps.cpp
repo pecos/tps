@@ -33,16 +33,6 @@
 /** @file
  * @copydoc tps.hpp
  */
-
-#include "tps.hpp"
-
-#ifdef HAVE_MPI_EXT
-#include <mpi-ext.h>
-#endif
-
-#include <sys/types.h>
-#include <unistd.h>
-
 #ifdef HAVE_PYTHON
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -56,6 +46,15 @@ using namespace py::literals;
 #endif
 
 #endif
+
+#include "tps.hpp"
+
+#ifdef HAVE_MPI_EXT
+#include <mpi-ext.h>
+#endif
+
+#include <sys/types.h>
+#include <unistd.h>
 
 #include "cycle_avg_joule_coupling.hpp"
 #include "independent_coupling.hpp"
