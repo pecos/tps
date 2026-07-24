@@ -456,9 +456,9 @@ void CycleAvgJouleCoupling::interpElectricFieldFromEMToFlowforBTE() {
       MFEM_ABORT("FATAL: interpolating real electric field from EM to flow.");
   }
 
-  grvy_printf(ginfo, "[rank %d] efield_real_gf vdim=%d, interp_vals.Size()=%d, expected=%d\n",
-            rank_, efield_real_gf->VectorDim(), interp_vals.Size(),
-            n_flow_interp_nodes_ * efield_real_gf->VectorDim());
+  // grvy_printf(ginfo, "[rank %d] efield_real_gf vdim=%d, interp_vals.Size()=%d, expected=%d\n",
+  //           rank_, efield_real_gf->VectorDim(), interp_vals.Size(),
+  //           n_flow_interp_nodes_ * efield_real_gf->VectorDim());
   // MFEM_VERIFY(interp_vals.Size() == n_flow_interp_nodes_ * efield_real_gf->VectorDim(),
   //           "interp_vals size does not match efield_real_gf vector dimension");
 
@@ -503,9 +503,9 @@ void CycleAvgJouleCoupling::interpElectricFieldFromEMToFlowforBTE() {
       MFEM_ABORT("FATAL: interpolating imaginary electric field from EM to flow.");
   }
 
-  grvy_printf(ginfo, "[rank %d] efield_imag_gf vdim=%d, interp_vals.Size()=%d, expected=%d\n",
-            rank_, efield_imag_gf->VectorDim(), interp_vals.Size(),
-            n_flow_interp_nodes_ * efield_imag_gf->VectorDim());
+  // grvy_printf(ginfo, "[rank %d] efield_imag_gf vdim=%d, interp_vals.Size()=%d, expected=%d\n",
+  //           rank_, efield_imag_gf->VectorDim(), interp_vals.Size(),
+  //           n_flow_interp_nodes_ * efield_imag_gf->VectorDim());
   MFEM_VERIFY(interp_vals.Size() == n_flow_interp_nodes_ * efield_imag_gf->VectorDim(),
             "interp_vals size does not match efield_real_gf vector dimension");
 

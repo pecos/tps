@@ -166,6 +166,9 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     tpsP_->getInput("boltzmannSolver/clip_rr", clip_rr, 0);
     tpsP_->getInput("boltzmannSolver/clip_frac", clip_frac, 10.0);
     tpsP_->getInput("boltzmannSolver/use_Efield", use_Efield, 1);
+
+    tpsP_->getInput("boltzmannSolver/Ei_frac", Ei_frac_, 1.0);
+    MFEM_VERIFY((Ei_frac_ >= 0.0 && Ei_frac_ <= 1.0), "FATAL: Ei_frac_ does not lie between 0 and 1.")
   }
 #endif
 
@@ -177,7 +180,7 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
       if (bte_from_tps_){
         if (rank0_) {
           std::cout << "do-bte-sub-cluster = " << do_bte_sub_cluster << ", ee_collisions = " << ee_collisions
-          << ", store_csv = " << store_csv << ", use_Efield = " << use_Efield << "\n";
+          << ", store_csv = " << store_csv << ", use_Efield = " << use_Efield << ", Ei_frac_ = " << Ei_frac_ << "\n";
         }
       }
   }
@@ -887,21 +890,21 @@ ReactingFlow::~ReactingFlow() {
   }
 
 #ifdef HAVE_PYTHON
-  // for (unsigned int i = 0; i < vizReacFields_.size(); i++) {
-  //   delete vizReacFields_[i];
-  // }
+  for (unsigned int i = 0; i < vizReacFields_.size(); i++) {
+    delete vizReacFields_[i];
+  }
 
   // for (unsigned int i = 0; i < vizProdFields_.size(); i++) {
   //   delete vizProdFields_[i];
   // }
 
-  // for (unsigned int i = 0; i < vizkReacFields_.size(); i++) {
-  //   delete vizkReacFields_[i];
-  // }
+  for (unsigned int i = 0; i < vizkReacFields_.size(); i++) {
+    delete vizkReacFields_[i];
+  }
 
-  // for (unsigned int i = 0; i < vizrrfbyrrbFields_.size(); i++) {
-  //   delete vizrrfbyrrbFields_[i];
-  // }
+  for (unsigned int i = 0; i < vizrrfbyrrbFields_.size(); i++) {
+    delete vizrrfbyrrbFields_[i];
+  }
 
   // for (unsigned int i = 0; i < vizBTEReacFields_.size(); i++) {
   //   delete vizBTEReacFields_[i];
@@ -1029,13 +1032,13 @@ ReactingFlow::~ReactingFlow() {
   delete sfec_;
   delete yfes_;
   delete yfec_;
-  // delete rfes_;
-  // delete rfec_;
+  delete rfes_;
+  delete rfec_;
 
-// #ifdef HAVE_PYTHON
-  // delete rrf_by_rrbfes_;
-  // delete rrf_by_rrbfec_;
-// #endif
+#ifdef HAVE_PYTHON
+  delete rrf_by_rrbfes_;
+  delete rrf_by_rrbfec_;
+#endif
 }
 
 void ReactingFlow::initializeSelf() {
@@ -1060,14 +1063,14 @@ void ReactingFlow::initializeSelf() {
   vfes_ = new ParFiniteElementSpace(pmesh_, vfec_, dim_);
 
   // PREPARING FINITE ELEMENT SPACE FOR REACTION PROGRESS RATES
-  // rfec_ = new H1_FECollection(order_, dim_);
-  // rfes_ = new ParFiniteElementSpace(pmesh_, yfec_, nReactions_);
+  rfec_ = new H1_FECollection(order_, dim_);
+  rfes_ = new ParFiniteElementSpace(pmesh_, yfec_, nReactions_);
 
-// #ifdef HAVE_PYTHON
-//   // PREPARING FINITE ELEMENT SPACE FOR REACTION RATE RATIO (forward rate / backward rate)
-//   rrf_by_rrbfec_ = new H1_FECollection(order_, dim_);
-//   rrf_by_rrbfes_ = new ParFiniteElementSpace(pmesh_, yfec_, int(nReactions_/2));
-// #endif
+#ifdef HAVE_PYTHON
+  // PREPARING FINITE ELEMENT SPACE FOR REACTION RATE RATIO (forward rate / backward rate)
+  rrf_by_rrbfec_ = new H1_FECollection(order_, dim_);
+  rrf_by_rrbfes_ = new ParFiniteElementSpace(pmesh_, yfec_, int(nReactions_/2));
+#endif
 
   // Check if fully periodic mesh
   if (!(pmesh_->bdr_attributes.Size() == 0)) {
@@ -1087,14 +1090,14 @@ void ReactingFlow::initializeSelf() {
   yDofInt_ = yfes_->GetTrueVSize();
 
   // SETTING Dof PARAMETERS FOR REACTION PROGRESS RATES
-  // rDof_ = rfes_->GetVSize();
-  // rDofInt_ = rfes_->GetTrueVSize();
+  rDof_ = rfes_->GetVSize();
+  rDofInt_ = rfes_->GetTrueVSize();
 
-// #ifdef HAVE_PYTHON
-//   // SETTING Dof PARAMETERS FOR RATIO OF FORWARD TO BACKWARD REACTION RATES
-//   rrf_by_rrbDof_ = rrf_by_rrbfes_->GetVSize();
-//   rrf_by_rrbDofInt_ = rrf_by_rrbfes_->GetTrueVSize();
-// #endif
+#ifdef HAVE_PYTHON
+  // SETTING Dof PARAMETERS FOR RATIO OF FORWARD TO BACKWARD REACTION RATES
+  rrf_by_rrbDof_ = rrf_by_rrbfes_->GetVSize();
+  rrf_by_rrbDofInt_ = rrf_by_rrbfes_->GetTrueVSize();
+#endif
 
   weff_gf_.SetSpace(vfes_);
   weff_gf_ = 0.0;
@@ -1172,17 +1175,17 @@ void ReactingFlow::initializeSelf() {
   // productY_gf_ = 0.0;
 
   // reaction progress rates for plotting
-  // reacR_gf_.SetSpace(rfes_);
-  // reacR_gf_ = 0.0;
+  reacR_gf_.SetSpace(rfes_);
+  reacR_gf_ = 0.0;
 
-// #ifdef HAVE_PYTHON
+#ifdef HAVE_PYTHON
   // reaction rate coefficients for plotting
-  // kReac_gf_.SetSpace(rfes_);
-  // kReac_gf_ = 0.0;
+  kReac_gf_.SetSpace(rfes_);
+  kReac_gf_ = 0.0;
 
   // // reaction rate coefficients for plotting
-  // rrf_by_rrb_gf_.SetSpace(rrf_by_rrbfes_);
-  // rrf_by_rrb_gf_ = 0.0;
+  rrf_by_rrb_gf_.SetSpace(rrf_by_rrbfes_);
+  rrf_by_rrb_gf_ = 0.0;
 
   // BTEkReac_gf_.SetSpace(rfes_);
   // BTEkReac_gf_ = 0.0;
@@ -1194,7 +1197,7 @@ void ReactingFlow::initializeSelf() {
   // // reaction rate coefficients for plotting
   // BTErrf_by_rrb_gf_.SetSpace(rrf_by_rrbfes_);
   // BTErrf_by_rrb_gf_ = 0.0;
-// #endif
+#endif
 
   // rest can just be sfes
   Yn_gf_.SetSpace(sfes_);
@@ -1234,19 +1237,22 @@ void ReactingFlow::initializeSelf() {
   prodY_gf_ = 0.0;
 
   // reaction progress rates to be passed to reacR_gf
-  // reacR_.SetSize(rDofInt_);
-  // reacR_ = 0.0;
+  reacR_.SetSize(rDofInt_);
+  reacR_ = 0.0;
 
-// #ifdef HAVE_PYTHON
+#ifdef HAVE_PYTHON
 //   BTEreacR_.SetSize(rDofInt_);
 //   BTEreacR_ = 0.0; 
 
-//   rrf_by_rrb_.SetSize(int(rDofInt_/2));
-//   rrf_by_rrb_ = 0.0;
+  rrf_by_rrb_.SetSize(int(rDofInt_/2));
+  rrf_by_rrb_ = 0.0;
+
+  // productY_.SetSize(yDofInt_);
+  // productY_ = 1.0e-12;  // This vector is only for reading data and passing to productY_gf_ for plotting unlike prodY_ which is used by many functions
 
 //   BTErrf_by_rrb_.SetSize(int(rDofInt_/2));
 //   BTErrf_by_rrb_ = 0.0;
-// #endif
+#endif
 
   prodE_.SetSize(yDofInt_);
   prodE_ = 1.0e-12;
@@ -1286,8 +1292,8 @@ void ReactingFlow::initializeSelf() {
   bterates_ = 0.0;
 
   // reaction rate coefficients to be passed to kReac_gf_
-//   kReac_.SetSize(rDofInt_);
-//   kReac_ = 0.0;
+  kReac_.SetSize(rDofInt_);
+  kReac_ = 0.0;
 
 //   BTEkReac_.SetSize(rDofInt_);
 //   BTEkReac_ = 0.0;
@@ -1443,7 +1449,7 @@ void ReactingFlow::initializeSelf() {
   YnFull_gf_.SetFromTrueDofs(Yn_);
 
 // #ifdef HAVE_PYTHON
-//   productY_gf_.SetFromTrueDofs(prodY_);
+//   productY_gf_.SetFromTrueDofs(productY_);
 //   reacR_gf_.SetFromTrueDofs(reacR_);
 //   kReac_gf_.SetFromTrueDofs(kReac_);
 //   rrf_by_rrb_gf_.SetFromTrueDofs(rrf_by_rrb_);
@@ -2151,7 +2157,7 @@ void ReactingFlow::initializeOperators() {
     YnFull_gf_.SetFromTrueDofs(Yn_);
 
 // #ifdef HAVE_PYTHON
-    // productY_gf_.SetFromTrueDofs(prodY_);
+    // productY_gf_.SetFromTrueDofs(productY_);
     // reacR_gf_.SetFromTrueDofs(reacR_);
     // kReac_gf_.SetFromTrueDofs(kReac_);
     // rrf_by_rrb_gf_.SetFromTrueDofs(rrf_by_rrb_);
@@ -2168,7 +2174,7 @@ void ReactingFlow::initializeOperators() {
   YnFull_gf_.GetTrueDofs(Yn_);
 
 // #ifdef HAVE_PYTHON
-  // productY_gf_.GetTrueDofs(prodY_);  
+  // productY_gf_.GetTrueDofs(productY_);  
   // reacR_gf_.GetTrueDofs(reacR_);  
   // kReac_gf_.GetTrueDofs(kReac_);  
   // rrf_by_rrb_gf_.GetTrueDofs(rrf_by_rrb_);  
@@ -2537,12 +2543,12 @@ void ReactingFlow::step() {
       if (!use_Efield)
       {
         Er_zero.SetSize(er_.Size());
-        Ei_zero.SetSize(ei_.Size());
-
         Er_zero = 1e-6; // Pass a very small value only to the real component
-        Ei_zero = 0.0;
-
         Er_vec = &Er_zero;
+
+        // Explicitly pass zero for imaginary component of Efield here
+        Ei_zero.SetSize(ei_.Size());
+        Ei_zero = 0.0;
         Ei_vec = &Ei_zero;
       }
 
@@ -2587,7 +2593,7 @@ void ReactingFlow::step() {
         // CALL THE PYTHON FUNCTION
         result = script.attr("bte_from_tps")(Tarr, specarr, Erarr, Eiarr, collisionsFile, n_bte_reactions, solver_type, ee_collisions, 
                   n_bte_grids, py_grid_idx_to_npts, py_grid_idx_to_spatial_idx_map, use_interp, n_sub_clusters, te_array,
-                  Nr, rtolBTE, csv_store, BTE_dt, use_Efield);
+                  Nr, rtolBTE, csv_store, BTE_dt, use_Efield, Ei_frac_);
       } catch (const py::error_already_set &e) {
         std::cerr << "ReactingFlow::step(), Python error: " << e.what() << std::endl;
         MFEM_ABORT("FATAL: Error in Python script that calls the BTE solver.");
@@ -2660,9 +2666,9 @@ void ReactingFlow::step() {
 
       auto btearr = bterates_.HostRead(); // Vector containing rate coefficients coming from BTE
       
-      // auto datakfwd = kReac_.HostWrite();
-      // auto dataReac = reacR_.HostWrite();
-      // auto datarrfbyrrb = rrf_by_rrb_.HostWrite();
+      auto datakfwd = kReac_.HostWrite();
+      auto dataReac = reacR_.HostWrite();
+      auto datarrfbyrrb = rrf_by_rrb_.HostWrite();
 
       // auto dataProd = prodY_.HostWrite();
 
@@ -2676,9 +2682,9 @@ void ReactingFlow::step() {
       // mfem::Vector prograteBTE(nReactions_);
       // mfem::Vector rrfrrbBTE(nReactions_/2);
       
-      // mfem::Vector kf(nReactions_);
-      // mfem::Vector prograte(nReactions_);
-      // mfem::Vector rrfrrb(nReactions_/2);
+      mfem::Vector kf(nReactions_);
+      mfem::Vector prograte(nReactions_);
+      mfem::Vector rrfrrb(nReactions_/2);
       // mfem::Vector prodYsp(nSpecies_);
 
       bterates = 0.0;
@@ -2703,27 +2709,28 @@ void ReactingFlow::step() {
           // rrfrrbBTE = 0.0;
           // prodYsp = 0.0;
 
-          // kf = 0.0;
-          // prograte = 0.0;
-          // rrfrrb = 0.0;
+          kf = 0.0;
+          prograte = 0.0;
+          rrfrrb = 0.0;
 
           // Solve backward Euler update (with BTE rates)
-          solveChemistryStepBTE(YT, i, dt_, bterates.GetData()); 
-          // solveChemistryStep(YT, i, dt_);
+          solveChemistryStepBTE(YT, i, dt_, bterates.GetData(),
+                                kf.GetData(), prograte.GetData(), rrfrrb.GetData()); 
+
           //   , kf.GetData(), prograte.GetData(), rrfrrb.GetData(),
           //   kfBTE.GetData(), prograteBTE.GetData(), rrfrrbBTE.GetData(), prodYsp.GetData()
           // );
 
-          // for (int nr = 0; nr < nReactions_; nr++) {
-          //   datakfwd[i + nr*sDofInt_] = std::max(0.0,kf[nr]);
+          for (int nr = 0; nr < nReactions_; nr++) {
+            datakfwd[i + nr*sDofInt_] = std::max(0.0,kf[nr]);
           //   dataBTEkfwd[i + nr*sDofInt_] = std::max(0.0,kfBTE[nr]);
-          //   dataReac[i + nr * sDofInt_] = prograte[nr];
+            dataReac[i + nr * sDofInt_] = prograte[nr];
           //   dataBTEReac[i + nr * sDofInt_] = prograteBTE[nr];
-          //   if (nr % 2 == 0) {
-          //     datarrfbyrrb[i + int(nr/2) * sDofInt_] = std::max(0.0, prograte[nr] / (1e-28 + prograte[nr + 1]));
+            if (nr % 2 == 0) {
+              datarrfbyrrb[i + int(nr/2) * sDofInt_] = std::max(0.0, prograte[nr] / (1e-28 + prograte[nr + 1]));
           //     dataBTErrfbyrrb[i + int(nr/2) * sDofInt_] = std::max(0.0, prograteBTE[nr] / (1e-28 + prograteBTE[nr + 1]));
-          //   }
-          // }
+            }
+          }
 
           // for (int sp = 0; sp < nSpecies_; sp++) {
           //   dataProd[i + sp*sDofInt_] = prodYsp[sp];
@@ -2731,29 +2738,27 @@ void ReactingFlow::step() {
         } else{
 #endif    
           // prodYsp = 0.0;
-          // kf = 0.0;
-          // prograte = 0.0;
-          // rrfrrb = 0.0;
+          kf = 0.0;
+          prograte = 0.0;
+          rrfrrb = 0.0;
 
           // Solve backward Euler update (with tabulated rates)
-        //   solveChemistryStep(YT, i, dt_, kf.GetData(), prograte.GetData(), rrfrrb.GetData(), prodYsp.GetData()
-        // );
+          solveChemistryStep(YT, i, dt_, kf.GetData(), prograte.GetData(), rrfrrb.GetData());
 
           // Fill in the vectors storing rate coefficients (kf), reaction rates, rate of forward / backward rate from values
           // returned by solveChemistryStep()
-//           for(int nr = 0; nr < nReactions_; nr++) {
-//             datakfwd[i + nr * sDofInt_] = std::max(0.0,kf[nr]);
-//             dataReac[i + nr * sDofInt_] = prograte[nr];
-//             if (nr % 2 == 0) {
-//               datarrfbyrrb[i + int(nr/2) * sDofInt_] = std::max(0.0, prograte[nr] / (1e-28 + prograte[nr + 1]));
-//             }
-//           }
-
+          for(int nr = 0; nr < nReactions_; nr++) {
+            datakfwd[i + nr * sDofInt_] = std::max(0.0,kf[nr]);
+            dataReac[i + nr * sDofInt_] = prograte[nr];
+            if (nr % 2 == 0) {
+              datarrfbyrrb[i + int(nr/2) * sDofInt_] = std::max(0.0, prograte[nr] / (1e-28 + prograte[nr + 1]));
+            }
+          }
 //           for (int sp = 0; sp < nSpecies_; sp++) {
 //             dataProd[i + sp*sDofInt_] = prodYsp[sp];
 //           }
         
-        solveChemistryStep(YT, i, dt_);
+        // solveChemistryStep(YT, i, dt_);
 #ifdef HAVE_PYTHON
         }
 #endif
@@ -2769,10 +2774,10 @@ void ReactingFlow::step() {
       // int myRank;
       // MPI_Comm_rank(tpsP_->getTPSCommWorld(), &myRank);
 
-      // kReac_gf_.SetFromTrueDofs(kReac_);
-      // reacR_gf_.SetFromTrueDofs(reacR_);
-      // productY_gf_.SetFromTrueDofs(prodY_);
-      // rrf_by_rrb_gf_.SetFromTrueDofs(rrf_by_rrb_);
+      kReac_gf_.SetFromTrueDofs(kReac_);
+      reacR_gf_.SetFromTrueDofs(reacR_);
+      // productY_gf_.SetFromTrueDofs(productY_);
+      rrf_by_rrb_gf_.SetFromTrueDofs(rrf_by_rrb_);
 
       // BTEkReac_gf_.SetFromTrueDofs(BTEkReac_);
       // BTEreacR_gf_.SetFromTrueDofs(BTEreacR_);
@@ -2875,7 +2880,7 @@ void ReactingFlow::step() {
 // #ifdef HAVE_PYTHON
     // kReac_gf_.SetFromTrueDofs(kReac_);
     // reacR_gf_.SetFromTrueDofs(reacR_);
-    // productY_gf_.SetFromTrueDofs(prodY_);
+    // productY_gf_.SetFromTrueDofs(productY_);
     // rrf_by_rrb_gf_.SetFromTrueDofs(rrf_by_rrb_);
 
     // BTEkReac_gf_.SetFromTrueDofs(BTEkReac_);
@@ -3375,7 +3380,7 @@ void ReactingFlow::speciesProduction() {
 
   // prodY_gf stores the species production rates for each species
   // reacR_gf stores the reaction progress rates for each reaction
-  // productY_gf_.SetFromTrueDofs(prodY_);
+  // productY_gf_.SetFromTrueDofs(productY_);
   // reacR_gf_.SetFromTrueDofs(reacR_);
   // if Yn + P_Y*(dt*N) > 1 (or < 0) can we clip the value?
   // N = 4 or something (maybe nSub?)
@@ -3569,35 +3574,35 @@ void ReactingFlow::initializeViz(ParaViewDataCollection &pvdc) {
   // }
 
   // WRITING THE REACTION PROGRESS RATES TO THE PARAVIEW FILE
-  // vizReacFields_.clear();
-  // vizReacNames_.clear();
-  // for (int nr = 0; nr < nReactions_; nr++) {
-  //   auto sr = std::to_string(nr);
-  //   vizReacFields_.push_back(new ParGridFunction(sfes_, reacR_gf_, (nr * sDof_)));
-  //   vizReacNames_.push_back(std::string("reacR_" + sr));
-  //   pvdc.RegisterField(vizReacNames_[nr], vizReacFields_[nr]);
-  // }
+  vizReacFields_.clear();
+  vizReacNames_.clear();
+  for (int nr = 0; nr < nReactions_; nr++) {
+    auto sr = std::to_string(nr);
+    vizReacFields_.push_back(new ParGridFunction(sfes_, reacR_gf_, (nr * sDof_)));
+    vizReacNames_.push_back(std::string("reacR_" + sr));
+    pvdc.RegisterField(vizReacNames_[nr], vizReacFields_[nr]);
+  }
 
-// #ifdef HAVE_PYTHON
+#ifdef HAVE_PYTHON
   // WRITING THE REACTION RATE COEFFICIENTS TO THE PARAVIEW FILE
-  // vizkReacFields_.clear();
-  // vizkReacNames_.clear();
-  // for (int nr = 0; nr < nReactions_; nr++) {
-  //   auto sr = std::to_string(nr);
-  //   vizkReacFields_.push_back(new ParGridFunction(sfes_, kReac_gf_, (nr * sDof_)));
-  //   vizkReacNames_.push_back(std::string("kReac_" + sr));
-  //   pvdc.RegisterField(vizkReacNames_[nr], vizkReacFields_[nr]);
-  // }
+  vizkReacFields_.clear();
+  vizkReacNames_.clear();
+  for (int nr = 0; nr < nReactions_; nr++) {
+    auto sr = std::to_string(nr);
+    vizkReacFields_.push_back(new ParGridFunction(sfes_, kReac_gf_, (nr * sDof_)));
+    vizkReacNames_.push_back(std::string("kReac_" + sr));
+    pvdc.RegisterField(vizkReacNames_[nr], vizkReacFields_[nr]);
+  }
 
   // // WRITING THE RATIO OF FORWARD TO BACKWARD REACTION RATES TO THE PARAVIEW FILE
-  // vizrrfbyrrbFields_.clear();
-  // vizrrfbyrrbNames_.clear();
-  // for (int nr = 0; nr < int(nReactions_/2); nr++) {
-  //     auto sr = std::to_string(nr);
-  //     vizrrfbyrrbFields_.push_back(new ParGridFunction(sfes_, rrf_by_rrb_gf_, (nr * sDof_)));
-  //     vizrrfbyrrbNames_.push_back(std::string("rrf_by_rrb_" + sr));
-  //     pvdc.RegisterField(vizrrfbyrrbNames_[nr], vizrrfbyrrbFields_[nr]);
-  // }
+  vizrrfbyrrbFields_.clear();
+  vizrrfbyrrbNames_.clear();
+  for (int nr = 0; nr < int(nReactions_/2); nr++) {
+      auto sr = std::to_string(nr);
+      vizrrfbyrrbFields_.push_back(new ParGridFunction(sfes_, rrf_by_rrb_gf_, (nr * sDof_)));
+      vizrrfbyrrbNames_.push_back(std::string("rrf_by_rrb_" + sr));
+      pvdc.RegisterField(vizrrfbyrrbNames_[nr], vizrrfbyrrbFields_[nr]);
+  }
 
   // WRITING THE BTE REACTION PROGRESS RATES TO THE PARAVIEW FILE
   // vizBTEReacFields_.clear();
@@ -3626,7 +3631,7 @@ void ReactingFlow::initializeViz(ParaViewDataCollection &pvdc) {
 //       vizBTErrfbyrrbNames_.push_back(std::string("BTErrf_by_rrb_" + sr));
 //       pvdc.RegisterField(vizBTErrfbyrrbNames_[nr], vizBTErrfbyrrbFields_[nr]);
 //   }
-// #endif
+#endif
 }
 
 /**
@@ -4446,7 +4451,8 @@ void ReactingFlow::identifyCollisionType(const Array<GasSpcs> &speciesType, GasC
 
 // void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, double *omega, 
 //   double *kf, double *prograte, double *rrfrrb, double *prodYsp) {
-void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, double *omega) {
+void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, double *omega,
+                                          double *kf, double *prograte, double *rrfrrb) {
   // This function evaluates the reacting flow source terms at a given
   // state (i.e., at a point in the grid) which is necessary for a
   // nonlinear solve for an implicit time step at each point.  The
@@ -4569,13 +4575,13 @@ void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, 
   chemistry_->computeProgressRate(n_sp, kfwd, keq, progressRate);
   chemistry_->computeCreationRate(progressRate, creationRate, emissionRate);
 
-  // for (int nr = 0; nr < nReactions_; nr++) {
-  //   kf[nr] = kfwd[nr];
-  //   prograte[nr] = progressRate[nr];
-  //   if (nr % 2 == 0) {
-  //     rrfrrb[int(nr/2)] = progressRate[nr] / (1e-20 + progressRate[nr+1]);
-  //   }
-  // }
+  for (int nr = 0; nr < nReactions_; nr++) {
+    kf[nr] = kfwd[nr];
+    prograte[nr] = progressRate[nr];
+    if (nr % 2 == 0) {
+      rrfrrb[int(nr/2)] = progressRate[nr] / (1e-20 + progressRate[nr+1]);
+    }
+  }
 
   // for(int sp = 0; sp < nSpecies_; sp++){
   //   prodYsp[sp] = creationRate[sp];
@@ -4617,7 +4623,8 @@ void ReactingFlow::evaluateReactingSource(const double *YT, const int dofindex, 
 
 // void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const double dt, 
 //   double *kf, double *prograte, double *rrfrrb, double *prodYsp) {
-void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const double dt) {
+void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const double dt,
+                                      double *kf, double *prograte, double *rrfrrb) {
   const int nState = nActiveSpecies_ + 1;         // Number of variables in YT
   const double eps = implicit_chemistry_fd_eps_;  // Perturbation for finite difference Jacobian
 
@@ -4638,7 +4645,7 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
 
   // Evaluate RHS...
   // this->evaluateReactingSource(YT, dofindex, rhs, kf, prograte, rrfrrb, prodYsp);
-  this->evaluateReactingSource(YT, dofindex, rhs);
+  this->evaluateReactingSource(YT, dofindex, rhs, kf, prograte, rrfrrb);
 
   // ... and Jacobian (via finite difference)
   for (int i = 0; i < nState; i++) {
@@ -4652,7 +4659,7 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
     }
 
     // this->evaluateReactingSource(YT1, dofindex, rhs1, kf, prograte, rrfrrb, prodYsp);
-    this->evaluateReactingSource(YT1, dofindex, rhs1);
+    this->evaluateReactingSource(YT1, dofindex, rhs1, kf, prograte, rrfrrb);
 
     for (int j = 0; j < nState; j++) {
       Jac(j, i) = (rhs1[j] - rhs[j]) / (YT1[i] - YT[i]);
@@ -4689,7 +4696,7 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
 
     // Compute rhs and Jacobian, in preparation for next step
     // this->evaluateReactingSource(YT, dofindex, rhs, kf, prograte, rrfrrb, prodYsp);
-    this->evaluateReactingSource(YT, dofindex, rhs);
+    this->evaluateReactingSource(YT, dofindex, rhs, kf, prograte, rrfrrb);
 
     for (int i = 0; i < nState; i++) {
       for (int j = 0; j < nState; j++) {
@@ -4702,7 +4709,7 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
       }
 
       // this->evaluateReactingSource(YT1, dofindex, rhs1, kf, prograte, rrfrrb, prodYsp);
-      this->evaluateReactingSource(YT1, dofindex, rhs1);
+      this->evaluateReactingSource(YT1, dofindex, rhs1, kf, prograte, rrfrrb);
       for (int j = 0; j < nState; j++) {
         Jac(j, i) = (rhs1[j] - rhs[j]) / (YT1[i] - YT[i]);
       }
@@ -4750,7 +4757,8 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
 
 #ifdef HAVE_PYTHON
 //   double *kf, double *prograte, double *rrfrrb, double *kfBTE, double *prograteBTE, double *rrfrrbBTE, double *prodYsp) {
-  void ReactingFlow::evaluateReactingSourceBTE(const double *YT, const int dofindex, double *omega, double *BTErr) { 
+  void ReactingFlow::evaluateReactingSourceBTE(const double *YT, const int dofindex, double *omega, double *BTErr,
+                                               double *kf, double *prograte, double *rrfrrb) { 
     // Extract data from incoming state and populate full set of mass & mole fractions
     std::vector<double> Y(nSpecies_);  // mass fractions
     std::vector<double> X(nSpecies_);  // mole fractions
@@ -4883,24 +4891,24 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
     // chemistry_->computeProgressRate(n_sp, BTEkfwd, keq, BTEprogressRate); //will be accurate only if detailed balance is False
     
     // Write the reaction progress rates into dataReac
-    // for(int nr = 0; nr < nReactions_; nr++){
-    //   kf[nr] = kfwd[nr];
-    //   kfBTE[nr] = std::max(0.0, BTEkfwd[nr]);
+    for(int nr = 0; nr < nReactions_; nr++){
+      kf[nr] = kfwd[nr];
+      // kfBTE[nr] = std::max(0.0, BTEkfwd[nr]);
 
-    //   if (nr % 2 == 0) {
-    //     if (clip_rr == 1) {
-    //       // Clip the forward reaction rate to a fraction of backward reaction rate (ONLY FOR DEBUGGING)
-    //       progressRate[nr] = std::max(0.0, std::min(clip_frac*progressRate[nr+1], progressRate[nr]));
-    //     }
-    //   }
-    //   prograte[nr] = progressRate[nr];
-    //   prograteBTE[nr] = BTEprogressRate[nr];
+      // if (nr % 2 == 0) {
+      //   if (clip_rr == 1) {
+      //     // Clip the forward reaction rate to a fraction of backward reaction rate (ONLY FOR DEBUGGING)
+      //     progressRate[nr] = std::max(0.0, std::min(clip_frac*progressRate[nr+1], progressRate[nr]));
+      //   }
+      // }
+      prograte[nr] = progressRate[nr];
+      // prograteBTE[nr] = BTEprogressRate[nr];
   
-    //   if (nr % 2 == 0){
-    //     rrfrrb[int(nr/2)] = progressRate[nr] / (1e-20 + progressRate[nr + 1]);
-    //     rrfrrbBTE[int(nr/2)] = std::max(0.0, BTEprogressRate[nr] / (1e-28 + BTEprogressRate[nr + 1]));
-    //   }
-    // }
+      if (nr % 2 == 0){
+        rrfrrb[int(nr/2)] = progressRate[nr] / (1e-20 + progressRate[nr + 1]);
+        // rrfrrbBTE[int(nr/2)] = std::max(0.0, BTEprogressRate[nr] / (1e-28 + BTEprogressRate[nr + 1]));
+      }
+    }
     
     chemistry_->computeCreationRate(progressRate, creationRate, emissionRate);
     
@@ -4946,7 +4954,9 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
 // void ReactingFlow::solveChemistryStepBTE(double *YT, const int dofindex, const double dt, double *BTErr,
 //   double *kf, double *prograte, double *rrfrrb,
 //   double *kfBTE, double *prograteBTE, double *rrfrrbBTE, double *prodYsp) {
-void ReactingFlow::solveChemistryStepBTE(double *YT, const int dofindex, const double dt, double *BTErr) {
+void ReactingFlow::solveChemistryStepBTE(double *YT, const int dofindex, const double dt, double *BTErr,
+                                         double *kf, double *prograte, double *rrfrrb
+) {
     const int nState = nActiveSpecies_ + 1;         // Number of variables in YT
     const double eps = implicit_chemistry_fd_eps_;  // Perturbation for finite difference Jacobian
   
@@ -4968,7 +4978,8 @@ void ReactingFlow::solveChemistryStepBTE(double *YT, const int dofindex, const d
     // Evaluate RHS...
     // this->evaluateReactingSourceBTE(YT, dofindex, rhs, BTErr, 
     //   kf, prograte, rrfrrb, kfBTE, prograteBTE, rrfrrbBTE, prodYsp);
-    this->evaluateReactingSourceBTE(YT, dofindex, rhs, BTErr);
+    this->evaluateReactingSourceBTE(YT, dofindex, rhs, BTErr, 
+                                    kf, prograte, rrfrrb);
   
     // ... and Jacobian (via finite difference)
     for (int i = 0; i < nState; i++) {
@@ -4981,7 +4992,8 @@ void ReactingFlow::solveChemistryStepBTE(double *YT, const int dofindex, const d
         YT1[i] *= (1 + eps);
       }
   
-      this->evaluateReactingSourceBTE(YT1, dofindex, rhs1, BTErr);
+      this->evaluateReactingSourceBTE(YT1, dofindex, rhs1, BTErr,
+                                      kf, prograte, rrfrrb);
     //   this->evaluateReactingSourceBTE(YT1, dofindex, rhs1, BTErr,
     //   kf, prograte, rrfrrb, kfBTE, prograteBTE, rrfrrbBTE, prodYsp);
   
@@ -5021,7 +5033,8 @@ void ReactingFlow::solveChemistryStepBTE(double *YT, const int dofindex, const d
       // Compute rhs and Jacobian, in preparation for next step
       // this->evaluateReactingSourceBTE(YT, dofindex, rhs, BTErr,
       // kf, prograte, rrfrrb, kfBTE, prograteBTE, rrfrrbBTE, prodYsp);
-      this->evaluateReactingSourceBTE(YT, dofindex, rhs, BTErr);
+      this->evaluateReactingSourceBTE(YT, dofindex, rhs, BTErr,
+                                      kf, prograte, rrfrrb);
   
       for (int i = 0; i < nState; i++) {
         for (int j = 0; j < nState; j++) {
@@ -5035,7 +5048,8 @@ void ReactingFlow::solveChemistryStepBTE(double *YT, const int dofindex, const d
   
       //   this->evaluateReactingSourceBTE(YT1, dofindex, rhs1, BTErr,
       //   kf, prograte, rrfrrb, kfBTE, prograteBTE, rrfrrbBTE, prodYsp);
-        this->evaluateReactingSourceBTE(YT1, dofindex, rhs1, BTErr);
+        this->evaluateReactingSourceBTE(YT1, dofindex, rhs1, BTErr,
+                                        kf, prograte, rrfrrb);
         for (int j = 0; j < nState; j++) {
           Jac(j, i) = (rhs1[j] - rhs[j]) / (YT1[i] - YT[i]);
         }

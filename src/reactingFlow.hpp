@@ -94,11 +94,11 @@ class ReactingFlow : public ThermoChemModelBase {
 #endif
 
   // Number of reactions and dofs
-  // int rDof_, rDofInt_;
+  int rDof_, rDofInt_;
 
-  // #ifdef HAVE_PYTHON
-  // int rrf_by_rrbDof_, rrf_by_rrbDofInt_;
-  // #endif
+#ifdef HAVE_PYTHON
+  int rrf_by_rrbDof_, rrf_by_rrbDofInt_;
+#endif
 
   WorkingFluid workFluid_;
   GasType gasType_;
@@ -219,24 +219,24 @@ class ReactingFlow : public ThermoChemModelBase {
   ParFiniteElementSpace *vfes_ = nullptr;
 
   // Reactions \f$H^1\f$ finite element collection.
-  // FiniteElementCollection *rfec_ = nullptr;
+  FiniteElementCollection *rfec_ = nullptr;
 
-  // // Reactions \f$H^1\f$ finite element space.
-  // ParFiniteElementSpace *rfes_ = nullptr;
+  // Reactions \f$H^1\f$ finite element space.
+  ParFiniteElementSpace *rfes_ = nullptr;
 
-// #ifdef HAVE_PYTHON
-//   // Reaction rate ratio (forward to backward) \f$H^1\f$ finite element collection (stores ratio of rates used to advance TPS, can be from tabulated, BTE, or blended).
-//   FiniteElementCollection *rrf_by_rrbfec_ = nullptr;
+#ifdef HAVE_PYTHON
+  // Reaction rate ratio (forward to backward) \f$H^1\f$ finite element collection (stores ratio of rates used to advance TPS, can be from tabulated, BTE, or blended).
+  FiniteElementCollection *rrf_by_rrbfec_ = nullptr;
 
-//   // // Reaction rate ratio \f$H^1\f$ finite element space.
-//   ParFiniteElementSpace *rrf_by_rrbfes_ = nullptr;
+  // Reaction rate ratio \f$H^1\f$ finite element space.
+  ParFiniteElementSpace *rrf_by_rrbfes_ = nullptr;
 
 //   // // BTE Reaction rate ratio (forward to backward) \f$H^1\f$ finite element collection (stores the rate ratio computed from BTE).
 //   FiniteElementCollection *BTErrf_by_rrbfec_ = nullptr;
 
 //   // // Reaction rate ratio \f$H^1\f$ finite element space.
 //   ParFiniteElementSpace *BTErrf_by_rrbfes_ = nullptr;
-// #endif
+#endif
   ParGridFunction *gridScale_gf_ = nullptr;
 
   // Fields
@@ -261,7 +261,7 @@ class ReactingFlow : public ThermoChemModelBase {
 
 
   // additions for reaction progress rates
-  // ParGridFunction reacR_gf_;
+  ParGridFunction reacR_gf_;
 
 // #ifdef HAVE_PYTHON
 //   ParGridFunction BTEreacR_gf_;
@@ -286,11 +286,11 @@ class ReactingFlow : public ThermoChemModelBase {
   ParGridFunction ei_gf_;
 
 // // Additions for ratio of forward to backward reaction rates
-//   ParGridFunction rrf_by_rrb_gf_;
+  ParGridFunction rrf_by_rrb_gf_;
 //   ParGridFunction BTErrf_by_rrb_gf_;
 
 //   // // additions for rate coefficients
-//   ParGridFunction kReac_gf_;
+  ParGridFunction kReac_gf_;
 //   ParGridFunction BTEkReac_gf_;
 #endif
 
@@ -420,10 +420,13 @@ class ReactingFlow : public ThermoChemModelBase {
   Vector er_, ei_;
   Vector bterates_;
   Vector bte_rr_mapping_;
-//   // additions for reaction rate coefficients
-//   Vector kReac_, BTEkReac_;
+
+  // additions for reaction rate coefficients
+  // Vector kReac_, BTEkReac_;
+  Vector kReac_;
 //   // Ratio of forward to reverse reaction rates
 //   Vector rrf_by_rrb_, BTErrf_by_rrb_;
+  Vector rrf_by_rrb_;
 #endif
 
   // additions for species
@@ -445,7 +448,8 @@ class ReactingFlow : public ThermoChemModelBase {
   Vector CpMix_;
 
   // additions for reaction progress rates
-  // Vector reacR_;
+  Vector reacR_;
+  // Vector productY_;
 
 // #ifdef HAVE_PYTHON
 //   Vector BTEreacR_;
@@ -502,9 +506,9 @@ class ReactingFlow : public ThermoChemModelBase {
   // std::vector<ParGridFunction *> vizProdFields_;
   // std::vector<std::string> vizProdNames_;
 
-  // // PARGRID FUNCTION AND STRING FOR REACTION PROGRESS RATES
-  // std::vector<ParGridFunction *> vizReacFields_;
-  // std::vector<std::string> vizReacNames_;
+  // PARGRID FUNCTION AND STRING FOR REACTION PROGRESS RATES
+  std::vector<ParGridFunction *> vizReacFields_;
+  std::vector<std::string> vizReacNames_;
 
 #ifdef HAVE_PYTHON
   // PARGRID FUNCTION AND STRING FOR REACTION PROGRESS RATES
@@ -512,16 +516,16 @@ class ReactingFlow : public ThermoChemModelBase {
   // std::vector<std::string> vizBTEReacNames_;
 
   // // // PARGRID FUNCTION AND STRING FOR REACTION PROGRESS RATES
-  // std::vector<ParGridFunction *> vizkReacFields_;
-  // std::vector<std::string> vizkReacNames_;
+  std::vector<ParGridFunction *> vizkReacFields_;
+  std::vector<std::string> vizkReacNames_;
 
   // // PARGRID FUNCTION AND STRING FOR REACTION PROGRESS RATES
   // std::vector<ParGridFunction *> vizBTEkReacFields_;
   // std::vector<std::string> vizBTEkReacNames_;
 
-  // // PARGRID FUNCTION AND STRING FOR REACTION PROGRESS RATES
-  // std::vector<ParGridFunction *> vizrrfbyrrbFields_;
-  // std::vector<std::string> vizrrfbyrrbNames_;
+  // PARGRID FUNCTION AND STRING FOR REACTION PROGRESS RATES
+  std::vector<ParGridFunction *> vizrrfbyrrbFields_;
+  std::vector<std::string> vizrrfbyrrbNames_;
 
   // std::vector<ParGridFunction *> vizBTErrfbyrrbFields_;
   // std::vector<std::string> vizBTErrfbyrrbNames_;
@@ -531,7 +535,7 @@ class ReactingFlow : public ThermoChemModelBase {
   // and incremented by bl_frac_increment after every bl_frac_change_freq steps of the main TPS solver
   // bl_frac_init -> specify in inputs file to say what is the blending fraction at start of simulation
   // This needs to be updated if you are starting a BTE blended run from a check point
-  double bl_frac_init_, bl_frac_increment_, bl_frac_;
+  double bl_frac_init_, bl_frac_increment_, bl_frac_, Ei_frac_;
   int bl_frac_change_freq_ = 1;
   int solve_bte_every_n = 1;
   int do_bte_sub_cluster = 1; // Setting to 1 means we are doing sub-clustering to reduce DoFs for the BTE solver
@@ -613,9 +617,11 @@ class ReactingFlow : public ThermoChemModelBase {
   // void evaluateReactingSourceBTE(const double *YT, const int dofindex, double *omega, double *BTErr,
   // double *kf, double *prograte, double *rrfrrb,
   // double *kfBTE, double *prograteBTE, double *rrfrrbBTE, double *prodYsp);
-  void evaluateReactingSourceBTE(const double *YT, const int dofindex, double *omega, double *BTErr);
+  void evaluateReactingSourceBTE(const double *YT, const int dofindex, double *omega, double *BTErr,
+                                 double *kf, double *prograte, double *rrfrrb);
 #endif
-  void evaluateReactingSource(const double *YT, const int dofindex, double *omega);
+  void evaluateReactingSource(const double *YT, const int dofindex, double *omega, 
+                              double *kf, double *prograte, double *rrfrrb);
 
   /**
    * @brief Solve the thermochemistry update
@@ -636,9 +642,11 @@ class ReactingFlow : public ThermoChemModelBase {
 //   double *kf, double *prograte, double *rrfrrb,
 //   double *kfBTE, double *prograteBTE, double *rrfrrbBTE, double *prodYsp
 //   );
-    void solveChemistryStepBTE(double *YT, const int dofindex, const double dt, double *BTErr);
+    void solveChemistryStepBTE(double *YT, const int dofindex, const double dt, double *BTErr,
+                               double *kf, double *prograte, double *rrfrrb);
 #endif
-    void solveChemistryStep(double *YT, const int dofindex, const double dt);
+    void solveChemistryStep(double *YT, const int dofindex, const double dt,
+                            double *kf, double *prograte, double *rrfrrb);
 
   // time-splitting
   void substepState();
