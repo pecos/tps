@@ -167,6 +167,12 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
     tpsP_->getInput("boltzmannSolver/clip_frac", clip_frac, 10.0);
     tpsP_->getInput("boltzmannSolver/use_Efield", use_Efield, 1);
 
+    tpsP_->getInput("boltzmannSolver/cold-wall-correction", cold_wall_correction_, false);
+    if (cold_wall_correction_) {
+      tpsP_->getInput("boltzmannSolver/low-ef", low_ef_, 0.1);
+      tpsP_->getInput("boltzmannSolver/low-Tg", low_Tg_, 1000.0);
+    }
+
     tpsP_->getInput("boltzmannSolver/Ei_frac", Ei_frac_, 1.0);
     MFEM_VERIFY((Ei_frac_ >= 0.0 && Ei_frac_ <= 1.0), "FATAL: Ei_frac_ does not lie between 0 and 1.")
   }
@@ -181,6 +187,9 @@ ReactingFlow::ReactingFlow(mfem::ParMesh *pmesh, LoMachOptions *loMach_opts, tem
         if (rank0_) {
           std::cout << "do-bte-sub-cluster = " << do_bte_sub_cluster << ", ee_collisions = " << ee_collisions
           << ", store_csv = " << store_csv << ", use_Efield = " << use_Efield << ", Ei_frac_ = " << Ei_frac_ << "\n";
+
+          std::cout << "cold-wall-correction = " << cold_wall_correction_ << ", low_ef = " << low_ef_
+          << ", low_Tg = " << low_Tg_ << "\n";
         }
       }
   }
@@ -1287,6 +1296,12 @@ void ReactingFlow::initializeSelf() {
 
   ei_.SetSize(sDofInt_);
   ei_ = 0.0;
+
+  EbyN_.SetSize(sDofInt_);
+  EbyN_ = 0.0;
+
+  EbyN_gf_.SetSpace(sfes_);
+  EbyN_gf_ = 0.0;
 
   bterates_.SetSize(sDofInt_*nBTEReactions_);
   bterates_ = 0.0;
@@ -2617,8 +2632,8 @@ void ReactingFlow::step() {
       }
       size_t free_mem, total_mem;
       cudaMemGetInfo(&free_mem, &total_mem);
-      std::cerr << "[rank " << myRank << "] GPU mem after bte_from_tps: "
-          << (total_mem - free_mem) / (1024.0*1024.0) << " MB used" << std::endl;
+      // std::cerr << "[rank " << myRank << "] GPU mem after bte_from_tps: "
+      //     << (total_mem - free_mem) / (1024.0*1024.0) << " MB used" << std::endl;
       // --- END NEW ---
 
       if (rank0_) {
@@ -2662,10 +2677,11 @@ void ReactingFlow::step() {
         dst[i] = src[i];
       }
     } 
-#endif
 
-      auto btearr = bterates_.HostRead(); // Vector containing rate coefficients coming from BTE
-      
+    auto btearr = bterates_.HostRead(); // Vector containing rate coefficients coming from BTE
+    mfem::Vector bterates(nBTEReactions_);
+    bterates = 0.0;
+#endif
       auto datakfwd = kReac_.HostWrite();
       auto dataReac = reacR_.HostWrite();
       auto datarrfbyrrb = rrf_by_rrb_.HostWrite();
@@ -2677,7 +2693,6 @@ void ReactingFlow::step() {
       // auto dataBTErrfbyrrb = BTErrf_by_rrb_.HostWrite();
 
       // // Define Vectors to be passed to solveChemistryStep
-      mfem::Vector bterates(nBTEReactions_);
       // mfem::Vector kfBTE(nReactions_);
       // mfem::Vector prograteBTE(nReactions_);
       // mfem::Vector rrfrrbBTE(nReactions_/2);
@@ -2687,8 +2702,74 @@ void ReactingFlow::step() {
       mfem::Vector rrfrrb(nReactions_/2);
       // mfem::Vector prodYsp(nSpecies_);
 
-      bterates = 0.0;
-      
+#ifdef HAVE_PYTHON
+      if (bte_from_tps_) {
+        // Populate E/N here
+        int nSlot = nSpecies_ - 1;
+
+        const double m_n = mixture_->GetGasParams(nSlot, GasParams::SPECIES_MW);
+
+        // Verify vector sizes are all matched
+        const int npts = er_.Size();
+        MFEM_VERIFY(npts == sDofInt_, "FATAL: Length of er_ does not equal sDofInt_");
+        MFEM_VERIFY(npts == EbyN_.Size(), "FATAL: Length of EbyN_ does not equal sDofInt_");
+
+        const double *dataEr = er_.HostRead();
+        const double *dataEi = ei_.HostRead();
+
+        const double *dataRho = rn_.HostRead();
+
+        double *dataEbyN = EbyN_.HostWrite();
+
+        for (int i = 0; i < sDofInt_; i++) {
+          const double rho = dataRho[i];
+
+          const double N0 = rho * AVOGADRONUMBER / m_n;
+          const double EMag = std::hypot(dataEr[i], dataEi[i]);
+          dataEbyN[i] = (EMag / N0) * 1e21; // convert EbyN to Td units
+
+          if (std::isnan(dataEbyN[i])) {
+            std::cerr << "NaN EbyN at index " << i << '\n'
+                  << "  Er  = " << dataEr[i] << '\n'
+                  << "  Ei  = " << dataEi[i] << '\n'
+                  << "  rho = " << dataRho[i] << '\n'
+                  << "  N   = " << N0 << '\n'
+                  << "  EbyN= " << dataEbyN[i] << std::endl;
+
+            MFEM_ABORT("FATAL: NaN EbyN encountered.");
+          }
+
+          if (!std::isfinite(dataEbyN[i])) {
+            std::cerr << "Infinite EbyN at index " << i << '\n'
+                  << "  Er  = " << dataEr[i] << '\n'
+                  << "  Ei  = " << dataEi[i] << '\n'
+                  << "  rho = " << dataRho[i] << '\n'
+                  << "  N   = " << N0 << '\n'
+                  << "  EbyN= " << dataEbyN[i] << std::endl;
+
+            MFEM_ABORT("FATAL: Infinite EbyN encountered.");
+          }
+
+          if (dataEbyN[i] < 0.0) {
+            std::cerr << "Negative EbyN at index " << i << '\n'
+                  << "  Er  = " << dataEr[i] << '\n'
+                  << "  Ei  = " << dataEi[i] << '\n'
+                  << "  rho = " << dataRho[i] << '\n'
+                  << "  N   = " << N0 << '\n'
+                  << "  EbyN= " << dataEbyN[i] << std::endl;
+
+            MFEM_ABORT("FATAL: Negative EbyN encountered.");
+          }
+        }
+      }
+
+      EbyN_gf_.SetFromTrueDofs(EbyN_);
+      MFEM_VERIFY(EbyN_.Size() == sDofInt_,
+            "EbyN_ size does not match the number of chemistry DOFs.");
+      // Get EbyN_ ready for passing to the solvechemistrystepBTE
+      const double *dataEbyNRead = EbyN_.HostRead();
+#endif
+
       for (int i = 0; i < sDofInt_; i++) {
         // Extract point state
         for (int sp = 0; sp < nActiveSpecies_; sp++) {
@@ -2713,9 +2794,11 @@ void ReactingFlow::step() {
           prograte = 0.0;
           rrfrrb = 0.0;
 
+          const double EbyNloc = dataEbyNRead[i];
+
           // Solve backward Euler update (with BTE rates)
           solveChemistryStepBTE(YT, i, dt_, bterates.GetData(),
-                                kf.GetData(), prograte.GetData(), rrfrrb.GetData()); 
+                                kf.GetData(), prograte.GetData(), rrfrrb.GetData(), EbyNloc); 
 
           //   , kf.GetData(), prograte.GetData(), rrfrrb.GetData(),
           //   kfBTE.GetData(), prograteBTE.GetData(), rrfrrbBTE.GetData(), prodYsp.GetData()
@@ -3546,6 +3629,7 @@ void ReactingFlow::initializeViz(ParaViewDataCollection &pvdc) {
 #ifdef HAVE_PYTHON
   pvdc.RegisterField("EfieldR", &er_gf_);
   pvdc.RegisterField("EfieldI", &ei_gf_);
+  pvdc.RegisterField("EbyN", &EbyN_gf_);
 #endif
   // diagnose Qt issues, rhs contributions
   // pvdc.RegisterField("rhsqt_bd", &rhsqt_bd_); //boundary terms
@@ -4758,7 +4842,7 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
 #ifdef HAVE_PYTHON
 //   double *kf, double *prograte, double *rrfrrb, double *kfBTE, double *prograteBTE, double *rrfrrbBTE, double *prodYsp) {
   void ReactingFlow::evaluateReactingSourceBTE(const double *YT, const int dofindex, double *omega, double *BTErr,
-                                               double *kf, double *prograte, double *rrfrrb) { 
+                                               double *kf, double *prograte, double *rrfrrb, const double EbyN) { 
     // Extract data from incoming state and populate full set of mass & mole fractions
     std::vector<double> Y(nSpecies_);  // mass fractions
     std::vector<double> X(nSpecies_);  // mole fractions
@@ -4867,21 +4951,16 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
     for (int rr = 0; rr < nBTEReactions_; rr++) {
         int tpi = int(mapping[rr]); // tpi stores TPS index of reaction given by BTE index rr
         double kblend = bl_frac_ * BTErr[rr] + (1.0 - bl_frac_) * kfwd[tpi];
+        if (cold_wall_correction_) {
+          if (EbyN <= low_ef_ && Th <= low_Tg_) {
+            // Cold walls of torch, the BTE rate coefficients are erroneous due to truncation issues
+            // at low Efield and low Tg. Enforce k(Tg) in these conditions.
+            // Without this, large thermal divergence appears near walls which crashes TPS when flow is unfrozen
+            kblend = kfwd[tpi];
+          }
+        }
       //   MFEM_VERIFY(kblend == kfwd[tpi], "kblend != kfwd[tpi] " << kblend
       //   << ", " << kfwd[tpi]);
-      //   if (!std::isfinite(BTErr[rr]) || !std::isfinite(kblend) || kblend != kfwd[tpi]) {
-      //     std::cerr << "[rank " << rank_local_ << "] FATAL: BTErr[" << rr << "] = " << BTErr[rr]
-      //               << " NOT FINITE at dofindex=" << dofindex
-      //               << ", tpi=" << tpi
-      //               << ", Th = " << Th << ", Te = " << Te << ", kblend = " << kblend
-      //               << ", bl_frac_ = " << bl_frac_ << ", " << (1.0 - bl_frac_)
-      //               << ", kfwd[tpi] = " << kfwd[tpi]
-      //               << std::endl;
-      //     std::cerr << "[rank " << rank_local_ << "] n_sp contents:" << std::endl;
-      //     n_sp.Print(std::cerr);
-      //     std::cerr.flush();
-      //     MFEM_ABORT("FATAL: BTE rate coefficients are infinite or NaN. Check the rate coefficients");
-      // }
         kfwd[tpi] = std::max(kblend, 0.0);
         // BTEkfwd[tpi] = BTErr[rr];
     }
@@ -4955,7 +5034,7 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
 //   double *kf, double *prograte, double *rrfrrb,
 //   double *kfBTE, double *prograteBTE, double *rrfrrbBTE, double *prodYsp) {
 void ReactingFlow::solveChemistryStepBTE(double *YT, const int dofindex, const double dt, double *BTErr,
-                                         double *kf, double *prograte, double *rrfrrb
+                                         double *kf, double *prograte, double *rrfrrb, const double EbyN
 ) {
     const int nState = nActiveSpecies_ + 1;         // Number of variables in YT
     const double eps = implicit_chemistry_fd_eps_;  // Perturbation for finite difference Jacobian
@@ -4979,7 +5058,7 @@ void ReactingFlow::solveChemistryStepBTE(double *YT, const int dofindex, const d
     // this->evaluateReactingSourceBTE(YT, dofindex, rhs, BTErr, 
     //   kf, prograte, rrfrrb, kfBTE, prograteBTE, rrfrrbBTE, prodYsp);
     this->evaluateReactingSourceBTE(YT, dofindex, rhs, BTErr, 
-                                    kf, prograte, rrfrrb);
+                                    kf, prograte, rrfrrb, EbyN);
   
     // ... and Jacobian (via finite difference)
     for (int i = 0; i < nState; i++) {
@@ -4993,7 +5072,7 @@ void ReactingFlow::solveChemistryStepBTE(double *YT, const int dofindex, const d
       }
   
       this->evaluateReactingSourceBTE(YT1, dofindex, rhs1, BTErr,
-                                      kf, prograte, rrfrrb);
+                                      kf, prograte, rrfrrb, EbyN);
     //   this->evaluateReactingSourceBTE(YT1, dofindex, rhs1, BTErr,
     //   kf, prograte, rrfrrb, kfBTE, prograteBTE, rrfrrbBTE, prodYsp);
   
@@ -5034,7 +5113,7 @@ void ReactingFlow::solveChemistryStepBTE(double *YT, const int dofindex, const d
       // this->evaluateReactingSourceBTE(YT, dofindex, rhs, BTErr,
       // kf, prograte, rrfrrb, kfBTE, prograteBTE, rrfrrbBTE, prodYsp);
       this->evaluateReactingSourceBTE(YT, dofindex, rhs, BTErr,
-                                      kf, prograte, rrfrrb);
+                                      kf, prograte, rrfrrb, EbyN);
   
       for (int i = 0; i < nState; i++) {
         for (int j = 0; j < nState; j++) {
@@ -5049,7 +5128,7 @@ void ReactingFlow::solveChemistryStepBTE(double *YT, const int dofindex, const d
       //   this->evaluateReactingSourceBTE(YT1, dofindex, rhs1, BTErr,
       //   kf, prograte, rrfrrb, kfBTE, prograteBTE, rrfrrbBTE, prodYsp);
         this->evaluateReactingSourceBTE(YT1, dofindex, rhs1, BTErr,
-                                        kf, prograte, rrfrrb);
+                                        kf, prograte, rrfrrb, EbyN);
         for (int j = 0; j < nState; j++) {
           Jac(j, i) = (rhs1[j] - rhs[j]) / (YT1[i] - YT[i]);
         }

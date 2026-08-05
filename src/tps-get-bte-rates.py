@@ -45,7 +45,8 @@ clstr_maxiter         = 10
 clstr_threshold       = 1e-3
 n0_param              = 3.22e22 
 kB                    = scipy.constants.Boltzmann
-Elow                  = 1e-6
+Elow                  = 1e-6 # If the maximum Efield in the grid is smaller than Elow, use tabulated chemistry
+Tglow                 = 1000
 
 neg_thresh            = 2e3 # negative threshold for rate coefficient 
 
@@ -179,6 +180,10 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
         efbyN        = ef/n0/Td_fac # Stores E/n0
         efbyN[e_id]  = (EMag_threshold/np.sqrt(2)) / n0[e_id] / Td_fac
 
+        # Get the ionization degree as well
+        iondeg = ne / n0
+        iondeg[iondeg<=0]     = 1e-16
+
         # INITIALIZE THE BOLTZMANN SOLVER OBJECT
         lm_modes                         = [[[l,0] for l in range(args.l_max+1)] for grid_idx in range(n_grids)]
         nr                               = np.ones(n_grids, dtype=np.int32) * args.Nr
@@ -192,6 +197,15 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
 
             # ev_max[idx] = 36 * np.mean( Tg[grid_idx_to_spatial_idx_map[idx]] / ev_to_K) 
             Tg_max = np.amax( Tg[grid_idx_to_spatial_idx_map[idx]] ) 
+            nen0max = np.amax(iondeg[grid_idx_to_spatial_idx_map[idx]])
+
+            if Tg_max <= 1000:
+                print(f"Low Tg WARNING: Rank {rank_}, gid {idx}, Tgmax = {Tg_max}, is low. Cold region may give bad rate coefficients.", flush=True)
+
+            # if nen0max > 1e-4:
+            #     args.ee_collisions = 1
+            #     print(f"Rank {rank_}/{size_}, ee_collisions enabled")
+            #     print(f"Rank {rank_}, gid {idx}, nen0max = {nen0max}")
 
             evmax_thermal = 30 * Tg_max / ev_to_K
 
@@ -202,15 +216,21 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
                 evmax_thermal = 80 * Tg_max / ev_to_K
 
             efmax = np.amax(efbyN[grid_idx_to_spatial_idx_map[idx]])
-            evmax_efield = 18.0
+
+            # Some useful prints for debugging BTE issues
+            if efmax <= 0.1:
+                print(f"Low E/N WARNING: Rank {rank_}, gid {idx}, efmax = {efmax}, is low. Bad coefficients possible.", flush=True)
+            evmax_efield = 16.0
+            if args.ee_collisions == 1:
+                evmax_efield = evmax_thermal
             if efmax > 0.1 and efmax <= 2.0:
-                evmax_efield = 20.0
+                evmax_efield = 18.0
             elif efmax > 2.0 and efmax <= 10.0:
-                evmax_efield = 40.0
+                evmax_efield = 35.0
             elif efmax > 10.0 and efmax <= 100.0:
-                evmax_efield = 80.0
+                evmax_efield = 75.0
             elif efmax > 100.0:
-                evmax_efield = 120.0
+                evmax_efield = 100.0
             
             ev_max[idx] = max(evmax_thermal, evmax_efield)
     except Exception as e:
@@ -255,17 +275,17 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
             coll_type_list.append(col_data["type"])
         
         if rank_ == 0:
-            print("col_cs = ", col_cs, [args.collisions])
+            # print("col_cs = ", col_cs, [args.collisions])
             print("ev_max = ", ev_max, ", Te = ", Te, ", n_grids = ", n_grids, ", tol = ", args.rtol, args.atol, ", Nr = ", nr)
-            print("coll_type_list = ", coll_type_list, len(coll_type_list))
+            # print("coll_type_list = ", coll_type_list, len(coll_type_list))
         
         is_recomb = np.zeros(len(coll_type_list))
         for idx in range(len(is_recomb)):
             if coll_type_list[idx] == "ATTACHMENT":
                 is_recomb[idx] = 1
         
-        if rank_ == 0:
-            print("is_recomb = ", is_recomb)
+        # if rank_ == 0:
+        #     print("is_recomb = ", is_recomb)
 
         nActSpecies = nSpecies - 2
         all_species           = cross_section.read_available_species(args.collisions)
@@ -470,7 +490,6 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
                 else:
                     mcw0                         = mw[np.random.choice(mw.shape[0], n_sub_clusters, replace=True)]
 
-                # gidx 3, Rank 0 fails in below line (hangs without any error)
                 mcw                          = scipy.cluster.vq.kmeans2(mw, mcw0, iter=clstr_maxiter, thresh=clstr_threshold, check_finite=False)[0]
 
                 mcw0[0:mcw.shape[0], :]      = mcw[:,:]
@@ -654,6 +673,7 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
     rates       = np.zeros((collision_count, tps_npts))
 
     cs_data_all   = cross_section.read_cross_section_data(args.collisions)
+    bad_kreac = 0 # This becomes 1 if the rate coefficients for a particular reaction are all negative. Solver will crash after writing csv files
     if (use_interp==1):
         if(nBTEreactions>0):
             rates[:,:] = 0.0
@@ -668,8 +688,8 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
                     h_curr    = bte_solver.normalized_distribution(grid_idx, u0)
                     qoi       = bte_solver.compute_QoIs(grid_idx, h_curr, effective_mobility=False)
                     rr_cpu    = xp.asnumpy(qoi["rates"])
-                    if rank_ == 0:
-                        print(f"Rank 0 gid {grid_idx}, shape(rr_cpu) = {rr_cpu.shape}")
+                    # if rank_ == 0:
+                    #     print(f"Rank 0 gid {grid_idx}, shape(rr_cpu) = {rr_cpu.shape}")
                     for rr_idx in range(coll_count):
                         ratearr = rr_cpu[rr_idx]
                         typ = cp.get_array_module(ratearr)
@@ -691,7 +711,8 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
                                 print(f"Rank {rank_}, gid {grid_idx}, Reaction {rr_idx}, max = {typ.amax(ratearr)}")
                                 print(f"Rank {rank_}, gid {grid_idx}, Reaction {rr_idx}, mean = {typ.mean(ratearr)}")
                                 print(f"FATAL: Rank {rank_}, gid {grid_idx}, Reaction {rr_idx}, Boltzmann solver produced no positive rate coefficients.")
-                                comm.Abort(1)
+                                bad_kreac = 1
+                                # comm.Abort(1)
                             
                         if not typ.all(ratearr >= 0.0):
                             print(f"With subclustering, Rank {rank_}, gidx {grid_idx}, rr_idx {rr_idx}, "
@@ -747,8 +768,8 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
                         print(f"FATAL: Rank {rank_}, gid {grid_idx}, len(is_rec) = {len(is_rec)}, collision_count = {coll_count} are different. Aborting.")
                         comm.Abort(1)
 
-                    if rank_ == 0 and grid_idx == 0:
-                        print("Rank ", rank_, ", grid_idx = ", grid_idx, ", shape(rr_cpu) = ", rr_cpu.shape, len(rr_cpu))
+                    # if rank_ == 0 and grid_idx == 0:
+                    #     print("Rank ", rank_, ", grid_idx = ", grid_idx, ", shape(rr_cpu) = ", rr_cpu.shape, len(rr_cpu))
 
                     # Clean up rr_cpu by ensuring that it has no negative values
                     # The rate coefficients may have negative values in some points
@@ -771,16 +792,17 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
                             neg_cutoff = neg_thresh / prefac
 
                             if typ.amin(ratearr) >= -neg_cutoff:
-                                print(f"Rank {rank_}, gid {grid_idx}, min = {typ.amin(ratearr)} >= neg_cutoff {-neg_cutoff}. Will swap sign of these rate coefficients.")
+                                print(f"Rank {rank_}, gid {grid_idx}, min = {typ.amin(ratearr)} >= neg_cutoff {-neg_cutoff}. Swapping sign of rate coefficients.")
                                 small_neg = (ratearr < 0.0) & (ratearr >= -neg_cutoff)
                                 ratearr[small_neg] *= -1
+                                # ratearr[small_neg] = 0.0 
                             else:
                                 print(f"FATAL: Rank {rank_}, gid {grid_idx}, Reaction {rr_idx} failed. All rate coefficients are < neg_cutoff = {neg_cutoff}.")
                                 print(f"Rank {rank_}, gid {grid_idx}, Reaction {rr_idx}, min = {typ.amin(ratearr)}")
                                 print(f"Rank {rank_}, gid {grid_idx}, Reaction {rr_idx}, max = {typ.amax(ratearr)}")
                                 print(f"Rank {rank_}, gid {grid_idx}, Reaction {rr_idx}, mean = {typ.mean(ratearr)}")
-                                print(f"FATAL: Rank {rank_}, gid {grid_idx}, Reaction {rr_idx}, Boltzmann solver produced no positive rate coefficients.")
-                                comm.Abort(1)
+                                bad_kreac = 1
+                                #comm.Abort(1)
                     
                         if not typ.all(ratearr >= 0.0):
                             print(f"Rank {rank_}, gidx {grid_idx}, rr_idx {rr_idx}, "
@@ -816,7 +838,7 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
     # WE NEED TO MULTIPLY THESE BY N_avo**2 TO CONVERT THE UNITS TO m^6-mol^{-2}-s^{-1} FOR USE IN TPS
     col_count = 0
     for col_str, col_data in cs_data_all.items():
-        print("col_count = ", col_count, col_str)
+        # print("col_count = ", col_count, col_str)
         if col_data["type"] == "ATTACHMENT":
             rates[col_count][:] = N_Avo*rates[col_count][:]
         col_count+=1
@@ -964,6 +986,10 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
         pinned_mempool = cp.get_default_pinned_memory_pool()
         mempool.free_all_blocks()
         pinned_mempool.free_all_blocks()
+
+    if bad_kreac == 1:
+        print("FATAL: Reaction rate coefficients have negative or garbage values somewhere. Check csv files.")
+        comm.Abort(1)
 
     return data
 

@@ -146,6 +146,9 @@ class ReactingFlow : public ThermoChemModelBase {
   bool bte_from_tps_ = false;       /**< true if the BTE solver is called from within TPS (C++ call Python) */
   std::string collisionsFile, solver_type;       /**< string to store the path of the collisions cross-sections file, BTE solver type (will be passed to BTE) */
   int ee_collisions = 0;            /**< flag to enable electron-electron collisions in BTE solver */
+  bool cold_wall_correction_ = false; // true if we want to impose the tabulated rate coefficients near cold walls (these regions have low gas temperature and low electric field)
+  double low_ef_ = 0.1; // When the local electric field (in Td) is < low_ef, switch to tabulated chemistry
+  double low_Tg_ = 1000.0; // if the gas is cold, switch to tabulated chemistry
 #endif
 
   // Linear-solver-related options
@@ -284,6 +287,7 @@ class ReactingFlow : public ThermoChemModelBase {
   // We only store the magnitude (works only for axisymmetric case)
   ParGridFunction er_gf_;
   ParGridFunction ei_gf_;
+  ParGridFunction EbyN_gf_;
 
 // // Additions for ratio of forward to backward reaction rates
   ParGridFunction rrf_by_rrb_gf_;
@@ -416,8 +420,8 @@ class ReactingFlow : public ThermoChemModelBase {
   Vector radiation_sink_;
 
 #ifdef HAVE_PYTHON
-  // Vectors for real and imaginary parts of electric field magnitude
-  Vector er_, ei_;
+  // Vectors for real and imaginary parts of electric field magnitude, EbyN = mag(E)/n0
+  Vector er_, ei_, EbyN_;
   Vector bterates_;
   Vector bte_rr_mapping_;
 
@@ -618,7 +622,7 @@ class ReactingFlow : public ThermoChemModelBase {
   // double *kf, double *prograte, double *rrfrrb,
   // double *kfBTE, double *prograteBTE, double *rrfrrbBTE, double *prodYsp);
   void evaluateReactingSourceBTE(const double *YT, const int dofindex, double *omega, double *BTErr,
-                                 double *kf, double *prograte, double *rrfrrb);
+                                 double *kf, double *prograte, double *rrfrrb, const double EbyN);
 #endif
   void evaluateReactingSource(const double *YT, const int dofindex, double *omega, 
                               double *kf, double *prograte, double *rrfrrb);
@@ -643,7 +647,7 @@ class ReactingFlow : public ThermoChemModelBase {
 //   double *kfBTE, double *prograteBTE, double *rrfrrbBTE, double *prodYsp
 //   );
     void solveChemistryStepBTE(double *YT, const int dofindex, const double dt, double *BTErr,
-                               double *kf, double *prograte, double *rrfrrb);
+                               double *kf, double *prograte, double *rrfrrb, const double EbyN);
 #endif
     void solveChemistryStep(double *YT, const int dofindex, const double dt,
                             double *kf, double *prograte, double *rrfrrb);

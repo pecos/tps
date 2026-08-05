@@ -632,8 +632,8 @@ void CycleAvgJouleCoupling::solve() {
     size_t free_mem0, total_mem0;
     cudaError_t err0 = cudaMemGetInfo(&free_mem0, &total_mem0);
     if (err0 == cudaSuccess) {
-        std::cerr << "[rank " << rank_ << "] [baseline] GPU mem before any BTE calls: "
-                  << (total_mem0 - free_mem0) / (1024.0*1024.0) << " MB used" << std::endl;
+        // std::cerr << "[rank " << rank_ << "] [baseline] GPU mem before any BTE calls: "
+        //           << (total_mem0 - free_mem0) / (1024.0*1024.0) << " MB used" << std::endl;
     } else {
         std::cerr << "[rank " << rank_ << "] [baseline] cudaMemGetInfo failed: "
                   << cudaGetErrorString(err0) << std::endl;
