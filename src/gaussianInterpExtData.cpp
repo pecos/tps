@@ -429,6 +429,9 @@ void GaussianInterpExtData::setInlet() {
       for (int d = 0; d < dim_; d++) {
         xp[d] = hcoords[n + d * Sdof_];
       }
+      if (dim_ < 3 || axisym_) {
+        xp[2] = 0.0;
+      }
 
       // int iCount = 0;
       double dist = 0.0;
@@ -681,6 +684,9 @@ void GaussianInterpExtData::setFieldInitSpec() {
       for (int d = 0; d < dim_; d++) {
         xp[d] = hcoords[n + d * Sdof_];
       }
+      if (dim_ < 3 || axisym_) {
+        xp[2] = 0.0;
+      }
 
       // int iCount = 0;
       double dist = 0.0;
@@ -858,6 +864,9 @@ void GaussianInterpExtData::setFieldTurbVisc() {
       for (int d = 0; d < dim_; d++) {
         xp[d] = hcoords[n + d * Sdof_];
       }
+      if (dim_ < 3 || axisym_) {
+        xp[2] = 0.0;
+      }
 
       // int iCount = 0;
       double dist = 0.0;
@@ -1024,6 +1033,9 @@ void GaussianInterpExtData::setInletTurbScalars() {
       for (int d = 0; d < dim_; d++) {
         xp[d] = hcoords[n + d * Sdof_];
       }
+      if (dim_ < 3 || axisym_) {
+        xp[2] = 0.0;
+      }
 
       // int iCount = 0;
       double dist = 0.0;
@@ -1087,6 +1099,18 @@ void GaussianInterpExtData::setInletTurbScalars() {
           val_V2 = val_V2 + wt * tke_pr[j].tke;
         }
       }
+
+      // if (1) {
+      //   // if (rank0_) {
+      //     std::cout << "x      : " << xp[0] << std::endl;
+      //     std::cout << "y      : " << xp[1] << std::endl;
+      //     std::cout << "z      : " << xp[2] << std::endl;
+      //     std::cout << "wt_tot : " << wt_tot << std::endl;
+      //     std::cout << "tke    : " << val_TKE << std::endl;
+      //     std::cout << " " << std::endl;
+      //   // }
+      // }
+
 
       if (wt_tot > 0.0) {
         // V2data[n] = val_V2 / wt_tot;

@@ -110,7 +110,7 @@ setup() {
     ./soln_differ $SOLN_FILE $REF_FILE
 }
 
-@test "[$TEST] verify serial restart consistency using 2 mpi tasks" {
+@test "[$TEST] verify singleFileWrite restart consistency using 2 mpi tasks" {
     RUNFILE=inputs/input.4iters.cyl.ini
     RUNFILE_PART=${RUNFILE}.part
     SOLN_FILE=restart_output.sol.h5
@@ -128,6 +128,33 @@ setup() {
 
     # run 2 tasks
     $MPIRUN -n 2 $EXE --runFile $RUNFILE_PART
+    test -s $SOLN_FILE_SERIAL
+
+    ./soln_differ $SOLN_FILE $REF_FILE
+
+    # clean up if we got this far
+    rm -f $RUNFILE_PART
+    rm -f restart_output.sol.*.h5
+}
+
+@test "[$TEST] verify singleFileReadWRite restart consistency using 2 mpi tasks" {
+    RUNFILE=inputs/input.4iters.cyl.ini
+    RUNFILE_PART=${RUNFILE}.part
+    SOLN_FILE=restart_output.sol.h5
+
+    rm -f $RUNFILE_PART
+    rm -f $SOLN_FILE
+
+    # copy the run file, b/c I want to edit it
+    test -s $RUNFILE
+    cp $RUNFILE $RUNFILE_PART
+
+    # request single file restart
+    echo "[io]" >> $RUNFILE_PART
+    echo "restartMode = singleFileReadWrite" >> $RUNFILE_PART
+
+    # run 2 tasks
+    mpirun -np 2 $EXE --runFile $RUNFILE_PART
     test -s $SOLN_FILE_SERIAL
 
     ./soln_differ $SOLN_FILE $REF_FILE
@@ -195,7 +222,7 @@ setup() {
     cp $RUNFILE $RUNFILE_MOD
     echo "[io]" >> $RUNFILE_MOD
     echo "restartMode   = singleFileRead" >> $RUNFILE_MOD
-    echo "enableRestart = true" >> $RUNFILE_MOD
+    echo "enableRestart = True" >> $RUNFILE_MOD
 
     $MPIRUN -n 4 $EXE --runFile $RUNFILE_MOD
     test -s partition.4p.h5
@@ -257,7 +284,7 @@ setup() {
     cp $RUNFILE $RUNFILE_MOD
     echo "[io]" >> $RUNFILE_MOD
     echo "restartMode   = singleFileWrite" >> $RUNFILE_MOD
-    echo "enableRestart = true" >> $RUNFILE_MOD
+    echo "enableRestart = True" >> $RUNFILE_MOD
 
     $MPIRUN -n 2 $EXE --runFile $RUNFILE_MOD
     test -s partition.2p.h5

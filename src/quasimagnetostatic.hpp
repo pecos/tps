@@ -97,7 +97,13 @@ class QuasiMagnetostaticSolverBase : public TPS::Solver {
 
   virtual void setStoreE(bool storeE) = 0;
 
-  virtual double elementJouleHeating(const FiniteElement& el, ElementTransformation& Tr, const Vector& elfun) = 0;
+#ifdef HAVE_PYTHON
+  bool getStoreE() {
+    return storeE_;
+  }
+#endif
+
+  virtual double elementJouleHeating(const FiniteElement &el, ElementTransformation &Tr, const Vector &elfun) = 0;
   virtual double totalJouleHeating() = 0;
 
   void scaleJouleHeating(const double val) { (*joule_heating_) *= val; }

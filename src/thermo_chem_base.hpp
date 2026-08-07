@@ -39,6 +39,7 @@
 
 namespace TPS {
 class Tps;
+class Tps2Boltzmann;
 }
 
 class IODataOrganizer;
@@ -81,8 +82,19 @@ class ThermoChemModelBase {
 
   double thermo_pressure_;
 
-  mfem::ParGridFunction* plasma_conductivity_gf_ = nullptr;
-  mfem::ParGridFunction* joule_heating_gf_ = nullptr;
+#ifdef HAVE_PYTHON
+  int current_iter_;
+#endif
+
+  mfem::ParGridFunction *plasma_conductivity_gf_ = nullptr;
+  mfem::ParGridFunction *joule_heating_gf_ = nullptr;
+
+#ifdef HAVE_PYTHON
+  // ParGridFunctions for real and imaginary parts of electric field
+  // These will be passed to BTE solver from ReactingFlow::solveStep()
+  mfem::ParGridFunction *efield_real_gf_ = nullptr;
+  mfem::ParGridFunction *efield_imag_gf_ = nullptr;
+#endif
 
  public:
   /// Destructor
@@ -192,9 +204,27 @@ class ThermoChemModelBase {
   double GetThermoPressure() { return thermo_pressure_; }
   void SetThermoPressure(double& Po) { thermo_pressure_ = Po; }
 
-  mfem::ParGridFunction* getPlasmaConductivityGF() { return plasma_conductivity_gf_; }
-  mfem::ParGridFunction* getJouleHeatingGF() { return joule_heating_gf_; }
+  mfem::ParGridFunction *getPlasmaConductivityGF() { return plasma_conductivity_gf_; }
+  mfem::ParGridFunction *getJouleHeatingGF() { return joule_heating_gf_; }
+#ifdef HAVE_PYTHON
+  mfem::ParGridFunction *getEfieldRealGF() { return efield_real_gf_; }
+  mfem::ParGridFunction *getEfieldImagGF() { return efield_imag_gf_; }
+
+  /// Return the current step number for BTE blending
+  int GetCurrentIter() { return current_iter_; }
+  void SetCurrentIter(int &iter) { current_iter_ = iter; }
+#endif
   virtual void evaluatePlasmaConductivityGF() {
+    std::cout << "ERROR: " << __func__ << " remains unimplemented" << std::endl;
+    exit(1);
+  }
+
+  virtual void push(TPS::Tps2Boltzmann &interface) {
+    std::cout << "ERROR: " << __func__ << " remains unimplemented" << std::endl;
+    exit(1);
+  }
+
+  virtual void fetch(TPS::Tps2Boltzmann &interface) {
     std::cout << "ERROR: " << __func__ << " remains unimplemented" << std::endl;
     exit(1);
   }

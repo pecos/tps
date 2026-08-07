@@ -155,8 +155,6 @@ void LoMachSolver::initialize() {
     turbModel_ = new AlgebraicSubgridModels(pmesh_, &loMach_opts_, tpsP_, (meshData_->getGridScale()), 1);
   } else if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::SIGMA) {
     turbModel_ = new AlgebraicSubgridModels(pmesh_, &loMach_opts_, tpsP_, (meshData_->getGridScale()), 2);
-  } else if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::WALE) {
-    turbModel_ = new AlgebraicSubgridModels(pmesh_, &loMach_opts_, tpsP_, (meshData_->getGridScale()), 3);
   } else if (loMach_opts_.turb_opts_.turb_model_type_ == TurbulenceModelOptions::ALGEBRAIC_RANS) {
     //    turbModel_ = new AlgebraicRans(serial_mesh_, pmesh_, partitioning_, loMach_opts_.order, tpsP_);
     turbModel_ = new AlgebraicRans(pmesh_, partitioning_, loMach_opts_.order, tpsP_, (meshData_->getWallDistance()));
@@ -408,11 +406,19 @@ void LoMachSolver::solveBegin() {
       std::cout << std::setw(10) << std::scientific << flow_screen_values[i] << " ";
     }
     std::cout << std::endl;
+    // std::cout << "LoMach::solveBegin(), iter = " << iter << ", iter_start = " << iter_start_ << "\n";
   }
 }
 
 void LoMachSolver::solveStep() {
   sw_step_.Start();
+
+  int iter_number_ = iter - iter_start_ + 1;
+  // if (rank0_) {
+  //   std::cout << "LoMach::solveStep(), iter = " << iter << ", iter_start = " << iter_start_ 
+  //             << ", iter_number_ = " << iter_number_ << ", disable_flow_ = " << disable_flow_ << "\n";
+  // }
+  thermo_->SetCurrentIter(iter_number_);
 
   if (loMach_opts_.ts_opts_.integrator_type_ == LoMachTemporalOptions::CURL_CURL) {
     SetTimeIntegrationCoefficients(iter - iter_start_);

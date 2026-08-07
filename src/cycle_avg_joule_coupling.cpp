@@ -37,6 +37,29 @@
 #include "quasimagnetostatic.hpp"
 
 CycleAvgJouleCoupling::CycleAvgJouleCoupling(string& inputFileName, TPS::Tps* tps)
+#include <fstream>
+#include <iostream>
+#include <string>
+#include <vector>
+
+#ifdef HAVE_PYTHON
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/embed.h>
+#include <pybind11/eval.h>
+#include <pybind11/numpy.h>
+
+namespace py = pybind11;
+using namespace py::literals;
+
+// ##ifdef HAVE_MPI4PY
+// ##include <mpi4py/mpi4py.h>
+// ##endif
+
+#include <cuda_runtime.h>
+#endif
+
+CycleAvgJouleCoupling::CycleAvgJouleCoupling(string &inputFileName, TPS::Tps *tps)
     : em_opt_(),
       qmsa_solver_(nullptr),
       flow_solver_(nullptr),
@@ -79,6 +102,13 @@ CycleAvgJouleCoupling::CycleAvgJouleCoupling(string& inputFileName, TPS::Tps* tp
     flow_solver_ = new M2ulPhyS(inputFileName, tps);
   } else if (plasma_solver == "lomach") {
     flow_solver_ = new LoMachSolver(tps);
+#ifdef HAVE_PYTHON
+    tps->getInput("cycle-avg-joule-coupled/bte-from-tps", bte_from_tps_, false);
+    tps->getRequiredInput("boltzmannSolver/bte-path", bte_path);
+    tps->getRequiredInput("boltzmannSolver/tps-src-path", tps_src_path);
+    tps->getRequiredInput("boltzmannSolver/torch-chem-path", torch_chem_path);
+#endif
+
   } else {
     assert(false);
     exit(-1);
@@ -175,7 +205,7 @@ void CycleAvgJouleCoupling::initializeInterpolationData() {
   for (int i = 0; i < flow_mesh->GetNE(); i++) {
     n_flow_interp_nodes_ += flow_fespace->GetFE(i)->GetNodes().GetNPoints();
   }
-  if (verbose) grvy_printf(ginfo, "Completed em-flow interpolation setup.\n");
+  // if (verbose) grvy_printf(ginfo, "Completed em-flow interpolation setup.\n");
 
 #else
   mfem_error("Cannot initialize interpolation without GSLIB support.");
@@ -290,6 +320,7 @@ void CycleAvgJouleCoupling::interpolationPoints(Vector& vxyz, int n_interp_nodes
 void CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow() {
   const bool verbose = rank0_;
   if (verbose) grvy_printf(ginfo, "Interpolating Joule heating to flow mesh.\n");
+  fflush(stdout);
 
 #ifdef HAVE_GSLIB
   const ParFiniteElementSpace* flow_fespace = flow_solver_->getFESpace();
@@ -297,6 +328,13 @@ void CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow() {
   // Generate list of points where the grid function will be evaluated.
   Vector vxyz;
   interpolationPoints(vxyz, n_flow_interp_nodes_, flow_fespace);
+
+  // grvy_printf(ginfo, "[rank %d] interpolationPoints returned: vxyz.Size()=%d n_flow_interp_nodes_=%d dim=%d\n",
+  //           rank_, vxyz.Size(), n_flow_interp_nodes_, flow_fespace->GetMesh()->Dimension());
+  // fflush(stdout);
+
+  // MFEM_VERIFY(vxyz.Size() == n_flow_interp_nodes_ * flow_fespace->GetMesh()->Dimension(),
+  //           "vxyz size does not match n_flow_interp_nodes_ * dim");
 
   // Evaluate source grid function.
   Vector interp_vals(n_flow_interp_nodes_);
@@ -307,6 +345,54 @@ void CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow() {
   interp_em_to_flow_->Interpolate(vxyz, *joule_heating_gf, interp_vals);
 
   ParGridFunction* joule_heating_flow = flow_solver_->getJouleHeatingGF();
+  const ParGridFunction *joule_heating_gf = qmsa_solver_->getJouleHeatingGF();
+  // MFEM_VERIFY(joule_heating_gf != NULL, "jouule_heating_gf is NULL in CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow()");
+
+  // bool coords_finite = (vxyz.CheckFinite() == 0);
+  // bool field_finite = (joule_heating_gf->CheckFinite() == 0);
+  // if (!coords_finite || !field_finite) {
+  //     grvy_printf(gerror, "[rank %d] NOT FINITE before interpolation: coords_ok=%d field_ok=%d "
+  //               "vxyz.Size()=%d n_flow_interp_nodes_=%d\n",
+  //               rank_, coords_finite, field_finite, vxyz.Size(), n_flow_interp_nodes_);
+  //     MFEM_ABORT("FATAL: interpolating Joule heating from EM to flow.");
+  // }
+
+  // --- NEW: r-coordinate (and z-coordinate) min/max logging ---
+  // {
+  //   const int dim = flow_fespace->GetMesh()->Dimension();
+  //   const int npts = vxyz.Size() / dim;
+
+  //   double rmin = 1e300, rmax = -1e300;
+  //   double zmin = 1e300, zmax = -1e300;
+  //   int n_near_axis = 0;
+  //   const double axis_tol = 1e-8;  // adjust based on your mesh scale
+
+  //   for (int i = 0; i < npts; i++) {
+  //     // MFEM FindPointsGSLIB expects interleaved or ordered-by-component
+  //     // layout depending on how interpolationPoints() builds vxyz --
+  //     // confirm this matches your actual ordering (see note below).
+  //     double r = vxyz(i);            // if byNODES ordering (component-major)
+  //     double z = vxyz(i + npts);
+
+  //     rmin = std::min(rmin, r);
+  //     rmax = std::max(rmax, r);
+  //     zmin = std::min(zmin, z);
+  //     zmax = std::max(zmax, z);
+
+  //     if (r < axis_tol) n_near_axis++;
+  //   }
+
+  //   grvy_printf(ginfo, "[rank %d] r range: [%g, %g], z range: [%g, %g], n_near_axis(r<%g)=%d\n",
+  //               rank_, rmin, rmax, zmin, zmax, axis_tol, n_near_axis);
+  //   fflush(stdout);
+  // }
+  // --- END NEW ---
+
+  interp_em_to_flow_->Interpolate(vxyz, *joule_heating_gf, interp_vals);
+
+  if (verbose) grvy_printf(ginfo, "[rank %d] Interp completed interp_em_to_flow for Joule heating.\n", rank_);
+
+  ParGridFunction *joule_heating_flow = flow_solver_->getJouleHeatingGF();
   if (flow_fespace->IsDGSpace()) {
     joule_heating_flow->SetFromTrueDofs(interp_vals);
   } else {
@@ -328,10 +414,142 @@ void CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow() {
     joule_heating_flow->SetTrueVector();
     joule_heating_flow->SetFromTrueVector();
   }
+
+  if (verbose) grvy_printf(ginfo, "Joule heating interpolated to flow mesh.\n");
 #else
   mfem_error("Cannot interpolate without GSLIB support.");
 #endif
 }
+
+#ifdef HAVE_PYTHON
+void CycleAvgJouleCoupling::interpElectricFieldFromEMToFlowforBTE() {
+  const bool verbose = rank0_;
+  if (verbose) grvy_printf(ginfo, "Interpolating Electric field to flow mesh for calling BTE from TPS.\n");
+
+  // FIRST, GET THE NUMBER OF ELECTRIC FIELD COMPONENTS
+  ParMesh *pmesh(flow_solver_->getMesh());
+  int nEfieldComps_ = 0;
+  switch (pmesh->Dimension()) {
+    case 2:
+      nEfieldComps_ = 2;
+      break;
+    case 3:
+      nEfieldComps_ = 6;
+      break;
+    default:
+      std::abort();
+  }
+  efield_ncomp_ = nEfieldComps_ / 2;
+
+#ifdef HAVE_GSLIB
+  const ParFiniteElementSpace *flow_fespace = flow_solver_->getFESpace();
+
+  // // Generate list of points where the grid function will be evaluated.
+  Vector vxyz;
+  interpolationPoints(vxyz, n_flow_interp_nodes_, flow_fespace);
+
+  // // Evaluate source grid function.
+  Vector interp_vals(n_flow_interp_nodes_ * efield_ncomp_);
+
+  const ParGridFunction *efield_real_gf = qmsa_solver_->getElectricFieldreal();
+  MFEM_VERIFY(efield_real_gf != NULL, "FATAL: efield_real_gf is NULL!");
+
+  bool coords_finite = (vxyz.CheckFinite() == 0);
+  bool field_finite = (efield_real_gf->CheckFinite() == 0);
+  if (!coords_finite || !field_finite) {
+      grvy_printf(gerror, "[rank %d] NOT FINITE before interpolation: coords_ok=%d field_ok=%d "
+                "vxyz.Size()=%d n_flow_interp_nodes_=%d\n",
+                rank_, coords_finite, field_finite, vxyz.Size(), n_flow_interp_nodes_);
+      MFEM_ABORT("FATAL: interpolating real electric field from EM to flow.");
+  }
+
+  // grvy_printf(ginfo, "[rank %d] efield_real_gf vdim=%d, interp_vals.Size()=%d, expected=%d\n",
+  //           rank_, efield_real_gf->VectorDim(), interp_vals.Size(),
+  //           n_flow_interp_nodes_ * efield_real_gf->VectorDim());
+  // MFEM_VERIFY(interp_vals.Size() == n_flow_interp_nodes_ * efield_real_gf->VectorDim(),
+  //           "interp_vals size does not match efield_real_gf vector dimension");
+
+  interp_em_to_flow_->Interpolate(vxyz, *efield_real_gf, interp_vals);
+
+  ParGridFunction *efield_real_flow = flow_solver_->getEfieldRealGF();
+  assert(efield_real_flow != nullptr);
+  if (flow_fespace->IsDGSpace()) {
+    efield_real_flow->SetFromTrueDofs(interp_vals);
+  } else {
+    Array<int> vdofs;
+    Vector elem_dof_vals;
+    int n0 = 0;
+    const int NE = flow_solver_->getMesh()->GetNE();
+    for (int i = 0; i < NE; i++) {
+      flow_fespace->GetElementDofs(i, vdofs);
+      const int nsp = flow_fespace->GetFE(i)->GetNodes().GetNPoints();
+      assert(nsp == vdofs.Size());
+      elem_dof_vals.SetSize(nsp);
+      for (int j = 0; j < nsp; j++) {
+        elem_dof_vals(j) = interp_vals(n0 + j);
+      }
+      efield_real_flow->SetSubVector(vdofs, elem_dof_vals);
+      n0 += nsp;
+    }
+    efield_real_flow->SetTrueVector();
+    efield_real_flow->SetFromTrueVector();
+  }
+  efield_real_flow->HostRead();
+
+  if (verbose) grvy_printf(ginfo, "Real part of Electric field interpolated to flow mesh for BTE.\n");
+
+  const ParGridFunction *efield_imag_gf = qmsa_solver_->getElectricFieldimag();
+  MFEM_VERIFY(efield_imag_gf != NULL, "FATAL: efield_imag_gf is NULL!");
+
+  coords_finite = (vxyz.CheckFinite() == 0);
+  field_finite = (efield_imag_gf->CheckFinite() == 0);
+  if (!coords_finite || !field_finite) {
+      grvy_printf(gerror, "[rank %d] NOT FINITE before interpolation: coords_ok=%d field_ok=%d "
+                "vxyz.Size()=%d n_flow_interp_nodes_=%d\n",
+                rank_, coords_finite, field_finite, vxyz.Size(), n_flow_interp_nodes_);
+      MFEM_ABORT("FATAL: interpolating imaginary electric field from EM to flow.");
+  }
+
+  // grvy_printf(ginfo, "[rank %d] efield_imag_gf vdim=%d, interp_vals.Size()=%d, expected=%d\n",
+  //           rank_, efield_imag_gf->VectorDim(), interp_vals.Size(),
+  //           n_flow_interp_nodes_ * efield_imag_gf->VectorDim());
+  MFEM_VERIFY(interp_vals.Size() == n_flow_interp_nodes_ * efield_imag_gf->VectorDim(),
+            "interp_vals size does not match efield_real_gf vector dimension");
+
+  interp_em_to_flow_->Interpolate(vxyz, *efield_imag_gf, interp_vals);
+
+  ParGridFunction *efield_imag_flow = flow_solver_->getEfieldImagGF();
+  assert(efield_imag_flow != nullptr);
+  if (flow_fespace->IsDGSpace()) {
+    efield_imag_flow->SetFromTrueDofs(interp_vals);
+  } else {
+    Array<int> vdofs;
+    Vector elem_dof_vals;
+    int n0 = 0;
+    const int NE = flow_solver_->getMesh()->GetNE();
+    for (int i = 0; i < NE; i++) {
+      flow_fespace->GetElementDofs(i, vdofs);
+      const int nsp = flow_fespace->GetFE(i)->GetNodes().GetNPoints();
+      assert(nsp == vdofs.Size());
+      elem_dof_vals.SetSize(nsp);
+      for (int j = 0; j < nsp; j++) {
+        elem_dof_vals(j) = interp_vals(n0 + j);
+      }
+      efield_imag_flow->SetSubVector(vdofs, elem_dof_vals);
+      n0 += nsp;
+    }
+    efield_imag_flow->SetTrueVector();
+    efield_imag_flow->SetFromTrueVector();
+  }
+  efield_imag_flow->HostRead();
+
+  if (verbose) grvy_printf(ginfo, "All components of Electric field interpolated to flow mesh for BTE.\n");
+
+#else
+  mfem_error("Cannot interpolate without GSLIB support.");
+#endif
+}
+#endif
 
 void CycleAvgJouleCoupling::interpElectricFieldFromEMToFlow() {
   assert(efieldFES_);
@@ -382,6 +600,56 @@ void CycleAvgJouleCoupling::initialize() {
 }
 
 void CycleAvgJouleCoupling::solve() {
+
+#ifdef HAVE_PYTHON
+  // INITIALIZE THE PYTHON INTERPRETER BEFORE solveBegin() is called
+  if(bte_from_tps_) {
+    py::initialize_interpreter();
+
+    // Import the paths to TPS and BTE
+    try {
+      py::module sys  = py::module::import("sys");
+
+      // Access sys.path (a Python list)
+      py::list sys_path = sys.attr("path");
+
+      // Add the TPS src path to sys.path
+      sys_path.insert(0, tps_src_path); // Insert at the beginning of sys.path
+      sys_path.insert(0, bte_path); // Path to BTE scripts
+      sys_path.insert(0, torch_chem_path); // Path to torch chemistry scripts (needed for temperature dependent collision cross-sections)
+
+      // Verify that the paths were added
+      if(rank0_) {
+        std::cout << "Updated sys.path:" << std::endl;
+        for (auto item : sys_path) {
+          std::cout << "  " << std::string(py::str(item)) << std::endl;
+        }
+      } 
+    } catch (const py::error_already_set& e) {
+        // Catch and print Python errors
+        std::cerr << "CycleAvgJouleCoupling::solve(), Python error: " << e.what() << std::endl;
+        MFEM_ABORT("FATAL: Error in importing system Paths for Python in Cycle_Avg_Joule_Coupling::Solve()");
+    } catch (const std::exception& e) {
+        // Catch other C++ exceptions
+        std::cerr << "CycleAvgJouleCoupling::solve(), C++ error: " << e.what() << std::endl;
+        MFEM_ABORT("FATAL: Error in C++ in Cycle_Avg_Joule_Coupling::Solve()");
+    }
+
+    // --- NEW: baseline GPU memory reading, before any CUDA context exists ---
+    size_t free_mem0, total_mem0;
+    cudaError_t err0 = cudaMemGetInfo(&free_mem0, &total_mem0);
+    if (err0 == cudaSuccess) {
+        // std::cerr << "[rank " << rank_ << "] [baseline] GPU mem before any BTE calls: "
+        //           << (total_mem0 - free_mem0) / (1024.0*1024.0) << " MB used" << std::endl;
+    } else {
+        std::cerr << "[rank " << rank_ << "] [baseline] cudaMemGetInfo failed: "
+                  << cudaGetErrorString(err0) << std::endl;
+    }
+    // --- END NEW ---
+
+  }
+#endif
+
   this->solveBegin();
   double tlast = grvy_timer_elapsed_global();
 
@@ -402,9 +670,25 @@ void CycleAvgJouleCoupling::solve() {
   }
 
   this->solveEnd();
+#ifdef HAVE_PYTHON
+  // FINALIZE PYTHON INTERPRETER
+  if (bte_from_tps_) {
+    py::finalize_interpreter();
+  }
+#endif
 }
 
 void CycleAvgJouleCoupling::solveBegin() {
+#ifdef HAVE_PYTHON
+  // if (bte_from_tps_) {
+  // Tell the EM solver to store the electric fields.
+  // Electric fields are stored now irrespective of the initialization of
+  // TPS-BTE interface
+    bool storeE = qmsa_solver_->getStoreE();
+    qmsa_solver_->setStoreE(true);
+    storeE = qmsa_solver_->getStoreE();
+  // }
+#endif
   flow_solver_->solveBegin();
   qmsa_solver_->solveBegin();
 }
@@ -414,14 +698,15 @@ void CycleAvgJouleCoupling::solveStep() {
   if (current_iter_ % solve_em_every_n_ == 0) {
     // update the power if necessary
     double delta_power = 0;
-    if (input_power_ > 0.0 && initial_input_power_ > 0.0) {
+    // if (input_power_ > 0.0 && initial_input_power_ > 0.0) {
+    if (input_power_ > 0) {
       delta_power = (input_power_ - initial_input_power_) * static_cast<double>(solve_em_every_n_) /
                     static_cast<double>(max_iters_);
-      if (rank0_) {
-        grvy_printf(GRVY_INFO, "input_power = %.6e\n", input_power_);
-        grvy_printf(GRVY_INFO, "initial_input_power = %.6e\n", initial_input_power_);
-        grvy_printf(GRVY_INFO, "delta_power = %.6e\n", delta_power);
-      }
+      // if (rank0_) {
+      //   grvy_printf(GRVY_INFO, "input_power = %.6e\n", input_power_);
+      //   grvy_printf(GRVY_INFO, "initial_input_power = %.6e\n", initial_input_power_);
+      //   grvy_printf(GRVY_INFO, "delta_power = %.6e\n", delta_power);
+      // }
     }
 
     // evaluate electric conductivity and interpolate it to EM mesh
@@ -434,7 +719,8 @@ void CycleAvgJouleCoupling::solveStep() {
     // report the "raw" Joule heating
     const double tot_jh = qmsa_solver_->totalJouleHeating();
     if (rank0_) {
-      grvy_printf(GRVY_INFO, "(cycle_avg_joule_coupling) The total input Joule heating = %.6e\n", tot_jh);
+      // grvy_printf(GRVY_INFO, "(cycle_avg_joule_coupling) The total input Joule heating = %.6e\n", tot_jh);
+      grvy_printf(GRVY_INFO, "The total input Joule heating = %.6e\n", tot_jh);
     }
 
     if (qmsa_solver_->evalRplasma()) {
@@ -459,60 +745,75 @@ void CycleAvgJouleCoupling::solveStep() {
     }
 
     // scale the Joule heating (if we are controlling the power input)
-    if (input_power_ > 0.0) {
+    if (input_power_ > 0) {
       double target_power = initial_input_power_ + (current_iter_ / solve_em_every_n_ + 1) * delta_power;
-      if (rank0_) {
-        grvy_printf(GRVY_INFO, "target_power_ = %.6e\n", target_power);
-      }
+      // if (rank0_) {
+      //   grvy_printf(GRVY_INFO, "target_power_ = %.6e\n", target_power);
+      // }
       if (oscillating_power_) {
         const double tau = ((double)current_iter_) / power_period_;
         target_power = input_power_ + power_amplitude_ * sin(2 * M_PI * tau);
         if (rank0_) {
-          grvy_printf(GRVY_INFO, "oscillating target_power = %.6e\n", target_power);
+        //   grvy_printf(GRVY_INFO, "oscillating target_power = %.6e\n", target_power);
+        // }
+      // }
+
+      // double ratio;
+      // if (initial_input_power_ > -1.0e-8) {
+      //   double target_power = initial_input_power_ + (current_iter_ / solve_em_every_n_ + 1) * delta_power;
+      //   // grvy_printf(GRVY_INFO, "initial_input_power, current_iter_, solve_em_every_n_, and delta_power = %.6e, %i,
+      //   // %i, %.6e \n", initial_input_power_, current_iter_, solve_em_every_n_, delta_power); grvy_printf(GRVY_INFO,
+      //   // "target_power and tot_jh = %.6e %.6e \n", target_power, tot_jh);
+      //   if (tot_jh > 0.0) {
+      //     ratio = target_power / tot_jh;
+      //   } else {
+      //     ratio = 1.0;  // hack, dont know what is correct here
+          grvy_printf(GRVY_INFO, "target_power = %.6e\n", target_power);
         }
+      // } else {
+      //   grvy_printf(GRVY_INFO, "input_power_ and tot_jh = %.6e %.6e \n", input_power_, tot_jh);
+      //   if (tot_jh > 0.0) {
+      //     ratio = input_power_ / tot_jh;
+      //   } else {
+      //     // odd situation here as we are requesting power be put in but the em-side says nothign can enter
+      //     ratio = 0.0;
+      //   }
+      //   // ratio = input_power_ / tot_jh;
+      // }
+      // if (rank0_) {
+      //   grvy_printf(GRVY_INFO, "ratio sent to qmsa_solver_ = %.6e\n", ratio);
       }
 
-      double ratio;
-      if (initial_input_power_ > -1.0e-8) {
-        double target_power = initial_input_power_ + (current_iter_ / solve_em_every_n_ + 1) * delta_power;
-        // grvy_printf(GRVY_INFO, "initial_input_power, current_iter_, solve_em_every_n_, and delta_power = %.6e, %i,
-        // %i, %.6e \n", initial_input_power_, current_iter_, solve_em_every_n_, delta_power); grvy_printf(GRVY_INFO,
-        // "target_power and tot_jh = %.6e %.6e \n", target_power, tot_jh);
-        if (tot_jh > 0.0) {
-          ratio = target_power / tot_jh;
-        } else {
-          ratio = 1.0;  // hack, dont know what is correct here
-        }
-
-      } else {
-        grvy_printf(GRVY_INFO, "input_power_ and tot_jh = %.6e %.6e \n", input_power_, tot_jh);
-        if (tot_jh > 0.0) {
-          ratio = input_power_ / tot_jh;
-        } else {
-          // odd situation here as we are requesting power be put in but the em-side says nothign can enter
-          ratio = 0.0;
-        }
-        // ratio = input_power_ / tot_jh;
-      }
-      if (rank0_) {
-        grvy_printf(GRVY_INFO, "ratio sent to qmsa_solver_ = %.6e\n", ratio);
-      }
-
+      const double ratio = target_power / tot_jh;
       qmsa_solver_->scaleJouleHeating(ratio);
       const double upd_jh = qmsa_solver_->totalJouleHeating();
       if (rank0_) {
         grvy_printf(GRVY_INFO, "current_iter = %d\n", current_iter_);
         grvy_printf(GRVY_INFO, "Joule heating scaling ratio = %.6e\n", ratio);
+        // grvy_printf(GRVY_INFO, "Joule heating scaling ratio = %d\n", ratio);
         grvy_printf(GRVY_INFO, "The total input Joule heating after scaling = %.6e\n", upd_jh);
       }
     }
 
     // interpolate the Joule heating to the flow mesh
     interpJouleHeatingFromEMToFlow();
+#ifdef HAVE_PYTHON
+    // Electrid field is interpolated from EM to Flow for calling BTE from TPS
+    // Interface is not used for this
+    if (bte_from_tps_) {
+      interpElectricFieldFromEMToFlowforBTE();
+    }
+#endif
+    // Electric field is interpolated from EM to Flow for the Interface
     if (efieldFES_) interpElectricFieldFromEMToFlow();
+    
   }
   // Run a step of the flow solver
   flow_solver_->solveStep();
+
+  // if (rank0_) {
+  //   std::cout << "current_iter_ = " << current_iter_ << "\n";
+  // }
   // Increment the current iterate
   ++current_iter_;
 }

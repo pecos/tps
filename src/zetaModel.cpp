@@ -158,7 +158,8 @@ ZetaModel::~ZetaModel() {
   // delete two_nu_delta_coeff_;
 
   // NOTE: seg fault originates from deleting coeffs used for BCs, which is done automatically in
-  // dirichlet_bc_helper.hpp delete tdr_wall_coeff_;
+  // dirichlet_bc_helper.hpp 
+  delete tdr_wall_coeff_;
 
   // delete gradZeta_coeff_;
   // delete two_nuNeg_delta_coeff_;
@@ -1316,20 +1317,33 @@ void ZetaModel::updateMuT() {
     // for (int i = 0; i < SdofInt_; i++) muT[i] *= std::min(dv2[i], twoThirds * dk[i]);
     for (int i = 0; i < SdofInt_; i++) muT[i] *= smoothMin(dv2[i], twoThirds * dk[i]);
     // to prevent kinks
+    // double wgt = 1.0;
     // for (int i = 0; i < SdofInt_; i++) {
-    // wgt = std::tanh(tanh_half_ * dv2[i]/(twoThirds*dk[i]));
-    // wgt = wgt * wgt;
-    // muT[i] *= ((1.0-wgt)*dv2[i] + wgt*twoThirds*dk[i]);
-    //}
+    //   if (std::abs(twoThirds*dk[i]) > 1e-16) {
+    //     wgt = std::tanh(tanh_half_ * dv2[i]/(twoThirds*dk[i]));
+    //   } else {
+    //     wgt = 1.0;
+    //     // std::cout << "clipped" << endl;
+    //   }
+    //   wgt = wgt * wgt;
+    //   muT[i] *= ((1.0-wgt)*dv2[i] + wgt*twoThirds*dk[i]);
+    //   // std::cout << wgt << endl;
+    //   // std::cout << dv2[i]/(twoThirds*dk[i]) << endl;
+    // }
 
     // for (int i = 0; i < SdofInt_; i++) muT[i] *= std::min(dTTS[i], dTTS_strain[i]);
     for (int i = 0; i < SdofInt_; i++) muT[i] *= smoothMin(dTTS[i], dTTS_strain[i]);
     // to prevent kinks
     // for (int i = 0; i < SdofInt_; i++) {
-    //  wgt = std::tanh(tanh_half_ * dTTS[i]/dTTS_strain[i]);
-    //  wgt = wgt * wgt;
-    //  muT[i] *= ((1.0-wgt)*dTTS[i] + wgt*dTTS_strain[i]);
-    //}
+    //   if (std::abs(dTTS_strain[i]) > 1e-16) {
+    //     wgt = std::tanh(tanh_half_ * dTTS[i]/dTTS_strain[i]);
+    //   } else {
+    //     wgt = 1.0;
+    //   }
+    //   wgt = wgt * wgt;
+    //   muT[i] *= ((1.0-wgt)*dTTS[i] + wgt*dTTS_strain[i]);
+    //   // std::cout << wgt << endl;
+    // }
 
     // for (int i = 0; i < SdofInt_; i++) muT[i] = std::max(muT[i], mut_min_);
     //??? for (int i = 0; i < SdofInt_; i++) muT[i] = smoothMax(muT[i], mut_min_);

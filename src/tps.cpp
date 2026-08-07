@@ -33,6 +33,19 @@
 /** @file
  * @copydoc tps.hpp
  */
+#ifdef HAVE_PYTHON
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/embed.h>
+
+namespace py = pybind11;
+using namespace py::literals;
+
+#ifdef HAVE_MPI4PY
+#include <mpi4py/mpi4py.h>
+#endif
+
+#endif
 
 #include "tps.hpp"
 
@@ -42,16 +55,6 @@
 
 #include <sys/types.h>
 #include <unistd.h>
-
-#ifdef HAVE_PYTHON
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
-
-#ifdef HAVE_MPI4PY
-#include <mpi4py/mpi4py.h>
-#endif
-
-#endif
 
 #include "cycle_avg_joule_coupling.hpp"
 #include "independent_coupling.hpp"
