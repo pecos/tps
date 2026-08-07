@@ -61,11 +61,20 @@ AlgebraicSubgridModels::AlgebraicSubgridModels(mfem::ParMesh* pmesh, LoMachOptio
 
   // read-ins
   double sgs_const = 0.;
+
+  // Smagorinsky
   if (sModel_ == 1) {
     sgs_const = 0.09;
+
+    // Sigma
   } else if (sModel_ == 2) {
     sgs_const = 0.135;
+
+    // WALE
+  } else if (sModel_ == 3) { 
+    sgs_const = 0.5;
   }
+
   tpsP_->getInput("loMach/sgsModelConstant", sgs_model_const_, sgs_const);
 
   tpsP_->getInput("loMach/sgsFilterModes", sgs_model_nFilter_, 0);
@@ -77,6 +86,7 @@ AlgebraicSubgridModels::AlgebraicSubgridModels(mfem::ParMesh* pmesh, LoMachOptio
   }
 
   tpsP_->getInput("loMach/sgsSmooth", sgs_model_smooth_, false);
+  tpsP_->getInput("loMach/sgsSmooth-steps", aveSteps_, 100);
 }
 
 AlgebraicSubgridModels::~AlgebraicSubgridModels() {
@@ -119,13 +129,14 @@ void AlgebraicSubgridModels::initializeSelf() {
 
   muT_NM0_.SetSize(sfes_truevsize);
   muT_NM1_.SetSize(sfes_truevsize);
-  muT_NM2_.SetSize(sfes_truevsize);
-  muT_NM3_.SetSize(sfes_truevsize);
+  // muT_NM2_.SetSize(sfes_truevsize);
+  // muT_NM3_.SetSize(sfes_truevsize);
   muT_NM0_ = 0.0;
   muT_NM1_ = 0.0;
-  muT_NM2_ = 0.0;
-  muT_NM3_ = 0.0;
-  aveSteps_ = 0;
+  activeSteps_ = 0;
+  // muT_NM2_ = 0.0;
+  // muT_NM3_ = 0.0;
+  // aveSteps_ = 0;
 
   gradU_.SetSize(vfes_truevsize);
   gradV_.SetSize(vfes_truevsize);
@@ -166,7 +177,7 @@ void AlgebraicSubgridModels::setup() {
 }
 
 void AlgebraicSubgridModels::step() {
-  if (sModel_ != 1 && sModel_ != 2) {
+  if (sModel_ != 1 && sModel_ != 2 && sModel_ != 3) {
     return;
   }
 
@@ -219,6 +230,24 @@ void AlgebraicSubgridModels::step() {
       sgsSigma(gradUp, del[i], nu_sgs);
       data[i] = rho[i] * nu_sgs;
     }
+
+  } else if (sModel_ == 3) {
+    for (int i = 0; i < SdofInt_; i++) {
+      double nu_sgs = 0.;
+      DenseMatrix gradUp;
+      gradUp.SetSize(nvel_, dim_);
+      for (int dir = 0; dir < dim_; dir++) {
+        gradUp(0, dir) = dGradU[i + dir * SdofInt_];
+      }
+      for (int dir = 0; dir < dim_; dir++) {
+        gradUp(1, dir) = dGradV[i + dir * SdofInt_];
+      }
+      for (int dir = 0; dir < dim_; dir++) {
+        gradUp(2, dir) = dGradW[i + dir * SdofInt_];
+      }
+      sgsWALE(gradUp, del[i], nu_sgs);
+      data[i] = rho[i] * nu_sgs;
+    }
   }
 
   subgridVisc_gf_.SetFromTrueDofs(subgridVisc_);
@@ -233,7 +262,6 @@ void AlgebraicSubgridModels::step() {
     MFEM_FORALL(i, subgridVisc_gf_.Size(),
                 { d_muT_gf[i] = (1.0 - filter_alpha) * d_muT_gf[i] + filter_alpha * d_muT_filtered_gf[i]; });
     subgridVisc_gf_.GetTrueDofs(subgridVisc_);
-  }
 
     // clip any small negatives resulting from filtering
     double* dmuT = subgridVisc_.HostReadWrite();
@@ -241,25 +269,24 @@ void AlgebraicSubgridModels::step() {
       dmuT[i] = std::max(dmuT[i], 1.0e-15);
     }
     subgridVisc_gf_.SetFromTrueDofs(subgridVisc_);
-  // clip any small negatives resulting from filtering
-  double *dmuT = subgridVisc_.HostReadWrite();
-  for (int i = 0; i < SdofInt_; i++) {
-    dmuT[i] = std::max(dmuT[i], 1.0e-12);
   }
 
   if (sgs_model_smooth_) {
-    aveSteps_++;
-    aveSteps_ = std::min(aveSteps_, 4);
+    // aveSteps_++;
+    // aveSteps_ = std::min(aveSteps_, 4);
   
     // take average of recent steps
-    muT_NM0_ = subgridVisc_;
-    double Cave = 1.0 / (double)aveSteps_;
-    subgridVisc_ = 0.0;
-    subgridVisc_.Add(Cave, muT_NM0_);
-    subgridVisc_.Add(Cave, muT_NM1_);
-    subgridVisc_.Add(Cave, muT_NM2_);
-    subgridVisc_.Add(Cave, muT_NM3_);
+    activeSteps_++;
+    double wt0 = 1.0 / std::min((double)aveSteps_, (double)activeSteps_);
+    double wt1 = 1.0 - wt0;
 
+    // muT_NM0_ = subgridVisc_;
+    // double Cave = 1.0 / (double)aveSteps_;
+    // subgridVisc_ = 0.0;
+    // subgridVisc_.Add(Cave, muT_NM0_);
+    // subgridVisc_.Add(Cave, muT_NM1_);
+    // subgridVisc_.Add(Cave, muT_NM2_);
+    // subgridVisc_.Add(Cave, muT_NM3_);
     double* dmuT = subgridVisc_.HostReadWrite();
     double* dmuT0 = muT_NM1_.HostReadWrite();
     for (int i = 0; i < SdofInt_; i++) {
@@ -272,11 +299,11 @@ void AlgebraicSubgridModels::step() {
     }
     subgridVisc_gf_.SetFromTrueDofs(subgridVisc_);
     // shift storage
-    muT_NM3_ = muT_NM2_;
-    muT_NM2_ = muT_NM1_;
-    muT_NM1_ = subgridVisc_;
+    // muT_NM3_ = muT_NM2_;
+    // muT_NM2_ = muT_NM1_;
+    // muT_NM1_ = subgridVisc_;
   }
-  subgridVisc_gf_.SetFromTrueDofs(subgridVisc_);
+  // subgridVisc_gf_.SetFromTrueDofs(subgridVisc_);
 }
 
 /**
