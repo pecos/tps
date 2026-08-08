@@ -334,52 +334,6 @@ void CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow() {
 
   interp_em_to_flow_->Interpolate(vxyz, *joule_heating_gf, interp_vals);
 
-  // ParGridFunction* joule_heating_flow = flow_solver_->getJouleHeatingGF();
-  // const ParGridFunction *joule_heating_gf = qmsa_solver_->getJouleHeatingGF();
-  // MFEM_VERIFY(joule_heating_gf != NULL, "jouule_heating_gf is NULL in CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow()");
-
-  // bool coords_finite = (vxyz.CheckFinite() == 0);
-  // bool field_finite = (joule_heating_gf->CheckFinite() == 0);
-  // if (!coords_finite || !field_finite) {
-  //     grvy_printf(gerror, "[rank %d] NOT FINITE before interpolation: coords_ok=%d field_ok=%d "
-  //               "vxyz.Size()=%d n_flow_interp_nodes_=%d\n",
-  //               rank_, coords_finite, field_finite, vxyz.Size(), n_flow_interp_nodes_);
-  //     MFEM_ABORT("FATAL: interpolating Joule heating from EM to flow.");
-  // }
-
-  // --- NEW: r-coordinate (and z-coordinate) min/max logging ---
-  // {
-  //   const int dim = flow_fespace->GetMesh()->Dimension();
-  //   const int npts = vxyz.Size() / dim;
-
-  //   double rmin = 1e300, rmax = -1e300;
-  //   double zmin = 1e300, zmax = -1e300;
-  //   int n_near_axis = 0;
-  //   const double axis_tol = 1e-8;  // adjust based on your mesh scale
-
-  //   for (int i = 0; i < npts; i++) {
-  //     // MFEM FindPointsGSLIB expects interleaved or ordered-by-component
-  //     // layout depending on how interpolationPoints() builds vxyz --
-  //     // confirm this matches your actual ordering (see note below).
-  //     double r = vxyz(i);            // if byNODES ordering (component-major)
-  //     double z = vxyz(i + npts);
-
-  //     rmin = std::min(rmin, r);
-  //     rmax = std::max(rmax, r);
-  //     zmin = std::min(zmin, z);
-  //     zmax = std::max(zmax, z);
-
-  //     if (r < axis_tol) n_near_axis++;
-  //   }
-
-  //   grvy_printf(ginfo, "[rank %d] r range: [%g, %g], z range: [%g, %g], n_near_axis(r<%g)=%d\n",
-  //               rank_, rmin, rmax, zmin, zmax, axis_tol, n_near_axis);
-  //   fflush(stdout);
-  // }
-  // --- END NEW ---
-
-  // interp_em_to_flow_->Interpolate(vxyz, *joule_heating_gf, interp_vals);
-  // if (verbose) grvy_printf(ginfo, "[rank %d] Interp completed interp_em_to_flow for Joule heating.\n", rank_);
   ParGridFunction *joule_heating_flow = flow_solver_->getJouleHeatingGF();
   if (flow_fespace->IsDGSpace()) {
     joule_heating_flow->SetFromTrueDofs(interp_vals);
