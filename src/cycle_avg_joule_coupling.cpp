@@ -655,7 +655,6 @@ void CycleAvgJouleCoupling::solveStep() {
           ratio = target_power / tot_jh;
         } else {
           ratio = 1.0;  // hack, dont know what is correct here
-          // grvy_printf(GRVY_INFO, "target_power = %.6e\n", target_power);
         }
       } else {
         grvy_printf(GRVY_INFO, "input_power_ and tot_jh = %.6e %.6e \n", input_power_, tot_jh);
