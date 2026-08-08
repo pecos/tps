@@ -186,10 +186,10 @@ LteThermoChem::LteThermoChem(mfem::ParMesh* pmesh, LoMachOptions* loMach_opts, t
 
   // use full stabilization for all but momentum
   tpsP_->getInput("loMach/ltethermo/streamwise-stabilization", sw_stab_, false);
-  tpsP_->getInput("loMach/ltethermo/Reh_factor", Reh_factor_, 0.5);
-  tpsP_->getInput("loMach/ltethermo/Reh_offset", Reh_offset_, 1.0);
-
+  tpsP_->getInput("loMach/ltethermo/Reh_factor", Reh_factor_, 1.0);
+  tpsP_->getInput("loMach/ltethermo/Reh_offset", Reh_offset_, 0.0);
   tpsP_->getInput("loMach/ltethermo/neumann-temp", neumann_temp_, false);
+
   if (sw_stab_) {
     if (rank0_) std::cout << "Using SUPG in LTE thermo chem!" << std::endl;
   }
@@ -479,6 +479,7 @@ void LteThermoChem::initializeSelf() {
             std::cout << "Calorically Perfect: Setting zero Neumann temperature on patch = " << patch << std::endl;
           }
         }
+        // AddTempDirichletBC(temperature_value, inlet_attr);
 
       } else if (type == "normal") {
         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
@@ -539,7 +540,7 @@ void LteThermoChem::initializeSelf() {
 
   // Wall BCs
   {
-    if (rank0_) std::cout << "There are " << pmesh_->bdr_attributes.Max() << " boundary attributes!" << std::endl;
+    if (rank0_) std::cout << "There are " << pmesh_->bdr_attributes.Max() << " boundary attributes" << std::endl;
     Array<int> attr_wall(pmesh_->bdr_attributes.Max());
     attr_wall = 0;
 
@@ -926,7 +927,6 @@ void LteThermoChem::initializeOperators() {
   }
   LQ_form_->AddDomainIntegrator(lqd_blfi);
 
-<<<<<<< HEAD
   // NO, this is not consistent and will degrade stability
   // if (sw_stab_) {
   //  auto *slqd_blfi = new DiffusionIntegrator(*supg_coeff_);
@@ -936,15 +936,6 @@ void LteThermoChem::initializeOperators() {
   //  LQ_form_->AddDomainIntegrator(slqd_blfi);
   // }
 
-=======
-  // if (sw_stab_) {
-  //   auto *slqd_blfi = new DiffusionIntegrator(*supg_coeff_);
-  //   if (numerical_integ_) {
-  //     slqd_blfi->SetIntRule(&ir_di);
-  //   }
-  //   LQ_form_->AddDomainIntegrator(slqd_blfi);
-  // }
->>>>>>> zetaf-bte
   if (partial_assembly_) {
     LQ_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   }
