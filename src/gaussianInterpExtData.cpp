@@ -429,9 +429,6 @@ void GaussianInterpExtData::setInlet() {
       for (int d = 0; d < dim_; d++) {
         xp[d] = hcoords[n + d * Sdof_];
       }
-      // if (dim_ < 3 || axisym_) {
-      //   xp[2] = 0.0;
-      // }
 
       // int iCount = 0;
       double dist = 0.0;
@@ -684,9 +681,6 @@ void GaussianInterpExtData::setFieldInitSpec() {
       for (int d = 0; d < dim_; d++) {
         xp[d] = hcoords[n + d * Sdof_];
       }
-      // if (dim_ < 3 || axisym_) {
-      //   xp[2] = 0.0;
-      // }
 
       // int iCount = 0;
       double dist = 0.0;
@@ -864,9 +858,6 @@ void GaussianInterpExtData::setFieldTurbVisc() {
       for (int d = 0; d < dim_; d++) {
         xp[d] = hcoords[n + d * Sdof_];
       }
-      // if (dim_ < 3 || axisym_) {
-      //   xp[2] = 0.0;
-      // }
 
       // int iCount = 0;
       double dist = 0.0;
@@ -1033,9 +1024,6 @@ void GaussianInterpExtData::setInletTurbScalars() {
       for (int d = 0; d < dim_; d++) {
         xp[d] = hcoords[n + d * Sdof_];
       }
-      // if (dim_ < 3 || axisym_) {
-      //   xp[2] = 0.0;
-      // }
 
       // int iCount = 0;
       double dist = 0.0;
