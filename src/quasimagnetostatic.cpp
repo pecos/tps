@@ -747,6 +747,7 @@ double QuasiMagnetostaticSolver3D::totalJouleHeating() {
     joule_heating_->GetSubVector(vdofs, el_x);
 #endif
 
+    // following bad fields here (el_x has the actual data)...
     int_jh += elementJouleHeating(*fe, *T, el_x);
   }
 
@@ -1091,7 +1092,7 @@ void QuasiMagnetostaticSolverAxiSym::solveStep() {
   // TODO(trevilo): Compute B field (maybe... we only need it for validation comparisons)
 
   // Compute Joule heating (on em mesh obviously)
-  const double omega = (2 * M_PI * em_opts_.current_frequency);
+  const double omega = (2.0 * M_PI * em_opts_.current_frequency);
   const double omega2 = omega * omega;
 
   Vector tmp1 = (*Atheta_real_);
