@@ -51,10 +51,6 @@
 
 namespace py = pybind11;
 using namespace py::literals;
-
-// ##ifdef HAVE_MPI4PY
-// ##include <mpi4py/mpi4py.h>
-// ##endif
 #include <cuda_runtime.h>
  
 #endif
@@ -895,11 +891,11 @@ ReactingFlow::ReactingFlow(mfem::ParMesh* pmesh, LoMachOptions* loMach_opts, tem
 
   // artificial diffusion (SUPG)
   tpsP_->getInput("loMach/reactingFlow/streamwise-stabilization", sw_stab_, false);
-  tpsP_->getInput("loMach/reactingFlow/Reh_factor", Reh_factor_, 0.5);
-  tpsP_->getInput("loMach/reactingFlow/Reh_offset", Reh_offset_, 1.0);
 
   // specified plasma initial condition (use full sw-stab for all but momentum)
   tpsP_->getInput("plasma_models/initialize_species", species_init_, false);
+  tpsP_->getInput("loMach/reactingFlow/Reh_factor", Reh_factor_, 1.0);
+  tpsP_->getInput("loMach/reactingFlow/Reh_offset", Reh_offset_, 0.0);
 
   // zero-gradient BCs
   tpsP_->getInput("loMach/reactingFlow/neumann-temp", neumann_temp_, false);
@@ -1041,21 +1037,6 @@ ReactingFlow::~ReactingFlow() {
   delete swdiff_coeff_;
   delete supg_coeff_;
   delete supg_cp_coeff_;
-
-  // delete umag_coeff_;
-  // delete gscale_coeff_;
-  // delete visc_coeff_;
-  // delete visc_inv_coeff_;
-  // delete reh1_coeff_;
-  // delete reh2_coeff_;
-  // delete Reh_coeff_;
-  // delete csupg_coeff_;
-  // delete uw1_coeff_;
-  // delete uw2_coeff_;
-  // delete upwind_coeff_;
-  // delete swdiff_coeff_;
-  // delete supg_coeff_;
-  // delete supg_cp_coeff_;
 
   // allocated in initializeSelf
   delete vfes_;
@@ -2447,21 +2428,8 @@ void ReactingFlow::step() {
     int update_bte_rates = (iter - 1) % solve_bte_every_n;
 
     int regrid_bte = (iter - 1) % regrid_bte_every_n;
-    
-    // if (rank0_) {
-    //   int iter_number_ = this->GetCurrentIter();
-    //   std::cout << "[C++] Iter = " << iter_number_ << "sDofInt = " << sDofInt_ 
-    //   << ", update_bte_rates = " << update_bte_rates << ", regrid_bte = " << regrid_bte << ", " << regrid_bte_every_n <<
-    //   ", bl_frac_ = " << bl_frac_ << ", bl_frac_change_freq_ = " << bl_frac_change_freq_ <<
-    //   ", nBTEReactions, nReactions = " << nBTEReactions_ << ", " << nReactions_ << ", bte_from_tps = " << bte_from_tps_ << "\n";
-    // }
 
     if (bte_from_tps_ && regrid_bte == 0) {
-      // if (rank0_) {
-      //   int iter_number_ = this->GetCurrentIter();
-      //   std::cout << "[C++] Iter = " << iter_number_ << ", Setting up the v-space grids for BTE..." << "\n";
-      // }
-
       int myRank;
       MPI_Comm_rank(tpsP_->getTPSCommWorld(), &myRank);
 
