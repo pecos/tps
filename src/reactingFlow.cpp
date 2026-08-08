@@ -1575,17 +1575,17 @@ void ReactingFlow::initializeSelf() {
         }
 
       } else if (type == "normal") {
-         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
-         inlet_attr = 0;
-         inlet_attr[patch - 1] = 1;
-         double temperature_value;
-         tpsP_->getRequiredInput((basepath + "/temperature").c_str(), temperature_value);
-         if (rank0_) {
-            std::cout << "Rx Flow: Setting uniform Dirichlet temperature on patch = " << patch << std::endl;
-         }
-         AddTempDirichletBC(temperature_value, inlet_attr);
+          Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
+          inlet_attr = 0;
+          inlet_attr[patch - 1] = 1;
+          double temperature_value;
+          tpsP_->getRequiredInput((basepath + "/temperature").c_str(), temperature_value);
+          if (rank0_) {
+              std::cout << "Rx Flow: Setting uniform Dirichlet temperature on patch = " << patch << std::endl;
+          }
+          AddTempDirichletBC(temperature_value, inlet_attr);
 
-          // do nothing for species for time being
+            // do nothing for species for time being
 
       } else {
         if (rank0_) {
@@ -1671,6 +1671,7 @@ void ReactingFlow::initializeOperators() {
       sigma_gf_.ProjectCoefficient(sigma_start_up_2d);
     }
   }
+
   Array<int> empty;
 
   // GLL integration rule (Numerical Integration)
@@ -2085,6 +2086,7 @@ void ReactingFlow::initializeOperators() {
   //   }
   //   LQ_form_->AddDomainIntegrator(slqd_blfi);
   // }
+
   if (partial_assembly_) {
     LQ_form_->SetAssemblyLevel(AssemblyLevel::PARTIAL);
   }
@@ -2315,6 +2317,7 @@ void ReactingFlow::step() {
       // if(wgt >1) {
       // std::cout << "BAD WGT: " << wgt << endl;
       // }
+
       // free electron value (mass-fraction)
       h_Yn[eSlot * sDofInt_ + i] += wgt * spark_peak_;
 
@@ -3586,6 +3589,7 @@ void ReactingFlow::initializeIO(IODataOrganizer& io) {
   const bool species_in_restart_file = !restart_from_lte;
 
   io.registerIOFamily("Species", "/species", &YnFull_gf_, true, species_in_restart_file, yfec_);
+  
   for (int sp = 0; sp < nSpecies_; sp++) {
     std::string speciesName = std::to_string(sp);
     io.registerIOVar("/species", "Y_" + speciesName, sp, species_in_restart_file);
