@@ -1574,6 +1574,19 @@ void ReactingFlow::initializeSelf() {
           Yn_gf_.ProjectBdrCoefficient(*species_bc_field_, inlet_attr);
         }
 
+      } else if (type == "normal") {
+         Array<int> inlet_attr(pmesh_->bdr_attributes.Max());
+         inlet_attr = 0;
+         inlet_attr[patch - 1] = 1;
+         double temperature_value;
+         tpsP_->getRequiredInput((basepath + "/temperature").c_str(), temperature_value);
+         if (rank0_) {
+            std::cout << "Rx Flow: Setting uniform Dirichlet temperature on patch = " << patch << std::endl;
+         }
+         AddTempDirichletBC(temperature_value, inlet_attr);
+
+          // do nothing for species for time being
+
       } else {
         if (rank0_) {
           std::cout << "ERROR: Rx Flow inlet type = " << type << " not supported." << std::endl;
