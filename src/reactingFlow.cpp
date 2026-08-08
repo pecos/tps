@@ -2452,15 +2452,6 @@ void ReactingFlow::step() {
         std::cerr << "ReactingFlow::step(), Python error in BTE grid setup: " << e.what() << std::endl;
         MFEM_ABORT("FATAL: Error in Python script bte_grid_setup()");
       }
-
-      // --- NEW: same CUDA check here too, for symmetry/coverage ---
-      cudaError_t cuda_err = cudaGetLastError();
-      if (cuda_err != cudaSuccess) {
-        std::cerr << "[rank " << myRank << "] CUDA error after bte_grid_setup: "
-              << cudaGetErrorString(cuda_err) << std::endl;
-        MFEM_ABORT("FATAL: CUDA error after bte_grid_setup");
-      }
-      // --- END NEW ---
       
       py::tuple arrays = result.cast<py::tuple>();
 
@@ -2609,25 +2600,6 @@ void ReactingFlow::step() {
       int myRank;
       MPI_Comm_rank(tpsP_->getTPSCommWorld(), &myRank);
 
-      // --- NEW: CUDA error/sync check, immediately after Python returns ---
-      cudaError_t cuda_err = cudaGetLastError();
-      if (cuda_err != cudaSuccess) {
-        std::cerr << "[rank " << myRank << "] CUDA error after bte_from_tps: "
-              << cudaGetErrorString(cuda_err) << std::endl;
-        MFEM_ABORT("FATAL: CUDA error after Python/CuPy call");
-      }
-      cuda_err = cudaDeviceSynchronize();
-      if (cuda_err != cudaSuccess) {
-        std::cerr << "[rank " << myRank << "] CUDA sync error after bte_from_tps: "
-              << cudaGetErrorString(cuda_err) << std::endl;
-        MFEM_ABORT("FATAL: CUDA sync error after Python/CuPy call");
-      }
-      size_t free_mem, total_mem;
-      cudaMemGetInfo(&free_mem, &total_mem);
-      // std::cerr << "[rank " << myRank << "] GPU mem after bte_from_tps: "
-      //     << (total_mem - free_mem) / (1024.0*1024.0) << " MB used" << std::endl;
-      // --- END NEW ---
-
       if (rank0_) {
         std::cout << "Rank 0, back to TPS after solving BTE in Python\n";
       }
@@ -2772,15 +2744,9 @@ void ReactingFlow::step() {
 #ifdef HAVE_PYTHON
         if (bte_from_tps_) {
           // Extract point state for the BTE rates
-          // double *bterates = new double[nBTEReactions_];
           for (int rr = 0; rr < nBTEReactions_; rr++) {
             bterates[rr] = btearr[i + rr*sDofInt_];
           }
-
-          // kfBTE = 0.0; 
-          // prograteBTE = 0.0;
-          // rrfrrbBTE = 0.0;
-          // prodYsp = 0.0;
 
           kf = 0.0;
           prograte = 0.0;
@@ -2792,33 +2758,22 @@ void ReactingFlow::step() {
           solveChemistryStepBTE(YT, i, dt_, bterates.GetData(),
                                 kf.GetData(), prograte.GetData(), rrfrrb.GetData(), EbyNloc); 
 
-          //   , kf.GetData(), prograte.GetData(), rrfrrb.GetData(),
-          //   kfBTE.GetData(), prograteBTE.GetData(), rrfrrbBTE.GetData(), prodYsp.GetData()
-          // );
-
           for (int nr = 0; nr < nReactions_; nr++) {
             datakfwd[i + nr*sDofInt_] = std::max(0.0,kf[nr]);
-          //   dataBTEkfwd[i + nr*sDofInt_] = std::max(0.0,kfBTE[nr]);
             dataReac[i + nr * sDofInt_] = prograte[nr];
-          //   dataBTEReac[i + nr * sDofInt_] = prograteBTE[nr];
             if (nr % 2 == 0) {
               datarrfbyrrb[i + int(nr/2) * sDofInt_] = std::max(0.0, prograte[nr] / (1e-28 + prograte[nr + 1]));
-          //     dataBTErrfbyrrb[i + int(nr/2) * sDofInt_] = std::max(0.0, prograteBTE[nr] / (1e-28 + prograteBTE[nr + 1]));
             }
           }
-
-          // for (int sp = 0; sp < nSpecies_; sp++) {
-          //   dataProd[i + sp*sDofInt_] = prodYsp[sp];
-          // }
         } else{
 #endif    
-          // prodYsp = 0.0;
           kf = 0.0;
           prograte = 0.0;
           rrfrrb = 0.0;
 
           // Solve backward Euler update (with tabulated rates)
           solveChemistryStep(YT, i, dt_, kf.GetData(), prograte.GetData(), rrfrrb.GetData());
+          // solveChemistryStep(YT, i, dt_);
 
           // Fill in the vectors storing rate coefficients (kf), reaction rates, rate of forward / backward rate from values
           // returned by solveChemistryStep()
@@ -2829,11 +2784,6 @@ void ReactingFlow::step() {
               datarrfbyrrb[i + int(nr/2) * sDofInt_] = std::max(0.0, prograte[nr] / (1e-28 + prograte[nr + 1]));
             }
           }
-//           for (int sp = 0; sp < nSpecies_; sp++) {
-//             dataProd[i + sp*sDofInt_] = prodYsp[sp];
-//           }
-        
-        // solveChemistryStep(YT, i, dt_);
 #ifdef HAVE_PYTHON
         }
 #endif
