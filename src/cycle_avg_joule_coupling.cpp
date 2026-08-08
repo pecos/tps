@@ -317,7 +317,6 @@ void CycleAvgJouleCoupling::interpolationPoints(Vector& vxyz, int n_interp_nodes
 void CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow() {
   const bool verbose = rank0_;
   if (verbose) grvy_printf(ginfo, "Interpolating Joule heating to flow mesh.\n");
-  fflush(stdout);
 
 #ifdef HAVE_GSLIB
   const ParFiniteElementSpace* flow_fespace = flow_solver_->getFESpace();
@@ -356,7 +355,6 @@ void CycleAvgJouleCoupling::interpJouleHeatingFromEMToFlow() {
     joule_heating_flow->SetTrueVector();
     joule_heating_flow->SetFromTrueVector();
   }
-  // if (verbose) grvy_printf(ginfo, "Joule heating interpolated to flow mesh.\n");
 #else
   mfem_error("Cannot interpolate without GSLIB support.");
 #endif
@@ -393,7 +391,6 @@ void CycleAvgJouleCoupling::interpElectricFieldFromEMToFlowforBTE() {
   Vector interp_vals(n_flow_interp_nodes_ * efield_ncomp_);
 
   const ParGridFunction *efield_real_gf = qmsa_solver_->getElectricFieldreal();
-
   interp_em_to_flow_->Interpolate(vxyz, *efield_real_gf, interp_vals);
 
   ParGridFunction *efield_real_flow = flow_solver_->getEfieldRealGF();
@@ -508,7 +505,6 @@ void CycleAvgJouleCoupling::initialize() {
 }
 
 void CycleAvgJouleCoupling::solve() {
-
 #ifdef HAVE_PYTHON
   // INITIALIZE THE PYTHON INTERPRETER BEFORE solveBegin() is called
   if(bte_from_tps_) {
@@ -543,21 +539,8 @@ void CycleAvgJouleCoupling::solve() {
         MFEM_ABORT("FATAL: Error in C++ in Cycle_Avg_Joule_Coupling::Solve()");
     }
 
-    // --- NEW: baseline GPU memory reading, before any CUDA context exists ---
-    size_t free_mem0, total_mem0;
-    cudaError_t err0 = cudaMemGetInfo(&free_mem0, &total_mem0);
-    if (err0 == cudaSuccess) {
-        // std::cerr << "[rank " << rank_ << "] [baseline] GPU mem before any BTE calls: "
-        //           << (total_mem0 - free_mem0) / (1024.0*1024.0) << " MB used" << std::endl;
-    } else {
-        std::cerr << "[rank " << rank_ << "] [baseline] cudaMemGetInfo failed: "
-                  << cudaGetErrorString(err0) << std::endl;
-    }
-    // --- END NEW ---
-
   }
 #endif
-
   this->solveBegin();
   double tlast = grvy_timer_elapsed_global();
 
