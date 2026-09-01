@@ -22,7 +22,7 @@ import scipy.sparse.linalg
 from   datetime import datetime
 from   bte_0d3v_batched import bte_0d3v_batched
 import utils as bte_utils
-import cupy as cp
+import cupy as cp 
 import matplotlib.pyplot as plt
 import csv
 import sys
@@ -39,7 +39,7 @@ c_gamma               = np.sqrt(2 * (scipy.constants.elementary_charge / me))
 eps                   = 1e-15
 N_Avo                 = scipy.constants.Avogadro
 
-EMag_threshold        = 1e-10
+EMag_threshold        = 1e-15
 rand_seed             = 0
 clstr_maxiter         = 10
 clstr_threshold       = 1e-3
@@ -53,7 +53,27 @@ neg_thresh            = 2e3 # negative threshold for rate coefficient
 varyT_cs = 1
 append_recomb_cs = 1
 
+maxwellian_bypass = 0
+
 cs_datbase = "/scratch/10565/ashwathsv/tps-venv/vista/tps/tps-inputs/axisymmetric/argon/highP/cs_data"
+nist_file = "/scratch/10565/ashwathsv/tps-venv/vista/tps/torch-chemistry/argon/input-data/ArI-levels-nist.csv"
+g0 = 1 # Ar ground state degeneracy
+g1 = 4 # Ar ion degeneracy
+
+delE_ex = 11.512684347610431 # Excitation threshold energy in eV
+delE_ig = 15.650008568830833 # Ionization threshold energy from ground state
+delE_il = delE_ig - delE_ex
+enforce_detailed_balance = 0
+
+m_e                   = scipy.constants.electron_mass
+k_B                   = scipy.constants.Boltzmann
+h_pl                  = scipy.constants.Planck
+g0 = 1 # Ar ground state degeneracy
+g1 = 4 # Ar ion degeneracy
+
+delE_ex = 11.512684347610431 # Excitation threshold energy in eV for Ar
+delE_ig = 15.650008568830833 # Ionization threshold energy from ground state for Ar
+delE_il = delE_ig - delE_ex
 
 logfile = "outlog.txt"
 
@@ -183,6 +203,7 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
         # Get the ionization degree as well
         iondeg = ne / n0
         iondeg[iondeg<=0]     = 1e-16
+        # iondeg[iondeg<=0]     = 0.0
 
         # INITIALIZE THE BOLTZMANN SOLVER OBJECT
         lm_modes                         = [[[l,0] for l in range(args.l_max+1)] for grid_idx in range(n_grids)]
@@ -199,18 +220,13 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
             Tg_max = np.amax( Tg[grid_idx_to_spatial_idx_map[idx]] ) 
             nen0max = np.amax(iondeg[grid_idx_to_spatial_idx_map[idx]])
 
-            if Tg_max <= 1000:
-                print(f"Low Tg WARNING: Rank {rank_}, gid {idx}, Tgmax = {Tg_max}, is low. Cold region may give bad rate coefficients.", flush=True)
+            evmax_thermal = 40 * Tg_max / ev_to_K
 
-            # if nen0max > 1e-4:
-            #     args.ee_collisions = 1
-            #     print(f"Rank {rank_}/{size_}, ee_collisions enabled")
-            #     print(f"Rank {rank_}, gid {idx}, nen0max = {nen0max}")
-
-            evmax_thermal = 30 * Tg_max / ev_to_K
+            if Tg_max < 3000:
+                evmax_thermal = 40 * Tg_max / ev_to_K
 
             if Tg_max > 6000:
-                evmax_thermal = 54 * Tg_max / ev_to_K 
+                evmax_thermal = 40 * Tg_max / ev_to_K 
             
             if args.ee_collisions==1:
                 evmax_thermal = 80 * Tg_max / ev_to_K
@@ -220,18 +236,28 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
             # Some useful prints for debugging BTE issues
             if efmax <= 0.1:
                 print(f"Low E/N WARNING: Rank {rank_}, gid {idx}, efmax = {efmax}, is low. Bad coefficients possible.", flush=True)
-            evmax_efield = 16.0
-            if args.ee_collisions == 1:
-                evmax_efield = evmax_thermal
-            if efmax > 0.1 and efmax <= 2.0:
+            evmax_efield = 8.0
+            if efmax > 0.1 and efmax <= 0.5:
+                evmax_efield = 16.0
+                if Tg_max < 3000:
+                    evmax_efield = 12.0
+            elif efmax > 0.5 and efmax <= 1.0:
                 evmax_efield = 18.0
-            elif efmax > 2.0 and efmax <= 10.0:
-                evmax_efield = 35.0
-            elif efmax > 10.0 and efmax <= 100.0:
-                evmax_efield = 75.0
-            elif efmax > 100.0:
+            elif efmax > 1.0 and efmax <= 2.0:
+                evmax_efield = 20.0
+            elif efmax > 2.0 and efmax <= 5.0:
+                evmax_efield = 30.0
+            elif efmax > 5.0 and efmax <= 10.0:
+                evmax_efield = 50.0
+            elif efmax > 10.0:
                 evmax_efield = 100.0
             
+            if maxwellian_bypass == 1:
+                if idx == 0:
+                    print(f"Rank {rank_}, maxwellian_bypass == {maxwellian_bypass}. ")
+                evmax_efield = evmax_thermal
+            
+            # evmax_efield = evmax_thermal
             ev_max[idx] = max(evmax_thermal, evmax_efield)
     except Exception as e:
         traceback.print_exc()
@@ -239,22 +265,46 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
         print("rank [%d/%d], failed setting up ev_max for each v-space grid"%(rank_, size_), flush=True)
         comm.Abort(1)
 
+    print(f"Rank {rank_}, ev_max = {ev_max}")
+
     try:
         col_cs = list()
+        args.collisions = collisions_file # collision cross-section file
+        cs_data_all   = cross_section.read_cross_section_data(args.collisions)
+        
+        coll_type_list = list()
+        allow_cols     = list()
+        for col_str, col_data in cs_data_all.items():
+            coll_type_list.append(col_data["type"])
+            allow_cols.append(col_str)
+
+        glump = -1 * np.ones(n_grids)
+
+        if varyT_cs == 1:
+            Tlfile = cs_datbase + "/Tlump.txt"
+            Tlarr = np.loadtxt(Tlfile, delimiter=",")
+
+            glfile = cs_datbase + "/glump.txt"
+            glarr = np.loadtxt(glfile, delimiter="\t")
+
         for idx in range(n_grids):
             cs_fname = collisions_file
             if varyT_cs == 1:
-                Tlfile = cs_datbase + "/Tlump.txt"
-                Tlarr = np.loadtxt(Tlfile, delimiter=",")
                 Temp = Tlarr[np.argmin(np.abs((Te[idx]*ev_to_K) - Tlarr))]
+
+                # Lumped state degeneracy is determined at Temp
+                glump[idx] = glarr[np.argmin(np.abs(glarr[:,0] - Temp)), 1]
+
                 cs_input = "/crs_Tlump%06d.lxcat" %(Temp)
                 cs_input = cs_datbase + cs_input
                 cs_fname = "%s/crs_rank_%06d_npes_%06d_%06d.txt"%(crs_folder, rank_, size_, idx) 
-                # synthetic_cs.gen_lxcat_file(cs_fname, Te[idx] * ev_to_K, append_recomb_cs, rank_, idx)
-                # synthetic_cs.gen_lxcat_file_coupledsolve(cs_fname, Te[idx] * ev_to_K, ev_max[idx], append_recomb_cs, rank_, idx)
-                synthetic_cs.read_and_write_lumpedcs(cs_fname, cs_input, ev_max[idx], rank_, idx)
+                synthetic_cs.read_and_write_lumpedcs(cs_fname, cs_input, ev_max[idx], allow_cols, rank_, idx)
 
             col_cs.append(cs_fname)
+        
+        if np.amin(glump) <= 0:
+            print(f"Rank {rank_}, glump = {glump}, negative values found. Aborting...")
+            comm.Abort(1)
     except Exception as e:
         traceback.print_exc()
         print("rank [%d/%d], failed setting up the cross-section files"%(rank_, size_), flush=True)
@@ -269,29 +319,25 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
             if rank_ == 0:
                 print("Rank ", rank_, ", args.collisions = ", args.collisions, flush=True)
         cs_data_all   = cross_section.read_cross_section_data(args.collisions)
-
-        coll_type_list = list()
-        for col_str, col_data in cs_data_all.items():
-            coll_type_list.append(col_data["type"])
         
         if rank_ == 0:
-            # print("col_cs = ", col_cs, [args.collisions])
             print("ev_max = ", ev_max, ", Te = ", Te, ", n_grids = ", n_grids, ", tol = ", args.rtol, args.atol, ", Nr = ", nr)
-            # print("coll_type_list = ", coll_type_list, len(coll_type_list))
         
         is_recomb = np.zeros(len(coll_type_list))
         for idx in range(len(is_recomb)):
             if coll_type_list[idx] == "ATTACHMENT":
                 is_recomb[idx] = 1
         
-        # if rank_ == 0:
-        #     print("is_recomb = ", is_recomb)
+        if rank_ == 0:
+            print("is_recomb = ", is_recomb)
 
         nActSpecies = nSpecies - 2
         all_species           = cross_section.read_available_species(args.collisions)
 
         args.solver_type = solver_type
         args.ee_collisions = ee_collisions
+        if maxwellian_bypass == 1:
+            args.ee_collisions = 0
 
         if rank_ == 0:
             print("[Python] BTE solver_type = ", args.solver_type, ", ee_collisions = ", args.ee_collisions, ", rtol = ", args.rtol, ", Nr = ", args.Nr, ", max-iter = ", args.max_iter, "do_sub_clust = ", use_interp, ", n_sub_clusters = ", n_sub_clusters, ", store_csv = ", store_csv, ", dt_BTE = ", dt_bte)
@@ -322,22 +368,13 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
             if all_species[i] == 'Ar':
                 ns_by_n0[i] = narr[NEUIDX*n_pts:NEUIDX*n_pts+n_pts] / n0
             elif all_species[i] == 'Ar*':
-                ns_by_n0[i] = narr[EXCIDX*n_pts:EXCIDX*n_pts+n_pts] / n0
+                ns_by_n0[i] = 0.0*narr[EXCIDX*n_pts:EXCIDX*n_pts+n_pts] / n0 # If this is zero, collision operator does not have Ar* collisions
             elif all_species[i] == 'Ar+':
                 ns_by_n0[i] = (ni / n0)
 
         # enforce mixture mass is normalized
         ns_by_n0 = ns_by_n0/np.sum(ns_by_n0, axis=0)
     
-        #  generate crs Tg depended crs data 
-        # col_cs = list()
-        # for idx in range(n_grids):
-        #     cs_fname = collisions_file
-        #     if varyT_cs == 1:
-        #         cs_fname = "%s/crs_rank_%06d_npes_%06d_%06d.txt"%(crs_folder, rank_, size_, idx) 
-        #         synthetic_cs.gen_lxcat_file_coupledsolve(cs_fname, Te[idx] * ev_to_K, ev_max[idx], append_recomb_cs, rank_, idx)
-        #     col_cs.append(cs_fname)
-        # comm.Barrier()
     except Exception as e:
         traceback.print_exc()
         print(e)
@@ -447,8 +484,6 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
     ExbyN                   = ERe/n0/Td_fac
     EybyN                   = EIm/n0/Td_fac
 
-    # ExbyN[e_idx]            = (EMag_threshold/np.sqrt(2)) / n0[e_idx] / Td_fac
-    # EybyN[e_idx]            = (EMag_threshold/np.sqrt(2)) / n0[e_idx] / Td_fac
     ExbyN[e_idx]            = (EMag_threshold/np.sqrt(2)) / n0[e_idx] / Td_fac
 
     Ex                      = ExbyN * n0 * Td_fac
@@ -456,6 +491,7 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
 
     ion_deg                 = ne/n0
     ion_deg[ion_deg<=0]     = 1e-16
+    # ion_deg[ion_deg<=0]     = 0.0
     ns_by_n0[ns_by_n0<=0]   = 0
     m_bte                   = np.concatenate([n0.reshape((-1, 1)), ExbyN.reshape((-1, 1)), EybyN.reshape((-1, 1)), Tg.reshape((-1, 1)), ion_deg.reshape((-1, 1))] + [ ns_by_n0[i].reshape((-1, 1)) for i in range(ns_by_n0.shape[0])], axis=1)
 
@@ -636,7 +672,7 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
             try:
                 f0 = bte_solver.get_boltzmann_parameter(grid_idx, "u0")
                 ls_c     = 1e-4
-                if args.ee_collisions == 1:
+                if args.ee_collisions == 1 and maxwellian_bypass == 0:
                 # disabling ee-collisions temporary by force to get a good initial guess. 
                     args.ee_collisions = 0  
                     ff , qoi = bte_solver.solve(grid_idx, f0, args.atol, args.rtol, args.max_iter, args.solver_type,
@@ -647,8 +683,16 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
                 # enable ee-collisions
                     args.ee_collisions = 1                
                 f0       = bte_solver.get_boltzmann_parameter(grid_idx,"u0")
-                ff , qoi = bte_solver.solve(grid_idx, f0, args.atol, args.rtol, args.max_iter, args.solver_type,
-                            alpha_min = 1e-16, alpha_rho=0.5, line_search_c = ls_c)
+                if maxwellian_bypass == 0:
+                    ff , qoi = bte_solver.solve(grid_idx, f0, args.atol, args.rtol, args.max_iter, args.solver_type,
+                                alpha_min = 1e-16, alpha_rho=0.5, line_search_c = ls_c)
+                elif maxwellian_bypass == 1:
+                    ff = f0
+                    bte_solver.set_boltzmann_parameter(grid_idx, "u_avg", ff)
+                    qA        = bte_solver._op_diag_dg[grid_idx]
+                    u0        = bte_solver.get_boltzmann_parameter(grid_idx, "u_avg")
+                    h_curr    = bte_solver.normalized_distribution(grid_idx, u0)
+                    qoi       = bte_solver.compute_QoIs(grid_idx, h_curr, effective_mobility=False)
                 
                 ff_list[grid_idx]  = ff
                 qoi_list[grid_idx] = qoi
@@ -688,53 +732,204 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
                     h_curr    = bte_solver.normalized_distribution(grid_idx, u0)
                     qoi       = bte_solver.compute_QoIs(grid_idx, h_curr, effective_mobility=False)
                     rr_cpu    = xp.asnumpy(qoi["rates"])
-                    # if rank_ == 0:
-                    #     print(f"Rank 0 gid {grid_idx}, shape(rr_cpu) = {rr_cpu.shape}")
-                    for rr_idx in range(coll_count):
-                        ratearr = rr_cpu[rr_idx]
-                        typ = cp.get_array_module(ratearr)
-                        # Find out is the maximum of ratearr is positive or negative
-                        if not typ.any(ratearr >= 0.0):
-                            # All the rate coefficients are negative
-                            # If they are small negative values, we can just swap the sign and make them positive
-                            prefac = N_Avo
-                            if is_rec[rr_idx] == 1:
-                                prefac = N_Avo**2
-                            neg_cutoff = neg_thresh / prefac
-                            if typ.amin(ratearr) >= -neg_cutoff:
-                                print(f"Rank {rank_}, gid {grid_idx}, min = {typ.amin(ratearr)} > neg_cutoff {-neg_cutoff}. Will swap sign of these rate coefficients.")
-                                small_neg = (ratearr < 0.0) & (ratearr >= -neg_cutoff)
-                                ratearr[small_neg] *= -1
-                            else:
-                                print(f"FATAL: With subclustering, Rank {rank_}, gid {grid_idx}, Reaction {rr_idx} failed. All rate coefficients are negative")
-                                print(f"Rank {rank_}, gid {grid_idx}, Reaction {rr_idx}, min = {typ.amin(ratearr)}")
-                                print(f"Rank {rank_}, gid {grid_idx}, Reaction {rr_idx}, max = {typ.amax(ratearr)}")
-                                print(f"Rank {rank_}, gid {grid_idx}, Reaction {rr_idx}, mean = {typ.mean(ratearr)}")
-                                print(f"FATAL: Rank {rank_}, gid {grid_idx}, Reaction {rr_idx}, Boltzmann solver produced no positive rate coefficients.")
-                                bad_kreac = 1
-                                # comm.Abort(1)
-                            
-                        if not typ.all(ratearr >= 0.0):
-                            print(f"With subclustering, Rank {rank_}, gidx {grid_idx}, rr_idx {rr_idx}, "
-                                f"some negative rate coefficients found. " \
-                                "Will be correcting them to the mean of the remaining positive values.", 
-                                flush=True,
-                                )
 
-                            prefac = N_Avo
-                            if is_rec[rr_idx] == 1:
-                                prefac = N_Avo**2
-                            positive_values = ratearr[ratearr >= 0]
-                            positive_mean = typ.mean(positive_values)
+                    # Enforce detailed balance for the rate coefficients
+                    if enforce_detailed_balance == 1:
+                        # Get the mean electron temperature in the v-space grid
+                        Te_arr = (2.0/3.0) * xp.asnumpy(qoi["energy"])
+                        typ = cp.get_array_module(Te_arr)
+                        if rank_ == 0 and grid_idx == 0:
+                            print("Typ(Te_arr) = ", typ)
+                        prefac = ((2 * np.pi * m_e * k_B * Te_arr * ev_to_K) / (h_pl**2))**1.5
 
-                            # The negative values are replaced with positive_mean
-                            neg_cutoff = neg_thresh / prefac
-                            small_neg = (ratearr < 0.0) & (ratearr >= -neg_cutoff)
-                            large_neg = ratearr < -neg_cutoff
-                            ratearr[small_neg] *= -1
-                            ratearr[large_neg] = positive_mean
+                        if len(allow_cols) != coll_count:
+                            print(f"Rank {rank_}, gid {grid_idx}, len(allow_cols) = {len(allow_cols)} != coll_count ({coll_count}). Aborting")
+                            comm.Abort(1)
+
+                        for rr_idx in range(coll_count):
+                            ratearr = rr_cpu[rr_idx]
+                            if np.amin(ratearr) < 0:
+                                rmin = np.amin(ratearr)
+                                print(f"FATAL: Before enforcement, Rank {rank_}, gid {grid_idx}, rr_idx {rr_idx}, negative rate coefficient {rmin}. Aborting")
+                                comm.Abort(1)  
+                                
+                            if rank_ == 0 and grid_idx == 0:
+                                print("shape(ratearr) = ", ratearr.shape)
+
+                            if allow_cols[rr_idx] == "E + Ar -> E + E + Ar+":
+                                # Ground ionization (compare electron temperature to ionization threshold)
+                                ig_thresh = 0.05 * delE_ig
+                                lo_cutoff = 0.9 * ig_thresh
+                                hi_cutoff = 1.1 * ig_thresh
+                                Keq = (2 * g1 / g0) * prefac * np.exp(-delE_ig / Te_arr)
+                                if np.amin(Keq) < 0.0:
+                                    print(f"Rank {rank_} gid {grid_idx}, col {allow_cols[rr_idx]} has Keq < 0 ({np.amin(Keq)})")
+
+                                # First, confirm that the cross-section file has ground recombination
+                                irec = -1
+                                ii = 0
+                                for ii in range(len(allow_cols)):
+                                    if allow_cols[ii] == "E + E + Ar+ -> E + Ar":
+                                        irec = ii
+                                if irec == -1:
+                                    print(f"FATAL: Rank {rank_}, gidx {grid_idx}, collisions file does not have ground recombination. Aborting")
+                                    comm.Abort(1)
+                                
+                                if np.amax(Te_arr) <= hi_cutoff:
+                                    print(f"Rank {rank_}, gid {grid_idx}, Ground ionization, max(Te) = {np.amax(Te_arr)} <= hi_cutoff ({hi_cutoff} eV)")
+                                    krec = rr_cpu[irec] # recombination rate as computed by BTE
+                                    if rank_ == 0 and grid_idx == 0:
+                                        print("shape(krec) = ", krec.shape, ", shape(Keq) = ", Keq.shape)
+                                    
+                                    if np.amax(Te_arr) <= lo_cutoff:
+                                        # Ground ionization coefficient determined by detailed balance using recombination
+                                        # Since Te << deltaE_ig, electron energy is very low. 
+                                        # BTE computed ground ionization coefficient may be corrupted by numerical noise
+                                        print(f"Rank {rank_}, gid {grid_idx}, Ground ionization, max(Te) = {np.amax(Te_arr)} < lo_cutoff ({lo_cutoff}), ground ionization obtained from recombination")
+                                        ratearr = krec * Keq
+                                    else:
+                                        print(f"Rank {rank_}, gid {grid_idx}, Ground ionization, {lo_cutoff} < max(Te) = {np.amax(Te_arr)} < {hi_cutoff}, coefficient obtained by blending BTE and detailed balance")
+                                        # Blending the BTE obtained rate coefficient with detailed balance rate coefficient
+                                        # Transition Zone: Smooth blending with Quintic Smoothstep
+                                        kBTE = ratearr # Rate coefficient for forward ionization obtained from BTE
+                                        x = (Te_arr - lo_cutoff) / (hi_cutoff - lo_cutoff)
+                                        w = 6.0 * (x**5) - 15.0 * (x**4) + 10.0 * (x**3)
+
+                                        krec_high = kBTE / Keq # Recombination coefficient obtained based on detailed balance from forward reaction
+
+                                        # Blend the recombination rates and derive ionization rate via inverted detailed balance (use Keq and krec to determine kion)
+                                        k_rec_fluid = (1.0 - w) * krec + w * krec_high
+                                        k_ion_fluid = k_rec_fluid * Keq
+
+                                        ratearr = k_ion_fluid
+
+                                        # UPDATE THE RECOMBINATION RATE COEFFICIENT 
+                                        print(f"Rank {rank_}, gid {grid_idx}, Updating recombination to ground rate coefficient after blending (irec = {irec}).")
+                                        rr_cpu[irec] = k_rec_fluid
+                                else:
+                                    print(f"Rank {rank_}, gid {grid_idx}, Ground ionization, max(Te) = {np.amax(Te_arr)} > hi_cutoff ({hi_cutoff}), recombination determined from ground ionization.")
+                                    # The ionization rate coefficient stays as obtained from BTE
+                                    # Determine recombination rate coefficient from detailed balance based on forward reaction
+                                    krec = ratearr / Keq
+                                    # Update the recomination rate
+                                    print(f"Rank {rank_}, gid {grid_idx}, Updating recombination to ground rate coefficient based on detailed balance (irec = {irec}).")
+                                    rr_cpu[irec] = krec
+                            # --------------------------- Ground ionization ends here -----------------------------
+                            elif allow_cols[rr_idx] == "E + Ar* -> E + E + Ar+":
+                                # Lumped ionization (compare electron temperature to ionization threshold)
+                                il_thresh = 0.05 * delE_il
+                                lo_cutoff = 0.9 * il_thresh
+                                hi_cutoff = 1.1 * il_thresh
+                                Keq = (2 * glump[grid_idx] / g0) * prefac * np.exp(-delE_il / Te_arr)
+
+                                # First, confirm that the cross-section file has lumped recombination
+                                irec = -1
+                                ii = 0
+                                for ii in range(len(allow_cols)):
+                                    if allow_cols[ii] == "E + E + Ar+ -> E + Ar*":
+                                        irec = ii
+                                
+                                if irec == -1:
+                                    print(f"FATAL: Rank {rank_}, gidx {grid_idx}, collisions file does not have lumped recombination. Aborting")
+                                    comm.Abort(1)
+                                
+                                if np.amax(Te_arr) <= hi_cutoff:
+                                    print(f"Rank {rank_}, gid {grid_idx}, Lumped ionization, max(Te) = {np.amax(Te_arr)} <= hi_cutoff ({hi_cutoff}) eV")
+                                    # Lumped Ionization rate coefficient obtained from recombination via detailed balance
+                                    krec = rr_cpu[irec] # recombination rate as computed by BTE
+
+                                    if np.amax(Te_arr) <= lo_cutoff:
+                                        # Lumped ionization coefficient determined by detailed balance using recombination
+                                        print(f"Rank {rank_}, gid {grid_idx}, Lumped ionization, max(Te) = {np.amax(Te_arr)} < lo_cutoff ({lo_cutoff}), lumped ionization obtained from recombination")
+                                        ratearr = krec * Keq
+                                    else:
+                                        print(f"Rank {rank_}, gid {grid_idx}, Lumped ionization, {lo_cutoff} < max(Te) = {np.amax(Te_arr)} < {hi_cutoff}, coefficient obtained by blending BTE and detailed balance")
+                                        # Blending the BTE obtained rate coefficient with detailed balance rate coefficient
+                                        # Blending the BTE obtained rate coefficient with detailed balance rate coefficient
+                                        kBTE = ratearr # Rate coefficient for forward ionization obtained from BTE
+                                        x = (Te_arr - lo_cutoff) / (hi_cutoff - lo_cutoff)
+                                        w = 6.0 * (x**5) - 15.0 * (x**4) + 10.0 * (x**3)
+
+                                        krec_high = kBTE / Keq # Recombination coefficient obtained based on detailed balance from forward reaction
+
+                                        # Blend the recombination rates and derive ionization rate via inverted detailed balance
+                                        k_rec_fluid = (1.0 - w) * krec + w * krec_high
+                                        k_ion_fluid = k_rec_fluid * Keq
+
+                                        print(f"Rank {rank_}, gid {grid_idx}, min(kBTE) = {np.amin(kBTE)}, min(krec_high) = {np.amin(krec_high)}"
+                                                f", min(k_rec_fluid) = {np.amin(k_rec_fluid)}, min(k_ion_fluid) = {np.amin(k_ion_fluid)}")
+                                        
+                                        if np.amin(kBTE) < 0.0 or np.amin(krec_high) < 0.0 or np.amin(k_rec_fluid) < 0.0 or np.amin(k_ion_fluid) < 0.0:
+                                            print(f"FATAL: Rank {rank_} gid {grid_idx}, some rate coefficient is negative.")
+                                            print(f"min(Keq) = {np.amin(Keq)}")
+                                            print(f"x = {x}, w = {w}, glump = {glump[grid_idx]}")
+                                            comm.Abort(1)
+
+                                        ratearr = k_ion_fluid
+                                        # UPDATE THE RECOMBINATION RATE COEFFICIENT 
+                                        print(f"Rank {rank_}, gid {grid_idx}, Updating recombination to lumped rate coefficient after blending (irec = {irec}).")
+                                        rr_cpu[irec] = k_rec_fluid
+                                else:
+                                    print(f"Rank {rank_}, gid {grid_idx}, Lumped ionization, max(Te) = {np.amax(Te_arr)} > hi_cutoff ({hi_cutoff}), recombination determined from lumped ionization.")
+                                    # The ionization rate coefficient stays as is
+                                    # Determine recombination rate coefficient from detailed balance based on forward reaction
+                                    krec = ratearr / Keq
+                                    # Update the recomination rate
+                                    print(f"Rank {rank_}, gid {grid_idx}, Updating recombination to lumped rate coefficient based on detailed balance (irec = {irec}).")
+                                    rr_cpu[irec] = krec
+                    
+                            rr_cpu[rr_idx] = ratearr  
+                            if np.amin(rr_cpu[rr_idx]) < 0:
+                                rmin = np.amin(rr_cpu[rr_idx])
+                                print(f"FATAL: Rank {rank_}, gid {grid_idx}, rr_idx {rr_idx}, negative rate coefficient {rmin}. Aborting")
+                                comm.Abort(1)  
+
+
+                    # for rr_idx in range(coll_count):
+                    #     ratearr = rr_cpu[rr_idx]
+                    #     typ = cp.get_array_module(ratearr)
+                    #     # Find out is the maximum of ratearr is positive or negative
+                    #     if not typ.any(ratearr >= 0.0):
+                    #         # All the rate coefficients are negative
+                    #         # If they are small negative values, we can just swap the sign and make them positive
+                    #         prefac = N_Avo
+                    #         if is_rec[rr_idx] == 1:
+                    #             prefac = N_Avo**2
+                    #         neg_cutoff = neg_thresh / prefac
+                    #         if typ.amin(ratearr) >= -neg_cutoff:
+                    #             print(f"Rank {rank_}, gid {grid_idx}, min = {typ.amin(ratearr)} > neg_cutoff {-neg_cutoff}. Will swap sign of these rate coefficients.")
+                    #             small_neg = (ratearr < 0.0) & (ratearr >= -neg_cutoff)
+                    #             ratearr[small_neg] *= -1
+                    #         else:
+                    #             print(f"FATAL: With subclustering, Rank {rank_}, gid {grid_idx}, Reaction {rr_idx} failed. All rate coefficients are negative")
+                    #             print(f"Rank {rank_}, gid {grid_idx}, Reaction {rr_idx}, min = {typ.amin(ratearr)}")
+                    #             print(f"Rank {rank_}, gid {grid_idx}, Reaction {rr_idx}, max = {typ.amax(ratearr)}")
+                    #             print(f"Rank {rank_}, gid {grid_idx}, Reaction {rr_idx}, mean = {typ.mean(ratearr)}")
+                    #             print(f"FATAL: Rank {rank_}, gid {grid_idx}, Reaction {rr_idx}, Boltzmann solver produced no positive rate coefficients.")
+                    #             bad_kreac = 1
+                    #             # comm.Abort(1)
                             
-                        rr_cpu[rr_idx] = ratearr
+                    #     if not typ.all(ratearr >= 0.0):
+                    #         print(f"With subclustering, Rank {rank_}, gidx {grid_idx}, rr_idx {rr_idx}, "
+                    #             f"some negative rate coefficients found. " \
+                    #             "Will be correcting them to the mean of the remaining positive values.", 
+                    #             flush=True,
+                    #             )
+
+                    #         prefac = N_Avo
+                    #         if is_rec[rr_idx] == 1:
+                    #             prefac = N_Avo**2
+                    #         positive_values = ratearr[ratearr >= 0]
+                    #         positive_mean = typ.mean(positive_values)
+
+                    #         # The negative values are replaced with positive_mean
+                    #         neg_cutoff = neg_thresh / prefac
+                    #         small_neg = (ratearr < 0.0) & (ratearr >= -neg_cutoff)
+                    #         large_neg = ratearr < -neg_cutoff
+                    #         ratearr[small_neg] *= -1
+                    #         ratearr[large_neg] = positive_mean
+                            
+                    # rr_cpu[rr_idx] = ratearr
 
                     inp_mask  = xp.asnumpy(sub_cluster_c_lbl[grid_idx]) == np.arange(n_sub_clusters)[:, None]
                     rr_interp = np.zeros((coll_count, len(grid_idx_to_spatial_idx_map[grid_idx])))
@@ -746,6 +941,9 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
 
                     for r_idx in range(coll_count):                            
                         rates[r_idx][grid_idx_to_spatial_idx_map[grid_idx]] = rr_interp[r_idx, :]
+                        if np.amin(rates[r_idx][grid_idx_to_spatial_idx_map[grid_idx]]) < 0.0:
+                            rmin = np.amin(rates[r_idx][grid_idx_to_spatial_idx_map[grid_idx]])
+                            print(f"Rank {rank_}, gid {grid_idx}, r_idx {r_idx}, negative rate coefficient found ({rmin})")
                     
                 with cp.cuda.Device(dev_id):
                     t1(bte_solver, sub_cluster_c_lbl, n_sub_clusters, grid_idx_to_spatial_idx_map, collision_count, is_recomb)
@@ -768,9 +966,6 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
                         print(f"FATAL: Rank {rank_}, gid {grid_idx}, len(is_rec) = {len(is_rec)}, collision_count = {coll_count} are different. Aborting.")
                         comm.Abort(1)
 
-                    # if rank_ == 0 and grid_idx == 0:
-                    #     print("Rank ", rank_, ", grid_idx = ", grid_idx, ", shape(rr_cpu) = ", rr_cpu.shape, len(rr_cpu))
-
                     # Clean up rr_cpu by ensuring that it has no negative values
                     # The rate coefficients may have negative values in some points
                     # If these negative values are small, they can be fixed by setting to zero
@@ -779,51 +974,51 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
                     # not very different from other points in the batch that have positive values
                     # This is only a hack and might work if the number of negative rate coefficients
                     # is only a fraction of the total batch
-                    for rr_idx in range(coll_count):
-                        ratearr = rr_cpu[rr_idx]
-                        typ = cp.get_array_module(ratearr)
-                        # Find out is the maximum of ratearr is positive or negative
-                        if not typ.any(ratearr >= 0.0):
-                            # All the rate coefficients are negative
-                            # If they are small negative values, we can just swap the sign and make them positive
-                            prefac = N_Avo
-                            if is_rec[rr_idx] == 1:
-                                prefac = N_Avo**2
-                            neg_cutoff = neg_thresh / prefac
+                    # for rr_idx in range(coll_count):
+                    #     ratearr = rr_cpu[rr_idx]
+                    #     typ = cp.get_array_module(ratearr)
+                    #     # Find out is the maximum of ratearr is positive or negative
+                    #     if not typ.any(ratearr >= 0.0):
+                    #         # All the rate coefficients are negative
+                    #         # If they are small negative values, we can just swap the sign and make them positive
+                    #         prefac = N_Avo
+                    #         if is_rec[rr_idx] == 1:
+                    #             prefac = N_Avo**2
+                    #         neg_cutoff = neg_thresh / prefac
 
-                            if typ.amin(ratearr) >= -neg_cutoff:
-                                print(f"Rank {rank_}, gid {grid_idx}, min = {typ.amin(ratearr)} >= neg_cutoff {-neg_cutoff}. Swapping sign of rate coefficients.")
-                                small_neg = (ratearr < 0.0) & (ratearr >= -neg_cutoff)
-                                ratearr[small_neg] *= -1
-                                # ratearr[small_neg] = 0.0 
-                            else:
-                                print(f"FATAL: Rank {rank_}, gid {grid_idx}, Reaction {rr_idx} failed. All rate coefficients are < neg_cutoff = {neg_cutoff}.")
-                                print(f"Rank {rank_}, gid {grid_idx}, Reaction {rr_idx}, min = {typ.amin(ratearr)}")
-                                print(f"Rank {rank_}, gid {grid_idx}, Reaction {rr_idx}, max = {typ.amax(ratearr)}")
-                                print(f"Rank {rank_}, gid {grid_idx}, Reaction {rr_idx}, mean = {typ.mean(ratearr)}")
-                                bad_kreac = 1
-                                #comm.Abort(1)
+                    #         if typ.amin(ratearr) >= -neg_cutoff:
+                    #             print(f"Rank {rank_}, gid {grid_idx}, min = {typ.amin(ratearr)} >= neg_cutoff {-neg_cutoff}. Swapping sign of rate coefficients.")
+                    #             small_neg = (ratearr < 0.0) & (ratearr >= -neg_cutoff)
+                    #             ratearr[small_neg] *= -1
+                    #             # ratearr[small_neg] = 0.0 
+                    #         else:
+                    #             print(f"FATAL: Rank {rank_}, gid {grid_idx}, Reaction {rr_idx} failed. All rate coefficients are < neg_cutoff = {neg_cutoff}.")
+                    #             print(f"Rank {rank_}, gid {grid_idx}, Reaction {rr_idx}, min = {typ.amin(ratearr)}")
+                    #             print(f"Rank {rank_}, gid {grid_idx}, Reaction {rr_idx}, max = {typ.amax(ratearr)}")
+                    #             print(f"Rank {rank_}, gid {grid_idx}, Reaction {rr_idx}, mean = {typ.mean(ratearr)}")
+                    #             bad_kreac = 1
+                    #             #comm.Abort(1)
                     
-                        if not typ.all(ratearr >= 0.0):
-                            print(f"Rank {rank_}, gidx {grid_idx}, rr_idx {rr_idx}, "
-                                f"some negative rate coefficients found. " \
-                                f"Will be correcting them to the mean of the remaining positive values.", 
-                                flush=True,
-                                )
-                            prefac = N_Avo
-                            if is_rec[rr_idx] == 1:
-                                prefac = N_Avo**2
-                            positive_values = ratearr[ratearr >= 0]
-                            positive_mean = typ.mean(positive_values)
+                    #     if not typ.all(ratearr >= 0.0):
+                    #         print(f"Rank {rank_}, gidx {grid_idx}, rr_idx {rr_idx}, "
+                    #             f"some negative rate coefficients found. " \
+                    #             f"Will be correcting them to the mean of the remaining positive values.", 
+                    #             flush=True,
+                    #             )
+                    #         prefac = N_Avo
+                    #         if is_rec[rr_idx] == 1:
+                    #             prefac = N_Avo**2
+                    #         positive_values = ratearr[ratearr >= 0]
+                    #         positive_mean = typ.mean(positive_values)
 
-                            # The negative values are replaced with positive_mean
-                            neg_cutoff = neg_thresh / prefac
-                            small_neg = (ratearr < 0.0) & (ratearr >= -neg_cutoff)
-                            large_neg = ratearr < -neg_cutoff
-                            ratearr[small_neg] *= -1
-                            ratearr[large_neg] = positive_mean
+                    #         # The negative values are replaced with positive_mean
+                    #         neg_cutoff = neg_thresh / prefac
+                    #         small_neg = (ratearr < 0.0) & (ratearr >= -neg_cutoff)
+                    #         large_neg = ratearr < -neg_cutoff
+                    #         ratearr[small_neg] *= -1
+                    #         ratearr[large_neg] = positive_mean
                         
-                        rr_cpu[rr_idx] = ratearr
+                    #     rr_cpu[rr_idx] = ratearr
                         
                     for r_idx in range(coll_count):
                         rates[r_idx][grid_idx_to_spatial_idx_map[grid_idx]] = rr_cpu[r_idx] * N_Avo
@@ -976,7 +1171,7 @@ def bte_from_tps(Tarr, narr, Er, Ei, collisions_file, nBTEreactions, solver_type
     # --- END NEW ---
 
     if (data < 0.0).any():
-        print(f"FATAL: Rank {rank_}, negative rate coefficients found after correction.")
+        print(f"FATAL: Rank {rank_}, negative rate coefficients found after correction. Smallest value = {np.amin(data)}.")
         comm.Abort(1)
     comm.Barrier()
 

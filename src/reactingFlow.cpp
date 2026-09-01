@@ -2168,6 +2168,16 @@ void ReactingFlow::initializeOperators() {
   bool restart_from_lte;
   tpsP_->getInput("io/restartFromLTE", restart_from_lte, false);
   if (restart_from_lte) {
+    bool fixed_Yn;
+    Array<double> fixed_Yn_init_(nSpecies_);
+    tpsP_->getInput("io/fixedYn", fixed_Yn, false);
+    if (fixed_Yn) {
+      // Initialize with a constant species mass fraction
+      // This must be defined in the input file
+      // Ordering must match with TPS species ordering
+      // User must ensure sum of mass fractions is 1
+      tpsP_->getRequiredVec("io/fixed-Yn-init", fixed_Yn_init_, nSpecies_);
+    }
     Vector n_sp(nSpecies_);
     Vector rho_sp(nSpecies_);
     const double* h_T = Tn_.HostRead();
@@ -2187,8 +2197,19 @@ void ReactingFlow::initializeOperators() {
       }
 
       // Finally, evaluate mass fraction
+      double Yn_sum = 0.0; // Track sum of mass fractions
       for (int sp = 0; sp < nSpecies_; sp++) {
         h_Yn[i + sp * sDofInt_] = rho_sp[sp] / mixture_density;
+        if (fixed_Yn) {
+          MFEM_VERIFY(fixed_Yn_init_[sp] >= 0.0, "fixed species mass fraction for restart < 0 = " << fixed_Yn_init_[sp]);
+          h_Yn[i + sp * sDofInt_] = fixed_Yn_init_[sp];
+          if (sp == nSpecies_ - 1) {
+            // Fix Y_Ar based on other values to ensure sum is 1
+            h_Yn[i + sp * sDofInt_] = 1.0 - Yn_sum;
+          } else {
+            Yn_sum += h_Yn[i + sp * sDofInt_];
+          }
+        }
       }
     }
     Ynm1_ = Yn_;
@@ -2812,8 +2833,8 @@ void ReactingFlow::step() {
       delete[] YT;
 
 #ifdef HAVE_PYTHON
-      // int myRank;
-      // MPI_Comm_rank(tpsP_->getTPSCommWorld(), &myRank);
+      int myRank;
+      MPI_Comm_rank(tpsP_->getTPSCommWorld(), &myRank);
 
       kReac_gf_.SetFromTrueDofs(kReac_);
       reacR_gf_.SetFromTrueDofs(reacR_);
@@ -2835,6 +2856,26 @@ void ReactingFlow::step() {
         }
         bl_frac_ = std::min(bl_frac_, 1.0);
       }
+
+      // Get the min/max of rrf_by_rrb
+      // for (int rr = 0; rr < nReactions_; rr++) {
+      //   if (rr % 2 == 0) {
+      //     mfem::Vector rrf_by_rrb_view(rrf_by_rrb_.GetData() + int(rr/2)*sDofInt_, sDofInt_);
+
+      //     double loc_min = rrf_by_rrb_view.Min();
+      //     double loc_max = rrf_by_rrb_view.Max();
+
+
+      //     double glob_min, glob_max;
+
+      //     MPI_Allreduce(&loc_min, &glob_min, 1, MPI_DOUBLE, MPI_MIN, tpsP_->getTPSCommWorld());
+      //     MPI_Allreduce(&loc_max, &glob_max, 1, MPI_DOUBLE, MPI_MAX, tpsP_->getTPSCommWorld());
+
+      //     std::cout << "Rank " << myRank << ", Set " << int(rr/2) << ", Rf/Rb Local min = " << loc_min
+      //     << ", max = " << loc_max << ", Global min = " << glob_min << ", max = " << glob_max << "\n";
+      //   }
+      // }
+
 #endif
 
       if (mixtureInput_.ambipolar) {
@@ -4942,7 +4983,7 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
     }
   
     // Evaluate the mole densities (from mass densities)
-    mixture_->computeNumberDensities(state, n_sp);
+    mixture_->computeNumberDensities(state, n_sp); // n_sp in mol-m^{-3}
   
     // GetMixtureCp returns cpMix = sum_s X_s Cp_s, where X_s is
     // mole density of species s and Cp_s is molar specific heat
@@ -4999,7 +5040,7 @@ void ReactingFlow::solveChemistryStep(double *YT, const int dofindex, const doub
         // BTEkfwd[tpi] = BTErr[rr];
     }
     chemistry_->computeEquilibriumConstants(Th, Te, keq.HostWrite());
-    chemistry_->computeProgressRate(n_sp, kfwd, keq, progressRate);
+    chemistry_->computeProgressRate(n_sp, kfwd, keq, progressRate); // progressRate in mol-m^{-3}-s^{-1}
     
     // chemistry_->computeProgressRate(n_sp, BTEkfwd, keq, BTEprogressRate); //will be accurate only if detailed balance is False
     
