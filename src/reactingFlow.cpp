@@ -2628,7 +2628,7 @@ void ReactingFlow::step() {
         // CALL THE PYTHON FUNCTION
         result = script.attr("bte_from_tps")(Tarr, specarr, Erarr, Eiarr, collisionsFile, n_bte_reactions, solver_type, ee_collisions, 
                   n_bte_grids, py_grid_idx_to_npts, py_grid_idx_to_spatial_idx_map, use_interp, n_sub_clusters, te_array,
-                  Nr, rtolBTE, csv_store, BTE_dt, use_Efield, Ei_frac_);
+                  Nr, rtolBTE, csv_store, BTE_dt);
       } catch (const py::error_already_set &e) {
         std::cerr << "ReactingFlow::step(), Python error: " << e.what() << std::endl;
         MFEM_ABORT("FATAL: Error in Python script that calls the BTE solver.");
